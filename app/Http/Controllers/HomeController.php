@@ -23,6 +23,8 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home');
+        $names = \App\BiogMain::select(['c_personid', 'c_name', 'c_name_chn'])->paginate(25);
+
+        return view('home', ['names' => $names]);
     }
 }

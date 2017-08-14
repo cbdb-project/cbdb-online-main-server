@@ -18,3 +18,21 @@ Route::get('/', function () {
 Auth::routes();
 
 Route::get('/home', 'HomeController@index')->name('home');
+
+Route::resource('informations', 'InformationsController', ['names' => [
+    'create' => 'information.create'
+]]);
+
+Route::resource('basicinformation', 'BasicInformationController', ['name' => [
+    'show' => 'basicinformation.show',
+    'create' => 'basicinformation.create',
+    'edit' => 'basicinformation.edit',
+    'update' => 'basicinformation.update'
+]]);
+
+Route::resource('addresses', 'AddressesController', ['name' => [
+    'show' => 'address.show',
+    'create' => 'address.create',
+    'edit' => 'address.edit',
+    'update' => 'address.update'
+]]);

@@ -10,6 +10,7 @@ namespace App\Repositories;
 
 
 use App\BiogMain;
+use Illuminate\Http\Request;
 
 
 /**
@@ -39,11 +40,30 @@ class BiogMainRepository
         $biogbasicinformation->update($request->all());
     }
 
+    /**
+     * @param $request
+     * @param $num
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function namesByQuery(Request $request, $num=20)
+    {
+        if ($temp = $request->query('num')){
+            $num = $temp;
+        }
+        $names = \App\BiogMain::select(['c_personid', 'c_name', 'c_name_chn'])->where('c_name_chn', 'like', '%'.$request->query('q').'%')->paginate($num);
+        $names->appends(['q' => $request->query('q'), 'num' => $num])->links();
+        return $names;
+    }
+
+    /**
+     * @param BiogMain $basicinformation
+     */
     private function normalizeBasicInfo(BiogMain $basicinformation)
     {
         $basicinformation->dynasty;
         $basicinformation->birthYearNH;
         $basicinformation->deathYearNH;
         $basicinformation->choronym;
+//        $basicinformation->ethnicity;
     }
 }

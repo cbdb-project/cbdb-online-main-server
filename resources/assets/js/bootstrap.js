@@ -12,6 +12,7 @@ try {
 
     require('bootstrap-sass');
     require('./select2.min');
+    require('./coustom');
 } catch (e) {}
 
 /**

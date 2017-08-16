@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
+    protected $biogMainRepository;
     /**
      * Create a new controller instance.
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(BiogMainRepository $biogMainRepository)
     {
         $this->middleware('auth');
+        $this->biogMainRepository = $biogMainRepository;
     }
 
     /**

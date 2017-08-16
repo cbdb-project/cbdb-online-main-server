@@ -36,3 +36,10 @@ Route::resource('addresses', 'AddressesController', ['name' => [
     'edit' => 'address.edit',
     'update' => 'address.update'
 ]]);
+
+Route::resource('tests', 'TestController', ['name' => [
+    'show' => 'test.show',
+    'create' => 'test.create',
+    'edit' => 'test.edit',
+    'update' => 'test.update'
+]]);

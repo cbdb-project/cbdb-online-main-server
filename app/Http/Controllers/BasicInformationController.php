@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\BiogMain;
-use App\ChoronymCode;
 use App\Http\Requests\BasicInformationRequest;
 use App\Repositories\BiogMainRepository;
 use Auth;
@@ -66,7 +64,7 @@ class BasicInformationController extends Controller
      * Display the specified resource.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return \App\BiogMain|\Illuminate\Http\Response
      */
     public function show($id)
     {
@@ -83,7 +81,6 @@ class BasicInformationController extends Controller
      */
     public function edit($id)
     {
-
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
         return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation]);
     }

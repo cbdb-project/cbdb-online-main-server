@@ -4,17 +4,16 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-class AddressesController extends Controller
+class TestController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response|string
+     * @return \Illuminate\Http\Response
      */
     public function index()
     {
         //
-        return 'address';
     }
 
     /**
@@ -36,7 +35,6 @@ class AddressesController extends Controller
     public function store(Request $request)
     {
         //
-//        return redirect()->route('tests.edit')
     }
 
     /**

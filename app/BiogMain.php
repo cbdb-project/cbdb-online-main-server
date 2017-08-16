@@ -50,4 +50,8 @@ class BiogMain extends Model
         return $this->belongsTo('App\ChoronymCode', 'c_choronym_code', 'c_choronym_code');
     }
 
+    public function ethnicity()
+    {
+        return $this->belongsTo('App\Ethnicity', 'c_dy', '﻿c_ethnicity_code');
+    }
 }

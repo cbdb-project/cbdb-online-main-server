@@ -11,7 +11,7 @@
                     <div class="panel-body">
 
                         <form action="/basicinformation/{{ $basicinformation->c_personid }}" method="post">
-                            {{ method_field('PUT') }}
+                            {{ method_field('PATCH') }}
                             {{ csrf_field() }}
                             <div class="form-group">
                                 <label for="c_persionid">person id</label>

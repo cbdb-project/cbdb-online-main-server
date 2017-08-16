@@ -23,8 +23,11 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 //});
 
 Route::middleware('api')->get('/biognames', function (Request $request) {
-    $condition=$request->all();
-    $names = \App\BiogMain::select(['c_personid', 'c_name', 'c_name_chn'])->where('c_name_chn', 'like', '%'.$request->query('q').'%')->paginate(25);
-    $names->appends(['q' => $request->query('q')])->links();
-    return $names;
+    $biogmianrepository = new \App\Repositories\BiogMainRepository();
+    return $biogmianrepository->nameList($request);
+});
+
+Route::middleware('api')->post('/name', function (Request $request) {
+    $biogmianrepository = new \App\Repositories\BiogMainRepository();
+    return $biogmianrepository->namesByQuery($request);
 });

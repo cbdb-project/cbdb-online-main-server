@@ -9,6 +9,7 @@
 
                     <div class="panel-body">
                         <form action="/biogbasicinformation" method="post">
+                            {{--{{ __METHOD__('put') }}--}}
                             {!! csrf_field() !!}
                             <div class="form-group">
                                 <label for="c_choronym_desc">拼音</label>

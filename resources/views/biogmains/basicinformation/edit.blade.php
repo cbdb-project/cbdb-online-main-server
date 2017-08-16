@@ -92,9 +92,10 @@
                             </div>
                             <div class="form-group col-md-6">
                                 <label for="c_female">性别（原female）</label>
-                                <select class="form-control">
-                                    <option>0-男</option>
-                                    <option>1-女</option>
+                                <select class="form-control" name="c_female">
+                                    <option value="0"></option>
+                                    <option value="0" {{ $basicinformation->c_female == 0? 'selected': '' }}>0-男</option>
+                                    <option value="1" {{ $basicinformation->c_female == 1? 'selected': '' }}>1-女</option>
                                 </select>
                             </div>
                             <div class="form-group">

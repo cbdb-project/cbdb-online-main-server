@@ -10,6 +10,7 @@ namespace App\Repositories;
 
 
 use App\BiogMain;
+use App\NameList;
 use Illuminate\Http\Request;
 
 
@@ -47,11 +48,11 @@ class BiogMainRepository
      */
     public function namesByQuery(Request $request, $num=20)
     {
-        if ($temp = $request->query('num')){
+        if ($temp = $request->num){
             $num = $temp;
         }
-        $names = \App\BiogMain::select(['c_personid', 'c_name', 'c_name_chn'])->where('c_name_chn', 'like', '%'.$request->query('q').'%')->paginate($num);
-        $names->appends(['q' => $request->query('q'), 'num' => $num])->links();
+        $names = BiogMain::select(['c_personid', 'c_name_chn'])->where('c_name_chn', 'like', '%'.$request->q.'%')->paginate($num);
+        $names->appends(['q' => $request->q, 'num' => $num])->links();
         return $names;
     }
 
@@ -64,6 +65,6 @@ class BiogMainRepository
         $basicinformation->birthYearNH;
         $basicinformation->deathYearNH;
         $basicinformation->choronym;
-//        $basicinformation->ethnicity;
+        $basicinformation->ethnicity;
     }
 }

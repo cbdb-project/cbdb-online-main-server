@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BasicInformationRequest;
 use App\Repositories\BiogMainRepository;
+use App\Repositories\EthnicityRepository;
 use Auth;
 use Illuminate\Http\Request;
 
@@ -17,16 +18,18 @@ use Illuminate\Http\Request;
 class BasicInformationController extends Controller
 {
     protected $biogMainRepository;
+    protected $ethnicityRepository;
 
     /**
      * Create a new controller instance.
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository)
     {
         $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
+        $this->ethnicityRepository = $ethnicityRepository;
     }
 
     /**
@@ -52,7 +55,7 @@ class BasicInformationController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \Illuminate\Http\Request $request
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
@@ -63,7 +66,7 @@ class BasicInformationController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  int  $id
+     * @param  int $id
      * @return \App\BiogMain|\Illuminate\Http\Response
      */
     public function show($id)
@@ -76,7 +79,7 @@ class BasicInformationController extends Controller
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int  $id
+     * @param  int $id
      * @return \Illuminate\Http\Response
      */
     public function edit($id)
@@ -103,7 +106,7 @@ class BasicInformationController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  int  $id
+     * @param  int $id
      * @return \Illuminate\Http\Response
      */
     public function destroy($id)

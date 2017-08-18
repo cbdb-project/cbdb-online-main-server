@@ -13,7 +13,11 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::middleware('auth:api')->get('/user', function (Request $request) {
+Route::middleware('auth:api')->get(/**
+ * @param Request $request
+ * @return mixed
+ */
+    '/user', function (Request $request) {
     return $request->user();
 });
 
@@ -22,12 +26,19 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 //    return $altnames;
 //});
 
-Route::middleware('api')->get('/biognames', function (Request $request) {
-    $biogmianrepository = new \App\Repositories\BiogMainRepository();
-    return $biogmianrepository->nameList($request);
+Route::middleware('auth:api')->get(/**
+ * @param Request $request
+ * @return mixed
+ */
+    '/testaauth', function (Request $request) {
+    return ['test' => 'Oauth'];
 });
 
-Route::middleware('api')->post('/name', function (Request $request) {
+Route::middleware('api')->post(/**
+ * @param Request $request
+ * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+ */
+    '/name', function (Request $request) {
     $biogmianrepository = new \App\Repositories\BiogMainRepository();
     return $biogmianrepository->namesByQuery($request);
 });

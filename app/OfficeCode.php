@@ -4,16 +4,15 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AddressCode extends Model
+class OfficeCode extends Model
 {
     /**
      * 与模型关联的数据表
      *
      * @var string
      */
-    protected $table = 'ADDR_CODES';
-    protected $primaryKey = 'c_addr_id';
-
+    protected $table = 'OFFICE_CODES';
+    protected $primaryKey = 'c_office_id';
     /**
      * 该模型是否被自动维护时间戳
      *
@@ -27,4 +26,5 @@ class AddressCode extends Model
      * @var array
      */
     protected $guarded = [];
+
 }

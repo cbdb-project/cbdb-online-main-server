@@ -66,9 +66,32 @@ Route::resource('addresses', 'AddressesController', ['name' => [
     'update' => 'address.update'
 ]]);
 
-Route::resource('tests', 'TestController', ['name' => [
-    'show' => 'test.show',
-    'create' => 'test.create',
-    'edit' => 'test.edit',
-    'update' => 'test.update'
+Route::resource('sources', 'SourcesController', ['name' => [
+    'show' => 'source.show',
+    'create' => 'source.create',
+    'edit' => 'source.edit',
+    'update' => 'source.update'
 ]]);
+
+Route::resource('texts', 'TextsController', ['name' => [
+    'show' => 'text.show',
+    'create' => 'text.create',
+    'edit' => 'text.edit',
+    'update' => 'text.update'
+]]);
+
+Route::resource('altnames', 'AltnamesController', ['name' => [
+    'show' => 'altname.show',
+    'create' => 'altname.create',
+    'edit' => 'altname.edit',
+    'update' => 'altname.update'
+]]);
+
+Route::resource('offices', 'OfficesController', ['name' => [
+    'show' => 'office.show',
+    'create' => 'office.create',
+    'edit' => 'office.edit',
+    'update' => 'office.update'
+]]);
+
+

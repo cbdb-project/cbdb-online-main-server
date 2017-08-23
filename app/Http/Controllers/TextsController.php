@@ -5,7 +5,11 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class AddressesController extends Controller
+/**
+ * Class TextsController
+ * @package App\Http\Controllers
+ */
+class TextsController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -24,12 +28,11 @@ class AddressesController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response|string
+     * @return \Illuminate\Http\Response
      */
     public function index()
     {
         //
-        return 'address';
     }
 
     /**
@@ -51,7 +54,6 @@ class AddressesController extends Controller
     public function store(Request $request)
     {
         //
-//        return redirect()->route('tests.edit')
     }
 
     /**
@@ -63,7 +65,7 @@ class AddressesController extends Controller
     public function show($id)
     {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
+        return view('biogmains.texts.show', ['basicinformation' => $biogbasicinformation]);
     }
 
     /**

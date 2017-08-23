@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BasicInformationRequest;
 use App\Repositories\BiogMainRepository;
+use App\Repositories\ChoronymRepository;
+use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
+use App\Repositories\NianHaoRepository;
+use App\Repositories\YearRangeRepository;
 use Auth;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 /**
@@ -19,17 +24,25 @@ class BasicInformationController extends Controller
 {
     protected $biogMainRepository;
     protected $ethnicityRepository;
+    protected $dynastyRepository;
+    protected $nianhaoRepository;
+    protected $choronymRepository;
+    protected $yearRangeRepository;
 
     /**
      * Create a new controller instance.
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository)
     {
         $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
+        $this->dynastyRepository = $dynastyRepository;
+        $this->nianhaoRepository = $nianHaoRepository;
+        $this->choronymRepository = $choronymRepository;
+        $this->yearRangeRepository = $yearRangeRepository;
     }
 
     /**
@@ -67,7 +80,7 @@ class BasicInformationController extends Controller
      * Display the specified resource.
      *
      * @param  int $id
-     * @return \App\BiogMain|\Illuminate\Http\Response
+     * @return \App\BiogMain|BiogMainRepository|BiogMainRepository[]|\Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|\Illuminate\Http\Response
      */
     public function show($id)
     {
@@ -85,7 +98,12 @@ class BasicInformationController extends Controller
     public function edit($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
-        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation]);
+        $ethnicities = $this->ethnicityRepository->ethnicities();
+        $dynasties = $this->dynastyRepository->dynasties();
+        $nianhaos = $this->nianhaoRepository->nianhaos();
+        $choronyms = $this->choronymRepository->choronyms();
+        $yearRange = $this->yearRangeRepository->yearRange();
+        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'ethnicities' => $ethnicities, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'choroynms' => $choronyms, 'yearRange' => $yearRange]);
     }
 
     /**
@@ -98,7 +116,8 @@ class BasicInformationController extends Controller
     public function update(BasicInformationRequest $request, $id)
     {
         $this->biogMainRepository->updateById($request, $id);
-        flash('Update success', 'success');
+//        $date = new DateTime();
+        flash('Update success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.edit', $id);
     }

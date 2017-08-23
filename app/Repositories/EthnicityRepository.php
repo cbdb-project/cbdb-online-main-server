@@ -13,8 +13,8 @@ use App\Ethnicity;
 
 class EthnicityRepository
 {
-    public function ethnicity()
+    public function ethnicities()
     {
-        return Ethnicity::all()->pluck('c_ethnicity_code', 'c_name_chn');
+        return Ethnicity::select(['c_ethnicity_code', 'c_name_chn', 'c_name'])->get();
     }
 }

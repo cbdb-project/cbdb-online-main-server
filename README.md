@@ -86,3 +86,11 @@ CHORONYM_CODES
 
 ### passport API认证
 http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
+
+### dingo API
+
+### 对数据库的修改
+
+**migrate 设置主键 寻找解决方法**
+
+1. 把BIOG_MAIN的c_name添加binary属性，用于区分大小写查询

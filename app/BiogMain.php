@@ -114,4 +114,9 @@ class BiogMain extends Model
     {
         return $this->belongsToMany('App\AddressCode', 'POSTED_TO_ADDR_DATA', 'c_personid','c_addr_id')->withPivot('c_posting_id')->where('c_office_id', '!=', -1);
     }
+
+    public function te()
+    {
+        return null;
+    }
 }

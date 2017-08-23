@@ -12,6 +12,7 @@ class AltnameCode extends Model
      * @var string
      */
     protected $table = 'ALTNAME_CODES';
+    protected $primaryKey = 'c_name_type_code';
 
     /**
      * 该模型是否被自动维护时间戳

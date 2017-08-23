@@ -11,11 +11,40 @@
 |
 */
 
+use Illuminate\Http\Request;
+
 Route::get('/', function () {
     return view('welcome');
 });
 
 Auth::routes();
+
+Route::get('/redirect', function () {
+    $query = http_build_query([
+        'client_id' => 3,
+        'redirect_uri' => 'http://cbdb-online-main-server.dev/callback',
+        'response_type' => 'code',
+        'scope' => '',
+    ]);
+
+    return redirect('http://cbdb-online-main-server.dev/oauth/authorize?'.$query);
+});
+
+Route::get('/callback', function (Request $request) {
+    $http = new GuzzleHttp\Client;
+
+    $response = $http->post('http://cbdb-online-main-server.dev/oauth/token', [
+        'form_params' => [
+            'grant_type' => 'authorization_code',
+            'client_id' => 3,
+            'client_secret' => 'gQHLMyG3qh1iDxwTmrLqKxtqVqcGNSHGtV3ixprA',
+            'redirect_uri' => 'http://cbdb-online-main-server.dev/callback',
+            'code' => $request->code,
+        ],
+    ]);
+
+    return json_decode((string) $response->getBody(), true);
+});
 
 Route::get('/home', 'HomeController@index')->name('home');
 
@@ -37,9 +66,32 @@ Route::resource('addresses', 'AddressesController', ['name' => [
     'update' => 'address.update'
 ]]);
 
-Route::resource('tests', 'TestController', ['name' => [
-    'show' => 'test.show',
-    'create' => 'test.create',
-    'edit' => 'test.edit',
-    'update' => 'test.update'
+Route::resource('sources', 'SourcesController', ['name' => [
+    'show' => 'source.show',
+    'create' => 'source.create',
+    'edit' => 'source.edit',
+    'update' => 'source.update'
 ]]);
+
+Route::resource('texts', 'TextsController', ['name' => [
+    'show' => 'text.show',
+    'create' => 'text.create',
+    'edit' => 'text.edit',
+    'update' => 'text.update'
+]]);
+
+Route::resource('altnames', 'AltnamesController', ['name' => [
+    'show' => 'altname.show',
+    'create' => 'altname.create',
+    'edit' => 'altname.edit',
+    'update' => 'altname.update'
+]]);
+
+Route::resource('offices', 'OfficesController', ['name' => [
+    'show' => 'office.show',
+    'create' => 'office.create',
+    'edit' => 'office.edit',
+    'update' => 'office.update'
+]]);
+
+

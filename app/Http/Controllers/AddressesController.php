@@ -2,10 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
 class AddressesController extends Controller
 {
+    /**
+     * @var BiogMainRepository
+     */
+    protected $biogMainRepository;
+
+    /**
+     * TextsController constructor.
+     * @param BiogMainRepository $biogMainRepository
+     */
+    public function __construct(BiogMainRepository $biogMainRepository)
+    {
+        $this->middleware('auth');
+        $this->biogMainRepository = $biogMainRepository;
+    }
     /**
      * Display a listing of the resource.
      *
@@ -47,7 +62,8 @@ class AddressesController extends Controller
      */
     public function show($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
     }
 
     /**

@@ -2,10 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class TestController extends Controller
+class OfficesController extends Controller
 {
+    /**
+     * @var BiogMainRepository
+     */
+    protected $biogMainRepository;
+
+    /**
+     * TextsController constructor.
+     * @param BiogMainRepository $biogMainRepository
+     */
+    public function __construct(BiogMainRepository $biogMainRepository)
+    {
+        $this->middleware('auth');
+        $this->biogMainRepository = $biogMainRepository;
+    }
     /**
      * Display a listing of the resource.
      *
@@ -45,7 +60,9 @@ class TestController extends Controller
      */
     public function show($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray());
+        return view('biogmains.offices.show', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr]);
     }
 
     /**
@@ -80,5 +97,16 @@ class TestController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    /**
+     * @param array $array
+     * @return null
+     */
+    protected function serialAddr(Array $array){
+        $res = [];
+        foreach ($array as $item)
+            $res[$item['pivot']['c_posting_id']] = $item['c_name_chn'];
+        return $res;
     }
 }

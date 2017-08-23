@@ -78,3 +78,19 @@ php artisan make:request BiogBasicInformationRequest
 vue模板放在`resource\assets\js\components`
 在`bootstrap.js`注册
 npm run dev
+
+### 已处理数据库表格
+BIOG_MAIN
+DYNASTIES
+CHORONYM_CODES
+
+### passport API认证
+http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
+
+### dingo API
+
+### 对数据库的修改
+
+**migrate 设置主键 寻找解决方法**
+
+1. 把BIOG_MAIN的c_name添加binary属性，用于区分大小写查询

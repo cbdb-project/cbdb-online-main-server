@@ -13,21 +13,26 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::middleware('auth:api')->get('/user', function (Request $request) {
+Route::middleware('auth:api')->get(/**
+ * @param Request $request
+ * @return mixed
+ */
+    '/user', function (Request $request) {
     return $request->user();
 });
 
-//Route::get('/altnames', function (Request $request) {
-//    $altnames = \App\AltnameCode::select(['c_name_type_code', 'c_name_type_desc_chn'])->where('c_name_type_desc_chn', 'like', '%'.$request->query('q').'%')->get();
-//    return $altnames;
-//});
-
-Route::middleware('api')->get('/biognames', function (Request $request) {
-    $biogmianrepository = new \App\Repositories\BiogMainRepository();
-    return $biogmianrepository->nameList($request);
-});
-
-Route::middleware('api')->post('/name', function (Request $request) {
+Route::middleware('auth:api')->post(/**
+ * @param Request $request
+ * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+ */
+    '/name', function (Request $request) {
     $biogmianrepository = new \App\Repositories\BiogMainRepository();
     return $biogmianrepository->namesByQuery($request);
+});
+
+Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
+    Route::get('ethnicity', 'ApiController@ethnicity');
+    Route::get('choronym', 'ApiController@choronym');
+    Route::get('dynasty', 'ApiController@dynasty');
+    Route::get('nianhao', 'ApiController@nianhao');
 });

@@ -26,7 +26,7 @@ class BiogMainRepository
      */
     public function byPersonId($id)
     {
-        $basicinformation = BiogMain::withCount('sources', 'texts', 'addresses', 'altnames', 'offices')->find($id);
+        $basicinformation = BiogMain::withCount('sources', 'texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'events', 'kinship', 'assoc')->find($id);
         return $basicinformation;
     }
 
@@ -36,7 +36,7 @@ class BiogMainRepository
      */
     public function simpleByPersonId($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'events', 'kinship', 'assoc')->find($id);
         return $basicinformation;
     }
 
@@ -64,7 +64,7 @@ class BiogMainRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function namesByQuery(Request $request, $num=10)
+    public function namesByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;

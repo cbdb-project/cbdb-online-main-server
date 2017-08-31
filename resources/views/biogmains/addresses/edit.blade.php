@@ -6,7 +6,7 @@
             <div class="col-md-8 col-md-offset-2">
                 @include('biogmains.banner')
                 <div class="panel panel-default">
-                    <div class="panel-heading">基本资料</div>
+                    <div class="panel-heading">地址 Addresses</div>
 
                     <div class="panel-body">
 

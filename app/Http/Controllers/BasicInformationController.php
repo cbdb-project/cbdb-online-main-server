@@ -98,12 +98,10 @@ class BasicInformationController extends Controller
     public function edit($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
-        $ethnicities = $this->ethnicityRepository->ethnicities();
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();
-        $choronyms = $this->choronymRepository->choronyms();
         $yearRange = $this->yearRangeRepository->yearRange();
-        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'ethnicities' => $ethnicities, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'choroynms' => $choronyms, 'yearRange' => $yearRange]);
+        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange]);
     }
 
     /**

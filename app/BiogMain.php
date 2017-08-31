@@ -67,7 +67,7 @@ class BiogMain extends Model
 
     public function ethnicity()
     {
-        return $this->belongsTo('App\Ethnicity', 'c_ethnicity_code', 'c_ethnicity_code');
+        return $this->belongsTo('App\Ethnicity', '﻿c_ethnicity_code', '﻿c_ethnicity_code');
     }
 
     public function simpleEthnicity()
@@ -82,7 +82,7 @@ class BiogMain extends Model
 
     public function addresses()
     {
-        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_firstyear', 'c_lastyear');
+        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_firstyear', 'c_lastyear', 'c_sequence');
     }
 
     public function addresses_type()
@@ -115,8 +115,38 @@ class BiogMain extends Model
         return $this->belongsToMany('App\AddressCode', 'POSTED_TO_ADDR_DATA', 'c_personid','c_addr_id')->withPivot('c_posting_id')->where('c_office_id', '!=', -1);
     }
 
-    public function te()
+    public function entries()
     {
-        return null;
+        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence')->orderBy('c_sequence');
+    }
+
+    public function statuses()
+    {
+        return $this->belongsToMany('App\StatusCode', 'STATUS_DATA', 'c_personid', 'c_status_code')->withPivot('c_sequence', 'c_lastyear', 'c_firstyear')->orderBy('c_sequence');
+    }
+
+    public function events()
+    {
+        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', '﻿c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
+    }
+
+    public function kinship()
+    {
+        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code');
+    }
+
+    public function kinship_name()
+    {
+        return $this->belongsToMany('App\BiogMain', 'KIN_DATA', 'c_personid', 'c_kin_id')->select(['c_name', 'c_name_chn']);
+    }
+
+    public function assoc()
+    {
+        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code');
+    }
+
+    public function assoc_name()
+    {
+        return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn']);
     }
 }

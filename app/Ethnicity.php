@@ -19,7 +19,7 @@ class Ethnicity extends Model
     /**
      * @var string
      */
-    protected $primaryKey = '﻿c_ethnicity_code';
+    protected $primaryKey = 'c_ethnicity_code';
     /**
      * 该模型是否被自动维护时间戳
      *
@@ -39,6 +39,6 @@ class Ethnicity extends Model
      */
     public function biographies()
     {
-        $this->hasMany('\App\BiogMain', '﻿c_ethnicity_code', '﻿c_ethnicity_code');
+        $this->hasMany('\App\BiogMain', 'c_ethnicity_code', '﻿c_ethnicity_code');
     }
 }

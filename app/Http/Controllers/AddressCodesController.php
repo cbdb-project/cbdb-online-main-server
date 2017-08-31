@@ -2,34 +2,40 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\AddrCodeRepository;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class AddressesController extends Controller
+/**
+ * Class AddressCodesController
+ * @package App\Http\Controllers
+ */
+class AddressCodesController extends Controller
 {
     /**
-     * @var BiogMainRepository
+     * @var AddrCodeRepository
      */
-    protected $biogMainRepository;
+    protected $addrcodeRepository;
+
 
     /**
-     * TextsController constructor.
-     * @param BiogMainRepository $biogMainRepository
+     * AddressCodesController constructor.
+     * @param AddrCodeRepository $addrcodeRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(AddrCodeRepository $addrcodeRepository)
     {
         $this->middleware('auth');
-        $this->biogMainRepository = $biogMainRepository;
+        $this->addrcodeRepository = $addrcodeRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response|string
+     * @return \Illuminate\Http\Response
      */
     public function index()
     {
-        //
-        return 'address';
+        return view('addresscodes.index');
     }
 
     /**
@@ -51,7 +57,6 @@ class AddressesController extends Controller
     public function store(Request $request)
     {
         //
-//        return redirect()->route('tests.edit')
     }
 
     /**
@@ -62,8 +67,7 @@ class AddressesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**
@@ -72,11 +76,9 @@ class AddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        dd($biogbasicinformation->addresses_type->toArray());
-        return view('biogmains.addresses.edit', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**

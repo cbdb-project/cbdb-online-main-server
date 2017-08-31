@@ -17,6 +17,10 @@ window.Vue = require('vue');
 
 Vue.component('example', require('./components/Example.vue'));
 Vue.component('name-list', require('./components/NameList.vue'));
+Vue.component('address-code-list', require('./components/AddrCodeList.vue'));
+Vue.component('altname-code-list', require('./components/AltnameCodeList.vue'));
+Vue.component('appoint-code-list', require('./components/AppointCodeList.vue'));
+
 Vue.component('select-vue', require('./components/Select.vue'));
 Vue.component(
     'passport-clients',

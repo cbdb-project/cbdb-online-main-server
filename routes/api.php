@@ -21,14 +21,45 @@ Route::middleware('auth:api')->get(/**
     return $request->user();
 });
 
-Route::middleware('auth:api')->post(/**
- * @param Request $request
- * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
- */
-    '/name', function (Request $request) {
-    $biogmianrepository = new \App\Repositories\BiogMainRepository();
-    return $biogmianrepository->namesByQuery($request);
+Route::group(['middleware' => 'auth:api'], function () {
+    Route::post('/name', function (Request $request)    {
+        $biogmianrepository = new \App\Repositories\BiogMainRepository();
+        return $biogmianrepository->namesByQuery($request);
+    });
+
+    Route::post('/addresscode', function (Request $request) {
+        $addrcoderepository = new \App\Repositories\AddrCodeRepository();
+        return $addrcoderepository->addrByQuery($request);
+    });
+
+    Route::post('/altnamecode', function (Request $request) {
+        $altcoderepository = new \App\Repositories\AltCodeRepository();
+        return $altcoderepository->altByQuery($request);
+    });
+
+    Route::post('/appointcode', function (Request $request) {
+        $appcoderepository = new \App\Repositories\AppointCodeRepository();
+        return $appcoderepository->appointByQuery($request);
+    });
 });
+
+//Route::middleware('auth:api')->post(/**
+// * @param Request $request
+// * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+// */
+//    '/name', function (Request $request) {
+//    $biogmianrepository = new \App\Repositories\BiogMainRepository();
+//    return $biogmianrepository->namesByQuery($request);
+//});
+//
+//Route::middleware('auth:api')->post(/**
+// * @param Request $request
+// * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+// */
+//    '/addresscode', function (Request $request) {
+//    $addrcoderepository = new \App\Repositories\AddrCodeRepository();
+//    return $addrcoderepository->addrByQuery($request);
+//});
 
 Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
     Route::get('ethnicity', 'ApiController@ethnicity');

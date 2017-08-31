@@ -2,34 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class AddressesController extends Controller
+class AltnameCodesController extends Controller
 {
-    /**
-     * @var BiogMainRepository
-     */
-    protected $biogMainRepository;
-
-    /**
-     * TextsController constructor.
-     * @param BiogMainRepository $biogMainRepository
-     */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct()
     {
         $this->middleware('auth');
-        $this->biogMainRepository = $biogMainRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response|string
+     * @return \Illuminate\Http\Response
      */
     public function index()
     {
-        //
-        return 'address';
+        return view('altnamecodes.index');
     }
 
     /**
@@ -51,7 +40,6 @@ class AddressesController extends Controller
     public function store(Request $request)
     {
         //
-//        return redirect()->route('tests.edit')
     }
 
     /**
@@ -62,8 +50,7 @@ class AddressesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**
@@ -72,11 +59,9 @@ class AddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        dd($biogbasicinformation->addresses_type->toArray());
-        return view('biogmains.addresses.edit', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**

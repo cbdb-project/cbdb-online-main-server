@@ -66,6 +66,13 @@ Route::resource('addresses', 'AddressesController', ['name' => [
     'update' => 'address.update'
 ]]);
 
+Route::resource('addresscodes', 'AddressCodesController', ['name' => [
+    'show' => 'addresscode.show',
+    'create' => 'addresscode.create',
+    'edit' => 'addresscode.edit',
+    'update' => 'addresscode.update'
+]]);
+
 Route::resource('sources', 'SourcesController', ['name' => [
     'show' => 'source.show',
     'create' => 'source.create',
@@ -87,6 +94,20 @@ Route::resource('altnames', 'AltnamesController', ['name' => [
     'update' => 'altname.update'
 ]]);
 
+Route::resource('altnamecodes', 'AltnameCodesController', ['name' => [
+    'show' => 'altnamecode.show',
+    'create' => 'altnamecode.create',
+    'edit' => 'altnamecode.edit',
+    'update' => 'altnamecode.update'
+]]);
+
+Route::resource('appointcodes', 'AppointCodesController', ['name' => [
+    'show' => 'appointcode.show',
+    'create' => 'appointcode.create',
+    'edit' => 'appointcode.edit',
+    'update' => 'appointcode.update'
+]]);
+
 Route::resource('offices', 'OfficesController', ['name' => [
     'show' => 'office.show',
     'create' => 'office.create',
@@ -94,4 +115,41 @@ Route::resource('offices', 'OfficesController', ['name' => [
     'update' => 'office.update'
 ]]);
 
+Route::resource('entries', 'EntriesController', ['name' => [
+    'show' => 'entry.show',
+    'create' => 'entry.create',
+    'edit' => 'entry.edit',
+    'update' => 'entry.update'
+]]);
 
+Route::resource('statuses', 'StatusesController', ['name' => [
+    'show' => 'status.show',
+    'create' => 'status.create',
+    'edit' => 'status.edit',
+    'update' => 'status.update'
+]]);
+
+Route::resource('events', 'EventsController', ['name' => [
+    'show' => 'event.show',
+    'create' => 'event.create',
+    'edit' => 'event.edit',
+    'update' => 'event.update'
+]]);
+
+Route::resource('kinship', 'KinshipController', ['name' => [
+    'show' => 'kinship.show',
+    'create' => 'kinship.create',
+    'edit' => 'kinship.edit',
+    'update' => 'kinship.update'
+]]);
+
+Route::resource('assoc', 'AssocController', ['name' => [
+    'show' => 'assoc.show',
+    'create' => 'assoc.create',
+    'edit' => 'assoc.edit',
+    'update' => 'assoc.update'
+]]);
+
+Route::get('admin', function (){
+    return view('admin-template');
+});

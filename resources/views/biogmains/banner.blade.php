@@ -18,19 +18,19 @@
             <a href="/offices/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;官名({{ $basicinformation->offices_count }})</a>
         </div>
         <div class="col-sm-offset-1 col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 入仕(1)</a>
+            <a href="/entries/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;入仕({{ $basicinformation->entries_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 事件(1)</a>
+            <a href="/events/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;事件({{ $basicinformation->events_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 社會區分(5)</a>
+            <a href="/statuses/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會區分({{ $basicinformation->statuses_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 親屬(25)</a>
+            <a href="/kinship/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;親屬({{ $basicinformation->kinship_count }})</a>
         </div>
         <div class="col-sm-3">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 社會關係(766)</a>
+            <a href="/assoc/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會關係({{ $basicinformation->assoc_count }})</a>
         </div>
         <div class="col-sm-offset-1 col-sm-2">
             <a href=""><i class="glyphicon glyphicon-user"></i> 財產(0)</a>

@@ -1615,6 +1615,402 @@ module.exports = {
 
 /***/ }),
 
+/***/ "./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AddrCodeList.vue":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+    props: [],
+    created: function created() {
+        this.notes = '正在查询，请稍后';
+        this.searchByName();
+        this.notes = '';
+    },
+    data: function data() {
+        return {
+            names: {},
+            q: '',
+            current_page: '',
+            page_num: 7,
+            notes: ''
+        };
+    },
+
+    computed: {
+        indexes: function indexes() {
+            var list = [];
+            //计算左右页码
+            var mid = parseInt(this.page_num / 2); //中间值
+            var left = Math.max(this.current_page - mid, 1);
+            var right = Math.max(this.current_page + this.page_num - mid - 1, this.page_num);
+            if (right > this.names.last_page) {
+                right = this.names.last_page;
+            }
+            while (left <= right) {
+                list.push(left);
+                left++;
+            }
+            return list;
+        },
+        showLast: function showLast() {
+            return this.current_page !== this.names.last_page;
+        },
+        showFirst: function showFirst() {
+            return this.current_page !== 1;
+        }
+
+    },
+    methods: {
+        searchByName: function searchByName() {
+            var _this = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/addresscode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this.names = response.data;
+                _this.current_page = _this.names.current_page;
+            });
+        },
+
+        searchByNameLazy: _.debounce(function () {
+            var _this2 = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/addresscode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this2.names = response.data;
+                _this2.current_page = _this2.names.current_page;
+            });
+        }, 500),
+        btnClick: function btnClick(index) {
+            if (index !== this.current_page) {
+                this.current_page = index;
+            }
+        }
+    },
+    watch: {
+        "current_page": function current_page(val, oldVal) {
+            this.searchByName(val);
+        },
+        "q": function q() {
+            this.notes = '正在查询，请稍后';
+            this.searchByNameLazy();
+            this.notes = '';
+        }
+    }
+});
+
+/***/ }),
+
+/***/ "./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AltnameCodeList.vue":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+    props: [],
+    created: function created() {
+        this.notes = '正在查询，请稍后';
+        this.searchByName();
+        this.notes = '';
+    },
+    data: function data() {
+        return {
+            names: {},
+            q: '',
+            current_page: '',
+            page_num: 7,
+            notes: ''
+        };
+    },
+
+    computed: {
+        indexes: function indexes() {
+            var list = [];
+            //计算左右页码
+            var mid = parseInt(this.page_num / 2); //中间值
+            var left = Math.max(this.current_page - mid, 1);
+            var right = Math.max(this.current_page + this.page_num - mid - 1, this.page_num);
+            if (right > this.names.last_page) {
+                right = this.names.last_page;
+            }
+            while (left <= right) {
+                list.push(left);
+                left++;
+            }
+            return list;
+        },
+        showLast: function showLast() {
+            return this.current_page !== this.names.last_page;
+        },
+        showFirst: function showFirst() {
+            return this.current_page !== 1;
+        }
+
+    },
+    methods: {
+        searchByName: function searchByName() {
+            var _this = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/altnamecode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this.names = response.data;
+                _this.current_page = _this.names.current_page;
+            });
+        },
+
+        searchByNameLazy: _.debounce(function () {
+            var _this2 = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/altnamecode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this2.names = response.data;
+                _this2.current_page = _this2.names.current_page;
+            });
+        }, 500),
+        btnClick: function btnClick(index) {
+            if (index !== this.current_page) {
+                this.current_page = index;
+            }
+        }
+    },
+    watch: {
+        "current_page": function current_page(val, oldVal) {
+            this.searchByName(val);
+        },
+        "q": function q() {
+            this.notes = '正在查询，请稍后';
+            this.searchByNameLazy();
+            this.notes = '';
+        }
+    }
+});
+
+/***/ }),
+
+/***/ "./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AppointCodeList.vue":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+    props: [],
+    created: function created() {
+        this.notes = '正在查询，请稍后';
+        this.searchByName();
+        this.notes = '';
+    },
+    data: function data() {
+        return {
+            names: {},
+            q: '',
+            current_page: '',
+            page_num: 7,
+            notes: ''
+        };
+    },
+
+    computed: {
+        indexes: function indexes() {
+            var list = [];
+            //计算左右页码
+            var mid = parseInt(this.page_num / 2); //中间值
+            var left = Math.max(this.current_page - mid, 1);
+            var right = Math.max(this.current_page + this.page_num - mid - 1, this.page_num);
+            if (right > this.names.last_page) {
+                right = this.names.last_page;
+            }
+            while (left <= right) {
+                list.push(left);
+                left++;
+            }
+            return list;
+        },
+        showLast: function showLast() {
+            return this.current_page !== this.names.last_page;
+        },
+        showFirst: function showFirst() {
+            return this.current_page !== 1;
+        }
+
+    },
+    methods: {
+        searchByName: function searchByName() {
+            var _this = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/appointcode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this.names = response.data;
+                _this.current_page = _this.names.current_page;
+            });
+        },
+
+        searchByNameLazy: _.debounce(function () {
+            var _this2 = this;
+
+            var val = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+            axios.post('/api/appointcode', { 'q': this.q, 'page': val }).then(function (response) {
+                _this2.names = response.data;
+                _this2.current_page = _this2.names.current_page;
+            });
+        }, 500),
+        btnClick: function btnClick(index) {
+            if (index !== this.current_page) {
+                this.current_page = index;
+            }
+        }
+    },
+    watch: {
+        "current_page": function current_page(val, oldVal) {
+            this.searchByName(val);
+        },
+        "q": function q() {
+            this.notes = '正在查询，请稍后';
+            this.searchByNameLazy();
+            this.notes = '';
+        }
+    }
+});
+
+/***/ }),
+
 /***/ "./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/Example.vue":
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -33194,6 +33590,104 @@ if (false) {
 
 /***/ }),
 
+/***/ "./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-39aa92f1\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AddrCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('div', {}, [_c('div', {
+    staticClass: "form-group"
+  }, [_c('div', {
+    staticClass: "text-center"
+  }, [_vm._v("查询地址")]), _vm._v(" "), _c('div', {
+    staticClass: "input-group"
+  }, [_c('input', {
+    directives: [{
+      name: "model",
+      rawName: "v-model",
+      value: (_vm.q),
+      expression: "q"
+    }],
+    staticClass: "form-control search-key",
+    attrs: {
+      "type": "text",
+      "placeholder": "Search"
+    },
+    domProps: {
+      "value": (_vm.q)
+    },
+    on: {
+      "input": function($event) {
+        if ($event.target.composing) { return; }
+        _vm.q = $event.target.value
+      }
+    }
+  }), _vm._v(" "), _c('div', {
+    staticClass: "input-group-btn"
+  }, [_c('button', {
+    staticClass: "btn btn-default search-name",
+    on: {
+      "click": _vm.searchByName
+    }
+  }, [_c('i', {
+    staticClass: "glyphicon glyphicon-search"
+  })])])])]), _vm._v(" "), _c('table', {
+    staticClass: "table table-hover table-condensed"
+  }, [_c('caption', [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]), _vm._v(" "), _vm._m(0), _vm._v(" "), _c('tbody', _vm._l((_vm.names.data), function(item) {
+    return _c('tr', [_c('td', [_vm._v(_vm._s(item.c_addr_id))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_name_chn))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_name))])])
+  }))]), _vm._v(" "), _c('nav', {
+    staticClass: "pull-right",
+    attrs: {
+      "aria-label": "Page navigation"
+    }
+  }, [_c('ul', {
+    staticClass: "pagination"
+  }, [(_vm.showFirst) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page--
+      }
+    }
+  }, [_vm._v("«")])]) : _vm._e(), _vm._v(" "), _vm._l((_vm.indexes), function(index) {
+    return _c('li', {
+      class: {
+        'active': _vm.current_page == index
+      }
+    }, [_c('a', {
+      attrs: {
+        "href": "javascript:"
+      },
+      on: {
+        "click": function($event) {
+          _vm.btnClick(index)
+        }
+      }
+    }, [_vm._v(_vm._s(index))])])
+  }), _vm._v(" "), (_vm.showLast) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page++
+      }
+    }
+  }, [_vm._v("»")])]) : _vm._e(), _vm._v(" "), _c('li', [_c('a', [_vm._v("共"), _c('i', [_vm._v(_vm._s(_vm.names.last_page))]), _vm._v("页")])])], 2)])])
+},staticRenderFns: [function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('thead', [_c('tr', [_c('th', [_vm._v("c_addr_id")]), _vm._v(" "), _c('th', [_vm._v("c_name_chn")]), _vm._v(" "), _c('th', [_vm._v("c_name")])])])
+}]}
+module.exports.render._withStripped = true
+if (false) {
+  module.hot.accept()
+  if (module.hot.data) {
+     require("vue-hot-reload-api").rerender("data-v-39aa92f1", module.exports)
+  }
+}
+
+/***/ }),
+
 /***/ "./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-65db2d04\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/NameList.vue":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -33302,6 +33796,202 @@ if (false) {
   module.hot.accept()
   if (module.hot.data) {
      require("vue-hot-reload-api").rerender("data-v-65db2d04", module.exports)
+  }
+}
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-660cf332\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AppointCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('div', {}, [_c('div', {
+    staticClass: "form-group"
+  }, [_c('div', {
+    staticClass: "text-center"
+  }, [_vm._v("查询任命类型")]), _vm._v(" "), _c('div', {
+    staticClass: "input-group"
+  }, [_c('input', {
+    directives: [{
+      name: "model",
+      rawName: "v-model",
+      value: (_vm.q),
+      expression: "q"
+    }],
+    staticClass: "form-control search-key",
+    attrs: {
+      "type": "text",
+      "placeholder": "Search"
+    },
+    domProps: {
+      "value": (_vm.q)
+    },
+    on: {
+      "input": function($event) {
+        if ($event.target.composing) { return; }
+        _vm.q = $event.target.value
+      }
+    }
+  }), _vm._v(" "), _c('div', {
+    staticClass: "input-group-btn"
+  }, [_c('button', {
+    staticClass: "btn btn-default search-name",
+    on: {
+      "click": _vm.searchByName
+    }
+  }, [_c('i', {
+    staticClass: "glyphicon glyphicon-search"
+  })])])])]), _vm._v(" "), _c('table', {
+    staticClass: "table table-hover table-condensed"
+  }, [_c('caption', [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]), _vm._v(" "), _vm._m(0), _vm._v(" "), _c('tbody', _vm._l((_vm.names.data), function(item) {
+    return _c('tr', [_c('td', [_vm._v(_vm._s(item.c_appt_type_code))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_appt_type_desc_chn))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_appt_type_desc))])])
+  }))]), _vm._v(" "), _c('nav', {
+    staticClass: "pull-right",
+    attrs: {
+      "aria-label": "Page navigation"
+    }
+  }, [_c('ul', {
+    staticClass: "pagination"
+  }, [(_vm.showFirst) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page--
+      }
+    }
+  }, [_vm._v("«")])]) : _vm._e(), _vm._v(" "), _vm._l((_vm.indexes), function(index) {
+    return _c('li', {
+      class: {
+        'active': _vm.current_page == index
+      }
+    }, [_c('a', {
+      attrs: {
+        "href": "javascript:"
+      },
+      on: {
+        "click": function($event) {
+          _vm.btnClick(index)
+        }
+      }
+    }, [_vm._v(_vm._s(index))])])
+  }), _vm._v(" "), (_vm.showLast) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page++
+      }
+    }
+  }, [_vm._v("»")])]) : _vm._e(), _vm._v(" "), _c('li', [_c('a', [_vm._v("共"), _c('i', [_vm._v(_vm._s(_vm.names.last_page))]), _vm._v("页")])])], 2)])])
+},staticRenderFns: [function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('thead', [_c('tr', [_c('th', [_vm._v("c_appt_type_code")]), _vm._v(" "), _c('th', [_vm._v("c_appt_type_desc_chn")]), _vm._v(" "), _c('th', [_vm._v("c_appt_type_desc")])])])
+}]}
+module.exports.render._withStripped = true
+if (false) {
+  module.hot.accept()
+  if (module.hot.data) {
+     require("vue-hot-reload-api").rerender("data-v-660cf332", module.exports)
+  }
+}
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-71611ada\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AltnameCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('div', {}, [_c('div', {
+    staticClass: "form-group"
+  }, [_c('div', {
+    staticClass: "text-center"
+  }, [_vm._v("查询别名")]), _vm._v(" "), _c('div', {
+    staticClass: "input-group"
+  }, [_c('input', {
+    directives: [{
+      name: "model",
+      rawName: "v-model",
+      value: (_vm.q),
+      expression: "q"
+    }],
+    staticClass: "form-control search-key",
+    attrs: {
+      "type": "text",
+      "placeholder": "Search"
+    },
+    domProps: {
+      "value": (_vm.q)
+    },
+    on: {
+      "input": function($event) {
+        if ($event.target.composing) { return; }
+        _vm.q = $event.target.value
+      }
+    }
+  }), _vm._v(" "), _c('div', {
+    staticClass: "input-group-btn"
+  }, [_c('button', {
+    staticClass: "btn btn-default search-name",
+    on: {
+      "click": _vm.searchByName
+    }
+  }, [_c('i', {
+    staticClass: "glyphicon glyphicon-search"
+  })])])])]), _vm._v(" "), _c('table', {
+    staticClass: "table table-hover table-condensed"
+  }, [_c('caption', [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]), _vm._v(" "), _vm._m(0), _vm._v(" "), _c('tbody', _vm._l((_vm.names.data), function(item) {
+    return _c('tr', [_c('td', [_vm._v(_vm._s(item.c_name_type_code))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_name_type_desc_chn))]), _vm._v(" "), _c('td', [_vm._v(_vm._s(item.c_name_type_desc))])])
+  }))]), _vm._v(" "), _c('nav', {
+    staticClass: "pull-right",
+    attrs: {
+      "aria-label": "Page navigation"
+    }
+  }, [_c('ul', {
+    staticClass: "pagination"
+  }, [(_vm.showFirst) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page--
+      }
+    }
+  }, [_vm._v("«")])]) : _vm._e(), _vm._v(" "), _vm._l((_vm.indexes), function(index) {
+    return _c('li', {
+      class: {
+        'active': _vm.current_page == index
+      }
+    }, [_c('a', {
+      attrs: {
+        "href": "javascript:"
+      },
+      on: {
+        "click": function($event) {
+          _vm.btnClick(index)
+        }
+      }
+    }, [_vm._v(_vm._s(index))])])
+  }), _vm._v(" "), (_vm.showLast) ? _c('li', [_c('a', {
+    attrs: {
+      "href": "javascript:"
+    },
+    on: {
+      "click": function($event) {
+        _vm.current_page++
+      }
+    }
+  }, [_vm._v("»")])]) : _vm._e(), _vm._v(" "), _c('li', [_c('a', [_vm._v("共"), _c('i', [_vm._v(_vm._s(_vm.names.last_page))]), _vm._v("页")])])], 2)])])
+},staticRenderFns: [function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('thead', [_c('tr', [_c('th', [_vm._v("c_name_type_code")]), _vm._v(" "), _c('th', [_vm._v("c_name_type_desc_chn")]), _vm._v(" "), _c('th', [_vm._v("c_name_type_desc")])])])
+}]}
+module.exports.render._withStripped = true
+if (false) {
+  module.hot.accept()
+  if (module.hot.data) {
+     require("vue-hot-reload-api").rerender("data-v-71611ada", module.exports)
   }
 }
 
@@ -44099,6 +44789,10 @@ window.Vue = __webpack_require__("./node_modules/vue/dist/vue.common.js");
 
 Vue.component('example', __webpack_require__("./resources/assets/js/components/Example.vue"));
 Vue.component('name-list', __webpack_require__("./resources/assets/js/components/NameList.vue"));
+Vue.component('address-code-list', __webpack_require__("./resources/assets/js/components/AddrCodeList.vue"));
+Vue.component('altname-code-list', __webpack_require__("./resources/assets/js/components/AltnameCodeList.vue"));
+Vue.component('appoint-code-list', __webpack_require__("./resources/assets/js/components/AppointCodeList.vue"));
+
 Vue.component('select-vue', __webpack_require__("./resources/assets/js/components/Select.vue"));
 Vue.component('passport-clients', __webpack_require__("./resources/assets/js/components/passport/Clients.vue"));
 
@@ -44170,6 +44864,129 @@ if (token) {
 //     broadcaster: 'pusher',
 //     key: 'your-pusher-key'
 // });
+
+/***/ }),
+
+/***/ "./resources/assets/js/components/AddrCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+var disposed = false
+var Component = __webpack_require__("./node_modules/vue-loader/lib/component-normalizer.js")(
+  /* script */
+  __webpack_require__("./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AddrCodeList.vue"),
+  /* template */
+  __webpack_require__("./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-39aa92f1\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AddrCodeList.vue"),
+  /* styles */
+  null,
+  /* scopeId */
+  null,
+  /* moduleIdentifier (server only) */
+  null
+)
+Component.options.__file = "/Users/fuqunchao/Workspace/Sites/cbdb-online-main-server/resources/assets/js/components/AddrCodeList.vue"
+if (Component.esModule && Object.keys(Component.esModule).some(function (key) {return key !== "default" && key.substr(0, 2) !== "__"})) {console.error("named exports are not supported in *.vue files.")}
+if (Component.options.functional) {console.error("[vue-loader] AddrCodeList.vue: functional components are not supported with templates, they should use render functions.")}
+
+/* hot reload */
+if (false) {(function () {
+  var hotAPI = require("vue-hot-reload-api")
+  hotAPI.install(require("vue"), false)
+  if (!hotAPI.compatible) return
+  module.hot.accept()
+  if (!module.hot.data) {
+    hotAPI.createRecord("data-v-39aa92f1", Component.options)
+  } else {
+    hotAPI.reload("data-v-39aa92f1", Component.options)
+  }
+  module.hot.dispose(function (data) {
+    disposed = true
+  })
+})()}
+
+module.exports = Component.exports
+
+
+/***/ }),
+
+/***/ "./resources/assets/js/components/AltnameCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+var disposed = false
+var Component = __webpack_require__("./node_modules/vue-loader/lib/component-normalizer.js")(
+  /* script */
+  __webpack_require__("./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AltnameCodeList.vue"),
+  /* template */
+  __webpack_require__("./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-71611ada\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AltnameCodeList.vue"),
+  /* styles */
+  null,
+  /* scopeId */
+  null,
+  /* moduleIdentifier (server only) */
+  null
+)
+Component.options.__file = "/Users/fuqunchao/Workspace/Sites/cbdb-online-main-server/resources/assets/js/components/AltnameCodeList.vue"
+if (Component.esModule && Object.keys(Component.esModule).some(function (key) {return key !== "default" && key.substr(0, 2) !== "__"})) {console.error("named exports are not supported in *.vue files.")}
+if (Component.options.functional) {console.error("[vue-loader] AltnameCodeList.vue: functional components are not supported with templates, they should use render functions.")}
+
+/* hot reload */
+if (false) {(function () {
+  var hotAPI = require("vue-hot-reload-api")
+  hotAPI.install(require("vue"), false)
+  if (!hotAPI.compatible) return
+  module.hot.accept()
+  if (!module.hot.data) {
+    hotAPI.createRecord("data-v-71611ada", Component.options)
+  } else {
+    hotAPI.reload("data-v-71611ada", Component.options)
+  }
+  module.hot.dispose(function (data) {
+    disposed = true
+  })
+})()}
+
+module.exports = Component.exports
+
+
+/***/ }),
+
+/***/ "./resources/assets/js/components/AppointCodeList.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+var disposed = false
+var Component = __webpack_require__("./node_modules/vue-loader/lib/component-normalizer.js")(
+  /* script */
+  __webpack_require__("./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/AppointCodeList.vue"),
+  /* template */
+  __webpack_require__("./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-660cf332\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/AppointCodeList.vue"),
+  /* styles */
+  null,
+  /* scopeId */
+  null,
+  /* moduleIdentifier (server only) */
+  null
+)
+Component.options.__file = "/Users/fuqunchao/Workspace/Sites/cbdb-online-main-server/resources/assets/js/components/AppointCodeList.vue"
+if (Component.esModule && Object.keys(Component.esModule).some(function (key) {return key !== "default" && key.substr(0, 2) !== "__"})) {console.error("named exports are not supported in *.vue files.")}
+if (Component.options.functional) {console.error("[vue-loader] AppointCodeList.vue: functional components are not supported with templates, they should use render functions.")}
+
+/* hot reload */
+if (false) {(function () {
+  var hotAPI = require("vue-hot-reload-api")
+  hotAPI.install(require("vue"), false)
+  if (!hotAPI.compatible) return
+  module.hot.accept()
+  if (!module.hot.data) {
+    hotAPI.createRecord("data-v-660cf332", Component.options)
+  } else {
+    hotAPI.reload("data-v-660cf332", Component.options)
+  }
+  module.hot.dispose(function (data) {
+    disposed = true
+  })
+})()}
+
+module.exports = Component.exports
+
 
 /***/ }),
 

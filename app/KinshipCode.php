@@ -4,18 +4,15 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AssocCode extends Model
+class KinshipCode extends Model
 {
     /**
      * 与模型关联的数据表
      *
      * @var string
      */
-    protected $table = 'ASSOC_CODES';
-    /**
-     * @var string
-     */
-    protected $primaryKey = 'c_assoc_code';
+    protected $table = 'KINSHIP_CODES';
+    protected $primaryKey = 'c_kincode';
     /**
      * 该模型是否被自动维护时间戳
      *

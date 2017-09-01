@@ -149,7 +149,3 @@ Route::resource('assoc', 'AssocController', ['name' => [
     'edit' => 'assoc.edit',
     'update' => 'assoc.update'
 ]]);
-
-Route::get('admin', function (){
-    return view('admin-template');
-});

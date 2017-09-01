@@ -10,7 +10,10 @@ window._ = require('lodash');
 try {
     window.$ = window.jQuery = require('jquery');
 
-    require('bootstrap-sass');
+    // require('bootstrap-sass');
+    require('./../../bower_components/AdminLte/bootstrap/js/bootstrap.min.js');
+    require('./../../bower_components/AdminLte/dist/js/app.min.js');
+    require('./../../bower_components/AdminLte/plugins/iCheck/icheck.min.js');
     require('./select2.min');
     require('./coustom');
 } catch (e) {}

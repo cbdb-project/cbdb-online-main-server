@@ -12,6 +12,7 @@
 */
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
     return view('welcome');
@@ -56,7 +57,8 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'show' => 'basicinformation.show',
     'create' => 'basicinformation.create',
     'edit' => 'basicinformation.edit',
-    'update' => 'basicinformation.update'
+    'update' => 'basicinformation.update',
+    'index' => 'basicinformation.index',
 ]]);
 
 Route::resource('addresses', 'AddressesController', ['name' => [
@@ -65,6 +67,10 @@ Route::resource('addresses', 'AddressesController', ['name' => [
     'edit' => 'address.edit',
     'update' => 'address.update'
 ]]);
+
+Route::get('/codes', 'CodesController@index')->name('codes.index');
+Route::get('/codes/{id}/edit', 'CodesController@edit')->name('codes.edit');
+Route::match(['put', 'patch'], '/codes/{id}', 'CodesController@update')->name('codes.update');
 
 Route::resource('addresscodes', 'AddressCodesController', ['name' => [
     'show' => 'addresscode.show',

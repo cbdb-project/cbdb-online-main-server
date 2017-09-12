@@ -20,8 +20,12 @@ Vue.component('name-list', require('./components/NameList.vue'));
 Vue.component('address-code-list', require('./components/AddrCodeList.vue'));
 Vue.component('altname-code-list', require('./components/AltnameCodeList.vue'));
 Vue.component('appoint-code-list', require('./components/AppointCodeList.vue'));
+Vue.component('codebox', require('./components/codebox.vue'));
 
 Vue.component('select-vue', require('./components/Select.vue'));
+Vue.component('select2-vue', require('./components/Select2Vue.vue'));
+Vue.component('select2', require('./components/Select2.vue'));
+
 Vue.component(
     'passport-clients',
     require('./components/passport/Clients.vue')

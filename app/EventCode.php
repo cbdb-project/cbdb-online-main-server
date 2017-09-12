@@ -15,7 +15,7 @@ class EventCode extends Model
     /**
      * @var string
      */
-    protected $primaryKey = '﻿c_event_code';
+    protected $primaryKey = 'c_event_code';
     /**
      * 该模型是否被自动维护时间戳
      *

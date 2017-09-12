@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
  */
 class AddrCodeRepository
 {
+
     /**
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
@@ -31,7 +32,7 @@ class AddrCodeRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function addrByQuery(Request $request, $num=50)
+    public function addrByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;
@@ -42,5 +43,17 @@ class AddrCodeRepository
         $names = AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
+    }
+
+    public function byId($id)
+    {
+        return AddressCode::find($id);
+    }
+
+    public function updateById($request, $id)
+    {
+        $data = $request->all();
+        $addrcode = AddressCode::find($id);
+        $addrcode->update($data);
     }
 }

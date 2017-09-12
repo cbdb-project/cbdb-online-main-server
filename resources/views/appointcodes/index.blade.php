@@ -1,22 +1,16 @@
-@extends('layouts.app')
+@extends('layouts.dashboard')
 
 @section('content')
-    <div class="container">
-        <div class="row">
-            <div class="col-md-8 col-md-offset-2">
-
-                <div class="panel panel-default">
-                    <div class="panel-heading">地址编码表</div>
-                    <div class="panel-body">
-                        <div class="panel-body">
-                            <appoint-code-list></appoint-code-list>
-                        </div>
-                    </div>
-                </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">任命类型编码表</div>
+        <div class="panel-body">
+            <div class="panel-body">
+                <appoint-code-list></appoint-code-list>
             </div>
         </div>
     </div>
-@section('js')
 
 @endsection
+@section('js')
+
 @endsection

@@ -26,7 +26,7 @@ class BiogMainRepository
      */
     public function byPersonId($id)
     {
-        $basicinformation = BiogMain::withCount('sources', 'texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'events', 'kinship', 'assoc')->find($id);
+        $basicinformation = BiogMain::withCount('sources', 'texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->find($id);
         return $basicinformation;
     }
 
@@ -36,7 +36,7 @@ class BiogMainRepository
      */
     public function simpleByPersonId($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'events', 'kinship', 'assoc')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->find($id);
         return $basicinformation;
     }
 

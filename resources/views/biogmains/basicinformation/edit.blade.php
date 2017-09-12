@@ -145,7 +145,7 @@
                             <div class="form-group">
                                 <label for="c_female" class="col-sm-2 control-label">性别（原female）</label>
                                 <div class="col-sm-4">
-                                    <select class="form-control" name="c_female">
+                                    <select class="form-control select2" name="c_female">
                                         <option value="0"></option>
                                         <option value="0" {{ $basicinformation->c_female == 0? 'selected': '' }}>0-男
                                         </option>
@@ -254,7 +254,7 @@
                                 </div>
                                 <label for="" class="col-sm-2 control-label">范围</label>
                                 <div class="col-sm-4">
-                                    <select class="form-control" name="c_death_age_range">
+                                    <select class="form-control select2" name="c_death_age_range">
                                         {{--<option value="null"></option>--}}
                                         @foreach($yearRange as $item )
                                             @if($item->c_range_code === $basicinformation->c_death_age_range)
@@ -362,10 +362,10 @@
             </div>
         </div>
     </div>
+@endsection
 @section('js')
     <script>
-        $("select[name^='c_']").select2();
+        $(".select2").select2();
     </script>
 
-@endsection
 @endsection

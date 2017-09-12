@@ -13,7 +13,7 @@ use App\AppointmentTypeCode;
 use Illuminate\Http\Request;
 
 class AppointCodeRepository{
-    public function appointByQuery(Request $request, $num=50)
+    public function appointByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;
@@ -24,5 +24,17 @@ class AppointCodeRepository{
         $names = AppointmentTypeCode::where('c_appt_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_desc', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_code', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
+    }
+
+    public function byId($id)
+    {
+        return AppointmentTypeCode::find($id);
+    }
+
+    public function updateById($request, $id)
+    {
+        $data = $request->all();
+        $altcode = AppointmentTypeCode::find($id);
+        $altcode->update($data);
     }
 }

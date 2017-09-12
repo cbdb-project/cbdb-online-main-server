@@ -7,6 +7,7 @@ use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ApiController extends Controller
 {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Repositories\AddrCodeRepository;
 use App\Repositories\BiogMainRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 /**
@@ -35,7 +36,7 @@ class AddressCodesController extends Controller
      */
     public function index()
     {
-        return view('addresscodes.index');
+        return view('addresscodes.index', ['page_title' => 'Address Codes', 'page_description' => '地址编码表', 'codes' => session('codes')]);
     }
 
     /**
@@ -78,7 +79,8 @@ class AddressCodesController extends Controller
      */
     public function edit($id)
     {
-        //
+        $data = $this->addrcodeRepository->byId($id);
+        return view('addresscodes.edit', ['page_title' => 'Address Codes', 'page_description' => '地址编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**
@@ -90,7 +92,10 @@ class AddressCodesController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->addrcodeRepository->updateById($request, $id);
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('addresscodes.edit', $id);
     }
 
     /**

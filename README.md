@@ -94,3 +94,5 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 **migrate 设置主键 寻找解决方法**
 
 1. 把BIOG_MAIN的c_name添加binary属性，用于区分大小写查询
+
+mongodump --host 35.167.67.47 --port 27017 -u crawler -p ash123\!\@\#  -d philanthropy -c pages_parsed_bupt -o ${back_dir}

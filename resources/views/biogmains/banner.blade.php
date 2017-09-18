@@ -6,7 +6,7 @@
             <a href="/basicinformation/{{ $basicinformation->c_personid }}/edit"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>&nbsp;&nbsp;基本资料</a>
         </div>
         <div class="col-sm-2">
-            <a href="/addresses/{{ $basicinformation->c_personid }}"><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>&nbsp;&nbsp;地址({{ $basicinformation->addresses_count }})</a>
+            <a href="{{ route('basicinformation.addresses.index', ['id' => $basicinformation->c_personid]) }}"><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>&nbsp;&nbsp;地址({{ $basicinformation->addresses_count }})</a>
         </div>
         <div class="col-sm-2">
             <a href="/altnames/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;别名({{ $basicinformation->altnames_count }})</a>

@@ -61,16 +61,15 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'index' => 'basicinformation.index',
 ]]);
 
-Route::resource('addresses', 'AddressesController', ['name' => [
-    'show' => 'address.show',
-    'create' => 'address.create',
-    'edit' => 'address.edit',
-    'update' => 'address.update'
-]]);
+Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
 
 Route::get('/codes', 'CodesController@index')->name('codes.index');
-Route::get('/codes/{id}/edit', 'CodesController@edit')->name('codes.edit');
-Route::match(['put', 'patch'], '/codes/{id}', 'CodesController@update')->name('codes.update');
+Route::get('/codes/{table_name}', 'CodesController@show')->name('codes.show');
+Route::get('/codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
+Route::match(['put', 'patch'], '/codes/{table_name}/{id}', 'CodesController@update')->name('codes.update');
+Route::get('/codes/{table_name}/create', 'CodesController@create')->name('codes.create');
+Route::post('/codes/{table_name}', 'CodesController@store')->name('codes.store');
+Route::delete('/codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
 
 Route::resource('addresscodes', 'AddressCodesController', ['name' => [
     'show' => 'addresscode.show',

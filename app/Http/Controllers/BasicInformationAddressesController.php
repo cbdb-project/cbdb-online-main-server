@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class AddressesController extends Controller
+class BasicInformationAddressesController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -24,12 +24,12 @@ class AddressesController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response|string
+     * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
-        return 'address';
+        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
     }
 
     /**
@@ -37,7 +37,7 @@ class AddressesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
         //
     }
@@ -51,7 +51,6 @@ class AddressesController extends Controller
     public function store(Request $request)
     {
         //
-//        return redirect()->route('tests.edit')
     }
 
     /**
@@ -62,8 +61,7 @@ class AddressesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.addresses.show', ['basicinformation' => $biogbasicinformation]);
+
     }
 
     /**
@@ -72,11 +70,10 @@ class AddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id, $addr)
     {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        dd($biogbasicinformation->addresses_type->toArray());
-        return view('biogmains.addresses.edit', ['basicinformation' => $biogbasicinformation]);
+        dd($biogbasicinformation->addresses);
     }
 
     /**

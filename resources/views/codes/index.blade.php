@@ -20,7 +20,7 @@
                 </thead>
                 <tbody>
                 @foreach($data as $item)
-                    <tr><td><a href="/codes?q={{ $item }}" target="_blank">{{ $item }}</a></td></tr>
+                    <tr><td><a href="/codes/{{ $item }}">{{ $item }}</a></td></tr>
                 @endforeach
                 </tbody>
             </table>

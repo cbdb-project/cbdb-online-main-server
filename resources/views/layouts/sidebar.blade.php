@@ -37,17 +37,7 @@
             <li class="{{ $page_title == 'Address Codes' ? 'active' : '' }}"><a href="{{ route('addresscodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址编码表</span></a></li>
             <li class="{{ $page_title == 'Altname Codes' ? 'active' : '' }}"><a href="{{ route('altnamecodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>别名编码表</span></a></li>
             <li class="{{ $page_title == 'Appointment Type Codes' ? 'active' : '' }}"><a href="{{ route('appointcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>任命类型编码表</span></a></li>
-            <li class="treeview">
-                <a href="#"><i class="fa fa-link"></i> <span>Multilevel</span>
-                    <span class="pull-right-container">
-                      <i class="fa fa-angle-left pull-right"></i>
-                    </span>
-                </a>
-                <ul class="treeview-menu">
-                    <li><a href="#">Link in level 2</a></li>
-                    <li><a href="#">Link in level 2</a></li>
-                </ul>
-            </li>
+
             <li class="header">CODES</li>
             <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>Codes</span></a></li>
 

@@ -6,15 +6,14 @@
         <div class="panel-heading">{{ $table }}</div>
         <div class="panel-body">
             <div class="panel-body">
-                <form action="/codes/{{ $table }}/{{ $id }}" class="form-horizontal" method="post">
-                    {{ method_field('PATCH') }}
+                <form action="/codes/{{ $table }}" class="form-horizontal" method="post">
                     {{ csrf_field() }}
-                    @foreach($row as $key => $value)
+                    @foreach($row as $key)
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
-                                       value="{{ $value }}">
+                                       >
                             </div>
                         </div>
                     @endforeach

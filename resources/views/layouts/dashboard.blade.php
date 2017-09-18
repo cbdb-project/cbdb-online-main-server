@@ -69,7 +69,8 @@ desired effect
             </h1>
             <ol class="breadcrumb">
                 <li><a href="/home"><i class="fa fa-dashboard"></i> Home</a></li>
-                <li class="active">{{ $page_title }}</li>
+                <li class="active"><a href="{{ $page_url or '#'}}">{{ $page_title }}</a></li>
+                {!! $archer or '' !!}
             </ol>
         </section>
 

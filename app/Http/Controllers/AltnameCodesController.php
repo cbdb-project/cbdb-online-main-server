@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\AltCodeRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AltnameCodesController extends Controller
 {
-    public function __construct()
+    protected $altcodeRepository;
+
+    public function __construct(AltCodeRepository $altcodeRepository)
     {
         $this->middleware('auth');
+        $this->altcodeRepository = $altcodeRepository;
     }
 
     /**
@@ -18,7 +23,7 @@ class AltnameCodesController extends Controller
      */
     public function index()
     {
-        return view('altnamecodes.index');
+        return view('altnamecodes.index', ['page_title' => 'Altname Codes', 'page_description' => '别名编码表', 'codes' => session('codes')]);
     }
 
     /**
@@ -61,7 +66,8 @@ class AltnameCodesController extends Controller
      */
     public function edit($id)
     {
-        //
+        $data = $this->altcodeRepository->byId($id);
+        return view('altnamecodes.edit', ['page_title' => 'Altname Codes', 'page_description' => '别名编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**
@@ -73,7 +79,10 @@ class AltnameCodesController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->altcodeRepository->updateById($request, $id);
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('altnamecodes.edit', $id);
     }
 
     /**

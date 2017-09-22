@@ -11,10 +11,14 @@ try {
     window.$ = window.jQuery = require('jquery');
 
     // require('bootstrap-sass');
-    require('./../../bower_components/AdminLte/bootstrap/js/bootstrap.min.js');
-    require('./../../bower_components/AdminLte/dist/js/app.min.js');
-    require('./../../bower_components/AdminLte/plugins/iCheck/icheck.min.js');
-    require('./select2.min');
+    require('./../../bower_components/AdminLte/bootstrap/js/bootstrap.min');
+    require('./../../bower_components/AdminLte/plugins/iCheck/icheck.min');
+    require('./../../bower_components/AdminLte/plugins/datatables/jquery.dataTables.min');
+    // require('./../../bower_components/AdminLte/plugins/datatables/dataTables.bootstrap.min');
+    require('./../../bower_components/AdminLte/plugins/slimScroll/jquery.slimscroll.min');
+    require('./../../bower_components/AdminLte/plugins/fastclick/fastclick.min');
+    require('./../../bower_components/AdminLte/plugins/select2/select2.min');
+    require('./../../bower_components/AdminLte/dist/js/app.min');
     require('./coustom');
 } catch (e) {}
 

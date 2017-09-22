@@ -18,6 +18,7 @@
                 <th>c_addr_id</th>
                 <th>c_name_chn</th>
                 <th>c_name</th>
+                <th>操作</th>
             </tr>
             </thead>
             <tbody>
@@ -25,6 +26,12 @@
                 <td>{{item.c_addr_id}}</td>
                 <td>{{item.c_name_chn}}</td>
                 <td>{{item.c_name}}</td>
+                <td>
+                    <div class="btn-group">
+                        <a type="button" class="btn btn-sm btn-info" :href="'/addresscodes/'+item.c_addr_id+'/edit'">edit</a>
+                        <a type="button" class="btn btn-sm btn-danger">delete</a>
+                    </div>
+                </td>
             </tr>
             </tbody>
         </table>

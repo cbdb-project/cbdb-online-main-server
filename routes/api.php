@@ -43,27 +43,20 @@ Route::group(['middleware' => 'auth:api'], function () {
     });
 });
 
-//Route::middleware('auth:api')->post(/**
-// * @param Request $request
-// * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
-// */
-//    '/name', function (Request $request) {
-//    $biogmianrepository = new \App\Repositories\BiogMainRepository();
-//    return $biogmianrepository->namesByQuery($request);
-//});
-//
-//Route::middleware('auth:api')->post(/**
-// * @param Request $request
-// * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
-// */
-//    '/addresscode', function (Request $request) {
-//    $addrcoderepository = new \App\Repositories\AddrCodeRepository();
-//    return $addrcoderepository->addrByQuery($request);
-//});
-
 Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
     Route::get('ethnicity', 'ApiController@ethnicity');
     Route::get('choronym', 'ApiController@choronym');
     Route::get('dynasty', 'ApiController@dynasty');
     Route::get('nianhao', 'ApiController@nianhao');
+    Route::get('codes', 'ApiController@codes');
+    Route::get('biogaddr', 'ApiController@biogaddr');
+    Route::get('altcode', 'ApiController@altcode');
+    Route::get('role', 'ApiController@role');
+    Route::get('range', 'ApiController@range');
+    Route::get('ganzhi', 'ApiController@ganzhi');
+    Route::get('household', 'ApiController@household');
+    Route::get('search/addr', 'ApiController@searchAddr');
+    Route::get('search/text', 'ApiController@searchText');
+    Route::get('search/office', 'ApiController@searchOffice');
+    Route::get('search/socialinst', 'ApiController@socialinst');
 });

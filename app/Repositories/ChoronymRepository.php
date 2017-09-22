@@ -15,6 +15,6 @@ class ChoronymRepository
 {
     public function choronyms()
     {
-        return ChoronymCode::select(['c_choronym_code', 'c_choronym_chn', 'c_choronym_desc'])->get();;
+        return ChoronymCode::select(['c_choronym_code', 'c_choronym_chn', 'c_choronym_desc'])->get();
     }
 }

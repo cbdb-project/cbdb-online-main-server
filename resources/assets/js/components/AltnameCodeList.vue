@@ -18,6 +18,7 @@
                 <th>c_name_type_code</th>
                 <th>c_name_type_desc_chn</th>
                 <th>c_name_type_desc</th>
+                <th>操作</th>
             </tr>
             </thead>
             <tbody>
@@ -25,6 +26,12 @@
                 <td>{{item.c_name_type_code}}</td>
                 <td>{{item.c_name_type_desc_chn}}</td>
                 <td>{{item.c_name_type_desc}}</td>
+                <td>
+                    <div class="btn-group">
+                        <a type="button" class="btn btn-sm btn-info" :href="'/altnamecodes/'+item.c_name_type_code+'/edit'">edit</a>
+                        <a type="button" class="btn btn-sm btn-danger">delete</a>
+                    </div>
+                </td>
             </tr>
             </tbody>
         </table>

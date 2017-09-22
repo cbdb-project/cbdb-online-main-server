@@ -1,5 +1,5 @@
 <template>
-    <select class="form-control" v-bind:name="name" v-model="selectedid">
+    <select class="form-control select2" v-bind:name="name" v-model="selectedid">
         <option disabled value="">请选择</option>
         <option v-for="item in data" v-bind:value="id(item)">{{ normalization(item) }}</option>
     </select>

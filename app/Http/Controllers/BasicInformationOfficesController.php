@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\TextCode;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
-class OfficesController extends Controller
+class BasicInformationOfficesController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -26,9 +28,12 @@ class OfficesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->byIdWithOff($id);
+        $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray());
+        return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名']);
     }
 
     /**
@@ -60,9 +65,7 @@ class OfficesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray());
-        return view('biogmains.offices.show', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr]);
+        //
     }
 
     /**
@@ -71,9 +74,20 @@ class OfficesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id, $office)
     {
-        //
+        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $office)->first();
+        $text_str = null;
+        if($row->c_source || $row->c_source === 0) {
+            $text_ = TextCode::find($row->c_source);
+            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+
+        }
+        return view('biogmains.offices.edit', ['id' => $id, 'row' => $row, 'text_str' => $text_str,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名',
+            'page_url' => '/basicinformation/'.$id.'/offices',
+            'archer' => "<li><a href='#'>Offices</a></li>",
+        ]);
     }
 
     /**

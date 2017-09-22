@@ -58,7 +58,9 @@ desired effect
 
 <!-- Content Wrapper. Contains page content -->
     <div class="content-wrapper">
-        @include('flash::message')
+        <div class="content-alert">
+            @include('flash::message')
+        </div>
         <!-- Content Header (Page header) -->
         <section class="content-header">
             <h1>
@@ -66,8 +68,9 @@ desired effect
                 <small>{{ $page_description or null }}</small>
             </h1>
             <ol class="breadcrumb">
-                <li><a href="#"><i class="fa fa-dashboard"></i> Level</a></li>
-                <li class="active">Here</li>
+                <li><a href="/home"><i class="fa fa-dashboard"></i> Home</a></li>
+                <li class="active"><a href="{{ $page_url or '#'}}">{{ $page_title }}</a></li>
+                {!! $archer or '' !!}
             </ol>
         </section>
 

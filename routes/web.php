@@ -12,6 +12,7 @@
 */
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
     return view('welcome');
@@ -56,15 +57,23 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'show' => 'basicinformation.show',
     'create' => 'basicinformation.create',
     'edit' => 'basicinformation.edit',
-    'update' => 'basicinformation.update'
+    'update' => 'basicinformation.update',
+    'index' => 'basicinformation.index',
 ]]);
 
-Route::resource('addresses', 'AddressesController', ['name' => [
-    'show' => 'address.show',
-    'create' => 'address.create',
-    'edit' => 'address.edit',
-    'update' => 'address.update'
-]]);
+Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
+Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');
+Route::resource('basicinformation.texts', 'BasicInformationTextsController');
+Route::resource('basicinformation.offices', 'BasicInformationOfficesController');
+
+
+Route::get('/codes', 'CodesController@index')->name('codes.index');
+Route::get('/codes/{table_name}', 'CodesController@show')->name('codes.show');
+Route::get('/codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
+Route::match(['put', 'patch'], '/codes/{table_name}/{id}', 'CodesController@update')->name('codes.update');
+Route::get('/codes/{table_name}/create', 'CodesController@create')->name('codes.create');
+Route::post('/codes/{table_name}', 'CodesController@store')->name('codes.store');
+Route::delete('/codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
 
 Route::resource('addresscodes', 'AddressCodesController', ['name' => [
     'show' => 'addresscode.show',
@@ -80,20 +89,6 @@ Route::resource('sources', 'SourcesController', ['name' => [
     'update' => 'source.update'
 ]]);
 
-Route::resource('texts', 'TextsController', ['name' => [
-    'show' => 'text.show',
-    'create' => 'text.create',
-    'edit' => 'text.edit',
-    'update' => 'text.update'
-]]);
-
-Route::resource('altnames', 'AltnamesController', ['name' => [
-    'show' => 'altname.show',
-    'create' => 'altname.create',
-    'edit' => 'altname.edit',
-    'update' => 'altname.update'
-]]);
-
 Route::resource('altnamecodes', 'AltnameCodesController', ['name' => [
     'show' => 'altnamecode.show',
     'create' => 'altnamecode.create',
@@ -106,13 +101,6 @@ Route::resource('appointcodes', 'AppointCodesController', ['name' => [
     'create' => 'appointcode.create',
     'edit' => 'appointcode.edit',
     'update' => 'appointcode.update'
-]]);
-
-Route::resource('offices', 'OfficesController', ['name' => [
-    'show' => 'office.show',
-    'create' => 'office.create',
-    'edit' => 'office.edit',
-    'update' => 'office.update'
 ]]);
 
 Route::resource('entries', 'EntriesController', ['name' => [

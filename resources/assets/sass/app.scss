@@ -8,11 +8,12 @@
 // Bootstrap
 //@import "node_modules/bootstrap-sass/assets/stylesheets/bootstrap";
 @import "./../../bower_components/AdminLte/bootstrap/css/bootstrap.min.css";
-@import "./../../bower_components/AdminLte/dist/css/AdminLTE.min.css";
 //AdminLTE Skins. We have chosen the skin-blue for this starter
 //page. However, you can choose any other skin. Make sure you
 //apply the skin class to the body tag so the changes take effect.
+@import "./../../bower_components/AdminLte/plugins/datatables/dataTables.bootstrap.css";
+@import "./../../bower_components/AdminLte/plugins/select2/select2.min.css";
+@import "./../../bower_components/AdminLte/dist/css/AdminLTE.min.css";
 @import "./../../bower_components/AdminLte/dist/css/skins/skin-blue.min.css";
 @import "./../../bower_components/AdminLte/plugins/iCheck/square/blue.css";
-@import "./../css/select2.min";
 @import "./../css/styles";

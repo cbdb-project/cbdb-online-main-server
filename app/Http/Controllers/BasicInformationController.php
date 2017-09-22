@@ -52,7 +52,7 @@ class BasicInformationController extends Controller
      */
     public function index()
     {
-        //
+        return view('biogmains.basicinformation.index', ['page_title' => 'Basicinformation', 'page_description' => '编辑人物基本信息']);
     }
 
     /**
@@ -101,7 +101,8 @@ class BasicInformationController extends Controller
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();
         $yearRange = $this->yearRangeRepository->yearRange();
-        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange]);
+        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 基本资料']);
     }
 
     /**
@@ -114,7 +115,6 @@ class BasicInformationController extends Controller
     public function update(BasicInformationRequest $request, $id)
     {
         $this->biogMainRepository->updateById($request, $id);
-//        $date = new DateTime();
         flash('Update success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.edit', $id);

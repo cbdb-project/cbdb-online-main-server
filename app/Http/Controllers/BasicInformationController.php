@@ -101,7 +101,8 @@ class BasicInformationController extends Controller
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();
         $yearRange = $this->yearRangeRepository->yearRange();
-        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange]);
+        return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 基本资料']);
     }
 
     /**

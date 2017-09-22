@@ -2258,26 +2258,22 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
-//
-//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
-    props: ['options', 'value'],
+    props: ['options', 'value', 'name'],
     mounted: function mounted() {
         var vm = this;
-        console.log(this.options);
         $(this.$el)
         // init select2
-        .select2({ data: vm.options }).val(vm.value).trigger('change')
+        .select2({ data: this.options }).val(this.value).trigger('change')
         // emit event on change.
         .on('change', function () {
-            vm.$emit('input', vm.value);
+            vm.$emit('input', this.value);
         });
     },
     watch: {
         value: function value(_value) {
             // update value
-            console.log(_value);
             $(this.$el).val(_value).trigger('change');
         },
         options: function options(_options) {
@@ -2287,6 +2283,31 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
     },
     destroyed: function destroyed() {
         $(this.$el).off().select2('destroy');
+    }
+});
+
+/***/ }),
+
+/***/ "./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/Select2Addr.vue":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+//
+//
+//
+//
+//
+//
+//
+//
+
+/* harmony default export */ __webpack_exports__["default"] = ({
+    data: function data() {
+        return {
+            selected: 2,
+            options: [{ id: 1, text: 'Hello' }, { id: 2, text: 'World' }]
+        };
     }
 });
 
@@ -2305,31 +2326,15 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
-//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
+    props: ['name', 'model', 'selected'],
     data: function data() {
         return {
-            selected: 2,
-            options: this.getData(),
-            data: ''
+            selectedid: this.selected,
+            options: [{ id: 1, text: 'Hello' }, { id: 2, text: 'World' }]
         };
-    },
-
-    methods: {
-        getData: function getData() {
-            axios.get('/api/select/codes').then(function (response) {
-                var data = response.data;
-                var temp = [];
-                data.forEach(function (idx, value) {
-                    temp.push({ id: value, text: data[value] });
-                });
-                console.log(temp);
-                return temp;
-            });
-        }
-    },
-    watch: {}
+    }
 });
 
 /***/ }),
@@ -31212,7 +31217,12 @@ if (false) {
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
-  return _c('select', [_vm._t("default")], 2)
+  return _c('select', {
+    staticClass: "form-control select2",
+    attrs: {
+      "name": _vm.name
+    }
+  }, [_vm._t("default")], 2)
 },staticRenderFns: []}
 module.exports.render._withStripped = true
 if (false) {
@@ -31590,23 +31600,24 @@ if (false) {
 module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
   return _c('div', {
     staticClass: "form-group"
-  }, [_c('span', [_vm._v(_vm._s(_vm.data))]), _vm._v(" "), _c('select2', {
+  }, [_c('select2', {
     attrs: {
-      "options": _vm.options
+      "options": _vm.options,
+      "name": _vm.name
     },
     model: {
-      value: (_vm.selected),
+      value: (_vm.selectedid),
       callback: function($$v) {
-        _vm.selected = $$v
+        _vm.selectedid = $$v
       },
-      expression: "selected"
+      expression: "selectedid"
     }
   }, [_c('option', {
     attrs: {
       "disabled": "",
-      "value": "0"
+      "value": ""
     }
-  }, [_vm._v("Select one")])])], 1)
+  }, [_vm._v("请选择")])])], 1)
 },staticRenderFns: []}
 module.exports.render._withStripped = true
 if (false) {
@@ -31724,6 +31735,40 @@ if (false) {
   module.hot.accept()
   if (module.hot.data) {
      require("vue-hot-reload-api").rerender("data-v-39aa92f1", module.exports)
+  }
+}
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-5def0422\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/Select2Addr.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports={render:function (){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;
+  return _c('div', {
+    staticClass: "form-group"
+  }, [_c('select2', {
+    attrs: {
+      "options": _vm.options
+    },
+    model: {
+      value: (_vm.selected),
+      callback: function($$v) {
+        _vm.selected = $$v
+      },
+      expression: "selected"
+    }
+  }, [_c('option', {
+    attrs: {
+      "disabled": "",
+      "value": ""
+    }
+  }, [_vm._v("请选择")])])], 1)
+},staticRenderFns: []}
+module.exports.render._withStripped = true
+if (false) {
+  module.hot.accept()
+  if (module.hot.data) {
+     require("vue-hot-reload-api").rerender("data-v-5def0422", module.exports)
   }
 }
 
@@ -42864,6 +42909,7 @@ Vue.component('codebox', __webpack_require__("./resources/assets/js/components/c
 Vue.component('select-vue', __webpack_require__("./resources/assets/js/components/Select.vue"));
 Vue.component('select2-vue', __webpack_require__("./resources/assets/js/components/Select2Vue.vue"));
 Vue.component('select2', __webpack_require__("./resources/assets/js/components/Select2.vue"));
+Vue.component('select2-addr', __webpack_require__("./resources/assets/js/components/Select2Addr.vue"));
 
 Vue.component('passport-clients', __webpack_require__("./resources/assets/js/components/passport/Clients.vue"));
 
@@ -43221,6 +43267,47 @@ if (false) {(function () {
     hotAPI.createRecord("data-v-03fa4911", Component.options)
   } else {
     hotAPI.reload("data-v-03fa4911", Component.options)
+  }
+  module.hot.dispose(function (data) {
+    disposed = true
+  })
+})()}
+
+module.exports = Component.exports
+
+
+/***/ }),
+
+/***/ "./resources/assets/js/components/Select2Addr.vue":
+/***/ (function(module, exports, __webpack_require__) {
+
+var disposed = false
+var Component = __webpack_require__("./node_modules/vue-loader/lib/component-normalizer.js")(
+  /* script */
+  __webpack_require__("./node_modules/babel-loader/lib/index.js?{\"cacheDirectory\":true,\"presets\":[[\"env\",{\"modules\":false,\"targets\":{\"browsers\":[\"> 2%\"],\"uglify\":true}}]]}!./node_modules/vue-loader/lib/selector.js?type=script&index=0!./resources/assets/js/components/Select2Addr.vue"),
+  /* template */
+  __webpack_require__("./node_modules/vue-loader/lib/template-compiler/index.js?{\"id\":\"data-v-5def0422\",\"hasScoped\":false}!./node_modules/vue-loader/lib/selector.js?type=template&index=0!./resources/assets/js/components/Select2Addr.vue"),
+  /* styles */
+  null,
+  /* scopeId */
+  null,
+  /* moduleIdentifier (server only) */
+  null
+)
+Component.options.__file = "/Users/fuqunchao/Workspace/Sites/cbdb-online-main-server/resources/assets/js/components/Select2Addr.vue"
+if (Component.esModule && Object.keys(Component.esModule).some(function (key) {return key !== "default" && key.substr(0, 2) !== "__"})) {console.error("named exports are not supported in *.vue files.")}
+if (Component.options.functional) {console.error("[vue-loader] Select2Addr.vue: functional components are not supported with templates, they should use render functions.")}
+
+/* hot reload */
+if (false) {(function () {
+  var hotAPI = require("vue-hot-reload-api")
+  hotAPI.install(require("vue"), false)
+  if (!hotAPI.compatible) return
+  module.hot.accept()
+  if (!module.hot.data) {
+    hotAPI.createRecord("data-v-5def0422", Component.options)
+  } else {
+    hotAPI.reload("data-v-5def0422", Component.options)
   }
   module.hot.dispose(function (data) {
     disposed = true

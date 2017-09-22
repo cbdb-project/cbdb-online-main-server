@@ -40,6 +40,30 @@ class BiogMainRepository
         return $basicinformation;
     }
 
+    public function byIdWithAddr($id)
+    {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->with('addresses')->find($id);
+        return $basicinformation;
+    }
+
+    public function byIdWithAlt($id)
+    {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->with('altnames')->find($id);
+        return $basicinformation;
+    }
+
+    public function byIdWithText($id)
+    {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->with('texts')->find($id);
+        return $basicinformation;
+    }
+
+    public function byIdWithOff($id)
+    {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc')->with('offices')->find($id);
+        return $basicinformation;
+    }
+
     /**
      * @param $request
      * @param $id

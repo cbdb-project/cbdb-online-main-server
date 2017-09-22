@@ -15,6 +15,6 @@ class YearRangeRepository
 {
     public function yearRange()
     {
-        return YearRangeCode::all();
+        return YearRangeCode::select(['c_range_code', 'c_range', 'c_range_chn'])->get();
     }
 }

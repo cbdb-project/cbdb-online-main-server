@@ -49,4 +49,14 @@ Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
     Route::get('dynasty', 'ApiController@dynasty');
     Route::get('nianhao', 'ApiController@nianhao');
     Route::get('codes', 'ApiController@codes');
+    Route::get('biogaddr', 'ApiController@biogaddr');
+    Route::get('altcode', 'ApiController@altcode');
+    Route::get('role', 'ApiController@role');
+    Route::get('range', 'ApiController@range');
+    Route::get('ganzhi', 'ApiController@ganzhi');
+    Route::get('household', 'ApiController@household');
+    Route::get('search/addr', 'ApiController@searchAddr');
+    Route::get('search/text', 'ApiController@searchText');
+    Route::get('search/office', 'ApiController@searchOffice');
+    Route::get('search/socialinst', 'ApiController@socialinst');
 });

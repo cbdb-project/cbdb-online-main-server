@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\AddressCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\TextCode;
@@ -10,12 +9,13 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class BasicInformationAddressesController extends Controller
+class BasicInformationTextsController extends Controller
 {
     /**
      * @var BiogMainRepository
      */
     protected $biogMainRepository;
+    protected $table_name;
     protected $operationRepository;
 
     /**
@@ -26,6 +26,7 @@ class BasicInformationAddressesController extends Controller
     {
         $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
+        $this->table_name = 'TEXT_DATA';
         $this->operationRepository = $operationRepository;
     }
     /**
@@ -35,9 +36,9 @@ class BasicInformationAddressesController extends Controller
      */
     public function index($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->byIdWithAddr($id);
-        return view('biogmains.addresses.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址']);
+        $biogbasicinformation = $this->biogMainRepository->byIdWithText($id);
+        return view('biogmains.texts.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述']);
     }
 
     /**
@@ -47,9 +48,9 @@ class BasicInformationAddressesController extends Controller
      */
     public function create($id)
     {
-        return view('biogmains.addresses.create', [
+        return view('biogmains.texts.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述']);
     }
 
     /**
@@ -60,17 +61,13 @@ class BasicInformationAddressesController extends Controller
      */
     public function store(Request $request, $id)
     {
-        $data['c_addr'] = 0;
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['tts_sysno'] = DB::table('BIOG_ADDR_DATA')->max('tts_sysno') + 1;
-//        dd($data);
-        DB::table('BIOG_ADDR_DATA')->insert($data);
+        $data['tts_sysno'] = DB::table($this->table_name)->max('tts_sysno') + 1;
+        DB::table($this->table_name)->insert($data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['tts_sysno']]);
+        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['tts_sysno']]);
     }
 
     /**
@@ -81,7 +78,7 @@ class BasicInformationAddressesController extends Controller
      */
     public function show($id)
     {
-
+        //
     }
 
     /**
@@ -90,26 +87,26 @@ class BasicInformationAddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $addr)
+    public function edit($id, $id_)
     {
-//        dd($id.' '.$addr);
-        $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
-        $addr_str = null;
-        if($row->c_addr_id || $row->c_addr_id === 0){
-            $addr_ = AddressCode::find($row->c_addr_id);
-            $addr_str = $addr_->c_addr_id." ".$addr_->c_name." ".$addr_->c_name_chn;
+        $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
+        $text = null;
+        if($row->c_textid || $row->c_textid === 0) {
+            $text_ = TextCode::find($row->c_textid);
+//            dd($text_);
+            $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+
         }
         $text_str = null;
-//        dd($row->c_source);
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
-        return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址',
-            'page_url' => '/basicinformation/'.$id.'/addresses',
-            'archer' => "<li><a href='#'>Address</a></li>",
+        return view('biogmains.texts.edit', ['id' => $id, 'row' => $row, 'text_str' => $text_str, 'text' => $text,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述',
+            'page_url' => '/basicinformation/'.$id.'/texts',
+            'archer' => "<li><a href='#'>Texts</a></li>",
         ]);
     }
 
@@ -120,18 +117,13 @@ class BasicInformationAddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $addr)
+    public function update(Request $request, $id, $id_)
     {
         $data = $request->all();
-
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-
         $data = array_except($data, ['_method', '_token']);
-        DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$addr)->update($data);
-//        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
+        DB::table($this->table_name)->where('tts_sysno',$id_)->update($data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
+        return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 
     /**
@@ -140,20 +132,19 @@ class BasicInformationAddressesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $addr)
+    public function destroy($id, $id_)
     {
-//        dd($id.' '.$addr);
-        $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
+        $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
 //        dd($row);
         $op = [
             'op_type' => 1,
-            'resource' => 'BIOG_ADDR_DATA',
-            'resource_id' => $addr,
+            'resource' => $this->table_name,
+            'resource_id' => $id_,
             'resource_data' => json_encode((array)$row)
         ];
         $this->operationRepository->store($op);
-        DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->delete();
+        DB::table($this->table_name)->where('tts_sysno', $id_)->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.index', ['id' => $id]);
+        return redirect()->route('basicinformation.texts.index', ['id' => $id]);
     }
 }

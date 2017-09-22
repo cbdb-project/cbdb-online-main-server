@@ -38,4 +38,9 @@ class AltCodeRepository
         $altcode = AltnameCode::find($id);
         $altcode->update($data);
     }
+
+    public function altcode()
+    {
+        return AltnameCode::select(['c_name_type_code', 'c_name_type_desc', 'c_name_type_desc_chn'])->get();
+    }
 }

@@ -14,8 +14,8 @@ class AddUserSettingToUsers extends Migration
     public function up()
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('avatar');
-            $table->json('settings');
+            $table->string('avatar')->default('avatar5.png');
+            $table->json('settings')->nullable();
         });
     }
 

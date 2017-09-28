@@ -89,21 +89,8 @@ class BasicInformationTextsController extends Controller
      */
     public function edit($id, $id_)
     {
-        $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
-        $text = null;
-        if($row->c_textid || $row->c_textid === 0) {
-            $text_ = TextCode::find($row->c_textid);
-//            dd($text_);
-            $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
-        }
-        $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
-            $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
-        }
-        return view('biogmains.texts.edit', ['id' => $id, 'row' => $row, 'text_str' => $text_str, 'text' => $text,
+        $res = $this->biogMainRepository->textById($id_);
+        return view('biogmains.texts.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述',
             'page_url' => '/basicinformation/'.$id.'/texts',
             'archer' => "<li><a href='#'>Texts</a></li>",
@@ -121,6 +108,7 @@ class BasicInformationTextsController extends Controller
     {
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
+        if ($data['c_textid'] == -999) $data['c_textid'] = 0;
         DB::table($this->table_name)->where('tts_sysno',$id_)->update($data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -137,7 +125,7 @@ class BasicInformationTextsController extends Controller
         $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
 //        dd($row);
         $op = [
-            'op_type' => 1,
+            'op_type' => 4,
             'resource' => $this->table_name,
             'resource_id' => $id_,
             'resource_data' => json_encode((array)$row)

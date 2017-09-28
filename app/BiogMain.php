@@ -117,7 +117,7 @@ class BiogMain extends Model
 
     public function entries()
     {
-        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'tts_sysno')->orderBy('c_sequence');
     }
 
     public function statuses()
@@ -127,7 +127,7 @@ class BiogMain extends Model
 
     public function events()
     {
-        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', '﻿c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
     }
 
     public function kinship()
@@ -148,5 +148,19 @@ class BiogMain extends Model
     public function assoc_name()
     {
         return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn']);
+    }
+
+    public function possession()
+    {
+        return $this->belongsToMany('App\PossessionActCode', 'POSSESSION_DATA', 'c_personid', 'c_possession_act_code')->withPivot('c_sequence', 'c_possession_desc', 'c_possession_desc_chn')->orderBy('c_sequence');
+    }
+
+    public function inst()
+    {
+        return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year');
+    }
+
+    public function inst_name(){
+        return $this->belongsToMany('App\SocialInst', 'BIOG_INST_DATA', 'c_personid', 'c_inst_name_code');
     }
 }

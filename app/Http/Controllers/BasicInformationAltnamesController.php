@@ -113,10 +113,8 @@ class BasicInformationAltnamesController extends Controller
     public function update(Request $request, $id, $alt)
     {
         $data = $request->all();
-//        dd($data);
         $data = array_except($data, ['_method', '_token']);
         DB::table('ALTNAME_DATA')->where('tts_sysno',$alt)->update($data);
-//        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$alt]);
     }
@@ -133,7 +131,7 @@ class BasicInformationAltnamesController extends Controller
         $row = DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->first();
 //        dd($row);
         $op = [
-            'op_type' => 1,
+            'op_type' => 4,
             'resource' => 'ALTNAME_DATA',
             'resource_id' => $alt,
             'resource_data' => json_encode((array)$row)

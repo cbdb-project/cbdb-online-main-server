@@ -67,4 +67,14 @@ class AddrCodeRepository
         }
         return $data;
     }
+    public function searchOfficeAddr(Request $request)
+    {
+        $data = AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_addr_id == 0 ? -999 : $item->c_addr_id;
+            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn;
+        }
+        return $data;
+    }
 }

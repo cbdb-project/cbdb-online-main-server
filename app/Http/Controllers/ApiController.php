@@ -66,6 +66,12 @@ class ApiController extends Controller
         $data = $addrcodeRepository->searchAddr($request);
         return $data;
     }
+    public function searchOfficeAddr(Request $request)
+    {
+        $addrcodeRepository = new AddrCodeRepository();
+        $data = $addrcodeRepository->searchOfficeAddr($request);
+        return $data;
+    }
 
     public function range()
     {
@@ -83,11 +89,27 @@ class ApiController extends Controller
         return DB::table('HOUSEHOLD_STATUS_CODES')->get();
     }
 
+    public function appttype()
+    {
+        return DB::table('APPOINTMENT_TYPE_CODES')->get();
+    }
+
+    public function assumeoffice()
+    {
+        return DB::table('ASSUME_OFFICE_CODES')->get();
+    }
+
+    public function officecate()
+    {
+        return DB::table('OFFICE_CATEGORIES')->get();
+    }
+
     public function searchText(Request $request){
         $data = TextCode::select(['c_textid', 'c_title_chn', 'c_title'])->where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_textid;
+            if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn;
         }
         return $data;
@@ -98,6 +120,7 @@ class ApiController extends Controller
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_office_id;
+            if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_office_id." ".$item->c_office_pinyin." ".$item->c_office_chn;
         }
         return $data;
@@ -109,6 +132,7 @@ class ApiController extends Controller
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_inst_name_code;
+            if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_inst_name_code." ".$item->c_inst_name_py." ".$item->c_inst_name_hz;
         }
         return $data;

@@ -55,7 +55,14 @@ Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
     Route::get('range', 'ApiController@range');
     Route::get('ganzhi', 'ApiController@ganzhi');
     Route::get('household', 'ApiController@household');
+    Route::get('appttype', 'ApiController@appttype');
+    Route::get('assumeoffice', 'ApiController@assumeoffice');
+    Route::get('officecate', 'ApiController@officecate');
+});
+
+Route::group(['prefix' => 'select'], function (){
     Route::get('search/addr', 'ApiController@searchAddr');
+    Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');
     Route::get('search/office', 'ApiController@searchOffice');
     Route::get('search/socialinst', 'ApiController@socialinst');

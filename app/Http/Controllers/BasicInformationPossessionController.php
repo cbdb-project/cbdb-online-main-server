@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class KinshipController extends Controller
+class BasicInformationPossessionController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -26,9 +26,11 @@ class KinshipController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->byIdWithPossession($id);
+        return view('biogmains.possession.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產']);
     }
 
     /**
@@ -36,9 +38,11 @@ class KinshipController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.possession.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產']);
     }
 
     /**
@@ -60,8 +64,7 @@ class KinshipController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.kinship.show', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**

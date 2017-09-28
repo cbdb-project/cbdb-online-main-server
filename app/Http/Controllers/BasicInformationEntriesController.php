@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class EntriesController extends Controller
+class BasicInformationEntriesController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -26,9 +26,11 @@ class EntriesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->byIdWithEntries($id);
+        return view('biogmains.entries.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕']);
     }
 
     /**
@@ -36,9 +38,11 @@ class EntriesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.entries.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕']);
     }
 
     /**
@@ -60,8 +64,7 @@ class EntriesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.entries.show', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**
@@ -70,7 +73,7 @@ class EntriesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id, $id_)
     {
         //
     }

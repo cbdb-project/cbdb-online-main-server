@@ -5,12 +5,8 @@
         <div class="panel-heading">官名 Postings</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.offices.update', ['id' => $id, 'id_'=> $row->tts_sysno]) }}" class="form-horizontal" method="post">
-                {{ method_field('PATCH') }}
+            <form action="{{ route('basicinformation.offices.store', $id) }}" class="form-horizontal" method="post">
                 {{ csrf_field() }}
-                <input name="_id" type="text" class="hidden" value="{{ $id }}">
-                <input name="_postingid" type="text" class="hidden" value="{{ $row->c_posting_id }}">
-                <input name="_officeid" type="text" class="hidden" value="{{ $row->c_office_id }}">
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
                     <div class="col-sm-10">
@@ -18,15 +14,9 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">posting_id</label>
-                    <div class="col-sm-10">
-                        <input type="text" class="form-control" value="{{ $row->c_posting_id }}" disabled>
-                    </div>
-                </div>
-                <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <input name="c_sequence" type="text" class="form-control" value="{{ $row->c_sequence }}">
+                        <input name="c_sequence" type="text" class="form-control" value="">
                         <p>註:若有同時任命的官職, 請手動填上相同的sequence</p>
                     </div>
                 </div>
@@ -34,9 +24,7 @@
                     <label for="c_office_id" class="col-sm-2 control-label">官名(office_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_office_id" name="c_office_id">
-                            @if($res['office_str'])
-                                <option value="{{ $row->c_office_id }}" selected="selected">{{ $res['office_str'] }}</option>
-                            @endif
+                            <option value="0">0 unknown 未详</option>
                         </select>
                     </div>
                 </div>
@@ -44,9 +32,7 @@
                     <label for="c_office_id" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            @if($res['posting_str'])
-                            <option value="{{ $row->c_posting_id }}" selected="selected">{{ $res['posting_str'] }}</option>
-                            @endif
+
                         </select>
                     </div>
                 </div>
@@ -54,11 +40,7 @@
                     <label for="c_addr" class="col-sm-2 control-label">地名</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr" name="c_addr[]" multiple="multiple">
-                            @if($res['addr_str'])
-                                @foreach($res['addr_str'] as $item)
-                                    <option value="{{ $item[0] }}" selected="selected">{{ $item[1] }}</option>
-                                @endforeach
-                            @endif
+
                         </select>
                     </div>
                 </div>
@@ -66,131 +48,129 @@
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            @if($res['text_str'])
-                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
-                            @endif
+
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
+                        <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">始年(firstyear)</label>
                     <div class="col-md-1">
                         <input type="text" name="c_firstyear" class="form-control"
-                               value="{{ $row->c_firstyear }}">
+                               value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_fy_nh_code">年号</label>
-                        <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $row->c_fy_nh_code }}"></select-vue>
+                        <select-vue name="c_fy_nh_code" model="nianhao" selected=""></select-vue>
                         <input type="text" name="c_fy_nh_year" class="form-control"
-                               value="{{ $row->c_fy_nh_year }}">
+                               value="">
                         <span for="">年</span>
                     </div>
                     <div class="col-md-3">
                         <label for="">時限</label>
-                        <select-vue name="c_fy_range" model="range" selected="{{ $row->c_fy_range }}"></select-vue>
+                        <select-vue name="c_fy_range" model="range" selected=""></select-vue>
                     </div>
                     <div class="col-md-2">
                         <label for="">閏</label>
                         <select name="c_fy_intercalary" class="form-control select2" name="c_natal">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ ord($row->c_fy_intercalary) == 0? 'selected': '' }}>0-否
+                            <option value="0" selected>0-否
                             </option>
-                            <option value="1" {{ ord($row->c_fy_intercalary) == 1? 'selected': '' }}>1-是
+                            <option value="1">1-是
                             </option>
                         </select>
                     </div>
                     <div class="col-sm-2">
                         <input type="text" name="c_fy_month" class="form-control"
-                               value="{{ $row->c_fy_month }}">
+                               value="">
                         <span for="">月</span>
                         <input type="text" name="c_fy_day" class="form-control"
-                               value="{{ $row->c_fy_day }}">
+                               value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
-                        <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $row->c_fy_day_gz }}"></select-vue>
+                        <select-vue name="c_fy_day_gz" model="ganzhi" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_lastyear" class="col-sm-2 control-label">終年(lastyear)</label>
                     <div class="col-md-1">
                         <input type="text" name="c_lastyear" class="form-control"
-                               value="{{ $row->c_lastyear }}">
+                               value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_ly_nh_code">年号</label>
-                        <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $row->c_ly_nh_code }}"></select-vue>
+                        <select-vue name="c_ly_nh_code" model="nianhao" selected=""></select-vue>
                         <input type="text" name="c_ly_nh_year" class="form-control"
-                               value="{{ $row->c_ly_nh_year }}">
+                               value="">
                         <span for="">年</span>
                     </div>
                     <div class="col-md-3">
                         <label for="">時限</label>
-                        <select-vue name="c_ly_range" model="range" selected="{{ $row->c_ly_range }}"></select-vue>
+                        <select-vue name="c_ly_range" model="range" selected=""></select-vue>
                     </div>
                     <div class="col-md-2">
                         <label for="">閏</label>
                         <select name="c_ly_intercalary" class="form-control select2" name="c_natal">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ $row->c_ly_intercalary == 0? 'selected': '' }}>0-否
+                            <option value="0" selected>0-否
                             </option>
-                            <option value="1" {{ $row->c_ly_intercalary == 1? 'selected': '' }}>1-是
+                            <option value="1">1-是
                             </option>
                         </select>
                     </div>
                     <div class="col-sm-2">
                         <input type="text" name="c_ly_month" class="form-control"
-                               value="{{ $row->c_ly_month }}">
+                               value="">
                         <span for="">月</span>
                         <input type="text" name="c_ly_day" class="form-control"
-                               value="{{ $row->c_ly_day }}">
+                               value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
-                        <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $row->c_ly_day_gz }}"></select-vue>
+                        <select-vue name="c_ly_day_gz" model="ganzhi" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_appt_type_code" class="col-sm-2 control-label">除授類別(c_appt_type_code)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_appt_type_code" model="appttype" selected="{{ $row->c_appt_type_code }}"></select-vue>
+                        <select-vue name="c_appt_type_code" model="appttype" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_assume_office_code" class="col-sm-2 control-label">是否赴任(c_assume_office_code)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_assume_office_code" model="assumeoffice" selected="{{ $row->c_assume_office_code }}"></select-vue>
+                        <select-vue name="c_assume_office_code" model="assumeoffice" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_office_category_id" class="col-sm-2 control-label">職官類別(c_office_category_id)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_office_category_id" model="officecate" selected="{{ $row->c_office_category_id }}"></select-vue>
+                        <select-vue name="c_office_category_id" model="officecate" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5">{{ $row->c_notes }}</textarea>
+                                  rows="5"></textarea>
 
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_dy" class="col-sm-2 control-label">朝代(dy)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_dy" model="dynasty" selected="{{ $row->c_dy }}"></select-vue>
+                        <select-vue name="c_dy" model="dynasty" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
-                               value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
+                               value=""
                                disabled>
                     </div>
                 </div>
@@ -198,7 +178,7 @@
                     <label for="" class="col-sm-2 control-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
-                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
+                               value=""
                                disabled>
                     </div>
                 </div>

@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class SourcesController extends Controller
+class BasicInformationEventsController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -26,9 +26,11 @@ class SourcesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        return view('biogmains.events.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件']);
     }
 
     /**
@@ -36,9 +38,11 @@ class SourcesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.events.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件']);
     }
 
     /**
@@ -60,9 +64,7 @@ class SourcesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.sources.index', ['basicinformation' => $biogbasicinformation,
-        'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处']);
+        //
     }
 
     /**

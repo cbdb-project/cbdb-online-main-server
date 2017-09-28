@@ -2,22 +2,35 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class AssocCodeController extends Controller
+class BasicInformationAssocController extends Controller
 {
-    public function __construct()
+    /**
+     * @var BiogMainRepository
+     */
+    protected $biogMainRepository;
+
+    /**
+     * TextsController constructor.
+     * @param BiogMainRepository $biogMainRepository
+     */
+    public function __construct(BiogMainRepository $biogMainRepository)
     {
         $this->middleware('auth');
+        $this->biogMainRepository = $biogMainRepository;
     }
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
+        return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
     }
 
     /**
@@ -25,9 +38,11 @@ class AssocCodeController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.assoc.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
     }
 
     /**

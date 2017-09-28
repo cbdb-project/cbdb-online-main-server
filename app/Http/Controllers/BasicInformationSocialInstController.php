@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 
-class StatusesController extends Controller
+class BasicInformationSocialInstController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -26,9 +26,11 @@ class StatusesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index($id)
     {
-        //
+        $biogbasicinformation = $this->biogMainRepository->byIdWithSocialInst($id);
+        return view('biogmains.socialinst.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構']);
     }
 
     /**
@@ -36,9 +38,11 @@ class StatusesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.socialinst.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構']);
     }
 
     /**
@@ -60,8 +64,7 @@ class StatusesController extends Controller
      */
     public function show($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.statuses.show', ['basicinformation' => $biogbasicinformation]);
+        //
     }
 
     /**

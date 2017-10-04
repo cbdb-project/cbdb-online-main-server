@@ -18,8 +18,8 @@
                     <label for="c_role_id" class="col-sm-2 control-label">著述代碼(c_textid)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_textid">
-                            @if($text)
-                                <option value="{{ $row->c_textid }}" selected="selected">{{ $text }}</option>
+                            @if($res['text'])
+                                <option value="{{ $row->c_textid }}" selected="selected">{{ $res['text'] }}</option>
                             @endif
                         </select>
                     </div>
@@ -34,8 +34,8 @@
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            @if($text_str)
-                                <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
+                            @if($res['text_str'])
+                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
                             @endif
                         </select>
                     </div>

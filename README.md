@@ -95,4 +95,12 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 
 1. 把BIOG_MAIN的c_name添加binary属性，用于区分大小写查询
 
-mongodump --host 35.167.67.47 --port 27017 -u crawler -p ash123\!\@\#  -d philanthropy -c pages_parsed_bupt -o ${back_dir}
+### 注意：
+1. 官名包含 `POSTED_TO_OFFICE_DATA` `POSTED_TO_ADDR_DATA`
+
+### 优化：
+1. 添加提示，保存错误提示，尤其是操作数据库的提示
+
+问题：
+1. event表的问题，code null
+2. 财产表，社会机构

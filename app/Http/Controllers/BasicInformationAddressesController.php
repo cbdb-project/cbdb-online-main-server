@@ -146,7 +146,7 @@ class BasicInformationAddressesController extends Controller
         $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
 //        dd($row);
         $op = [
-            'op_type' => 1,
+            'op_type' => 4,
             'resource' => 'BIOG_ADDR_DATA',
             'resource_id' => $addr,
             'resource_data' => json_encode((array)$row)

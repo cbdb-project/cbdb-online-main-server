@@ -118,7 +118,7 @@
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            @if($addr_str)
+                            @if($text_str)
                             <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
                             @endif
                         </select>

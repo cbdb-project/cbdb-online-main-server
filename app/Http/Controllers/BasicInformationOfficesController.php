@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\OfficeCode;
 use App\Repositories\BiogMainRepository;
+use App\SocialInst;
 use App\TextCode;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 
 class BasicInformationOfficesController extends Controller
@@ -41,9 +45,11 @@ class BasicInformationOfficesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create($id)
     {
-        //
+        return view('biogmains.offices.create', [
+            'id' => $id,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名']);
     }
 
     /**
@@ -52,9 +58,11 @@ class BasicInformationOfficesController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, $id)
     {
-        //
+        $_id = $this->biogMainRepository->officeStoreById($request, $id);
+        flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
     }
 
     /**
@@ -76,14 +84,8 @@ class BasicInformationOfficesController extends Controller
      */
     public function edit($id, $office)
     {
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $office)->first();
-        $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
-            $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
-        }
-        return view('biogmains.offices.edit', ['id' => $id, 'row' => $row, 'text_str' => $text_str,
+        $res = $this->biogMainRepository->officeById($office);
+        return view('biogmains.offices.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名',
             'page_url' => '/basicinformation/'.$id.'/offices',
             'archer' => "<li><a href='#'>Offices</a></li>",
@@ -97,9 +99,11 @@ class BasicInformationOfficesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, $id_)
     {
-        //
+        $this->biogMainRepository->officeUpdateById($request, $id_);
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$id_]);
     }
 
     /**
@@ -108,9 +112,11 @@ class BasicInformationOfficesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id, $office)
     {
-        //
+        $this->biogMainRepository->officeDeleteById($office);
+        flash('Delete success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.offices.index', ['id' => $id]);
     }
 
     /**
@@ -120,7 +126,8 @@ class BasicInformationOfficesController extends Controller
     protected function serialAddr(Array $array){
         $res = [];
         foreach ($array as $item)
-            $res[$item['pivot']['c_posting_id']] = $item['c_name_chn'];
+            if (array_has($res, $item['pivot']['c_posting_id'])) $res[$item['pivot']['c_posting_id']] = $res[$item['pivot']['c_posting_id']].';'.$item['c_name_chn'];
+            else $res[$item['pivot']['c_posting_id']] = $item['c_name_chn'];
         return $res;
     }
 }

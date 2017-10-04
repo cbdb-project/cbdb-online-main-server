@@ -117,22 +117,22 @@ class BiogMain extends Model
 
     public function entries()
     {
-        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'tts_sysno')->orderBy('c_sequence');
     }
 
     public function statuses()
     {
-        return $this->belongsToMany('App\StatusCode', 'STATUS_DATA', 'c_personid', 'c_status_code')->withPivot('c_sequence', 'c_lastyear', 'c_firstyear')->orderBy('c_sequence');
+        return $this->belongsToMany('App\StatusCode', 'STATUS_DATA', 'c_personid', 'c_status_code')->withPivot('c_sequence', 'c_lastyear', 'c_firstyear', 'tts_sysno')->orderBy('c_sequence');
     }
 
     public function events()
     {
-        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', '﻿c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence', 'tts_sysno')->orderBy('c_sequence');
     }
 
     public function kinship()
     {
-        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code');
+        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno');
     }
 
     public function kinship_name()
@@ -142,11 +142,25 @@ class BiogMain extends Model
 
     public function assoc()
     {
-        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code');
+        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')->withPivot('tts_sysno');
     }
 
     public function assoc_name()
     {
         return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn']);
+    }
+
+    public function possession()
+    {
+        return $this->belongsToMany('App\PossessionActCode', 'POSSESSION_DATA', 'c_personid', 'c_possession_act_code')->withPivot('c_sequence', 'c_possession_desc', 'c_possession_desc_chn', 'c_possession_record_id')->orderBy('c_sequence');
+    }
+
+    public function inst()
+    {
+        return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year', 'tts_sysno');
+    }
+
+    public function inst_name(){
+        return $this->belongsToMany('App\SocialInst', 'BIOG_INST_DATA', 'c_personid', 'c_inst_name_code');
     }
 }

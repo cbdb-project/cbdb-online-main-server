@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\BiogMain;
 use App\Http\Requests\BasicInformationRequest;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
@@ -62,7 +63,7 @@ class BasicInformationController extends Controller
      */
     public function create()
     {
-        return view('biogmains.basicinformation.create');
+        return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息']);
     }
 
     /**
@@ -73,7 +74,11 @@ class BasicInformationController extends Controller
      */
     public function store(Request $request)
     {
-//        return redirect()->route('basicinformation.show', [1]);
+        $data = $request->all();
+        $data['c_personid'] = BiogMain::max('c_personid') + 1;
+        $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
+        $flight = BiogMain::create($data);
+        return redirect()->route('basicinformation.edit', $data['c_personid']);
     }
 
     /**

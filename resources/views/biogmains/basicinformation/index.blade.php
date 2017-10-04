@@ -5,6 +5,8 @@
     <div class="panel panel-default">
         <div class="panel-heading">人名查询</div>
         <div class="panel-body">
+            <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
+            <div class="clearfix"></div>
             <name-list user="{{ Auth::id() }}"></name-list>
         </div>
     </div>

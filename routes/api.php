@@ -55,8 +55,27 @@ Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
     Route::get('range', 'ApiController@range');
     Route::get('ganzhi', 'ApiController@ganzhi');
     Route::get('household', 'ApiController@household');
+    Route::get('appttype', 'ApiController@appttype');
+    Route::get('assumeoffice', 'ApiController@assumeoffice');
+    Route::get('officecate', 'ApiController@officecate');
+    Route::get('parentstatus', 'ApiController@parentstatus');
+    Route::get('measure', 'ApiController@measure');
+    Route::get('possact', 'ApiController@possact');
+    Route::get('birole', 'ApiController@birole');
+    Route::get('topic', 'ApiController@topic');
+    Route::get('occasion', 'ApiController@occasion');
+});
+
+Route::group(['prefix' => 'select'], function (){
     Route::get('search/addr', 'ApiController@searchAddr');
+    Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');
     Route::get('search/office', 'ApiController@searchOffice');
     Route::get('search/socialinst', 'ApiController@socialinst');
+    Route::get('search/entry', 'ApiController@searchEntry');
+    Route::get('search/kincode', 'ApiController@searchKincode');
+    Route::get('search/assoccode', 'ApiController@searchAssoccode');
+    Route::get('search/status', 'ApiController@searchStatuscode');
+    Route::get('search/biog', 'ApiController@searchBiog');
+    Route::get('search/event', 'ApiController@searchEvent');
 });

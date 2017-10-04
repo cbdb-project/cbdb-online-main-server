@@ -5,8 +5,10 @@
         <div class="panel-heading">入仕 Entry</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.socialinst.store', $id) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.events.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+                {{ method_field('PATCH') }}
                 {{ csrf_field() }}
+                <input type="text" class="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
                     <div class="col-sm-10">
@@ -14,72 +16,104 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            <option value="0" selected="selected"></option>
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">事件名稱</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_event_code" name="c_event_code">
+                            @if($res['event_str'])
+                                <option value="{{ $row->c_event_code }}" selected="selected">{{ $res['event_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_bi_role_code" class="col-sm-2 control-label">社交機構角色(c_bi_role_code)</label>
+                    <label for="c_role" class="col-sm-2 control-label">傳主在該事件中角色</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_bi_role_code" model="birole" selected="0"></select-vue>
+                        <input type="text" class="form-control" name="c_role" value="{{ $row->c_role }}">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_bi_begin_year" class="col-sm-2 control-label">始年(firstyear)</label>
+                    <label for="c_year" class="col-sm-2 control-label">事件發生年</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_bi_begin_year" class="form-control"
-                               value="">
+                        <input type="text" name="c_year" class="form-control"
+                               value="{{ $row->c_year }}">
                     </div>
+
                     <div class="col-md-2 from-inline">
-                        <label for="c_bi_by_nh_code">年号</label>
-                        <select-vue name="c_bi_by_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_by_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_by_nh_year">年</span>
+                        <label for="c_nh_code">事件年號</label>
+                        <select-vue name="c_nh_code" model="nianhao" selected="{{ $row->c_nh_code }}"></select-vue>
+                        <input type="text" name="c_nh_year" class="form-control"
+                               value="{{ $row->c_nh_code }}">
+                        <span for="c_nh_year">年</span>
                     </div>
                     <div class="col-md-3">
-                        <label for="c_bi_by_range">時限</label>
-                        <select-vue name="c_bi_by_range" model="range" selected=""></select-vue>
+                        <label for="c_yr_range">時限</label>
+                        <select-vue name="c_yr_range" model="range" selected="{{ $row->c_yr_range }}"></select-vue>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="">閏</label>
+                        <select name="c_intercalary" class="form-control select2">
+                            <option disabled value="">请选择</option>
+                            <option value="0" {{ $row->c_intercalary == 0? 'selected': '' }}>0-否
+                            </option>
+                            <option value="1" {{ $row->c_intercalary == 0? 'selected': '' }}>1-是
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <input type="text" name="c_month" class="form-control"
+                               value="{{ $row->c_month }}">
+                        <span for="">月</span>
+                        <input type="text" name="c_day" class="form-control"
+                               value="{{ $row->c_day }}">
+                        <span for="">日</span>
+                        <label for="">日(干支) </label>
+                        <select-vue name="c_day_ganzhi" model="ganzhi" selected="{{ $row->c_day_ganzhi }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_bi_end_year" class="col-sm-2 control-label">終年(lastyear)</label>
-                    <div class="col-md-1">
-                        <input type="text" name="c_bi_end_year" class="form-control"
-                               value="">
-                    </div>
-                    <div class="col-md-2 from-inline">
-                        <label for="c_bi_ey_nh_code">年号</label>
-                        <select-vue name="c_bi_ey_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_ey_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_ey_nh_year">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="c_bi_ey_range">時限</label>
-                        <select-vue name="c_bi_ey_range" model="range" selected=""></select-vue>
+                    <label for="c_addr_id" class="col-sm-2 control-label">地名</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
+                            @if($res['addr_str'])
+                                @foreach($res['addr_str'] as $item)
+                                    <option value="{{ $item[0] }}" selected="selected">{{ $item[1] }}</option>
+                                @endforeach
+                            @endif
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                    <label for="" class="col-sm-2 control-label">出處</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            <option value="0" selected="selected"></option>
+                            @if($res['text_str'])
+                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="">
+                        <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                    <label for="c_event" class="col-sm-2 control-label">大事件</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_event" id="" cols="30"
+                                  rows="5">{{ $row->c_event }}</textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_notes" class="col-sm-2 control-label">注</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5"></textarea>
+                                  rows="5">{{ $row->c_notes }}</textarea>
                     </div>
                 </div>
                 <div class="form-group">
@@ -96,8 +130,9 @@
 @section('js')
     <script>
         $(".select2").select2();
-        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_addr_id").select2(options('addr'));
+        $(".c_event_code").select2(options('event'));
 
         function formatRepo (repo) {
             if (repo.loading) {

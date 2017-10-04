@@ -13,7 +13,99 @@
                         <input type="text" class="form-control" value="{{ $id }}" disabled>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(sequence)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_sequence">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">事件名稱</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_event_code" name="c_event_code">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_role" class="col-sm-2 control-label">傳主在該事件中角色</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_role">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_year" class="col-sm-2 control-label">事件發生年</label>
+                    <div class="col-md-1">
+                        <input type="text" name="c_year" class="form-control"
+                               value="">
+                    </div>
 
+                    <div class="col-md-2 from-inline">
+                        <label for="c_nh_code">事件年號</label>
+                        <select-vue name="c_nh_code" model="nianhao" selected=""></select-vue>
+                        <input type="text" name="c_nh_year" class="form-control"
+                               value="">
+                        <span for="c_nh_year">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="c_yr_range">時限</label>
+                        <select-vue name="c_yr_range" model="range" selected=""></select-vue>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="">閏</label>
+                        <select name="c_intercalary" class="form-control select2">
+                            <option disabled value="">请选择</option>
+                            <option value="0">0-否
+                            </option>
+                            <option value="1">1-是
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <input type="text" name="c_month" class="form-control"
+                               value="">
+                        <span for="">月</span>
+                        <input type="text" name="c_day" class="form-control"
+                               value="">
+                        <span for="">日</span>
+                        <label for="">日(干支) </label>
+                        <select-vue name="c_day_ganzhi" model="ganzhi" selected=""></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_addr_id" class="col-sm-2 control-label">地名</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
+                            <option value="0" selected>未详</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">出處</label>
+                    <div class="col-sm-5">
+                        <select class="form-control c_source" name="c_source">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                    <div class="col-sm-3">
+                        <input type="text" class="form-control" name="c_pages" value="">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_notes" class="col-sm-2 control-label">大事件</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_notes" id="" cols="30"
+                                  rows="5"></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_event" class="col-sm-2 control-label">注</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_event" id="" cols="30"
+                                  rows="5"></textarea>
+                    </div>
+                </div>
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
@@ -28,6 +120,9 @@
 @section('js')
     <script>
         $(".select2").select2();
+        $(".c_source").select2(options('text'));
+        $(".c_addr_id").select2(options('addr'));
+        $(".c_event_code").select2(options('event'));
 
         function formatRepo (repo) {
             if (repo.loading) {

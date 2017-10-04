@@ -13,7 +13,82 @@
                         <input type="text" class="form-control" value="{{ $id }}" disabled>
                     </div>
                 </div>
-
+                <div class="form-group">
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_sequence">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">社會區分(c_status_code)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_status_code" name="c_status_code">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_supplement" class="col-sm-2 control-label">補充文字(c_supplement)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_supplement" value="">
+                        請補充 “並稱/齊名” 的稱號 , 如「東南三賢」,「四俊」等
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
+                    <div class="col-md-1">
+                        <input type="text" name="c_firstyear" class="form-control"
+                               value="">
+                    </div>
+                    <div class="col-md-2 from-inline">
+                        <label for="c_fy_nh_code">年号</label>
+                        <select-vue name="c_fy_nh_code" model="nianhao" selected=""></select-vue>
+                        <input type="text" name="c_fy_nh_year" class="form-control"
+                               value="">
+                        <span for="c_fy_nh_year">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="c_fy_range">時限</label>
+                        <select-vue name="c_fy_range" model="range" selected=""></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
+                    <div class="col-md-1">
+                        <input type="text" name="c_lastyear" class="form-control"
+                               value="">
+                    </div>
+                    <div class="col-md-2 from-inline">
+                        <label for="c_ly_nh_code">年号</label>
+                        <select-vue name="c_ly_nh_code" model="nianhao" selected=""></select-vue>
+                        <input type="text" name="c_ly_nh_year" class="form-control"
+                               value="">
+                        <span for="c_ly_nh_year">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="c_ly_range">時限</label>
+                        <select-vue name="c_ly_range" model="range" selected=""></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                    <div class="col-sm-5">
+                        <select class="form-control c_source" name="c_source">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                    <div class="col-sm-3">
+                        <input type="text" class="form-control" name="c_pages" value="">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_notes" id="" cols="30"
+                                  rows="5"></textarea>
+                    </div>
+                </div>
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
@@ -28,6 +103,8 @@
 @section('js')
     <script>
         $(".select2").select2();
+        $(".c_source").select2(options('text'));
+        $(".c_status_code").select2(options('status'));
 
         function formatRepo (repo) {
             if (repo.loading) {

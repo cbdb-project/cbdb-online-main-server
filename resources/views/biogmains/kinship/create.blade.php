@@ -13,7 +13,48 @@
                         <input type="text" class="form-control" value="{{ $id }}" disabled>
                     </div>
                 </div>
-
+                <div class="form-group">
+                    <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kin_code" name="c_kin_code">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kin_id" name="c_kin_id">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                    <div class="col-sm-5">
+                        <select class="form-control c_source" name="c_source">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                    <div class="col-sm-3">
+                        <input type="text" class="form-control" name="c_pages" value="">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_notes" id="" cols="30"
+                                  rows="5"></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_autogen_notes" class="col-sm-2 control-label">c_autogen_notes</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_autogen_notes" id="" cols="30"
+                                  rows="5"></textarea>
+                    </div>
+                </div>
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
@@ -28,6 +69,9 @@
 @section('js')
     <script>
         $(".select2").select2();
+        $(".c_source").select2(options('text'));
+        $(".c_kin_code").select2(options('kincode'));
+        $(".c_kin_id").select2(options('biog'));
 
         function formatRepo (repo) {
             if (repo.loading) {

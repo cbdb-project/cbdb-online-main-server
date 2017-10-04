@@ -5,7 +5,8 @@
         <div class="panel-heading">入仕 Entry</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.socialinst.store', $id) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.kinship.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+                {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
@@ -14,72 +15,51 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            <option value="0" selected="selected"></option>
+                        <select class="form-control c_kin_code" name="c_kin_code">
+                            @if($res['kin_str'])
+                                <option value="{{ $row->c_kin_code }}" selected="selected">{{ $res['kin_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_bi_role_code" class="col-sm-2 control-label">社交機構角色(c_bi_role_code)</label>
+                    <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_bi_role_code" model="birole" selected="0"></select-vue>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_bi_begin_year" class="col-sm-2 control-label">始年(firstyear)</label>
-                    <div class="col-md-1">
-                        <input type="text" name="c_bi_begin_year" class="form-control"
-                               value="">
-                    </div>
-                    <div class="col-md-2 from-inline">
-                        <label for="c_bi_by_nh_code">年号</label>
-                        <select-vue name="c_bi_by_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_by_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_by_nh_year">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="c_bi_by_range">時限</label>
-                        <select-vue name="c_bi_by_range" model="range" selected=""></select-vue>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_bi_end_year" class="col-sm-2 control-label">終年(lastyear)</label>
-                    <div class="col-md-1">
-                        <input type="text" name="c_bi_end_year" class="form-control"
-                               value="">
-                    </div>
-                    <div class="col-md-2 from-inline">
-                        <label for="c_bi_ey_nh_code">年号</label>
-                        <select-vue name="c_bi_ey_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_ey_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_ey_nh_year">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="c_bi_ey_range">時限</label>
-                        <select-vue name="c_bi_ey_range" model="range" selected=""></select-vue>
+                        <select class="form-control c_kin_id" name="c_kin_id">
+                            @if($res['biog_str'])
+                                <option value="{{ $row->c_kin_id }}" selected="selected">{{ $res['biog_str'] }}</option>
+                            @endif
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            <option value="0" selected="selected"></option>
+                            @if($res['text_str'])
+                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="">
+                        <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5"></textarea>
+                                  rows="5">{{ $row->c_notes }}</textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_autogen_notes" class="col-sm-2 control-label">c_autogen_notes</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="c_autogen_notes" id="" cols="30"
+                                  rows="5">{{ $row->c_autogen_notes }}</textarea>
                     </div>
                 </div>
                 <div class="form-group">
@@ -96,8 +76,9 @@
 @section('js')
     <script>
         $(".select2").select2();
-        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_kin_code").select2(options('kincode'));
+        $(".c_kin_id").select2(options('biog'));
 
         function formatRepo (repo) {
             if (repo.loading) {

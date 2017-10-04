@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BasicInformationPossessionController extends Controller
@@ -51,9 +52,12 @@ class BasicInformationPossessionController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, $id)
     {
-        //
+        $_id = $this->biogMainRepository->possessionStoreById($request, $id);
+        flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.possession.edit', ['id' => $id, '_id' => $_id]);
+
     }
 
     /**
@@ -73,9 +77,15 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id, $id_)
     {
-        //
+        $res = $this->biogMainRepository->possessionById($id_);
+//        dd($res);
+        return view('biogmains.possession.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產',
+            'page_url' => '/basicinformation/'.$id.'/possession',
+            'archer' => "<li><a href='#'>Possession</a></li>",
+        ]);
     }
 
     /**
@@ -85,9 +95,11 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, $id_)
     {
-        //
+        $this->biogMainRepository->possessionUpdateById($request, $id, $id_);
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.possession.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 
     /**
@@ -96,8 +108,10 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id, $id_)
     {
-        //
+        $this->biogMainRepository->possessionDeleteById($id_);
+        flash('Delete success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.possession.index', ['id' => $id]);
     }
 }

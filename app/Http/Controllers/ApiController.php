@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\AssocCode;
+use App\BiogMain;
+use App\EntryCode;
+use App\EventCode;
+use App\KinshipCode;
 use App\OfficeCode;
 use App\Repositories\AddrCodeRepository;
 use App\Repositories\AltCodeRepository;
@@ -13,6 +18,7 @@ use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
 use App\SocialInst;
+use App\StatusCode;
 use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +110,36 @@ class ApiController extends Controller
         return DB::table('OFFICE_CATEGORIES')->get();
     }
 
+    public function parentstatus()
+    {
+        return DB::table('PARENTAL_STATUS_CODES')->get();
+    }
+
+    public function measure()
+    {
+        return DB::table('MEASURE_CODES')->get();
+    }
+
+    public function possact()
+    {
+        return DB::table('POSSESSION_ACT_CODES')->get();
+    }
+
+    public function birole()
+    {
+        return DB::table('BIOG_INST_CODES')->get();
+    }
+
+    public function topic()
+    {
+        return DB::table('SCHOLARLYTOPIC_CODES')->get();
+    }
+
+    public function occasion()
+    {
+        return DB::table('OCCASION_CODES')->get();
+    }
+
     public function searchText(Request $request){
         $data = TextCode::select(['c_textid', 'c_title_chn', 'c_title'])->where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
@@ -134,6 +170,78 @@ class ApiController extends Controller
             $item['id'] = $item->c_inst_name_code;
             if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_inst_name_code." ".$item->c_inst_name_py." ".$item->c_inst_name_hz;
+        }
+        return $data;
+    }
+
+    public function searchEntry(Request $request)
+    {
+        $data = EntryCode::where('c_entry_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_entry_desc', 'like', '%'.$request->q.'%')->orWhere('c_entry_code', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_entry_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_entry_code." ".$item->c_entry_desc_chn." ".$item->c_entry_desc;
+        }
+        return $data;
+    }
+
+    public function searchKincode(Request $request)
+    {
+        $data = KinshipCode::where('c_kinrel_chn', 'like', '%'.$request->q.'%')->orWhere('c_kinrel', 'like', '%'.$request->q.'%')->orWhere('c_kincode', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_kincode;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_kincode." ".$item->c_kinrel_chn." ".$item->c_kinrel;
+        }
+        return $data;
+    }
+
+    public function searchAssoccode(Request $request)
+    {
+        $data = AssocCode::where('c_assoc_desc', 'like', '%'.$request->q.'%')->orWhere('c_assoc_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_assoc_code', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_assoc_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_assoc_code." ".$item->c_assoc_desc_chn." ".$item->c_assoc_desc;
+        }
+        return $data;
+    }
+
+    public function searchStatuscode(Request $request)
+    {
+        $data = StatusCode::where('c_status_desc', 'like', '%'.$request->q.'%')->orWhere('c_status_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_status_code', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_status_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_status_code." ".$item->c_status_desc_chn." ".$item->c_status_desc;
+        }
+        return $data;
+    }
+
+    public function searchBiog(Request $request)
+    {
+        $data = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_personid;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name;
+        }
+        return $data;
+    }
+
+    public function searchEvent(Request $request)
+    {
+        $data = EventCode::where('c_event_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_event_name', 'like', '%'.$request->q.'%')->orWhere('c_event_code', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_event_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $item['text'] = $item->c_event_code." ".$item->c_event_name_chn." ".$item->c_event_name;
         }
         return $data;
     }

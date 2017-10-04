@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BasicInformationKinshipController extends Controller
@@ -51,9 +52,11 @@ class BasicInformationKinshipController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, $id)
     {
-        //
+        $_id = $this->biogMainRepository->kinshipStoreById($request, $id);
+        flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.kinship.edit', ['id' => $id, '_id' => $_id]);
     }
 
     /**
@@ -73,9 +76,15 @@ class BasicInformationKinshipController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id, $id_)
     {
-        //
+        $res = $this->biogMainRepository->kinshipById($id_);
+//        dd($res);
+        return view('biogmains.kinship.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬',
+            'page_url' => '/basicinformation/'.$id.'/kinship',
+            'archer' => "<li><a href='#'>Kinship</a></li>",
+        ]);
     }
 
     /**
@@ -85,9 +94,11 @@ class BasicInformationKinshipController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, $id_)
     {
-        //
+        $this->biogMainRepository->kinshipUpdateById($request, $id_);
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.kinship.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 
     /**
@@ -96,8 +107,10 @@ class BasicInformationKinshipController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id, $id_)
     {
-        //
+        $this->biogMainRepository->kinshipDeleteById($id_);
+        flash('Delete success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.kinship.index', ['id' => $id]);
     }
 }

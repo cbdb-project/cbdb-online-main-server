@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class BasicInformationStatusesController extends Controller
@@ -51,9 +52,11 @@ class BasicInformationStatusesController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, $id)
     {
-        //
+        $_id = $this->biogMainRepository->statuseStoreById($request, $id);
+        flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.statuses.edit', ['id' => $id, '_id' => $_id]);
     }
 
     /**
@@ -73,9 +76,14 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit($id, $id_)
     {
-        //
+        $res = $this->biogMainRepository->statuseById($id_);
+        return view('biogmains.statuses.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分',
+            'page_url' => '/basicinformation/'.$id.'/statuses',
+            'archer' => "<li><a href='#'>Statuses</a></li>",
+        ]);
     }
 
     /**
@@ -85,9 +93,11 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, $id_)
     {
-        //
+        $this->biogMainRepository->statuseUpdateById($request, $id_);
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.statuses.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 
     /**
@@ -96,8 +106,10 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id, $id_)
     {
-        //
+        $this->biogMainRepository->statuseDeleteById($id_);
+        flash('Delete success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.statuses.index', ['id' => $id]);
     }
 }

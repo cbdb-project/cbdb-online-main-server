@@ -63,6 +63,7 @@ class AddrCodeRepository
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_addr_id;
+            if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn;
         }
         return $data;

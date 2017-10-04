@@ -5,7 +5,8 @@
         <div class="panel-heading">入仕 Entry</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.socialinst.store', $id) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.possession.update', [$id, $row->c_possession_record_id]) }}" class="form-horizontal" method="post">
+                {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
@@ -14,72 +15,89 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            <option value="0" selected="selected"></option>
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_possession_act_code" class="col-sm-2 control-label">行為&#60;擁有、捐出等&#62;(possession_act_code)</label>
+                    <div class="col-sm-10">
+                        <select-vue name="c_possession_act_code" model="possact" selected="{{ $row->c_possession_act_code }}"></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_possession_desc" class="col-sm-2 control-label">財產&#60;英文描述&#62;(possession_desc)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_possession_desc" value="{{ $row->c_possession_desc }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_possession_desc_chn" class="col-sm-2 control-label">財產&#60;中文描述&#62;(possession_desc_chn)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_possession_desc_chn" value="{{ $row->c_possession_desc_chn }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_quantity" class="col-sm-2 control-label">數量(quantity)</label>
+                    <div class="col-md-1">
+                        <input type="text" name="c_quantity" class="form-control"
+                               value="{{ $row->c_quantity }}">
+                    </div>
+                    <div class="col-md-5 from-inline">
+                        <label for="c_measure_code">度量單位(measure_code)</label>
+                        <select-vue name="c_measure_code" model="measure" selected="{{ $row->c_measure_code }}"></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_possession_yr" class="col-sm-2 control-label">年份(possession_yr)</label>
+                    <div class="col-md-1">
+                        <input type="text" name="c_possession_yr" class="form-control"
+                               value="{{ $row->c_possession_yr }}">
+                    </div>
+                    <div class="col-md-2 from-inline">
+                        <label for="c_possession_nh_code">年号</label>
+                        <select-vue name="c_possession_nh_code" model="nianhao" selected="{{ $row->c_possession_nh_code }}"></select-vue>
+                        <input type="text" name="c_possession_nh_yr" class="form-control"
+                               value="{{ $row->c_possession_nh_yr }}">
+                        <span for="c_possession_nh_yr">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="c_possession_yr_range">時限</label>
+                        <select-vue name="c_possession_yr_range" model="range" selected="{{ $row->c_possession_yr_range }}"></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_addr_id" class="col-sm-2 control-label">地名</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
+                            @if($res['addr_str'])
+                                @foreach($res['addr_str'] as $item)
+                                    <option value="{{ $item[0] }}" selected="selected">{{ $item[1] }}</option>
+                                @endforeach
+                            @endif
                         </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_bi_role_code" class="col-sm-2 control-label">社交機構角色(c_bi_role_code)</label>
-                    <div class="col-sm-10">
-                        <select-vue name="c_bi_role_code" model="birole" selected="0"></select-vue>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_bi_begin_year" class="col-sm-2 control-label">始年(firstyear)</label>
-                    <div class="col-md-1">
-                        <input type="text" name="c_bi_begin_year" class="form-control"
-                               value="">
-                    </div>
-                    <div class="col-md-2 from-inline">
-                        <label for="c_bi_by_nh_code">年号</label>
-                        <select-vue name="c_bi_by_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_by_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_by_nh_year">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="c_bi_by_range">時限</label>
-                        <select-vue name="c_bi_by_range" model="range" selected=""></select-vue>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_bi_end_year" class="col-sm-2 control-label">終年(lastyear)</label>
-                    <div class="col-md-1">
-                        <input type="text" name="c_bi_end_year" class="form-control"
-                               value="">
-                    </div>
-                    <div class="col-md-2 from-inline">
-                        <label for="c_bi_ey_nh_code">年号</label>
-                        <select-vue name="c_bi_ey_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_ey_nh_year" class="form-control"
-                               value="">
-                        <span for="c_bi_ey_nh_year">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="c_bi_ey_range">時限</label>
-                        <select-vue name="c_bi_ey_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            <option value="0" selected="selected"></option>
+                            @if($res['text_str'])
+                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="">
+                        <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5"></textarea>
+                                  rows="5">{{ $row->c_notes }}</textarea>
                     </div>
                 </div>
                 <div class="form-group">
@@ -96,8 +114,8 @@
 @section('js')
     <script>
         $(".select2").select2();
-        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_addr_id").select2(options('officeaddr'));
 
         function formatRepo (repo) {
             if (repo.loading) {

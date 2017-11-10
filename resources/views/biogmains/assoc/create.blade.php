@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">社會關係</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.assoc.store', $id) }}" class="form-horizontal" method="post">
@@ -16,7 +16,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" maxlength="4">
+                        <input type="number" class="form-control" name="c_sequence" maxlength="4">
                     </div>
                 </div>
                 <div class="form-group">
@@ -67,14 +67,14 @@
                 <div class="form-group">
                     <label for="c_assoc_year" class="col-sm-2 control-label">社會關係年份</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_assoc_year" class="form-control"
+                        <input type="number" name="c_assoc_year" class="form-control"
                                value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_assoc_nh_code">年号</label>
                         <select-vue name="c_assoc_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_assoc_nh_year" class="form-control"
+                        <input type="number" name="c_assoc_nh_year" class="form-control"
                                value="">
                         <span for="c_assoc_nh_year">年</span>
                     </div>
@@ -93,10 +93,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_assoc_month" class="form-control"
+                        <input type="number" name="c_assoc_month" class="form-control"
                                value="">
                         <span for="">月</span>
-                        <input type="text" name="c_assoc_day" class="form-control"
+                        <input type="number" name="c_assoc_day" class="form-control"
                                value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>

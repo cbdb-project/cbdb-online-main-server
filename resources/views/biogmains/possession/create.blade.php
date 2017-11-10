@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">財產 Possession</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.possession.store', $id) }}" class="form-horizontal" method="post">
@@ -51,13 +51,13 @@
                 <div class="form-group">
                     <label for="c_possession_yr" class="col-sm-2 control-label">年份(possession_yr)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_possession_yr" class="form-control"
+                        <input type="number" name="c_possession_yr" class="form-control"
                                value="">
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_possession_nh_code">年号</label>
                         <select-vue name="c_possession_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_possession_nh_yr" class="form-control"
+                        <input type="number" name="c_possession_nh_yr" class="form-control"
                                value="">
                         <span for="c_possession_nh_yr">年</span>
                     </div>

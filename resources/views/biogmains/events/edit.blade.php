@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">事件 Event</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.events.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
@@ -40,14 +40,14 @@
                 <div class="form-group">
                     <label for="c_year" class="col-sm-2 control-label">事件發生年</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_year" class="form-control"
+                        <input type="number" name="c_year" class="form-control"
                                value="{{ $row->c_year }}">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_nh_code">事件年號</label>
                         <select-vue name="c_nh_code" model="nianhao" selected="{{ $row->c_nh_code }}"></select-vue>
-                        <input type="text" name="c_nh_year" class="form-control"
+                        <input type="number" name="c_nh_year" class="form-control"
                                value="{{ $row->c_nh_code }}">
                         <span for="c_nh_year">年</span>
                     </div>
@@ -66,10 +66,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_month" class="form-control"
+                        <input type="number" name="c_month" class="form-control"
                                value="{{ $row->c_month }}">
                         <span for="">月</span>
-                        <input type="text" name="c_day" class="form-control"
+                        <input type="number" name="c_day" class="form-control"
                                value="{{ $row->c_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>

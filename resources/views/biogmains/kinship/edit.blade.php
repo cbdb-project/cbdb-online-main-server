@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">親屬 Kinship</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.kinship.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">

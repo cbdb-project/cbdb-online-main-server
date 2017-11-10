@@ -43,7 +43,7 @@ class BasicInformationKinshipController extends Controller
     {
         return view('biogmains.kinship.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬', 'page_url' => '/basicinformation/'.$id.'/kinships']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬', 'page_url' => '/basicinformation/'.$id.'/kinship']);
     }
 
     /**

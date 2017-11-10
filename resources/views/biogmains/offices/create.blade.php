@@ -32,7 +32,7 @@
                     <label for="c_office_id" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-
+                            <option value="0">0 unknown 未详</option>
                         </select>
                     </div>
                 </div>
@@ -40,7 +40,7 @@
                     <label for="c_addr" class="col-sm-2 control-label">地名</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr" name="c_addr[]" multiple="multiple">
-
+                            <option value="0" selected>未详</option>
                         </select>
                     </div>
                 </div>
@@ -59,14 +59,14 @@
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">始年(firstyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_firstyear" class="form-control"
+                        <input type="number" name="c_firstyear" class="form-control"
                                value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_fy_nh_code">年号</label>
                         <select-vue name="c_fy_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_fy_nh_year" class="form-control"
+                        <input type="number" name="c_fy_nh_year" class="form-control"
                                value="">
                         <span for="">年</span>
                     </div>
@@ -85,10 +85,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_fy_month" class="form-control"
+                        <input type="number" name="c_fy_month" class="form-control"
                                value="">
                         <span for="">月</span>
-                        <input type="text" name="c_fy_day" class="form-control"
+                        <input type="number" name="c_fy_day" class="form-control"
                                value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
@@ -98,14 +98,14 @@
                 <div class="form-group">
                     <label for="c_lastyear" class="col-sm-2 control-label">終年(lastyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_lastyear" class="form-control"
+                        <input type="number" name="c_lastyear" class="form-control"
                                value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_ly_nh_code">年号</label>
                         <select-vue name="c_ly_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_ly_nh_year" class="form-control"
+                        <input type="number" name="c_ly_nh_year" class="form-control"
                                value="">
                         <span for="">年</span>
                     </div>
@@ -124,10 +124,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_ly_month" class="form-control"
+                        <input type="number" name="c_ly_month" class="form-control"
                                value="">
                         <span for="">月</span>
-                        <input type="text" name="c_ly_day" class="form-control"
+                        <input type="number" name="c_ly_day" class="form-control"
                                value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>

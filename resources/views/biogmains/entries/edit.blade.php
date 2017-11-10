@@ -33,7 +33,7 @@
                 <div class="form-group">
                     <label for="c_year" class="col-sm-2 control-label">入仕年(year)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_year" class="form-control"
+                        <input type="number" name="c_year" class="form-control"
                                value="{{ $row->c_year }}">
                     </div>
                     <div class="col-md-2 from-inline">

@@ -35,21 +35,21 @@ class CodesController extends Controller
     public function show($table_name)
     {
         try{
-            $data = DB::table($table_name)->paginate(1000);
+            $data = DB::table($table_name)->paginate(100);
             $thead = array();
             $count = 0;
             foreach($data[0] as $key => $value){
                 if ($count >2){
-                    break;
+//                    break;
                 }
-                if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence')){
+                if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn')){
                     array_push($thead, $key);
                     $count++;
                 }
             }
 //                dd($data);
             return view('codes.show', [
-                'page_title' => 'Codes',
+                'page_title' => $table_name,
                 'page_description' => $table_name,
                 'page_url' => '/codes',
                 'archer' => "<li><a href=''>".$table_name."</a></li>",

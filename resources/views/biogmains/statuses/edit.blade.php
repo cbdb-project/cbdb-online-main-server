@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">社會區分 Status</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.statuses.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
@@ -40,13 +40,13 @@
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_firstyear" class="form-control"
+                        <input type="number" name="c_firstyear" class="form-control"
                                value="{{ $row->c_firstyear }}">
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_fy_nh_code">年号</label>
                         <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $row->c_fy_nh_code }}"></select-vue>
-                        <input type="text" name="c_fy_nh_year" class="form-control"
+                        <input type="number" name="c_fy_nh_year" class="form-control"
                                value="{{ $row->c_fy_nh_year }}">
                         <span for="c_fy_nh_year">年</span>
                     </div>
@@ -58,13 +58,13 @@
                 <div class="form-group">
                     <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_lastyear" class="form-control"
+                        <input type="number" name="c_lastyear" class="form-control"
                                value="{{ $row->c_lastyear }}">
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_ly_nh_code">年号</label>
                         <select-vue name="c_ly_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_ly_nh_year" class="form-control"
+                        <input type="number" name="c_ly_nh_year" class="form-control"
                                value="{{ $row->c_ly_nh_year }}">
                         <span for="c_ly_nh_year">年</span>
                     </div>

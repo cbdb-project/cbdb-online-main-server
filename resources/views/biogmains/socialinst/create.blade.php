@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
+        <div class="panel-heading">社交機構 SocialInst</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.socialinst.store', $id) }}" class="form-horizontal" method="post">
@@ -30,13 +30,13 @@
                 <div class="form-group">
                     <label for="c_bi_begin_year" class="col-sm-2 control-label">始年(firstyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_bi_begin_year" class="form-control"
+                        <input type="number" name="c_bi_begin_year" class="form-control"
                                value="">
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_bi_by_nh_code">年号</label>
                         <select-vue name="c_bi_by_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_by_nh_year" class="form-control"
+                        <input type="number" name="c_bi_by_nh_year" class="form-control"
                                value="">
                         <span for="c_bi_by_nh_year">年</span>
                     </div>
@@ -48,13 +48,13 @@
                 <div class="form-group">
                     <label for="c_bi_end_year" class="col-sm-2 control-label">終年(lastyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_bi_end_year" class="form-control"
+                        <input type="number" name="c_bi_end_year" class="form-control"
                                value="">
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_bi_ey_nh_code">年号</label>
                         <select-vue name="c_bi_ey_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="text" name="c_bi_ey_nh_year" class="form-control"
+                        <input type="number" name="c_bi_ey_nh_year" class="form-control"
                                value="">
                         <span for="c_bi_ey_nh_year">年</span>
                     </div>

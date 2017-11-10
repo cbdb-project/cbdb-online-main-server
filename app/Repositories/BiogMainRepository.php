@@ -692,8 +692,9 @@ class BiogMainRepository
         $data = $this->formatSelect($data);
         $data['c_personid'] = $id;
         $data = array_except($data, ['_token']);
-        $data['tts_sysno'] = DB::table('KIN_DATA')->max('tts_sysno') + 1;
+        $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+//        dump($data);
         DB::table('ASSOC_DATA')->insert($data);
         return $data['tts_sysno'];
     }

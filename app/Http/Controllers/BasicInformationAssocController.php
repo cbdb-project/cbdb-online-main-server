@@ -30,6 +30,7 @@ class BasicInformationAssocController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
+//        dd($biogbasicinformation->assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
     }
@@ -43,7 +44,7 @@ class BasicInformationAssocController extends Controller
     {
         return view('biogmains.assoc.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc']);
     }
 
     /**

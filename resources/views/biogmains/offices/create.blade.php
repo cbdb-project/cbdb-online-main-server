@@ -16,7 +16,7 @@
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <input name="c_sequence" type="text" class="form-control" value="">
+                        <input name="c_sequence" type="text" class="form-control" value="" maxlength="4">
                         <p>註:若有同時任命的官職, 請手動填上相同的sequence</p>
                     </div>
                 </div>

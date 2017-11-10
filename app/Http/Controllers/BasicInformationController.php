@@ -90,6 +90,8 @@ class BasicInformationController extends Controller
     public function show($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
+        $biogbasicinformation->kinship;
+        $biogbasicinformation->office;
         return $biogbasicinformation;
 //        return view('biogmains.show', $result);
     }

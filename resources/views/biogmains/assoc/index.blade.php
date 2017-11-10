@@ -22,7 +22,8 @@
                     <tr>
                         <td>{{ $key+1 }}</td>
                         <td>{{ $value->c_assoc_desc_chn }}</td>
-                        <td>{{ $basicinformation->assoc_name[$key]->c_name_chn.' '.$basicinformation->assoc_name[$key]->c_name }}</td>
+                        {{--{{ $basicinformation->assoc_name[$key]->c_name_chn.' '.$basicinformation->assoc_name[$key]->c_name }}--}}
+                        <td></td>
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->tts_sysno]) }}">edit</a>

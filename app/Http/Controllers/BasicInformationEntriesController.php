@@ -43,7 +43,7 @@ class BasicInformationEntriesController extends Controller
     {
         return view('biogmains.entries.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕', 'page_url' => '/basicinformation/'.$id.'/entries']);
     }
 
     /**

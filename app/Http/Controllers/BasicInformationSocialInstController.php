@@ -43,7 +43,7 @@ class BasicInformationSocialInstController extends Controller
     {
         return view('biogmains.socialinst.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構', 'page_url' => '/basicinformation/'.$id.'/socialinst']);
     }
 
     /**

@@ -26,7 +26,7 @@
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <input name="c_sequence" type="text" class="form-control" value="{{ $row->c_sequence }}">
+                        <input name="c_sequence" type="text" class="form-control" value="{{ $row->c_sequence }}" maxlength="4">
                         <p>註:若有同時任命的官職, 請手動填上相同的sequence</p>
                     </div>
                 </div>
@@ -58,6 +58,8 @@
                                 @foreach($res['addr_str'] as $item)
                                     <option value="{{ $item[0] }}" selected="selected">{{ $item[1] }}</option>
                                 @endforeach
+                            @else
+                              <option value="0">0 unknown 未详</option>
                             @endif
                         </select>
                     </div>

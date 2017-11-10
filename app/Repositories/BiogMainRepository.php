@@ -121,6 +121,9 @@ class BiogMainRepository
         $data['c_name'] = $c_name;
         $data['c_name_proper'] = $c_name_proper;
         $data['c_name_rm'] = $c_name_rm;
+        $data['c_female'] = (int)($data['c_female']);
+        $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
+        $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
         $biogbasicinformation = BiogMain::find($id);
         $biogbasicinformation->update($data);
     }

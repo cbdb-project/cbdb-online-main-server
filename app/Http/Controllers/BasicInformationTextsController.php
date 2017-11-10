@@ -50,7 +50,7 @@ class BasicInformationTextsController extends Controller
     {
         return view('biogmains.texts.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述', 'page_url' => '/basicinformation/'.$id.'/texts']);
     }
 
     /**

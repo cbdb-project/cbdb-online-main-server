@@ -48,7 +48,7 @@ class BasicInformationAltnamesController extends Controller
     {
         return view('biogmains.altname.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名', 'page_url' => '/basicinformation/'.$id.'/altnames']);
     }
 
     /**

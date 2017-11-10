@@ -24,7 +24,7 @@
                 <div class="form-group">
                     <label for="c_role_id" class="col-sm-2 control-label">著述角色(c_role_id)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_role_id" model="role" selected=""></select-vue>
+                        <select-vue name="c_role_id" model="role" selected="0"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

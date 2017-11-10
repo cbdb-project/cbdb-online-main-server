@@ -49,7 +49,7 @@ class BasicInformationAddressesController extends Controller
     {
         return view('biogmains.addresses.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址', 'page_url' => '/basicinformation/'.$id.'/addresses']);
     }
 
     /**

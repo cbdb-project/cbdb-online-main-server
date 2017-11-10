@@ -43,7 +43,7 @@ class BasicInformationStatusesController extends Controller
     {
         return view('biogmains.statuses.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分', 'page_url' => '/basicinformation/'.$id.'/statuses']);
     }
 
     /**

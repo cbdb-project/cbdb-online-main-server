@@ -17,7 +17,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
                 <div class="form-group">

@@ -18,7 +18,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">次序(sequence)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
                 <div class="form-group">
@@ -84,6 +84,8 @@
                                 @foreach($res['addr_str'] as $item)
                                     <option value="{{ $item[0] }}" selected="selected">{{ $item[1] }}</option>
                                 @endforeach
+                            @else
+                                <option value="0" selected>未详</option>
                             @endif
                         </select>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\AddressCode;
 use App\AssocCode;
 use App\BiogMain;
 use App\EntryCode;
@@ -132,7 +133,7 @@ class ApiController extends Controller
 
     public function topic()
     {
-        return DB::table('SCHOLARLYTOPIC_CODES')->get();
+        return DB::table('SCHOLARLYTOPIC_CODES')->select('c_topic_code', 'c_topic_desc', 'c_topic_desc_chn', 'c_topic_type_desc', 'c_topic_type_desc_chn')->get();
     }
 
     public function occasion()
@@ -141,7 +142,7 @@ class ApiController extends Controller
     }
 
     public function searchText(Request $request){
-        $data = TextCode::select(['c_textid', 'c_title_chn', 'c_title'])->where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
+        $data = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_textid;
@@ -152,7 +153,7 @@ class ApiController extends Controller
     }
 
     public function searchOffice(Request $request){
-        $data = OfficeCode::select(['c_office_id', 'c_office_pinyin', 'c_office_chn'])->where('c_office_chn', 'like', '%'.$request->q.'%')->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')->orWhere('c_office_id', $request->q)->paginate(20);
+        $data = OfficeCode::where('c_office_chn', 'like', '%'.$request->q.'%')->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')->orWhere('c_office_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_office_id;
@@ -243,6 +244,14 @@ class ApiController extends Controller
             if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_event_code." ".$item->c_event_name_chn." ".$item->c_event_name;
         }
+        return $data;
+    }
+
+    public function codeAddr(Request $request)
+    {
+        $num = is_null($request->num) ? 20 : $request->num;
+        $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate($num);
+        $data->appends(['q' => $request->q])->links();
         return $data;
     }
 }

@@ -11,6 +11,7 @@ class Dynasty extends Model
      *
      * @var string
      */
+    protected $table = 'DYNASTIES';
     protected $primaryKey = 'c_dy';
     /**
      * 该模型是否被自动维护时间戳

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\AddressCode;
 use App\AssocCode;
 use App\BiogMain;
+use App\Dynasty;
 use App\EntryCode;
 use App\EventCode;
 use App\KinshipCode;
@@ -22,6 +23,7 @@ use App\SocialInst;
 use App\StatusCode;
 use App\TextCode;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 
 class ApiController extends Controller
@@ -158,7 +160,8 @@ class ApiController extends Controller
         foreach($data as $item){
             $item['id'] = $item->c_office_id;
             if($item['id'] === 0) $item['id'] = -999;
-            $item['text'] = $item->c_office_id." ".$item->c_office_pinyin." ".$item->c_office_chn;
+            $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
+            $item['text'] = $item->c_office_id." ".$item->c_office_pinyin." ".$item->c_office_chn." ".$dy;
         }
         return $data;
     }
@@ -225,12 +228,13 @@ class ApiController extends Controller
 
     public function searchBiog(Request $request)
     {
-        $data = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
+        $data = BiogMain::select(['c_personid', 'c_name_chn', 'c_name', 'c_index_year', 'c_dy'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_personid;
             if($item['id'] === 0) $item['id'] = -999;
-            $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name;
+            $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
+            $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name." ".$dy." index_year:".$item->c_index_year;
         }
         return $data;
     }

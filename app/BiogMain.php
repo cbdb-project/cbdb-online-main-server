@@ -137,7 +137,7 @@ class BiogMain extends Model
 
     public function kinship_name()
     {
-        return $this->belongsToMany('App\BiogMain', 'KIN_DATA', 'c_personid', 'c_kin_id')->select(['c_name', 'c_name_chn']);
+        return $this->belongsToMany('App\BiogMain', 'KIN_DATA', 'c_personid', 'c_kin_id')->select(['c_name', 'c_name_chn', 'c_kin_id']);
     }
 
     public function assoc()

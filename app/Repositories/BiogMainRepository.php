@@ -12,6 +12,7 @@ namespace App\Repositories;
 use App\AddressCode;
 use App\AssocCode;
 use App\BiogMain;
+use App\Dynasty;
 use App\EntryCode;
 use App\EventCode;
 use App\KinshipCode;
@@ -86,7 +87,7 @@ class BiogMainRepository
     }
     public function byIdWithAssoc($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc', 'assoc_name')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc')->find($id);
         return $basicinformation;
     }
     public function byIdWithKinship($id)
@@ -183,14 +184,16 @@ class BiogMainRepository
         $office_str = null;
         if($row->c_office_id || $row->c_office_id === 0) {
             $text_ = OfficeCode::find($row->c_office_id);
-            $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn;
+            $dy = Dynasty::where('c_dy', $text_->c_dy)->first()->c_dynasty_chn;
+            $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn." ".$dy;
         }
         $posting_str = null;
-        if($row->c_posting_id || $row->c_posting_id === 0) {
-            $text_ = SocialInst::find($row->c_office_id);
+//        dd($row->c_inst_name_code);
+        if($row->c_inst_code || $row->c_inst_code === 0) {
+            $text_ = SocialInst::find($row->c_inst_code);
             $posting_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
         }
-
+//        dd($posting_str);
         $addr_ = DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->get();
         $addr_str = [];
         foreach ($addr_ as $key=>$value) {
@@ -716,7 +719,8 @@ class BiogMainRepository
     protected function addr_str($id)
     {
         $row = AddressCode::find($id);
-        return $row->c_addr_id.' '.$row->c_name.' '.$row->c_name_chn;
+        $belongs = $row->belongs1_Name." ".$row->belongs2_Name." ".$row->belongs3_Name." ".$row->belongs4_Name." ".$row->belongs5_Name;
+        return $row->c_addr_id.' '.$row->c_name.' '.$row->c_name_chn.' '.trim($belongs);
     }
 
     protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)

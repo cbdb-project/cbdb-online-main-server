@@ -64,7 +64,8 @@ class AddrCodeRepository
         foreach($data as $item){
             $item['id'] = $item->c_addr_id;
             if($item['id'] === 0) $item['id'] = -999;
-            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn;
+            $belongs = $item->belongs1_Name." ".$item->belongs2_Name." ".$item->belongs3_Name." ".$item->belongs4_Name." ".$item->belongs5_Name;
+            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs);
         }
         return $data;
     }
@@ -74,7 +75,8 @@ class AddrCodeRepository
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_addr_id == 0 ? -999 : $item->c_addr_id;
-            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn;
+            $belongs = $item->belongs1_ID." ".$item->belongs1_Name." ".$item->belongs2_ID." ".$item->belongs2_Name." ".$item->belongs3_ID." ".$item->belongs3_Name." ".$item->belongs4_ID." ".$item->belongs4_Name." ".$item->belongs5_ID." ".$item->belongs5_Name;
+            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs);
         }
         return $data;
     }

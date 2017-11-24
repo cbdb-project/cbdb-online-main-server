@@ -75,9 +75,15 @@ class BasicInformationController extends Controller
     public function store(Request $request)
     {
         $data = $request->all();
-        $data['c_personid'] = BiogMain::max('c_personid') + 1;
+//        dd(!BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty());
+        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()){
+            flash('person id 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+//        $data['c_personid'] = BiogMain::max('c_personid') + 1;
         $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $flight = BiogMain::create($data);
+        flash('Create success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.edit', $data['c_personid']);
     }
 

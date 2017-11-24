@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_office_id" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
                             <option value="0">0 unknown 未详</option>
@@ -48,7 +48,7 @@
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-
+                            <option value="0" selected>0 Weizhi 未知</option>
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
@@ -200,7 +200,7 @@
         $(".c_office_id").select2(options('office'));
         $(".c_source").select2(options('text'));
         $(".c_inst_code").select2(options('socialinst'));
-        $(".c_addr").select2(options('officeaddr'));
+        $(".c_addr").select2(options('addr'));
 
         function formatRepo (repo) {
             if (repo.loading) {

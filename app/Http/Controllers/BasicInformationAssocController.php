@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use function PHPSTORM_META\map;
 
 class BasicInformationAssocController extends Controller
 {
@@ -30,9 +32,16 @@ class BasicInformationAssocController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
-//        dd($biogbasicinformation->assoc_name);
+        $person_id = $biogbasicinformation->c_personid;
+        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) {
+            $assoc = DB::table('ASSOC_DATA')->where('tts_sysno', '=', $item->pivot->tts_sysno)->first();
+            $assoc_biog = DB::table('BIOG_MAIN')->where('c_personid', '=', $assoc->c_assoc_id)->first();
+            if(is_null($assoc_biog)) return null;
+            return ['c_personid' => $assoc_biog->c_personid,'assoc_name' => $assoc_biog->c_name.' '.$assoc_biog->c_name_chn];
+        });
+//        dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
+            'assoc_name' => $assoc_name, 'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
     }
 
     /**

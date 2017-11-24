@@ -30,7 +30,7 @@
                             @if($count > count($thead)-1)
                                 @break
                             @endif
-                            @if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn'))
+                            @if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy'))
                                 @if($count == 0)
                                     @php($id_ = $value)
                                 @endif

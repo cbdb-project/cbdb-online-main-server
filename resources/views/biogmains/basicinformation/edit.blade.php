@@ -166,7 +166,7 @@
                     <label for="c_firstyear" class="col-sm-2 control-label">生年(birth year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_birthyear" class="form-control"
-                               value="{{ $basicinformation->c_birthyear }}">
+                               value="{{ $basicinformation->c_birthyear }}" onchange="indexYear()">
                     </div>
 
                     <div class="col-md-2 from-inline">
@@ -205,7 +205,7 @@
                     <label for="c_firstyear" class="col-sm-2 control-label">卒年(death year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_deathyear" class="form-control"
-                               value="{{ $basicinformation->c_deathyear }}">
+                               value="{{ $basicinformation->c_deathyear }}" onchange="indexYear()">
                     </div>
 
                     <div class="col-md-2 from-inline">
@@ -377,6 +377,18 @@
 @section('js')
     <script>
         $(".select2").select2();
+        function indexYear() {
+            let birth = $('input[name=c_birthyear]').val();
+            let death = $('input[name=c_deathyear]').val();
+            if(birth && death){
+                if(death < birth) return;
+                let deathage = death - birth;
+                $('input[name=c_death_age]').val(deathage);
+                let indexyear = deathage > 60 ? parseInt(birth) + 60 : death;
+                $('input[name=c_index_year]').val(indexyear);
+            }
+            // let index =
+        }
     </script>
 
 @endsection

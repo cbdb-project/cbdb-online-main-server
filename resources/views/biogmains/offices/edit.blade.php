@@ -45,7 +45,7 @@
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
                             @if($res['posting_str'])
-                            <option value="{{ $row->c_posting_id }}" selected="selected">{{ $res['posting_str'] }}</option>
+                            <option value="{{ $row->c_inst_code }}" selected="selected">{{ $res['posting_str'] }}</option>
                             @endif
                         </select>
                     </div>
@@ -222,7 +222,7 @@
         $(".c_office_id").select2(options('office'));
         $(".c_source").select2(options('text'));
         $(".c_inst_code").select2(options('socialinst'));
-        $(".c_addr").select2(options('officeaddr'));
+        $(".c_addr").select2(options('addr'));
 
         function formatRepo (repo) {
             if (repo.loading) {

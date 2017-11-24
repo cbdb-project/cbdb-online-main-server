@@ -20,6 +20,8 @@ Route::get('/', function () {
 
 Auth::routes();
 
+Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
+Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
 Route::get('/redirect', function () {
     $query = http_build_query([
         'client_id' => 3,

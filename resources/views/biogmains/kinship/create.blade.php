@@ -16,16 +16,16 @@
                 <div class="form-group">
                     <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_kin_code" name="c_kin_code">
-                            <option value="0" selected="selected"></option>
+                        <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
+                            <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_kin_id" name="c_kin_id">
-                            <option value="0" selected="selected"></option>
+                        <select class="form-control c_kin_id" name="c_kin_id" onchange="kinship_pair()">
+                            <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                 </div>
@@ -33,7 +33,7 @@
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
@@ -56,6 +56,14 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成对亲属关系</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kinship_pair" name="c_kinship_pair">
+                            <option value="0">无对应亲属关系</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>
@@ -69,6 +77,7 @@
 @section('js')
     <script>
         $(".select2").select2();
+        $(".c_kinship_pair").select2();
         $(".c_source").select2(options('text'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_kin_id").select2(options('biog'));
@@ -126,6 +135,20 @@
                 templateResult: formatRepo,
                 templateSelection: formatRepoSelection
             }
+        }
+
+        function kinship_pair(){
+            let c_kin_code = $('.c_kin_code').val();
+            let c_kin_id = $('.c_kin_id').val();
+            console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            console.log($(".c_kinship_pair").val());
+            $(".c_kinship_pair").append(new Option("Jquery", 10001, false, true));
         }
     </script>
 @endsection

@@ -228,13 +228,14 @@ class ApiController extends Controller
 
     public function searchBiog(Request $request)
     {
-        $data = BiogMain::select(['c_personid', 'c_name_chn', 'c_name', 'c_index_year', 'c_dy'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
+        $data = BiogMain::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
+//        return $data;
         foreach($data as $item){
             $item['id'] = $item->c_personid;
             if($item['id'] === 0) $item['id'] = -999;
-            $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
-            $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name." ".$dy." index_year:".$item->c_index_year;
+//            $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
+            $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name." index_year:".$item->c_index_year;
         }
         return $data;
     }

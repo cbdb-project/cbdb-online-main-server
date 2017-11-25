@@ -431,6 +431,7 @@ class BiogMainRepository
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+
         DB::table('KIN_DATA')->insert($data);
         return $data['tts_sysno'];
     }

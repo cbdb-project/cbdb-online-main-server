@@ -65,7 +65,7 @@ class AddrCodeRepository
             $item['id'] = $item->c_addr_id;
             if($item['id'] === 0) $item['id'] = -999;
             $belongs = $item->belongs1_Name." ".$item->belongs2_Name." ".$item->belongs3_Name." ".$item->belongs4_Name." ".$item->belongs5_Name;
-            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs);
+            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
         }
         return $data;
     }

@@ -11,7 +11,7 @@ class AddressCode extends Model
      *
      * @var string
      */
-    protected $table = 'ADDR_CODES';
+    protected $table = 'ADDRESSES';
     protected $primaryKey = 'c_addr_id';
 
     /**

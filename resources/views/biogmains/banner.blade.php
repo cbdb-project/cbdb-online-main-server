@@ -18,27 +18,27 @@
             <a href="{{ route('basicinformation.offices.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;官名({{ $basicinformation->offices_count }})</a>
         </div>
         <div class="col-sm-offset-1 col-sm-2">
-            <a href="/entries/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;入仕({{ $basicinformation->entries_count }})</a>
+            <a href="{{ route('basicinformation.entries.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;入仕({{ $basicinformation->entries_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href="/events/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;事件({{ $basicinformation->events_count }})</a>
+            <a href="{{ route('basicinformation.events.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;事件({{ $basicinformation->events_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href="/statuses/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會區分({{ $basicinformation->statuses_count }})</a>
+            <a href="{{ route('basicinformation.statuses.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會區分({{ $basicinformation->statuses_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href="/kinship/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;親屬({{ $basicinformation->kinship_count }})</a>
+            <a href="{{ route('basicinformation.kinship.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;親屬({{ $basicinformation->kinship_count }})</a>
         </div>
         <div class="col-sm-3">
-            <a href="/assoc/{{ $basicinformation->c_personid }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會關係({{ $basicinformation->assoc_count }})</a>
+            <a href="{{ route('basicinformation.assoc.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社會關係({{ $basicinformation->assoc_count }})</a>
         </div>
         <div class="col-sm-offset-1 col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 財產(0)</a>
+            <a href="{{ route('basicinformation.possession.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;財產({{ $basicinformation->possession_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href=""><i class="glyphicon glyphicon-user"></i> 社交機構(0)</a>
+            <a href="{{ route('basicinformation.socialinst.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社交機構({{ $basicinformation->inst_count }})</a>
         </div>
-        <div class="col-sm-2">
+        <div class="col-sm-2 hidden">
             <a href="/sources/{{ $basicinformation->c_personid }}"><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>&nbsp;&nbsp;出处({{ $basicinformation->sources_count }})</a>
         </div>
     </div>

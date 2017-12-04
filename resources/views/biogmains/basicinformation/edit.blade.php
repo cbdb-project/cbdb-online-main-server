@@ -165,14 +165,14 @@
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">生年(birth year)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_birthyear" class="form-control"
-                               value="{{ $basicinformation->c_birthyear }}">
+                        <input type="number" name="c_birthyear" class="form-control"
+                               value="{{ $basicinformation->c_birthyear }}" onchange="indexYear()">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_fy_nh_code">年号</label>
                         <select-vue name="c_by_nh_code" model="nianhao" selected="{{ $basicinformation->c_by_nh_code }}"></select-vue>
-                        <input type="text" name="c_by_nh_year" class="form-control"
+                        <input type="number" name="c_by_nh_year" class="form-control"
                                value="{{ $basicinformation->c_by_nh_year }}">
                         <span for="">年</span>
                     </div>
@@ -191,10 +191,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_by_month" class="form-control"
+                        <input type="number" name="c_by_month" class="form-control"
                                value="{{ $basicinformation->c_by_month }}">
                         <span for="">月</span>
-                        <input type="text" name="c_by_day" class="form-control"
+                        <input type="number" name="c_by_day" class="form-control"
                                value="{{ $basicinformation->c_by_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
@@ -204,14 +204,14 @@
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">卒年(death year)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_deathyear" class="form-control"
-                               value="{{ $basicinformation->c_deathyear }}">
+                        <input type="number" name="c_deathyear" class="form-control"
+                               value="{{ $basicinformation->c_deathyear }}" onchange="indexYear()">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_dy_nh_code">年号</label>
                         <select-vue name="c_dy_nh_code" model="nianhao" selected="{{ $basicinformation->c_dy_nh_code }}"></select-vue>
-                        <input type="text" name="c_dy_nh_year" class="form-control"
+                        <input type="number" name="c_dy_nh_year" class="form-control"
                                value="{{ $basicinformation->c_dy_nh_year }}">
                         <span for="">年</span>
                     </div>
@@ -230,10 +230,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_dy_month" class="form-control"
+                        <input type="number" name="c_dy_month" class="form-control"
                                value="{{ $basicinformation->c_dy_month }}">
                         <span for="">月</span>
-                        <input type="text" name="c_dy_day" class="form-control"
+                        <input type="number" name="c_dy_day" class="form-control"
                                value="{{ $basicinformation->c_dy_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
@@ -377,6 +377,18 @@
 @section('js')
     <script>
         $(".select2").select2();
+        function indexYear() {
+            let birth = $('input[name=c_birthyear]').val();
+            let death = $('input[name=c_deathyear]').val();
+            if(birth && death){
+                if(death < birth) return;
+                let deathage = death - birth;
+                $('input[name=c_death_age]').val(deathage);
+                let indexyear = deathage > 60 ? parseInt(birth) + 60 : death;
+                $('input[name=c_index_year]').val(indexyear);
+            }
+            // let index =
+        }
     </script>
 
 @endsection

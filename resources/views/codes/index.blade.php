@@ -15,7 +15,7 @@
             <table class="table table-hover table-condensed">
                 <thead>
                 <tr>
-                    <th>表明</th>
+                    <th>表名</th>
                 </tr>
                 </thead>
                 <tbody>

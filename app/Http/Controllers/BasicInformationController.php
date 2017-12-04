@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\BiogMain;
 use App\Http\Requests\BasicInformationRequest;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
@@ -62,7 +63,7 @@ class BasicInformationController extends Controller
      */
     public function create()
     {
-        return view('biogmains.basicinformation.create');
+        return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息']);
     }
 
     /**
@@ -73,7 +74,17 @@ class BasicInformationController extends Controller
      */
     public function store(Request $request)
     {
-//        return redirect()->route('basicinformation.show', [1]);
+        $data = $request->all();
+//        dd(!BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty());
+        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()){
+            flash('person id 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+//        $data['c_personid'] = BiogMain::max('c_personid') + 1;
+        $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
+        $flight = BiogMain::create($data);
+        flash('Create success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.edit', $data['c_personid']);
     }
 
     /**
@@ -85,6 +96,8 @@ class BasicInformationController extends Controller
     public function show($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
+        $biogbasicinformation->kinship;
+        $biogbasicinformation->office;
         return $biogbasicinformation;
 //        return view('biogmains.show', $result);
     }

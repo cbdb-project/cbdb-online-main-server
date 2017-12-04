@@ -68,7 +68,7 @@
             </div>
         </form>
         <div class="social-auth-links text-center"></div>
-        {{--<a href="#">I forgot my password</a><br>--}}
+        <a href="{{ url('/password/reset') }}">I forgot my password</a><br>
         <a href="{{ route('register') }}" class="text-center">Register a new membership</a>
 
     </div>

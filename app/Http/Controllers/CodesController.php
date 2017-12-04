@@ -40,16 +40,16 @@ class CodesController extends Controller
             $count = 0;
             foreach($data[0] as $key => $value){
                 if ($count >2){
-                    break;
+//                    break;
                 }
-                if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence')){
+                if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy')){
                     array_push($thead, $key);
                     $count++;
                 }
             }
 //                dd($data);
             return view('codes.show', [
-                'page_title' => 'Codes',
+                'page_title' => $table_name,
                 'page_description' => $table_name,
                 'page_url' => '/codes',
                 'archer' => "<li><a href=''>".$table_name."</a></li>",
@@ -129,7 +129,7 @@ class CodesController extends Controller
         $id_name = $this->getIdName($table_name);
         $row = DB::table($table_name)->where($id_name, $id)->first();
         $op = [
-            'op_type' => 1,
+            'op_type' => 4,
             'resource' => $table_name,
             'resource_id' => $id,
             'resource_data' => json_encode((array)$row)

@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             <table class="table table-hover table-condensed">
-                <a href="{{ route('basicinformation.altnames.create', $basicinformation->c_personid) }}" class="btn btn-default">新增</a>
+                <a href="{{ route('basicinformation.altnames.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
                 <caption>共查询到{{ $basicinformation->altnames_count }}条记录</caption>
                 <thead>
                 <tr>
@@ -27,9 +27,15 @@
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->tts_sysno]) }}">edit</a>
                                 <a href=""
-                                   onclick="alert('确认删除');
-                                event.preventDefault();
-                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();"
+                                   onclick="
+                                           let msg = '您真的确定要删除吗？\n\n请确认！';
+                                           if (confirm(msg)===true){
+                                               event.preventDefault();
+                                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();
+                                           }else{
+                                               return false;
+                                           }
+                                "
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>

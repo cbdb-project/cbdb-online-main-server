@@ -49,7 +49,7 @@ class BasicInformationAddressesController extends Controller
     {
         return view('biogmains.addresses.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址', 'page_url' => '/basicinformation/'.$id.'/addresses']);
     }
 
     /**
@@ -146,7 +146,7 @@ class BasicInformationAddressesController extends Controller
         $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
 //        dd($row);
         $op = [
-            'op_type' => 1,
+            'op_type' => 4,
             'resource' => 'BIOG_ADDR_DATA',
             'resource_id' => $addr,
             'resource_data' => json_encode((array)$row)

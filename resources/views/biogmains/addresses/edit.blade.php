@@ -17,7 +17,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">遷徙次序</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
                 <div class="form-group">
@@ -39,14 +39,14 @@
                 <div class="form-group">
                     <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_firstyear" class="form-control"
+                        <input type="number" name="c_firstyear" class="form-control"
                                value="{{ $row->c_firstyear }}">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_fy_nh_code">年号</label>
                         <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $row->c_fy_nh_code }}"></select-vue>
-                        <input type="text" name="c_fy_nh_year" class="form-control"
+                        <input type="number" name="c_fy_nh_year" class="form-control"
                                value="{{ $row->c_fy_nh_year }}">
                         <span for="">年</span>
                     </div>
@@ -65,10 +65,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_fy_month" class="form-control"
+                        <input type="number" name="c_fy_month" class="form-control"
                                value="{{ $row->c_fy_month }}">
                         <span for="">月</span>
-                        <input type="text" name="c_fy_day" class="form-control"
+                        <input type="number" name="c_fy_day" class="form-control"
                                value="{{ $row->c_fy_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
@@ -78,14 +78,14 @@
                 <div class="form-group">
                     <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
                     <div class="col-md-1">
-                        <input type="text" name="c_lastyear" class="form-control"
+                        <input type="number" name="c_lastyear" class="form-control"
                                value="{{ $row->c_lastyear }}">
                     </div>
 
                     <div class="col-md-2 from-inline">
                         <label for="c_ly_nh_code">年号</label>
                         <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $row->c_ly_nh_code }}"></select-vue>
-                        <input type="text" name="c_ly_nh_year" class="form-control"
+                        <input type="number" name="c_ly_nh_year" class="form-control"
                                value="{{ $row->c_ly_nh_year }}">
                         <span for="">年</span>
                     </div>
@@ -104,10 +104,10 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="text" name="c_ly_month" class="form-control"
+                        <input type="number" name="c_ly_month" class="form-control"
                                value="{{ $row->c_ly_month }}">
                         <span for="">月</span>
-                        <input type="text" name="c_ly_day" class="form-control"
+                        <input type="number" name="c_ly_day" class="form-control"
                                value="{{ $row->c_ly_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
@@ -118,7 +118,7 @@
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source">
-                            @if($addr_str)
+                            @if($text_str)
                             <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
                             @endif
                         </select>

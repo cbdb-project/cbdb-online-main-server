@@ -64,7 +64,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'PRC',
 
     /*
     |--------------------------------------------------------------------------
@@ -163,12 +163,14 @@ return [
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
 
+
         /*
          * Package Service Providers...
          */
         Laravel\Tinker\TinkerServiceProvider::class,
         Laracasts\Flash\FlashServiceProvider::class,
         Laravel\Passport\PassportServiceProvider::class,
+        Naux\Mail\SendCloudServiceProvider::class,
 //        Dingo\Api\Provider\LaravelServiceProvider::class,
 
         /*

@@ -63,7 +63,8 @@ class BasicInformationController extends Controller
      */
     public function create()
     {
-        return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息']);
+        $temp_id = BiogMain::max('c_personid') + 1;
+        return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息', 'temp_id' => $temp_id]);
     }
 
     /**

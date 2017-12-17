@@ -35,7 +35,10 @@ class BasicInformationOfficesController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithOff($id);
+//        dd($biogbasicinformation->offices_addr->toArray());
+
         $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray());
+//        dd($serialAddr);
         return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名']);
     }
@@ -125,6 +128,7 @@ class BasicInformationOfficesController extends Controller
      */
     protected function serialAddr(Array $array){
         $res = [];
+//        dd($array);
         foreach ($array as $item)
             if (array_has($res, $item['pivot']['c_posting_id'])) $res[$item['pivot']['c_posting_id']] = $res[$item['pivot']['c_posting_id']].';'.$item['c_name_chn'];
             else $res[$item['pivot']['c_posting_id']] = $item['c_name_chn'];

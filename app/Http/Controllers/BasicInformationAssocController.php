@@ -32,12 +32,17 @@ class BasicInformationAssocController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
-        $person_id = $biogbasicinformation->c_personid;
-        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) {
-            $assoc = DB::table('ASSOC_DATA')->where('tts_sysno', '=', $item->pivot->tts_sysno)->first();
-            $assoc_biog = DB::table('BIOG_MAIN')->where('c_personid', '=', $assoc->c_assoc_id)->first();
-            if(is_null($assoc_biog)) return null;
-            return ['c_personid' => $assoc_biog->c_personid,'assoc_name' => $assoc_biog->c_name.' '.$assoc_biog->c_name_chn];
+        $assoc_name_id = array();
+        $assoc_name_name = array();
+        foreach ($biogbasicinformation->assoc_name as $key => $value){
+            $assoc_name_id[$key] = $value->pivot->c_assoc_id;
+            $assoc_name_name[$key] = $value->c_name.' '.$value->c_name_chn;
+        }
+        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_name) {
+            if (in_array($item->pivot->c_assoc_id, $assoc_name_id)) {
+                return ['c_personid' => $item->pivot->c_assoc_id,'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
+            }
+            return ['c_personid' => 0, 'assoc_name' => ''];
         });
 //        dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,

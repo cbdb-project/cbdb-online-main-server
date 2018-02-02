@@ -49,8 +49,8 @@ class RegisterController extends Controller
      */
     public function showRegistrationForm()
     {
-        return '内测阶段，暂不开放注册';
-//        return view('auth.register');
+//        return '内测阶段，暂不开放注册';
+        return view('auth.register');
     }
 
     /**

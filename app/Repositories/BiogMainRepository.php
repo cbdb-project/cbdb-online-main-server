@@ -411,33 +411,46 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str, 'kin_str' => $kin_str, 'biog_str' => $biog_str];
     }
 
-    public function kinshipUpdateById(Request $request, $id)
+    public function kinshipUpdateById(Request $request, $id, $id_)
     {
         $data = $request->all();
 //        dd($data);
-        $data = array_except($data, ['_token', '_method']);
+        $kin_pair = $data['c_kinship_pair'];
+        $kin_id = $data['c_kin_id'];
+        $data = array_except($data, ['_token', '_method', 'c_kinship_pair', 'c_kin_id']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
-        $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        DB::table('KIN_DATA')->where('tts_sysno',$id)->update($data);
+//        dd($data);
+        DB::table('KIN_DATA')->where('tts_sysno',$id_)->update($data);
+        $data['c_kin_code'] = $kin_pair;
+//        dd($data);
+        DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $kin_id]])->update($data);
+//        dd($data);
     }
 
     public function kinshipStoreById(Request $request, $id)
     {
         $data = $request->all();
-        $data = array_except($data, ['_token']);
+        $kin_pair = $data['c_kinship_pair'];
+        $data = array_except($data, ['_token', 'c_kinship_pair']);
         $data['tts_sysno'] = DB::table('KIN_DATA')->max('tts_sysno') + 1;
+        $tts = $data['tts_sysno'];
         $data['c_personid'] = $id;
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-
         DB::table('KIN_DATA')->insert($data);
-        return $data['tts_sysno'];
+        $data['tts_sysno'] += 1;
+        $data['c_kin_code'] = $kin_pair;
+        $data['c_personid'] = $data['c_kin_id'];
+        $data['c_kin_id'] = $id;
+        DB::table('KIN_DATA')->insert($data);
+        return $tts;
     }
 
     public function kinshipDeleteById($id)
     {
+        $operationRepository = new OperationRepository();
         $row = DB::table('KIN_DATA')->where('tts_sysno', $id)->first();
         $op = [
             'op_type' => 4,
@@ -445,9 +458,17 @@ class BiogMainRepository
             'resource_id' => $id,
             'resource_data' => json_encode((array)$row)
         ];
-        $operationRepository = new OperationRepository();
+        $operationRepository->store($op);
+        $row = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first();
+        $op = [
+            'op_type' => 4,
+            'resource' => 'KIN_DATA',
+            'resource_id' => $row->tts_sysno,
+            'resource_data' => json_encode((array)$row)
+        ];
         $operationRepository->store($op);
         DB::table('KIN_DATA')->where('tts_sysno', $id)->delete();
+        DB::table('KIN_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
     }
 
     public function possessionById($id)

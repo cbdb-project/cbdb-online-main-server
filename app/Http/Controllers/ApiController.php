@@ -259,4 +259,13 @@ class ApiController extends Controller
         $data->appends(['q' => $request->q])->links();
         return $data;
     }
+
+    public function searchKinPair(Request $request)
+    {
+        $kin_code = $request->kin_code;
+        $person_id = $request->person_id;
+        $data = KinshipCode::find($kin_code);
+        $res = KinshipCode::find([$data->c_kin_pair1, $data->c_kin_pair2]);
+        return $res;
+    }
 }

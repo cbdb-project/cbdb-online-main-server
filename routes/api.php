@@ -78,6 +78,7 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('search/status', 'ApiController@searchStatuscode');
     Route::get('search/biog', 'ApiController@searchBiog');
     Route::get('search/event', 'ApiController@searchEvent');
+    Route::get('search/kinpair', 'ApiController@searchKinPair');
 });
 
 Route::group(['prefix' => 'code'], function (){

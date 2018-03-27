@@ -96,7 +96,7 @@ class BasicInformationKinshipController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
-        $this->biogMainRepository->kinshipUpdateById($request, $id_);
+        $this->biogMainRepository->kinshipUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.edit', ['id'=>$id, 'id_'=>$id_]);
     }

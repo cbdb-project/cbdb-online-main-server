@@ -24,7 +24,7 @@
                 <div class="form-group">
                     <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_kin_id" name="c_kin_id" onchange="kinship_pair()">
+                        <select class="form-control c_kin_id" name="c_kin_id">
                             <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
@@ -140,15 +140,22 @@
         function kinship_pair(){
             let c_kin_code = $('.c_kin_code').val();
             let c_kin_id = $('.c_kin_id').val();
-            console.log(c_kin_id, c_kin_code);
+            // console.log(c_kin_id, c_kin_code);
             // if (c_kin_id == 0 || c_kin_id == -999) {return}
             let data = [{
                 id: 0,
                 text: '请选择对应亲属关系'
             }];
             // $(".c_kinship_pair").val(null).trigger("change");
-            console.log($(".c_kinship_pair").val());
-            $(".c_kinship_pair").append(new Option("Jquery", 10001, false, true));
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                for (item in data){
+                    // console.log(data[item]);
+                    $(".c_kinship_pair").append(new Option(data[item]['c_kinrel'] + ' ' + data[item]['c_kinrel_chn'], data[item]['c_kincode'], false, true));
+                }
+            });
+
         }
     </script>
 @endsection

@@ -150,9 +150,12 @@
             // console.log($(".c_kinship_pair").val());
             $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
                 //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                for (item in data){
-                    // console.log(data[item]);
-                    $(".c_kinship_pair").append(new Option(data[item]['c_kinrel'] + ' ' + data[item]['c_kinrel_chn'], data[item]['c_kincode'], false, true));
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+
+                    item = data[i];
+                    // console.log(item);
+                    $(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
                 }
             });
 

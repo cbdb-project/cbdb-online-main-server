@@ -265,7 +265,17 @@ class ApiController extends Controller
         $kin_code = $request->kin_code;
         $person_id = $request->person_id;
         $data = KinshipCode::find($kin_code);
-        $res = KinshipCode::find([$data->c_kin_pair1, $data->c_kin_pair2]);
+        $res = KinshipCode::find([$data->c_kin_pair2, $data->c_kin_pair1]);
         return $res;
     }
+
+    public function searchAssocPair(Request $request)
+    {
+        $assoc_code = $request->assoc_code;
+        $person_id = $request->person_id;
+        $data = AssocCode::find($assoc_code);
+        $res = AssocCode::find([$data->c_assoc_pair, $data->c_assoc_pair2]);
+        return $res;
+    }
+
 }

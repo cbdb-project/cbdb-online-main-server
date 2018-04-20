@@ -43,7 +43,7 @@
                     <label for="" class="col-sm-2 control-label">社會關係人Y</label>
                     <div class="col-sm-1">關係</div>
                     <div class="col-sm-3">
-                        <select class="form-control c_assoc_code" name="c_assoc_code">
+                        <select class="form-control c_assoc_code" name="c_assoc_code" onchange="assocship_pair()">
                             @if($res['assoc_code'])
                                 <option value="{{ $row->c_assoc_code }}" selected="selected">{{ $res['assoc_code'] }}</option>
                             @endif
@@ -192,7 +192,14 @@
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成对社会关系</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_assocship_pair" name="c_assocship_pair">
+                            <option value="" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
@@ -214,6 +221,8 @@
         $(".c_addr_id").select2(options('addr'));
         $(".c_inst_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_assocship_pair").select2();
+        assocship_pair();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -265,6 +274,30 @@
                 templateResult: formatRepo,
                 templateSelection: formatRepoSelection
             }
+        }
+
+        function assocship_pair(){
+            let c_assoc_code = $('.c_assoc_code').val();
+            let c_assoc_id = $('.c_assoc_id').val();
+            // console.log(c_assoc_id, c_assoc_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应社会关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/assocpair', {assoc_code: c_assoc_code, person_id: c_assoc_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+
+                    item = data[i];
+                    // console.log(item);
+                    $(".c_assocship_pair").append(new Option(item['c_assoc_code'] + ' ' + item['c_assoc_desc_chn'] + ' ' + item['c_assoc_desc'], item['c_assoc_code'], false, true));
+                }
+            });
+
         }
     </script>
 @endsection

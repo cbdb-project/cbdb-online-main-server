@@ -68,7 +68,7 @@
                     <label for="" class="col-sm-2 control-label">成对亲属关系</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kinship_pair" name="c_kinship_pair">
-
+                            <option value="" selected="selected"></option>
                         </select>
                     </div>
                 </div>
@@ -90,7 +90,7 @@
         $(".c_source").select2(options('text'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_kin_id").select2(options('biog'));
-        kinship_pair();
+        // kinship_pair();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -160,9 +160,10 @@
             // console.log($(".c_kinship_pair").val());
             $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
                 //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                for (item in data){
-                    // console.log(data[item]);
-                    $(".c_kinship_pair").append(new Option(data[item]['c_kinrel'] + ' ' + data[item]['c_kinrel_chn'], data[item]['c_kincode'], false, true));
+                for (let i=data.length-1; i>-1; i--){
+                    item = data[i];
+                    // console.log(item);
+                    $(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
                 }
             });
 

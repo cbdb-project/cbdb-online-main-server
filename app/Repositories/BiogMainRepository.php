@@ -706,26 +706,38 @@ class BiogMainRepository
     {
         $data = $request->all();
         $data = $this->formatSelect($data);
-        $data = array_except($data, ['_method', '_token']);
+        $assoc_pair = $data['c_assocship_pair'];
+        $assoc_id = $data['c_assoc_id'];
+        $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         DB::table('ASSOC_DATA')->where('tts_sysno',$id)->update($data);
+        $data['c_assoc_code'] = $assoc_pair;
+//        dd($data);
+        DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
     }
 
     public function assocStoreById(Request $request, $id)
     {
         $data = $request->all();
         $data = $this->formatSelect($data);
+        $assoc_pair = $data['c_assocship_pair'];
         $data['c_personid'] = $id;
-        $data = array_except($data, ['_token']);
+        $data = array_except($data, ['_token', 'c_assocship_pair']);
         $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
 //        dump($data);
+        DB::table('ASSOC_DATA')->insert($data);
+        $data['tts_sysno'] += 1;
+        $data['c_assoc_code'] = $assoc_pair;
+        $data['c_personid'] = $data['c_assoc_id'];
+        $data['c_assoc_id'] = $id;
         DB::table('ASSOC_DATA')->insert($data);
         return $data['tts_sysno'];
     }
 
     public function assocDeleteById($id)
     {
+        $operationRepository = new OperationRepository();
         $row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         $op = [
             'op_type' => 4,
@@ -733,9 +745,17 @@ class BiogMainRepository
             'resource_id' => $id,
             'resource_data' => json_encode((array)$row)
         ];
-        $operationRepository = new OperationRepository();
+        $operationRepository->store($op);
+        $row = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id]])->first();
+        $op = [
+            'op_type' => 4,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => $row->tts_sysno,
+            'resource_data' => json_encode((array)$row)
+        ];
         $operationRepository->store($op);
         DB::table('ASSOC_DATA')->where('tts_sysno', $id)->delete();
+        DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
     }
 
     protected function addr_str($id)

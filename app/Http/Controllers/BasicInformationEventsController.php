@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BasicInformationEventsController extends Controller
 {
@@ -19,7 +20,6 @@ class BasicInformationEventsController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
     }
     /**
@@ -54,6 +54,14 @@ class BasicInformationEventsController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $_id = $this->biogMainRepository->eventStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.events.edit', ['id' => $id, '_id' => $_id]);
@@ -95,6 +103,14 @@ class BasicInformationEventsController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->eventUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.events.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -108,6 +124,14 @@ class BasicInformationEventsController extends Controller
      */
     public function destroy($id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->eventDeleteById($id_);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.events.index', ['id' => $id]);

@@ -21,7 +21,7 @@ Route::middleware('auth:api')->get(/**
     return $request->user();
 });
 
-Route::group(['middleware' => 'auth:api'], function () {
+Route::group([], function () {
     Route::post('/name', function (Request $request)    {
         $biogmianrepository = new \App\Repositories\BiogMainRepository();
         return $biogmianrepository->namesByQuery($request);
@@ -43,7 +43,7 @@ Route::group(['middleware' => 'auth:api'], function () {
     });
 });
 
-Route::group(['middleware' => 'auth:api', 'prefix' => 'select'], function (){
+Route::group(['prefix' => 'select'], function (){
     Route::get('ethnicity', 'ApiController@ethnicity');
     Route::get('choronym', 'ApiController@choronym');
     Route::get('dynasty', 'ApiController@dynasty');

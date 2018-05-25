@@ -25,12 +25,12 @@ Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsContr
 Route::get('/redirect', function () {
     $query = http_build_query([
         'client_id' => 3,
-        'redirect_uri' => 'http://cbdb-online-main-server.dev/callback',
+        'redirect_uri' => 'http://cbdb-online-main-server.test/callback',
         'response_type' => 'code',
         'scope' => '',
     ]);
 
-    return redirect('http://cbdb-online-main-server.dev/oauth/authorize?'.$query);
+    return redirect('http://cbdb-online-main-server.test/oauth/authorize?'.$query);
 });
 
 Route::get('/callback', function (Request $request) {
@@ -145,3 +145,15 @@ Route::resource('assoc', 'AssocController', ['name' => [
     'edit' => 'assoc.edit',
     'update' => 'assoc.update'
 ]]);
+
+Route::resource('manage', 'ManagementController', ['name' => [
+    'show' => 'manage.show',
+    'create' => 'manage.create',
+    'edit' => 'manage.edit',
+    'update' => 'manage.update'
+]]);
+
+Route::get('/test', function (Request $request){
+    $tools = new \App\Repositories\ToolsRepository;
+//    $tools->timestamp([]);
+});

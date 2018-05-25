@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BasicInformationKinshipController extends Controller
 {
@@ -19,7 +20,6 @@ class BasicInformationKinshipController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
     }
     /**
@@ -54,6 +54,14 @@ class BasicInformationKinshipController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $_id = $this->biogMainRepository->kinshipStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.edit', ['id' => $id, '_id' => $_id]);
@@ -96,6 +104,14 @@ class BasicInformationKinshipController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->kinshipUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -109,6 +125,14 @@ class BasicInformationKinshipController extends Controller
      */
     public function destroy($id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->kinshipDeleteById($id_);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.index', ['id' => $id]);

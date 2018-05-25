@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BasicInformationTextsController extends Controller
@@ -17,17 +19,18 @@ class BasicInformationTextsController extends Controller
     protected $biogMainRepository;
     protected $table_name;
     protected $operationRepository;
+    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository)
+    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->table_name = 'TEXT_DATA';
         $this->operationRepository = $operationRepository;
+        $this->toolsRepository = $toolsRepository;
     }
     /**
      * Display a listing of the resource.
@@ -61,10 +64,19 @@ class BasicInformationTextsController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['tts_sysno'] = DB::table($this->table_name)->max('tts_sysno') + 1;
+        $data = $this->toolsRepository->timestamp($data, True);
         DB::table($this->table_name)->insert($data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['tts_sysno']]);
@@ -106,9 +118,18 @@ class BasicInformationTextsController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         if ($data['c_textid'] == -999) $data['c_textid'] = 0;
+        $data = $this->toolsRepository->timestamp($data);
         DB::table($this->table_name)->where('tts_sysno',$id_)->update($data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -122,6 +143,14 @@ class BasicInformationTextsController extends Controller
      */
     public function destroy($id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
 //        dd($row);
         $op = [

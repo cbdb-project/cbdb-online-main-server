@@ -6,6 +6,7 @@ use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use phpDocumentor\Reflection\Types\Null_;
@@ -17,7 +18,6 @@ class CodesController extends Controller
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
     {
-        $this->middleware('auth');
         $this->codesrepostory = $codesRepository;
         $this->operationRepository = $operationRepository;
     }
@@ -87,6 +87,14 @@ class CodesController extends Controller
 
     public function update(Request $request, $table_name, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
 //        dd($data);
@@ -114,6 +122,14 @@ class CodesController extends Controller
 
     public function store(Request $request, $table_name)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $id_ = $this->getIdName($table_name);
@@ -126,6 +142,14 @@ class CodesController extends Controller
 
     public function destroy($table_name, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $id_name = $this->getIdName($table_name);
         $row = DB::table($table_name)->where($id_name, $id)->first();
         $op = [

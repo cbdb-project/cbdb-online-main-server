@@ -9,6 +9,7 @@ use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BasicInformationOfficesController extends Controller
@@ -24,7 +25,6 @@ class BasicInformationOfficesController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
     }
     /**
@@ -63,6 +63,14 @@ class BasicInformationOfficesController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
@@ -104,6 +112,14 @@ class BasicInformationOfficesController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->officeUpdateById($request, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$id_]);
@@ -117,6 +133,14 @@ class BasicInformationOfficesController extends Controller
      */
     public function destroy($id, $office)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->officeDeleteById($office);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.index', ['id' => $id]);

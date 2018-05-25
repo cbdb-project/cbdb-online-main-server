@@ -6,14 +6,19 @@
 
         <!-- Sidebar user panel (optional) -->
         <div class="user-panel">
-            <div class="pull-left image">
-                <img src="/images/avatar/{{ Auth::user()->avatar }}" class="img-circle" alt="User Image">
-            </div>
-            <div class="pull-left info">
-                <p>{{ Auth::user()->name }}</p>
-                <!-- Status -->
-                <a href="#"><i class="fa fa-circle text-success"></i> Online</a>
-            </div>
+            @if (Auth::guest())
+
+            @else
+                <div class="pull-left image">
+                    <img src="/images/avatar/{{ Auth::user()->avatar }}" class="img-circle" alt="User Image">
+                </div>
+                <div class="pull-left info">
+                    <p>{{ Auth::user()->name }}</p>
+                    <!-- Status -->
+                    <a href="#"><i class="fa fa-circle text-success"></i> Online</a>
+                </div>
+            @endif
+
         </div>
 
         <!-- search form (Optional) -->
@@ -44,7 +49,10 @@
             <li class="{{ $page_title == 'Altname Codes' ? 'active' : '' }}"><a href="{{ route('altnamecodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>别名编码表</span></a></li>
             <li class="{{ $page_title == 'Appointment Type Codes' ? 'active' : '' }}"><a href="{{ route('appointcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>任命类型编码表</span></a></li>
 
-
+            @if(Auth::check() and Auth::user()->is_admin == 1)
+                <li class="header">Management</li>
+                <li class="{{ $page_title == 'Management' ? 'active' : '' }}"><a href="{{ route('manage.index') }}"><i class="ion ion-ios-people-outline"></i> <span>管理用户</span></a></li>
+            @endif
         </ul>
         <!-- /.sidebar-menu -->
     </section>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BasicInformationStatusesController extends Controller
 {
@@ -54,6 +55,14 @@ class BasicInformationStatusesController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $_id = $this->biogMainRepository->statuseStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.statuses.edit', ['id' => $id, '_id' => $_id]);
@@ -95,6 +104,14 @@ class BasicInformationStatusesController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->statuseUpdateById($request, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.statuses.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -108,6 +125,14 @@ class BasicInformationStatusesController extends Controller
      */
     public function destroy($id, $id_)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->biogMainRepository->statuseDeleteById($id_);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.statuses.index', ['id' => $id]);

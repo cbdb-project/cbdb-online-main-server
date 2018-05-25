@@ -102,8 +102,8 @@
                             <img src="/images/avatar/{{ Auth::user()->avatar }}" class="img-circle" alt="User Image">
 
                             <p>
-                                {{ Auth::user()->name }} - Web Developer
-                                <small>Member since Nov. 2012</small>
+                                {{ Auth::user()->name }}
+                                <small>{{ Auth::user()->institution }}</small>
                             </p>
                         </li>
                         <!-- Menu Body -->

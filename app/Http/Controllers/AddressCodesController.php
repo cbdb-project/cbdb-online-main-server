@@ -6,6 +6,7 @@ use App\Repositories\AddrCodeRepository;
 use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Class AddressCodesController
@@ -25,7 +26,6 @@ class AddressCodesController extends Controller
      */
     public function __construct(AddrCodeRepository $addrcodeRepository)
     {
-        $this->middleware('auth');
         $this->addrcodeRepository = $addrcodeRepository;
     }
 
@@ -92,6 +92,14 @@ class AddressCodesController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->addrcodeRepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
 

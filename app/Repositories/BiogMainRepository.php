@@ -23,6 +23,7 @@ use App\StatusCode;
 use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 
@@ -125,6 +126,7 @@ class BiogMainRepository
         $data['c_female'] = (int)($data['c_female']);
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
+        $data = (new ToolsRepository)->timestamp($data);
         $biogbasicinformation = BiogMain::find($id);
         $biogbasicinformation->update($data);
     }
@@ -244,6 +246,7 @@ class BiogMainRepository
         $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->first();
 //        dd($row);
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'POSTED_TO_OFFICE_DATA',
             'resource_id' => $id,
@@ -302,6 +305,7 @@ class BiogMainRepository
         $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('ENTRY_DATA')->where('tts_sysno',$id)->update($data);
     }
 
@@ -317,6 +321,7 @@ class BiogMainRepository
         $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ENTRY_DATA')->insert($data);
         return $data['tts_sysno'];
     }
@@ -325,6 +330,7 @@ class BiogMainRepository
     {
         $row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'ENTRY_DATA',
             'resource_id' => $id,
@@ -358,6 +364,7 @@ class BiogMainRepository
         $data = array_except($data, ['_token', '_method']);
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('STATUS_DATA')->where('tts_sysno',$id)->update($data);
     }
 
@@ -370,6 +377,7 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('STATUS_DATA')->insert($data);
         return $data['tts_sysno'];
     }
@@ -378,6 +386,7 @@ class BiogMainRepository
     {
         $row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'STATUS_DATA',
             'resource_id' => $id,
@@ -421,6 +430,7 @@ class BiogMainRepository
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
 //        dd($data);
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('KIN_DATA')->where('tts_sysno',$id_)->update($data);
         $data['c_kin_code'] = $kin_pair;
 //        dd($data);
@@ -439,6 +449,7 @@ class BiogMainRepository
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('KIN_DATA')->insert($data);
         $data['tts_sysno'] += 1;
         $data['c_kin_code'] = $kin_pair;
@@ -453,6 +464,7 @@ class BiogMainRepository
         $operationRepository = new OperationRepository();
         $row = DB::table('KIN_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'KIN_DATA',
             'resource_id' => $id,
@@ -461,6 +473,7 @@ class BiogMainRepository
         $operationRepository->store($op);
         $row = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'KIN_DATA',
             'resource_id' => $row->tts_sysno,
@@ -499,6 +512,7 @@ class BiogMainRepository
         $this->insertAddrPo($data['c_addr_id'], $id_, $id);
         $data = array_except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSSESSION_DATA')->where('c_possession_record_id',$id_)->update($data);
     }
 
@@ -510,6 +524,7 @@ class BiogMainRepository
         $this->insertAddrPo($data['c_addr_id'], $data['c_possession_record_id'], $data['c_personid']);
         $data = array_except($data, ['_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSSESSION_DATA')->insert($data);
         return $data['c_possession_record_id'];
     }
@@ -519,6 +534,7 @@ class BiogMainRepository
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
 //        dd($row);
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'POSSESSION_DATA',
             'resource_id' => $id,
@@ -554,6 +570,7 @@ class BiogMainRepository
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('BIOG_INST_DATA')->where('tts_sysno',$id_)->update($data);
     }
 
@@ -563,6 +580,7 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data = array_except($data, ['_token']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data = (new ToolsRepository)->timestamp($data, True);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
         return $tts;
     }
@@ -571,6 +589,7 @@ class BiogMainRepository
     {
         $row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'BIOG_INST_DATA',
             'resource_id' => $id,
@@ -612,6 +631,7 @@ class BiogMainRepository
         $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
         $data = array_except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('EVENTS_DATA')->where('tts_sysno',$id_)->update($data);
     }
 
@@ -625,6 +645,7 @@ class BiogMainRepository
         $data = array_except($data, ['_token', 'c_addr_id']);
         $data['tts_sysno'] = DB::table('EVENTS_DATA')->max('tts_sysno') + 1;
         $data['c_intercalary'] = (int)($data['c_intercalary']);
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('EVENTS_DATA')->insert($data);
         return $data['tts_sysno'];
     }
@@ -633,6 +654,7 @@ class BiogMainRepository
     {
         $row = DB::table('EVENTS_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'EVENTS_DATA',
             'resource_id' => $id,
@@ -710,6 +732,7 @@ class BiogMainRepository
         $assoc_id = $data['c_assoc_id'];
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+        $data = (new ToolsRepository)->timestamp($data);
         DB::table('ASSOC_DATA')->where('tts_sysno',$id)->update($data);
         $data['c_assoc_code'] = $assoc_pair;
 //        dd($data);
@@ -726,6 +749,7 @@ class BiogMainRepository
         $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
 //        dump($data);
+        $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
         $data['tts_sysno'] += 1;
         $data['c_assoc_code'] = $assoc_pair;
@@ -740,6 +764,7 @@ class BiogMainRepository
         $operationRepository = new OperationRepository();
         $row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'ASSOC_DATA',
             'resource_id' => $id,
@@ -748,6 +773,7 @@ class BiogMainRepository
         $operationRepository->store($op);
         $row = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id]])->first();
         $op = [
+            'user_id' => Auth::id(),
             'op_type' => 4,
             'resource' => 'ASSOC_DATA',
             'resource_id' => $row->tts_sysno,

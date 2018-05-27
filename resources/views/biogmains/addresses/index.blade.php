@@ -22,7 +22,7 @@
                 @for ($i = 0; $i < $basicinformation->addresses_count; $i++)
                     <tr>
                         <td>{{ $i+1 }}</td>
-                        <td>{{ $basicinformation->addresses_type[$i]->c_addr_desc_chn }}</td>
+                        <td>{{ $basicinformation->addresses[$i]->pivot->c_addr_type }}</td>
                         <td>{{ $basicinformation->addresses[$i]->c_name_chn }}</td>
                         <td>{{ $basicinformation->addresses[$i]->pivot->c_firstyear }}</td>
                         <td>{{ $basicinformation->addresses[$i]->pivot->c_lastyear }}</td>

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use function PHPSTORM_META\map;
 
@@ -19,9 +21,8 @@ class BasicInformationAssocController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
     }
     /**
@@ -32,12 +33,17 @@ class BasicInformationAssocController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
-        $person_id = $biogbasicinformation->c_personid;
-        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) {
-            $assoc = DB::table('ASSOC_DATA')->where('tts_sysno', '=', $item->pivot->tts_sysno)->first();
-            $assoc_biog = DB::table('BIOG_MAIN')->where('c_personid', '=', $assoc->c_assoc_id)->first();
-            if(is_null($assoc_biog)) return null;
-            return ['c_personid' => $assoc_biog->c_personid,'assoc_name' => $assoc_biog->c_name.' '.$assoc_biog->c_name_chn];
+        $assoc_name_id = array();
+        $assoc_name_name = array();
+        foreach ($biogbasicinformation->assoc_name as $key => $value){
+            $assoc_name_id[$key] = $value->pivot->c_assoc_id;
+            $assoc_name_name[$key] = $value->c_name.' '.$value->c_name_chn;
+        }
+        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_name) {
+            if (in_array($item->pivot->c_assoc_id, $assoc_name_id)) {
+                return ['c_personid' => $item->pivot->c_assoc_id,'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
+            }
+            return ['c_personid' => 0, 'assoc_name' => ''];
         });
 //        dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
@@ -64,6 +70,14 @@ class BasicInformationAssocController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $_id = $this->biogMainRepository->assocStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.edit', ['id' => $id, '_id' => $_id]);
@@ -105,7 +119,15 @@ class BasicInformationAssocController extends Controller
      */
     public function update(Request $request, $id, $id_)
     {
-        $this->biogMainRepository->assocUpdateById($request, $id_);
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $this->biogMainRepository->assocUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.edit', ['id'=>$id, 'id_'=>$id_]);
     }
@@ -118,7 +140,15 @@ class BasicInformationAssocController extends Controller
      */
     public function destroy($id, $id_)
     {
-        $this->biogMainRepository->assocDeleteById($id_);
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $this->biogMainRepository->assocDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.index', ['id' => $id]);
     }

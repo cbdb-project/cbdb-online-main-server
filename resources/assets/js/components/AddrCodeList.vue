@@ -29,7 +29,7 @@
                 <td>
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/addresscodes/'+item.c_addr_id+'/edit'">edit</a>
-                        <a type="button" class="btn btn-sm btn-danger">delete</a>
+
                     </div>
                 </td>
             </tr>

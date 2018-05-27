@@ -43,6 +43,17 @@ class RegisterController extends Controller
     }
 
     /**
+     * Show the application registration form.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showRegistrationForm()
+    {
+//        return '内测阶段，暂不开放注册';
+        return view('auth.register');
+    }
+
+    /**
      * Get a validator for an incoming registration request.
      *
      * @param  array  $data
@@ -68,6 +79,7 @@ class RegisterController extends Controller
         $user =  User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'institution' => $data['institution'],
             'avatar' => 'avatar5.png',
             'confirmation_token' => str_random(40),
             'password' => bcrypt($data['password']),

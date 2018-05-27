@@ -370,6 +370,25 @@
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>
                 </div>
+
+            </form>
+            <div class="btn-group pull-right">
+                <a href=""
+                   onclick="
+                               let msg = '您真的确定要删除吗？\n\n请确认！';
+                               if (confirm(msg)===true){
+                               event.preventDefault();
+                               document.getElementById('delete-form').submit();
+                               }else{
+                               return false;
+                               }
+                               "
+                   class="btn btn-danger">delete</a>
+
+            </div>
+            <form id="delete-form" action="{{ route('basicinformation.destroy', ['id' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
+                {{ method_field('DELETE') }}
+                {{ csrf_field() }}
             </form>
         </div>
     </div>

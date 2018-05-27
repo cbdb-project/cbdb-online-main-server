@@ -29,7 +29,7 @@
                 <td>
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/altnamecodes/'+item.c_name_type_code+'/edit'">edit</a>
-                        <a type="button" class="btn btn-sm btn-danger">delete</a>
+
                     </div>
                 </td>
             </tr>

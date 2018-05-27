@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\AltCodeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AltnameCodesController extends Controller
 {
@@ -12,7 +13,6 @@ class AltnameCodesController extends Controller
 
     public function __construct(AltCodeRepository $altcodeRepository)
     {
-        $this->middleware('auth');
         $this->altcodeRepository = $altcodeRepository;
     }
 
@@ -79,6 +79,14 @@ class AltnameCodesController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $this->altcodeRepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
 

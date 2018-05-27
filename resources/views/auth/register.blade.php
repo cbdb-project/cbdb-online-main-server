@@ -47,8 +47,17 @@
                 <input id="email" type="email" class="form-control" name="email" value="{{ old('email') }}" placeholder="Email" required>
                 <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
                 @if ($errors->has('email'))
-                    <span class="help-block">
+                    <span class="help-block">I
                         <strong>{{ $errors->first('email') }}</strong>
+                    </span>
+                @endif
+            </div>
+            <div class="form-group has-feedback{{ $errors->has('institution') ? ' has-error' : '' }}">
+                <input id="institution" type="text" class="form-control" name="institution" value="{{ old('institution') }}" placeholder="Institution" required>
+                <span class="glyphicon glyphicon-briefcase form-control-feedback"></span>
+                @if ($errors->has('institution'))
+                    <span class="help-block">
+                        <strong>{{ $errors->first('institution') }}</strong>
                     </span>
                 @endif
             </div>

@@ -17,11 +17,12 @@
                 <div class="form-group">
                     <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_kin_code" name="c_kin_code">
+                        <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
                             @if($res['kin_str'])
                                 <option value="{{ $row->c_kin_code }}" selected="selected">{{ $res['kin_str'] }}</option>
                             @endif
                         </select>
+
                     </div>
                 </div>
                 <div class="form-group">
@@ -32,6 +33,7 @@
                                 <option value="{{ $row->c_kin_id }}" selected="selected">{{ $res['biog_str'] }}</option>
                             @endif
                         </select>
+                        {{--<input type="text" class="hidden" value="{{ $row->c_kin_id }}" name="c_kin_id">--}}
                     </div>
                 </div>
                 <div class="form-group">
@@ -63,6 +65,16 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成对亲属关系</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kinship_pair" name="c_kinship_pair">
+                            @if($res['kinpair_str'])
+                                <option value="{{ $res['k_p_code'] }}" selected="selected">{{ $res['kinpair_str'] }}</option>
+                            @endif
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>
@@ -76,9 +88,11 @@
 @section('js')
     <script>
         $(".select2").select2();
+        $(".c_kinship_pair").select2();
         $(".c_source").select2(options('text'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_kin_id").select2(options('biog'));
+        // kinship_pair();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -133,6 +147,28 @@
                 templateResult: formatRepo,
                 templateSelection: formatRepoSelection
             }
+        }
+
+        function kinship_pair(){
+            let c_kin_code = $('.c_kin_code').val();
+            let c_kin_id = $('.c_kin_id').val();
+            // console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                for (let i=data.length-1; i>-1; i--){
+                    item = data[i];
+                    // console.log(item);
+                    $(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                }
+            });
+
         }
     </script>
 @endsection

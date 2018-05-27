@@ -15,10 +15,13 @@ class CreateOperationsTable extends Migration
     {
         Schema::create('operations', function (Blueprint $table) {
             $table->increments('id');
-            $table->smallInteger('op_type')->comment('1.Post(Create) 2.Put(Update 全部信息) 3. Patch(Update 部分属性) 4.Delete(Delete)');
+            $table->integer('user_id');
+            $table->integer('c_personid');
+            $table->smallInteger('op_type')->comment('1.Popst(Create) 2.Put(Update 全部信息) 3. Patch(Update 部分属性) 4.Delete(Delete)');
             $table->string('resource');
             $table->integer('resource_id');
             $table->json('resource_data');
+            $table->json('biog')->nullable();
             $table->timestamps();
         });
     }

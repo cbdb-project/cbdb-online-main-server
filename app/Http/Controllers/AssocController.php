@@ -18,7 +18,6 @@ class AssocController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
     }
     /**

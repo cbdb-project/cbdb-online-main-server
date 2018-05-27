@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BasicInformationAltnamesController extends Controller
@@ -16,16 +18,17 @@ class BasicInformationAltnamesController extends Controller
      */
     protected $biogMainRepository;
     protected $operationRepository;
+    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
+        $this->toolsRepository = $toolsRepository;
     }
     /**
      * Display a listing of the resource.
@@ -59,11 +62,21 @@ class BasicInformationAltnamesController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['tts_sysno'] = DB::table('ALTNAME_DATA')->max('tts_sysno') + 1;
+        $data = $this->toolsRepository->timestamp($data, True);
         DB::table('ALTNAME_DATA')->insert($data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['tts_sysno'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['tts_sysno']]);
     }
@@ -112,9 +125,19 @@ class BasicInformationAltnamesController extends Controller
      */
     public function update(Request $request, $id, $alt)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
+        $data = $this->toolsRepository->timestamp($data);
         DB::table('ALTNAME_DATA')->where('tts_sysno',$alt)->update($data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $alt, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$alt]);
     }
@@ -127,16 +150,17 @@ class BasicInformationAltnamesController extends Controller
      */
     public function destroy($id, $alt)
     {
-
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $row = DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->first();
-//        dd($row);
-        $op = [
-            'op_type' => 4,
-            'resource' => 'ALTNAME_DATA',
-            'resource_id' => $alt,
-            'resource_data' => json_encode((array)$row)
-        ];
-        $this->operationRepository->store($op);
+
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
         DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['id' => $id]);

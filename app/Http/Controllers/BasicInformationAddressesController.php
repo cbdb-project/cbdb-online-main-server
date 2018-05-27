@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\AddressCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class BasicInformationAddressesController extends Controller
@@ -17,16 +19,18 @@ class BasicInformationAddressesController extends Controller
      */
     protected $biogMainRepository;
     protected $operationRepository;
+    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository)
+    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
         $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
+        $this->toolsRepository = $toolsRepository;
     }
     /**
      * Display a listing of the resource.
@@ -60,6 +64,14 @@ class BasicInformationAddressesController extends Controller
      */
     public function store(Request $request, $id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data['c_addr'] = 0;
         $data = $request->all();
         $data = array_except($data, ['_token']);
@@ -68,7 +80,9 @@ class BasicInformationAddressesController extends Controller
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['tts_sysno'] = DB::table('BIOG_ADDR_DATA')->max('tts_sysno') + 1;
 //        dd($data);
+        $data = $this->toolsRepository->timestamp($data, True);
         DB::table('BIOG_ADDR_DATA')->insert($data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['tts_sysno'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['tts_sysno']]);
     }
@@ -106,6 +120,7 @@ class BasicInformationAddressesController extends Controller
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
+
         return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址',
             'page_url' => '/basicinformation/'.$id.'/addresses',
@@ -122,14 +137,24 @@ class BasicInformationAddressesController extends Controller
      */
     public function update(Request $request, $id, $addr)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $request->all();
 
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
 
         $data = array_except($data, ['_method', '_token']);
+        $data = $this->toolsRepository->timestamp($data);
         DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$addr)->update($data);
 //        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $addr, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
     }
@@ -142,17 +167,19 @@ class BasicInformationAddressesController extends Controller
      */
     public function destroy($id, $addr)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
 //        dd($id.' '.$addr);
         $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
-//        dd($row);
-        $op = [
-            'op_type' => 4,
-            'resource' => 'BIOG_ADDR_DATA',
-            'resource_id' => $addr,
-            'resource_data' => json_encode((array)$row)
-        ];
-        $this->operationRepository->store($op);
+
         DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->delete();
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.index', ['id' => $id]);
     }

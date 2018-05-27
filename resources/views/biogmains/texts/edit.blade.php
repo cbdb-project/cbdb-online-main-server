@@ -61,6 +61,14 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">更新</label>
+                    <div class="col-sm-10">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
+                               disabled>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>

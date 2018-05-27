@@ -161,7 +161,17 @@
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">建檔</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="" disabled>
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
+                               disabled>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">更新</label>
+                    <div class="col-sm-10">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
+                               disabled>
                     </div>
                 </div>
                 <div class="form-group">

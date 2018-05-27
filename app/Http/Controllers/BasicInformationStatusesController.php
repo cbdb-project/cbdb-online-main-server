@@ -112,7 +112,7 @@ class BasicInformationStatusesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->statuseUpdateById($request, $id_);
+        $this->biogMainRepository->statuseUpdateById($request, $id_ ,$id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.statuses.edit', ['id'=>$id, 'id_'=>$id_]);
     }
@@ -133,7 +133,7 @@ class BasicInformationStatusesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->statuseDeleteById($id_);
+        $this->biogMainRepository->statuseDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.statuses.index', ['id' => $id]);
     }

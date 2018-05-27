@@ -120,7 +120,7 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->officeUpdateById($request, $id_);
+        $this->biogMainRepository->officeUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$id_]);
     }
@@ -141,7 +141,7 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->officeDeleteById($office);
+        $this->biogMainRepository->officeDeleteById($office, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.index', ['id' => $id]);
     }

@@ -78,6 +78,7 @@ class BasicInformationTextsController extends Controller
         $data['tts_sysno'] = DB::table($this->table_name)->max('tts_sysno') + 1;
         $data = $this->toolsRepository->timestamp($data, True);
         DB::table($this->table_name)->insert($data);
+        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['tts_sysno'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['tts_sysno']]);
     }
@@ -131,6 +132,7 @@ class BasicInformationTextsController extends Controller
         if ($data['c_textid'] == -999) $data['c_textid'] = 0;
         $data = $this->toolsRepository->timestamp($data);
         DB::table($this->table_name)->where('tts_sysno',$id_)->update($data);
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $id_, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
     }
@@ -152,15 +154,8 @@ class BasicInformationTextsController extends Controller
             return redirect()->back();
         }
         $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
-//        dd($row);
-        $op = [
-            'op_type' => 4,
-            'resource' => $this->table_name,
-            'resource_id' => $id_,
-            'resource_data' => json_encode((array)$row)
-        ];
-        $this->operationRepository->store($op);
         DB::table($this->table_name)->where('tts_sysno', $id_)->delete();
+        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.index', ['id' => $id]);
     }

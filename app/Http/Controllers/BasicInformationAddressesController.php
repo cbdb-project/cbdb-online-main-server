@@ -82,6 +82,7 @@ class BasicInformationAddressesController extends Controller
 //        dd($data);
         $data = $this->toolsRepository->timestamp($data, True);
         DB::table('BIOG_ADDR_DATA')->insert($data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['tts_sysno'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['tts_sysno']]);
     }
@@ -119,6 +120,7 @@ class BasicInformationAddressesController extends Controller
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
+
         return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址',
             'page_url' => '/basicinformation/'.$id.'/addresses',
@@ -152,6 +154,7 @@ class BasicInformationAddressesController extends Controller
         $data = $this->toolsRepository->timestamp($data);
         DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$addr)->update($data);
 //        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $addr, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
     }
@@ -174,15 +177,9 @@ class BasicInformationAddressesController extends Controller
         }
 //        dd($id.' '.$addr);
         $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
-//        dd($row);
-        $op = [
-            'op_type' => 4,
-            'resource' => 'BIOG_ADDR_DATA',
-            'resource_id' => $addr,
-            'resource_data' => json_encode((array)$row)
-        ];
-        $this->operationRepository->store($op);
+
         DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->delete();
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.index', ['id' => $id]);
     }

@@ -153,6 +153,13 @@ Route::resource('manage', 'ManagementController', ['name' => [
     'update' => 'manage.update'
 ]]);
 
+Route::resource('operations', 'OperationsController', ['name' => [
+    'show' => 'operations.show',
+    'create' => 'operations.create',
+    'edit' => 'operations.edit',
+    'update' => 'operations.update'
+]]);
+
 Route::get('/test', function (Request $request){
     $tools = new \App\Repositories\ToolsRepository;
 //    $tools->timestamp([]);

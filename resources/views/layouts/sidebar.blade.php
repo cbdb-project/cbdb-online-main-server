@@ -37,9 +37,9 @@
         <ul class="sidebar-menu">
             <li class="header">MAIN NAVIGATION</li>
             <!-- Optionally, you can add icons to the links -->
-            <li class="{{ $page_title == 'Dashboard' ? 'active' : '' }}"><a href="/home"><i class="fa fa-dashboard"></i> <span>控制面板</span></a></li>
+            {{--<li class="{{ $page_title == 'Dashboard' ? 'active' : '' }}"><a href="/home"><i class="fa fa-dashboard"></i> <span>控制面板</span></a></li>--}}
             <li class="{{ $page_title == 'Basicinformation' ? 'active' : '' }}"><a href="{{ route('basicinformation.index') }}"><i class="ion ion-ios-people-outline"></i> <span>个人基本信息</span></a></li>
-{{--            <li class="{{ $page_title == 'NewUpdate' ? 'active' : '' }}"><a href="{{ route('operations.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近编辑列表</span></a></li>--}}
+            <li class="{{ $page_title == 'NewUpdate' ? 'active' : '' }}"><a href="{{ route('operations.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近编辑列表</span></a></li>
 
             <li class="header">CODES</li>
             <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>Codes</span></a></li>

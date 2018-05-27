@@ -111,7 +111,7 @@ class BasicInformationSocialInstController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->socialInstUpdateById($request, $id_);
+        $this->biogMainRepository->socialInstUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$id_]);
     }
@@ -132,7 +132,7 @@ class BasicInformationSocialInstController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->socialInstDeleteById($id_);
+        $this->biogMainRepository->socialInstDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.index', ['id' => $id]);
     }

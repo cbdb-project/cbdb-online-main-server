@@ -76,6 +76,7 @@ class BasicInformationAltnamesController extends Controller
         $data['tts_sysno'] = DB::table('ALTNAME_DATA')->max('tts_sysno') + 1;
         $data = $this->toolsRepository->timestamp($data, True);
         DB::table('ALTNAME_DATA')->insert($data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['tts_sysno'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['tts_sysno']]);
     }
@@ -136,6 +137,7 @@ class BasicInformationAltnamesController extends Controller
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         DB::table('ALTNAME_DATA')->where('tts_sysno',$alt)->update($data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $alt, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$alt]);
     }
@@ -157,14 +159,8 @@ class BasicInformationAltnamesController extends Controller
             return redirect()->back();
         }
         $row = DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->first();
-//        dd($row);
-        $op = [
-            'op_type' => 4,
-            'resource' => 'ALTNAME_DATA',
-            'resource_id' => $alt,
-            'resource_data' => json_encode((array)$row)
-        ];
-        $this->operationRepository->store($op);
+
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
         DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['id' => $id]);

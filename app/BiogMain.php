@@ -82,7 +82,7 @@ class BiogMain extends Model
 
     public function addresses()
     {
-        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_firstyear', 'c_lastyear', 'c_sequence', 'tts_sysno');
+        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_addr_type', 'c_firstyear', 'c_lastyear', 'c_sequence', 'tts_sysno');
     }
 
     public function addresses_type()
@@ -162,5 +162,10 @@ class BiogMain extends Model
 
     public function inst_name(){
         return $this->belongsToMany('App\SocialInst', 'BIOG_INST_DATA', 'c_personid', 'c_inst_name_code');
+    }
+
+    public function operation()
+    {
+        return $this->hasMany('App\Operation', 'c_personid', 'c_personid');
     }
 }

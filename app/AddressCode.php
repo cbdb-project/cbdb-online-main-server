@@ -27,4 +27,8 @@ class AddressCode extends Model
      * @var array
      */
     protected $guarded = [];
+
+    public function type() {
+        $this->hasOne('App\BiogAddrCode');
+    }
 }

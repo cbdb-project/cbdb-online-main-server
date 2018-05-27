@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,7 @@ class BasicInformationAssocController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository)
     {
         $this->biogMainRepository = $biogMainRepository;
     }
@@ -126,7 +127,7 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->assocUpdateById($request, $id_);
+        $this->biogMainRepository->assocUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.edit', ['id'=>$id, 'id_'=>$id_]);
     }
@@ -147,7 +148,7 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->assocDeleteById($id_);
+        $this->biogMainRepository->assocDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.index', ['id' => $id]);
     }

@@ -134,7 +134,7 @@ class BasicInformationPossessionController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->possessionDeleteById($id_);
+        $this->biogMainRepository->possessionDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.possession.index', ['id' => $id]);
     }

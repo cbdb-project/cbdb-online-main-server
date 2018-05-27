@@ -9,6 +9,7 @@ use App\Repositories\ChoronymRepository;
 use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
+use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
@@ -30,6 +31,7 @@ class BasicInformationController extends Controller
     protected $nianhaoRepository;
     protected $choronymRepository;
     protected $yearRangeRepository;
+    protected $operationRepository;
     protected $toolRepository;
 
     /**
@@ -37,7 +39,7 @@ class BasicInformationController extends Controller
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository)
     {
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
@@ -45,6 +47,7 @@ class BasicInformationController extends Controller
         $this->nianhaoRepository = $nianHaoRepository;
         $this->choronymRepository = $choronymRepository;
         $this->yearRangeRepository = $yearRangeRepository;
+        $this->operationRepository = $operationRepository;
         $this->toolRepository  = $toolsRepository;
     }
 
@@ -90,7 +93,7 @@ class BasicInformationController extends Controller
         if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()){
             flash('person id 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();
-        }elseif ((BiogMain::max('c_personid')-$data['c_personid']) > 10000) {
+        }elseif ((int)$data['c_personid']-(BiogMain::max('c_personid')) > 10000) {
             flash('person id 过大 '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -98,6 +101,7 @@ class BasicInformationController extends Controller
         $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $data = $this->toolRepository->timestamp($data, True);
         $flight = BiogMain::create($data);
+        $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['tts_sysno'], $data);
         flash('Create success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.edit', $data['c_personid']);
     }
@@ -164,7 +168,10 @@ class BasicInformationController extends Controller
      */
     public function destroy($id)
     {
-        //
+        $biog = BiogMain::find($id);
+        $biog->c_name_chn = '<待删除>';
+        $biog->save();
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, []);
     }
 
 

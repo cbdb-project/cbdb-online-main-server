@@ -28,12 +28,12 @@
                 <div class="form-group">
                     <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_kin_id" name="c_kin_id" disabled>
+                        <select class="form-control c_kin_id" name="c_kin_id">
                             @if($res['biog_str'])
                                 <option value="{{ $row->c_kin_id }}" selected="selected">{{ $res['biog_str'] }}</option>
                             @endif
                         </select>
-                        <input type="text" class="hidden" value="{{ $row->c_kin_id }}" name="c_kin_id">
+                        {{--<input type="text" class="hidden" value="{{ $row->c_kin_id }}" name="c_kin_id">--}}
                     </div>
                 </div>
                 <div class="form-group">
@@ -68,7 +68,9 @@
                     <label for="" class="col-sm-2 control-label">成对亲属关系</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kinship_pair" name="c_kinship_pair">
-                            <option value="" selected="selected"></option>
+                            @if($res['kinpair_str'])
+                                <option value="{{ $res['k_p_code'] }}" selected="selected">{{ $res['kinpair_str'] }}</option>
+                            @endif
                         </select>
                     </div>
                 </div>

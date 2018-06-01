@@ -15,8 +15,11 @@ class BiogAddress extends Resource
     public function toArray($request)
     {
         return [
-            'c_name_chn' => $this->c_name_chn,
-            'tts_sysno' => $this->pivot->tts_sysno
+            'biog' => [
+                'c_personid' => $this->c_personid,
+                'c_name_chn' => $this->c_name_chn
+            ],
+            'address' => $this->addresses
         ];
     }
 

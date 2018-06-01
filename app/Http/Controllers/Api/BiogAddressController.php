@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Resources\BiogAddress;
 use App\Http\Resources\BiogAddressCollection;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
@@ -25,14 +26,13 @@ class BiogAddressController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return BiogAddressCollection
+     * @return BiogAddress
      */
     public function index($id)
     {
         //
         $biog = $this->biogMainRepository->byPersonId($id);
-        $biog->addresses;
-        return new BiogAddressCollection($biog->addresses);
+        return new BiogAddress($biog);
     }
 
     /**

@@ -108,6 +108,23 @@ class BiogMainRepository
         return $basicinformation;
     }
 
+    public function byQuery($query)
+    {
+        $params = explode(' ', $query);
+//        dump($params);
+        /**
+         * 这里我想到了两种方法，
+         * 第一种：建索引表，跟搜索引擎一样，每个人物的有一个提取出一个关键特征向量，用二进制表示，把用户的查询条件转换成相应的特征向量，通过与或匹配
+         * 第一种方法的优缺点都很明显，优点是搜索功能可以很强大，缺点是工程量比较大
+         *
+         * 第二种：先定义好查询的范围，再查
+         *
+         */
+        $basicinformation = BiogMain::whereIn('c_name_chn', $params)->simplePaginate(5);
+        $basicinformation->withPath(url('v1/api/biog?query='.$query));
+        return $basicinformation;
+    }
+
     /**
      * @param $request
      * @param $id

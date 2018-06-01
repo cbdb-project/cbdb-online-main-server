@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\BiogMain;
+use App\Http\Resources\BiogMainCollection;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
@@ -26,15 +27,18 @@ class BiogMainController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\Http\Response
+     * @return BiogMainCollection
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        if ($request['query']) {
+            $res = $this->biogMainRepository->byQuery($request['query']);
+            return new BiogMainCollection($res);
+        }
         return response()->json([
-            "error" => "no_id",
-            "message" => "没有输入id",
-            "hint" => "/api/v1/biog/{id}"
+            "error" => "no_query",
+            "message" => "没有查询条件",
+            "hint" => "/api/v1/biog?query="
         ]);
     }
 
@@ -84,7 +88,15 @@ class BiogMainController extends Controller
     public function show($id)
     {
         $data = $this->biogMainRepository->byPersonId($id);
-//        dump($data->toArray());
+        if (!$data) {
+            return response()->json([
+                "error" => 'ID Exception',
+                "message" => "无此ID",
+                "hint" => ""
+            ]);
+        }
+        //这是是需要链表查询的用法
+        $data->choronym;
         return new BiogMain($data);
     }
 
@@ -108,11 +120,10 @@ class BiogMainController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
         $this->biogMainRepository->updateById($request, $id);
         return response()->json([
             "error" => 0,
-            "message" => "创建成功",
+            "message" => "修改成功",
             "hint" => ""
         ]);
     }
@@ -125,6 +136,7 @@ class BiogMainController extends Controller
      */
     public function destroy($id)
     {
+        dd('sdf23e');
         $biog = BiogMain::find($id);
         $biog->c_name_chn = '<待删除>';
         $biog->save();

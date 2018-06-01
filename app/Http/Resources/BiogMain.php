@@ -15,7 +15,7 @@ class BiogMain extends Resource
     public function toArray($request)
     {
 //        return parent::toArray($request);
-        $json = array_except(parent::toArray($request), ['tts_sysno']);
+        $json = array_except(parent::toArray($request), ['tts_sysno', 'c_personid']);
         return $json;
     }
 

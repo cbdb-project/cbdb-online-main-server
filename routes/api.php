@@ -88,12 +88,5 @@ Route::group(['prefix' => 'code'], function (){
 
 Route::middleware('guest')->post('/v1/user/login', 'Api\LoginController@login');
 Route::group(['prefix' => '/v1', 'middleware' => ['auth:api']], function (){
-//    Route::post('/user/login', 'Api\LoginController@login');
-    Route::resource('biog', 'Api\BiogMainController', ['name' => [
-        'show' => 'biog.show',
-        'create' => 'biog.create',
-        'edit' => 'biog.edit',
-        'update' => 'biog.update',
-        'index' => 'biog.index',
-    ]]);
+    Route::resource('biog', 'Api\BiogMainController');
 });

@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Resources\BiogMain;
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class BiogMainController extends Controller
 {
@@ -52,18 +56,36 @@ class BiogMainController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $data = $request->all();
+        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()){
+            flash('person id 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }elseif ((int)$data['c_personid']-(BiogMain::max('c_personid')) > 10000) {
+            flash('person id 过大 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
+        (new ToolsRepository())->timestamp($data, True);
+        $flight = BiogMain::create($data);
+        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['tts_sysno'], $data);
+        return response()->json([
+            "error" => 0,
+            "message" => "新增成功",
+            "hint" => ""
+        ]);
     }
 
     /**
      * Display the specified resource.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return BiogMain
      */
     public function show($id)
     {
         $data = $this->biogMainRepository->byPersonId($id);
+//        dump($data->toArray());
+        return new BiogMain($data);
     }
 
     /**
@@ -87,6 +109,12 @@ class BiogMainController extends Controller
     public function update(Request $request, $id)
     {
         //
+        $this->biogMainRepository->updateById($request, $id);
+        return response()->json([
+            "error" => 0,
+            "message" => "创建成功",
+            "hint" => ""
+        ]);
     }
 
     /**
@@ -97,6 +125,9 @@ class BiogMainController extends Controller
      */
     public function destroy($id)
     {
-        //
+        $biog = BiogMain::find($id);
+        $biog->c_name_chn = '<待删除>';
+        $biog->save();
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, []);
     }
 }

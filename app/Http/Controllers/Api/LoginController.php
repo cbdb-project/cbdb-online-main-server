@@ -31,7 +31,7 @@ class LoginController extends ApiController
         $credentials = $this->credentials($request);
 
         if ($this->guard('api')->attempt($credentials, $request->has('remember'))) {
-            return $this->sendLoginResponse($request, 'sdf');
+            return $this->sendLoginResponse($request);
         }
 
         return $this->failed('login failed', 401);

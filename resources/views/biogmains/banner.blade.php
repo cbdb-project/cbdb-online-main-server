@@ -1,6 +1,6 @@
 
 <div class="text-center">
-    <h3>{{ $basicinformation->c_name_chn.'（'.$basicinformation->c_name.'）' }}</h3>
+    <h3>{{ $basicinformation->c_name_chn.'（'.$basicinformation->c_name.'）- '.$basicinformation->c_personid }}</h3>
     <div class="row text-left">
         <div class="col-sm-offset-1 col-sm-2">
             <a href="/basicinformation/{{ $basicinformation->c_personid }}/edit"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>&nbsp;&nbsp;基本资料</a>

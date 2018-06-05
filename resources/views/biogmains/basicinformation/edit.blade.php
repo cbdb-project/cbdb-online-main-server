@@ -285,7 +285,7 @@
                         <input type="text" name="c_fl_earliest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_earliest_year }}">
                         <label for="">年号</label>
-                        <select-vue name="c_fl_ey_nh_code" model="ganzhi" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
+                        <select-vue name="c_fl_ey_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ey_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ey_nh_year }}">
                         <label for="">年</label>
                         在世始年注
@@ -300,7 +300,7 @@
                         <input type="text" name="c_fl_latest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_latest_year }}">
                         <label for="">年号</label>
-                        <select-vue name="c_fl_ly_nh_code" model="ganzhi" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
+                        <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ly_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ly_nh_year }}">
                         <label for="">年</label>
                         在世始年注

@@ -17,7 +17,11 @@ class NianHaoRepository
     {
         $nianhao = NianHao::select(['c_nianhao_id', 'c_dynasty_chn', 'c_nianhao_chn', 'c_firstyear', 'c_lastyear'])->get();
         return $nianhao->map(function ($item, $key){
-            return $item->c_nianhao_id." ".$item->c_nianhao_chn." [".$item->c_firstyear."]~[".$item->c_lastyear."]";
+            return [
+                'c_nianhao_id' => $item->c_nianhao_id,
+                'c_nianhao_chn' => $item->c_nianhao_chn,
+                'c_str' => "[".$item->c_firstyear."]~[".$item->c_lastyear."]"
+            ];
         });
     }
 }

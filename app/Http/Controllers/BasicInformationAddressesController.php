@@ -27,7 +27,6 @@ class BasicInformationAddressesController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;

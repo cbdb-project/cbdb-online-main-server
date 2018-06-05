@@ -88,6 +88,6 @@ Route::group(['prefix' => 'code'], function (){
 
 Route::middleware('guest')->post('/v1/user/login', 'Api\LoginController@login');
 Route::group(['prefix' => '/v1', 'middleware' => ['auth:api']], function (){
-    Route::resource('biog', 'Api\BiogMainController');
+    Route::resource('biog.main', 'Api\BiogMainController');
     Route::resource('biog.addr', 'Api\BiogAddressController');
 });

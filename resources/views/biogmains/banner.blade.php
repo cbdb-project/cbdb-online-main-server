@@ -38,8 +38,8 @@
         <div class="col-sm-2">
             <a href="{{ route('basicinformation.socialinst.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社交機構({{ $basicinformation->inst_count }})</a>
         </div>
-        <div class="col-sm-2 hidden">
-            <a href="/sources/{{ $basicinformation->c_personid }}"><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>&nbsp;&nbsp;出处({{ $basicinformation->sources_count }})</a>
+        <div class="col-sm-2">
+            <a href="{{ route('basicinformation.sources.index', ['id' => $basicinformation->c_personid]) }}"><span class="glyphicon glyphicon-user"></span>&nbsp;&nbsp;出处({{ $basicinformation->sources_count }})</a>
         </div>
     </div>
     <br>

@@ -723,6 +723,48 @@ class BiogMainRepository
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
     }
 
+    public function sourceById($id, $text_id)
+    {
+        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
+        $text_str = null;
+        if($row->c_textid || $row->c_textid === 0) {
+            $text_ = TextCode::find($row->c_textid);
+            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+        }
+        return ['row' => $row, 'text_str' => $text_str];
+    }
+
+    public function sourceUpdateById(Request $request, $id, $text_id)
+    {
+        $data = $request->all();
+        $data = array_except($data, ['_method', '_token']);
+        $data['c_personid'] = $id;
+        $data['c_main_source'] = (int)$data['c_main_source'];
+        $data['c_self_bio'] = (int)$data['c_self_bio'];
+        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->update($data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $text_id, $data);
+        return $data['c_textid'];
+    }
+
+    public function sourceStoreById(Request $request, $id)
+    {
+        $data = $request->all();
+        $data = array_except($data, ['_token']);
+        $data['c_personid'] = $id;
+        $data['c_main_source'] = (int)$data['c_main_source'];
+        $data['c_self_bio'] = (int)$data['c_self_bio'];
+        DB::table('BIOG_SOURCE_DATA')->insert($data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        return $data['c_textid'];
+    }
+
+    public function sourceDeleteById($id, $id_)
+    {
+        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
+        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
+    }
+
     protected function addr_str($id)
     {
         $row = AddressCode::find($id);

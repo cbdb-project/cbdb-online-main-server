@@ -104,3 +104,6 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 问题：
 1. event表的问题，code null
 2. 财产表，社会机构
+
+###
+License: [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/) 

@@ -105,5 +105,8 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 1. event表的问题，code null
 2. 财产表，社会机构
 
+### Laravel multile language document
+https://laravel-china.org/docs/laravel/5.5/localization/1305
+
 ###
 License: [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/) 

@@ -13,6 +13,7 @@ class BiogMain extends Model
      */
     protected $table = 'BIOG_MAIN';
     protected $primaryKey = 'c_personid';
+    public $incrementing = false;
     /**
      * 该模型是否被自动维护时间戳
      *
@@ -88,6 +89,11 @@ class BiogMain extends Model
     public function addresses_type()
     {
         return $this->belongsToMany('App\BiogAddrCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_type');
+    }
+
+    public function biog_addresses()
+    {
+        return $this->hasMany('App\BiogAddr', 'c_personid', 'c_personid');
     }
 
     public function altnames()

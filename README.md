@@ -101,6 +101,65 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 ### 优化：
 1. 添加提示，保存错误提示，尤其是操作数据库的提示
 
-问题：
-1. event表的问题，code null
-2. 财产表，社会机构
+### 构建API资源服务
+
+参考文档[controllers](http://d.laravel-china.org/docs/5.5/eloquent-resources)
+
+创建API资源控制器，如人物主要信息
+
+```sh
+php artisan make:controller Api/BiogMainController --resource
+```
+
+在api.php里添加路由
+
+```php
+Route::resource('biog', 'Api\BiogMainController', ['name' => [
+        'show' => 'biog.show',
+        'create' => 'biog.create',
+        'edit' => 'biog.edit',
+        'update' => 'biog.update',
+        'index' => 'biog.index',
+    ]]);
+```
+
+包含了对改资源的操作
+
+创建API RESOURCE格式化函数
+```sh
+php artisan make:resource BiogMain
+```
+
+使用如下：
+修改BiogMain的toArray方法
+
+```php
+public function toArray($request)
+    {
+        return [
+            'c_name_chn' => $this->c_name_chn,
+            'source_count' => $this->source_count,
+        ];
+    }
+```
+
+在controller中
+
+```php
+public function show($id)
+    {
+        $data = $this->biogMainRepository->byPersonId($id);
+        return new BiogMain($data);
+    }
+```
+
+其他的方法可完全参照对应Controller的方法
+
+批量查询使用API Resource Collection功能
+
+```sh
+php artisan make:resource BiogCollection
+```
+
+Api相关代码在
+`app/Http/Controller/Api`和`app/Http/Resource`和`routes/api.php`当中

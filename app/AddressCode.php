@@ -31,4 +31,9 @@ class AddressCode extends Model
     public function type() {
         $this->hasOne('App\BiogAddrCode');
     }
+
+    public function biog()
+    {
+        return $this->belongsToMany('App\BiogMain', 'BIOG_ADDR_DATA', 'c_addr_id', 'c_personid')->withPivot('c_addr_type', 'c_firstyear', 'c_lastyear', 'c_sequence', 'tts_sysno');
+    }
 }

@@ -48,6 +48,7 @@ Route::resource('basicinformation.kinship', 'BasicInformationKinshipController')
 Route::resource('basicinformation.statuses', 'BasicInformationStatusesController');
 Route::resource('basicinformation.possession', 'BasicInformationPossessionController');
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
+Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
 Route::get('/codes', 'CodesController@index')->name('codes.index');
 Route::get('/codes/{table_name}', 'CodesController@show')->name('codes.show');

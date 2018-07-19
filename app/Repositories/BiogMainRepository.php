@@ -172,7 +172,12 @@ class BiogMainRepository
      * @return array
      */
     public function textById($id_){
-        $row = DB::table('TEXT_DATA')->where('tts_sysno', $id_)->first();
+        $temp_l = explode("-", $id_);
+        $row = DB::table('TEXT_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]],
+        ])->first();
         $text = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
@@ -194,7 +199,11 @@ class BiogMainRepository
 
     public function officeById($id)
     {
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->first();
+        $temp_l = explode("-", $id);
+        $row = DB::table('POSTED_TO_OFFICE_DATA')->where([
+            ['c_office_id', '=', $temp_l[0]],
+            ['c_posting_id', '=', $temp_l[1]],
+        ])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -248,7 +257,6 @@ class BiogMainRepository
     public function officeStoreById(Request $request, $id)
     {
         $data = $request->all();
-//        dd($data);
         $c_addr = $data['c_addr'];
         $data = array_except($data, ['_token', 'c_addr']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
@@ -259,8 +267,8 @@ class BiogMainRepository
         $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['tts_sysno'], $data);
-        return $data['tts_sysno'];
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', '', $data);
+        return $data['c_office_id']."-".$data['c_posting_id'];
     }
 
     public function officeDeleteById($id, $c_personid)
@@ -335,6 +343,7 @@ class BiogMainRepository
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
+        dd($data);
         DB::table('ENTRY_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
         return $data['tts_sysno'];

@@ -75,12 +75,20 @@ class BasicInformationTextsController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
-        $data['tts_sysno'] = DB::table($this->table_name)->max('tts_sysno') + 1;
         $data = $this->toolsRepository->timestamp($data, True);
+        $temp = DB::table($this->table_name)->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_textid', '=', $data['c_textid']],
+            ['c_role_id', '=', $data['c_role_id']],
+        ])->first();
+        if (!blank($temp)) {
+            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         DB::table($this->table_name)->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['tts_sysno'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['tts_sysno']]);
+        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id']]);
     }
 
     /**
@@ -129,9 +137,13 @@ class BasicInformationTextsController extends Controller
         }
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
-        if ($data['c_textid'] == -999) $data['c_textid'] = 0;
         $data = $this->toolsRepository->timestamp($data);
-        DB::table($this->table_name)->where('tts_sysno',$id_)->update($data);
+        $temp_l = explode("-", $id_);
+        DB::table($this->table_name)->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]],
+        ])->update($data);
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $id_, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
@@ -153,8 +165,17 @@ class BasicInformationTextsController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $row = DB::table($this->table_name)->where('tts_sysno', $id_)->first();
-        DB::table($this->table_name)->where('tts_sysno', $id_)->delete();
+        $temp_l = explode("-", $id_);
+        $row = DB::table($this->table_name)->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]]
+        ])->first();
+        DB::table($this->table_name)->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]]
+        ])->delete();
         $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.index', ['id' => $id]);

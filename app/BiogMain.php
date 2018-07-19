@@ -93,17 +93,17 @@ class BiogMain extends Model
 
     public function biog_addresses()
     {
-        return $this->hasMany('App\BiogAddr', 'c_personid', 'c_personid');
+        return $this->hasMany('App\BiogAddr', 'c_personid', 'c_personid')->orderBy('c_sequence');
     }
 
     public function altnames()
     {
-        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'tts_sysno');
+        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'tts_sysno', 'c_alt_name_type_code');
     }
 
     public function texts()
     {
-        return $this->belongsToMany('App\TextCode', 'TEXT_DATA', 'c_personid', 'c_textid')->withPivot('tts_sysno');
+        return $this->belongsToMany('App\TextCode', 'TEXT_DATA', 'c_personid', 'c_textid')->withPivot('tts_sysno', 'c_textid', 'c_role_id');
     }
 
     public function texts_role()
@@ -118,12 +118,12 @@ class BiogMain extends Model
 
     public function offices_addr()
     {
-        return $this->belongsToMany('App\AddressCode', 'POSTED_TO_ADDR_DATA', 'c_personid','c_addr_id')->withPivot('c_posting_id')->where('c_office_id', '!=', -1);
+        return $this->belongsToMany('App\AddrCode', 'POSTED_TO_ADDR_DATA', 'c_personid','c_addr_id')->withPivot('c_posting_id')->where('c_office_id', '!=', -1);
     }
 
     public function entries()
     {
-        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'tts_sysno')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'tts_sysno', 'c_kin_code', 'c_kin_id', 'c_assoc_code', 'c_assoc_id', 'c_year', 'c_inst_code', 'c_inst_name_code')->orderBy('c_sequence');
     }
 
     public function statuses()

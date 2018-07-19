@@ -34,13 +34,13 @@
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $basicinformation->addresses[$i]->pivot->tts_sysno }}').submit();
+                                               document.getElementById('delete-form-{{ $basicinformation->c_personid."-".$basicinformation->biog_addresses[$i]->c_addr_id."-".$basicinformation->biog_addresses[$i]->c_addr_type."-".$basicinformation->biog_addresses[$i]->c_sequence }}').submit();
                                            }else{
                                                return false;
                                            }"
                                    class="btn btn-sm btn-danger">delete</a>
                             </div>
-                            <form id="delete-form-{{ $basicinformation->addresses[$i]->pivot->tts_sysno }}" action="{{ route('basicinformation.addresses.destroy', ['id' => $basicinformation->c_personid, 'addr' => $basicinformation->c_personid."-".$basicinformation->biog_addresses[$i]->c_addr_id."-".$basicinformation->biog_addresses[$i]->c_addr_type."-".$basicinformation->biog_addresses[$i]->c_sequence]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $basicinformation->c_personid."-".$basicinformation->biog_addresses[$i]->c_addr_id."-".$basicinformation->biog_addresses[$i]->c_addr_type."-".$basicinformation->biog_addresses[$i]->c_sequence }}" action="{{ route('basicinformation.addresses.destroy', ['id' => $basicinformation->c_personid, 'addr' => $basicinformation->c_personid."-".$basicinformation->biog_addresses[$i]->c_addr_id."-".$basicinformation->biog_addresses[$i]->c_addr_type."-".$basicinformation->biog_addresses[$i]->c_sequence]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

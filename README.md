@@ -162,4 +162,4 @@ php artisan make:resource BiogCollection
 ```
 
 Api相关代码在
-`app/Http/Controller/Api`和`app/Http/Resource`和`routes/api.php`当中
+`app/Http/Controllers/Api`和`app/Http/Resources`和`routes/api.php`当中

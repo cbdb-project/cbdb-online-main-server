@@ -236,13 +236,13 @@ class BiogMainRepository
     public function officeUpdateById(Request $request, $id, $c_personid)
     {
         $data = $request->all();
-//        dd($data);
         $_id = $data['_id'];
         $_postingid = $data['_postingid'];
-        $c_addr = $data['c_addr'];
         $_officeid = $data['_officeid']; //目前与officeid无关
 
-        $this->insertAddr($c_addr, $_id, $_postingid, $_officeid);
+        if (!empty($data['c_addr'])){
+            $this->insertAddr($data['c_addr'], $_id, $_postingid, $_officeid);
+        }
         $data = array_except($data, ['_method', '_token', 'c_addr', '_id', '_postingid', '_officeid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
@@ -250,7 +250,7 @@ class BiogMainRepository
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
-        DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno',$id)->update($data);
+        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
     }
 
@@ -261,9 +261,9 @@ class BiogMainRepository
         $data = array_except($data, ['_token', 'c_addr']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['tts_sysno'] = DB::table('POSTED_TO_OFFICE_DATA')->max('tts_sysno') + 1;
         $data['c_posting_id'] = DB::table('POSTED_TO_OFFICE_DATA')->max('c_posting_id') + 1;
         $data['c_personid'] = $id;
+        DB::table('POSTING_DATA')->insert(['c_personid' => $data['c_personid'], 'c_posting_id' => $data['c_posting_id']]);
         $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
@@ -273,9 +273,11 @@ class BiogMainRepository
 
     public function officeDeleteById($id, $c_personid)
     {
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->first();
-        DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->delete();
-        DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->delete();
+        $addr_l = explode("-", $id);
+        $row = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->first();
+        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->delete();
+        DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+        DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $id, $row);
     }
 

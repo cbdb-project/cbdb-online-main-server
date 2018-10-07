@@ -2,7 +2,7 @@
 
 按照[旧版本录入系统](http://cbdb.fas.harvard.edu/cbdbc/cbdbedit)重构，技术选型Laravel + Mysql + Vuejs + webpack （mix）
 
-采用[Laravel 5.4](https://laravel.com/docs/5.4)框架
+更新至[Laravel 5.5](https://laravel.com/docs/5.5)框架
 
 ### Database migrations
 

@@ -154,7 +154,7 @@ class BiogMainRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function namesByQuery(Request $request, $num=20)
+    static public function namesByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;

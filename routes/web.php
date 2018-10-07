@@ -136,6 +136,7 @@ Route::resource('operations', 'OperationsController', ['name' => [
 ]]);
 
 Route::get('/test', function (Request $request){
-    $tools = new \App\Repositories\ToolsRepository;
-//    $tools->timestamp([]);
+    $data = \App\TextCode::find(2031);
+    $data->type;
+    return $data;
 });

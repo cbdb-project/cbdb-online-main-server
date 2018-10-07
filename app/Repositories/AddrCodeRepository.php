@@ -33,7 +33,7 @@ class AddrCodeRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function addrByQuery(Request $request, $num=20)
+    static public function addrByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;

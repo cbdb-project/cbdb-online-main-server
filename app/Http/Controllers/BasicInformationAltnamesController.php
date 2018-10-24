@@ -155,6 +155,7 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_type_code', '=', $addr_l[2]],
         ])->update($data);
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $alt, $data);
+        $alt = $id.'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$alt]);
     }

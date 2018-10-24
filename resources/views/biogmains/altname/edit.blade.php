@@ -17,7 +17,7 @@
                 <div class="form-group">
                     <label for="c_alt_name_chn" class="col-sm-2 control-label">別名漢字(c_alt_name_chn)</label>
                     <div class="col-sm-10">
-                        <input name="c_alt_name_chn" type="text" class="form-control" value="{{ $row->c_alt_name_chn }}" disabled>
+                        <input name="c_alt_name_chn" type="text" class="form-control" value="{{ $row->c_alt_name_chn }}">
                     </div>
                 </div>
                 <div class="form-group">
@@ -29,7 +29,7 @@
                 <div class="form-group">
                     <label for="c_alt_name_type_code" class="col-sm-2 control-label">別名類別代碼(c_alt_name_type_code)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_alt_name_type_code" model="altcode" selected="{{ $row->c_alt_name_type_code }}" disabled></select-vue>
+                        <select-vue name="c_alt_name_type_code" model="altcode" selected="{{ $row->c_alt_name_type_code }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

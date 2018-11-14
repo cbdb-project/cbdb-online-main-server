@@ -163,3 +163,30 @@ php artisan make:resource BiogCollection
 
 Api相关代码在
 `app/Http/Controllers/Api`和`app/Http/Resources`和`routes/api.php`当中
+
+### 修改通知
+
+在此文件中：
+
+cbdb-online-main-server/resources/views/layouts/dashboard.blade.php
+
+修改 <div class="callout callout-warning"> 和 </div> 中间的内容。如需要分段，则用 <p> 标签。
+        
+实例参见 old-server 分支：
+
+https://github.com/cbdb-project/cbdb-online-main-server/blob/old-server/resources/views/layouts/dashboard.blade.php
+
+
+### 首页迁移（借 503 status code 跳转）
+
+建立 cbdb-online-main-server/resources/views/errors/503.blade.php
+
+形如
+
+```<html>
+<h3>
+We will update our server from 10:00am to 12:00pm on 11/16. The inputting service will be closed for 2 hours. We are apologized for this inconvenience. CBDB Team 2018.11.14
+</h3>
+```</html>
+
+如果相关目录或者文件，请直接新建

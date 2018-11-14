@@ -194,7 +194,8 @@ We will update our server from 10:00am to 12:00pm on 11/16. The inputting servic
 
 ### 将更改应用于服务器（暂停和启动程式）
 
-```php artisan down
+```
+php artisan down
 
 php artisan up
 ```

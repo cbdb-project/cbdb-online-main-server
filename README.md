@@ -170,7 +170,7 @@ Api相关代码在
 
 cbdb-online-main-server/resources/views/layouts/dashboard.blade.php
 
-修改 <div class="callout callout-warning"> 和 </div> 中间的内容。如需要分段，则用 <p> 标签。
+修改 `<div class="callout callout-warning">` 和 `</div>` 中间的内容。如需要分段，则用 `<p>` 标签。
         
 实例参见 old-server 分支：
 

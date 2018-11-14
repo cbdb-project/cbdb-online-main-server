@@ -191,3 +191,12 @@ We will update our server from 10:00am to 12:00pm on 11/16. The inputting servic
 ```
 
 如果相关目录或者文件缺失，请直接新建
+
+### 将更改应用于服务器（暂停和启动程式）
+
+```php artisan down
+
+php artisan up
+```
+
+记得不要在前面加 sudo。据群超：docker 下没有 sudo 的权限，如果使用 laradock 的环境，sudo 命令将不会成功

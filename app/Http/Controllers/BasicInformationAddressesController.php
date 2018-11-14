@@ -27,7 +27,6 @@ class BasicInformationAddressesController extends Controller
      */
     public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
-        $this->middleware('auth');
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
@@ -72,19 +71,27 @@ class BasicInformationAddressesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $data['c_addr'] = 0;
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['tts_sysno'] = DB::table('BIOG_ADDR_DATA')->max('tts_sysno') + 1;
-//        dd($data);
+
+        $temp = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_addr_id', '=', $data['c_addr_id']],
+            ['c_addr_type', '=', $data['c_addr_type']],
+            ['c_sequence', '=', $data['c_sequence']]
+        ])->first();
+        if (!blank($temp)) {
+            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $data = $this->toolsRepository->timestamp($data, True);
         DB::table('BIOG_ADDR_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['tts_sysno'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['tts_sysno']]);
+        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence']]);
     }
 
     /**
@@ -106,12 +113,19 @@ class BasicInformationAddressesController extends Controller
      */
     public function edit($id, $addr)
     {
-//        dd($id.' '.$addr);
-        $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
+
+        $addr_l = explode("-", $addr);
+//        dd($addr_l);
+        $row = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_addr_id', '=', $addr_l[1]],
+            ['c_addr_type', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[3]]
+        ])->first();
         $addr_str = null;
         if($row->c_addr_id || $row->c_addr_id === 0){
             $addr_ = AddressCode::find($row->c_addr_id);
-            $addr_str = $addr_->c_addr_id." ".$addr_->c_name." ".$addr_->c_name_chn;
+            $addr_str = $addr_->c_addr_id." ".$addr_->c_name." ".$addr_->c_name_chn." ".$addr_->c_firstyear."~".$addr_->c_lastyear;
         }
         $text_str = null;
 //        dd($row->c_source);
@@ -152,11 +166,19 @@ class BasicInformationAddressesController extends Controller
 
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
-        DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$addr)->update($data);
-//        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
+        $addr_l = explode("-", $addr);
+        DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_addr_id', '=', $addr_l[1]],
+            ['c_addr_type', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[3]]
+        ])->update($data);
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $addr, $data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
+        //20181107建安修改回傳的畫面
+        //return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
+        $data['c_personid'] = $addr_l[0];
+        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence']]);
     }
 
     /**
@@ -175,10 +197,20 @@ class BasicInformationAddressesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-//        dd($id.' '.$addr);
-        $row = DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->first();
+        $addr_l = explode("-", $addr);
+        $row = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_addr_id', '=', $addr_l[1]],
+            ['c_addr_type', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[3]]
+        ])->first();
 
-        DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr)->delete();
+        DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_addr_id', '=', $addr_l[1]],
+            ['c_addr_type', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[3]]
+        ])->delete();
         $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.index', ['id' => $id]);

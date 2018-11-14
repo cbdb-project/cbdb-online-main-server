@@ -35,7 +35,8 @@ class CodesController extends Controller
     public function show($table_name)
     {
         try{
-            $data = DB::table($table_name)->paginate(1000);
+//            $data = DB::table($table_name)->paginate(1000);
+            $data = DB::table($table_name)->get();
             $thead = array();
             $count = 0;
             foreach($data[0] as $key => $value){
@@ -101,7 +102,9 @@ class CodesController extends Controller
         $id_name = $this->getIdName($table_name);
         DB::table($table_name)->where($id_name, $id)->update($data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);
+        //建安新增,修改後使用新的序號.20181108
+        //return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);
+        return redirect()->route('codes.show', ['table_name' => $table_name]);
     }
 
     public function create($table_name)

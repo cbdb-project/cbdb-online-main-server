@@ -26,4 +26,9 @@ class TextCode extends Model
      * @var array
      */
     protected $guarded = [];
+
+    public function type()
+    {
+        return $this->belongsTo('App\TextType', 'c_text_type_id', 'c_text_type_code');
+    }
 }

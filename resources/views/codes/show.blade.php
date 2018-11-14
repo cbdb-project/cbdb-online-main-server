@@ -64,7 +64,7 @@
                 </tr>
                 </tfoot>
             </table>
-            <div class="pull-right">{{ $data->links() }}</div>
+            {{--<div class="pull-right">{{ $data->links() }}</div>--}}
         </div>
         <!-- /.box-body -->
     </div>

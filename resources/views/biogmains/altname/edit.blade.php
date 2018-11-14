@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">別名 Alt. Names</div>
+        <div class="panel-heading">別名 Alt. Names </div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.altnames.update', ['id'=>$id, 'alt'=>$alt]) }}" class="form-horizontal" method="post">

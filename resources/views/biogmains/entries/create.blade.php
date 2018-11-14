@@ -16,7 +16,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" maxlength="4">
+                        <input type="number" class="form-control" name="c_sequence" maxlength="4" required>
                     </div>
                 </div>
                 <div class="form-group">
@@ -31,7 +31,7 @@
                     <label for="c_year" class="col-sm-2 control-label">入仕年(year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_year" class="form-control"
-                               value="">
+                               value="" required>
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_nianhao_id">年号</label>
@@ -74,7 +74,6 @@
                     <label for="c_entry_addr_id" class="col-sm-2 control-label">地點(c_addr_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_entry_addr_id" name="c_entry_addr_id">
-                            <option value="0" selected="selected"></option>
                         </select>
                     </div>
                 </div>
@@ -94,35 +93,48 @@
                     <label for="c_kin_code" class="col-sm-2 control-label">親屬關係類別(kin_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kin_code" name="c_kin_code">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 未知 weizhi</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
-                    <label for="" class="col-sm-2 control-label">親戚(kin_id)</label>
+                <div class="form-group">
+                    <label for="c_kin_id" class="col-sm-2 control-label">親戚(kin_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="">
+                        <select class="form-control c_kin_id" name="c_kin_id">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_assoc_code" class="col-sm-2 control-label">社會關係類別(assoc_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_assoc_code" name="c_assoc_code">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 未知 weizhi</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
+                <div class="form-group">
                     <label for="c_assoc_id" class="col-sm-2 control-label">社會關係人(assoc_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_assoc_id">
+                        <select class="form-control c_assoc_id" name="c_assoc_id">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_inst_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
+                    </div>
+                    <input type="text" class="hidden" value="0" name="c_inst_name_code">
+                </div>
+                <div class="form-group">
+                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
                         </select>
                     </div>
                 </div>
@@ -169,8 +181,11 @@
         $(".c_entry_addr_id").select2(options('addr'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_inst_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstaddr'));
+        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_kin_id").select2(options('biog'));
+        $(".c_assoc_id").select2(options('biog'));
 
         function formatRepo (repo) {
             if (repo.loading) {

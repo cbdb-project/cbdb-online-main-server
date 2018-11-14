@@ -33,20 +33,20 @@
                         <td>{{ $value->pivot->c_lastyear }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->tts_sysno]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id."-".$value->pivot->c_posting_id]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();
+                                               document.getElementById('delete-form-{{ $value->pivot->c_office_id."-".$value->pivot->c_posting_id }}').submit();
                                            }else{
                                                return false;
                                            }"
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="{{ route('basicinformation.offices.destroy', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->tts_sysno]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->c_office_id."-".$value->pivot->c_posting_id }}" action="{{ route('basicinformation.offices.destroy', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id."-".$value->pivot->c_posting_id]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

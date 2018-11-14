@@ -5,7 +5,7 @@
         <div class="panel-heading">社交機構 SocialInst</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.socialinst.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.socialinst.update', [$id, '_id' => $row->c_personid.'-'.$row->c_bi_role_code]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -85,6 +85,22 @@
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">建檔</label>
+                    <div class="col-sm-10">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
+                               disabled>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">更新</label>
+                    <div class="col-sm-10">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
+                               disabled>
                     </div>
                 </div>
                 <div class="form-group">

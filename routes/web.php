@@ -22,32 +22,6 @@ Auth::routes();
 
 Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
-Route::get('/redirect', function () {
-    $query = http_build_query([
-        'client_id' => 3,
-        'redirect_uri' => 'http://cbdb-online-main-server.test/callback',
-        'response_type' => 'code',
-        'scope' => '',
-    ]);
-
-    return redirect('http://cbdb-online-main-server.test/oauth/authorize?'.$query);
-});
-
-Route::get('/callback', function (Request $request) {
-    $http = new GuzzleHttp\Client;
-
-    $response = $http->post('http://cbdb-online-main-server.dev/oauth/token', [
-        'form_params' => [
-            'grant_type' => 'authorization_code',
-            'client_id' => 3,
-            'client_secret' => 'gQHLMyG3qh1iDxwTmrLqKxtqVqcGNSHGtV3ixprA',
-            'redirect_uri' => 'http://cbdb-online-main-server.dev/callback',
-            'code' => $request->code,
-        ],
-    ]);
-
-    return json_decode((string) $response->getBody(), true);
-});
 
 Route::get('/home', 'HomeController@index')->name('home');
 
@@ -74,6 +48,7 @@ Route::resource('basicinformation.kinship', 'BasicInformationKinshipController')
 Route::resource('basicinformation.statuses', 'BasicInformationStatusesController');
 Route::resource('basicinformation.possession', 'BasicInformationPossessionController');
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
+Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
 Route::get('/codes', 'CodesController@index')->name('codes.index');
 Route::get('/codes/{table_name}', 'CodesController@show')->name('codes.show');
@@ -161,6 +136,22 @@ Route::resource('operations', 'OperationsController', ['name' => [
 ]]);
 
 Route::get('/test', function (Request $request){
-    $tools = new \App\Repositories\ToolsRepository;
-//    $tools->timestamp([]);
+    $data = \App\TextCode::find(2031);
+    $data->type;
+    return $data;
 });
+
+//20181105建安新增
+Route::resource('textcodes', 'TextCodesController', ['name' => [
+    'show' => 'textcode.show',
+    'create' => 'textcode.create',
+    'edit' => 'textcode.edit',
+    'update' => 'textcode.update'
+]]);
+
+Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
+    'show' => 'addrbelongsdata.show',
+    'create' => 'addrbelongsdata.create',
+    'edit' => 'addrbelongsdata.edit',
+    'update' => 'addrbelongsdata.update'
+]]);

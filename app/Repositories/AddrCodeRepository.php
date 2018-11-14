@@ -9,6 +9,7 @@
 namespace App\Repositories;
 
 
+use App\AddrCode;
 use App\AddressCode;
 use Illuminate\Http\Request;
 
@@ -32,7 +33,7 @@ class AddrCodeRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function addrByQuery(Request $request, $num=20)
+    static public function addrByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;
@@ -59,12 +60,12 @@ class AddrCodeRepository
 
     public function searchAddr(Request $request)
     {
-        $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
+        $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_addr_id;
             if($item['id'] === 0) $item['id'] = -999;
-            $belongs = $item->belongs1_Name." ".$item->belongs2_Name." ".$item->belongs3_Name." ".$item->belongs4_Name." ".$item->belongs5_Name;
+            $belongs = "";
             $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
         }
         return $data;

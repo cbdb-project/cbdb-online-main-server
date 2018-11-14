@@ -20,14 +20,53 @@ use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
 use App\SocialInst;
+use App\SocialInstAddr;
+use App\SocialInstCode;
 use App\StatusCode;
 use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 
+//20181017建安新增
+use Auth;
+use App\v1;
+//end
+
 class ApiController extends Controller
 {
+    //20180815建安寫在最上面
+    public function searchC_presonid(Request $request)
+    {
+        $data = new v1();
+        return $data->search($request);
+    }
+
+    public function addC_presonid(Request $request)
+    {
+        $data = new v1();
+        return $data->addC($request);
+    }
+
+    public function updateC_presonid(Request $request)
+    {
+        $data = new v1();
+        return $data->updateC($request);
+    }
+
+    public function deleteC_presonid(Request $request)
+    {
+        $data = new v1();
+        return $data->deleteC($request);
+    }
+
+    public function userC_presonid(Request $request)
+    {
+        $data = new v1();
+        return $data->token($request);
+    }
+    //end
+
     public function ethnicity()
     {
         $ethnicityRepository = new EthnicityRepository();
@@ -174,6 +213,27 @@ class ApiController extends Controller
             $item['id'] = $item->c_inst_name_code;
             if($item['id'] === 0) $item['id'] = -999;
             $item['text'] = $item->c_inst_name_code." ".$item->c_inst_name_py." ".$item->c_inst_name_hz;
+        }
+        return $data;
+    }
+
+    public function socialinstaddr(Request $request)
+    {
+        $data = SocialInstAddr::where('c_inst_code', 'like', '%'.$request->q.'%')->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_inst_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $addr = AddressCode::where('c_addr_id', $item->c_inst_addr_id)->first()->c_name_chn;
+            $dy = SocialInstCode::where('c_inst_code', $item->c_inst_code)->first()->c_inst_begin_year;
+            $dy2 = SocialInstCode::where('c_inst_code', $item->c_inst_code)->first()->c_inst_floruit_dy;
+            $dy3 = SocialInstCode::where('c_inst_code', $item->c_inst_code)->first()->c_inst_end_year;
+            $dy4 = SocialInstCode::where('c_inst_code', $item->c_inst_code)->first()->c_inst_last_known_year;
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $item['text'] = $item->c_inst_code." ".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
         return $data;
     }

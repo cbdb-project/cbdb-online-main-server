@@ -5,7 +5,7 @@
         <div class="panel-heading">著述 Writings</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.texts.update', ['id' => $id, 'id_'=> $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.texts.update', ['id' => $id, 'id_'=> $id."-".$row->c_textid."-".$row->c_role_id]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -57,6 +57,14 @@
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
+                               disabled>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">更新</label>
+                    <div class="col-sm-10">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>

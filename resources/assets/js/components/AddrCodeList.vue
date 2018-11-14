@@ -85,7 +85,6 @@
             showFirst: function(){
                 return this.current_page !== 1;
             },
-
         },
         methods: {
             searchByName(val = 1) {

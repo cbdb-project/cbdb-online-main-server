@@ -8,6 +8,7 @@
         </div>
         <!-- /.box-header -->
         <div class="box-body">
+
             <table id="example1" class="table table-bordered table-striped">
                 <thead>
                 <tr>
@@ -43,7 +44,9 @@
         <!-- /.box-body -->
     </div>
     <!-- /.box -->
-
+    <passport-clients></passport-clients>
+    <passport-authorized-clients></passport-authorized-clients>
+    <passport-personal-access-tokens></passport-personal-access-tokens>
 @endsection
 @section('js')
     <script>

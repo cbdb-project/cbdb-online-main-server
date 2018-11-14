@@ -185,7 +185,7 @@ https://github.com/cbdb-project/cbdb-online-main-server/blob/old-server/resource
 
 ```<html>
 <h3>
-We will update our server from 10:00am to 12:00pm on 11/16. The inputting service will be closed for 2 hours. We are apologized for this inconvenience. CBDB Team 2018.11.14
+We will update our server from 10:00am to 12:00pm on 11/16. The inputting service will be closed for 2 hours. We apologize for this inconvenience. CBDB Team 2018.11.14
 </h3>
 </html>
 ```

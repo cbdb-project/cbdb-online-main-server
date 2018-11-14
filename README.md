@@ -177,11 +177,11 @@ cbdb-online-main-server/resources/views/layouts/dashboard.blade.php
 https://github.com/cbdb-project/cbdb-online-main-server/blob/old-server/resources/views/layouts/dashboard.blade.php
 
 
-### 首页迁移（借 503 status code 跳转）
+### 首页迁移（503 page）
 
 建立 cbdb-online-main-server/resources/views/errors/503.blade.php
 
-形如
+503.blade.php 的內容形如
 
 ```<html>
 <h3>
@@ -190,4 +190,4 @@ We will update our server from 10:00am to 12:00pm on 11/16. The inputting servic
 </html>
 ```
 
-如果相关目录或者文件，请直接新建
+如果相关目录或者文件缺失，请直接新建

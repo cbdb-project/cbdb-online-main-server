@@ -87,7 +87,8 @@ class TextCodesController extends Controller
         }
         $this->textcoderepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-
+        //建安修改20181115，使用更新後的id來跳轉。
+        $id = $request['c_textid'];
         return redirect()->route('textcodes.edit', $id);
     }
 

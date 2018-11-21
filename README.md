@@ -206,7 +206,8 @@ php artisan up
 
 查看容器状态
 
-``` docker stats
+``` 
+docker stats
 ```
 启动 docker
 ```

@@ -23,13 +23,11 @@ Route::middleware('auth:api')->get(/**
 
 Route::group([], function () {
     Route::post('/name', function (Request $request)    {
-        $biogmianrepository = new \App\Repositories\BiogMainRepository();
-        return $biogmianrepository->namesByQuery($request);
+        return \App\Repositories\BiogMainRepository::namesByQuery($request);
     });
 
     Route::post('/addresscode', function (Request $request) {
-        $addrcoderepository = new \App\Repositories\AddrCodeRepository();
-        return $addrcoderepository->addrByQuery($request);
+        return \App\Repositories\AddrCodeRepository::addrByQuery($request);
     });
 
     Route::post('/altnamecode', function (Request $request) {
@@ -84,4 +82,10 @@ Route::group(['prefix' => 'select'], function (){
 
 Route::group(['prefix' => 'code'], function (){
     Route::get('addr', 'ApiController@codeAddr');
+});
+
+Route::middleware('guest')->post('/v1/user/login', 'Api\LoginController@login');
+Route::group(['prefix' => '/v1', 'middleware' => ['auth:api']], function (){
+    Route::resource('biog', 'Api\BiogMainController');
+    Route::resource('biog.addr', 'Api\BiogAddressController');
 });

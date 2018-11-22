@@ -5,7 +5,7 @@
         <div class="panel-heading">官名 Postings</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.offices.update', ['id' => $id, 'id_'=> $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.offices.update', ['id' => $id, 'id_'=> $row->c_office_id.'-'.$row->c_posting_id]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <input name="_id" type="text" class="hidden" value="{{ $id }}">

@@ -2,7 +2,7 @@
 
 按照[旧版本录入系统](http://cbdb.fas.harvard.edu/cbdbc/cbdbedit)重构，技术选型Laravel + Mysql + Vuejs + webpack （mix）
 
-采用[Laravel 5.4](https://laravel.com/docs/5.4)框架
+更新至[Laravel 5.5](https://laravel.com/docs/5.5)框架
 
 ### Database migrations
 
@@ -101,6 +101,7 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 ### 优化：
 1. 添加提示，保存错误提示，尤其是操作数据库的提示
 
+
 问题：
 1. event表的问题，code null
 2. 财产表，社会机构
@@ -108,5 +109,119 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 ### Laravel multile language document
 https://laravel-china.org/docs/laravel/5.5/localization/1305
 
-###
-License: [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/) 
+### License
+[CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/) 
+
+### 构建API资源服务
+
+参考文档[controllers](http://d.laravel-china.org/docs/5.5/eloquent-resources)
+
+创建API资源控制器，如人物主要信息
+
+```sh
+php artisan make:controller Api/BiogMainController --resource
+```
+
+在api.php里添加路由
+
+```php
+Route::resource('biog', 'Api\BiogMainController', ['name' => [
+        'show' => 'biog.show',
+        'create' => 'biog.create',
+        'edit' => 'biog.edit',
+        'update' => 'biog.update',
+        'index' => 'biog.index',
+    ]]);
+```
+
+包含了对改资源的操作
+
+创建API RESOURCE格式化函数
+```sh
+php artisan make:resource BiogMain
+```
+
+使用如下：
+修改BiogMain的toArray方法
+
+```php
+public function toArray($request)
+    {
+        return [
+            'c_name_chn' => $this->c_name_chn,
+            'source_count' => $this->source_count,
+        ];
+    }
+```
+
+在controller中
+
+```php
+public function show($id)
+    {
+        $data = $this->biogMainRepository->byPersonId($id);
+        return new BiogMain($data);
+    }
+```
+
+其他的方法可完全参照对应Controller的方法
+
+批量查询使用API Resource Collection功能
+
+```sh
+php artisan make:resource BiogCollection
+```
+
+Api相关代码在
+`app/Http/Controllers/Api`和`app/Http/Resources`和`routes/api.php`当中
+
+### 修改通知
+
+在此文件中：
+
+cbdb-online-main-server/resources/views/layouts/dashboard.blade.php
+
+修改 `<div class="callout callout-warning">` 和 `</div>` 中间的内容。如需要分段，则用 `<p>` 标签。
+        
+实例参见 old-server 分支：
+
+https://github.com/cbdb-project/cbdb-online-main-server/blob/old-server/resources/views/layouts/dashboard.blade.php
+
+
+### 首页迁移（503 page）
+
+建立 cbdb-online-main-server/resources/views/errors/503.blade.php
+
+503.blade.php 的內容形如
+
+```<html>
+<h3>
+We will update our server from 10:00am to 12:00pm on 11/16. The inputting service will be closed for 2 hours. We apologize for this inconvenience. CBDB Team 2018.11.14
+</h3>
+</html>
+```
+
+如果相关目录或者文件缺失，请直接新建
+
+### 将更改应用于服务器（暂停和启动程式）
+
+```
+php artisan down
+
+php artisan up
+```
+
+记得不要在前面加 sudo。据群超：docker 下没有 sudo 的权限，如果使用 laradock 的环境，sudo 命令将不会成功
+
+### 容器启动
+
+查看容器状态
+
+``` 
+docker stats
+```
+启动 docker
+```
+cd /home/wanghs/laradock
+docker-compose up -d nginx mysql
+```

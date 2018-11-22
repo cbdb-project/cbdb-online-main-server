@@ -39,7 +39,7 @@ class BiogMainRepository
      */
     public function byPersonId($id)
     {
-        $basicinformation = BiogMain::withCount('sources', 'texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
+        $basicinformation = BiogMain::withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
         return $basicinformation;
     }
 
@@ -49,62 +49,79 @@ class BiogMainRepository
      */
     public function simpleByPersonId($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
         return $basicinformation;
     }
 
     public function byIdWithAddr($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('addresses', 'addresses_type')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('biog_addresses')->find($id);
         return $basicinformation;
     }
 
     public function byIdWithAlt($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('altnames')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('altnames')->find($id);
         return $basicinformation;
     }
 
     public function byIdWithText($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('texts', 'texts_role')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('texts', 'texts_role')->find($id);
         return $basicinformation;
     }
 
     public function byIdWithOff($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('offices', 'offices_addr')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('offices', 'offices_addr')->find($id);
         return $basicinformation;
     }
     public function byIdWithEntries($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('entries')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('entries')->find($id);
         return $basicinformation;
     }
     public function byIdWithStatuses($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('statuses')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('statuses')->find($id);
         return $basicinformation;
     }
     public function byIdWithAssoc($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc', 'assoc_name')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc', 'assoc_name')->find($id);
         return $basicinformation;
     }
     public function byIdWithKinship($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('kinship', 'kinship_name')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('kinship', 'kinship_name')->find($id);
         return $basicinformation;
     }
     public function byIdWithPossession($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('possession')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('possession')->find($id);
         return $basicinformation;
     }
 
     public function byIdWithSocialInst($id)
     {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('inst', 'inst_name')->find($id);
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('inst', 'inst_name')->find($id);
+        return $basicinformation;
+    }
+
+    public function byQuery($query)
+    {
+        $params = explode(' ', $query);
+//        dump($params);
+        /**
+         * 这里我想到了两种方法，
+         * 第一种：建索引表，跟搜索引擎一样，每个人物的有一个提取出一个关键特征向量，用二进制表示，把用户的查询条件转换成相应的特征向量，通过与或匹配
+         * 第一种方法的优缺点都很明显，优点是搜索功能可以很强大，缺点是工程量比较大
+         *
+         * 第二种：先定义好查询的范围，再查
+         *
+         */
+        $basicinformation = BiogMain::whereIn('c_name_chn', $params)->simplePaginate(5);
+        $basicinformation->withPath(url('v1/api/biog?query='.$query));
         return $basicinformation;
     }
 
@@ -137,7 +154,7 @@ class BiogMainRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function namesByQuery(Request $request, $num=20)
+    static public function namesByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;
@@ -155,7 +172,12 @@ class BiogMainRepository
      * @return array
      */
     public function textById($id_){
-        $row = DB::table('TEXT_DATA')->where('tts_sysno', $id_)->first();
+        $temp_l = explode("-", $id_);
+        $row = DB::table('TEXT_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]],
+        ])->first();
         $text = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
@@ -177,7 +199,11 @@ class BiogMainRepository
 
     public function officeById($id)
     {
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->first();
+        $temp_l = explode("-", $id);
+        $row = DB::table('POSTED_TO_OFFICE_DATA')->where([
+            ['c_office_id', '=', $temp_l[0]],
+            ['c_posting_id', '=', $temp_l[1]],
+        ])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -210,13 +236,13 @@ class BiogMainRepository
     public function officeUpdateById(Request $request, $id, $c_personid)
     {
         $data = $request->all();
-//        dd($data);
         $_id = $data['_id'];
         $_postingid = $data['_postingid'];
-        $c_addr = $data['c_addr'];
         $_officeid = $data['_officeid']; //目前与officeid无关
 
-        $this->insertAddr($c_addr, $_id, $_postingid, $_officeid);
+        if (!empty($data['c_addr'])){
+            $this->insertAddr($data['c_addr'], $_id, $_postingid, $_officeid);
+        }
         $data = array_except($data, ['_method', '_token', 'c_addr', '_id', '_postingid', '_officeid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
@@ -224,33 +250,34 @@ class BiogMainRepository
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
-        DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno',$id)->update($data);
+        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
     }
 
     public function officeStoreById(Request $request, $id)
     {
         $data = $request->all();
-//        dd($data);
         $c_addr = $data['c_addr'];
         $data = array_except($data, ['_token', 'c_addr']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['tts_sysno'] = DB::table('POSTED_TO_OFFICE_DATA')->max('tts_sysno') + 1;
         $data['c_posting_id'] = DB::table('POSTED_TO_OFFICE_DATA')->max('c_posting_id') + 1;
         $data['c_personid'] = $id;
+        DB::table('POSTING_DATA')->insert(['c_personid' => $data['c_personid'], 'c_posting_id' => $data['c_posting_id']]);
         $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['tts_sysno'], $data);
-        return $data['tts_sysno'];
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', '', $data);
+        return $data['c_office_id']."-".$data['c_posting_id'];
     }
 
     public function officeDeleteById($id, $c_personid)
     {
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->first();
-        DB::table('POSTED_TO_OFFICE_DATA')->where('tts_sysno', $id)->delete();
-        DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->delete();
+        $addr_l = explode("-", $id);
+        $row = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->first();
+        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->delete();
+        DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+        DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $id, $row);
     }
 
@@ -318,6 +345,7 @@ class BiogMainRepository
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
+        dd($data);
         DB::table('ENTRY_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
         return $data['tts_sysno'];
@@ -721,6 +749,48 @@ class BiogMainRepository
         DB::table('ASSOC_DATA')->where('tts_sysno', $id)->delete();
         DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
+    }
+
+    public function sourceById($id, $text_id)
+    {
+        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
+        $text_str = null;
+        if($row->c_textid || $row->c_textid === 0) {
+            $text_ = TextCode::find($row->c_textid);
+            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+        }
+        return ['row' => $row, 'text_str' => $text_str];
+    }
+
+    public function sourceUpdateById(Request $request, $id, $text_id)
+    {
+        $data = $request->all();
+        $data = array_except($data, ['_method', '_token']);
+        $data['c_personid'] = $id;
+        $data['c_main_source'] = (int)$data['c_main_source'];
+        $data['c_self_bio'] = (int)$data['c_self_bio'];
+        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->update($data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $text_id, $data);
+        return $data['c_textid'];
+    }
+
+    public function sourceStoreById(Request $request, $id)
+    {
+        $data = $request->all();
+        $data = array_except($data, ['_token']);
+        $data['c_personid'] = $id;
+        $data['c_main_source'] = (int)$data['c_main_source'];
+        $data['c_self_bio'] = (int)$data['c_self_bio'];
+        DB::table('BIOG_SOURCE_DATA')->insert($data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        return $data['c_textid'];
+    }
+
+    public function sourceDeleteById($id, $id_)
+    {
+        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
+        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
     }
 
     protected function addr_str($id)

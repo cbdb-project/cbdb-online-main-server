@@ -73,12 +73,20 @@ class BasicInformationAltnamesController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
-        $data['tts_sysno'] = DB::table('ALTNAME_DATA')->max('tts_sysno') + 1;
         $data = $this->toolsRepository->timestamp($data, True);
+        $temp = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
+        ])->first();
+        if (!blank($temp)) {
+            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         DB::table('ALTNAME_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['tts_sysno'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['tts_sysno']]);
+        return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code']]);
     }
 
     /**
@@ -100,9 +108,13 @@ class BasicInformationAltnamesController extends Controller
      */
     public function edit($id, $alt)
     {
-        $row = DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->first();
+        $addr_l = explode("-", $alt);
+        $row = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_type_code', '=', $addr_l[2]],
+        ])->first();
         $text_str = null;
-//        dd($row->c_source);
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
@@ -136,8 +148,14 @@ class BasicInformationAltnamesController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
-        DB::table('ALTNAME_DATA')->where('tts_sysno',$alt)->update($data);
+        $addr_l = explode("-", $alt);
+        DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_type_code', '=', $addr_l[2]],
+        ])->update($data);
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $alt, $data);
+        $alt = $id.'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$alt]);
     }
@@ -158,10 +176,19 @@ class BasicInformationAltnamesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $row = DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->first();
+        $addr_l = explode("-", $alt);
+        $row = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_type_code', '=', $addr_l[2]],
+        ])->first();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
-        DB::table('ALTNAME_DATA')->where('tts_sysno', $alt)->delete();
+        DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_type_code', '=', $addr_l[2]],
+        ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['id' => $id]);
     }

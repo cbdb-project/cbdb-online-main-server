@@ -285,7 +285,7 @@
                         <input type="text" name="c_fl_earliest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_earliest_year }}">
                         <label for="">年号</label>
-                        <select-vue name="c_fl_ey_nh_code" model="ganzhi" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
+                        <select-vue name="c_fl_ey_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ey_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ey_nh_year }}">
                         <label for="">年</label>
                         在世始年注
@@ -300,7 +300,7 @@
                         <input type="text" name="c_fl_latest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_latest_year }}">
                         <label for="">年号</label>
-                        <select-vue name="c_fl_ly_nh_code" model="ganzhi" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
+                        <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ly_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ly_nh_year }}">
                         <label for="">年</label>
                         在世始年注
@@ -327,28 +327,7 @@
                                   rows="5">{{ $basicinformation->c_notes }}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="TTSMQ_db_ID"
-                           class="col-sm-2 control-label">中央研究院明清人名權威檔案(TTS-MQ權威號) </label>
-                    <div class="col-sm-10">
-                        <input type="text" name="TTSMQ_db_ID" class="form-control"
-                               value="{{ $basicinformation->TTSMQ_db_ID }}">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="MQWWLink" class="col-sm-2 control-label">明清婦女著作(MQWW Link)</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="MQWWLink" class="form-control"
-                               value="{{ $basicinformation->MQWWLink }}">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="KyotoLink" class="col-sm-2 control-label">京都大學唐代人物知識(Kyoto Link)</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="KyotoLink" class="form-control"
-                               value="{{ $basicinformation->KyotoLink }}">
-                    </div>
-                </div>
+                
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">建檔</label>
                     <div class="col-sm-10">

@@ -35,7 +35,8 @@ class CodesController extends Controller
     public function show($table_name)
     {
         try{
-            $data = DB::table($table_name)->paginate(1000);
+//            $data = DB::table($table_name)->paginate(1000);
+            $data = DB::table($table_name)->get();
             $thead = array();
             $count = 0;
             foreach($data[0] as $key => $value){

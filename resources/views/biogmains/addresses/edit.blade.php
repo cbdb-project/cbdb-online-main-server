@@ -5,7 +5,7 @@
         <div class="panel-heading">地址 Address</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.addresses.update', ['id' => $id, 'addr'=> $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.addresses.update', ['id' => $id, 'addr'=> $id."-".$row->c_addr_id."-".$row->c_addr_type."-".$row->c_sequence]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -17,19 +17,19 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">遷徙次序</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
+                        <input type="number" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4" disabled>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_addr_type" class="col-sm-2 control-label">地址類別(c_addr_type)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_addr_type" model="biogaddr" selected="{{ $row->c_addr_type }}"></select-vue>
+                        <select-vue name="c_addr_type" model="biogaddr" selected="{{ $row->c_addr_type }}" disabled></select-vue>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_addr_id" class="col-sm-2 control-label">地名(c_addr_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_addr_id" name="c_addr_id">
+                        <select class="form-control c_addr_id" name="c_addr_id" disabled>
                             @if($addr_str)
                             <option value="{{ $row->c_addr_id }}" selected="selected">{{ $addr_str }}</option>
                             @endif

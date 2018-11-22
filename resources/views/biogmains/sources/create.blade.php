@@ -2,11 +2,10 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">親屬 Kinship</div>
+        <div class="panel-heading">出处 Source</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.kinship.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
-                {{ method_field('PATCH') }}
+            <form action="{{ route('basicinformation.sources.store', $id) }}" class="form-horizontal" method="post">
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
@@ -15,79 +14,41 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
-                    <div class="col-sm-10">
-                        <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
-                            @if($res['kin_str'])
-                                <option value="{{ $row->c_kin_code }}" selected="selected">{{ $res['kin_str'] }}</option>
-                            @endif
-                        </select>
-
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
-                    <div class="col-sm-10">
-                        <select class="form-control c_kin_id" name="c_kin_id">
-                            @if($res['biog_str'])
-                                <option value="{{ $row->c_kin_id }}" selected="selected">{{ $res['biog_str'] }}</option>
-                            @endif
-                        </select>
-                        {{--<input type="text" class="hidden" value="{{ $row->c_kin_id }}" name="c_kin_id">--}}
-                    </div>
-                </div>
-                <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-5">
-                        <select class="form-control c_source" name="c_source">
-                            @if($res['text_str'])
-                                <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
-                            @endif
+                        <select class="form-control c_source" name="c_textid" required>
                         </select>
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
+                        <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5">{{ $row->c_notes }}</textarea>
+                                  rows="5"></textarea>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_autogen_notes" class="col-sm-2 control-label">c_autogen_notes</label>
-                    <div class="col-sm-10">
-                        <textarea class="form-control" name="c_autogen_notes" id="" cols="30"
-                                  rows="5">{{ $row->c_autogen_notes }}</textarea>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">成对亲属关系</label>
-                    <div class="col-sm-10">
-                        <select class="form-control c_kinship_pair" name="c_kinship_pair">
-                            @if($res['kinpair_str'])
-                                <option value="{{ $res['k_p_code'] }}" selected="selected">{{ $res['kinpair_str'] }}</option>
-                            @endif
+                    <label for="c_female" class="col-sm-2 control-label">是主要出处</label>
+                    <div class="col-sm-4">
+                        <select class="form-control select2" name="c_main_source">
+                            <option value=0>0-否
+                            </option>
+                            <option value=1>1-是
+                            </option>
                         </select>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
-                               disabled>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
-                               disabled>
+                    <label for="c_ethnicity_code" class="col-sm-2 control-label">是本人传记</label>
+                    <div class="col-sm-4">
+                        <select class="form-control select2" name="c_self_bio">
+                            <option value="0">0-否
+                            </option>
+                            <option value="1">1-是
+                            </option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -104,11 +65,7 @@
 @section('js')
     <script>
         $(".select2").select2();
-        $(".c_kinship_pair").select2();
         $(".c_source").select2(options('text'));
-        $(".c_kin_code").select2(options('kincode'));
-        $(".c_kin_id").select2(options('biog'));
-        // kinship_pair();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -163,28 +120,6 @@
                 templateResult: formatRepo,
                 templateSelection: formatRepoSelection
             }
-        }
-
-        function kinship_pair(){
-            let c_kin_code = $('.c_kin_code').val();
-            let c_kin_id = $('.c_kin_id').val();
-            // console.log(c_kin_id, c_kin_code);
-            // if (c_kin_id == 0 || c_kin_id == -999) {return}
-            let data = [{
-                id: 0,
-                text: '请选择对应亲属关系'
-            }];
-            // $(".c_kinship_pair").val(null).trigger("change");
-            // console.log($(".c_kinship_pair").val());
-            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
-                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                for (let i=data.length-1; i>-1; i--){
-                    item = data[i];
-                    // console.log(item);
-                    $(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
-                }
-            });
-
         }
     </script>
 @endsection

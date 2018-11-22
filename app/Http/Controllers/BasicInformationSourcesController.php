@@ -7,7 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class BasicInformationStatusesController extends Controller
+class BasicInformationSourcesController extends Controller
 {
     /**
      * @var BiogMainRepository
@@ -29,9 +29,9 @@ class BasicInformationStatusesController extends Controller
      */
     public function index($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->byIdWithStatuses($id);
-        return view('biogmains.statuses.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分']);
+        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        return view('biogmains.sources.index', ['basicinformation' => $biogbasicinformation,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处']);
     }
 
     /**
@@ -41,9 +41,9 @@ class BasicInformationStatusesController extends Controller
      */
     public function create($id)
     {
-        return view('biogmains.statuses.create', [
+        return view('biogmains.sources.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分', 'page_url' => '/basicinformation/'.$id.'/statuses']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处', 'page_url' => '/basicinformation/'.$id.'/sources']);
     }
 
     /**
@@ -62,9 +62,9 @@ class BasicInformationStatusesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $_id = $this->biogMainRepository->statuseStoreById($request, $id);
+        $text_id = $this->biogMainRepository->sourceStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.sources.edit', ['id' => $id, '_id' => $text_id]);
     }
 
     /**
@@ -76,6 +76,7 @@ class BasicInformationStatusesController extends Controller
     public function show($id)
     {
         //
+
     }
 
     /**
@@ -86,11 +87,11 @@ class BasicInformationStatusesController extends Controller
      */
     public function edit($id, $id_)
     {
-        $res = $this->biogMainRepository->statuseById($id_);
-        return view('biogmains.statuses.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分',
-            'page_url' => '/basicinformation/'.$id.'/statuses',
-            'archer' => "<li><a href='#'>Statuses</a></li>",
+        $res = $this->biogMainRepository->sourceById($id, $id_);
+        return view('biogmains.sources.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处',
+            'page_url' => '/basicinformation/'.$id.'/sources',
+            'archer' => "<li><a href='#'>Sources</a></li>",
         ]);
     }
 
@@ -111,9 +112,9 @@ class BasicInformationStatusesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->statuseUpdateById($request, $id_ ,$id);
+        $text_id = $this->biogMainRepository->SourceUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.sources.edit', ['id'=>$id, 'id_'=>$text_id]);
     }
 
     /**
@@ -132,8 +133,8 @@ class BasicInformationStatusesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->statuseDeleteById($id_, $id);
+        $this->biogMainRepository->sourceDeleteById($id, $id_);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.index', ['id' => $id]);
+        return redirect()->route('basicinformation.sources.index', ['id' => $id]);
     }
 }

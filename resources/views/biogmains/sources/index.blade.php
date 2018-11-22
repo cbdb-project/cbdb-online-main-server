@@ -7,6 +7,7 @@
 
         <div class="panel-body">
             <table class="table table-hover table-condensed">
+                <a href="{{ route('basicinformation.sources.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
                 <caption>共查询到{{ $basicinformation->sources_count }}条记录</caption>
                 <thead>
                 <tr>
@@ -24,7 +25,7 @@
                         <td>{{ $value->pivot->c_pages }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->c_textid]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -38,7 +39,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="{{ route('basicinformation.sources.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->c_textid]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

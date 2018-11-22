@@ -4,15 +4,15 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class TextCode extends Model
+class TextType extends Model
 {
     /**
      * 与模型关联的数据表
      *
      * @var string
      */
-    protected $table = 'TEXT_CODES';
-    protected $primaryKey = 'c_textid';
+    protected $table = 'TEXT_TYPE';
+    protected $primaryKey = 'c_text_type_code';
     /**
      * 该模型是否被自动维护时间戳
      *
@@ -26,9 +26,4 @@ class TextCode extends Model
      * @var array
      */
     protected $guarded = [];
-
-    public function type()
-    {
-        return $this->belongsTo('App\TextType', 'c_text_type_id', 'c_text_type_code');
-    }
 }

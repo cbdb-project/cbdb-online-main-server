@@ -17,7 +17,7 @@
                 <div class="form-group">
                     <label for="c_role_id" class="col-sm-2 control-label">著述代碼(c_textid)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_source" name="c_textid" disabled>
+                        <select class="form-control c_source" name="c_textid">
                             @if($res['text'])
                                 <option value="{{ $row->c_textid }}" selected="selected">{{ $res['text'] }}</option>
                             @endif
@@ -27,7 +27,7 @@
                 <div class="form-group">
                     <label for="c_role_id" class="col-sm-2 control-label">著述角色(c_role_id)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_role_id" model="role" selected="{{ $row->c_role_id }}" disabled></select-vue>
+                        <select-vue name="c_role_id" model="role" selected="{{ $row->c_role_id }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

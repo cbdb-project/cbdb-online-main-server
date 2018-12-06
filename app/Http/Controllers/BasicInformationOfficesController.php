@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\OfficeCode;
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use App\SocialInst;
-use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -18,14 +19,20 @@ class BasicInformationOfficesController extends Controller
      * @var BiogMainRepository
      */
     protected $biogMainRepository;
+    protected $table_name;
+    protected $operationRepository;
+    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
         $this->biogMainRepository = $biogMainRepository;
+        $this->table_name = 'POSTED_TO_OFFICE_DATA';
+        $this->operationRepository = $operationRepository;
+        $this->toolsRepository = $toolsRepository;
     }
     /**
      * Display a listing of the resource.
@@ -123,6 +130,21 @@ class BasicInformationOfficesController extends Controller
         $this->biogMainRepository->officeUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$id_]);
+        //20181107建安修改
+        //return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$data['c_office_id']."-".$data['c_posting_id']]);
+/*
+        $data = $request->all();
+        $data = array_except($data, ['_method', '_token']);
+        $temp_l = explode("-", $id_);
+        DB::table($this->table_name)->where([
+            ['c_office_id', '=', $temp_l[0]],
+            ['c_posting_id', '=', $temp_l[1]],
+        ])->update($data);
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $id_, $data);
+        flash('Update success @ '.Carbon::now(), 'success');
+        $data['c_office_id'] = $temp_l[0];
+        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $data['c_office_id']."-".$data['c_posting_id']]);
+*/
     }
 
     /**

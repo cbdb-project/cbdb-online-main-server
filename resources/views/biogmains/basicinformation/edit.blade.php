@@ -115,14 +115,14 @@
                     <label for="c_name_chn" class="col-sm-2 control-label">姓名(中)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name_chn" class="form-control"
-                               value="{{ $basicinformation->c_name_chn }}" disabled>
+                               value="{{ $basicinformation->c_name_chn }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_name" class="col-sm-2 control-label">姓名(英)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name" class="form-control"
-                               value="{{ $basicinformation->c_name }}" disabled>
+                               value="{{ $basicinformation->c_name }}">
                     </div>
                 </div>
                 <div class="form-group">

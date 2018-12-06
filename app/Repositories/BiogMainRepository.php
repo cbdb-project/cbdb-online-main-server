@@ -26,6 +26,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
+//20181112建安修改
+use App\SocialInstCode;
+use App\SocialInstAddr;
+//修改結束
+
 
 /**
  * Class BiogMainRepository
@@ -283,7 +288,15 @@ class BiogMainRepository
 
     public function entryById($id)
     {
-        $row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
+        //建安修改20181109
+        //$row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
+        $addr_l = explode("-", $id);
+        $row = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_entry_code', '=', $addr_l[1]],
+            ['c_sequence', '=', $addr_l[2]],
+        ])->first();
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -304,17 +317,47 @@ class BiogMainRepository
             $text_ = KinshipCode::find($row->c_kin_code);
             $kin_str = $text_->c_kin_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
+        //20181112建安修改
+        $biog_str = null;
+        if($row->c_kin_id || $row->c_kin_id === 0) {
+            $text_ = BiogMain::find($row->c_kin_id);
+            $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+        }
+        $biog_str2 = null;
+        if($row->c_assoc_id || $row->c_assoc_id === 0) {
+            $text_ = BiogMain::find($row->c_assoc_id);
+            $biog_str2 = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+        }
+        //修改結束
         $assoc_str = null;
         if($row->c_assoc_code || $row->c_assoc_code === 0) {
             $text_ = AssocCode::find($row->c_assoc_code);
             $assoc_str = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
         }
-        $inst_str = null;
+        //20181112建安修改
+        $inst_str_new = null;
         if($row->c_inst_code || $row->c_inst_code === 0) {
-            $text_ = SocialInst::find($row->c_inst_code);
-            $inst_str = $text_->c_inst_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
+            $text = SocialInstAddr::find($row->c_inst_code);
+            $addr = AddressCode::where('c_addr_id', $text->c_inst_addr_id)->first()->c_name_chn;
+            $dy = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_begin_year;
+            $dy2 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_floruit_dy;
+            $dy3 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_end_year;
+            $dy4 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_last_known_year;
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $inst_str_new = $row->c_inst_code." ".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
-        return ['row' => $row, 'text_str' => $text_str, 'entry_str' => $entry_str, 'addr_str' => $addr_str, 'kin_str' => $kin_str, 'assoc_str' => $assoc_str, 'inst_str' => $inst_str];
+        
+        $inst_str = null;
+        if($row->c_inst_name_code || $row->c_inst_name_code === 0) {
+            $text_ = SocialInst::find($row->c_inst_name_code);
+            $inst_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
+        }
+        
+        //修改結束
+        return ['row' => $row, 'text_str' => $text_str, 'entry_str' => $entry_str, 'addr_str' => $addr_str, 'kin_str' => $kin_str, 'assoc_str' => $assoc_str, 'inst_str' => $inst_str, 'inst_str_new' => $inst_str_new, 'biog_str' => $biog_str, 'biog_str2' => $biog_str2];
     }
 
     public function entryUpdateById(Request $request, $id, $c_personid)
@@ -334,21 +377,25 @@ class BiogMainRepository
 
     public function entryStoreById(Request $request, $id)
     {
+        //建安修改20181109
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['tts_sysno'] = DB::table('ENTRY_DATA')->max('tts_sysno') + 1;
         $data['c_personid'] = $id;
         $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
-        $data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
+        //$data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
-        dd($data);
+        //dd($data);
         DB::table('ENTRY_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
-        return $data['tts_sysno'];
+        //新增的聯合主鍵
+        $newid = $data['c_personid']."-".$data['c_entry_code']."-".$data['c_sequence'];
+        //return $data['tts_sysno'];
+        return $newid;
     }
 
     public function entryDeleteById($id, $c_personid)
@@ -544,7 +591,10 @@ class BiogMainRepository
 
     public function socialInstById($id)
     {
-        $row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
+        //建安修改20181113
+        //$row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
+        $addr_l = explode("-", $id);
+        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -580,7 +630,9 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data, True);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $tts, $data);
-        return $tts;
+        //新增的聯合主鍵
+        $newid = $data['c_personid']."-".$data['c_inst_name_code']."-".$data['c_bi_role_code'];
+        return $newid;
     }
 
     public function socialInstDeleteById($id, $c_personid)

@@ -380,7 +380,7 @@
             let death = $('input[name=c_deathyear]').val();
             if(birth && death){
                 if(death < birth) return;
-                let deathage = death - birth;
+                let deathage = death - birth + 1;
                 $('input[name=c_death_age]').val(deathage);
                 let indexyear = deathage > 60 ? parseInt(birth) + 60 : death;
                 $('input[name=c_index_year]').val(indexyear);

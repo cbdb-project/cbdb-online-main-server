@@ -161,7 +161,11 @@ class CodesController extends Controller
             'resource_id' => $id,
             'resource_data' => json_encode((array)$row)
         ];
-        $this->operationRepository->store($op);
+        //$this->operationRepository->store($op);
+        //20181207建安修改片段
+        $row2 = json_encode((array)$row);
+        $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row2);
+        //修改結束
         DB::table($table_name)->where($id_name, $id)->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.show', ['table_name' => $table_name]);

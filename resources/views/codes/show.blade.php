@@ -44,10 +44,10 @@
                                 <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
                                    onclick="alert('确认删除');
                                             event.preventDefault();
-                                           document.getElementById('delete-form').submit();"
+                                           document.getElementById('delete-form-{{ $id_ }}').submit();"
                                    class="btn btn-sm btn-danger">delete</a>
                             </div>
-                            <form id="delete-form" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $id_ }}" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

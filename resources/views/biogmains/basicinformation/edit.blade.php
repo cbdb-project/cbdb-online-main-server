@@ -303,7 +303,7 @@
                         <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ly_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ly_nh_year }}">
                         <label for="">年</label>
-                        在世始年注
+                        在世終年注
                         <input type="text" name="c_fl_ly_notes" class="form-control" value="{{ $basicinformation->c_fl_ly_notes }}">
 
                     </div>

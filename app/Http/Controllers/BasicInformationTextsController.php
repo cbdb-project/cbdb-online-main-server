@@ -146,7 +146,10 @@ class BasicInformationTextsController extends Controller
         ])->update($data);
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $id_, $data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
+        //20181107建安修改
+        //return redirect()->route('basicinformation.texts.edit', ['id'=>$id, 'id_'=>$id_]);
+        $data['c_personid'] = $temp_l[0];
+        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id']]);
     }
 
     /**

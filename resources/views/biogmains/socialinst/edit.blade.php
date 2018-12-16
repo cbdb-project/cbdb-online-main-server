@@ -5,7 +5,7 @@
         <div class="panel-heading">社交機構 SocialInst</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.socialinst.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.socialinst.update', [$id, '_id' => $row->c_personid.'-'.$row->c_bi_role_code]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

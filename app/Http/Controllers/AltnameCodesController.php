@@ -89,7 +89,8 @@ class AltnameCodesController extends Controller
         }
         $this->altcodeRepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-
+        //建安修改20181115，使用更新後的id來跳轉。
+        $id = $request['c_name_type_code'];
         return redirect()->route('altnamecodes.edit', $id);
     }
 

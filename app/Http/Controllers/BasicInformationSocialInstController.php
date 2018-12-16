@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
+use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class BasicInformationSocialInstController extends Controller
 {
@@ -13,14 +17,18 @@ class BasicInformationSocialInstController extends Controller
      * @var BiogMainRepository
      */
     protected $biogMainRepository;
+    protected $operationRepository;
+    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
         $this->biogMainRepository = $biogMainRepository;
+        $this->operationRepository = $operationRepository;
+        $this->toolsRepository = $toolsRepository;
     }
     /**
      * Display a listing of the resource.
@@ -111,9 +119,25 @@ class BasicInformationSocialInstController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        /*
+        //原本的寫法，保留做為參考。
         $this->biogMainRepository->socialInstUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$id_]);
+        */
+        
+        $data = $request->all();
+        $data = array_except($data, ['_method', '_token']);
+        $data = $this->toolsRepository->timestamp($data);
+        $addr_l = explode("-", $id_);
+        DB::table('BIOG_INST_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_bi_role_code', '=', $addr_l[1]],
+        ])->update($data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $id_, $data);
+        $newid = $id.'-'.$data['c_bi_role_code'];
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$newid]);
     }
 
     /**
@@ -132,7 +156,19 @@ class BasicInformationSocialInstController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->socialInstDeleteById($id_, $id);
+        //建安修改20191113
+        //$this->biogMainRepository->socialInstDeleteById($id_, $id);
+        $addr_l = explode("-", $id_);
+        $row = DB::table('BIOG_INST_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_bi_role_code', '=', $addr_l[1]],
+        ])->first();
+
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', $id_, $row);
+        DB::table('BIOG_INST_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_bi_role_code', '=', $addr_l[1]],
+        ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.index', ['id' => $id]);
     }

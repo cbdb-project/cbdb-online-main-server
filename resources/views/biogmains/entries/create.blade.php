@@ -97,10 +97,12 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
-                    <label for="" class="col-sm-2 control-label">親戚(kin_id)</label>
+                <div class="form-group">
+                    <label for="c_kin_id" class="col-sm-2 control-label">親戚(kin_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="" required>
+                        <select class="form-control c_kin_id" name="c_kin_id">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -111,10 +113,12 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
+                <div class="form-group">
                     <label for="c_assoc_id" class="col-sm-2 control-label">社會關係人(assoc_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_assoc_id" required>
+                        <select class="form-control c_assoc_id" name="c_assoc_id">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -125,6 +129,14 @@
                         </select>
                     </div>
                     <input type="text" class="hidden" value="0" name="c_inst_name_code">
+                </div>
+                <div class="form-group">
+                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(source)</label>
@@ -169,8 +181,11 @@
         $(".c_entry_addr_id").select2(options('addr'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_inst_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstaddr'));
+        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_kin_id").select2(options('biog'));
+        $(".c_assoc_id").select2(options('biog'));
 
         function formatRepo (repo) {
             if (repo.loading) {

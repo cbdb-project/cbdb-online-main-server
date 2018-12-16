@@ -212,16 +212,3 @@ php artisan up
 ```
 
 记得不要在前面加 sudo。据群超：docker 下没有 sudo 的权限，如果使用 laradock 的环境，sudo 命令将不会成功
-
-### 容器启动
-
-查看容器状态
-
-``` 
-docker stats
-```
-启动 docker
-```
-cd /home/wanghs/laradock
-docker-compose up -d nginx mysql
-```

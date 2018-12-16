@@ -115,14 +115,14 @@
                     <label for="c_name_chn" class="col-sm-2 control-label">姓名(中)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name_chn" class="form-control"
-                               value="{{ $basicinformation->c_name_chn }}" disabled>
+                               value="{{ $basicinformation->c_name_chn }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_name" class="col-sm-2 control-label">姓名(英)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name" class="form-control"
-                               value="{{ $basicinformation->c_name }}" disabled>
+                               value="{{ $basicinformation->c_name }}">
                     </div>
                 </div>
                 <div class="form-group">
@@ -303,7 +303,7 @@
                         <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
                         <input type="text" name="c_fl_ly_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ly_nh_year }}">
                         <label for="">年</label>
-                        在世始年注
+                        在世終年注
                         <input type="text" name="c_fl_ly_notes" class="form-control" value="{{ $basicinformation->c_fl_ly_notes }}">
 
                     </div>
@@ -380,7 +380,7 @@
             let death = $('input[name=c_deathyear]').val();
             if(birth && death){
                 if(death < birth) return;
-                let deathage = death - birth;
+                let deathage = death - birth + 1;
                 $('input[name=c_death_age]').val(deathage);
                 let indexyear = deathage > 60 ? parseInt(birth) + 60 : death;
                 $('input[name=c_index_year]').val(indexyear);

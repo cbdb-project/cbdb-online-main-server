@@ -29,13 +29,14 @@
                         <td>{{ $value->pivot->c_bi_end_year }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->tts_sysno]) }}">edit</a>
+                                @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_bi_role_code)
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();
+                                               document.getElementById('delete-form-{{ $id_ }}').submit();
                                            }else{
                                                return false;
                                            }
@@ -43,7 +44,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="{{ route('basicinformation.socialinst.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->tts_sysno]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $id_ }}" action="{{ route('basicinformation.socialinst.destroy', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

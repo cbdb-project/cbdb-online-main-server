@@ -39,6 +39,15 @@ Route::group([], function () {
         $appcoderepository = new \App\Repositories\AppointCodeRepository();
         return $appcoderepository->appointByQuery($request);
     });
+    //20181105建安新增
+    Route::post('/textcode', function (Request $request) {
+        $textcoderepository = new \App\Repositories\TextCodeRepository();
+        return $textcoderepository->textByQuery($request);
+    });
+     Route::post('/addrbelongsdata', function (Request $request) {
+        $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
+        return $addrbelongsdatarepository->AddrByQuery($request);
+    });
 });
 
 Route::group(['prefix' => 'select'], function (){
@@ -70,6 +79,7 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('search/text', 'ApiController@searchText');
     Route::get('search/office', 'ApiController@searchOffice');
     Route::get('search/socialinst', 'ApiController@socialinst');
+    Route::get('search/socialinstaddr', 'ApiController@socialinstaddr');
     Route::get('search/entry', 'ApiController@searchEntry');
     Route::get('search/kincode', 'ApiController@searchKincode');
     Route::get('search/assoccode', 'ApiController@searchAssoccode');
@@ -88,4 +98,13 @@ Route::middleware('guest')->post('/v1/user/login', 'Api\LoginController@login');
 Route::group(['prefix' => '/v1', 'middleware' => ['auth:api']], function (){
     Route::resource('biog', 'Api\BiogMainController');
     Route::resource('biog.addr', 'Api\BiogAddressController');
+});
+
+//20181105建安新增
+Route::group(['prefix' => 'v1'], function (){
+    Route::get('biog', 'ApiController@searchC_presonid');
+    Route::get('add', 'ApiController@addC_presonid');
+    Route::get('update', 'ApiController@updateC_presonid');
+    Route::get('delete', 'ApiController@deleteC_presonid');
+    Route::get('user', 'ApiController@userC_presonid');
 });

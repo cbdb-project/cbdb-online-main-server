@@ -163,7 +163,9 @@ class BiogMain extends Model
 
     public function inst()
     {
-        return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year', 'tts_sysno');
+        return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year');
+        //建安修改20181113
+        //return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year', 'tts_sysno');
     }
 
     public function inst_name(){

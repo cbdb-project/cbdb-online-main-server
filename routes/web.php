@@ -140,3 +140,20 @@ Route::get('/test', function (Request $request){
     $data->type;
     return $data;
 });
+
+//20181105建安新增
+Route::resource('textcodes', 'TextCodesController', ['name' => [
+    'show' => 'textcode.show',
+    'create' => 'textcode.create',
+    'edit' => 'textcode.edit',
+    'update' => 'textcode.update'
+]]);
+
+Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
+    'show' => 'addrbelongsdata.show',
+    'create' => 'addrbelongsdata.create',
+    'edit' => 'addrbelongsdata.edit',
+    'update' => 'addrbelongsdata.update'
+]]);
+//20181207建安新增
+Route::get('/addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');

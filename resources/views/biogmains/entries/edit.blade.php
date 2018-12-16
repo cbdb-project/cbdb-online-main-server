@@ -5,7 +5,7 @@
         <div class="panel-heading">入仕 Entry</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.entries.update', ['id' =>$id, '_id' => $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.entries.update', ['id' =>$id, '_id' => $row->c_personid.'-'.$row->c_entry_code.'-'.$row->c_sequence]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -105,10 +105,14 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
+                <div class="form-group">
                     <label for="" class="col-sm-2 control-label">親戚(kin_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="">
+                        <select class="form-control c_kin_id" name="c_kin_id">
+                            @if($res['biog_str'])
+                                <option value="{{ $row->c_kin_id }}" selected="selected">{{ $res['biog_str'] }}</option>
+                            @endif
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
@@ -121,18 +125,32 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group hidden">
+                <div class="form-group">
                     <label for="c_assoc_id" class="col-sm-2 control-label">社會關係人(assoc_id)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_assoc_id">
+                        <select class="form-control c_assoc_id" name="c_assoc_id">
+                            @if($res['biog_str2'])
+                                <option value="{{ $row->c_assoc_id }}" selected="selected">{{ $res['biog_str2'] }}</option>
+                            @endif
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_inst_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
+                            @if($res['inst_str_new'])
+                                <option value="{{ $row->c_inst_code }}" selected="selected">{{ $res['inst_str_new'] }}</option>
+                            @endif
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
                             @if($res['inst_str'])
-                                <option value="{{ $row->c_inst_code }}" selected="selected">{{ $res['inst_str'] }}</option>
+                                <option value="{{ $row->c_inst_name_code }}" selected="selected">{{ $res['inst_str'] }}</option>
                             @endif
                         </select>
                     </div>
@@ -192,8 +210,11 @@
         $(".c_addr_id").select2(options('addr'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_inst_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstaddr'));
+        $(".c_inst_name_code").select2(options('socialinst'));
         $(".c_source").select2(options('text'));
+        $(".c_kin_id").select2(options('biog'));
+        $(".c_assoc_id").select2(options('biog'));
 
         function formatRepo (repo) {
             if (repo.loading) {

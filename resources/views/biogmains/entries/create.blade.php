@@ -16,7 +16,7 @@
                 <div class="form-group">
                     <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
-                        <input type="number" class="form-control" name="c_sequence" maxlength="4" required>
+                        <input type="number" class="form-control" name="c_sequence" maxlength="4" value="0" required>
                     </div>
                 </div>
                 <div class="form-group">
@@ -31,7 +31,7 @@
                     <label for="c_year" class="col-sm-2 control-label">入仕年(year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_year" class="form-control"
-                               value="" required>
+                               value="0" required>
                     </div>
                     <div class="col-md-2 from-inline">
                         <label for="c_nianhao_id">年号</label>
@@ -73,7 +73,7 @@
                 <div class="form-group">
                     <label for="c_entry_addr_id" class="col-sm-2 control-label">地點(c_addr_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_entry_addr_id" name="c_entry_addr_id">
+                        <select class="form-control c_entry_addr_id" name="c_entry_addr_id" required>
                         </select>
                     </div>
                 </div>
@@ -128,7 +128,6 @@
                             <option value="0" selected="selected">0 未知 weizhi</option>
                         </select>
                     </div>
-                    <input type="text" class="hidden" value="0" name="c_inst_name_code">
                 </div>
                 <div class="form-group">
                     <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>

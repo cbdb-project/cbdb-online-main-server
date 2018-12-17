@@ -26,7 +26,7 @@
                         <td>
                             <div class="btn-group">
                                 @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_entry_code."-".$value->pivot->c_sequence."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_year."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code)
-                                @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_entry_code."-".$value->pivot->c_sequence)
+                                @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_entry_code."-".$value->pivot->c_sequence."-".$value->pivot->c_kin_code."-".$value->pivot->c_assoc_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_year."-".$value->pivot->c_assoc_id."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code)
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.entries.edit', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}">edit</a>
                                 <a href=""
                                    onclick="

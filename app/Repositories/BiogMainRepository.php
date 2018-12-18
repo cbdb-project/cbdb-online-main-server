@@ -257,6 +257,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
+        return $data['c_office_id']."-".$_postingid;
     }
 
     public function officeStoreById(Request $request, $id)

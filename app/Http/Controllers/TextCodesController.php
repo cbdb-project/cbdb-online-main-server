@@ -21,7 +21,7 @@ class TextCodesController extends Controller
      */
     public function index()
     {
-        return view('textcodes.index', ['page_title' => 'Text Type Codes', 'page_description' => '著作编码表', 'codes' => session('codes')]);
+        return view('textcodes.index', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'codes' => session('codes')]);
     }
 
     /**
@@ -65,7 +65,7 @@ class TextCodesController extends Controller
     public function edit($id)
     {
         $data = $this->textcoderepository->byId($id);
-        return view('textcodes.edit', ['page_title' => 'Text Type Codes', 'page_description' => '著作编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('textcodes.edit', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

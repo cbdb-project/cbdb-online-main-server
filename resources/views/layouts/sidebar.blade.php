@@ -48,8 +48,9 @@
             <li class="{{ $page_title == 'Address Codes' ? 'active' : '' }}"><a href="{{ route('addresscodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址编码表</span></a></li>
             <li class="{{ $page_title == 'Altname Codes' ? 'active' : '' }}"><a href="{{ route('altnamecodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>别名编码表</span></a></li>
             <li class="{{ $page_title == 'Appointment Type Codes' ? 'active' : '' }}"><a href="{{ route('appointcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>任命类型编码表</span></a></li>
-            <li class="{{ $page_title == 'textcodes Type Codes' ? 'active' : '' }}"><a href="{{ route('textcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作编码表</span></a></li>
-            <li class="{{ $page_title == 'addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>行政單位等級编码表</span></a></li>
+            <li class="{{ $page_title == 'Text Codes' ? 'active' : '' }}"><a href="{{ route('textcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作编码表</span></a></li>
+            <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>行政单位等级编码表</span></a></li>
+            <li class="{{ $page_title == 'Addr Codes' ? 'active' : '' }}"><a href="{{ route('addrcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>中国行政地理单位编码表</span></a></li>
 
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>

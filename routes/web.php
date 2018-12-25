@@ -157,3 +157,10 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
 ]]);
 //20181207建安新增
 Route::get('/addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
+
+Route::resource('addrcodes', 'AddrCodesController', ['name' => [
+    'show' => 'addrcode.show',
+    'create' => 'addrcode.create',
+    'edit' => 'addrcode.edit',
+    'update' => 'addrcode.update'
+]]);

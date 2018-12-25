@@ -5,21 +5,16 @@
  * Date: 2017/8/30
  * Time: 14:43
  */
-
 namespace App\Repositories;
-
-
 use App\AddrCode;
 use App\AddressCode;
 use Illuminate\Http\Request;
-
 /**
  * Class AddrCodeRepository
  * @package App\Repositories
  */
 class AddrCodeRepository
 {
-
     /**
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
@@ -27,7 +22,6 @@ class AddrCodeRepository
     {
         return AddressCode::paginate(200);
     }
-
     /**
      * @param $request
      * @param $num
@@ -45,19 +39,16 @@ class AddrCodeRepository
         $names->appends(['q' => $request->q])->links();
         return $names;
     }
-
     public function byId($id)
     {
         return AddressCode::find($id);
     }
-
     public function updateById($request, $id)
     {
         $data = $request->all();
         $addrcode = AddressCode::find($id);
         $addrcode->update($data);
     }
-
     public function searchAddr(Request $request)
     {
         $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
@@ -81,5 +72,4 @@ class AddrCodeRepository
         }
         return $data;
     }
-
 }

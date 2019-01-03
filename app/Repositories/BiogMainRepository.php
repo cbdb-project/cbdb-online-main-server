@@ -257,6 +257,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
+        return $data['c_office_id']."-".$_postingid;
     }
 
     public function officeStoreById(Request $request, $id)
@@ -290,11 +291,18 @@ class BiogMainRepository
     {
         //建安修改20181109
         //$row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
-        $addr_l = explode("-", $id);
+        $addr_a = explode("-", $id);
         $row = DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_entry_code', '=', $addr_l[1]],
-            ['c_sequence', '=', $addr_l[2]],
+            ['c_personid', '=', $addr_a[0]],
+            ['c_entry_code', '=', $addr_a[1]],
+            ['c_sequence', '=', $addr_a[2]],
+            ['c_kin_code', '=', $addr_a[3]],
+            ['c_assoc_code', '=', $addr_a[4]],
+            ['c_kin_id', '=', $addr_a[5]],
+            ['c_year', '=', $addr_a[6]],
+            ['c_assoc_id', '=', $addr_a[7]],
+            ['c_inst_code', '=', $addr_a[8]],
+            ['c_inst_name_code', '=', $addr_a[9]],
         ])->first();
 
         $text_str = null;

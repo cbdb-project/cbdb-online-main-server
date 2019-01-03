@@ -127,9 +127,9 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        $id_ = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$id_]);
+        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $id_]);
         //20181107建安修改
         //return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$data['c_office_id']."-".$data['c_posting_id']]);
 /*

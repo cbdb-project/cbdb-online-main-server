@@ -44,9 +44,13 @@ Route::group([], function () {
         $textcoderepository = new \App\Repositories\TextCodeRepository();
         return $textcoderepository->textByQuery($request);
     });
-     Route::post('/addrbelongsdata', function (Request $request) {
+    Route::post('/addrbelongsdata', function (Request $request) {
         $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
         return $addrbelongsdatarepository->AddrByQuery($request);
+    });
+    Route::post('/addrcode', function (Request $request) {
+        $addrcoderepository = new \App\Repositories\AddrcodeRepository();
+        return $addrcoderepository->addrByQuery($request);
     });
 });
 

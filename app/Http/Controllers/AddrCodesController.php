@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\TextCodeRepository;
+use App\Repositories\AddrcodeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class TextCodesController extends Controller
+class AddrCodesController extends Controller
 {
-    protected $textcoderepository;
-    public function __construct(TextCodeRepository $textcoderepository)
+    protected $addrcoderepository;
+    public function __construct(AddrcodeRepository $addrcoderepository)
     {
-        $this->textcoderepository = $textcoderepository;
+        $this->addrcoderepository = $addrcoderepository;
     }
     /**
      * Display a listing of the resource.
@@ -21,7 +21,7 @@ class TextCodesController extends Controller
      */
     public function index()
     {
-        return view('textcodes.index', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'codes' => session('codes')]);
+        return view('addrcodes.index', ['page_title' => 'Addr Codes', 'page_description' => '中国行政地理单位编码表', 'codes' => session('codes')]);
     }
 
     /**
@@ -64,8 +64,8 @@ class TextCodesController extends Controller
      */
     public function edit($id)
     {
-        $data = $this->textcoderepository->byId($id);
-        return view('textcodes.edit', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        $data = $this->addrcoderepository->byId($id);
+        return view('addrcodes.edit', ['page_title' => 'Addr Codes', 'page_description' => '中国行政地理单位编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**
@@ -85,11 +85,10 @@ class TextCodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->textcoderepository->updateById($request, $id);
+        $this->addrcoderepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        //建安修改20181115，使用更新後的id來跳轉。
-        $id = $request['c_textid'];
-        return redirect()->route('textcodes.edit', $id);
+        $id = $request['c_addr_id'];
+        return redirect()->route('addrcodes.edit', $id);
     }
 
     /**

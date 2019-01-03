@@ -22,6 +22,7 @@ Vue.component('altname-code-list', require('./components/AltnameCodeList.vue'));
 Vue.component('appoint-code-list', require('./components/AppointCodeList.vue'));
 Vue.component('text-code-list', require('./components/TextCodeList.vue'));
 Vue.component('addr-belongs-data-list', require('./components/AddrBelongsDataList.vue'));
+Vue.component('addr-code-list', require('./components/Addr2CodeList.vue'));
 Vue.component('codebox', require('./components/codebox.vue'));
 
 Vue.component('select-vue', require('./components/Select.vue'));

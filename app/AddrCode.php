@@ -1,9 +1,6 @@
 <?php
-
 namespace App;
-
 use Illuminate\Database\Eloquent\Model;
-
 class AddrCode extends Model
 {
     /**
@@ -20,7 +17,7 @@ class AddrCode extends Model
      * @var bool
      */
     public $timestamps = false;
-
+    protected $guarded = [];
     public function belong()
     {
         return $this->hasMany('App\AddrBelong', 'c_addr_id', 'c_addr_id');

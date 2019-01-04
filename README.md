@@ -201,3 +201,30 @@ php artisan up
 ```
 
 记得不要在前面加 sudo。据群超：docker 下没有 sudo 的权限，如果使用 laradock 的环境，sudo 命令将不会成功
+
+### 關閉服務和打開服務(Centos)
+
+STOP:
+
+```
+cd /.../cbdb-online-main-server
+
+php artisan down
+
+systemctl stop docker
+
+init 0
+```
+
+START:
+
+```
+cd /.../laradock
+
+docker-compose up -d nginx mysql
+
+cd /.../cbdb-online-main-server
+
+php artisan up
+```
+

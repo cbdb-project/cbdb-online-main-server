@@ -22,33 +22,33 @@ Route::middleware('auth:api')->get(/**
 });
 
 Route::group([], function () {
-    Route::post('/name', function (Request $request)    {
+    Route::post('name', function (Request $request)    {
         return \App\Repositories\BiogMainRepository::namesByQuery($request);
     });
 
-    Route::post('/addresscode', function (Request $request) {
+    Route::post('addresscode', function (Request $request) {
         return \App\Repositories\AddrCodeRepository::addrByQuery($request);
     });
 
-    Route::post('/altnamecode', function (Request $request) {
+    Route::post('altnamecode', function (Request $request) {
         $altcoderepository = new \App\Repositories\AltCodeRepository();
         return $altcoderepository->altByQuery($request);
     });
 
-    Route::post('/appointcode', function (Request $request) {
+    Route::post('appointcode', function (Request $request) {
         $appcoderepository = new \App\Repositories\AppointCodeRepository();
         return $appcoderepository->appointByQuery($request);
     });
     //20181105建安新增
-    Route::post('/textcode', function (Request $request) {
+    Route::post('textcode', function (Request $request) {
         $textcoderepository = new \App\Repositories\TextCodeRepository();
         return $textcoderepository->textByQuery($request);
     });
-    Route::post('/addrbelongsdata', function (Request $request) {
+    Route::post('addrbelongsdata', function (Request $request) {
         $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
         return $addrbelongsdatarepository->AddrByQuery($request);
     });
-    Route::post('/addrcode', function (Request $request) {
+    Route::post('addrcode', function (Request $request) {
         $addrcoderepository = new \App\Repositories\AddrcodeRepository();
         return $addrcoderepository->addrByQuery($request);
     });
@@ -98,8 +98,8 @@ Route::group(['prefix' => 'code'], function (){
     Route::get('addr', 'ApiController@codeAddr');
 });
 
-Route::middleware('guest')->post('/v1/user/login', 'Api\LoginController@login');
-Route::group(['prefix' => '/v1', 'middleware' => ['auth:api']], function (){
+Route::middleware('guest')->post('v1/user/login', 'Api\LoginController@login');
+Route::group(['prefix' => 'v1', 'middleware' => ['auth:api']], function (){
     Route::resource('biog', 'Api\BiogMainController');
     Route::resource('biog.addr', 'Api\BiogAddressController');
 });

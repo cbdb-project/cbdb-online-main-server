@@ -31,7 +31,9 @@ class AddrCodesController extends Controller
      */
     public function create()
     {
-        //
+        $id = 1;
+        $data = $this->addrcoderepository->byId($id);
+        return view('addrcodes.edit', ['page_title' => 'Addr Codes', 'page_description' => '中国行政地理单位编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

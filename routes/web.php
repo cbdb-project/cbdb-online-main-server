@@ -23,7 +23,7 @@ Auth::routes();
 Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
 
-Route::get('/home', 'HomeController@index')->name('home');
+Route::get('home', 'HomeController@index')->name('home');
 
 Route::resource('informations', 'InformationsController', ['names' => [
     'create' => 'information.create'
@@ -50,13 +50,13 @@ Route::resource('basicinformation.possession', 'BasicInformationPossessionContro
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
 Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
-Route::get('/codes', 'CodesController@index')->name('codes.index');
-Route::get('/codes/{table_name}', 'CodesController@show')->name('codes.show');
-Route::get('/codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
-Route::match(['put', 'patch'], '/codes/{table_name}/{id}', 'CodesController@update')->name('codes.update');
-Route::get('/codes/{table_name}/create', 'CodesController@create')->name('codes.create');
-Route::post('/codes/{table_name}', 'CodesController@store')->name('codes.store');
-Route::delete('/codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
+Route::get('codes', 'CodesController@index')->name('codes.index');
+Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
+Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
+Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->name('codes.update');
+Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
+Route::post('codes/{table_name}', 'CodesController@store')->name('codes.store');
+Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
 
 Route::resource('addresscodes', 'AddressCodesController', ['name' => [
     'show' => 'addresscode.show',
@@ -135,7 +135,7 @@ Route::resource('operations', 'OperationsController', ['name' => [
     'update' => 'operations.update'
 ]]);
 
-Route::get('/test', function (Request $request){
+Route::get('test', function (Request $request){
     $data = \App\TextCode::find(2031);
     $data->type;
     return $data;
@@ -156,7 +156,7 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
     'update' => 'addrbelongsdata.update'
 ]]);
 //20181207建安新增
-Route::get('/addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
+Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
 
 Route::resource('addrcodes', 'AddrCodesController', ['name' => [
     'show' => 'addrcode.show',

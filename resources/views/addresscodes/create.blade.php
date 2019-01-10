@@ -3,10 +3,10 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">中国行政地理单位编码表</div>
+        <div class="panel-heading">地址编码表</div>
         <div class="panel-body">
             <div class="panel-body">
-                <form action="{{ route('addrcodes.store') }}" class="form-horizontal" method="post">
+                <form action="{{ route('addresscodes.store') }}" class="form-horizontal" method="post">
                     {{ csrf_field() }}
                     <div class="form-group">
                         <label for="c_addr_id" class="col-sm-2 control-label">c_addr_id</label>

@@ -3,16 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\TextCodeRepository;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
+use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\TextCode;
 
 class TextCodesController extends Controller
 {
     protected $textcoderepository;
-    public function __construct(TextCodeRepository $textcoderepository)
+    protected $operationRepository;
+    protected $toolRepository;
+    protected $yearRangeRepository;
+    public function __construct(TextCodeRepository $textcoderepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, YearRangeRepository $yearRangeRepository)
     {
         $this->textcoderepository = $textcoderepository;
+        $this->operationRepository = $operationRepository;
+        $this->toolRepository  = $toolsRepository;
+        $this->yearRangeRepository = $yearRangeRepository;
     }
     /**
      * Display a listing of the resource.
@@ -31,7 +41,9 @@ class TextCodesController extends Controller
      */
     public function create()
     {
-        //
+        $temp_id = TextCode::max('c_textid') + 1;
+        return view('textcodes.create', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'temp_id' => $temp_id]);
+    
     }
 
     /**
@@ -42,7 +54,23 @@ class TextCodesController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $data = $request->all();
+        if ($data['c_textid'] == null or $data['c_textid'] == 0 or !TextCode::where('c_textid', $data['c_textid'])->get()->isEmpty()){
+            flash('c_textid 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $flight = TextCode::create($data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'TEXT_CODES', $data['c_textid'], $data);
+        flash('Create success @ '.Carbon::now(), 'success');
+        return redirect()->route('textcodes.edit', $data['c_textid']);
     }
 
     /**

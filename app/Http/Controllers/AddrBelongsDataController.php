@@ -4,19 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Repositories\AddrBelongsDataRepository;
 use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
+use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\AddrBelongsData;
 
 class AddrBelongsDataController extends Controller
 {
     protected $addrbelongsdatarepository;
-    public function __construct(AddrBelongsDataRepository $addrbelongsdatarepository, OperationRepository $operationRepository)
+    protected $operationRepository;
+    protected $toolRepository;
+    protected $yearRangeRepository;
+    public function __construct(AddrBelongsDataRepository $addrbelongsdatarepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, YearRangeRepository $yearRangeRepository)
     {
         $this->addrbelongsdatarepository = $addrbelongsdatarepository;
         $this->operationRepository = $operationRepository;
+        $this->toolRepository  = $toolsRepository;
+        $this->yearRangeRepository = $yearRangeRepository;
     }
     /**
      * Display a listing of the resource.
@@ -35,7 +43,8 @@ class AddrBelongsDataController extends Controller
      */
     public function create()
     {
-        //
+        $temp_id = AddrBelongsData::max('c_addr_id') + 1;
+        return view('addrbelongsdata.create', ['page_title' => 'Addr Belongs Data', 'page_description' => '行政單位等級编码表', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -46,7 +55,23 @@ class AddrBelongsDataController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $data = $request->all();
+        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0 or !AddrBelongsData::where('c_addr_id', $data['c_addr_id'])->get()->isEmpty()){
+            flash('c_addr_id 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $flight = AddrBelongsData::create($data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_BELONGS_DATA', $data['c_addr_id'], $data);
+        flash('Create success @ '.Carbon::now(), 'success');
+        return redirect()->route('addrbelongsdata.edit', $data['c_addr_id']);
     }
 
     /**

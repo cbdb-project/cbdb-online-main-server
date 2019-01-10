@@ -3,16 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\AddrcodeRepository;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
+use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\AddrCode;
 
 class AddrCodesController extends Controller
 {
     protected $addrcoderepository;
-    public function __construct(AddrcodeRepository $addrcoderepository)
+    protected $operationRepository;
+    protected $toolRepository;
+    protected $yearRangeRepository;
+
+    public function __construct(AddrcodeRepository $addrcoderepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, YearRangeRepository $yearRangeRepository)
     {
         $this->addrcoderepository = $addrcoderepository;
+        $this->operationRepository = $operationRepository;
+        $this->toolRepository  = $toolsRepository;
+        $this->yearRangeRepository = $yearRangeRepository;
     }
     /**
      * Display a listing of the resource.
@@ -31,9 +42,8 @@ class AddrCodesController extends Controller
      */
     public function create()
     {
-        $id = 1;
-        $data = $this->addrcoderepository->byId($id);
-        return view('addrcodes.edit', ['page_title' => 'Addr Codes', 'page_description' => '中国行政地理单位编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        $temp_id = AddrCode::max('c_addr_id') + 1;
+        return view('addrcodes.create', ['page_title' => 'Addr Codes', 'page_description' => '中国行政地理单位编码表', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -44,7 +54,23 @@ class AddrCodesController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $data = $request->all();
+        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0 or !AddrCode::where('c_addr_id', $data['c_addr_id'])->get()->isEmpty()){
+            flash('c_addr_id 未填或已存在 '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $flight = AddrCode::create($data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_CODES', $data['c_addr_id'], $data);
+        flash('Create success @ '.Carbon::now(), 'success');
+        return redirect()->route('addrcodes.edit', $data['c_addr_id']);
     }
 
     /**

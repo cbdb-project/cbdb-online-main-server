@@ -12,6 +12,7 @@
                 <thead>
                 <tr>
                     <th>序號</th>
+                    <th>sequence</th>
                     <th>社會關係類別</th>
                     <th>社會關係人</th>
                     <th style="width: 120px">操作</th>
@@ -21,6 +22,11 @@
                 @foreach($basicinformation->assoc as $key=>$value)
                     <tr>
                         <td>{{ $key+1 }}</td>
+                        <td>
+                            @if($assoc_name[$key])
+                                {{ $assoc_name[$key]['c_sequence'] }}
+                            @endif
+                        </td>
                         <td>{{ $value->c_assoc_desc_chn }}</td>
                         <td>
                             @if($assoc_name[$key])

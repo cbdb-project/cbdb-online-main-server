@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">中国行政地理单位编码表</div>
+        <div class="panel-heading">地址编码表(ADDR_CODES)</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="{{ route('addrcodes.store') }}" class="form-horizontal" method="post">

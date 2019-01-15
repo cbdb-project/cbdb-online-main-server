@@ -153,7 +153,7 @@ class BiogMain extends Model
 
     public function assoc_name()
     {
-        return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn']);
+        return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn' ,'c_sequence']);
     }
 
     public function possession()

@@ -125,7 +125,7 @@
                 <div class="form-group">
                     <label for="c_text_title" class="col-sm-2 control-label">作品標題</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_text_title">
+                        <input type="text" class="form-control" name="c_text_title" value="[n/a]">
                     </div>
                 </div>
                 <div class="form-group">

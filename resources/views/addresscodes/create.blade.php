@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">地址编码表</div>
+        <div class="panel-heading">地址编码表(ADDRESSES)</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="{{ route('addresscodes.store') }}" class="form-horizontal" method="post">

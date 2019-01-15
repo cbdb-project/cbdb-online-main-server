@@ -21,7 +21,7 @@
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
-                        <input type="text" class="form-control" name="c_pages" value="">
+                        <input type="text" class="form-control" name="c_pages" value="0">
                     </div>
                 </div>
                 <div class="form-group">

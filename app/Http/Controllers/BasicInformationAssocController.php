@@ -34,18 +34,21 @@ class BasicInformationAssocController extends Controller
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
         $assoc_name_id = array();
+        $assoc_name_sequence = array();
         $assoc_name_name = array();
         foreach ($biogbasicinformation->assoc_name as $key => $value){
             $assoc_name_id[$key] = $value->pivot->c_assoc_id;
+            $assoc_name_sequence[$key] = $value->c_sequence;
             $assoc_name_name[$key] = $value->c_name.' '.$value->c_name_chn;
         }
-        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_name) {
+        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_sequence, $assoc_name_name) {
             if (in_array($item->pivot->c_assoc_id, $assoc_name_id)) {
-                return ['c_personid' => $item->pivot->c_assoc_id,'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
+                return ['c_personid' => $item->pivot->c_assoc_id, 'c_sequence' => $assoc_name_sequence[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
             }
-            return ['c_personid' => 0, 'assoc_name' => ''];
+            return ['c_personid' => 0, 'c_sequence' => 0, 'assoc_name' => ''];
         });
-//        dd($assoc_name);
+        //dd($biogbasicinformation);
+        //dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
             'assoc_name' => $assoc_name, 'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
     }

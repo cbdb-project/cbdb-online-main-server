@@ -8,6 +8,7 @@
 namespace App\Repositories;
 use App\AddrCode;
 use App\AddressCode;
+use App\AddrBelong;
 use Illuminate\Http\Request;
 /**
  * Class AddrCodeRepository
@@ -57,7 +58,20 @@ class AddrCodeRepository
             $item['id'] = $item->c_addr_id;
             if($item['id'] === 0) $item['id'] = -999;
             $belongs = "";
-            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+            //20190115修改,地址查詢的時候希望組出來地址和上層行政單位
+            //$item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+            $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+            $add = "";
+            $dy = AddrBelong::where('c_addr_id', $item['id'])->value('c_belongs_to');
+            $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+            if($dy == null) { 
+                $dy = 0; $add = ""; 
+            }
+            else {
+                $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+                $add = "[[".$dy." ".$dy2."]]"; 
+            }
+            $item['text'] = $originalText." ".$add;
         }
         return $data;
     }

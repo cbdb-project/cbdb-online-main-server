@@ -138,7 +138,7 @@ class BiogMain extends Model
 
     public function kinship()
     {
-        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno');
+        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno', 'c_personid', 'c_kin_id', 'c_kin_code');
     }
 
     public function kinship_name()

@@ -6,6 +6,7 @@ use App\Repositories\BiogMainRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\BiogMain;
 
 class BasicInformationKinshipController extends Controller
 {
@@ -62,7 +63,8 @@ class BasicInformationKinshipController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $_id = $this->biogMainRepository->kinshipStoreById($request, $id);
+        $data = $this->biogMainRepository->kinshipStoreById($request, $id);
+        $_id = $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'];
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.edit', ['id' => $id, '_id' => $_id]);
     }
@@ -87,7 +89,6 @@ class BasicInformationKinshipController extends Controller
     public function edit($id, $id_)
     {
         $res = $this->biogMainRepository->kinshipById($id_);
-//        dd($res);
         return view('biogmains.kinship.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬',
             'page_url' => '/basicinformation/'.$id.'/kinship',
@@ -112,7 +113,8 @@ class BasicInformationKinshipController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->kinshipUpdateById($request, $id, $id_);
+        $data = $this->biogMainRepository->kinshipUpdateById($request, $id, $id_);
+        $id_ = $id."-".$data['c_kin_id']."-".$data['c_kin_code'];
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.kinship.edit', ['id'=>$id, 'id_'=>$id_]);
     }

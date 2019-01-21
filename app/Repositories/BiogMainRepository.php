@@ -151,7 +151,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data);
         $biogbasicinformation = BiogMain::find($id);
         $biogbasicinformation->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->tts_sysno, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data);
     }
 
     /**
@@ -819,6 +819,7 @@ class BiogMainRepository
         DB::table('ASSOC_DATA')->where('tts_sysno',$id)->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $id, $data);
         $data['c_assoc_code'] = $assoc_pair;
+        //20190118筆記 我覺得這一行好像寫錯了耶? $id是tts_sysno, 怎麼會跟c_assoc_id比對? 應該用$c_personid去跟c_assoc_id比對才對?
         DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
     }
 
@@ -844,6 +845,7 @@ class BiogMainRepository
 
     public function assocDeleteById($id, $c_personid)
     {
+        //20190118筆記, 這邊的刪除功能也寫錯了.
         $row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         DB::table('ASSOC_DATA')->where('tts_sysno', $id)->delete();
         DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();

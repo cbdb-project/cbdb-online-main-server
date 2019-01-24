@@ -25,13 +25,13 @@
                         <td>{{ $value->pivot->c_pages }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->c_textid]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();
+                                               document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages }}').submit();
                                            }else{
                                                return false;
                                            }
@@ -39,7 +39,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="{{ route('basicinformation.sources.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->c_textid]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages }}" action="{{ route('basicinformation.sources.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

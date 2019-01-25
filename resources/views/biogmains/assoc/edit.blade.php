@@ -5,7 +5,7 @@
         <div class="panel-heading">社會關係</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.assoc.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.assoc.update', [$id, $row->c_personid."-".$row->c_assoc_code."-".$row->c_assoc_id]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

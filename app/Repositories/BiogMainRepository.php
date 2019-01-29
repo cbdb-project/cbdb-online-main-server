@@ -928,9 +928,15 @@ class BiogMainRepository
         ])->delete();
     }
 
-    public function sourceById($id, $text_id)
+    public function sourceById($id, $_id)
     {
-        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
+        $temp_l = explode("-", $_id);
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
+        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
         $text_str = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
@@ -939,16 +945,26 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str];
     }
 
-    public function sourceUpdateById(Request $request, $id, $text_id)
+    public function sourceUpdateById(Request $request, $id, $id_)
     {
+        $temp_l = explode("-", $id_);
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $text_id, $data);
-        return $data['c_textid'];
+        DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->update($data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        return $data;
     }
 
     public function sourceStoreById(Request $request, $id)
@@ -960,13 +976,24 @@ class BiogMainRepository
         $data['c_self_bio'] = (int)$data['c_self_bio'];
         DB::table('BIOG_SOURCE_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
-        return $data['c_textid'];
+        return $data;
     }
 
     public function sourceDeleteById($id, $id_)
     {
-        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
-        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        $temp_l = explode("-", $id_);
+        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
+        //DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
+        DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->delete();
         (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
     }
 

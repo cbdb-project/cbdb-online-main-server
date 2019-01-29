@@ -13,6 +13,7 @@ class OfficeCode extends Model
      */
     protected $table = 'OFFICE_CODES';
     protected $primaryKey = 'c_office_id';
+
     /**
      * 该模型是否被自动维护时间戳
      *
@@ -26,5 +27,4 @@ class OfficeCode extends Model
      * @var array
      */
     protected $guarded = [];
-
 }

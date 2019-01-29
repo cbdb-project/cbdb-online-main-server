@@ -52,6 +52,10 @@ Route::group([], function () {
         $addrcoderepository = new \App\Repositories\AddrcodeRepository();
         return $addrcoderepository->addrByQuery($request);
     });
+    Route::post('officecode', function (Request $request) {
+        $officecoderepository = new \App\Repositories\OfficeCodeRepository();
+        return $officecoderepository->officeByQuery($request);
+    });
 });
 
 Route::group(['prefix' => 'select'], function (){

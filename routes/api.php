@@ -56,6 +56,10 @@ Route::group([], function () {
         $officecoderepository = new \App\Repositories\OfficeCodeRepository();
         return $officecoderepository->officeByQuery($request);
     });
+    Route::post('socialinstitutioncode', function (Request $request) {
+        $socialinstitutioncoderepository = new \App\Repositories\SocialInstitutionCodeRepository();
+        return $socialinstitutioncoderepository->socialinstitutionByQuery($request);
+    });
 });
 
 Route::group(['prefix' => 'select'], function (){

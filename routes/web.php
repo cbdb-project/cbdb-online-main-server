@@ -170,3 +170,10 @@ Route::resource('officecodes', 'OfficeCodesController', ['name' => [
     'edit' => 'officecode.edit',
     'update' => 'officecode.update'
 ]]);
+
+Route::resource('socialinstitutioncodes', 'SocialInstitutionCodesController', ['name' => [
+    'show' => 'socialinstitutioncode.show',
+    'create' => 'socialinstitutioncode.create',
+    'edit' => 'socialinstitutioncode.edit',
+    'update' => 'socialinstitutioncode.update'
+]]);

@@ -141,7 +141,6 @@ Route::get('test', function (Request $request){
     return $data;
 });
 
-//20181105建安新增
 Route::resource('textcodes', 'TextCodesController', ['name' => [
     'show' => 'textcode.show',
     'create' => 'textcode.create',
@@ -155,7 +154,7 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
     'edit' => 'addrbelongsdata.edit',
     'update' => 'addrbelongsdata.update'
 ]]);
-//20181207建安新增
+
 Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
 
 Route::resource('addrcodes', 'AddrCodesController', ['name' => [
@@ -163,4 +162,11 @@ Route::resource('addrcodes', 'AddrCodesController', ['name' => [
     'create' => 'addrcode.create',
     'edit' => 'addrcode.edit',
     'update' => 'addrcode.update'
+]]);
+
+Route::resource('officecodes', 'OfficeCodesController', ['name' => [
+    'show' => 'officecode.show',
+    'create' => 'officecode.create',
+    'edit' => 'officecode.edit',
+    'update' => 'officecode.update'
 ]]);

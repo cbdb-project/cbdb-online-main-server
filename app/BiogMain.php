@@ -138,7 +138,7 @@ class BiogMain extends Model
 
     public function kinship()
     {
-        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno');
+        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno', 'c_personid', 'c_kin_id', 'c_kin_code');
     }
 
     public function kinship_name()
@@ -153,7 +153,7 @@ class BiogMain extends Model
 
     public function assoc_name()
     {
-        return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn']);
+        return $this->belongsToMany('App\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn' ,'c_sequence']);
     }
 
     public function possession()

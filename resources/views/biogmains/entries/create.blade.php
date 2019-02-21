@@ -73,7 +73,8 @@
                 <div class="form-group">
                     <label for="c_entry_addr_id" class="col-sm-2 control-label">地點(c_addr_id)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_entry_addr_id" name="c_entry_addr_id" required>
+                        <select class="form-control c_entry_addr_id" name="c_entry_addr_id">
+                            <option value="0" selected="selected">0 未知 weizhi</option>
                         </select>
                     </div>
                 </div>

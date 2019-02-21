@@ -4,15 +4,15 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class OfficeCode extends Model
+class SocialInstitutionCode extends Model
 {
     /**
      * 与模型关联的数据表
      *
      * @var string
      */
-    protected $table = 'OFFICE_CODES';
-    protected $primaryKey = 'c_office_id';
+    protected $table = 'SOCIAL_INSTITUTION_CODES';
+    protected $primaryKey = 'c_inst_name_code';
 
     /**
      * 该模型是否被自动维护时间戳

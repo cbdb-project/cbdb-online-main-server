@@ -49,8 +49,16 @@ Route::group([], function () {
         return $addrbelongsdatarepository->AddrByQuery($request);
     });
     Route::post('addrcode', function (Request $request) {
-        $addrcoderepository = new \App\Repositories\AddrcodeRepository();
+        $addrcoderepository = new \App\Repositories\AddrCode2Repository();
         return $addrcoderepository->addrByQuery($request);
+    });
+    Route::post('officecode', function (Request $request) {
+        $officecoderepository = new \App\Repositories\OfficeCodeRepository();
+        return $officecoderepository->officeByQuery($request);
+    });
+    Route::post('socialinstitutioncode', function (Request $request) {
+        $socialinstitutioncoderepository = new \App\Repositories\SocialInstitutionCodeRepository();
+        return $socialinstitutioncoderepository->socialinstitutionByQuery($request);
     });
 });
 

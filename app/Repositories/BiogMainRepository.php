@@ -512,7 +512,8 @@ class BiogMainRepository
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
-            $k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            //$k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            $k_p_code = $row->c_kin_code;
             $text_ = KinshipCode::find($k_p_code);
             $kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }

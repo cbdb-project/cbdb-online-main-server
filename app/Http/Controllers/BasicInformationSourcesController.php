@@ -62,9 +62,10 @@ class BasicInformationSourcesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $text_id = $this->biogMainRepository->sourceStoreById($request, $id);
+        $data = $this->biogMainRepository->sourceStoreById($request, $id);
+        $_id = $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'];
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.sources.edit', ['id' => $id, '_id' => $text_id]);
+        return redirect()->route('basicinformation.sources.edit', ['id' => $id, '_id' => $_id]);
     }
 
     /**
@@ -112,9 +113,10 @@ class BasicInformationSourcesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $text_id = $this->biogMainRepository->SourceUpdateById($request, $id, $id_);
+        $data = $this->biogMainRepository->SourceUpdateById($request, $id, $id_);
+        $id_ = $id."-".$data['c_textid']."-".$data['c_pages'];
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.sources.edit', ['id'=>$id, 'id_'=>$text_id]);
+        return redirect()->route('basicinformation.sources.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 
     /**

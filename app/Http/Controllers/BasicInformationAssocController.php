@@ -81,7 +81,8 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $_id = $this->biogMainRepository->assocStoreById($request, $id);
+        $data = $this->biogMainRepository->assocStoreById($request, $id);
+        $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'];
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.edit', ['id' => $id, '_id' => $_id]);
     }
@@ -130,7 +131,8 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->assocUpdateById($request, $id_, $id);
+        $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
+        $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id'];
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.assoc.edit', ['id'=>$id, 'id_'=>$id_]);
     }

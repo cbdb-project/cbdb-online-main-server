@@ -5,7 +5,7 @@
         <div class="panel-heading">出处 Source</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.sources.update', [$id, $row->c_textid]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.sources.update', [$id, $row->c_personid."-".$row->c_textid."-".$row->c_pages]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

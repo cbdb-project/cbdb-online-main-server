@@ -415,7 +415,13 @@ class BiogMainRepository
 
     public function statuseById($id)
     {
-        $row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
+        $temp_l = explode("-", $id);
+        $row = DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_sequence', '=', $temp_l[1]],
+            ['c_status_code', '=', $temp_l[2]],
+        ])->first();
+        //$row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -431,13 +437,24 @@ class BiogMainRepository
 
     public function statuseUpdateById(Request $request, $id, $c_personid)
     {
+        $temp_l = explode("-", $id);
+        $row = DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_sequence', '=', $temp_l[1]],
+            ['c_status_code', '=', $temp_l[2]],
+        ])->first();
         $data = $request->all();
         $data = array_except($data, ['_token', '_method']);
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
-        DB::table('STATUS_DATA')->where('tts_sysno',$id)->update($data);
+        DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_sequence', '=', $temp_l[1]],
+            ['c_status_code', '=', $temp_l[2]],
+        ])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $id, $data);
+        return $data;
     }
 
     public function statuseStoreById(Request $request, $id)
@@ -450,15 +467,25 @@ class BiogMainRepository
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('STATUS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['tts_sysno'], $data);
-        return $data['tts_sysno'];
+        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['c_personid'], $data);
+        return $data;
     }
 
     public function statuseDeleteById($id, $c_personid)
     {
-        $row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
-        DB::table('STATUS_DATA')->where('tts_sysno', $id)->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'STATUS_DATA', $id, $row);
+        $temp_l = explode("-", $id);
+        $row = DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_sequence', '=', $temp_l[1]],
+            ['c_status_code', '=', $temp_l[2]],
+        ])->first(); 
+        //$row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
+        DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_sequence', '=', $temp_l[1]],
+            ['c_status_code', '=', $temp_l[2]],
+        ])->delete();
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', $id, $row);
     }
 
     public function kinshipById($id)
@@ -485,7 +512,8 @@ class BiogMainRepository
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
-            $k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            //$k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            $k_p_code = $row->c_kin_code;
             $text_ = KinshipCode::find($k_p_code);
             $kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
@@ -544,7 +572,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $data['tts_sysno'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $id, $data);
         $data['tts_sysno'] += 1;
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $data['c_kin_id'];
@@ -751,7 +779,13 @@ class BiogMainRepository
 
     public function assocById($id)
     {
-        $row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
+        $temp_l = explode("-", $id);
+        $row = DB::table('ASSOC_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+        ])->first();
+        //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -809,19 +843,39 @@ class BiogMainRepository
 
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
+        $temp_l = explode("-", $id);
+        $row = DB::table('ASSOC_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+        ])->first();
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
         $assoc_id = $data['c_assoc_id'];
-        $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
+        $old_assoc_id = $row->c_assoc_id;
+        //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
+        //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
+        $data = array_except($data, ['_method', '_token', 'c_assocship_pair']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         $data = (new ToolsRepository)->timestamp($data);
-        DB::table('ASSOC_DATA')->where('tts_sysno',$id)->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $id, $data);
+        DB::table('ASSOC_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+        ])->update($data);
+        $ori_data = $data;
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $c_personid, $data);
         $data['c_assoc_code'] = $assoc_pair;
+        $data['c_personid'] = $assoc_id;
+        $data = array_except($data, ['c_assoc_id']);
         //20190118筆記 修改這邊的更新功能.
         //DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
-        DB::table('ASSOC_DATA')->where([['c_assoc_id',$c_personid], ['c_personid', $assoc_id]])->update($data);
+        DB::table('ASSOC_DATA')->where([
+            ['c_assoc_id', '=', $id], 
+            ['c_personid', '=', $old_assoc_id],
+        ])->update($data);
+        return $ori_data;
     }
 
     public function assocStoreById(Request $request, $id)
@@ -835,28 +889,55 @@ class BiogMainRepository
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
+        $ori_Data = $data;
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['tts_sysno'], $data);
         $data['tts_sysno'] += 1;
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;
         DB::table('ASSOC_DATA')->insert($data);
-        return $data['tts_sysno'];
+        //return $data['tts_sysno'];
+        return $ori_Data;
     }
 
     public function assocDeleteById($id, $c_personid)
     {
         //20190118筆記, 修改這邊的刪除功能.
-        $row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
-        DB::table('ASSOC_DATA')->where('tts_sysno', $id)->delete();
+        //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
-        DB::table('ASSOC_DATA')->where([['c_personid', $row->c_assoc_id], ['c_assoc_id', $row->c_personid]])->delete();
+        $temp_l = explode("-", $id);
+        $row = DB::table('ASSOC_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+        ])->first();
+        $row2 = DB::table('ASSOC_DATA')->where([
+            ['c_personid',$row->c_assoc_id],
+            ['c_assoc_id', $row->c_personid],
+            ['c_source', $row->c_source],
+        ])->first();
+        DB::table('ASSOC_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+        ])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
+        DB::table('ASSOC_DATA')->where([
+            ['c_personid',$row2->c_personid],
+            ['c_assoc_id', $row2->c_assoc_id],
+            ['c_source', $row2->c_source],
+        ])->delete();
     }
 
-    public function sourceById($id, $text_id)
+    public function sourceById($id, $_id)
     {
-        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
+        $temp_l = explode("-", $_id);
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
+        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
         $text_str = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
@@ -865,16 +946,26 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str];
     }
 
-    public function sourceUpdateById(Request $request, $id, $text_id)
+    public function sourceUpdateById(Request $request, $id, $id_)
     {
+        $temp_l = explode("-", $id_);
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $text_id, $data);
-        return $data['c_textid'];
+        DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->update($data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        return $data;
     }
 
     public function sourceStoreById(Request $request, $id)
@@ -886,13 +977,24 @@ class BiogMainRepository
         $data['c_self_bio'] = (int)$data['c_self_bio'];
         DB::table('BIOG_SOURCE_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
-        return $data['c_textid'];
+        return $data;
     }
 
     public function sourceDeleteById($id, $id_)
     {
-        $row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
-        DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        $temp_l = explode("-", $id_);
+        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
+        //DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->first();
+        DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_pages', '=', $temp_l[2]],
+        ])->delete();
         (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
     }
 

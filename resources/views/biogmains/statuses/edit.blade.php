@@ -5,7 +5,7 @@
         <div class="panel-heading">社會區分 Status</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.statuses.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.statuses.update', [$id, $row->c_personid."-".$row->c_sequence."-".$row->c_status_code]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

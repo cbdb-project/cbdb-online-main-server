@@ -49,7 +49,7 @@ Route::group([], function () {
         return $addrbelongsdatarepository->AddrByQuery($request);
     });
     Route::post('addrcode', function (Request $request) {
-        $addrcoderepository = new \App\Repositories\AddrcodeRepository();
+        $addrcoderepository = new \App\Repositories\AddrCode2Repository();
         return $addrcoderepository->addrByQuery($request);
     });
     Route::post('officecode', function (Request $request) {

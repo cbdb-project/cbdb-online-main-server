@@ -12,7 +12,7 @@ namespace App\Repositories;
 use App\AddrCode;
 use Illuminate\Http\Request;
 
-class AddrcodeRepository{
+class AddrCode2Repository{
     public function addrByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){

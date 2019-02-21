@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\AddrcodeRepository;
+use App\Repositories\AddrCode2Repository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
@@ -18,7 +18,7 @@ class AddrCodesController extends Controller
     protected $toolRepository;
     protected $yearRangeRepository;
 
-    public function __construct(AddrcodeRepository $addrcoderepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, YearRangeRepository $yearRangeRepository)
+    public function __construct(AddrCode2Repository $addrcoderepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, YearRangeRepository $yearRangeRepository)
     {
         $this->addrcoderepository = $addrcoderepository;
         $this->operationRepository = $operationRepository;

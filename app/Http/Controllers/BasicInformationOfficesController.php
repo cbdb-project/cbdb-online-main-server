@@ -135,6 +135,14 @@ class BasicInformationOfficesController extends Controller
     //20190225新增另存功能
     public function saveas($id, $cpk)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         $res = $this->biogMainRepository->officeById($cpk);
         $res2 = json_encode($res['row']);
 	$res2 = json_decode($res2, true);

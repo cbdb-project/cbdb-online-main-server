@@ -163,6 +163,14 @@ class BasicInformationController extends Controller
     //20190223新增另存功能
     public function saveas($id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
         //如果沒有使用toArray(), 需搭配save()儲存, 則會儲存物件本身, 就無法另存.
         $data = BiogMain::find($id)->toArray();
         $new_id = BiogMain::max('c_personid') + 1;

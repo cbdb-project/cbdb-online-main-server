@@ -130,21 +130,51 @@ class BasicInformationOfficesController extends Controller
         $id_ = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $id_]);
-        //20181107建安修改
-        //return redirect()->route('basicinformation.offices.edit', ['id'=>$id, 'office'=>$data['c_office_id']."-".$data['c_posting_id']]);
-/*
-        $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
-        $temp_l = explode("-", $id_);
-        DB::table($this->table_name)->where([
-            ['c_office_id', '=', $temp_l[0]],
-            ['c_posting_id', '=', $temp_l[1]],
-        ])->update($data);
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $id_, $data);
-        flash('Update success @ '.Carbon::now(), 'success');
-        $data['c_office_id'] = $temp_l[0];
-        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $data['c_office_id']."-".$data['c_posting_id']]);
-*/
+    }
+
+    //20190225新增另存功能
+    public function saveas($id, $cpk)
+    {
+        $res = $this->biogMainRepository->officeById($cpk);
+        $res2 = json_encode($res['row']);
+	$res2 = json_decode($res2, true);
+        $res3 = $res['addr_str'];
+        $data2 = array();
+        $x = count($res3);
+        for($i=0;$i<$x;$i++) {
+            array_push($data2, $res3[$i][0]);
+        }
+        $data = $res2;
+        $c_addr = $data2;
+        $data = array_except($data, ['_token', 'c_addr']);
+        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
+        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+        $data['c_posting_id'] = DB::table('POSTED_TO_OFFICE_DATA')->max('c_posting_id') + 1;
+        $data['c_personid'] = $id;
+        DB::table('POSTING_DATA')->insert(['c_personid' => $data['c_personid'], 'c_posting_id' => $data['c_posting_id']]);
+        $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
+        $data = (new ToolsRepository)->timestamp($data, True);
+        $data['c_modified_by'] = $data['c_modified_date'] = '';
+        DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_posting_id'], $data);
+        $_id = $data['c_office_id']."-".$data['c_posting_id'];
+        flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
+    }
+
+    public function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)
+    {
+        DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $_id)->where('c_posting_id', $_postingid)->delete();
+        foreach ($c_addr as $item) {
+            DB::table('POSTED_TO_ADDR_DATA')->insert(
+                [
+                    'c_personid' => $_id,
+                    'c_posting_id' => $_postingid,
+                    'c_office_id' => $_officeid,
+                    'c_addr_id' => $item == -999 ? 0 : $item
+                ]
+            );
+        }
     }
 
     /**

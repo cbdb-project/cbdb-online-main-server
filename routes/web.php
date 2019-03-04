@@ -36,6 +36,8 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'update' => 'basicinformation.update',
     'index' => 'basicinformation.index',
 ]]);
+Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
+Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOfficesController@saveas');
 
 Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
 Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');

@@ -207,6 +207,7 @@
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
+                        <a href="../../../../basicinformation/{{ $row->c_personid }}/offices/{{ $row->c_office_id.'-'.$row->c_posting_id }}/saveas" class="btn btn-success" style="margin-left:40px;">create</a>
                     </div>
                 </div>
             </form>

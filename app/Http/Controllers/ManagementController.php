@@ -65,18 +65,29 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
-        //
+        $type = $request['type'];
         if (Auth::user()->is_admin != 1){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $user = User::find($id);
-        $user->is_active = 1 - $user->is_active;
-        $user->save();
-        flash('修改成功 @ '.Carbon::now(), 'success');
-        return redirect()->route('manage.index');
+        if($type == 1) {
+            $user = User::find($id);
+            $user->is_active = 1 - $user->is_active;
+            $user->save();
+            flash('修改成功 @ '.Carbon::now(), 'success');
+            return redirect()->route('manage.index');
+        }
+        if($type == 2) {
+            $user = User::find($id);
+            if($user->is_admin == 1) { $user->is_admin = 2; }
+            elseif($user->is_admin == 2) { $user->is_admin = 0; }
+            elseif($user->is_admin == 0) { $user->is_admin = 1; }
+            $user->save();
+            flash('修改成功 @ '.Carbon::now(), 'success');
+            return redirect()->route('manage.index');
+        }
     }
 
     /**

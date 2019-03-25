@@ -18,6 +18,8 @@
                     <th>Institution</th>
                     <th>是否通过审核</th>
                     <th style="width: 120px">操作</th>
+                    <th>一般/專家/眾包用戶</th>
+                    <th style="width: 120px">操作</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -33,7 +35,15 @@
                         <td>{{ $user->is_active == 1 ? 'Yes' : 'No' }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id]) }}">改变审核状态</a>
+                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '1']) }}">改变审核状态</a>
+                            </div>
+                        </td>
+                        <td>
+                            {{ $user->is_admin == 2 ? '眾包' : ( $user->is_admin == 1 ? '專家' : '一般' ) }}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
                             </div>
                         </td>
                     </tr>

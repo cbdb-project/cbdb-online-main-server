@@ -3,10 +3,12 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">人名列表</div>
+        <div class="panel-heading">最近修改記錄</div>
         <div class="panel-body">
             <table class="table table-bordered table-striped">
-                <p>* 修改类型 1表示新增， 3表示修改，4表示删除</p>
+                <p>* 修改类型 1表示新增，3表示修改，4表示删除<br />
+                * 狀態 0代表是專業用戶修改的記錄，1代表crowdsourcing記錄並且已經被插入數據庫。
+                </p>
                 <thead>
                 <tr>
                     <th>人物</th>
@@ -15,7 +17,9 @@
                     <th>资源tts</th>
                     <th>修改类型</th>
                     <th>修改人</th>
-                    <th>修改时间</th>
+                    <th>次數</th>
+                    <th>錄入时间</th>
+                    <th>狀態</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -29,7 +33,9 @@
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
                             <td>{{ $item->user->name }}</td>
+                            <td>{{ $item->rate }}</td>
                             <td>{{ $item->updated_at }}</td>
+                            <td>{{ $item->crowdsourcing_status }}</td>
                         </tr>
                         <!--Start-->
                         <div id="myModal" class="modal fade" role="dialog">
@@ -56,7 +62,6 @@
                         <!--End-->
                     @endforeach
                 </tbody>
-
             </table>
             <div class="pull-right">
                 {{ $lists->links() }}

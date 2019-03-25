@@ -3,10 +3,12 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">人名列表</div>
+        <div class="panel-heading">最近眾包錄入記錄</div>
         <div class="panel-body">
             <table class="table table-bordered table-striped">
-                <p>* 修改类型 1表示新增， 3表示修改，4表示删除</p>
+                <p>* 修改类型 1表示新增，3表示修改，4表示删除<br />
+                * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄還沒有被處理，3表示記錄reject，4表示記錄處理失敗。
+                </p>
                 <thead>
                 <tr>
                     <th>人物</th>
@@ -15,7 +17,10 @@
                     <th>资源tts</th>
                     <th>修改类型</th>
                     <th>修改人</th>
-                    <th>修改时间</th>
+                    <th>次數</th>
+                    <th>錄入时间</th>
+                    <th>狀態</th>
+                    <th>操作</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -29,7 +34,13 @@
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
                             <td>{{ $item->user->name }}</td>
+                            <td>{{ $item->rate }}</td>
                             <td>{{ $item->updated_at }}</td>
+                            <td>{{ $item->crowdsourcing_status }}</td>
+                            <td>
+                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>　
+                                <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
+                            </td>
                         </tr>
                         <!--Start-->
                         <div id="myModal" class="modal fade" role="dialog">
@@ -56,7 +67,6 @@
                         <!--End-->
                     @endforeach
                 </tbody>
-
             </table>
             <div class="pull-right">
                 {{ $lists->links() }}

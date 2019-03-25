@@ -23,6 +23,8 @@ class CreateOperationsTable extends Migration
             $table->json('resource_data');
             $table->json('biog')->nullable();
             $table->timestamps();
+            $table->smallInteger('crowdsourcing_status')->comment('0.專業用戶修改紀錄 1.crowdsourcing記錄並已插入數據庫 2.crowdsourcing記錄還沒有被處理 3.crowdsourcing記錄reject 4.crowdsourcing處理失敗');
+            $table->smallInteger('rate')->comment('記錄處理次數');
         });
     }
 

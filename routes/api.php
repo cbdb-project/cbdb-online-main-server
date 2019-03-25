@@ -120,3 +120,9 @@ Route::group(['prefix' => 'v1'], function (){
     Route::get('delete', 'ApiController@deleteC_presonid');
     Route::get('user', 'ApiController@userC_presonid');
 });
+
+Route::group(['prefix' => 'operations'], function (){
+    Route::get('token', 'Api\OperationsController@token');
+    Route::get('add', 'Api\OperationsController@add');
+    Route::get('storeProcess', 'Api\OperationsController@storeProcess');
+});

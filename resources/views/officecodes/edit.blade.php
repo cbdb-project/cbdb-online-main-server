@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">机构单位编码表</div>
+        <div class="panel-heading">任官编码表</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="/officecodes/{{ $id }}" class="form-horizontal" method="post">

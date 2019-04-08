@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">行政單位等級编码表</div>
+        <div class="panel-heading">地址从属表</div>
         <div class="panel-body">
             <a href="{{ route('addrbelongsdata.create') }}" class="pull-right btn btn-default">新增</a>
             <div class="panel-body">

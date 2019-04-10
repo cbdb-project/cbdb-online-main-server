@@ -14,6 +14,11 @@ use App\v1;
 
 class OperationsController extends Controller
 {
+    public function hello(Request $request)
+    {
+        return $request;
+    }
+
     public function add(Request $request)
     {
 
@@ -91,6 +96,7 @@ class OperationsController extends Controller
         if (Auth::attempt(['email' => $user_id, 'password' => $user_password])) {
             $data = DB::table('users')->where('email','=',$user_id)->get();
             foreach($data as $item){
+                if($item->is_admin != 2) { return "帳號須為眾包身分，才可以取得token。"; }
                 $data = $item->confirmation_token;
             }
             return $data;

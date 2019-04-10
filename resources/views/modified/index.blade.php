@@ -6,7 +6,7 @@
         <div class="panel-heading">最近修改記錄</div>
         <div class="panel-body">
             <table class="table table-bordered table-striped">
-                <p>* 修改类型 1表示新增，3表示修改，4表示删除<br />
+                <p>* 修改类型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示删除<br />
                 * 狀態 0代表是專業用戶修改的記錄，1代表crowdsourcing記錄並且已經被插入數據庫。
                 </p>
                 <thead>
@@ -17,15 +17,69 @@
                     <th>资源tts</th>
                     <th>修改类型</th>
                     <th>修改人</th>
-                    <th>次數</th>
                     <th>錄入时间</th>
+                    <th>修改时间</th>
                     <th>狀態</th>
                 </tr>
                 </thead>
                 <tbody>
                     @foreach($lists as $item)
                         <tr>
-                            <td><a href="/basicinformation/{{ $item->biogmain->c_personid }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a></td>
+                            <td>
+                            <a href="/basicinformation/
+@php
+  $a = $item->resource;
+  $id = $item->c_personid;
+  $res_id = $item->resource_id;
+if($item->op_type == 4) { echo $id; }
+else {
+  switch ($a) {
+    case "BIOG_MAIN":
+      echo $id;
+      break;
+    case "BIOG_ADDR_DATA":
+      echo $id."/addresses/".$res_id;
+      break;
+    case "ALTNAME_DATA":
+      echo $id."/altnames/".$res_id;
+      break;
+    case "TEXT_DATA":
+      echo $id."/texts/".$res_id;
+      break;
+    case "POSTED_TO_OFFICE_DATA":
+      echo $id."/offices/".$res_id;
+      break;
+    case "ENTRY_DATA":
+      echo $id."/entries/".$res_id;
+      break;
+    case "EVENTS_DATA":
+      echo $id."/events/".$res_id;
+      break;
+    case "STATUS_DATA":
+      echo $id."/statuses/".$res_id;
+      break;
+    case "KIN_DATA":
+      echo $id."/kinship/".$res_id;
+      break;
+    case "ASSOC_DATA":
+      echo $id."/assoc/".$res_id;
+      break;
+    case "POSSESSION_DATA":
+      echo $id."/possession/".$res_id;
+      break;
+    case "BIOG_INST_DATA":
+      echo $id."/socialinst/".$res_id;
+      break;
+    case "BIOG_SOURCE_DATA":
+      echo $id."/sources/".$res_id;
+      break;
+    default:
+      echo $id;
+  }
+}
+@endphp
+/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
+                            </td>
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal">resource_data</button>
@@ -33,7 +87,7 @@
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
                             <td>{{ $item->user->name }}</td>
-                            <td>{{ $item->rate }}</td>
+                            <td>{{ $item->created_at }}</td>
                             <td>{{ $item->updated_at }}</td>
                             <td>{{ $item->crowdsourcing_status }}</td>
                         </tr>

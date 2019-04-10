@@ -31,7 +31,7 @@ class CrowdsourcingController extends Controller
 
     public function index()
     {
-        $lists = Operation::where('crowdsourcing_status', '!=' , 0)->orderBy('rate', 'desc')->orderBy('updated_at', 'desc')->limit(100)->paginate(20);
+        $lists = Operation::where('crowdsourcing_status', '!=' , 0)->orderBy('created_at', 'desc')->limit(100)->paginate(20);
         return view('crowdsourcing.index', ['lists' => $lists,
             'page_title' => 'Crowdsourcing', 'page_description' => '最近眾包錄入紀錄',
             'page_url' => '/crowdsourcing'
@@ -62,6 +62,7 @@ class CrowdsourcingController extends Controller
         //資料對應處理
         switch ($resource) {
             case "BIOG_MAIN":
+                $updated_at = Carbon::now()->format('YmdHis');
                 $new_id = BiogMain::max('c_personid') + 1;
                 $new_ttsid = BiogMain::max('tts_sysno') + 1;
                 $data['c_personid'] = $new_id;
@@ -70,12 +71,12 @@ class CrowdsourcingController extends Controller
                 $message = BiogMain::create($data);
                 $message ? $message='200' : $message='500';
                 if($message=='200') {
-                    DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 1, 'rate' => $rate));
+                    DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at));
                     $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, $resource, $data['tts_sysno'], $data);
                     flash('Create success @ '.Carbon::now(), 'success');
                 }
                 elseif($message=='500') {
-                    DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 4, 'rate' => $rate));
+                    DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 4, 'rate' => $rate, 'updated_at' => $updated_at));
                     flash('Create error @ '.Carbon::now(), 'danger');
                 }
                 break;
@@ -95,7 +96,8 @@ class CrowdsourcingController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 3));
+        $updated_at = Carbon::now()->format('YmdHis');
+        DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 3, 'updated_at' => $updated_at));
         flash('Reject success @ '.Carbon::now(), 'success');
         return redirect()->route('crowdsourcing.index');
     }

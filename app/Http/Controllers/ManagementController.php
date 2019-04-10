@@ -23,7 +23,7 @@ class ManagementController extends Controller
         if (Auth::user()->is_admin != 1){
             return redirect('/home');
         }
-        $data = User::all();
+        $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
         return view('manage.index',['data' => $data, 'page_title' => 'Management', 'page_description' => '审核用户']);
     }
 
@@ -86,6 +86,18 @@ class ManagementController extends Controller
             elseif($user->is_admin == 0) { $user->is_admin = 1; }
             $user->save();
             flash('修改成功 @ '.Carbon::now(), 'success');
+            return redirect()->route('manage.index');
+        }
+        if($type == 3) {
+            $user = User::find($id);
+            $email = $user->email;
+            $user->email = $email.'-'.Carbon::now();
+            $user->password = '-';
+            $user->confirmation_token = '-';
+            $user->remember_token = '-';
+            $user->updated_at = Carbon::now();
+            $user->save();
+            flash('刪除成功 @ '.Carbon::now(), 'danger');
             return redirect()->route('manage.index');
         }
     }

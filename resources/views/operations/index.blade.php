@@ -21,7 +21,61 @@
                 <tbody>
                     @foreach($lists as $item)
                         <tr>
-                            <td><a href="/basicinformation/{{ $item->biogmain->c_personid }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a></td>
+                            <td>
+                            <a href="/basicinformation/
+@php
+  $a = $item->resource;
+  $id = $item->c_personid;
+  $res_id = $item->resource_id;
+if($item->op_type == 4) { echo $id; }
+else {
+  switch ($a) {
+    case "BIOG_MAIN":
+      echo $id;
+      break;
+    case "BIOG_ADDR_DATA":
+      echo $id."/addresses/".$res_id;
+      break;
+    case "ALTNAME_DATA":
+      echo $id."/altnames/".$res_id;
+      break;
+    case "TEXT_DATA":
+      echo $id."/texts/".$res_id;
+      break;
+    case "POSTED_TO_OFFICE_DATA":
+      echo $id."/offices/".$res_id;
+      break;
+    case "ENTRY_DATA":
+      echo $id."/entries/".$res_id;
+      break;
+    case "EVENTS_DATA":
+      echo $id."/events/".$res_id;
+      break;
+    case "STATUS_DATA":
+      echo $id."/statuses/".$res_id;
+      break;
+    case "KIN_DATA":
+      echo $id."/kinship/".$res_id;
+      break;
+    case "ASSOC_DATA":
+      echo $id."/assoc/".$res_id;
+      break;
+    case "POSSESSION_DATA":
+      echo $id."/possession/".$res_id;
+      break;
+    case "BIOG_INST_DATA":
+      echo $id."/socialinst/".$res_id;
+      break;
+    case "BIOG_SOURCE_DATA":
+      echo $id."/sources/".$res_id;
+      break;
+    default: 
+      echo $id;
+  }
+}
+@endphp
+/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
+                            </td>
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal">resource_data</button>

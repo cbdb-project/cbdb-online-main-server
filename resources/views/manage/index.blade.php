@@ -20,6 +20,7 @@
                     <th style="width: 120px">操作</th>
                     <th>一般/專家/眾包用戶</th>
                     <th style="width: 120px">操作</th>
+                    <th>刪除</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -44,6 +45,21 @@
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a type="button" 
+                                    onclick="
+                                    let msg = '您真的确定要删除吗？\n\n请确认！';
+                                    if (confirm(msg)===true){
+                                        return true;
+                                    }else{
+                                        return false;
+                                    }"
+                                    class="btn btn-xs btn-danger" 
+                                    href="{{ route('manage.edit', ['id' => $user->id , 'type' => '3']) }}">
+                                del</a>
                             </div>
                         </td>
                     </tr>

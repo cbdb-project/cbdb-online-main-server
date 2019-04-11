@@ -256,7 +256,7 @@ class BiogMainRepository
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data);
         return $data['c_office_id']."-".$_postingid;
     }
 
@@ -453,7 +453,8 @@ class BiogMainRepository
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $id, $data);
+        $new_id = $c_personid."-".$data['c_sequence']."-".$data['c_status_code'];
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data);
         return $data;
     }
 
@@ -548,7 +549,8 @@ class BiogMainRepository
             ['c_kin_code', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $id_, $data);
+        $new_id_ = $id."-".$data['c_kin_id']."-".$data['c_kin_code'];
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $new_id_, $data);
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $kin_id;
         $data = array_except($data, ['c_kin_id']);
@@ -866,6 +868,7 @@ class BiogMainRepository
             ['c_assoc_id', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
+        $data['c_personid'] = $c_personid;
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'], $data);
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $assoc_id;

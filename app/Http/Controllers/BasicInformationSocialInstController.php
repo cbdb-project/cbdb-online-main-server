@@ -134,8 +134,8 @@ class BasicInformationSocialInstController extends Controller
             ['c_personid', '=', $addr_l[0]],
             ['c_bi_role_code', '=', $addr_l[1]],
         ])->update($data);
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $id_, $data);
         $newid = $id.'-'.$data['c_bi_role_code'];
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$newid]);
     }

@@ -173,12 +173,11 @@ class BasicInformationAddressesController extends Controller
             ['c_addr_type', '=', $addr_l[2]],
             ['c_sequence', '=', $addr_l[3]]
         ])->update($data);
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $addr, $data);
-        flash('Update success @ '.Carbon::now(), 'success');
-        //20181107建安修改回傳的畫面
-        //return redirect()->route('basicinformation.addresses.edit', ['id'=>$id, 'addr'=>$addr]);
         $data['c_personid'] = $addr_l[0];
-        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence']]);
+        $new_addr = $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'];
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data);
+        flash('Update success @ '.Carbon::now(), 'success');
+        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $new_addr]);
     }
 
     /**

@@ -29,7 +29,7 @@
                             <td><a href="/basicinformation/{{ $item->biogmain->c_personid }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a></td>
                             <td>{{ $item->resource }}</td>
                             <td>
-                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal">resource_data</button>
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
                             </td>
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
@@ -45,7 +45,7 @@
                             </td>
                         </tr>
                         <!--Start-->
-                        <div id="myModal" class="modal fade" role="dialog">
+                        <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
                           <div class="modal-dialog">
                             <!-- Modal content-->
                             <div class="modal-content">

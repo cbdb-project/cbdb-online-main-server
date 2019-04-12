@@ -58,30 +58,30 @@ class CrowdsourcingController extends Controller
         $resource = $data[0]['resource'];
         $data = $data[0]['resource_data'];
         $data = json_decode($data,true);
+        $updated_at = Carbon::now()->format('YmdHis');
 
         //資料對應處理
         switch ($resource) {
             case "BIOG_MAIN":
-                $updated_at = Carbon::now()->format('YmdHis');
                 $new_id = BiogMain::max('c_personid') + 1;
                 $new_ttsid = BiogMain::max('tts_sysno') + 1;
                 $data['c_personid'] = $new_id;
                 $data['tts_sysno'] = $new_ttsid;
                 $data = $this->toolRepository->timestamp($data); //建檔資訊
+                $errorMsg = "您提供的JSON格式不符合，請refect這筆紀錄。";
+                App::abort(403, $errorMsg);
+
                 $message = BiogMain::create($data);
-                $message ? $message='200' : $message='500';
-                if($message=='200') {
+                if($message == 1) {
                     DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at));
-                    $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, $resource, $data['tts_sysno'], $data);
+                    $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, $resource, $data['c_personid'], $data);
                     flash('Create success @ '.Carbon::now(), 'success');
-                }
-                elseif($message=='500') {
-                    DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 4, 'rate' => $rate, 'updated_at' => $updated_at));
-                    flash('Create error @ '.Carbon::now(), 'danger');
                 }
                 break;
             default:
-                return "Error";
+                DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 4, 'rate' => $rate, 'updated_at' => $updated_at));
+                flash('Create error @ '.Carbon::now(), 'danger');
+                break;
         }
         return redirect()->route('crowdsourcing.index');
     }

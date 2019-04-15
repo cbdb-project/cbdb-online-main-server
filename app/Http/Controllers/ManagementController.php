@@ -23,7 +23,7 @@ class ManagementController extends Controller
         if (Auth::user()->is_admin != 1){
             return redirect('/home');
         }
-        $data = User::all();
+        $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
         return view('manage.index',['data' => $data, 'page_title' => 'Management', 'page_description' => '审核用户']);
     }
 
@@ -65,18 +65,41 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
-        //
+        $type = $request['type'];
         if (Auth::user()->is_admin != 1){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $user = User::find($id);
-        $user->is_active = 1 - $user->is_active;
-        $user->save();
-        flash('修改成功 @ '.Carbon::now(), 'success');
-        return redirect()->route('manage.index');
+        if($type == 1) {
+            $user = User::find($id);
+            $user->is_active = 1 - $user->is_active;
+            $user->save();
+            flash('修改成功 @ '.Carbon::now(), 'success');
+            return redirect()->route('manage.index');
+        }
+        if($type == 2) {
+            $user = User::find($id);
+            if($user->is_admin == 1) { $user->is_admin = 2; }
+            elseif($user->is_admin == 2) { $user->is_admin = 0; }
+            elseif($user->is_admin == 0) { $user->is_admin = 1; }
+            $user->save();
+            flash('修改成功 @ '.Carbon::now(), 'success');
+            return redirect()->route('manage.index');
+        }
+        if($type == 3) {
+            $user = User::find($id);
+            $email = $user->email;
+            $user->email = $email.'-'.Carbon::now();
+            $user->password = '-';
+            $user->confirmation_token = '-';
+            $user->remember_token = '-';
+            $user->updated_at = Carbon::now();
+            $user->save();
+            flash('刪除成功 @ '.Carbon::now(), 'danger');
+            return redirect()->route('manage.index');
+        }
     }
 
     /**

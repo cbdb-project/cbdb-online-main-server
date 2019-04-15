@@ -2,78 +2,82 @@
 
 @section('content')
 
-    <div class="box">
-        <div class="box-header">
-            <h3 class="box-title">编码表</h3>
-        </div>
-        <!-- /.box-header -->
-        <div class="box-body">
-
+    <div class="panel panel-default">
+        <div class="panel-heading">最近眾包錄入記錄</div>
+        <div class="panel-body">
             <table id="example1" class="table table-bordered table-striped">
+                <p>* 修改类型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示删除<br />
+                * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄還沒有被處理，3表示記錄reject，4表示記錄處理失敗。
+                </p>
                 <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Institution</th>
-                    <th>是否通过审核</th>
-                    <th style="width: 120px">操作</th>
-                    <th>一般/專家/眾包用戶</th>
-                    <th style="width: 120px">操作</th>
-                    <th>刪除</th>
+                    <th>人物</th>
+                    <th>修改资源</th>
+                    <th>修改值</th>
+                    <th>资源tts</th>
+                    <th>修改类型</th>
+                    <th>修改人</th>
+                    <th>次數</th>
+                    <th>錄入时间</th>
+                    <th>狀態</th>
+                    <th>操作</th>
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($data as $user)
-                    @if($user->id == Auth::id())
-                        @continue
-                    @endif
-                    <tr>
-                        <td>{{ $user->id }}</td>
-                        <td>{{ $user->name }}</td>
-                        <td>{{ $user->email }}</td>
-                        <td>{{ $user->institution }}</td>
-                        <td>{{ $user->is_active == 1 ? 'Yes' : 'No' }}</td>
-                        <td>
-                            <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '1']) }}">改变审核状态</a>
+                    @foreach($lists as $item)
+                        <tr>
+                            <td><a href="/basicinformation/{{ $item->biogmain->c_personid }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a></td>
+                            <td>{{ $item->resource }}</td>
+                            <td>
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
+                            </td>
+                            <td>{{ $item->resource_id }}</td>
+                            <td>{{ $item->op_type }}</td>
+                            <td>{{ $item->user->name }}</td>
+                            <td>{{ $item->rate }}</td>
+                            <td>{{ $item->created_at }}</td>
+                            <td>{{ $item->crowdsourcing_status }}</td>
+                            <td>
+                                @if($item->crowdsourcing_status == 2)
+                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>　
+                                <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
+                                @endif
+                            </td>
+                        </tr>
+                        <!--Start-->
+                        <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
+                          <div class="modal-dialog">
+                            <!-- Modal content-->
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                <h4 class="modal-title">resource_data </h4>
+                              </div>
+                              <div class="modal-body" style="word-break: break-all;">
+                                <textarea rows="16" cols="90">{{ $item->resource_data }}</textarea>
+                              </div>
+                              <div class="modal-footer">
+                                <!--temporarily
+                                <a href="" type="button" class="btn btn-success">Confirm</a>
+                                <a href="" type="button" class="btn btn-danger">Reject</a>
+                                -->
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                              </div>
                             </div>
-                        </td>
-                        <td>
-                            {{ $user->is_admin == 2 ? '眾包' : ( $user->is_admin == 1 ? '專家' : '一般' ) }}
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <a type="button" 
-                                    onclick="
-                                    let msg = '您真的确定要删除吗？\n\n请确认！';
-                                    if (confirm(msg)===true){
-                                        return true;
-                                    }else{
-                                        return false;
-                                    }"
-                                    class="btn btn-xs btn-danger" 
-                                    href="{{ route('manage.edit', ['id' => $user->id , 'type' => '3']) }}">
-                                del</a>
-                            </div>
-                        </td>
-                    </tr>
-                @endforeach
+                          </div>
+                        </div>
+                        <!--End-->
+                    @endforeach
                 </tbody>
             </table>
+            <div class="pull-right">
+                {{ $lists->links() }}
+            </div>
         </div>
-        <!-- /.box-body -->
     </div>
-    <!-- /.box -->
-    <passport-clients></passport-clients>
-    <passport-authorized-clients></passport-authorized-clients>
-    <passport-personal-access-tokens></passport-personal-access-tokens>
+
 @endsection
+
 @section('js')
     <script>
         (function(window, document, undefined){
@@ -98,7 +102,6 @@
                     sFilterInput:  "form-control input-sm",
                     sLengthSelect: "form-control input-sm"
                 } );
-
 
                 /* Bootstrap paging button renderer */
                 DataTable.ext.renderer.pageButton.bootstrap = function ( settings, host, idx, buttons, page, pages ) {

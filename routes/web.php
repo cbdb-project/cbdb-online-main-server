@@ -22,6 +22,7 @@ Auth::routes();
 
 Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
+Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
 
 Route::get('home', 'HomeController@index')->name('home');
 
@@ -135,6 +136,23 @@ Route::resource('operations', 'OperationsController', ['name' => [
     'create' => 'operations.create',
     'edit' => 'operations.edit',
     'update' => 'operations.update'
+]]);
+
+Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
+    'show' => 'crowdsourcing.show',
+    'create' => 'crowdsourcing.create',
+    'edit' => 'crowdsourcing.edit',
+    'update' => 'crowdsourcing.update'
+]]);
+
+Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
+Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
+
+Route::resource('modified', 'ModifiedController', ['name' => [
+    'show' => 'modified.show',
+    'create' => 'modified.create',
+    'edit' => 'modified.edit',
+    'update' => 'modified.update'
 ]]);
 
 Route::get('test', function (Request $request){

@@ -189,8 +189,8 @@ class BasicInformationEntriesController extends Controller
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->update($data);
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $id_, $data);
         $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.entries.edit', ['id'=>$id, 'id_'=>$newid]);
     }

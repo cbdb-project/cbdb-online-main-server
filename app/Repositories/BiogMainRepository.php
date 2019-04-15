@@ -256,7 +256,7 @@ class BiogMainRepository
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $id, $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data);
         return $data['c_office_id']."-".$_postingid;
     }
 
@@ -273,7 +273,7 @@ class BiogMainRepository
         $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', '', $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$data['c_posting_id'], $data);
         return $data['c_office_id']."-".$data['c_posting_id'];
     }
 
@@ -453,7 +453,8 @@ class BiogMainRepository
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $id, $data);
+        $new_id = $c_personid."-".$data['c_sequence']."-".$data['c_status_code'];
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data);
         return $data;
     }
 
@@ -467,7 +468,7 @@ class BiogMainRepository
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('STATUS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['c_personid'], $data);
+        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_status_code'], $data);
         return $data;
     }
 
@@ -548,7 +549,8 @@ class BiogMainRepository
             ['c_kin_code', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $id_, $data);
+        $new_id_ = $id."-".$data['c_kin_id']."-".$data['c_kin_code'];
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $new_id_, $data);
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $kin_id;
         $data = array_except($data, ['c_kin_id']);
@@ -572,7 +574,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $id, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'], $data);
         $data['tts_sysno'] += 1;
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $data['c_kin_id'];
@@ -704,16 +706,17 @@ class BiogMainRepository
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $tts, $data);
         //新增的聯合主鍵
-        $newid = $data['c_personid']."-".$data['c_inst_name_code']."-".$data['c_bi_role_code'];
+        $newid = $data['c_personid']."-".$data['c_bi_role_code'];
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
         return $newid;
     }
 
     public function socialInstDeleteById($id, $c_personid)
     {
-        $row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
-        DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->delete();
+        $addr_l = explode("-", $id);
+        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->first();
+        DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $id, $row);
     }
 
@@ -865,7 +868,8 @@ class BiogMainRepository
             ['c_assoc_id', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $c_personid, $data);
+        $data['c_personid'] = $c_personid;
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'], $data);
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $assoc_id;
         $data = array_except($data, ['c_assoc_id']);
@@ -890,7 +894,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['tts_sysno'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'], $data);
         $data['tts_sysno'] += 1;
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
@@ -964,7 +968,7 @@ class BiogMainRepository
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
         return $data;
     }
 
@@ -976,7 +980,7 @@ class BiogMainRepository
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
         DB::table('BIOG_SOURCE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_textid'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
         return $data;
     }
 

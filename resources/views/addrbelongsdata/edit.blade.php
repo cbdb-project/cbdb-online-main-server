@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">行政單位等級编码表</div>
+        <div class="panel-heading">地址从属表</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="/addrbelongsdata/{{ $id }}" class="form-horizontal" method="post">

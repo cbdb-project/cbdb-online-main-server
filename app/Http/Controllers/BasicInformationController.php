@@ -101,7 +101,7 @@ class BasicInformationController extends Controller
         $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $data = $this->toolRepository->timestamp($data, True);
         $flight = BiogMain::create($data);
-        $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['tts_sysno'], $data);
+        $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
         flash('Create success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.edit', $data['c_personid']);
     }

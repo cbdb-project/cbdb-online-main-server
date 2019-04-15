@@ -43665,9 +43665,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [
-        _vm._v("查询行政單位等級类型")
-      ]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查询地址从属")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -44417,7 +44415,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询机构单位")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查询任官")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {

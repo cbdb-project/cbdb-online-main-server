@@ -122,6 +122,6 @@ Route::group(['prefix' => 'v1'], function (){
 });
 
 Route::group(['prefix' => 'operations'], function (){
-    Route::get('token', 'Api\OperationsController@token');
+    Route::match(['get', 'post'], 'token', 'Api\OperationsController@token');
     Route::post('add', 'Api\OperationsController@add');
 });

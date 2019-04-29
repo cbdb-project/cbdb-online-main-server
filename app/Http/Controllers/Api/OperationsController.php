@@ -21,19 +21,9 @@ class OperationsController extends Controller
 
     public function add(Request $request)
     {
-
         //用來將json存入operations
         $x = $this->add_operations($request);
         return $x;
-
-/*
-        //用來將json存入資料表
-        $x = $this->storeProcess(27);
-        return $x;
-*/
-        //$this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
-        //$data = new v1();
-        //return $data->addC($request);
     }
 
     public function add_operations($keyword)
@@ -44,7 +34,9 @@ class OperationsController extends Controller
         $token = $token[0]['id'];
         if(empty($token)) { return '500'; }
         $x = $keyword['json'];
+        if(empty($x)) { return '500'; }
         $y = $keyword['resource'];
+        if(empty($y)) { return '500'; }
         $operation = new Operation();
         $operation->resource = $y;
         $operation->resource_data = $x;

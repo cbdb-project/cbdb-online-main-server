@@ -270,7 +270,10 @@
 
         })(window, document);
         $(function () {
-            $("#example1").DataTable();
+            $("#example1").DataTable({
+                "lengthMenu": [10, 25, 50, 75, 100],
+                "pageLength": 50
+            });
         });
     </script>
 @endsection

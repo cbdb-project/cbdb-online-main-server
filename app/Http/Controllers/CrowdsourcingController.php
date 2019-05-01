@@ -69,6 +69,10 @@ class CrowdsourcingController extends Controller
                 $data['tts_sysno'] = $new_ttsid;
                 $data = $this->toolRepository->timestamp($data); //建檔資訊
 
+                //$errorMsg = "您提供的JSON格式不符合，請refect這筆紀錄。";
+                //App::abort(403, $errorMsg);
+
+
                 $message = BiogMain::create($data);
                 if($message == true) {
                     DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at));

@@ -11,7 +11,7 @@
                 </p>
                 <thead>
                 <tr>
-                    <th>人物</th>
+
                     <th>修改资源</th>
                     <th>修改值</th>
                     <th>资源tts</th>
@@ -26,7 +26,7 @@
                 <tbody>
                     @foreach($lists as $item)
                         <tr>
-                            <td><a href="/basicinformation/{{ $item->biogmain->c_personid }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a></td>
+
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
@@ -273,7 +273,12 @@
 
         })(window, document);
         $(function () {
-            $("#example1").DataTable();
+
+            $("#example1").DataTable({
+                "lengthMenu": [10, 25, 50, 75, 100, 150, 200],
+                "pageLength": 100
+            });
+
         });
     </script>
 @endsection

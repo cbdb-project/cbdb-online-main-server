@@ -11,6 +11,7 @@
                 </p>
                 <thead>
                 <tr>
+
                     <th>修改资源</th>
                     <th>修改值</th>
                     <th>资源tts</th>
@@ -25,6 +26,7 @@
                 <tbody>
                     @foreach($lists as $item)
                         <tr>
+
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
@@ -271,10 +273,12 @@
 
         })(window, document);
         $(function () {
+
             $("#example1").DataTable({
                 "lengthMenu": [10, 25, 50, 75, 100, 150, 200],
                 "pageLength": 100
             });
+
         });
     </script>
 @endsection

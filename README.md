@@ -228,3 +228,9 @@ cd /.../cbdb-online-main-server
 php artisan up
 ```
 
+### 当数据库的 datadupm 中有 UTF8MB4 字符集的字符时（比如使用 Navicat 时）
+
+导入的时候，务必打开 .sql 文件，检查文件头是否有 SET NAMES utf8mb4。
+
+如果没有，请手动添加。
+

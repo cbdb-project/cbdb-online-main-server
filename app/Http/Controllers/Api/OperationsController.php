@@ -21,9 +21,11 @@ class OperationsController extends Controller
 
     public function add(Request $request)
     {
+
         //用來將json存入operations
         $x = $this->add_operations($request);
         return $x;
+
     }
 
     public function add_operations($keyword)
@@ -34,9 +36,11 @@ class OperationsController extends Controller
         $token = $token[0]['id'];
         if(empty($token)) { return '500'; }
         $x = $keyword['json'];
+
         if(empty($x)) { return '500'; }
         $y = $keyword['resource'];
         if(empty($y)) { return '500'; }
+
         $operation = new Operation();
         $operation->resource = $y;
         $operation->resource_data = $x;

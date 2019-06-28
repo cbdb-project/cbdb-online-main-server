@@ -150,8 +150,16 @@ class BiogMainRepository
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
         $data = (new ToolsRepository)->timestamp($data);
         $biogbasicinformation = BiogMain::find($id);
-        $biogbasicinformation->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data);
+        $ori = $this->byPersonId($id);
+        //20190531判別是否為眾包用戶
+        if (Auth::user()->is_admin == 2) {
+            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
+        }
+        else {
+            $biogbasicinformation->update($data);
+            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
+        }
+        //20190531修改結束
     }
 
     /**

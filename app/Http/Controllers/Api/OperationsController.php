@@ -14,18 +14,26 @@ use App\v1;
 
 class OperationsController extends Controller
 {
-    public function hello(Request $request)
-    {
-        return $request;
-    }
 
     public function add(Request $request)
     {
-
         //用來將json存入operations
         $x = $this->add_operations($request);
         return $x;
+    }
 
+    public function update(Request $request)
+    {
+        //要製作update_operations
+        $x = $this->update_operations($request);
+        return $x;
+    }
+
+    public function del(Request $request)
+    {
+        //要製作destroy_operations
+        $x = $this->destroy_operations($request);
+        return $x;
     }
 
     public function add_operations($keyword)
@@ -36,7 +44,6 @@ class OperationsController extends Controller
         $token = $token[0]['id'];
         if(empty($token)) { return '500'; }
         $x = $keyword['json'];
-
         if(empty($x)) { return '500'; }
         $y = $keyword['resource'];
         if(empty($y)) { return '500'; }
@@ -46,6 +53,7 @@ class OperationsController extends Controller
         $operation->resource_data = $x;
         $operation->user_id = $token; //這邊要規劃由token取值.
         $operation->crowdsourcing_status = 2;
+        $operation->op_type = 1;
         //crowdsourcing_status欄位值說明
         //0.專業用戶修改紀錄
         //1.crowdsourcing記錄並已插入數據庫 
@@ -56,8 +64,71 @@ class OperationsController extends Controller
         return $message;
     }
 
+    public function update_operations($keyword)
+    {
+        $z = $keyword['token'];
+        $token = DB::table('users')->where('confirmation_token', $z)->get();
+        $token = json_decode($token,true);
+        $token = $token[0]['id'];
+        if(empty($token)) { return '500'; }
+        $x = $keyword['json'];
+        if(empty($x)) { return '500'; }
+        $y = $keyword['resource'];
+        if(empty($y)) { return '500'; }
+        //20190627新增
+        $c_personid = $keyword['c_personid'];
+        if(empty($c_personid)) { return '500'; }
+        $BiogMainRepository = new BiogMainRepository();
+        $ori = $BiogMainRepository->byPersonId($c_personid); 
+
+        $operation = new Operation();
+        $operation->resource = $y;
+        $operation->c_personid = $c_personid;
+        $operation->resource_id = $c_personid;
+        $operation->resource_data = $x;
+        $operation->biog = $ori;
+        $operation->user_id = $token; //這邊要規劃由token取值.
+        $operation->crowdsourcing_status = 2;
+        $operation->op_type = 3;
+        $message = $operation->save();
+        $message ? $message='200' : $message='500';
+        return $message;
+    }
+
+    public function destroy_operations($keyword)
+    {
+        $z = $keyword['token'];
+        $token = DB::table('users')->where('confirmation_token', $z)->get();
+        $token = json_decode($token,true);
+        $token = $token[0]['id'];
+        if(empty($token)) { return '500'; }
+        $y = $keyword['resource'];
+        if(empty($y)) { return '500'; }
+        //20190627新增
+        $c_personid = $keyword['c_personid'];
+        if(empty($c_personid)) { return '500'; }
+        $BiogMainRepository = new BiogMainRepository();
+        $ori = $BiogMainRepository->byPersonId($c_personid);
+        $biog = BiogMain::find($c_personid);
+        $biog->c_name_chn = '<待删除>';
+
+        $operation = new Operation();
+        $operation->resource = $y;
+        $operation->c_personid = $c_personid;
+        $operation->resource_id = $c_personid;
+        $operation->resource_data = $biog;
+        $operation->biog = $ori;
+        $operation->user_id = $token; //這邊要規劃由token取值.
+        $operation->crowdsourcing_status = 2;
+        $operation->op_type = 4;
+        $message = $operation->save();
+        $message ? $message='200' : $message='500';
+        return $message;
+    }
+
     public function storeProcess(Request $request)
     {
+        //20190531這邊要取得table名稱, 規劃建置switch case來處理各種儲存
         $id = $request['id'];
         DB::table('operations')->where('id', $id)->update(array('crowdsourcing_status' => 1));
         $data = DB::table('operations')->where('id', $id)->get();
@@ -71,18 +142,6 @@ class OperationsController extends Controller
         $message = BiogMain::create($data);
         $message ? $message='200' : $message='500';
         return $message;
-    }
-
-    public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data)
-    {
-        $operation = new Operation();
-        $operation->user_id = $user_id;
-        $operation->c_personid = $c_personid;
-        $operation->op_type = $op_type;
-        $operation->resource = $resource;
-        $operation->resource_id = $resource_id;
-        $operation->resource_data = json_encode($resource_data);
-        $operation->save();
     }
 
     public function token(Request $request) {

@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Operation;
+use App\Repositories\OperationRepository;
 use Illuminate\Http\Request;
 
 class OperationsController extends Controller
 {
-    public function __construct()
+    protected $operationRepository;
+
+    public function __construct(OperationRepository $operationRepository)
     {
+        $this->operationRepository = $operationRepository;
     }
 
     public function store()
@@ -19,6 +23,24 @@ class OperationsController extends Controller
     public function index()
     {
         $lists = Operation::where('crowdsourcing_status', 0)->orderBy('updated_at', 'desc')->limit(100)->paginate(20);
+        //將物件轉為陣列進行陣列比對
+        $listsArr = $this->operationRepository->objectToArray($lists);
+        $all = count($listsArr['data']);
+        for($x=0;$x<$all;$x++) {
+            $arr1 = $listsArr['data'][$x]['resource_data'];
+            $arr2 = $listsArr['data'][$x]['biog'];
+            if(!empty($arr2)) {
+                //將json轉換為陣列進行比對
+                $arr1 = json_decode($arr1, true);
+                $arr2 = json_decode($arr2, true);
+                $ans = $this->operationRepository->getArrDiff($arr1, $arr2);
+                //將比對後的結果存回至biog欄位
+                $lists[$x]['biog'] = $ans;
+            }
+        }
+        //echo "<pre><code>";
+        //print_r($lists[0]['biog']); //成功
+        //echo "</code></pre>";
         return view('operations.index', ['lists' => $lists,
             'page_title' => 'NewUpdate', 'page_description' => '最近编辑列表',
             'page_url' => '/operations'

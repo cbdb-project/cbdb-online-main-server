@@ -23,7 +23,7 @@ class AltnameCodesController extends Controller
      */
     public function index()
     {
-        return view('altnamecodes.index', ['page_title' => 'Altname Codes', 'page_description' => '别名编码表', 'codes' => session('codes')]);
+        return view('altnamecodes.index', ['page_title' => 'Altname Codes', 'page_description' => '別名編碼表', 'codes' => session('codes')]);
     }
 
     /**
@@ -67,7 +67,7 @@ class AltnameCodesController extends Controller
     public function edit($id)
     {
         $data = $this->altcodeRepository->byId($id);
-        return view('altnamecodes.edit', ['page_title' => 'Altname Codes', 'page_description' => '别名编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('altnamecodes.edit', ['page_title' => 'Altname Codes', 'page_description' => '別名編碼表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

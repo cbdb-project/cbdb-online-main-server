@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">社会机构编码表</div>
+        <div class="panel-heading">社會機構編碼表</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="/socialinstitutioncodes/{{ $id }}" class="form-horizontal" method="post">

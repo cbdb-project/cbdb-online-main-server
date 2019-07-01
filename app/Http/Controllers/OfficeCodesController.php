@@ -32,7 +32,7 @@ class OfficeCodesController extends Controller
      */
     public function index()
     {
-        return view('officecodes.index', ['page_title' => 'Office Codes', 'page_description' => '任官编码表', 'codes' => session('codes')]);
+        return view('officecodes.index', ['page_title' => 'Office Codes', 'page_description' => '任官編碼表', 'codes' => session('codes')]);
     }
 
     /**
@@ -43,7 +43,7 @@ class OfficeCodesController extends Controller
     public function create()
     {
         $temp_id = OfficeCode::max('c_office_id') + 1;
-        return view('officecodes.create', ['page_title' => 'Office Codes', 'page_description' => '任官编码表', 'temp_id' => $temp_id]);
+        return view('officecodes.create', ['page_title' => 'Office Codes', 'page_description' => '任官編碼表', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -93,7 +93,7 @@ class OfficeCodesController extends Controller
     public function edit($id)
     {
         $data = $this->officecoderepository->byId($id);
-        return view('officecodes.edit', ['page_title' => 'Office Codes', 'page_description' => '任官编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('officecodes.edit', ['page_title' => 'Office Codes', 'page_description' => '任官編碼表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">著作编码表</div>
+        <div class="panel-heading">著作編碼表</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="/textcodes/{{ $id }}" class="form-horizontal" method="post">

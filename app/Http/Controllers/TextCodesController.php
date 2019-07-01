@@ -31,7 +31,7 @@ class TextCodesController extends Controller
      */
     public function index()
     {
-        return view('textcodes.index', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'codes' => session('codes')]);
+        return view('textcodes.index', ['page_title' => 'Text Codes', 'page_description' => '著作編碼表', 'codes' => session('codes')]);
     }
 
     /**
@@ -42,7 +42,7 @@ class TextCodesController extends Controller
     public function create()
     {
         $temp_id = TextCode::max('c_textid') + 1;
-        return view('textcodes.create', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'temp_id' => $temp_id]);
+        return view('textcodes.create', ['page_title' => 'Text Codes', 'page_description' => '著作編碼表', 'temp_id' => $temp_id]);
     
     }
 
@@ -93,7 +93,7 @@ class TextCodesController extends Controller
     public function edit($id)
     {
         $data = $this->textcoderepository->byId($id);
-        return view('textcodes.edit', ['page_title' => 'Text Codes', 'page_description' => '著作编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('textcodes.edit', ['page_title' => 'Text Codes', 'page_description' => '著作編碼表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

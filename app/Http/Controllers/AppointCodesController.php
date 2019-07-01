@@ -21,7 +21,7 @@ class AppointCodesController extends Controller
      */
     public function index()
     {
-        return view('appointcodes.index', ['page_title' => 'Appointment Type Codes', 'page_description' => '任命编码表', 'codes' => session('codes')]);
+        return view('appointcodes.index', ['page_title' => 'Appointment Type Codes', 'page_description' => '任命類型編碼表', 'codes' => session('codes')]);
     }
 
     /**
@@ -65,7 +65,7 @@ class AppointCodesController extends Controller
     public function edit($id)
     {
         $data = $this->appcoderepository->byId($id);
-        return view('appointcodes.edit', ['page_title' => 'Appointment Type Codes', 'page_description' => '任命类型编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('appointcodes.edit', ['page_title' => 'Appointment Type Codes', 'page_description' => '任命類型編碼表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

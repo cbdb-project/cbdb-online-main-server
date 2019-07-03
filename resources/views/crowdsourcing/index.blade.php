@@ -30,6 +30,7 @@
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}">compare</button>
                             </td>
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
@@ -38,7 +39,7 @@
                             <td>{{ $item->created_at }}</td>
                             <td>{{ $item->crowdsourcing_status }}</td>
                             <td>
-                                @if($item->crowdsourcing_status == 2)
+                                @if($item->crowdsourcing_status == 2 and Auth::check() and Auth::user()->is_admin == 1)
                                 <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>　
                                 <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
                                 @endif
@@ -51,16 +52,37 @@
                             <div class="modal-content">
                               <div class="modal-header">
                                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">resource_data </h4>
+                                <h4 class="modal-title">resource_data</h4>
                               </div>
                               <div class="modal-body" style="word-break: break-all;">
                                 <textarea rows="16" cols="90">{{ $item->resource_data }}</textarea>
                               </div>
                               <div class="modal-footer">
-                                <!--temporarily
-                                <a href="" type="button" class="btn btn-success">Confirm</a>
-                                <a href="" type="button" class="btn btn-danger">Reject</a>
-                                -->
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <!--End-->
+                        <!--Start-->
+                        <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog">
+                          <div class="modal-dialog">
+                            <!-- Modal content-->
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                <h4 class="modal-title">compare</h4>
+                              </div>
+                              <div class="modal-body" style="word-break: break-all;">
+                                <div>
+                                @if (!empty($item->biog))
+                                    欄位比對的結果：<br/>
+                                    {!! $item->biog !!}
+                                @else
+                                    沒有比對紀錄
+                                @endif
+                                </div>
+                              <div class="modal-footer">
                                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                               </div>
                             </div>

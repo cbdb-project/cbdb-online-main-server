@@ -100,10 +100,19 @@ class BasicInformationController extends Controller
 //        $data['c_personid'] = BiogMain::max('c_personid') + 1;
         $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $data = $this->toolRepository->timestamp($data, True);
-        $flight = BiogMain::create($data);
-        $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
-        flash('Create success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.edit', $data['c_personid']);
+        //20190531判別是否為眾包用戶
+        if (Auth::user()->is_admin == 2) {
+            $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data, '', 2);
+            flash('眾包紀錄 Create success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.index');
+        }
+        else {
+            $flight = BiogMain::create($data);
+            $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
+            flash('Create success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.edit', $data['c_personid']);
+        }
+        //20190531修改結束
     }
 
     /**
@@ -155,9 +164,16 @@ class BasicInformationController extends Controller
             return redirect()->back();
         }
         $this->biogMainRepository->updateById($request, $id);
-        flash('Update success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.edit', $id);
+        //20190531判別是否為眾包用戶
+        if (Auth::user()->is_admin == 2) {
+            flash('眾包紀錄 Update success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.index');
+        }
+        else {
+            flash('Update success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.edit', $id);
+        }
+        //20190531修改結束
     }
 
     //20190223新增另存功能
@@ -167,7 +183,7 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1){
+        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -193,11 +209,28 @@ class BasicInformationController extends Controller
      */
     public function destroy($id)
     {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $ori = $this->biogMainRepository->byPersonId($id);
         $biog = BiogMain::find($id);
         $biog->c_name_chn = '<待删除>';
-        $biog->save();
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, []);
+        //20190605判別是否為眾包用戶
+        if (Auth::user()->is_admin == 2) {
+            $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori, 2);
+            flash('眾包紀錄 Delete success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.index');
+        }
+        else {
+            $biog->save();
+            $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori);
+            flash('Delete success @ '.Carbon::now(), 'success');
+            return redirect()->route('basicinformation.index');
+        }
     }
-
-
 }

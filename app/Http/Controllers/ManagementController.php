@@ -24,7 +24,7 @@ class ManagementController extends Controller
             return redirect('/home');
         }
         $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
-        return view('manage.index',['data' => $data, 'page_title' => 'Management', 'page_description' => '审核用户']);
+        return view('manage.index',['data' => $data, 'page_title' => 'Management', 'page_description' => '管理用戶']);
     }
 
     /**

@@ -45,7 +45,7 @@ class AddressCodesController extends Controller
      */
     public function index()
     {
-        return view('addresscodes.index', ['page_title' => 'Address Codes', 'page_description' => '地址编码表(ADDRESSES)', 'codes' => session('codes')]);
+        return view('addresscodes.index', ['page_title' => 'Address Codes', 'page_description' => '地址編碼表(ADDRESSES)', 'codes' => session('codes')]);
     }
 
     /**
@@ -56,7 +56,7 @@ class AddressCodesController extends Controller
     public function create()
     {
         $temp_id = AddressCode::max('c_addr_id') + 1;
-        return view('addresscodes.create', ['page_title' => 'Address Codes', 'page_description' => '地址编码表(ADDRESSES)', 'temp_id' => $temp_id]);
+        return view('addresscodes.create', ['page_title' => 'Address Codes', 'page_description' => '地址編碼表(ADDRESSES)', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -106,7 +106,7 @@ class AddressCodesController extends Controller
     public function edit($id)
     {
         $data = $this->addrcodeRepository->byId($id);
-        return view('addresscodes.edit', ['page_title' => 'Address Codes', 'page_description' => '地址编码表(ADDRESSES)', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('addresscodes.edit', ['page_title' => 'Address Codes', 'page_description' => '地址編碼表(ADDRESSES)', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

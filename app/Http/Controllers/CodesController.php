@@ -27,7 +27,7 @@ class CodesController extends Controller
         $data = $this->codesrepostory->codes();
         return view('codes.index',[
             'page_title' => 'Codes',
-            'page_description' => '编码表',
+            'page_description' => '代碼表',
             'page_url' => '/codes',
             'data' => $data]);
     }

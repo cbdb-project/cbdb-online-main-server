@@ -42,7 +42,7 @@ class OperationsController extends Controller
         //print_r($lists[0]['biog']); //成功
         //echo "</code></pre>";
         return view('operations.index', ['lists' => $lists,
-            'page_title' => 'NewUpdate', 'page_description' => '最近编辑列表',
+            'page_title' => 'NewUpdate', 'page_description' => '最近編輯列表',
             'page_url' => '/operations'
         ]);
     }

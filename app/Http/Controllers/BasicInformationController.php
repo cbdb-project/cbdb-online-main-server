@@ -58,7 +58,7 @@ class BasicInformationController extends Controller
      */
     public function index()
     {
-        return view('biogmains.basicinformation.index', ['page_title' => 'Basicinformation', 'page_description' => '编辑人物基本信息']);
+        return view('biogmains.basicinformation.index', ['page_title' => 'Basicinformation', 'page_description' => '編輯人物基本信息']);
     }
 
     /**

@@ -32,7 +32,7 @@ class SocialInstitutionCodesController extends Controller
      */
     public function index()
     {
-        return view('socialinstitutioncodes.index', ['page_title' => 'Social Institution Codes', 'page_description' => '社会机构编码表', 'codes' => session('codes')]);
+        return view('socialinstitutioncodes.index', ['page_title' => 'Social Institution Codes', 'page_description' => '社會機構編碼表', 'codes' => session('codes')]);
     }
 
     /**
@@ -43,7 +43,7 @@ class SocialInstitutionCodesController extends Controller
     public function create()
     {
         $temp_id = SocialInstitutionCode::max('c_inst_name_code') + 1;
-        return view('socialinstitutioncodes.create', ['page_title' => 'Social Institution Codes', 'page_description' => '社会机构编码表', 'temp_id' => $temp_id]);
+        return view('socialinstitutioncodes.create', ['page_title' => 'Social Institution Codes', 'page_description' => '社會機構編碼表', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -94,7 +94,7 @@ class SocialInstitutionCodesController extends Controller
     public function edit($id)
     {
         $data = $this->socialinstitutioncoderepository->byUnionId($id);
-        return view('socialinstitutioncodes.edit', ['page_title' => 'Social Institution Codes', 'page_description' => '社会机构编码表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('socialinstitutioncodes.edit', ['page_title' => 'Social Institution Codes', 'page_description' => '社會機構編碼表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

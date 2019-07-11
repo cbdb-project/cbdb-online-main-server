@@ -183,13 +183,33 @@ class ApiController extends Controller
     }
 
     public function searchText(Request $request){
+        //20190708依據需求修改輸出內容
         $data = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach($data as $item){
             $item['id'] = $item->c_textid;
             if($item['id'] === 0) $item['id'] = -999;
-            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn;
+            //進行查詢資訊的擴充
+            $c_bibl_cat_code = $item['c_bibl_cat_code'];
+            $x1 = DB::table('TEXT_BIBLCAT_CODE_TYPE_REL')->select('c_text_cat_type_id')->where('c_text_cat_code', $c_bibl_cat_code)->get();
+            foreach($x1 as $object) {
+                $ans1[0] = $object->c_text_cat_type_id;
+            }
+            for($j=0; $j<=3; $j++) {
+                $x[$j] = $this->searchTextSub($ans1[$j]);
+                foreach($x[$j] as $object) {
+                    $ans1[$j+1] = $object->c_text_cat_type_parent_id;
+                    $ans2[$j+1] = $object->c_text_cat_type_desc_chn;
+                }
+            }
+            $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
+            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$word;
         }
+        return $data;
+    }
+
+    public function searchTextSub($request){
+        $data = DB::table('TEXT_BIBLCAT_TYPES')->select('c_text_cat_type_parent_id', 'c_text_cat_type_desc_chn')->where('c_text_cat_type_id', $request)->get();
         return $data;
     }
 

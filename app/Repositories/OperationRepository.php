@@ -49,14 +49,17 @@ class OperationRepository
         return json_decode(json_encode($object), true);
     }
 
-    public function getArrDiff($arr1, $arr2)
+    public function getArrDiff($arr1, $arr2, $arr3)
     {
         //進行陣列雜訊的濾除
         if(!is_array($arr1) || !is_array($arr2)) { return ""; }
         $NewArr1ture = array();
         $NewArr2ture = array();
+        $NewArr3ture = array();
         $NewArr1 = array_diff_assoc($arr1, $arr2);
         $NewArr2 = array_diff_assoc($arr2, $arr1);
+        $NewArr3 = array_diff_assoc($arr1, $arr3);
+
         $data = "<br/><p>[修改後]</p>";
         foreach($NewArr1 as $key => $value){
             if($key == "_method" || $key == "_token") {
@@ -71,6 +74,19 @@ class OperationRepository
         foreach($NewArr1ture as $key => $value){
             $NewArr2ture[$key] = $value;
             $data .= "欄位：".$key."  內容：".$NewArr2[$key]."<br/>";
+        }
+
+        $data .= "<br/><p>[實時比對]</p>";
+        foreach($NewArr3 as $key => $value){
+            if($key == "_method" || $key == "_token") {
+                continue;
+            }
+            else {
+                if(!empty($arr3[$key])) {
+                    $NewArr3ture[$key] = $value;
+                    $data .= "欄位：".$key."  內容：".$arr3[$key]."<br/>";
+                }
+            }
         }
         //雜訊濾除結束
         return $data;

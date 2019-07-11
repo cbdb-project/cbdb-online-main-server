@@ -38,7 +38,7 @@ class OperationRepository
         $operation->resource = $resource;
         $operation->resource_id = $resource_id;
         $operation->resource_data = json_encode($resource_data);
-        if(!empty($ori)) $operation->biog = json_encode($ori);
+        if(!empty($ori)) $operation->resource_original = json_encode($ori);
         if($crowdsourcing_status != 0) $operation->crowdsourcing_status = $crowdsourcing_status;
         $operation->save();
     }

@@ -86,7 +86,7 @@ class OperationsController extends Controller
         $operation->c_personid = $c_personid;
         $operation->resource_id = $c_personid;
         $operation->resource_data = $x;
-        $operation->biog = $ori;
+        $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.
         $operation->crowdsourcing_status = 2;
         $operation->op_type = 3;
@@ -117,7 +117,7 @@ class OperationsController extends Controller
         $operation->c_personid = $c_personid;
         $operation->resource_id = $c_personid;
         $operation->resource_data = $biog;
-        $operation->biog = $ori;
+        $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.
         $operation->crowdsourcing_status = 2;
         $operation->op_type = 4;

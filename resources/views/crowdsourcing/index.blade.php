@@ -75,9 +75,9 @@
                               </div>
                               <div class="modal-body" style="word-break: break-all;">
                                 <div>
-                                @if (!empty($item->biog))
+                                @if (!empty($item->resource_original))
                                     欄位比對的結果：<br/>
-                                    {!! $item->biog !!}
+                                    {!! $item->resource_original !!}
                                 @else
                                     沒有比對紀錄
                                 @endif

@@ -194,7 +194,22 @@ class BiogMainRepository
         $text = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
-            $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            //進行查詢資訊的擴充
+            $c_bibl_cat_code = $text_->c_bibl_cat_code;
+            $x1 = DB::table('TEXT_BIBLCAT_CODE_TYPE_REL')->select('c_text_cat_type_id')->where('c_text_cat_code', $c_bibl_cat_code)->get();
+            foreach($x1 as $object) {
+                $ans1[0] = $object->c_text_cat_type_id;
+            }
+            for($j=0; $j<=3; $j++) {
+                $x[$j] = $this->searchTextSub($ans1[$j]);
+                foreach($x[$j] as $object) {
+                    $ans1[$j+1] = $object->c_text_cat_type_parent_id;
+                    $ans2[$j+1] = $object->c_text_cat_type_desc_chn;
+                }
+            }
+            $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
+            $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn." ".$word;
+            //$text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
         $text_str = null;
@@ -203,6 +218,11 @@ class BiogMainRepository
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
         return ['row' => $row, 'text' => $text, 'text_str' => $text_str];
+    }
+
+    public function searchTextSub($request){
+        $data = DB::table('TEXT_BIBLCAT_TYPES')->select('c_text_cat_type_parent_id', 'c_text_cat_type_desc_chn')->where('c_text_cat_type_id', $request)->get();
+        return $data;
     }
 
     public function textUpdateById( )

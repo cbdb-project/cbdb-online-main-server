@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Operation;
+use App\BiogMain;
 use App\Repositories\OperationRepository;
 use Illuminate\Http\Request;
 
@@ -27,13 +28,16 @@ class OperationsController extends Controller
         $listsArr = $this->operationRepository->objectToArray($lists);
         $all = count($listsArr['data']);
         for($x=0;$x<$all;$x++) {
+            $c_personid = '';
+            $arr3 = array();
             $arr1 = $listsArr['data'][$x]['resource_data'];
             $arr2 = $listsArr['data'][$x]['biog'];
+            if(!empty($c_personid = $listsArr['data'][$x]['c_personid'])) { $arr3 = BiogMain::find($c_personid)->toArray(); }
             if(!empty($arr2)) {
                 //將json轉換為陣列進行比對
                 $arr1 = json_decode($arr1, true);
                 $arr2 = json_decode($arr2, true);
-                $ans = $this->operationRepository->getArrDiff($arr1, $arr2);
+                $ans = $this->operationRepository->getArrDiff($arr1, $arr2, $arr3);
                 //將比對後的結果存回至biog欄位
                 $lists[$x]['biog'] = $ans;
             }

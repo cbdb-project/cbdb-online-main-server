@@ -39,18 +39,15 @@ class ModifiedController extends Controller
             $c_personid = '';
             $arr3 = array();
             $arr1 = $listsArr['data'][$x]['resource_data'];
-            $arr2 = $listsArr['data'][$x]['biog'];
+            $arr2 = $listsArr['data'][$x]['resource_original'];
             if(!empty($c_personid = $listsArr['data'][$x]['c_personid'])) { $arr3 = BiogMain::find($c_personid)->toArray(); }
-
             if(!empty($arr2)) {
                 //將json轉換為陣列進行比對
                 $arr1 = json_decode($arr1, true);
                 $arr2 = json_decode($arr2, true);
-
                 $ans = $this->operationRepository->getArrDiff($arr1, $arr2, $arr3);
-
-                //將比對後的結果存回至biog欄位
-                $lists[$x]['biog'] = $ans;
+                //將比對後的結果存回至resource_original欄位
+                $lists[$x]['resource_original'] = $ans;
             }
         }
         return view('modified.index', ['lists' => $lists,

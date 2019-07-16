@@ -519,7 +519,12 @@ class BiogMainRepository
 
     public function kinshipById($id)
     {
+        $id = str_replace("--","-負",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("負","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
@@ -553,7 +558,12 @@ class BiogMainRepository
 
     public function kinshipUpdateById(Request $request, $id, $id_)
     {
+        $id_ = str_replace("--","-負",$id_);
         $temp_l = explode("-", $id_);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("負","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
@@ -567,6 +577,7 @@ class BiogMainRepository
         $old_kin_id = $row->c_kin_id;
         $data = array_except($data, ['_token', '_method', 'c_kinship_pair']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
+        $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
 //        dump($data);
@@ -615,7 +626,12 @@ class BiogMainRepository
     public function kinshipDeleteById($id, $id_)
     {
         $operationRepository = new OperationRepository();
+        $id = str_replace("--","-負",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("負","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],

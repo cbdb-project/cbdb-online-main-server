@@ -176,7 +176,11 @@ class BasicInformationEntriesController extends Controller
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         //新增結束
+        $id_ = str_replace("--","-minus",$id_);
         $addr_a = explode("-", $id_);
+        foreach($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus","-",$value);
+        }
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],
@@ -213,7 +217,11 @@ class BasicInformationEntriesController extends Controller
         }
         //建安修改20191112
         //$this->biogMainRepository->entryDeleteById($id_, $id);
+        $id_ = str_replace("--","-minus",$id_);
         $addr_a = explode("-", $id_);
+        foreach($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],

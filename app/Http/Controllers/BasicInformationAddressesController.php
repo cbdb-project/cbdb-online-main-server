@@ -113,8 +113,11 @@ class BasicInformationAddressesController extends Controller
      */
     public function edit($id, $addr)
     {
-
+        $addr = str_replace("--","-minus",$addr);
         $addr_l = explode("-", $addr);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
 //        dd($addr_l);
         $row = DB::table('BIOG_ADDR_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
@@ -166,7 +169,11 @@ class BasicInformationAddressesController extends Controller
 
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
+        $addr = str_replace("--","-minus",$addr);
         $addr_l = explode("-", $addr);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
         DB::table('BIOG_ADDR_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_addr_id', '=', $addr_l[1]],
@@ -196,7 +203,11 @@ class BasicInformationAddressesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        $addr = str_replace("--","-minus",$addr);
         $addr_l = explode("-", $addr);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('BIOG_ADDR_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_addr_id', '=', $addr_l[1]],

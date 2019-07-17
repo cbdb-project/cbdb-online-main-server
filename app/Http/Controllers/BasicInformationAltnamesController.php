@@ -108,7 +108,11 @@ class BasicInformationAltnamesController extends Controller
      */
     public function edit($id, $alt)
     {
+        $alt = str_replace("--","-minus",$alt);
         $addr_l = explode("-", $alt);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_alt_name_chn', '=', $addr_l[1]],
@@ -148,7 +152,11 @@ class BasicInformationAltnamesController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
+        $alt = str_replace("--","-minus",$alt);
         $addr_l = explode("-", $alt);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_alt_name_chn', '=', $addr_l[1]],
@@ -176,7 +184,11 @@ class BasicInformationAltnamesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        $alt = str_replace("--","-minus",$alt);
         $addr_l = explode("-", $alt);
+        foreach($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_alt_name_chn', '=', $addr_l[1]],

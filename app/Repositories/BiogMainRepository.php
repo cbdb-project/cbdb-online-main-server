@@ -319,7 +319,11 @@ class BiogMainRepository
     {
         //建安修改20181109
         //$row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
+        $id = str_replace("--","-minus",$id);
         $addr_a = explode("-", $id);
+        foreach($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],
@@ -443,7 +447,11 @@ class BiogMainRepository
 
     public function statuseById($id)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_sequence', '=', $temp_l[1]],
@@ -465,7 +473,11 @@ class BiogMainRepository
 
     public function statuseUpdateById(Request $request, $id, $c_personid)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_sequence', '=', $temp_l[1]],
@@ -502,7 +514,11 @@ class BiogMainRepository
 
     public function statuseDeleteById($id, $c_personid)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_sequence', '=', $temp_l[1]],
@@ -519,7 +535,12 @@ class BiogMainRepository
 
     public function kinshipById($id)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
@@ -553,7 +574,12 @@ class BiogMainRepository
 
     public function kinshipUpdateById(Request $request, $id, $id_)
     {
+        $id_ = str_replace("--","-minus",$id_);
         $temp_l = explode("-", $id_);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
@@ -567,6 +593,7 @@ class BiogMainRepository
         $old_kin_id = $row->c_kin_id;
         $data = array_except($data, ['_token', '_method', 'c_kinship_pair']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
+        $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
 //        dump($data);
@@ -615,7 +642,12 @@ class BiogMainRepository
     public function kinshipDeleteById($id, $id_)
     {
         $operationRepository = new OperationRepository();
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
+
         $row = DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
@@ -810,7 +842,11 @@ class BiogMainRepository
 
     public function assocById($id)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -874,7 +910,11 @@ class BiogMainRepository
 
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -937,7 +977,11 @@ class BiogMainRepository
         //20190118筆記, 修改這邊的刪除功能.
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
+        $id = str_replace("--","-minus",$id);
         $temp_l = explode("-", $id);
+        foreach($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus","-",$value);
+        }
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],

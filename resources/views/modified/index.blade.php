@@ -62,6 +62,7 @@ else {
       echo $id."/kinship/".$res_id;
       break;
     case "ASSOC_DATA":
+      $res_id = str_replace("/","(slash)",$res_id);
       echo $id."/assoc/".$res_id;
       break;
     case "POSSESSION_DATA":

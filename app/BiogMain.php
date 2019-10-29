@@ -148,7 +148,7 @@ class BiogMain extends Model
 
     public function assoc()
     {
-        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')->withPivot('tts_sysno', 'c_assoc_id');
+        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')->withPivot('tts_sysno', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title');
     }
 
     public function assoc_name()

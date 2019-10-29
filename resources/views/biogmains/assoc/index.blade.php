@@ -34,13 +34,16 @@
                             @endif
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id]) }}">edit</a>
+                            @php
+                            $value->pivot->c_text_title = str_replace("/","(slash)",$value->pivot->c_text_title);
+                            @endphp
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id }}').submit();
+                                               document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title }}').submit();
                                            }else{
                                                 return false;
                                            }
@@ -48,7 +51,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id }}" action="{{ route('basicinformation.assoc.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title }}" action="{{ route('basicinformation.assoc.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

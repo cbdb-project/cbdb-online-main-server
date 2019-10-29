@@ -5,7 +5,10 @@
         <div class="panel-heading">社會關係</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.assoc.update', [$id, $row->c_personid."-".$row->c_assoc_code."-".$row->c_assoc_id]) }}" class="form-horizontal" method="post">
+@php
+$row->c_text_title = str_replace("/","(slash)",$row->c_text_title);
+@endphp
+            <form action="{{ route('basicinformation.assoc.update', [$id, $row->c_personid."-".$row->c_assoc_code."-".$row->c_assoc_id."-".$row->c_kin_code."-".$row->c_kin_id."-".$row->c_assoc_kin_code."-".$row->c_assoc_kin_id."-".$row->c_text_title]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -138,6 +141,9 @@
                 <div class="form-group">
                     <label for="c_text_title" class="col-sm-2 control-label">作品標題</label>
                     <div class="col-sm-10">
+@php
+$row->c_text_title = str_replace("(slash)","/",$row->c_text_title);
+@endphp
                         <input type="text" class="form-control" name="c_text_title" value="{{ $row->c_text_title }}">
                     </div>
                 </div>

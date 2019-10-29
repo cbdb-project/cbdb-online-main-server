@@ -843,14 +843,33 @@ class BiogMainRepository
     public function assocById($id)
     {
         $id = str_replace("--","-minus",$id);
+        //20191029對於c_text_title欄位內含斜線所做的字串重組
+        $id = str_replace("(slash)","/",$id);
+        //end
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
         }
+        //20191028防止c_text_title欄位內含負號所做的字串重組
+        $new_c_text_title = '';
+        if(!empty($temp_l[8])) {
+            for($i=7; $i<count($temp_l); $i++) {
+                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
+                else { $new_c_text_title .= "-".$temp_l[$i]; }
+            }
+            $temp_l[7] = $new_c_text_title;
+        }
+        
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
             ['c_assoc_id', '=', $temp_l[2]],
+            //20191028進行聯合主鍵的擴充修改
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $temp_l[7]],
         ])->first();
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
@@ -911,14 +930,34 @@ class BiogMainRepository
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
         $id = str_replace("--","-minus",$id);
+        //20191029對於c_text_title欄位內含斜線所做的字串重組
+        $id = str_replace("(slash)","/",$id);
+        //end
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
         }
+        //20191028防止c_text_title欄位內含負號所做的字串重組
+        $new_c_text_title = '';
+        if(!empty($temp_l[8])) {
+            for($i=7; $i<count($temp_l); $i++) {
+                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
+                else { $new_c_text_title .= "-".$temp_l[$i]; }
+            }
+            $temp_l[7] = $new_c_text_title;
+        }
+        //end
+
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
             ['c_assoc_id', '=', $temp_l[2]],
+            //20191028進行聯合主鍵的擴充修改
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $temp_l[7]],
         ])->first();
         $data = $request->all();
         $data = $this->formatSelect($data);
@@ -934,10 +973,16 @@ class BiogMainRepository
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
             ['c_assoc_id', '=', $temp_l[2]],
+            //20191028進行聯合主鍵的擴充修改
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $temp_l[7]],
         ])->update($data);
         $ori_data = $data;
         $data['c_personid'] = $c_personid;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'], $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $assoc_id;
         $data = array_except($data, ['c_assoc_id']);
@@ -962,7 +1007,7 @@ class BiogMainRepository
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
         $data['tts_sysno'] += 1;
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
@@ -978,14 +1023,33 @@ class BiogMainRepository
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
         $id = str_replace("--","-minus",$id);
+        //20191029對於c_text_title欄位內含斜線所做的字串重組
+        $id = str_replace("(slash)","/",$id);
+        //end
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
+        }        
+        //20191028防止c_text_title欄位內含負號所做的字串重組
+        $new_c_text_title = '';
+        if(!empty($temp_l[8])) {
+            for($i=7; $i<count($temp_l); $i++) {
+                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
+                else { $new_c_text_title .= "-".$temp_l[$i]; }
+            }
+            $temp_l[7] = $new_c_text_title;
         }
+
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
             ['c_assoc_id', '=', $temp_l[2]],
+            //20191028進行聯合主鍵的擴充修改
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $temp_l[7]],
         ])->first();
         $row2 = DB::table('ASSOC_DATA')->where([
             ['c_personid',$row->c_assoc_id],
@@ -996,6 +1060,12 @@ class BiogMainRepository
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
             ['c_assoc_id', '=', $temp_l[2]],
+            //20191028進行聯合主鍵的擴充修改
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $temp_l[7]],
         ])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
         DB::table('ASSOC_DATA')->where([

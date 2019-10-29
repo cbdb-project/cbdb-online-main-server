@@ -843,6 +843,7 @@ class BiogMainRepository
     public function assocById($id)
     {
         $id = str_replace("--","-minus",$id);
+
         //20191029對於c_text_title欄位內含斜線所做的字串重組
         $id = str_replace("(slash)","/",$id);
         //end
@@ -850,6 +851,7 @@ class BiogMainRepository
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
         }
+
         //20191028防止c_text_title欄位內含負號所做的字串重組
         $new_c_text_title = '';
         if(!empty($temp_l[8])) {
@@ -860,6 +862,7 @@ class BiogMainRepository
             $temp_l[7] = $new_c_text_title;
         }
         
+
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -930,13 +933,16 @@ class BiogMainRepository
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
         $id = str_replace("--","-minus",$id);
+
         //20191029對於c_text_title欄位內含斜線所做的字串重組
         $id = str_replace("(slash)","/",$id);
         //end
+
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
         }
+
         //20191028防止c_text_title欄位內含負號所做的字串重組
         $new_c_text_title = '';
         if(!empty($temp_l[8])) {
@@ -1023,6 +1029,7 @@ class BiogMainRepository
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
         $id = str_replace("--","-minus",$id);
+
         //20191029對於c_text_title欄位內含斜線所做的字串重組
         $id = str_replace("(slash)","/",$id);
         //end

@@ -59,7 +59,6 @@ class OperationRepository
         $NewArr1 = array_diff_assoc($arr1, $arr2);
         $NewArr2 = array_diff_assoc($arr2, $arr1);
         $NewArr3 = array_diff_assoc($arr1, $arr3);
-
         $data = "<br/><p>[修改後]</p>";
         foreach($NewArr1 as $key => $value){
             if($key == "_method" || $key == "_token") {
@@ -75,7 +74,6 @@ class OperationRepository
             $NewArr2ture[$key] = $value;
             $data .= "欄位：".$key."  內容：".$NewArr2[$key]."<br/>";
         }
-
         $data .= "<br/><p>[實時比對]</p>";
         foreach($NewArr3 as $key => $value){
             if($key == "_method" || $key == "_token") {

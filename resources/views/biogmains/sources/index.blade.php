@@ -3,7 +3,7 @@
 @section('content')
     @include('biogmains.banner')
     <div class="panel panel-default">
-        <div class="panel-heading">出处</div>
+        <div class="panel-heading">出處</div>
 
         <div class="panel-body">
             <table class="table table-hover table-condensed">

@@ -203,7 +203,7 @@ class ApiController extends Controller
                 }
             }
             $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
-            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$word;
+            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$item->c_period." ".$word;
         }
         return $data;
     }

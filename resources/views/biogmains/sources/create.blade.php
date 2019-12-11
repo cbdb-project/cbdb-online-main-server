@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">出处 Source</div>
+        <div class="panel-heading">出處 Source</div>
         <div class="panel-body">
             <div class="panel-body">
             <form action="{{ route('basicinformation.sources.store', $id) }}" class="form-horizontal" method="post">
@@ -32,7 +32,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_female" class="col-sm-2 control-label">是主要出处</label>
+                    <label for="c_female" class="col-sm-2 control-label">是主要出處</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_main_source">
                             <option value=0>0-否
@@ -41,7 +41,7 @@
                             </option>
                         </select>
                     </div>
-                    <label for="c_ethnicity_code" class="col-sm-2 control-label">是本人传记</label>
+                    <label for="c_ethnicity_code" class="col-sm-2 control-label">是本人傳記</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_self_bio">
                             <option value="0">0-否

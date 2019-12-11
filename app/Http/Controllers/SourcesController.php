@@ -61,7 +61,7 @@ class SourcesController extends Controller
     {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
         return view('biogmains.sources.index', ['basicinformation' => $biogbasicinformation,
-        'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处']);
+        'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處']);
     }
 
     /**

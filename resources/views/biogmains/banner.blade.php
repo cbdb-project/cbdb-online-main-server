@@ -3,7 +3,7 @@
     <h3>{{ $basicinformation->c_name_chn.'（'.$basicinformation->c_name.'）- '.$basicinformation->c_personid }}</h3>
     <div class="row text-left">
         <div class="col-sm-offset-1 col-sm-2">
-            <a href="/basicinformation/{{ $basicinformation->c_personid }}/edit"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>&nbsp;&nbsp;基本资料</a>
+            <a href="/basicinformation/{{ $basicinformation->c_personid }}/edit"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>&nbsp;&nbsp;基本資料</a>
         </div>
         <div class="col-sm-2">
             <a href="{{ route('basicinformation.addresses.index', ['id' => $basicinformation->c_personid]) }}"><span class="glyphicon glyphicon-folder-open" aria-hidden="true"></span>&nbsp;&nbsp;地址({{ $basicinformation->biog_addresses_count }})</a>
@@ -39,7 +39,7 @@
             <a href="{{ route('basicinformation.socialinst.index', ['id' => $basicinformation->c_personid]) }}"><i class="glyphicon glyphicon-user"></i>&nbsp;&nbsp;社交機構({{ $basicinformation->inst_count }})</a>
         </div>
         <div class="col-sm-2">
-            <a href="{{ route('basicinformation.sources.index', ['id' => $basicinformation->c_personid]) }}"><span class="glyphicon glyphicon-user"></span>&nbsp;&nbsp;出处({{ $basicinformation->sources_count }})</a>
+            <a href="{{ route('basicinformation.sources.index', ['id' => $basicinformation->c_personid]) }}"><span class="glyphicon glyphicon-user"></span>&nbsp;&nbsp;出處({{ $basicinformation->sources_count }})</a>
         </div>
     </div>
     <br>

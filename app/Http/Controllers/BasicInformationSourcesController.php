@@ -31,7 +31,7 @@ class BasicInformationSourcesController extends Controller
     {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
         return view('biogmains.sources.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處']);
     }
 
     /**
@@ -43,7 +43,7 @@ class BasicInformationSourcesController extends Controller
     {
         return view('biogmains.sources.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处', 'page_url' => '/basicinformation/'.$id.'/sources']);
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處', 'page_url' => '/basicinformation/'.$id.'/sources']);
     }
 
     /**
@@ -90,7 +90,7 @@ class BasicInformationSourcesController extends Controller
     {
         $res = $this->biogMainRepository->sourceById($id, $id_);
         return view('biogmains.sources.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出处',
+            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處',
             'page_url' => '/basicinformation/'.$id.'/sources',
             'archer' => "<li><a href='#'>Sources</a></li>",
         ]);

@@ -127,3 +127,13 @@ Route::group(['prefix' => 'operations'], function (){
     Route::post('update', 'Api\OperationsController@update');
     Route::post('delete', 'Api\OperationsController@del');
 });
+
+Route::group(['prefix' => 'OFFICE_CODES'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_CODES');
+});
+Route::group(['prefix' => 'OFFICE_CODE_TYPE_REL'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_CODE_TYPE_REL');
+});
+Route::group(['prefix' => 'OFFICE_TYPE_TREE'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_TYPE_TREE');
+});

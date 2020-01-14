@@ -52,7 +52,7 @@ class OperationRepository
     public function getArrDiff($arr1, $arr2, $arr3)
     {
         //進行陣列雜訊的濾除
-        if(!is_array($arr1) || !is_array($arr2)) { return ""; }
+        if(!is_array($arr1) || !is_array($arr2) || !is_array($arr3)) { return ""; }
         $NewArr1ture = array();
         $NewArr2ture = array();
         $NewArr3ture = array();

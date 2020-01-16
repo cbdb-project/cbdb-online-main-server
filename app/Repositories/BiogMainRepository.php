@@ -930,7 +930,6 @@ class BiogMainRepository
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
         $id = str_replace("--","-minus",$id);
-
         //20191029對於c_text_title欄位內含斜線所做的字串重組
         $id = str_replace("(slash)","/",$id);
         //end

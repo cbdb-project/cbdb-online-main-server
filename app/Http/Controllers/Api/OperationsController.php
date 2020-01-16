@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\BiogMain;
+use App\OfficeCode;
+use App\OfficeCodeTypeRel;
+use App\OfficeTypeTree;
 use App\Operation;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
@@ -75,16 +78,39 @@ class OperationsController extends Controller
         if(empty($x)) { return '500'; }
         $y = $keyword['resource'];
         if(empty($y)) { return '500'; }
-        //20190627新增
-        $c_personid = $keyword['c_personid'];
-        if(empty($c_personid)) { return '500'; }
-        $BiogMainRepository = new BiogMainRepository();
-        $ori = $BiogMainRepository->byPersonId($c_personid); 
-
+        //20191224增加判斷式，開放其他API進入。
+        if($y == "BIOG_MAIN") {
+            $c_personid = $keyword['c_personid'];
+            $resource_id = $c_personid;
+            if(empty($c_personid)) { return '500'; }
+            $BiogMainRepository = new BiogMainRepository();
+            $ori = $BiogMainRepository->byPersonId($c_personid); 
+        }
+        else {
+            $pId = $keyword['pId'];
+            $c_personid = "";
+            $resource_id = $pId;
+            switch ($y) {
+                case "OFFICE_CODES": 
+                    $ori = OfficeCode::find($pId);
+                    break;
+                case "OFFICE_CODE_TYPE_REL":
+                    $temp_l = explode("-", $pId);
+                    $ori = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])->where('c_office_tree_id', $temp_l[1])->first();
+                    break;
+                case "OFFICE_TYPE_TREE":
+                    $ori = OfficeTypeTree::find($pId);
+                    break;
+                default:
+                    $ori = null;
+                    break;
+            }
+        }
         $operation = new Operation();
         $operation->resource = $y;
         $operation->c_personid = $c_personid;
-        $operation->resource_id = $c_personid;
+        $operation->resource_id = $resource_id;
+
         $operation->resource_data = $x;
         $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.
@@ -104,18 +130,42 @@ class OperationsController extends Controller
         if(empty($token)) { return '500'; }
         $y = $keyword['resource'];
         if(empty($y)) { return '500'; }
-        //20190627新增
-        $c_personid = $keyword['c_personid'];
-        if(empty($c_personid)) { return '500'; }
-        $BiogMainRepository = new BiogMainRepository();
-        $ori = $BiogMainRepository->byPersonId($c_personid);
-        $biog = BiogMain::find($c_personid);
-        $biog->c_name_chn = '<待删除>';
 
+        //20191224增加判斷式，開放其他API進入。
+        if($y == "BIOG_MAIN") {
+            $c_personid = $keyword['c_personid'];
+            $resource_id = $c_personid;
+            if(empty($c_personid)) { return '500'; }
+            $BiogMainRepository = new BiogMainRepository();
+            $ori = $BiogMainRepository->byPersonId($c_personid);
+            $biog = BiogMain::find($c_personid);
+            $biog->c_name_chn = '<待删除>';
+        }
+        else {
+            $pId = $keyword['pId'];
+            $c_personid = "";
+            $resource_id = $pId;
+            $ori = null;
+            switch ($y) {
+                case "OFFICE_CODES":
+                    $biog = OfficeCode::find($pId);
+                    break;
+                case "OFFICE_CODE_TYPE_REL":
+                    $temp_l = explode("-", $pId);
+                    $biog = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])->where('c_office_tree_id', $temp_l[1])->first();
+                    break;
+                case "OFFICE_TYPE_TREE":
+                    $biog = OfficeTypeTree::find($pId);
+                    break;
+                default:
+                    $biog = null;
+                    break;
+            }
+        }
         $operation = new Operation();
         $operation->resource = $y;
         $operation->c_personid = $c_personid;
-        $operation->resource_id = $c_personid;
+        $operation->resource_id = $resource_id;
         $operation->resource_data = $biog;
         $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.

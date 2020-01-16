@@ -69,7 +69,6 @@ class ModifiedController extends Controller
                 }
             }
             else { $arr3 = array(); }
-
             if(!empty($arr2)) {
                 //將json轉換為陣列進行比對
                 $arr1 = json_decode($arr1, true);

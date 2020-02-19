@@ -63,7 +63,9 @@ class OperationsController extends Controller
         //2.crowdsourcing記錄還沒有被處理 
         //3.crowdsourcing記錄reject
         $message = $operation->save();
-        $message ? $message='200' : $message='500';
+        $msgArray['status_code'] = 200;
+        $msgArray['message'] = "if you submitted a new person/address/office... id, it might be changed by auto increment primary key mechanism, when your data will be approved. Please contact CBDB project manager, if you want to customize the id. 您提交的數據中若包含新人名/地名/官名等 id，這些 id 可能在這條記錄被確認匯入系統之後發生改變。因此，如果您希望將這些 id 設定為固定值，請聯絡 CBDB 項目經理。";
+        $message ? $message=$msgArray : $message='500';
         return $message;
     }
 

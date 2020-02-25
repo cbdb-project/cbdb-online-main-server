@@ -39,7 +39,7 @@
                             <td>{{ $item->created_at }}</td>
                             <td>{{ $item->crowdsourcing_status }}</td>
                             <td>
-                                @if($item->crowdsourcing_status == 2 and Auth::check() and Auth::user()->is_admin == 1)
+                                @if($item->crowdsourcing_status == 2 and Auth::check() and Auth::user()->is_admin != 2)
                                 <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>　
                                 <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
                                 @endif
@@ -298,7 +298,8 @@
 
             $("#example1").DataTable({
                 "lengthMenu": [10, 25, 50, 75, 100, 150, 200],
-                "pageLength": 100
+                "pageLength": 100,
+                "aaSorting" : [[7, "desc"]]
             });
 
         });

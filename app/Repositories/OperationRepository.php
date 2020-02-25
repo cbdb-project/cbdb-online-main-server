@@ -75,6 +75,7 @@ class OperationRepository
             $data .= "欄位：".$key."  內容：".$NewArr2[$key]."<br/>";
         }
         $data .= "<br/><p>[實時比對]</p>";
+        $check = 0;
         foreach($NewArr3 as $key => $value){
             if($key == "_method" || $key == "_token") {
                 continue;
@@ -83,9 +84,11 @@ class OperationRepository
                 if(!empty($arr3[$key])) {
                     $NewArr3ture[$key] = $value;
                     $data .= "欄位：".$key."  內容：".$arr3[$key]."<br/>";
+                    $check++;
                 }
             }
         }
+        if(empty($check)) { $data .= "資料與[修改後]完全一致"; }
         //雜訊濾除結束
         return $data;
     }

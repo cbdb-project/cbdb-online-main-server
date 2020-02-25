@@ -234,3 +234,8 @@ php artisan up
 
 如果没有，请手动添加。
 
+### 合并分支与 continuous development
+
+1. 合并分支时，解决 conflict 问题之后，在 Pull requests 界面中使用 Squash and merge 按钮进行分支合并。
+
+2. 合并之后，在服务器环境中的 /.../cbdb-online-main-server 下运行 git pull 即可。建议 pull 之后重启一次。

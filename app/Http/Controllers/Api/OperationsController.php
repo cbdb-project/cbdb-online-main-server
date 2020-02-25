@@ -176,6 +176,113 @@ class OperationsController extends Controller
         return $message;
     }
 
+    public function update_operations($keyword)
+    {
+        $z = $keyword['token'];
+        $token = DB::table('users')->where('confirmation_token', $z)->get();
+        $token = json_decode($token,true);
+        $token = $token[0]['id'];
+        if(empty($token)) { return '500'; }
+        $x = $keyword['json'];
+        if(empty($x)) { return '500'; }
+        $y = $keyword['resource'];
+        if(empty($y)) { return '500'; }
+        //20191224增加判斷式，開放其他API進入。
+        if($y == "BIOG_MAIN") {
+            $c_personid = $keyword['c_personid'];
+            $resource_id = $c_personid;
+            if(empty($c_personid)) { return '500'; }
+            $BiogMainRepository = new BiogMainRepository();
+            $ori = $BiogMainRepository->byPersonId($c_personid); 
+        }
+        else {
+            $pId = $keyword['pId'];
+            $c_personid = "";
+            $resource_id = $pId;
+            switch ($y) {
+                case "OFFICE_CODES": 
+                    $ori = OfficeCode::find($pId);
+                    break;
+                case "OFFICE_CODE_TYPE_REL":
+                    $temp_l = explode("-", $pId);
+                    $ori = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])->where('c_office_tree_id', $temp_l[1])->first();
+                    break;
+                case "OFFICE_TYPE_TREE":
+                    $ori = OfficeTypeTree::find($pId);
+                    break;
+                default:
+                    $ori = null;
+                    break;
+            }
+        }
+        $operation = new Operation();
+        $operation->resource = $y;
+        $operation->c_personid = $c_personid;
+        $operation->resource_id = $resource_id;
+        $operation->resource_data = $x;
+        $operation->resource_original = $ori;
+        $operation->user_id = $token; //這邊要規劃由token取值.
+        $operation->crowdsourcing_status = 2;
+        $operation->op_type = 3;
+        $message = $operation->save();
+        $message ? $message='200' : $message='500';
+        return $message;
+    }
+
+    public function destroy_operations($keyword)
+    {
+        $z = $keyword['token'];
+        $token = DB::table('users')->where('confirmation_token', $z)->get();
+        $token = json_decode($token,true);
+        $token = $token[0]['id'];
+        if(empty($token)) { return '500'; }
+        $y = $keyword['resource'];
+        if(empty($y)) { return '500'; }
+        //20191224增加判斷式，開放其他API進入。
+        if($y == "BIOG_MAIN") {
+            $c_personid = $keyword['c_personid'];
+            $resource_id = $c_personid;
+            if(empty($c_personid)) { return '500'; }
+            $BiogMainRepository = new BiogMainRepository();
+            $ori = $BiogMainRepository->byPersonId($c_personid);
+            $biog = BiogMain::find($c_personid);
+            $biog->c_name_chn = '<待删除>';
+        }
+        else {
+            $pId = $keyword['pId'];
+            $c_personid = "";
+            $resource_id = $pId;
+            $ori = null;
+            switch ($y) {
+                case "OFFICE_CODES":
+                    $biog = OfficeCode::find($pId);
+                    break;
+                case "OFFICE_CODE_TYPE_REL":
+                    $temp_l = explode("-", $pId);
+                    $biog = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])->where('c_office_tree_id', $temp_l[1])->first();
+                    break;
+                case "OFFICE_TYPE_TREE":
+                    $biog = OfficeTypeTree::find($pId);
+                    break;
+                default:
+                    $biog = null;
+                    break;
+            }
+        }
+        $operation = new Operation();
+        $operation->resource = $y;
+        $operation->c_personid = $c_personid;
+        $operation->resource_id = $resource_id;
+        $operation->resource_data = $biog;
+        $operation->resource_original = $ori;
+        $operation->user_id = $token; //這邊要規劃由token取值.
+        $operation->crowdsourcing_status = 2;
+        $operation->op_type = 4;
+        $message = $operation->save();
+        $message ? $message='200' : $message='500';
+        return $message;
+    }
+
     public function storeProcess(Request $request)
     {
         //20190531這邊要取得table名稱, 規劃建置switch case來處理各種儲存

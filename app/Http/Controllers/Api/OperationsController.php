@@ -110,7 +110,6 @@ class OperationsController extends Controller
         $operation->resource = $y;
         $operation->c_personid = $c_personid;
         $operation->resource_id = $resource_id;
-
         $operation->resource_data = $x;
         $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.
@@ -130,7 +129,6 @@ class OperationsController extends Controller
         if(empty($token)) { return '500'; }
         $y = $keyword['resource'];
         if(empty($y)) { return '500'; }
-
         //20191224增加判斷式，開放其他API進入。
         if($y == "BIOG_MAIN") {
             $c_personid = $keyword['c_personid'];

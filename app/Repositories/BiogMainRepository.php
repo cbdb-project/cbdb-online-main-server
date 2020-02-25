@@ -1078,6 +1078,16 @@ class BiogMainRepository
     public function sourceById($id, $_id)
     {
         $temp_l = explode("-", $_id);
+        //20200121防止c_pages欄位內含負號所做的字串重組
+        $new_c_pages = '';
+        if(!empty($temp_l[3])) {
+            for($i=2; $i<count($temp_l); $i++) {
+                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
+                else { $new_c_pages .= "-".$temp_l[$i]; }
+            }
+            $temp_l[2] = $new_c_pages;
+        }
+        //20200121修改結束
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -1095,6 +1105,16 @@ class BiogMainRepository
     public function sourceUpdateById(Request $request, $id, $id_)
     {
         $temp_l = explode("-", $id_);
+        //20200121防止c_pages欄位內含負號所做的字串重組
+        $new_c_pages = '';
+        if(!empty($temp_l[3])) {
+            for($i=2; $i<count($temp_l); $i++) {
+                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
+                else { $new_c_pages .= "-".$temp_l[$i]; }
+            }
+            $temp_l[2] = $new_c_pages;
+        }
+        //20200121修改結束
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -1129,6 +1149,16 @@ class BiogMainRepository
     public function sourceDeleteById($id, $id_)
     {
         $temp_l = explode("-", $id_);
+        //20200121防止c_pages欄位內含負號所做的字串重組
+        $new_c_pages = '';
+        if(!empty($temp_l[3])) {
+            for($i=2; $i<count($temp_l); $i++) {
+                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
+                else { $new_c_pages .= "-".$temp_l[$i]; }
+            }
+            $temp_l[2] = $new_c_pages;
+        }
+        //20200121修改結束
         //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
         //DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
         $row = DB::table('BIOG_SOURCE_DATA')->where([

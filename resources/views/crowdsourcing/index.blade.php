@@ -299,7 +299,7 @@
             $("#example1").DataTable({
                 "lengthMenu": [10, 25, 50, 75, 100, 150, 200],
                 "pageLength": 100,
-                "aaSorting" : [[7, "desc"]]
+                "aaSorting" : [[6, "desc"]]
             });
 
         });

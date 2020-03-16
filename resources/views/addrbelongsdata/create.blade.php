@@ -3,7 +3,7 @@
 @section('content')
 
     <div class="panel panel-default">
-        <div class="panel-heading">地址从属表</div>
+        <div class="panel-heading">地址從屬表</div>
         <div class="panel-body">
             <div class="panel-body">
                 <form action="{{ route('addrbelongsdata.store') }}" class="form-horizontal" method="post">

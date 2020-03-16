@@ -33,7 +33,7 @@ class AddrBelongsDataController extends Controller
      */
     public function index()
     {
-        return view('addrbelongsdata.index', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址从属表', 'codes' => session('codes')]);
+        return view('addrbelongsdata.index', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址從屬表', 'codes' => session('codes')]);
     }
 
     /**
@@ -44,7 +44,7 @@ class AddrBelongsDataController extends Controller
     public function create()
     {
         $temp_id = AddrBelongsData::max('c_addr_id') + 1;
-        return view('addrbelongsdata.create', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址从属表', 'temp_id' => $temp_id]);
+        return view('addrbelongsdata.create', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址從屬表', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -94,7 +94,7 @@ class AddrBelongsDataController extends Controller
     public function edit($id)
     {
         $data = $this->addrbelongsdatarepository->byId($id);
-        return view('addrbelongsdata.edit', ['page_title' => 'AddrBelongsData Type Codes', 'page_description' => '地址从属表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
+        return view('addrbelongsdata.edit', ['page_title' => 'AddrBelongsData Type Codes', 'page_description' => '地址從屬表', 'id' => $id, 'row' => $data, 'codes' => session('codes')]);
     }
 
     /**

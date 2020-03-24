@@ -137,3 +137,8 @@ Route::group(['prefix' => 'OFFICE_CODE_TYPE_REL'], function (){
 Route::group(['prefix' => 'OFFICE_TYPE_TREE'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_TYPE_TREE');
 });
+
+Route::group(['prefix' => '/post_list'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@post_list');
+});
+

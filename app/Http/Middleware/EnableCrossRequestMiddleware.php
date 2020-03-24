@@ -25,8 +25,6 @@ class EnableCrossRequestMiddleware
         $allow_origin = [
             // 20200324這邊要宣告跨域请求的網址
             //'http://localhost:8000',
-            //測試用網址
-            //'https://wcd-ihp.ascdc.sinica.edu.tw/',
         ];
         if (in_array($origin, $allow_origin)) {
             $response->header('Access-Control-Allow-Origin', $origin);

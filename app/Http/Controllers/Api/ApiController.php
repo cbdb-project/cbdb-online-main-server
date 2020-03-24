@@ -31,6 +31,47 @@ class ApiController extends Controller
         $this->middleware('guest');
     }
 
+    //20200324依據指定規格製作API
+    protected function post_list(Request $request){
+        $ans = $data = $data_val = array();
+        // 變數接值
+        $id = $request['id'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            $biogAll = OfficeTypeTree::where('c_office_type_node_id', 'like', $id.'%')->get();
+            $total = count($biogAll);
+            $biog = $biogAll->slice($start, $list);
+        }
+        elseif($id) {
+            $biog = OfficeTypeTree::where('c_office_type_node_id', 'like', $id.'%')->get();
+            $total = count($biog);
+        }
+        else {
+            $biog = OfficeTypeTree::all();
+            $total = count($biog);
+        }
+
+        foreach ($biog as $val) {
+            $data_val['pId'] = $val->c_office_type_node_id;
+            $data_val['pName'] = $val->c_office_type_desc;
+            $data_val['pNameChn'] = $val->c_office_type_desc_chn;
+            array_push($data, $data_val);
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list)) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        $ans['data'] = $data;
+
+        return $ans;
+    }
+
     protected function OFFICE_CODES(Request $request){
         if($end = $request['end']) {
             if($start = $request['start']) {

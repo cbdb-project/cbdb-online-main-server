@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 ini_set('memory_limit','512M');
+ini_set('max_execution_time', 300);
 
 class ApiController extends Controller
 {
@@ -41,29 +42,33 @@ class ApiController extends Controller
         $list = $request['list'];
 
         if($list) {
-            $biogAll = OfficeTypeTree::where('c_office_type_node_id', 'like', $id.'%')->get();
+            $biogAll = OfficeCodeTypeRel::where('c_office_tree_id', 'like', $id.'%')->get();
             $total = count($biogAll);
             $biog = $biogAll->slice($start, $list);
         }
         elseif($id) {
-            $biog = OfficeTypeTree::where('c_office_type_node_id', 'like', $id.'%')->get();
+            $biog = OfficeCodeTypeRel::where('c_office_tree_id', 'like', $id.'%')->get();
             $total = count($biog);
         }
         else {
-            $biog = OfficeTypeTree::all();
+            $biog = OfficeCodeTypeRel::all();
             $total = count($biog);
         }
 
         foreach ($biog as $val) {
-            $data_val['pId'] = $val->c_office_type_node_id;
-            $data_val['pName'] = $val->c_office_type_desc;
-            $data_val['pNameChn'] = $val->c_office_type_desc_chn;
-            array_push($data, $data_val);
+            $c_office_id = $val->c_office_id;
+            $biog2 = OfficeCode::where('c_office_id', '=', $c_office_id)->get();
+            foreach ($biog2 as $val2) {
+                $data_val['pId'] = $c_office_id;
+                $data_val['pName'] = $val2->c_office_pinyin;
+                $data_val['pNameChn'] = $val2->c_office_chn;
+                array_push($data, $data_val);
+            }
         }
 
         $ans['total'] = $total;
         if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
-        if(isset($list)) {
+        if(isset($list) && $list >= 0) {
             $ans['end'] = (int)$list + (int)$start;
             if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
         }

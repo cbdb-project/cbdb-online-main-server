@@ -142,3 +142,14 @@ Route::group(['prefix' => '/post_list'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@post_list');
 });
 
+Route::group(['prefix' => '/entry_list'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list');
+});
+Route::group(['prefix' => '/place_list'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@place_list');
+});
+Route::group(['prefix' => '/place_belongs_to'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@place_belongs_to');
+});
+
+

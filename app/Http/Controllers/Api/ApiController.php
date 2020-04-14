@@ -13,6 +13,10 @@ use App\BiogMain;
 use App\OfficeCode;
 use App\OfficeCodeTypeRel;
 use App\OfficeTypeTree;
+use App\EntryCode;
+use App\EntryCodeTypeRel;
+use App\AddrCode;
+use App\AddrBelongsData;
 use App\Operation;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
@@ -30,6 +34,228 @@ class ApiController extends Controller
     public function __construct()
     {
         $this->middleware('guest');
+    }
+
+    //20200409依據指定規格製作place_belongs_to API
+    public function add_place_belongs_to($id, $data_all){
+        $c_addr_id = $c_belongs_to = '';
+        $biog = AddrBelongsData::where('c_addr_id', '=', $id)->first();
+        $c_addr_id = $biog['c_addr_id'];
+        $c_belongs_to = $biog['c_belongs_to'];
+
+        $biog2 = AddrCode::where('c_addr_id', '=', $c_addr_id)->get();
+        foreach ($biog2 as $val2) {
+            $data_val['pId'] = $c_addr_id;
+            $data_val['pName'] = $val2->c_name;
+            $data_val['pNameChn'] = $val2->c_name_chn;
+            $data_val['pStartTime'] = $val2->c_firstyear;
+            $data_val['pEndTime'] = $val2->c_lastyear;
+        }
+        $biog3 = AddrCode::where('c_addr_id', '=', $c_belongs_to)->get();
+        foreach ($biog3 as $val3) {
+            $data_val['pBId'] = $c_belongs_to;
+            $data_val['pBName'] = $val3->c_name;
+            $data_val['pBNameChn'] = $val3->c_name_chn;
+        }
+        
+        array_push($data_all, $data_val);
+        if($c_belongs_to == '0' || $c_belongs_to == '' || $c_addr_id == '') { 
+            return $data_all;
+        }
+        else { 
+            $data_all = $this->add_place_belongs_to($c_belongs_to, $data_all);
+            return $data_all;
+        }
+    }
+
+    protected function place_belongs_to(Request $request){
+        $ans = $data = $data_val = $data_all = array();
+        // 變數接值
+        $id = $request['id'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            $biogAll = $this->add_place_belongs_to($id, $data_all);
+            $total = count($biogAll);
+            $data = array_slice($biogAll, $start, $list);
+        }
+        elseif($id) {
+            $data = $this->add_place_belongs_to($id, $data_all);
+            $total = count($data);
+        }
+        else {
+            return 500;
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list) && $list >= 0) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        else {
+            $ans['end'] = (int)$total;
+        }
+        $ans['data'] = $data;
+
+        return $ans;
+    }
+
+    //20200408依據指定規格製作place_list API
+    protected function place_list(Request $request){
+        $ans = $data = $data_val = array();
+        // 變數接值
+        $name = $request['name'];
+        $startTime = $request['startTime'];
+        $endTime = $request['endTime'];
+        $accurate = $request['accurate'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            if($accurate == 1) {
+                if($startTime && $endTime) {
+                    $biogAll = AddrCode::where([
+                        ['c_name', 'like', '%'.$name.'%'],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                }
+                else {
+                    $biogAll = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                }
+            }
+            else {
+                if($startTime && $endTime) {
+                    $biogAll = AddrCode::where([
+                        ['c_name', '=', $name],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->orWhere('c_name_chn', '=', $name)->get();
+                }
+                else {
+                    $biogAll = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();
+                }
+            }
+            $total = count($biogAll);
+            $biog = $biogAll->slice($start, $list);
+        }
+        elseif($name) {
+            if($accurate == 1) {
+                if($startTime && $endTime) {
+                    $biog = AddrCode::where([
+                        ['c_name', 'like', '%'.$name.'%'],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                }
+                else {
+                    $biog = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                }
+            }
+            else {
+                if($startTime && $endTime) {
+                    $biog = AddrCode::where([
+                        ['c_name', '=', $name],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->orWhere('c_name_chn', '=', $name)->get();
+                }
+                else {
+                    $biog = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();
+                }
+            }
+            $total = count($biog);
+        }
+        else {
+            $biog = AddrCode::all();
+            $total = count($biog);
+        }
+
+        foreach ($biog as $val) {
+            $c_addr_id = $val->c_addr_id;
+            $data_val['pId'] = $c_addr_id;
+            $data_val['pName'] = $val->c_name;
+            $data_val['pNameChn'] = $val->c_name_chn;
+            $data_val['pStartTime'] = $val->c_firstyear;
+            $data_val['pEndTime'] = $val->c_lastyear;
+            $pBName = $pBNameChn = "";
+            $biog2 = AddrBelongsData::where('c_addr_id', '=', $c_addr_id)->get();
+            foreach ($biog2 as $val2) {
+                $biog3 = AddrCode::where('c_addr_id', '=', $val2->c_belongs_to)->get();
+                foreach ($biog3 as $val3) {
+                    $pBName = $val3->c_name;
+                    $pBNameChn = $val3->c_name_chn;
+                }
+            }
+            $data_val['pBName'] = $pBName;
+            $data_val['pBNameChn'] = $pBNameChn;
+            array_push($data, $data_val);
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list) && $list >= 0) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        else {
+            $ans['end'] = (int)$total;
+        }
+        $ans['data'] = $data;
+
+        return $ans;
+    }
+
+    //20200408依據指定規格製作entry_list API
+    protected function entry_list(Request $request){
+        $ans = $data = $data_val = array();
+        // 變數接值
+        $id = $request['id'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            $biogAll = EntryCodeTypeRel::where('c_entry_type', 'like', $id.'%')->get();
+            $total = count($biogAll);
+            $biog = $biogAll->slice($start, $list);
+        }
+        elseif($id) {
+            $biog = EntryCodeTypeRel::where('c_entry_type', 'like', $id.'%')->get();
+            $total = count($biog);
+        }
+        else {
+            $biog = EntryCodeTypeRel::all();
+            $total = count($biog);
+        }
+
+        foreach ($biog as $val) {
+            $c_entry_code = $val->c_entry_code;
+            $biog2 = EntryCode::where('c_entry_code', '=', $c_entry_code)->get();
+            foreach ($biog2 as $val2) {
+                $data_val['eId'] = $c_entry_code;
+                $data_val['eName'] = $val2->c_entry_desc;
+                $data_val['eNameChn'] = $val2->c_entry_desc_chn;
+                array_push($data, $data_val);
+            }
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list) && $list >= 0) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        else {
+            $ans['end'] = (int)$total;
+        }
+        $ans['data'] = $data;
+
+        return $ans;
     }
 
     //20200324依據指定規格製作API
@@ -72,6 +298,11 @@ class ApiController extends Controller
             $ans['end'] = (int)$list + (int)$start;
             if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
         }
+
+        else {
+            $ans['end'] = (int)$total;
+        }
+
         $ans['data'] = $data;
 
         return $ans;

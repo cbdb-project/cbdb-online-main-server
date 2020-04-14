@@ -298,9 +298,11 @@ class ApiController extends Controller
             $ans['end'] = (int)$list + (int)$start;
             if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
         }
+
         else {
             $ans['end'] = (int)$total;
         }
+
         $ans['data'] = $data;
 
         return $ans;

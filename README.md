@@ -239,3 +239,8 @@ php artisan up
 1. 合并分支时，解决 conflict 问题之后，在 Pull requests 界面中使用 Squash and merge 按钮进行分支合并。
 
 2. 合并之后，在服务器环境中的 /.../cbdb-online-main-server 下运行 git pull 即可。建议 pull 之后重启一次。
+
+### 不使用 git pull 更新本地录入系统
+
+先备份本地 .env 文件，以及 vendor、logs 文件夹，将前述三个文件/文件夹复制至从 github 下载的 CBDB 在线录入系统最新源代码解压后的根目录即可。
+

@@ -37,53 +37,94 @@ class ApiController extends Controller
     }
 
     //20200409依據指定規格製作place_belongs_to API
-    public function add_place_belongs_to($id, $data_all){
+    public function add_place_belongs_to($id, $data_all, $once){
         $c_addr_id = $c_belongs_to = '';
-        $biog = AddrBelongsData::where('c_addr_id', '=', $id)->first();
-        $c_addr_id = $biog['c_addr_id'];
-        $c_belongs_to = $biog['c_belongs_to'];
+        $newIdArr = array();
+        if($once == 1) { // 取得AddrCode第一筆資料
+            $biogOnce = AddrBelongsData::whereIn('c_addr_id', $id)->get();
+            foreach ($biogOnce as $val1) {
+                $c_addr_id = $val1->c_addr_id;
+                $c_belongs_to = $val1->c_belongs_to;
 
-        $biog2 = AddrCode::where('c_addr_id', '=', $c_addr_id)->get();
-        foreach ($biog2 as $val2) {
-            $data_val['pId'] = $c_addr_id;
-            $data_val['pName'] = $val2->c_name;
-            $data_val['pNameChn'] = $val2->c_name_chn;
-            $data_val['pStartTime'] = $val2->c_firstyear;
-            $data_val['pEndTime'] = $val2->c_lastyear;
+                $biog2Once = AddrCode::where('c_addr_id', '=', $c_addr_id)->get();
+                foreach ($biog2Once as $val2) {
+                    $data_val['pId'] = $c_addr_id;
+                    $data_val['pName'] = $val2->c_name;
+                    $data_val['pNameChn'] = $val2->c_name_chn;
+                    $data_val['pStartTime'] = $val2->c_firstyear;
+                    $data_val['pEndTime'] = $val2->c_lastyear;
+                }
+                $biog3Once = AddrCode::where('c_addr_id', '=', $c_belongs_to)->get();
+                foreach ($biog3Once as $val3) {
+                    $data_val['pBId'] = $c_belongs_to;
+                    $data_val['pBName'] = $val3->c_name;
+                    $data_val['pBNameChn'] = $val3->c_name_chn;
+                }
+                array_push($data_all, $data_val);
+            }
         }
-        $biog3 = AddrCode::where('c_addr_id', '=', $c_belongs_to)->get();
-        foreach ($biog3 as $val3) {
-            $data_val['pBId'] = $c_belongs_to;
-            $data_val['pBName'] = $val3->c_name;
-            $data_val['pBNameChn'] = $val3->c_name_chn;
+        $biog = AddrBelongsData::whereIn('c_belongs_to', $id)->get();
+        if($biog) { //AddrBelongsData有值，才執行。
+            foreach ($biog as $val1) {
+                $c_addr_id = $val1->c_addr_id;
+                $c_belongs_to = $val1->c_belongs_to;
+                $biog2 = AddrCode::where('c_addr_id', '=', $c_addr_id)->get();
+                foreach ($biog2 as $val2) {
+                    $data_val['pId'] = $c_addr_id;
+                    $data_val['pName'] = $val2->c_name;
+                    $data_val['pNameChn'] = $val2->c_name_chn;
+                    $data_val['pStartTime'] = $val2->c_firstyear;
+                    $data_val['pEndTime'] = $val2->c_lastyear;
+                }
+                $biog3 = AddrCode::where('c_addr_id', '=', $c_belongs_to)->get();
+                foreach ($biog3 as $val3) {
+                    $data_val['pBId'] = $c_belongs_to;
+                    $data_val['pBName'] = $val3->c_name;
+                    $data_val['pBNameChn'] = $val3->c_name_chn;
+                }
+                array_push($data_all, $data_val);
+                array_push($newIdArr, $c_addr_id);
+            }
+
+            if($c_belongs_to == '0' || $c_belongs_to == '' || $c_addr_id == '') {
+                // AddrBelongsData底下沒有資料了，回傳陣列。 
+                return $data_all;
+            }
+            else {
+                // AddrBelongsData底下還有資料，再次執行遞迴，同時也把目前組合的陣列傳遞給後續的遞迴。
+                $data_all = $this->add_place_belongs_to($newIdArr, $data_all ,0);
+                return $data_all;
+            }
         }
-        
-        array_push($data_all, $data_val);
-        if($c_belongs_to == '0' || $c_belongs_to == '' || $c_addr_id == '') { 
-            return $data_all;
-        }
-        else { 
-            $data_all = $this->add_place_belongs_to($c_belongs_to, $data_all);
-            return $data_all;
+        else { //如果AddrBelongsData沒有值，直接回傳陣列。
+          return $data_all;
         }
     }
 
     protected function place_belongs_to(Request $request){
-        $ans = $data = $data_val = $data_all = array();
+        $ans = $data = $data_val = $data_all = $id = array();
         // 變數接值
-        $id = $request['id'];
+        array_push($id, $request['id']);
         if($request['start'] <= 0) { $start = 0; } // 避免start為負數
         else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
         $list = $request['list'];
 
         if($list) {
-            $biogAll = $this->add_place_belongs_to($id, $data_all);
+            $biogAll = $this->add_place_belongs_to($id, $data_all, 1);
             $total = count($biogAll);
+            //陣列排序依據pId的順序
+            $biogAll = array_values(array_sort($biogAll, function($value) {
+                return $value['pId'];
+            }));
             $data = array_slice($biogAll, $start, $list);
         }
         elseif($id) {
-            $data = $this->add_place_belongs_to($id, $data_all);
+            $data = $this->add_place_belongs_to($id, $data_all, 1);
             $total = count($data);
+            //陣列排序依據pId的順序
+            $data = array_values(array_sort($data, function($value) {
+                return $value['pId'];
+            }));
         }
         else {
             return 500;
@@ -122,7 +163,11 @@ class ApiController extends Controller
                         ['c_name', 'like', '%'.$name.'%'],
                         ['c_firstyear', '=', $startTime],
                         ['c_lastyear', '=', $endTime],
-                        ])->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                        ])->orWhere([
+                        ['c_name_chn', 'like', '%'.$name.'%'],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->get();
                 }
                 else {
                     $biogAll = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
@@ -134,7 +179,11 @@ class ApiController extends Controller
                         ['c_name', '=', $name],
                         ['c_firstyear', '=', $startTime],
                         ['c_lastyear', '=', $endTime],
-                        ])->orWhere('c_name_chn', '=', $name)->get();
+                        ])->orWhere([
+                        ['c_name_chn', '=', $name],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->get();
                 }
                 else {
                     $biogAll = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();
@@ -150,7 +199,11 @@ class ApiController extends Controller
                         ['c_name', 'like', '%'.$name.'%'],
                         ['c_firstyear', '=', $startTime],
                         ['c_lastyear', '=', $endTime],
-                        ])->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
+                        ])->orWhere([
+                        ['c_name_chn', 'like', '%'.$name.'%'],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->get();
                 }
                 else {
                     $biog = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
@@ -162,7 +215,11 @@ class ApiController extends Controller
                         ['c_name', '=', $name],
                         ['c_firstyear', '=', $startTime],
                         ['c_lastyear', '=', $endTime],
-                        ])->orWhere('c_name_chn', '=', $name)->get();
+                        ])->orWhere([
+                        ['c_name_chn', '=', $name],
+                        ['c_firstyear', '=', $startTime],
+                        ['c_lastyear', '=', $endTime],
+                        ])->get();
                 }
                 else {
                     $biog = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();

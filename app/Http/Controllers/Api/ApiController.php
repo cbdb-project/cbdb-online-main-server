@@ -161,12 +161,12 @@ class ApiController extends Controller
                 if($startTime && $endTime) {
                     $biogAll = AddrCode::where([
                         ['c_name', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->orWhere([
                         ['c_name_chn', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->get();
                 }
                 else {
@@ -177,12 +177,12 @@ class ApiController extends Controller
                 if($startTime && $endTime) {
                     $biogAll = AddrCode::where([
                         ['c_name', '=', $name],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->orWhere([
                         ['c_name_chn', '=', $name],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->get();
                 }
                 else {
@@ -197,12 +197,12 @@ class ApiController extends Controller
                 if($startTime && $endTime) {
                     $biog = AddrCode::where([
                         ['c_name', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->orWhere([
                         ['c_name_chn', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->get();
                 }
                 else {
@@ -213,12 +213,12 @@ class ApiController extends Controller
                 if($startTime && $endTime) {
                     $biog = AddrCode::where([
                         ['c_name', '=', $name],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->orWhere([
                         ['c_name_chn', '=', $name],
-                        ['c_firstyear', '=', $startTime],
-                        ['c_lastyear', '=', $endTime],
+                        ['c_firstyear', '>=', $startTime],
+                        ['c_lastyear', '<=', $endTime],
                         ])->get();
                 }
                 else {

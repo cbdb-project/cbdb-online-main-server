@@ -36,6 +36,124 @@ class ApiController extends Controller
         $this->middleware('guest');
     }
 
+    //20200427依據指定規格製作entry_list_by_name API
+    protected function entry_list_by_name(Request $request){
+        $ans = $data = $data_val = array();
+        // 變數接值
+        $eName = $request['eName'];
+        $accurate = $request['accurate'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            if($accurate == 1) {
+                $biogAll = EntryCode::where('c_entry_desc', '=', $eName)
+                    ->orWhere('c_entry_desc_chn', '=', $eName)->get();
+            }
+            else {
+                $biogAll = EntryCode::where('c_entry_desc', 'like', '%'.$eName.'%')
+                    ->orWhere('c_entry_desc_chn', 'like', '%'.$eName.'%')->get();
+            }
+            $total = count($biogAll);
+            $biog = $biogAll->slice($start, $list);
+        }
+        elseif($pName) {
+            if($accurate == 1) {
+                $biog = EntryCode::where('c_entry_desc', '=', $eName)
+                    ->orWhere('c_entry_desc_chn', '=', $eName)->get();
+            }
+            else {
+                $biog = EntryCode::where('c_entry_desc', 'like', '%'.$eName.'%')
+                    ->orWhere('c_entry_desc_chn', 'like', '%'.$eName.'%')->get();
+            }
+            $total = count($biog);
+        }
+        else {
+            $biog = EntryCode::all();
+            $total = count($biog);
+        }
+
+        foreach ($biog as $val) {
+            $data_val['eId'] = $val->c_entry_code;
+            $data_val['eName'] = $val->c_entry_desc;
+            $data_val['eNameChn'] = $val->c_entry_desc_chn;
+            array_push($data, $data_val);
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list) && $list >= 0) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        else {
+            $ans['end'] = (int)$total;
+        }
+        $ans['data'] = $data;
+
+        return $ans;
+    }
+
+    //20200427依據指定規格製作office_list_by_name API
+    protected function office_list_by_name(Request $request){
+        $ans = $data = $data_val = array();
+        // 變數接值
+        $pName = $request['pName'];
+        $accurate = $request['accurate'];
+        if($request['start'] <= 0) { $start = 0; } // 避免start為負數
+        else { $start = $request['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $list = $request['list'];
+
+        if($list) {
+            if($accurate == 1) {
+                $biogAll = OfficeCode::where('c_office_chn', '=', $pName)
+                    ->orWhere('c_office_pinyin', '=', $pName)->get();
+            }
+            else {
+                $biogAll = OfficeCode::where('c_office_chn', 'like', '%'.$pName.'%')
+                    ->orWhere('c_office_pinyin', 'like', '%'.$pName.'%')->get();
+            }
+            $total = count($biogAll);
+            $biog = $biogAll->slice($start, $list);
+        }
+        elseif($pName) {
+            if($accurate == 1) {
+                $biog = OfficeCode::where('c_office_chn', '=', $pName)
+                    ->orWhere('c_office_pinyin', '=', $pName)->get();
+            }
+            else {
+                $biog = OfficeCode::where('c_office_chn', 'like', '%'.$pName.'%')
+                    ->orWhere('c_office_pinyin', 'like', '%'.$pName.'%')->get();
+            }
+            $total = count($biog);
+        }
+        else {
+            $biog = OfficeCode::all();
+            $total = count($biog);
+        }
+
+        foreach ($biog as $val) {
+            $data_val['pId'] = $val->c_office_id;
+            $data_val['pName'] = $val->c_office_pinyin;
+            $data_val['pNameChn'] = $val->c_office_chn;
+            array_push($data, $data_val);
+        }
+
+        $ans['total'] = $total;
+        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if(isset($list) && $list >= 0) {
+            $ans['end'] = (int)$list + (int)$start;
+            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
+        }
+        else {
+            $ans['end'] = (int)$total;
+        }
+        $ans['data'] = $data;
+
+        return $ans;
+    }
+
     //20200409依據指定規格製作place_belongs_to API
     public function add_place_belongs_to($id, $data_all, $once){
         $c_addr_id = $c_belongs_to = '';
@@ -159,15 +277,15 @@ class ApiController extends Controller
         if($list) {
             if($accurate == 1) {
                 if($startTime && $endTime) {
-                    $biogAll = AddrCode::where([
-                        ['c_name', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->orWhere([
-                        ['c_name_chn', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->get();
+                    $biogAll = AddrCode::where(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name', 'like', '%'.$name.'%')
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->orWhere(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name_chn', 'like', '%'.$name.'%')
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->get();
                 }
                 else {
                     $biogAll = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
@@ -175,15 +293,15 @@ class ApiController extends Controller
             }
             else {
                 if($startTime && $endTime) {
-                    $biogAll = AddrCode::where([
-                        ['c_name', '=', $name],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->orWhere([
-                        ['c_name_chn', '=', $name],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->get();
+                    $biogAll = AddrCode::where(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name', '=', $name)
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->orWhere(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name_chn', '=', $name)
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->get();
                 }
                 else {
                     $biogAll = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();
@@ -195,15 +313,15 @@ class ApiController extends Controller
         elseif($name) {
             if($accurate == 1) {
                 if($startTime && $endTime) {
-                    $biog = AddrCode::where([
-                        ['c_name', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->orWhere([
-                        ['c_name_chn', 'like', '%'.$name.'%'],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->get();
+                    $biog = AddrCode::where(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name', 'like', '%'.$name.'%')
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->orWhere(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name_chn', 'like', '%'.$name.'%')
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->get();
                 }
                 else {
                     $biog = AddrCode::where('c_name', 'like', '%'.$name.'%')->orWhere('c_name_chn', 'like', '%'.$name.'%')->get();
@@ -211,15 +329,15 @@ class ApiController extends Controller
             }
             else {
                 if($startTime && $endTime) {
-                    $biog = AddrCode::where([
-                        ['c_name', '=', $name],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->orWhere([
-                        ['c_name_chn', '=', $name],
-                        ['c_firstyear', '>=', $startTime],
-                        ['c_lastyear', '<=', $endTime],
-                        ])->get();
+                    $biog = AddrCode::where(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name', '=', $name)
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->orWhere(function ($query) use ($name, $startTime ,$endTime) {
+                        $query->where('c_name_chn', '=', $name)
+                              ->where('c_lastyear', '>=', $startTime)
+                              ->where('c_firstyear', '<=', $endTime);
+                        })->get();
                 }
                 else {
                     $biog = AddrCode::where('c_name', '=', $name)->orWhere('c_name_chn', '=', $name)->get();

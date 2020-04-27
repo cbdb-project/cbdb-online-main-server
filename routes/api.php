@@ -151,5 +151,9 @@ Route::group(['prefix' => '/place_list'], function (){
 Route::group(['prefix' => '/place_belongs_to'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@place_belongs_to');
 });
-
-
+Route::group(['prefix' => '/office_list_by_name'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@office_list_by_name');
+});
+Route::group(['prefix' => '/entry_list_by_name'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list_by_name');
+});

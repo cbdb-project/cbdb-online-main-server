@@ -192,6 +192,8 @@ We will update our server from 10:00am to 12:00pm on 11/16. The inputting servic
 
 如果相关目录或者文件缺失，请直接新建
 
+编辑 503.blade.php 后，运行 php artisan down 即可开启维护模式
+
 ### 将更改应用于服务器（暂停和启动程式）
 
 ```

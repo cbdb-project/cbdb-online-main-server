@@ -36,7 +36,7 @@ class ApiController2 extends Controller
     protected function query_office_postings(Request $request) {
         $json = $request['RequestPlayload'];
         $arr = json_decode($json, true);
-        $office = $officePlace = $peoplePlace = $data = array();
+        $office = $officePlace = $peoplePlace = $data = $useXyArr = array();
         $useOfficePlace = $usePeoplePlace = $indexYear = $indexStartTime = $indexEndTime = $useXy = $start = $list = 0;
         
         $office = $arr['office'];
@@ -68,16 +68,33 @@ class ApiController2 extends Controller
             $row->whereBetween('BIOG_MAIN.c_index_year', array($indexStartTime, $indexEndTime));
         }
         if($useXy) {
-            $row->join('ADDR_CODES', 'POSTED_TO_ADDR_DATA.c_addr_id', '=', 'ADDR_CODES.c_addr_id');
-            $row->join('ADDR_CODES as ADDR_CODES_1', 'ADDR_CODES.c_addr_id', '=', 'ADDR_CODES_1.c_addr_id');
-            $row->where(function($query) {
-                $query->where('ADDR_CODES.x_coord', '>=', 'ADDR_CODES_1.x_coord - 0.03')
-                      ->where('ADDR_CODES.x_coord', '<=', 'ADDR_CODES_1.x_coord + 0.03');
-            });
-            $row->where(function($query) {
-                $query->where('ADDR_CODES.y_coord', '>=', 'ADDR_CODES_1.y_coord - 0.03')
-                      ->where('ADDR_CODES.y_coord', '<=', 'ADDR_CODES_1.y_coord + 0.03');
-            });
+            $rowOut = $row->get();
+            foreach ($rowOut as $val) {
+                if($val->c_addr_id != null) {
+                    array_push($useXyArr, $val->c_addr_id);
+                }
+            }
+            //判斷是否為空陣列
+            if(!empty($useXyArr)) {
+                $useXyVar = '';
+                foreach ($useXyArr as $val) {
+                    if($useXyVar)  $useXyVar .= ',';
+                    $useXyVar .= $val;
+                }
+                $sqlTmp = sprintf('
+SELECT DISTINCT ADDR_CODES.c_addr_id FROM ADDR_CODES
+INNER JOIN ADDR_CODES AS ADDR_CODES_1
+ON ADDR_CODES_1.c_addr_id in ('. $useXyVar .')
+WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coord)<=(ADDR_CODES_1.x_coord+0.03)) AND ((ADDR_CODES.y_coord)>=(ADDR_CODES_1.y_coord-0.03) And (ADDR_CODES.y_coord)<=(ADDR_CODES_1.y_coord+0.03)))
+');
+                $useXyRes = DB::select($sqlTmp);
+                $useXyResArr = array();
+                foreach ($useXyRes as $val) {
+                    array_push($useXyResArr, $val->c_addr_id);
+                }
+                //從這邊對原本的row進行過濾
+                $row->whereIn('POSTED_TO_ADDR_DATA.c_addr_id', $useXyResArr);
+            }
         }
 
         $row = $row->get();
@@ -97,7 +114,12 @@ class ApiController2 extends Controller
             $data_val['Sex'] = $BiogMain->c_female ? '1-女' : '0-男';
             $data_val['IndexYear'] = $BiogMain->c_index_year;
             //這裡是查詢人物的[地址]BIOG_ADDR_DATA
-            $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->first();
+            //20200522修改人物的[地址]查詢依據
+            $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first(); 
+            if(!$BiogAddr) {
+                $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->first();
+            }
+            //20200522修改結束
             if($BiogAddr) { 
                 $c_addr_type = $BiogAddr->c_addr_type;
                 $c_addr_id = $BiogAddr->c_addr_id;

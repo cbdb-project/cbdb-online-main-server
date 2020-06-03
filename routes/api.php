@@ -159,3 +159,6 @@ Route::group(['prefix' => '/entry_list_by_name'], function (){
 Route::group(['prefix' => '/query_office_postings'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController2@query_office_postings');
 });
+Route::group(['prefix' => '/query_entry_postings'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController3@query_entry_postings');
+});

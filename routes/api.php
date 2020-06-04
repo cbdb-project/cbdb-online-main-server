@@ -141,7 +141,6 @@ Route::group(['prefix' => 'OFFICE_TYPE_TREE'], function (){
 Route::group(['prefix' => '/post_list'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@post_list');
 });
-
 Route::group(['prefix' => '/entry_list'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list');
 });
@@ -156,4 +155,10 @@ Route::group(['prefix' => '/office_list_by_name'], function (){
 });
 Route::group(['prefix' => '/entry_list_by_name'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list_by_name');
+});
+Route::group(['prefix' => '/query_office_postings'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController2@query_office_postings');
+});
+Route::group(['prefix' => '/query_entry_postings'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController3@query_entry_postings');
 });

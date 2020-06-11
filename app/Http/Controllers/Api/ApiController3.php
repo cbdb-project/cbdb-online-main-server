@@ -153,6 +153,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
 
             //這裡是查詢人物的[地址]BIOG_ADDR_DATA
             //20200522修改人物的[地址]查詢依據
+            $c_addr_type = $c_addr_id = 0;
             $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first(); 
             if(!$BiogAddr) {
                 $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->first();

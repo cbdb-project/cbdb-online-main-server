@@ -915,6 +915,7 @@ class BiogMainRepository
         $addr_id = null;
         if($row->c_addr_id || $row->c_addr_id === 0) {
             $text_ = AddressCode::find($row->c_addr_id);
+            if(!$text_) { $text_ = AddressCode::find(0); }
             $addr_id = $text_->c_addr_id." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $inst_code = null;

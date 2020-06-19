@@ -246,3 +246,7 @@ php artisan up
 
 先备份本地 .env 文件，以及 vendor、logs 文件夹，将前述三个文件/文件夹复制至从 github 下载的 CBDB 在线录入系统最新源代码解压后的根目录即可。
 
+### path for API codes
+
+https://github.com/cbdb-project/cbdb-online-main-server/tree/develop/app/Http/Controllers/Api
+

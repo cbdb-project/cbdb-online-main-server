@@ -104,8 +104,8 @@ class ApiController4 extends Controller
             $row = DB::table('KIN_DATA')->whereIn('KIN_DATA.c_personid', $people);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
             //五服查詢
-            $mCircleRow = DB::table('KIN_Mourning');
-            $mCircleRow->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kinrel', '=', 'KIN_Mourning.c_kinrel');
+            $mCircleRow = DB::table('KIN_MOURNING');
+            $mCircleRow->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kinrel', '=', 'KIN_MOURNING.c_kinrel');
             $mCircleRow = $mCircleRow->get();
             foreach ($mCircleRow as $val) {
                 array_push($mCircleArr, $val->c_kincode);

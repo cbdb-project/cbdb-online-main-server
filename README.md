@@ -251,6 +251,8 @@ php artisan up
 https://github.com/cbdb-project/cbdb-online-main-server/tree/develop/app/Http/Controllers/Api
 
 ### 如何將 CBDB 部署於 Windows 本地環境
+
 Contributed by [Chengxi YAN](https://github.com/yanchengxi)
+
 https://github.com/cbdb-project/cbdb-online-main-server/issues/59
 

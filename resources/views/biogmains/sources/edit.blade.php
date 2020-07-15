@@ -1,10 +1,15 @@
 @extends('layouts.dashboard')
 
 @section('content')
+@include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">出處 Source</div>
         <div class="panel-body">
             <div class="panel-body">
+@php
+$row->c_notes = unionPKDef($row->c_notes);
+$row->c_pages = unionPKDef($row->c_pages);
+@endphp
             <form action="{{ route('basicinformation.sources.update', [$id, $row->c_personid."-".$row->c_textid."-".$row->c_pages]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
@@ -25,12 +30,18 @@
                     </div>
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
                     <div class="col-sm-3">
+@php
+$row->c_pages = unionPKDef_decode_for_convert($row->c_pages);
+@endphp
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
+@php
+$row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
+@endphp
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
                     </div>

@@ -1,7 +1,7 @@
 @extends('layouts.dashboard')
 
 @section('content')
-
+@include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">最近修改記錄</div>
         <div class="panel-body">
@@ -24,6 +24,10 @@
                 </thead>
                 <tbody>
                     @foreach($lists as $item)
+@php
+$item->resource_id = unionPKDef($item->resource_id);
+$item->resource_data = unionPKDef($item->resource_data);
+@endphp
                         <tr>
                             <td>
                             <a href="/basicinformation/
@@ -78,6 +82,10 @@ else {
       echo $id;
   }
 }
+//20200714不能直接轉回去, 版型會消失, 需要使用專屬的轉換函式.
+$item->resource_id = unionPKDef_decode_for_convert($item->resource_id);
+$item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
+@endphp
 @endphp
 /edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
                             </td>

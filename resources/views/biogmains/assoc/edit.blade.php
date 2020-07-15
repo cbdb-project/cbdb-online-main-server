@@ -1,12 +1,14 @@
 @extends('layouts.dashboard')
 
 @section('content')
+@include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">社會關係</div>
         <div class="panel-body">
             <div class="panel-body">
 @php
-$row->c_text_title = str_replace("/","(slash)",$row->c_text_title);
+$row->c_text_title = unionPKDef($row->c_text_title);
+$row->c_notes = unionPKDef($row->c_notes);
 @endphp
             <form action="{{ route('basicinformation.assoc.update', [$id, $row->c_personid."-".$row->c_assoc_code."-".$row->c_assoc_id."-".$row->c_kin_code."-".$row->c_kin_id."-".$row->c_assoc_kin_code."-".$row->c_assoc_kin_id."-".$row->c_text_title]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
@@ -122,6 +124,9 @@ $row->c_text_title = str_replace("/","(slash)",$row->c_text_title);
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
+@php
+$row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
+@endphp
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
                     </div>
@@ -142,7 +147,7 @@ $row->c_text_title = str_replace("/","(slash)",$row->c_text_title);
                     <label for="c_text_title" class="col-sm-2 control-label">作品標題</label>
                     <div class="col-sm-10">
 @php
-$row->c_text_title = str_replace("(slash)","/",$row->c_text_title);
+$row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
 @endphp
                         <input type="text" class="form-control" name="c_text_title" value="{{ $row->c_text_title }}">
                     </div>

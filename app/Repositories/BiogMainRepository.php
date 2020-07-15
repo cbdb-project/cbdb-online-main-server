@@ -843,9 +843,8 @@ class BiogMainRepository
     public function assocById($id)
     {
         $id = str_replace("--","-minus",$id);
-        //20191029對於c_text_title欄位內含斜線所做的字串重組
-        $id = str_replace("(slash)","/",$id);
-        //end
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $id = $this->unionPKDef_decode($id);
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
@@ -931,9 +930,8 @@ class BiogMainRepository
     public function assocUpdateById(Request $request, $id, $c_personid)
     {
         $id = str_replace("--","-minus",$id);
-        //20191029對於c_text_title欄位內含斜線所做的字串重組
-        $id = str_replace("(slash)","/",$id);
-        //end
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $id = $this->unionPKDef_decode($id); 
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
@@ -1024,9 +1022,8 @@ class BiogMainRepository
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
         $id = str_replace("--","-minus",$id);
-        //20191029對於c_text_title欄位內含斜線所做的字串重組
-        $id = str_replace("(slash)","/",$id);
-        //end
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $id = $this->unionPKDef_decode($id); 
         $temp_l = explode("-", $id);
         foreach($temp_l as $key => $value) {
             $temp_l[$key] = str_replace("minus","-",$value);
@@ -1078,6 +1075,9 @@ class BiogMainRepository
 
     public function sourceById($id, $_id)
     {
+        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
+        $_id = str_replace("--","-minus",$_id);
+        $_id = $this->unionPKDef_decode($_id);
         $temp_l = explode("-", $_id);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
@@ -1105,6 +1105,9 @@ class BiogMainRepository
 
     public function sourceUpdateById(Request $request, $id, $id_)
     {
+        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
+        $id_ = str_replace("--","-minus",$id_);
+        $id_ = $this->unionPKDef_decode($id_);
         $temp_l = explode("-", $id_);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
@@ -1149,6 +1152,9 @@ class BiogMainRepository
 
     public function sourceDeleteById($id, $id_)
     {
+        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
+        $id_ = str_replace("--","-minus",$id_);
+        $id_ = $this->unionPKDef_decode($id_);
         $temp_l = explode("-", $id_);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
@@ -1231,6 +1237,26 @@ class BiogMainRepository
             if ($value == -999) $array[$key] = 0;
         }
         return $array;
+    }
+
+    //20200709聯合主鍵保留字弱點防禦函式
+    public function unionPKDef($key)
+    {
+        $key = str_replace("/","(slash)",$key);
+        $key = str_replace("{","(brackets)",$key);
+        $key = str_replace("}","(brackets_r)",$key);
+        $result = $key;
+        return $result;
+    }
+
+    //20200709欄位值解析保留字
+    function unionPKDef_decode($key)
+    {
+        $key = str_replace("(slash)","/",$key);
+        $key = str_replace("(brackets)","{",$key);
+        $key = str_replace("(brackets_r)","}",$key);
+        $result = $key;
+        return $result;
     }
 
 }

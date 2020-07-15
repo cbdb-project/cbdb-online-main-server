@@ -2,6 +2,7 @@
 
 @section('content')
     @include('biogmains.banner')
+    @include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">社會關係清單</div>
 
@@ -35,7 +36,7 @@
                         <td>
                             <div class="btn-group">
                             @php
-                            $value->pivot->c_text_title = str_replace("/","(slash)",$value->pivot->c_text_title);
+                            $value->pivot->c_text_title = unionPKDef($value->pivot->c_text_title);
                             @endphp
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title]) }}">edit</a>
                                 <a href=""

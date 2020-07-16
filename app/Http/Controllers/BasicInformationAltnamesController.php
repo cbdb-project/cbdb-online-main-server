@@ -86,6 +86,8 @@ class BasicInformationAltnamesController extends Controller
         DB::table('ALTNAME_DATA')->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
+        //20200709引用聯合主鍵保留字弱點防禦函式
+        $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
         return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code']]);
     }
 
@@ -109,6 +111,8 @@ class BasicInformationAltnamesController extends Controller
     public function edit($id, $alt)
     {
         $alt = str_replace("--","-minus",$alt);
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
         $addr_l = explode("-", $alt);
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
@@ -153,6 +157,8 @@ class BasicInformationAltnamesController extends Controller
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         $alt = str_replace("--","-minus",$alt);
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
         $addr_l = explode("-", $alt);
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
@@ -165,6 +171,8 @@ class BasicInformationAltnamesController extends Controller
         $new_alt = $id.'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data);
         flash('Update success @ '.Carbon::now(), 'success');
+        //20200709引用聯合主鍵保留字弱點防禦函式
+        $new_alt = $this->biogMainRepository->unionPKDef($new_alt);
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$new_alt]);
     }
 
@@ -185,6 +193,8 @@ class BasicInformationAltnamesController extends Controller
             return redirect()->back();
         }
         $alt = str_replace("--","-minus",$alt);
+        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
+        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
         $addr_l = explode("-", $alt);
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);

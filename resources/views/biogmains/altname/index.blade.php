@@ -2,6 +2,7 @@
 
 @section('content')
     @include('biogmains.banner')
+    @include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">别名</div>
 
@@ -19,10 +20,16 @@
                 </thead>
                 <tbody>
                 @foreach($basicinformation->altnames as $key=>$value)
+@php
+$value->pivot->c_alt_name = unionPKDef($value->pivot->c_alt_name);
+$value->pivot->c_alt_name_chn = unionPKDef($value->pivot->c_alt_name_chn);
+$c_alt_name_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name);
+$c_alt_name_chn_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name_chn);
+@endphp
                     <tr>
                         <td>{{ $key+1 }}</td>
-                        <td>{{ $value->pivot->c_alt_name }}</td>
-                        <td>{{ $value->pivot->c_alt_name_chn }}</td>
+                        <td>{{ $c_alt_name_view }}</td>
+                        <td>{{ $c_alt_name_chn_view }}</td>
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}">edit</a>

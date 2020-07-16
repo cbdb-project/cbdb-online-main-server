@@ -84,9 +84,8 @@ class BasicInformationAssocController extends Controller
         $data = $this->biogMainRepository->assocStoreById($request, $id);
         $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Store success @ '.Carbon::now(), 'success');
-        //20191029對於c_text_title欄位內含斜線所做的字串重組
-        $_id = str_replace("/","(slash)",$_id);
-        //end
+        //20200709引用聯合主鍵保留字弱點防禦函式
+        $_id = $this->biogMainRepository->unionPKDef($_id);
         return redirect()->route('basicinformation.assoc.edit', ['id' => $id, '_id' => $_id]);
     }
 
@@ -137,9 +136,8 @@ class BasicInformationAssocController extends Controller
         $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
         $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Update success @ '.Carbon::now(), 'success');
-        //20191029對於c_text_title欄位內含斜線所做的字串重組
-        $id_ = str_replace("/","(slash)",$id_);
-        //end
+        //20200709引用聯合主鍵保留字弱點防禦函式
+        $id_ = $this->biogMainRepository->unionPKDef($id_);
         return redirect()->route('basicinformation.assoc.edit', ['id'=>$id, 'id_'=>$id_]);
     }
 

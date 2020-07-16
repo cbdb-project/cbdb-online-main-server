@@ -1,10 +1,17 @@
 @extends('layouts.dashboard')
 
 @section('content')
+@include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">別名 Alt. Names </div>
         <div class="panel-body">
             <div class="panel-body">
+@php
+$alt = unionPKDef($alt);
+$row->c_alt_name_chn = unionPKDef($row->c_alt_name_chn);
+$row->c_alt_name = unionPKDef($row->c_alt_name);
+$row->c_notes = unionPKDef($row->c_notes);
+@endphp
             <form action="{{ route('basicinformation.altnames.update', ['id'=>$id, 'alt'=>$alt]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
@@ -17,12 +24,18 @@
                 <div class="form-group">
                     <label for="c_alt_name_chn" class="col-sm-2 control-label">別名漢字(c_alt_name_chn)</label>
                     <div class="col-sm-10">
+@php
+$row->c_alt_name_chn = unionPKDef_decode_for_convert($row->c_alt_name_chn);
+@endphp
                         <input name="c_alt_name_chn" type="text" class="form-control" value="{{ $row->c_alt_name_chn }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_alt_name" class="col-sm-2 control-label">別名拼音(c_alt_name)</label>
                     <div class="col-sm-10">
+@php
+$row->c_alt_name = unionPKDef_decode_for_convert($row->c_alt_name);
+@endphp
                         <input name="c_alt_name" type="text" class="form-control" value="{{ $row->c_alt_name }}">
                     </div>
                 </div>
@@ -49,6 +62,9 @@
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
                     <div class="col-sm-10">
+@php
+$row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
+@endphp
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
 

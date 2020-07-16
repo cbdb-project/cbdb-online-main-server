@@ -4,6 +4,10 @@
 
 更新至[Laravel 5.5](https://laravel.com/docs/5.5)框架
 
+### CBDB inputting system URL
+
+http://162.105.134.121/basicinformation
+
 ### Database migrations
 
 数据库配置文件在.env中

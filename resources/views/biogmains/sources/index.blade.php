@@ -2,6 +2,7 @@
 
 @section('content')
     @include('biogmains.banner')
+    @include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-heading">出處</div>
 
@@ -19,10 +20,14 @@
                 </thead>
                 <tbody>
                 @foreach($basicinformation->sources as $key=>$value)
+@php
+$value->pivot->c_pages = unionPKDef($value->pivot->c_pages);
+$c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
+@endphp
                     <tr>
                         <td>{{ $key+1 }}</td>
                         <td>{{ $value->c_title_chn }}</td>
-                        <td>{{ $value->pivot->c_pages }}</td>
+                        <td>{{ $c_pages_view }}</td>
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}">edit</a>

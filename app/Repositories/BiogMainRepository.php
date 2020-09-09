@@ -1243,6 +1243,8 @@ class BiogMainRepository
     public function unionPKDef($key)
     {
         $key = str_replace("/","(slash)",$key);
+        //因為反斜線在php有用途, 兩個反斜線代表一個反斜線.
+        $key = str_replace("\\","(backslash)",$key);
         $key = str_replace("{","(brackets)",$key);
         $key = str_replace("}","(brackets_r)",$key);
         $result = $key;
@@ -1253,6 +1255,7 @@ class BiogMainRepository
     function unionPKDef_decode($key)
     {
         $key = str_replace("(slash)","/",$key);
+        $key = str_replace("(backslash)","\\",$key);
         $key = str_replace("(brackets)","{",$key);
         $key = str_replace("(brackets_r)","}",$key);
         $result = $key;

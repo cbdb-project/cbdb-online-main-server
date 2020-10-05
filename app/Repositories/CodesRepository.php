@@ -19,7 +19,7 @@ class CodesRepository
         $tables = DB::select('SHOW TABLES');
         foreach($tables as $table)
         {
-            if(str_contains($table->Tables_in_cbdb_data,'_CODES')) {
+            if(str_contains($table->Tables_in_cbdb_data,'_CODES') or str_contains($table->Tables_in_cbdb_data,'_codes')) {
                 array_push($res, $table->Tables_in_cbdb_data);
             }
 

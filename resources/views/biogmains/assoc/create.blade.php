@@ -131,7 +131,7 @@
                 <div class="form-group">
                     <label for="c_assoc_count" class="col-sm-2 control-label">關係次數(c_assoc_count)</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" name="c_assoc_count">
+                        <input type="text" class="form-control" name="c_assoc_count" value="1">
                         此欄位僅適用於書信 : 當無法以標題及日期區分多次信件時 , 則僅建「一筆」社會關係 , 並將信件總數填於此欄 . 請填阿拉伯數字
                     </div>
                 </div>
@@ -147,7 +147,7 @@
                     <label for="" class="col-sm-2 control-label">社會關係發生地</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_addr_id">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 [Unknown] [未詳]  ~ </option>
                         </select>
                     </div>
                 </div>

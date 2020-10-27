@@ -555,17 +555,21 @@ class BiogMainRepository
         $kin_str = null;
         if($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
-            $kin_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            //20201026修改，提供給前端c_kincode可以更新親屬關係。
+            //$kin_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $kin_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         $biog_str = null;
         $kinpair_str = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
-            //$k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
-            $k_p_code = $row->c_kin_code;
+            $k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            //$k_p_code = $row->c_kin_code;
             $text_ = KinshipCode::find($k_p_code);
-            $kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            //20201026修改，提供給前端c_kincode可以更新親屬關係。
+            //$kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $kinpair_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
 
 //        dd($biog_str);
@@ -586,9 +590,9 @@ class BiogMainRepository
             ['c_kin_code', '=', $temp_l[2]],
         ])->first();
         $data = $request->all();
-
         $kin_pair = $data['c_kinship_pair'];
         $kin_id = $data['c_kin_id'];
+        $c_created_date = $row->c_created_date;
         //$old_kin_id = DB::table('KIN_DATA')->where('tts_sysno',$id_)->first()->c_kin_id;
         $old_kin_id = $row->c_kin_id;
         $data = array_except($data, ['_token', '_method', 'c_kinship_pair']);
@@ -611,7 +615,7 @@ class BiogMainRepository
         $data = array_except($data, ['c_kin_id']);
 //        dump($data);
 //        dd(DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id]])->first());
-        DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id]])->update($data);
+        DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_created_date', $c_created_date]])->update($data);
         return $ori_data;
     }
 
@@ -658,17 +662,31 @@ class BiogMainRepository
             ['c_kin_id',$row->c_personid], 
             ['c_personid', $row->c_kin_id],
             ['c_source', $row->c_source],
+            ['c_created_date', $row->c_created_date],
         ])->first();
         DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_kin_id', '=', $temp_l[1]],
             ['c_kin_code', '=', $temp_l[2]],
         ])->delete();
-        DB::table('KIN_DATA')->where([
-            ['c_kin_id',$row2->c_kin_id], 
-            ['c_personid', $row2->c_personid], 
-            ['c_kin_code', $row2->c_kin_code],
-        ])->delete();
+        //先檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
+        if(is_null($row2->c_modified_date)) {
+            DB::table('KIN_DATA')->where([
+                ['c_kin_id',$row2->c_kin_id], 
+                ['c_personid', $row2->c_personid], 
+                ['c_source', $row2->c_source],
+                ['c_created_date', $row2->c_created_date],
+            ])->delete();
+        }
+        else {
+            DB::table('KIN_DATA')->where([
+                ['c_kin_id',$row2->c_kin_id], 
+                ['c_personid', $row2->c_personid], 
+                ['c_source', $row2->c_source],
+                ['c_created_date', $row2->c_created_date],
+                ['c_modified_date', $row2->c_modified_date],
+            ])->delete();
+        }
     }
 
     public function possessionById($id)

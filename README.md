@@ -6,7 +6,7 @@
 
 ### CBDB inputting system URL
 
-http://162.105.134.121/basicinformation
+http://47.114.119.106:8000/basicinformation
 
 ### Database migrations
 

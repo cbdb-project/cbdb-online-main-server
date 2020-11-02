@@ -56,10 +56,10 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">成对亲属关系</label>
+                    <label for="" class="col-sm-2 control-label">成對親屬關係</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kinship_pair" name="c_kinship_pair">
-                            <option value="0">无对应亲属关系</option>
+                            <option value="0">無對應親屬關係</option>
                         </select>
                     </div>
                 </div>
@@ -155,7 +155,8 @@
 
                     item = data[i];
                     // console.log(item);
-                    $(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
                 }
             });
 

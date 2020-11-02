@@ -108,7 +108,8 @@
         $(".c_source").select2(options('text'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_kin_id").select2(options('biog'));
-        // kinship_pair();
+        //kinship_pair();
+        kinship_pair_first_load();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -183,6 +184,22 @@
                     // console.log(item);
                     //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
                     $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
+                }
+            });
+
+        }
+
+        function kinship_pair_first_load(){
+            let c_kin_code = $('.c_kin_code').val();
+            let c_kin_id = $('.c_kin_id').val();
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                for (let i=data.length-1; i>-1; i--){
+                    item = data[i];
+                    $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, false));
                 }
             });
 

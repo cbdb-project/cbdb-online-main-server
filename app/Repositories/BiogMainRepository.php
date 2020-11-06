@@ -186,7 +186,7 @@ class BiogMainRepository
      */
     public function textById($id_){
         $temp_l = explode("-", $id_);
-        $row = DB::table('TEXT_DATA')->where([
+        $row = DB::table('BIOG_TEXT_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
             ['c_role_id', '=', $temp_l[2]],
@@ -197,17 +197,24 @@ class BiogMainRepository
             //進行查詢資訊的擴充
             $c_bibl_cat_code = $text_->c_bibl_cat_code;
             $x1 = DB::table('TEXT_BIBLCAT_CODE_TYPE_REL')->select('c_text_cat_type_id')->where('c_text_cat_code', $c_bibl_cat_code)->get();
+            $ans1 = array();
             foreach($x1 as $object) {
                 $ans1[0] = $object->c_text_cat_type_id;
             }
-            for($j=0; $j<=3; $j++) {
-                $x[$j] = $this->searchTextSub($ans1[$j]);
-                foreach($x[$j] as $object) {
-                    $ans1[$j+1] = $object->c_text_cat_type_parent_id;
-                    $ans2[$j+1] = $object->c_text_cat_type_desc_chn;
+            //20201106這裡增加判斷式，因為TEXT_BIBLCAT_CODE_TYPE_REL的c_text_cat_code沒有完整對應TEXT_CODES資料表的c_bibl_cat_code。
+            if(!empty($ans1[0])) {
+                for($j=0; $j<=3; $j++) {
+                    $x[$j] = $this->searchTextSub($ans1[$j]);
+                    foreach($x[$j] as $object) {
+                        $ans1[$j+1] = $object->c_text_cat_type_parent_id;
+                        $ans2[$j+1] = $object->c_text_cat_type_desc_chn;
+                    }
                 }
+                $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
             }
-            $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
+            else {
+                $word = '';
+            }
             $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn." ".$word;
             //$text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 

@@ -168,6 +168,8 @@ Route::resource('textcodes', 'TextCodesController', ['name' => [
     'update' => 'textcode.update'
 ]]);
 
+Route::get('textcodes/{id}/delete', 'TextCodesController@destroy');
+
 Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
     'show' => 'addrbelongsdata.show',
     'create' => 'addrbelongsdata.create',

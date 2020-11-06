@@ -9,6 +9,8 @@ use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\TextCode;
 
 class TextCodesController extends Controller
@@ -128,6 +130,19 @@ class TextCodesController extends Controller
      */
     public function destroy($id)
     {
-        //
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        elseif (Auth::user()->is_active != 1){
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+        $table_name = "TEXT_CODES";
+        $row = DB::table($table_name)->where('c_textid', $id)->first();
+        $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row);
+        DB::table($table_name)->where('c_textid', $id)->delete();
+        flash('Delete success @ '.Carbon::now(), 'success');
+        return view('textcodes.index', ['page_title' => 'Text Codes', 'page_description' => '著作編碼表', 'codes' => session('codes')]);
     }
 }

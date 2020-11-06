@@ -97,12 +97,12 @@ class BiogMainPower extends Model
 
     public function texts()
     {
-        return $this->belongsToMany('App\TextCode', 'TEXT_DATA', 'c_personid', 'c_textid')->withPivot('tts_sysno');
+        return $this->belongsToMany('App\TextCode', 'BIOG_TEXT_DATA', 'c_personid', 'c_textid')->withPivot('tts_sysno');
     }
 
     public function texts_role()
     {
-        return $this->belongsToMany('App\TextRoleCode', 'TEXT_DATA', 'c_personid', 'c_role_id');
+        return $this->belongsToMany('App\TextRoleCode', 'BIOG_TEXT_DATA', 'c_personid', 'c_role_id');
     }
 
     public function offices()

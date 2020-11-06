@@ -50,6 +50,9 @@ else {
     case "TEXT_DATA":
       echo $id."/texts/".$res_id;
       break;
+    case "BIOG_TEXT_DATA":
+      echo $id."/texts/".$res_id;
+      break;
     case "POSTED_TO_OFFICE_DATA":
       echo $id."/offices/".$res_id;
       break;

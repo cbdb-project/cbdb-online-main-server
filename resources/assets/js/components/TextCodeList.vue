@@ -29,6 +29,7 @@
                 <td>
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/textcodes/'+item.c_textid+'/edit'">edit</a>
+                        <a type="button" class="btn btn-sm btn-danger" :href="'/textcodes/'+item.c_textid+'/delete'">Delete</a>
 
                     </div>
                 </td>

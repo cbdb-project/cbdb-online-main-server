@@ -43769,6 +43769,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
@@ -43921,6 +43922,18 @@ var render = function() {
                     }
                   },
                   [_vm._v("edit")]
+                ),
+                _vm._v(" "),
+                _c(
+                  "a",
+                  {
+                    staticClass: "btn btn-sm btn-danger",
+                    attrs: {
+                      type: "button",
+                      href: "/textcodes/" + item.c_textid + "/delete"
+                    }
+                  },
+                  [_vm._v("Delete")]
                 )
               ])
             ])

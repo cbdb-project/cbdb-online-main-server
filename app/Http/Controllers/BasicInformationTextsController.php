@@ -28,7 +28,7 @@ class BasicInformationTextsController extends Controller
     public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
     {
         $this->biogMainRepository = $biogMainRepository;
-        $this->table_name = 'TEXT_DATA';
+        $this->table_name = 'BIOG_TEXT_DATA';
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }

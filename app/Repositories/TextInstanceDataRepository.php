@@ -2,39 +2,39 @@
 /**
  * Created by PhpStorm.
  * User: Ja
- * Date: 2018/10/29
- * Time: 15:30
+ * Date: 2020/11/11
+ * Time: 11:00
  */
 
 namespace App\Repositories;
 
 
-use App\TextTypeCode;
+use App\TextInstanceData;
 use Illuminate\Http\Request;
 
-class TextCodeRepository{
+class TextInstanceDataRepository{
     public function textByQuery(Request $request, $num=20)
     {
         if ($temp = $request->num){
             $num = $temp;
         }
         if (!$request->q){
-            return TextTypeCode::paginate($num);
+            return TextInstanceData::paginate($num);
         }
-        $names = TextTypeCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate($num);
+        $names = TextInstanceData::where('c_instance_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_instance_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
     }
 
     public function byId($id)
     {
-        return TextTypeCode::find($id);
+        return TextInstanceData::find($id);
     }
 
     public function updateById($request, $id)
     {
         $data = $request->all();
-        $altcode = TextTypeCode::find($id);
+        $altcode = TextInstanceData::find($id);
         $altcode->update($data);
     }
 }

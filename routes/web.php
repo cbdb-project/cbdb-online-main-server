@@ -170,6 +170,15 @@ Route::resource('textcodes', 'TextCodesController', ['name' => [
 
 Route::get('textcodes/{id}/delete', 'TextCodesController@destroy');
 
+Route::resource('textinstancedata', 'TextInstanceDataController', ['name' => [
+    'show' => 'textinstancedata.show',
+    'create' => 'textinstancedata.create',
+    'edit' => 'textinstancedata.edit',
+    'update' => 'textinstancedata.update'
+]]);
+
+Route::get('textinstancedata/{id}/delete', 'TextInstanceDataController@destroy');
+
 Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
     'show' => 'addrbelongsdata.show',
     'create' => 'addrbelongsdata.create',

@@ -51,6 +51,7 @@
             <li class="{{ $page_title == 'Altname Codes' ? 'active' : '' }}"><a href="{{ route('altnamecodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>別名編碼表</span></a></li>
             <li class="{{ $page_title == 'Appointment Type Codes' ? 'active' : '' }}"><a href="{{ route('appointcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>任命類型編碼表</span></a></li>
             <li class="{{ $page_title == 'Text Codes' ? 'active' : '' }}"><a href="{{ route('textcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作編碼表</span></a></li>
+            <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
             <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
             <li class="{{ $page_title == 'Addr Codes' ? 'active' : '' }}"><a href="{{ route('addrcodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址編碼表(ADDR_CODES)</span></a></li>
             <li class="{{ $page_title == 'Office Codes' ? 'active' : '' }}"><a href="{{ route('officecodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>任官編碼表</span></a></li>

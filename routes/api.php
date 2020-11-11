@@ -44,6 +44,11 @@ Route::group([], function () {
         $textcoderepository = new \App\Repositories\TextCodeRepository();
         return $textcoderepository->textByQuery($request);
     });
+    //20201111建安新增
+    Route::post('textinstancedata', function (Request $request) {
+        $textinstancedatarepository = new \App\Repositories\TextInstanceDataRepository();
+        return $textinstancedatarepository->textByQuery($request);
+    });
     Route::post('addrbelongsdata', function (Request $request) {
         $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
         return $addrbelongsdatarepository->AddrByQuery($request);

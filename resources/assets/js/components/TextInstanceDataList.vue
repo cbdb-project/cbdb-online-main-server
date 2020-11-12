@@ -1,7 +1,7 @@
 <template>
     <div class="">
         <div class="form-group">
-            <div class="text-center">查詢著作類型</div>
+            <div class="text-center">查詢著作版本</div>
             <div class="input-group">
                 <input v-model="q" type="text" class="form-control search-key" placeholder="Search">
                 <div class="input-group-btn">

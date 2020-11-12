@@ -21,6 +21,7 @@ Vue.component('address-code-list', require('./components/AddrCodeList.vue'));
 Vue.component('altname-code-list', require('./components/AltnameCodeList.vue'));
 Vue.component('appoint-code-list', require('./components/AppointCodeList.vue'));
 Vue.component('text-code-list', require('./components/TextCodeList.vue'));
+Vue.component('text-instance-data-list', require('./components/TextInstanceDataList.vue'));
 Vue.component('addr-belongs-data-list', require('./components/AddrBelongsDataList.vue'));
 Vue.component('addr-code-list', require('./components/Addr2CodeList.vue'));
 Vue.component('office-code-list', require('./components/OfficeCodeList.vue'));

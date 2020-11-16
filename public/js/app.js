@@ -44243,7 +44243,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查詢著作類型")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢著作版本")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {

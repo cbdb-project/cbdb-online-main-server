@@ -1,7 +1,7 @@
 <template>
     <div class="">
         <div class="form-group">
-            <div class="text-center">查询人物</div>
+            <div class="text-center">查詢人物</div>
             <div class="input-group">
                 <input v-model="q" type="text" class="form-control search-key" placeholder="Search">
                 <div class="input-group-btn">
@@ -12,7 +12,7 @@
             </div>
         </div>
         <table class="table table-hover table-condensed">
-            <caption>共查询到{{names.total}}条记录</caption>
+            <caption>共查詢到{{names.total}}條記錄</caption>
             <thead>
             <tr>
                 <th>c_personid</th>
@@ -45,7 +45,7 @@
     export default {
         props:['user'],
         created() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，請稍候';
             this.searchByName();
             this.notes = '';
         },
@@ -104,7 +104,7 @@
                 this.searchByName(val);
             },
             "q": function () {
-                this.notes = '正在查询，请稍后';
+                this.notes = '正在查詢，請稍候';
                 this.searchByNameLazy();
                 this.notes = '';
             }

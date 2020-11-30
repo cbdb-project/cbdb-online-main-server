@@ -143,6 +143,9 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
             $KinshipCode = KinshipCode::where('c_kincode', '=', $val->c_kin_code)->first();
             $data_val['KinType'] = $KinshipCode->c_kinrel_chn;
             $BiogMainKin = BiogMain::where('c_personid', '=', $val->c_kin_id)->first();
+            if(!$BiogMainKin) {
+                $BiogMainKin = BiogMain::where('c_personid', '=', 0)->first();
+            }
             $data_val['KinName'] = $BiogMainKin->c_name;
             $data_val['KinChn'] = $BiogMainKin->c_name_chn;
             $AssocCode = AssocCode::where('c_assoc_code', '=', $val->c_assoc_code)->first();

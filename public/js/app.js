@@ -42292,7 +42292,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: ['user'],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，請稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -42363,7 +42363,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -42380,7 +42380,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询人物")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢人物")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -42414,7 +42414,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -42674,7 +42674,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -42744,7 +42744,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -42761,7 +42761,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询地址")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢地址")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -42795,7 +42795,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -43040,7 +43040,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -43111,7 +43111,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -43128,7 +43128,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询别名")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢別名")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -43162,7 +43162,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -43407,7 +43407,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -43478,7 +43478,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -43495,7 +43495,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询任命类型")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢任命類型")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -43529,7 +43529,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -43775,7 +43775,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -43846,7 +43846,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -43863,7 +43863,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询著作类型")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢著作類型")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -43897,7 +43897,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -44155,7 +44155,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -44226,7 +44226,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -44277,7 +44277,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -44535,7 +44535,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -44606,7 +44606,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -44623,7 +44623,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询地址从属")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢地址從屬")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -44657,7 +44657,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -44914,7 +44914,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -44985,7 +44985,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -45003,7 +45003,7 @@ var render = function() {
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
       _c("div", { staticClass: "text-center" }, [
-        _vm._v("查询中国行政地理单位")
+        _vm._v("查詢中國行政地理單位")
       ]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
@@ -45038,7 +45038,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -45283,7 +45283,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -45354,7 +45354,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -45371,7 +45371,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询任官")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢任官")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -45405,7 +45405,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -45650,7 +45650,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -45721,7 +45721,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }
@@ -45738,7 +45738,7 @@ var render = function() {
   var _c = _vm._self._c || _h
   return _c("div", {}, [
     _c("div", { staticClass: "form-group" }, [
-      _c("div", { staticClass: "text-center" }, [_vm._v("查询社会机构")]),
+      _c("div", { staticClass: "text-center" }, [_vm._v("查詢社會機構")]),
       _vm._v(" "),
       _c("div", { staticClass: "input-group" }, [
         _c("input", {
@@ -45772,7 +45772,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查询到" + _vm._s(_vm.names.total) + "条记录")]),
+      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),
@@ -46043,7 +46043,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
     created: function created() {
-        this.notes = '正在查询，请稍后';
+        this.notes = '正在查詢，请稍候';
         this.searchByName();
         this.notes = '';
     },
@@ -46114,7 +46114,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
             this.searchByName(val);
         },
         "q": function q() {
-            this.notes = '正在查询，请稍后';
+            this.notes = '正在查詢，请稍候';
             this.searchByNameLazy();
             this.notes = '';
         }

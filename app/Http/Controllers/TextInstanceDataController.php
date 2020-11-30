@@ -43,7 +43,9 @@ class TextInstanceDataController extends Controller
      */
     public function create()
     {
-        $temp_id = TextInstanceData::max('c_textid') + 1;
+        //20201116依據TEXT_CODE與TEXT_INSTANCE_DATA的邏輯，在[著作版本表]中新建記錄時，c_textid欄位直接留空。
+        //$temp_id = TextInstanceData::max('c_textid') + 1;
+        $temp_id = '';
         return view('textinstancedata.create', ['page_title' => 'Text Instance Data', 'page_description' => '著作版本表', 'temp_id' => $temp_id]);
     
     }

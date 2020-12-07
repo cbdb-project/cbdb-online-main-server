@@ -45,6 +45,26 @@ class BiogMainRepository
     public function byPersonId($id)
     {
         $basicinformation = BiogMain::withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
+
+        //20201207新增index year推算欄位
+        $c_index_year_type_code = $basicinformation->c_index_year_type_code;
+        if(!empty($c_index_year_type_code)) {
+            $simplify_type_code =  substr($c_index_year_type_code, 0, 2);
+            $row = DB::table('INDEXYEAR_TYPE_CODES')->where([['c_index_year_type_code' , '=', $simplify_type_code]])->first();
+            $ans_type_code = $c_index_year_type_code." ".$row->c_index_year_type_hz;
+            $basicinformation->c_index_year_type_code = $ans_type_code;
+        }
+        else { }
+
+        $c_index_year_source_id = $basicinformation->c_index_year_source_id;
+        if(!empty($c_index_year_source_id)) {
+            $name = $this->byPersonId($c_index_year_source_id);
+            $ans_source_id = $c_index_year_source_id." ".$name->c_name_chn;
+            $basicinformation->c_index_year_source_id = $ans_source_id;
+        }
+        else { }
+        //新增結束
+        
         return $basicinformation;
     }
 

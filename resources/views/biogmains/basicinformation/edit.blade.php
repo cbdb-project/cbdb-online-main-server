@@ -244,12 +244,26 @@
                     <label for="c_index_year" class="col-sm-2 control-label">指數年(index year)</label>
                     <div class="col-sm-10">
                         <input type="number" name="c_index_year" class="form-control"
-                               value="{{ $basicinformation->c_index_year }}">
+                               value="{{ $basicinformation->c_index_year }}" disabled>
                         @if ($errors->has('c_index_year'))
                             <span class="help-block">
                             <strong>{{ $errors->first('c_index_year') }}</strong>
                         </span>
                         @endif
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_index_year_type_code"
+                           class="col-sm-2 control-label">指數年推算方法(c_index_year_type_code)</label>
+                    <div class="col-sm-4">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $basicinformation->c_index_year_type_code }}" disabled>
+                    </div>
+                    <label for="c_index_year_source_id"
+                           class="col-sm-2 control-label">指數年推算來源(c_index_year_source_id)</label>
+                    <div class="col-sm-4">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $basicinformation->c_index_year_source_id }}" disabled>
                     </div>
                 </div>
                 <div class="form-group{{ $errors->has('c_death_age') ? ' has-error' : '' }}">

@@ -170,6 +170,12 @@ Route::group(['prefix' => '/query_entry_postings'], function (){
 Route::group(['prefix' => '/query_relatives'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController4@query_relatives');
 });
+Route::group(['prefix' => '/query_relatives_1'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController4_1@query_relatives');
+});
+Route::group(['prefix' => '/query_relatives_2'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController4_2@query_relatives');
+});
 Route::group(['prefix' => '/get_assoc'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController5@get_assoc');
 });

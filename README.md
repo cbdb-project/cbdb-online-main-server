@@ -264,3 +264,7 @@ Contributed by [Chengxi YAN](https://github.com/yanchengxi)
 
 https://github.com/cbdb-project/cbdb-online-main-server/issues/59
 
+### How to setup TLS/SSL protocol for CBDB online inputting system
+
+https://github.com/cbdb-project/cbdb-online-main-server/issues/116
+

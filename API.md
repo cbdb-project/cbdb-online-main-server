@@ -1,3 +1,9 @@
+# 使用方法
+將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu:81
+
+形如: [https://input.cbdb.fas.harvard.edu:81/api/post_list?id=06&start=0&list=100](https://input.cbdb.fas.harvard.edu:81/api/post_list?id=06&start=0&list=100)
+
+# 文檔
 # 一、根據官職類別代碼獲取其下屬官職列表
 ## 輸入參數:
 | 參數名| 參數類型 | 說明 |

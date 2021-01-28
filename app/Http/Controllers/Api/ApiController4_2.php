@@ -1,7 +1,7 @@
 <?php
 /**
  * User: ja
- * Date: 2020/12/15
+ * Date: 2021/01/22
  * Time: 15:10
  */
 
@@ -35,9 +35,104 @@ class ApiController4_2 extends Controller
         $this->middleware('guest');
     }
 
+    protected function eight_Kinship($cks) {
+      $cks = str_replace('-', '', $cks);
+      $cks = substr($cks, -2); 
+      $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
+      switch ($cks) {
+        case 'BB':
+        case 'ZB':
+          //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1); 
+          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0); 
+          break;
+        case 'BZ':
+        case 'ZZ':
+          //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1);
+          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
+          break;
+        case 'SB':
+        case 'DB':
+          //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
+          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
+          break;
+        case 'SZ':
+        case 'DZ':
+          //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
+          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
+          break;
+
+        default:
+          return 0;
+      }
+      return $s;
+    }
+
+    protected function sub_relativesLoop($newdata, $rowArr, $run) {
+        //對$newdata執行迴圈
+        $cks = '';
+        $sub_newdata = array();
+        $s = $checkArr = array();
+        $run = $run + 1;
+        foreach ($rowArr as $checkVal) {
+            array_push($checkArr, $checkVal['c_personid']);
+        }
+        foreach ($newdata as $val2) {
+            $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $val2['c_kin_id']);
+            //下列三行是避免循環
+            $row->where('KIN_DATA.c_kin_id', '!=', $val2['firstId']);
+            $row->where('KIN_DATA.c_kin_id', '!=', $val2['c_personid']);
+            $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
+            $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+            $row->where('KINSHIP_CODES.c_upstep', '<=', $val2['c_tot_up']);
+            $row->where('KINSHIP_CODES.c_dwnstep', '<=', $val2['c_tot_dwn']);
+            $row->where('KINSHIP_CODES.c_marstep', '<=', $val2['c_tot_mar']);
+            $row->where('KINSHIP_CODES.c_colstep', '<=', $val2['c_tot_col']);
+            $row = $row->get();
+
+            foreach ($row as $val) {
+                $data['firstId'] = $val2['firstId'];
+                $data['run'] = $run;
+                $data['c_personid'] = $val->c_personid;
+                $data['c_kin_id'] = $newC_kin_id = $val->c_kin_id;
+                $data['c_kin_code'] = $val->c_kin_code;
+                $data['c_notes'] = $val->c_notes;
+                $data['c_kinrel_simplified'] = $cks = $val2['c_kinrel_simplified'].'-'.$val->c_kinrel_simplified;
+                //在這邊增加例外判斷的函式，轉換UDMC值。
+                if(!empty($cks)) {
+                    $s = $this->eight_Kinship($cks);
+                }
+                if(!empty($s)) {
+                    $val->c_upstep = $s['U'];
+                    $val->c_dwnstep = $s['D'];
+                    $val->c_marstep = $s['M'];
+                    $val->c_colstep = $s['C'];
+                }
+                $data['c_tot_up'] = $val2['c_tot_up'] - $val->c_upstep + $val->c_dwnstep;
+                $data['c_tot_dwn'] = $val2['c_tot_dwn'] - $val->c_dwnstep + $val->c_upstep;
+                $data['c_tot_col'] = $val2['c_tot_col'] - $val->c_colstep;
+                $data['c_tot_mar'] = $val2['c_tot_mar'] - $val->c_marstep;
+                $data['c_upstep'] = $val->c_upstep;
+                $data['c_dwnstep'] = $val->c_dwnstep;
+                $data['c_colstep'] = $val->c_colstep;
+                $data['c_marstep'] = $val->c_marstep;
+                array_push($rowArr, $data);
+                array_push($sub_newdata, $data);
+            }
+        }
+        if(!empty($sub_newdata)) {
+        //if(!empty($sub_newdata) && $run < 9) {
+            $rowArr = $this->sub_relativesLoop($sub_newdata, $rowArr, $run);
+            return $rowArr;
+        }
+        else {
+            return $rowArr;
+        }
+    }
+
     //20200609製作query_relatives API 遞迴的function
     protected function relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run) {
         $c_kin_id = $data = $firstPeopleArr = array();
+        $newdata = $newrowArr = array();
         $run = $run + 1;
         //資料庫邏輯
         for($i=0;$i<count($people);$i++) {
@@ -45,34 +140,35 @@ class ApiController4_2 extends Controller
           $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
           $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
           $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
-          $row->where('KINSHIP_CODES.c_marstep', '<=', $MColLink);
-          $row->where('KINSHIP_CODES.c_colstep', '<=', $MMarLink);
+          $row->where('KINSHIP_CODES.c_marstep', '<=', $MMarLink);
+          $row->where('KINSHIP_CODES.c_colstep', '<=', $MColLink);
           $row = $row->get();
+
           foreach ($row as $val) {
             array_push($c_kin_id, $val->c_kin_id);
             array_push($firstPeopleArr, $firstPeople[$i]);
             $data['firstId'] = $firstPeople[$i];
             $data['run'] = $run;
             $data['c_personid'] = $val->c_personid;
-            $data['c_kin_id'] = $val->c_kin_id;
+            $data['c_kin_id'] = $newC_kin_id = $val->c_kin_id;
             $data['c_kin_code'] = $val->c_kin_code;
             $data['c_notes'] = $val->c_notes;
-            //20201215依據討論內容新增片段
-            /*
-            $data['c_tot_up'] = $rowArr[$i]['c_tot_up'] + $val->c_tot_up;
-            $data['c_tot_dwn'] = $rowArr[$i]['c_tot_dwn'] + $val->c_tot_dwn;
-            $data['c_tot_col'] = $rowArr[$i]['c_tot_col'] + $val->c_tot_col;
-            $data['c_tot_mar'] = $rowArr[$i]['c_tot_mar'] + $val->c_tot_mar;
-            */
-            //新增結束
+            $data['c_kinrel_simplified'] = $val->c_kinrel_simplified;
+            $data['c_tot_up'] = $newMAncGen = $MAncGen - $val->c_upstep + $val->c_dwnstep;
+            $data['c_tot_dwn'] = $newMDecGen = $MDecGen - $val->c_dwnstep + $val->c_upstep;
+            $data['c_tot_col'] = $newMColLink = $MColLink - $val->c_colstep;
+            $data['c_tot_mar'] = $newMMarLink = $MMarLink - $val->c_marstep;
+            $data['c_upstep'] = $val->c_upstep;
+            $data['c_dwnstep'] = $val->c_dwnstep;
+            $data['c_colstep'] = $val->c_colstep;
+            $data['c_marstep'] = $val->c_marstep;
             array_push($rowArr, $data);
+            array_push($newdata, $data);
           }
         }
-
-        $MLoop = $MLoop - 1;
-
-        if($MLoop >= 1) {
-            $rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeopleArr, $run);
+        //這邊判斷$newdata是否有值，有的則繼續遞迴。
+        if(!empty($newdata)) {
+            $rowArr = $this->sub_relativesLoop($newdata, $rowArr, $run); 
             return $rowArr;
         }
         else {
@@ -95,6 +191,9 @@ class ApiController4_2 extends Controller
         $MColLink = $arr['MColLink'];
         $MMarLink = $arr['MMarLink']; 
         $MLoop = $arr['MLoop'];
+
+        $debugMode = 0;
+        if(!empty($arr['debugMode'])) { $debugMode = $arr['debugMode']; }
 
         if(!empty($arr['start'])) { 
             if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
@@ -137,7 +236,8 @@ class ApiController4_2 extends Controller
         else {
             $row = $this->relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $people, $run);
             $total = count($row);
-            //return $row;
+            //20210126增加除錯模式的資料輸出
+            if($debugMode) { return $row; }
         }
 
         //預先組合計算用的資料

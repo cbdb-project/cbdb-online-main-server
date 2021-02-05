@@ -754,11 +754,18 @@ class BiogMainRepository
         $data = $request->all();
         $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
-        $this->insertAddrPo($data['c_addr_id'], $data['c_possession_record_id'], $data['c_personid']);
+        //20210205因為資料表關聯欄位的設定，資料新增的流程需要往後移動。
+        //$this->insertAddrPo($data['c_addr_id'], $data['c_possession_record_id'], $data['c_personid']);
+        $addr = array();
+        $addr = $data['c_addr_id'];
+        //修改段落
         $data = array_except($data, ['_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('POSSESSION_DATA')->insert($data);
+        //移動到這裡
+        $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
+        //修改結束
         (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
         return $data['c_possession_record_id'];
     }
@@ -964,8 +971,30 @@ class BiogMainRepository
         }
         $inst_code = null;
         if($row->c_inst_code || $row->c_inst_code === 0) {
-            $text_ = SocialInst::find($row->c_inst_code);
-            $inst_code = $text_->c_inst_name_code." ".$text_->c_inst_name_hz." ".$text_->c_inst_name_py;
+            //20210204進行改寫
+            //$text_ = SocialInst::find($row->c_inst_code);
+            //$inst_code = $text_->c_inst_name_code." ".$text_->c_inst_name_hz." ".$text_->c_inst_name_py;
+            $text_ = SocialInstCode::find($row->c_inst_code);
+            $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
+            $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
+            $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
+            if(count($res) == 0 ) $addr = "未詳";
+            else {
+                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            }
+            $dy = $text_->c_inst_begin_year;
+            $dy2 = $text_->c_inst_floruit_dy;
+            $dy3 = $text_->c_inst_end_year;
+            $dy4 = $text_->c_inst_last_known_year;
+            if($name_hz == null) $name_hz = "未詳";
+            if($name_py == null) $name_py = "未詳";
+            if($addr == null) $addr = "未詳";
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
+            //修改結束
         }
         return ['row' => $row, 'text_str' => $text_str, 'kin_code' => $kin_code, 'kin_id' => $kin_id,
             'assoc_code' => $assoc_code, 'assoc_id' => $assoc_id, 'assoc_kin_code' => $assoc_kin_code, 'assoc_kin_id' => $assoc_kin_id,
@@ -1012,6 +1041,9 @@ class BiogMainRepository
         //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+        //20210204增加儲存c_inst_name_code
+        $data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
+        //新增結束
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -1048,6 +1080,9 @@ class BiogMainRepository
         $data = array_except($data, ['_token', 'c_assocship_pair']);
         $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+        //20210204增加儲存c_inst_name_code
+        $data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
+        //新增結束
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;

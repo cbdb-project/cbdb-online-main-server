@@ -258,6 +258,36 @@ class ApiController extends Controller
         return $data;
     }
 
+    public function socialinstcode(Request $request)
+    {
+        $data = SocialInstCode::where('c_inst_code', 'like', '%'.$request->q.'%')->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $item['id'] = $item->c_inst_code;
+            if($item['id'] === 0) $item['id'] = -999;
+            $name_hz = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_hz;
+            $name_py = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_py;
+            $res = SocialInstAddr::where('c_inst_code', $item->c_inst_code)->first();
+            if(count($res) == 0 ) $addr = "未詳";
+            else {
+                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            }
+            $dy = $item->c_inst_begin_year;
+            $dy2 = $item->c_inst_floruit_dy;
+            $dy3 = $item->c_inst_end_year;
+            $dy4 = $item->c_inst_last_known_year;
+            if($name_hz == null) $name_hz = "未詳";
+            if($name_py == null) $name_py = "未詳";
+            if($addr == null) $addr = "未詳";
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $item['text'] = $item->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$item->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
+        }
+        return $data;
+    }
+
     public function searchEntry(Request $request)
     {
         $data = EntryCode::where('c_entry_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_entry_desc', 'like', '%'.$request->q.'%')->orWhere('c_entry_code', $request->q)->paginate(20);

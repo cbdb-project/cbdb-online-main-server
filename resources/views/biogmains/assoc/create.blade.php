@@ -147,7 +147,7 @@
                     <label for="" class="col-sm-2 control-label">社會關係發生地</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_addr_id">
-                            <option value="0" selected="selected">0 [Unknown] [未詳]  ~ </option>
+                            <option value="0" selected="selected">0 [Unknown] [未詳] </option>
                         </select>
                     </div>
                 </div>
@@ -155,20 +155,26 @@
                     <label for="" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            <option value="0" selected="selected"></option>
+                            <option value="0" selected="selected">0 [Unknown] [未詳] </option>
                         </select>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
-                    <div class="col-sm-5">
+                    <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
+                </div>
+                <div class="form-group">
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
-                    <div class="col-sm-3">
+                    <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
+                    </div>
+                    <label for="c_secondary_source_author" class="col-sm-2 control-label">二手文獻的原作者</label>
+                    <div class="col-sm-4">
+                        <input type="text" class="form-control" name="c_secondary_source_author" value="">
                     </div>
                 </div>
                 <div class="form-group">
@@ -198,7 +204,7 @@
         $(".c_assoc_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
         $(".c_addr_id").select2(options('addr'));
-        $(".c_inst_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
         $(".c_assocship_pair").select2();
 

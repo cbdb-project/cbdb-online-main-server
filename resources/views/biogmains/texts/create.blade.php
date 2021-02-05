@@ -29,14 +29,20 @@
                 </div>
                 <div class="form-group">
                     <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
-                    <div class="col-sm-5">
+                    <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source">
 
                         </select>
                     </div>
+                </div>
+                <div class="form-group">
                     <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
-                    <div class="col-sm-3">
+                    <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
+                    </div>
+                    <label for="c_secondary_source_author" class="col-sm-2 control-label">二手文獻的原作者</label>
+                    <div class="col-sm-4">
+                        <input type="text" class="form-control" name="c_secondary_source_author" value="">
                     </div>
                 </div>
                 <div class="form-group">

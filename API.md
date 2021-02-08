@@ -24,8 +24,8 @@
     "start":1,
     "end":2,
     "data":[
-        {"pId":"27","pName":"shang shu sheng gong bu shang shu","pNameChn":"尚書省工部尚書"},
-        {"pId":"28","pName":"shang shu sheng gong bu shi lang","pNameChn":"尚書省工部侍郎"}        
+        {"pId":"27","pName":"shang shu sheng gong bu shang shu","pNameChn":"尚書省工部尚書","pNameChnAlt":"工部尚書;尚書;工部一書;工書;冬卿;冬卿常伯"},
+        {"pId":"28","pName":"shang shu sheng gong bu shi lang","pNameChn":"尚書省工部侍郎","pNameChnAlt":"工部侍郎;工侍;小司空;司平少常伯;冬官之貳;共工之貳"}        
     ]
 }
 ```
@@ -37,7 +37,8 @@
 | data | 陣列 | 官職列表 |
 | data[`i`].pId | 數字 | office_id |
 | data[`i`].pName | 字符串 | 官職名，英文 |
-| data[`i`].pNameChn | 字符串 | 官職名，中文 |  
+| data[`i`].pNameChn | 字符串 | 官職名，中文 | 
+| data[`i`].pNameChnAlt | 字符串 | 官職別名，中文 [OFFICE_CODES].[c_office_chn_alt] |  
 
 # 二、根據入仕途徑類別代碼獲取其下屬的入仕途徑
 ## 輸入參數:
@@ -204,8 +205,8 @@
     "start":1,
     "end":2,
     "data":[
-        {"pId":"27","pName":"shang shu sheng gong bu shang shu","pNameChn":"尚書省工部尚書"},
-        {"pId":"28","pName":"shang shu sheng gong bu shi lang","pNameChn":"尚書省工部侍郎"}        
+        {"pId":"27","pName":"shang shu sheng gong bu shang shu","pNameChn":"尚書省工部尚書","pNameChnAlt":"工部尚書;尚書;工部一書;工書;冬卿;冬卿常伯"},
+        {"pId":"28","pName":"shang shu sheng gong bu shi lang","pNameChn":"尚書省工部侍郎","pNameChnAlt":"工部侍郎;工侍;小司空;司平少常伯;冬官之貳;共工之貳"}        
     ]
 }
 ```
@@ -218,6 +219,7 @@
 | data[`i`].pId | 數字 | office_id |
 | data[`i`].pName | 字符串 | 官職名，英文 |
 | data[`i`].pNameChn| 字符串 | 官職名，中文 |  
+| data[`i`].pNameChnAlt | 字符串 | 官職別名，中文 [OFFICE_CODES].[c_office_chn_alt] |  
 
 # 六、根據入仕途徑中英文名獲取入仕途徑列表
 ## 輸入參數:

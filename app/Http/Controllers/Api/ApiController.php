@@ -96,6 +96,7 @@ class ApiController extends Controller
     }
 
     //20200427依據指定規格製作office_list_by_name API
+    //202010304增列data[i].pNameChnAlt的屬性，官職的別名漢字。
     protected function office_list_by_name(Request $request){
         $ans = $data = $data_val = array();
         // 變數接值
@@ -137,6 +138,7 @@ class ApiController extends Controller
             $data_val['pId'] = $val->c_office_id;
             $data_val['pName'] = $val->c_office_pinyin;
             $data_val['pNameChn'] = $val->c_office_chn;
+            $data_val['pNameChnAlt'] = $val->c_office_chn_alt;
             array_push($data, $data_val);
         }
 

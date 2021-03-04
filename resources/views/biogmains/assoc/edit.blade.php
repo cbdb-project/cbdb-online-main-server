@@ -180,7 +180,7 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="" class="col-sm-2 control-label">社交機構(social_institution)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
                             @if($res['inst_code'])

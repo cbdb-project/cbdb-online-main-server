@@ -978,7 +978,7 @@ class BiogMainRepository
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count($res) == 0 ) $addr = "未詳";
+            if(count((array)$res) == 0 ) $addr = "未詳";
             else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }

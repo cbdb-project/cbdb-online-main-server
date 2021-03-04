@@ -258,6 +258,7 @@ class ApiController extends Controller
         return $data;
     }
 
+    /*20210205新增的API，提供社交機構(social_institution)查詢，20210304修改。*/
     public function socialinstcode(Request $request)
     {
         $data = SocialInstCode::where('c_inst_code', 'like', '%'.$request->q.'%')->paginate(20);
@@ -268,7 +269,7 @@ class ApiController extends Controller
             $name_hz = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $item->c_inst_code)->first();
-            if(count($res) == 0 ) $addr = "未詳";
+            if(count((array)$res) == 0 ) $addr = "未詳";
             else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }
@@ -376,7 +377,7 @@ class ApiController extends Controller
         $person_id = $request->person_id;
         //20201026修改成對親屬關係的選項
         $res = KinshipCode::where('c_kin_pair1', '=', $kin_code)->orWhere('c_kin_pair2', '=', $kin_code)->orderBy('c_pick_sorting', 'desc')->get();
-        if(count($res) == 0) {
+        if(count((array)$res) == 0) {
             $data = KinshipCode::find($kin_code);
             $res = KinshipCode::find([$data->c_kin_pair2, $data->c_kin_pair1]);
         }

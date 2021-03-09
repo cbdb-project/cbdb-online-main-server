@@ -258,13 +258,32 @@ class ApiController extends Controller
         return $data;
     }
 
-    /*20210205新增的API，提供社交機構(social_institution)查詢，20210304修改。*/
+    /*20210205新增的API，提供社交機構(social_institution)查詢，20210309修改。*/
     public function socialinstcode(Request $request)
     {
-        $data = SocialInstCode::where('c_inst_code', 'like', '%'.$request->q.'%')->paginate(20);
-        $data->appends(['q' => $request->q])->links();
+        $temp = explode("-", $request->q);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_name_code = '';
+        }
+
+        if($c_inst_name_code != '') {
+            $data = SocialInstCode::where([
+                ['c_inst_code', '=', $c_inst_code],
+                ['c_inst_name_code', '=', $c_inst_name_code],
+            ])->paginate(20);
+        }
+        else {
+            $data = SocialInstCode::where('c_inst_code', 'like', '%'.$c_inst_code.'%')->paginate(20);
+        }
+
+        $data->appends(['q' => $c_inst_code])->links();
         foreach($data as $item){
-            $item['id'] = $item->c_inst_code;
+            //修改$item['id']，改變這組API回傳的值。
+            $item['id'] = $item->c_inst_code .'-'. $item->c_inst_name_code;
             if($item['id'] === 0) $item['id'] = -999;
             $name_hz = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $item->c_inst_name_code)->first()->c_inst_name_py;

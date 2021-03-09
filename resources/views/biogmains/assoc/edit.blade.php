@@ -10,6 +10,7 @@
 $row->c_text_title = unionPKDef($row->c_text_title);
 $row->c_notes = unionPKDef($row->c_notes);
 @endphp
+
             <form action="{{ route('basicinformation.assoc.update', [$id, $row->c_personid."-".$row->c_assoc_code."-".$row->c_assoc_id."-".$row->c_kin_code."-".$row->c_kin_id."-".$row->c_assoc_kin_code."-".$row->c_assoc_kin_id."-".$row->c_text_title]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
@@ -181,10 +182,12 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                    <input name="c_inst_name_code" type="hidden">
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
                             @if($res['inst_code'])
-                                <option value="{{ $row->c_inst_code }}" selected="selected">{{ $res['inst_code'] }}</option>
+                                <option value="{{ $row->c_inst_code.'-'.$row->c_inst_name_code }}" selected="selected">{{ $res['inst_code'] }}</option>
+
                             @endif
                         </select>
                     </div>

@@ -48,7 +48,7 @@ class ModifiedController extends Controller
             elseif(!empty($resource_id = $listsArr['data'][$x]['resource_id']) && !empty($resource = $listsArr['data'][$x]['resource'])) {
                 switch ($resource) {
                     case "OFFICE_CODES":
-                        if(count(OfficeCode::find($resource_id))) {
+                        if(count((Array)OfficeCode::find($resource_id))) {
                             $arr3 = OfficeCode::find($resource_id)->toArray();
                         }
                         break;

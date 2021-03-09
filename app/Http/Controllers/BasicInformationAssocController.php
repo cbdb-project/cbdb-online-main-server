@@ -81,6 +81,24 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20210309在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_name_code = '';
+        }
+
+        if($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+        //return $request;
+        //修改結束
         $data = $this->biogMainRepository->assocStoreById($request, $id);
         $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Store success @ '.Carbon::now(), 'success');
@@ -133,6 +151,24 @@ class BasicInformationAssocController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20210309在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_name_code = '';
+        }
+
+        if($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+        //return $request;
+        //修改結束
         $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
         $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Update success @ '.Carbon::now(), 'success');

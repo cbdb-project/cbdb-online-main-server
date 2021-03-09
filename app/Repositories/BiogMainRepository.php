@@ -974,7 +974,11 @@ class BiogMainRepository
             //20210204進行改寫
             //$text_ = SocialInst::find($row->c_inst_code);
             //$inst_code = $text_->c_inst_name_code." ".$text_->c_inst_name_hz." ".$text_->c_inst_name_py;
-            $text_ = SocialInstCode::find($row->c_inst_code);
+            //$text_ = SocialInstCode::find($row->c_inst_code);
+            $text_ = SocialInstCode::where([
+                ['c_inst_code', '=', $row->c_inst_code],
+                ['c_inst_name_code', '=', $row->c_inst_name_code],
+            ])->first();
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
@@ -1042,7 +1046,7 @@ class BiogMainRepository
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
-        $data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
+        //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('ASSOC_DATA')->where([
@@ -1081,7 +1085,7 @@ class BiogMainRepository
         $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
-        $data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
+        //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);

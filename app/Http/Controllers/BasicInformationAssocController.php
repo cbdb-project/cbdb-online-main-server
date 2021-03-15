@@ -82,13 +82,15 @@ class BasicInformationAssocController extends Controller
             return redirect()->back();
         }
         //20210309在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        //20210315修正$c_inst_name_code預設為0
         $temp = explode("-", $request->c_inst_code);
         $c_inst_code = $temp[0];
         if(!empty($temp[1])) {
             $c_inst_name_code = $temp[1];
         }
         else {
-            $c_inst_name_code = '';
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
         }
 
         if($c_inst_name_code != '') {
@@ -152,13 +154,15 @@ class BasicInformationAssocController extends Controller
             return redirect()->back();
         }
         //20210309在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        //20210315修正$c_inst_name_code預設為0
         $temp = explode("-", $request->c_inst_code);
         $c_inst_code = $temp[0];
         if(!empty($temp[1])) {
             $c_inst_name_code = $temp[1];
         }
         else {
-            $c_inst_name_code = '';
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
         }
 
         if($c_inst_name_code != '') {

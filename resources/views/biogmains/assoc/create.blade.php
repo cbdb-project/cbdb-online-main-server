@@ -155,7 +155,7 @@
                     <label for="" class="col-sm-2 control-label">社交機構(social_institution)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            <option value="0" selected="selected">0 [Unknown] [未詳] </option>
+                            <option value="0-0" selected="selected">0 [Unknown] [未詳] </option>
                         </select>
                     </div>
                 </div>

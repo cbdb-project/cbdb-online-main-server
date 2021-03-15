@@ -259,6 +259,7 @@ class ApiController extends Controller
     }
 
     /*20210205新增的API，提供社交機構(social_institution)查詢，20210309修改。*/
+    /*20210315新增漢字與英文對SOCIAL_INSTITUTION_NAME_CODES的檢索。*/
     public function socialinstcode(Request $request)
     {
         $temp = explode("-", $request->q);
@@ -275,6 +276,14 @@ class ApiController extends Controller
                 ['c_inst_code', '=', $c_inst_code],
                 ['c_inst_name_code', '=', $c_inst_name_code],
             ])->paginate(20);
+        }
+        elseif(is_string($c_inst_code) && !is_numeric($c_inst_code) && !empty($c_inst_code)) {
+            $data_ori = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->select('c_inst_name_code')->where('c_inst_name_hz', 'like', '%'.$c_inst_code.'%')->orWhere('c_inst_name_py', 'like', '%'.$c_inst_code.'%')->get();
+            $data_arr = array();
+            foreach($data_ori as $value) {
+                array_push($data_arr, $value->c_inst_name_code);
+            }
+            $data = SocialInstCode::whereIn('c_inst_name_code', $data_arr)->paginate(20);
         }
         else {
             $data = SocialInstCode::where('c_inst_code', 'like', '%'.$c_inst_code.'%')->paginate(20);

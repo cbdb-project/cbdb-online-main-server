@@ -12,8 +12,11 @@
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
                             <div class="col-sm-10">
-                                <input type="text" name="{{ $key }}" class="form-control"
-                                       >
+                                <input type="text" name="{{ $key }}" class="form-control" 
+                                @if($table == 'SOCIAL_INSTITUTION_CODES' && $key == 'c_inst_name_code')
+                                    value="{{ $id }}"
+                                @endif
+                                >
                             </div>
                         </div>
                     @endforeach

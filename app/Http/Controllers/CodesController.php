@@ -107,12 +107,15 @@ class CodesController extends Controller
         return redirect()->route('codes.show', ['table_name' => $table_name]);
     }
 
+    //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設遮除的第1個欄位呈現。
     public function create($table_name)
     {
 //        dd($table_name);
         $data = Schema::getColumnListing($table_name);
         $id_ = $data[0];
-        $data = array_splice($data, 1);
+        if($table_name != 'SOCIAL_INSTITUTION_CODES') {
+            $data = array_splice($data, 1);
+        }
         $id = DB::table($table_name)->max($id_) + 1;
         return view('codes.create',[
             'page_title' => 'Codes',
@@ -123,6 +126,7 @@ class CodesController extends Controller
             'id' => $id, 'table' => $table_name]);
     }
 
+    //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
     public function store(Request $request, $table_name)
     {
         if (!Auth::check()) {
@@ -136,8 +140,14 @@ class CodesController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $id_ = $this->getIdName($table_name);
-        $id = DB::table($table_name)->max($id_) + 1;
-        $data[$id_] = $id;
+        if($table_name != 'SOCIAL_INSTITUTION_CODES') {
+            $id = DB::table($table_name)->max($id_) + 1;
+            $data[$id_] = $id;
+        }
+        else {
+            //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
+            $id = $data[$id_];
+        }
         DB::table($table_name)->insert($data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);

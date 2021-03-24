@@ -68,8 +68,15 @@ class CodesController extends Controller
 //        dd($table_name);
         if($table_name){
             try{
+                //20210323修改聯合主鍵的邏輯
+                $temp = explode("_._", $id);
                 $id_name = $this->getIdName($table_name);
-                $data = DB::table($table_name)->where($id_name, $id)->first();
+                $id_name_1 = $this->getIdName_1($table_name);
+                $id_name_2 = $this->getIdName_2($table_name);
+                //$data = DB::table($table_name)->where($id_name, $id)->first();
+                $data = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->first();
+                //$data = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->first();
+                //修改結束
                 return view('codes.edit', [
                     'page_title' => 'Codes',
                     'page_description' => $table_name,
@@ -99,12 +106,22 @@ class CodesController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
 //        dd($data);
+        //20210323修改聯合主鍵的邏輯
         $id_name = $this->getIdName($table_name);
-        DB::table($table_name)->where($id_name, $id)->update($data);
+        $id_name_1 = $this->getIdName_1($table_name);
+        $id_name_2 = $this->getIdName_2($table_name);
+        $temp = explode("_._", $id);
+        //DB::table($table_name)->where($id_name, $id)->update($data);
+        DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->update($data);
+        //DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->update($data);
+        //修改結束
         flash('Update success @ '.Carbon::now(), 'success');
-        //建安新增,修改後使用新的序號.20181108
-        //return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);
-        return redirect()->route('codes.show', ['table_name' => $table_name]);
+
+        //20210323組合新的id，避免修改聯合主鍵的值。 
+        $id = $data[$id_name].'_._'.$data[$id_name_1];
+        //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
+        //return redirect()->route('codes.show', ['table_name' => $table_name]);
+        return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設遮除的第1個欄位呈現。
@@ -113,9 +130,10 @@ class CodesController extends Controller
 //        dd($table_name);
         $data = Schema::getColumnListing($table_name);
         $id_ = $data[0];
-        if($table_name != 'SOCIAL_INSTITUTION_CODES') {
-            $data = array_splice($data, 1);
-        }
+        //20210323遮除「第一欄預設隱藏」
+        //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
+            //$data = array_splice($data, 1);
+        //}
         $id = DB::table($table_name)->max($id_) + 1;
         return view('codes.create',[
             'page_title' => 'Codes',
@@ -139,15 +157,23 @@ class CodesController extends Controller
         }
         $data = $request->all();
         $data = array_except($data, ['_token']);
-        $id_ = $this->getIdName($table_name);
-        if($table_name != 'SOCIAL_INSTITUTION_CODES') {
-            $id = DB::table($table_name)->max($id_) + 1;
-            $data[$id_] = $id;
-        }
-        else {
+        //20210323遮除「第一欄預設隱藏」
+        //$id_ = $this->getIdName($table_name);
+        //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
+            //$id = DB::table($table_name)->max($id_) + 1;
+            //$data[$id_] = $id;
+        //}
+        //else {
             //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
-            $id = $data[$id_];
-        }
+            //$id = $data[$id_];
+        //}
+        //20210323插入聯合主鍵的邏輯
+        $id_name = $this->getIdName($table_name);
+        $id_name_1 = $this->getIdName_1($table_name);
+        $id_name_2 = $this->getIdName_2($table_name);
+        $id = $data[$id_name].'_._'.$data[$id_name_1];
+        //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
+        //修改結束
         DB::table($table_name)->insert($data);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.edit', ['table_name' => $table_name, 'id' => $id]);
@@ -163,8 +189,15 @@ class CodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20210323修改聯合主鍵的邏輯
+        $temp = explode("_._", $id);
         $id_name = $this->getIdName($table_name);
-        $row = DB::table($table_name)->where($id_name, $id)->first();
+        $id_name_1 = $this->getIdName_1($table_name);
+        $id_name_2 = $this->getIdName_2($table_name);
+
+        $row = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->first();
+        //$row = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->first();
+        //修改結束
         $op = [
             'op_type' => 4,
             'resource' => $table_name,
@@ -176,7 +209,8 @@ class CodesController extends Controller
         $row2 = json_encode((array)$row);
         $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row2);
         //修改結束
-        DB::table($table_name)->where($id_name, $id)->delete();
+        DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->delete();
+        //DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.show', ['table_name' => $table_name]);
     }
@@ -184,5 +218,15 @@ class CodesController extends Controller
     protected function getIdName($table_name)
     {
         return $columns = Schema::getColumnListing($table_name)[0];
+    }
+
+    protected function getIdName_1($table_name)
+    {
+        return $columns = Schema::getColumnListing($table_name)[1];
+    }
+
+    protected function getIdName_2($table_name)
+    {
+        return $columns = Schema::getColumnListing($table_name)[2];
     }
 }

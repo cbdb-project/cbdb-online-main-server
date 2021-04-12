@@ -6,7 +6,7 @@
 
 ### CBDB inputting system URL
 
-http://47.114.119.106:8000/basicinformation
+https://input.cbdb.fas.harvard.edu/basicinformation
 
 ### Database migrations
 

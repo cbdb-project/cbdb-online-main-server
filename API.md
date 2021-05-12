@@ -665,6 +665,9 @@ RequestPlayload:{
 | place|陣列|人物地點列表|
 | usePeoplePlace | 數字 | 是否啟用人物地點列表，是=1，否=0 |
 | useXy|數字|是否使用xy座標，是=1，否=0|
+| indexYear|數字|是否採用指數年，是=1，否=0|
+| indexStartTime|數字|指數年開始日期|
+| indexEndTime|數字|指數年結束日期|
 | broad|數字|行政區域範圍是廣義的還是狹義的。廣義=1，狹義=0。廣義 `+/- 0.06` 狹義 `+/- 0.03`|
 
 **注：`usePeoplePlace` 的優先級高於`place`，即若以`usePeoplePlace`開頭的變數取值為0，則不採用人物地點列表，不論其取值是否為空**
@@ -677,10 +680,13 @@ RequestPlayload:{
     "place":[101125],
     "usePeoplePlace":1,
     "useXy":1,
+    "indexYear":1,
+    "indexStartTime":960,
+    "indexEndTime":1250,
     "broad":0
 }
 ```
-說明：查找滿足下列關係的Y：所有地點在“建州”的人物（X），其有“為Y之學生”關係。換句話說就是要查找地點在“建州”的人物（X）的老師（Y）  
+說明：查找滿足下列關係的Y：所有指數年在960年至1250年間，地點在“建州”的人物（X），其有“為Y之學生”關係。換句話說就是：查找960年至1250年間且地點在“建州”的人物（X）的老師（Y）  
 `/api/query_associates`
 ```json
 RequestPlayload:{

@@ -416,25 +416,53 @@ RequestPlayload:{
 | data[`i`].Notes  | 字符串 | 備註 |
 
 # 九、通過入仕途徑查詢人物
-## 輸入參數:
-| 參數名| 參數類型 | 說明 |
-| ------ | ------ | ------ |
-| entry | 陣列 | 要查詢的入仕途徑ID列表 |
-| usePeoplePlace | 數字 | 是否啟用與人物相關的地點這一條件。是=1，否=0 |
-| peoplePlace | 陣列 | 與人物相關的地點列表 |
-| locationType | 字符串 | 與人物相關的地點的類型 pAddr為僅查找人物地點 eAddr為僅查找入仕地點 peAddr 為同時查找兩者|
-| useDate|數字|是否採用年份這一條件，是=1，否=0|
-| dateType|字符串|年份類型 entry為入仕年 index為指數年|
-| dateStartTime|數字|年份開始日期|
-| dateEndTime|數字|年份結束日期|
-| useXy|數字|是否使用xy座標，是=1，否=0|
-| start|數字|結果開始筆數|
-| list|數字|列表長度|
 
-**注：`usePeoplePlace` `useDate` 的優先級高於`peoplePlace` `locationType` `dateType` `dateStartTime` `dateEndTime`，即若以`use`開頭的2個變數取值為0，就不使用後面的條件（不論陣列是否為空）**
-## 輸入示例: 
-**注：採用POST方法，Content-Type: application/json**
+## 輸入參數:
+
+| 參數名         | 參數類型 | 說明                                                                                       |
+| -------------- | -------- | ------------------------------------------------------------------------------------------ |
+| entry          | 陣列     | 要查詢的入仕途徑 ID 列表                                                                   |
+| usePeoplePlace | 數字     | 是否啟用與人物相關的地點這一條件。是=1，否=0                                               |
+| peoplePlace    | 陣列     | 與人物相關的地點列表                                                                       |
+| locationType   | 字符串   | 與人物相關的地點的類型 pAddr 為僅查找人物地點 eAddr 為僅查找入仕地點 peAddr 為同時查找兩者 |
+| useDate        | 數字     | 是否採用年份這一條件，是=1，否=0                                                           |
+| dateType       | 字符串   | 年份類型 entry 為入仕年 index 為指數年 dynasty 為朝代                                      |
+| dateStartTime  | 數字     | 年份開始日期                                                                               |
+| dateEndTime    | 數字     | 年份結束日期                                                                               |
+| dynStart       | 數字     | 朝代開始                                                                                   |
+| dynEnd         | 數字     | 朝代結束                                                                                   |
+| useXy          | 數字     | 是否使用 xy 座標，是=1，否=0                                                               |
+| start          | 數字     | 結果開始筆數                                                                               |
+| list           | 數字     | 列表長度                                                                                   |
+
+**注：`usePeoplePlace` `useDate` 的優先級高於`peoplePlace` `locationType` `dateType` `dateStartTime` `dateEndTime`，即若以`use`開頭的 2 個變數取值為 0，就不使用後面的條件（不論陣列是否為空）**
+**注：當 `dateType` 取值為 `entry` 或 `index` 時，僅考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值，不考慮 `dynStart` 與 `dynEnd` 的取值。反之， 當 `dateType` 取值為 `dynasty` 時，僅考慮 `dynStart` 與 `dynEnd` 的取值，不考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值**
+
+## 輸入示例:
+
+**注：採用 POST 方法，Content-Type: application/json**
 `/api/query_office_postings`
+
+```json
+RequestPlayload:{
+    "entry": [36],
+    "usePeoplePlace": 0,
+    "peoplePlace":[],
+    "locationType": "peAddr",
+    "useDate": 1,
+    "dateType": "entry",
+    "dateStartTime": 1368,
+    "dynStart": null,
+    "dynEnd": null,
+    "dateEndTime": 1644,
+    "useXy": 1,
+    "start": 1,
+    "list": 10
+}
+```
+
+說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於 1368-1644 的所有人物。返回第 1-10 筆結果
+
 ```json
 RequestPlayload:{
     "entry":[36],
@@ -443,17 +471,23 @@ RequestPlayload:{
     "locationType":"peAddr",
     "useDate":1,
     "dateType":"entry",
-    "dateStartTime":1368,
-    "dateEndTime":1644,
+    "dateStartTime":null,
+    "dateEndTime":null,
+    "dynStart": 17,
+    "dynEnd": 22,
     "useXy":1,
     "start":1,
     "list":10
 }
 ```
-說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於1368-1644的所有人物。返回第1-10筆結果
-## 輸出格式: 
-數據類型：`物件` 
-示例   
+
+說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
+
+## 輸出格式:
+
+數據類型：`物件`
+示例
+
 ```json
 {
     "total":100,
@@ -465,6 +499,7 @@ RequestPlayload:{
         ]
 }
 ```
+
 | 屬性名| 屬性類型 | 說明 |
 | ------ | ------ | ------ |
 | total |  數字 | 數據總筆數 |
@@ -498,10 +533,12 @@ RequestPlayload:{
 | data[`i`].EntryPlaceChn | 字符串 | 入仕地點，中文 |
 | data[`i`].EntryX | 數字 | 入仕地點經度座標 |
 | data[`i`].EntryY | 數字 | 入仕地點緯度座標 |
+| data[`i`].dynasty | 數字 | 朝代 英文 |
+| data[`i`].dynastyChn| 數字 | 朝代 中文 |
 | data[`i`].entry_xy_count | 數字 | 結果同一入仕地點的人物數 |
 
 
-# 九、根據給定人物陣列查詢人物親屬
+# 十、根據給定人物陣列查詢人物親屬
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
@@ -587,7 +624,7 @@ RequestPlayload:{
 
 **注：返回中心人物記錄時`rKinship`取值為`'ego'`，以p開頭的變數返回`''`（空字符串）即可**
 
-# 十、根據社會關係類型代碼獲取社會關係
+# 十一、根據社會關係類型代碼獲取社會關係
 ## 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -620,7 +657,7 @@ RequestPlayload:{
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十一、查找社會關係
+# 十二、查找社會關係
 ## 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -656,7 +693,7 @@ RequestPlayload:{
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十二、查詢人物社會關係
+# 十三、查詢人物社會關係
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |

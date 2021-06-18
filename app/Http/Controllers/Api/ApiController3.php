@@ -1,7 +1,7 @@
 <?php
 /**
  * User: ja
- * Date: 2020/5/22
+ * Date: 2021/06/16
  * Time: 09:20
  */
 
@@ -17,6 +17,7 @@ use App\EntryCode;
 use App\KinshipCode;
 use App\AssocCode;
 use App\Operation;
+use App\Dynasty;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -49,7 +50,9 @@ class ApiController3 extends Controller
         $useDate = $arr['useDate'];
         $dateType = $arr['dateType']; 
         $dateStartTime = $arr['dateStartTime']; 
-        $dateEndTime = $arr['dateEndTime']; 
+        $dateEndTime = $arr['dateEndTime'];
+        $dynStart = $arr['dynStart'];
+        $dynEnd = $arr['dynEnd']; 
         $useXy = $arr['useXy']; 
         if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
         else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
@@ -57,6 +60,7 @@ class ApiController3 extends Controller
 
         //資料庫邏輯
         $row = DB::table('ENTRY_DATA')->whereIn('ENTRY_DATA.c_entry_code', $entry);
+        $row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
 
         if($usePeoplePlace) {
             //人物地點BIOG_ADDR_DATA，地名資料ADDR_CODES
@@ -81,9 +85,15 @@ class ApiController3 extends Controller
                 $row->where('ENTRY_DATA.c_year', '<=', $dateEndTime);
             }
             elseif($dateType == 'index') {
-                $row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+                //$row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
                 $row->where('BIOG_MAIN.c_index_year', '>=', $dateStartTime);
                 $row->where('BIOG_MAIN.c_index_year', '<=', $dateEndTime);
+            }
+            elseif($dateType == 'dynasty') {
+                //$row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+                $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
+                $row->where('DYNASTIES.c_start', '>=', $dynStart);
+                $row->where('DYNASTIES.c_end', '<=', $dynEnd);
             }
             else {}
         }
@@ -119,6 +129,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
         //資料庫邏輯結束
 
         $row = $row->get();
+        //return $row;
         $total = count($row);
 
         if($list) {
@@ -198,6 +209,15 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
                 $data_val['EntryX'] = '';
                 $data_val['EntryY'] = '';
                 $data_val['entry_xy_count'] = '';
+            }
+            if($val->c_dy != null) {
+                $c_dy = Dynasty::where('c_dy', '=', $val->c_dy)->first();
+                $data_val['dynasty'] = $c_dy->c_dynasty;
+                $data_val['dynastyChn'] = $c_dy->c_dynasty_chn;
+            }
+            else {
+                $data_val['dynasty'] = '';
+                $data_val['dynastyChn'] = '';
             }
 
             array_push($data, $data_val);

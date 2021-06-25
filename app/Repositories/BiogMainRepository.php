@@ -31,6 +31,11 @@ use App\SocialInstCode;
 use App\SocialInstAddr;
 //修改結束
 
+//20210625建安修改
+use App\AddrCode;
+use App\BiogAddrCode;
+//修改結束
+
 
 /**
  * Class BiogMainRepository
@@ -61,6 +66,27 @@ class BiogMainRepository
             $name = $this->byPersonId($c_index_year_source_id);
             $ans_source_id = $c_index_year_source_id." ".$name->c_name_chn;
             $basicinformation->c_index_year_source_id = $ans_source_id;
+        }
+        else { }
+        //新增結束
+        //20210625新增指數地址(index_addr)與指數地址類型(index_addr_type)推算欄位
+        $c_index_addr_id = $basicinformation->c_index_addr_id;
+        if(!empty($c_index_addr_id)) {
+            $addr_name = AddrCode::find($c_index_addr_id);
+            if(!empty($addr_name)) {
+                $ans_index_addr = $c_index_addr_id." ".$addr_name->c_name." ".$addr_name->c_name_chn;
+                $basicinformation->c_index_addr_id = $ans_index_addr;
+            }
+        }
+        else { }
+
+        $c_index_addr_type_code = $basicinformation->c_index_addr_type_code;
+        if(!empty($c_index_addr_type_code)) {
+            $addr_type_name = BiogAddrCode::where('c_index_addr_default_rank', $c_index_addr_type_code)->first();
+            if(!empty($addr_type_name)) {
+                $ans_addr_type_name = $c_index_addr_type_code." ".$addr_type_name->c_addr_desc." ".$addr_type_name->c_addr_desc_chn;
+                $basicinformation->c_index_addr_type_code = $ans_addr_type_name;
+            }
         }
         else { }
         //新增結束

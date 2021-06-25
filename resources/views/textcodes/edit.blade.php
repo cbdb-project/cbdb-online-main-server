@@ -10,7 +10,11 @@
                     {{ method_field('PATCH') }}
                     {{ csrf_field() }}
                     @foreach($row->toArray() as $key => $value)
-                        <div class="form-group">
+                        <div class="form-group"
+                        @if($key == 'c_created_by' || $key == 'c_created_date' || $key == 'c_modified_by' || $key == 'c_modified_date')
+                            style="display:none"
+                        @endif
+                        >
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"

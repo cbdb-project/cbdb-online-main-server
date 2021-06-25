@@ -33,19 +33,28 @@ class BasicInformationAssocController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAssoc($id);
+        //dd($biogbasicinformation);
         $assoc_name_id = array();
         $assoc_name_sequence = array();
         $assoc_name_name = array();
+        $assoc_name_title = array();
         foreach ($biogbasicinformation->assoc_name as $key => $value){
             $assoc_name_id[$key] = $value->pivot->c_assoc_id;
             $assoc_name_sequence[$key] = $value->c_sequence;
             $assoc_name_name[$key] = $value->c_name.' '.$value->c_name_chn;
+            $title = '';
+            $title = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $value->pivot->c_personid],
+                ['c_assoc_id', '=', $value->pivot->c_assoc_id],
+                ['c_sequence', '=', $value->c_sequence]
+            ])->first();
+            $assoc_name_title[$key] = $title->c_text_title;
         }
-        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_sequence, $assoc_name_name) {
+        $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_sequence, $assoc_name_name, $assoc_name_title) {
             if (in_array($item->pivot->c_assoc_id, $assoc_name_id)) {
-                return ['c_personid' => $item->pivot->c_assoc_id, 'c_sequence' => $assoc_name_sequence[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
+                return ['c_personid' => $item->pivot->c_assoc_id, 'c_sequence' => $assoc_name_sequence[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'c_text_title' => $assoc_name_title[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
             }
-            return ['c_personid' => 0, 'c_sequence' => 0, 'assoc_name' => ''];
+            return ['c_personid' => 0, 'c_sequence' => 0, 'assoc_name' => '', 'c_text_title' => ''];
         });
         //dd($biogbasicinformation);
         //dd($assoc_name);

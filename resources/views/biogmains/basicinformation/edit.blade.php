@@ -266,6 +266,20 @@
                                value="{{ $basicinformation->c_index_year_source_id }}" disabled>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="c_index_addr_id"
+                           class="col-sm-2 control-label">指數地址(index_addr)</label>
+                    <div class="col-sm-4">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $basicinformation->c_index_addr_id }}" disabled>
+                    </div>
+                    <label for="c_index_addr_type_code"
+                           class="col-sm-2 control-label">指數地址類型(index_addr_type)</label>
+                    <div class="col-sm-4">
+                        <input type="text" name="" class="form-control"
+                               value="{{ $basicinformation->c_index_addr_type_code }}" disabled>
+                    </div>
+                </div>
                 <div class="form-group{{ $errors->has('c_death_age') ? ' has-error' : '' }}">
                     <label for="c_death_age" class="col-sm-2 control-label">享年(death_age)</label>
                     <div class="col-sm-4">

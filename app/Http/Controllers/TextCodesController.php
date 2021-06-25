@@ -65,6 +65,8 @@ class TextCodesController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
+        //20210624增加用戶名和保存時間自動填寫
+        $data = $this->toolRepository->timestamp($data, True); //新增
         if ($data['c_textid'] == null or $data['c_textid'] == 0 or !TextCode::where('c_textid', $data['c_textid'])->get()->isEmpty()){
             flash('c_textid 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();

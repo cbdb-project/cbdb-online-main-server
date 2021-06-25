@@ -16,6 +16,7 @@
                     <th>sequence</th>
                     <th>社會關係類別</th>
                     <th>社會關係人</th>
+                    <th>作品標題</th>
                     <th style="width: 120px">操作</th>
                 </tr>
                 </thead>
@@ -33,6 +34,7 @@
                             @if($assoc_name[$key])
                                 <a href="{{ route('basicinformation.edit', $assoc_name[$key]['c_personid']) }}" target="_blank">{{ $assoc_name[$key]['assoc_name'] }}</a></td>
                             @endif
+                        <td>{{ $value->pivot->c_text_title }}</td>
                         <td>
                             <div class="btn-group">
                             @php

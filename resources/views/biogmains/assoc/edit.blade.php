@@ -30,7 +30,7 @@ $row->c_notes = unionPKDef($row->c_notes);
                     <label for="" class="col-sm-2 control-label">親屬關係人</label>
                     <div class="col-sm-1">關係</div>
                     <div class="col-sm-3">
-                        <select class="form-control c_kin_code" name="c_kin_code">
+                        <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
                             @if($res['kin_code'])
                                 <option value="{{ $row->c_kin_code }}" selected="selected">{{ $res['kin_code'] }}</option>
                             @endif
@@ -68,7 +68,7 @@ $row->c_notes = unionPKDef($row->c_notes);
                     <label for="" class="col-sm-2 control-label">社會關係人親屬</label>
                     <div class="col-sm-1">關係</div>
                     <div class="col-sm-3">
-                        <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code">
+                        <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code" onchange="assoc_kinship_pair()">
                             @if($res['assoc_kin_code'])
                                 <option value="{{ $row->c_assoc_kin_code }}" selected="selected">{{ $res['assoc_kin_code'] }}</option>
                             @endif
@@ -161,11 +161,27 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">社會關係指證人</label>
+                    <label for="" class="col-sm-2 control-label">社會關係中介人(tertiary_personid)</label>
                     <div class="col-sm-10">
                         <select class="form-control biog" name="c_tertiary_personid">
                             @if($res['tertiary_personid'])
                                 <option value="{{ $row->c_tertiary_personid }}" selected="selected">{{ $res['tertiary_personid'] }}</option>
+                            @endif
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">社會關係中介類型(tertiary_type)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_tertiary_type_notes" value="{{ $row->c_tertiary_type_notes }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">社會關係指證人</label>
+                    <div class="col-sm-10">
+                        <select class="form-control biog" name="c_assoc_claimer_id">
+                            @if($res['assoc_claimer_id'])
+                                <option value="{{ $row->c_assoc_claimer_id }}" selected="selected">{{ $res['assoc_claimer_id'] }}</option>
                             @endif
                         </select>
                     </div>
@@ -221,6 +237,28 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成對親屬關係</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kinship_pair" name="c_kinship_pair">
+                            @if($res['kinship_pair'])
+                                <option value="{{ $res['kinship_pair'] }}" selected="selected">{{ $res['kinship_pair'] }}</option>
+                            @endif
+                                <option value="0">無對應親屬關係</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成對社會關係人的親屬關係</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_assoc_kinship_pair" name="c_assoc_kinship_pair">
+                            @if($res['assoc_kinship_pair'])
+                                <option value="{{ $res['assoc_kinship_pair'] }}" selected="selected">{{ $res['assoc_kinship_pair'] }}</option>
+                            @endif
+                                <option value="0">無對應親屬關係</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="" class="col-sm-2 control-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
@@ -252,13 +290,17 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
         $(".select2").select2();
         $(".biog").select2(options('biog'));
         $(".c_kin_code").select2(options('kincode'));
+        $(".c_kinship_pair").select2();
         $(".c_assoc_kin_code").select2(options('kincode'));
+        $(".c_assoc_kinship_pair").select2();
         $(".c_assoc_code").select2(options('assoccode'));
         $(".c_addr_id").select2(options('addr'));
         $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
         $(".c_assocship_pair").select2();
         assocship_pair();
+        //kinship_pair();
+        //assoc_kinship_pair();
 
         function formatRepo (repo) {
             if (repo.loading) {
@@ -331,6 +373,55 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                     item = data[i];
                     // console.log(item);
                     $(".c_assocship_pair").append(new Option(item['c_assoc_code'] + ' ' + item['c_assoc_desc_chn'] + ' ' + item['c_assoc_desc'], item['c_assoc_code'], false, true));
+                }
+            });
+
+        }
+
+        function kinship_pair(){
+            let c_kin_code = $('.c_kin_code').val();
+            let c_kin_id = $('.c_kin_id').val();
+            // console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+                    item = data[i];
+                    // console.log(item);
+                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
+                }
+            });
+
+        }
+
+        function assoc_kinship_pair(){
+            let c_assoc_kin_code = $('.c_assoc_kin_code').val();
+            let c_assoc_kin_id = $('.c_assoc_kin_id').val();
+            // console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_assoc_kin_code, person_id: c_assoc_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+
+                    item = data[i];
+                    // console.log(item);
+                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    $(".c_assoc_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
                 }
             });
 

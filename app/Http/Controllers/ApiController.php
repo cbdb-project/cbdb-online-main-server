@@ -405,7 +405,8 @@ class ApiController extends Controller
         $person_id = $request->person_id;
         //20201026修改成對親屬關係的選項
         $res = KinshipCode::where('c_kin_pair1', '=', $kin_code)->orWhere('c_kin_pair2', '=', $kin_code)->orderBy('c_pick_sorting', 'desc')->get();
-        if(count((array)$res) == 0) {
+        $res_arr = json_decode($res, true);
+        if(count((array)$res_arr) == 0) {
             $data = KinshipCode::find($kin_code);
             $res = KinshipCode::find([$data->c_kin_pair2, $data->c_kin_pair1]);
         }

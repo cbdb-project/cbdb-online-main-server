@@ -23,7 +23,7 @@
                     <label for="" class="col-sm-2 control-label">親屬關係人</label>
                     <div class="col-sm-1">關係</div>
                     <div class="col-sm-3">
-                        <select class="form-control c_kin_code" name="c_kin_code">
+                        <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
@@ -53,7 +53,7 @@
                     <label for="" class="col-sm-2 control-label">社會關係人親屬</label>
                     <div class="col-sm-1">關係</div>
                     <div class="col-sm-3">
-                        <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code">
+                        <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code" onchange="assoc_kinship_pair()">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
@@ -136,9 +136,23 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">社會關係指證人</label>
+                    <label for="" class="col-sm-2 control-label">社會關係中介人(tertiary_personid)</label>
                     <div class="col-sm-10">
                         <select class="form-control biog" name="c_tertiary_personid">
+                            <option value="0" selected="selected"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">社會關係中介類型(tertiary_type)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="c_tertiary_type_notes" value="">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">社會關係指證人</label>
+                    <div class="col-sm-10">
+                        <select class="form-control biog" name="c_assoc_claimer_id">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
@@ -186,6 +200,22 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成對親屬關係</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_kinship_pair" name="c_kinship_pair">
+                            <option value="0">無對應親屬關係</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="" class="col-sm-2 control-label">成對社會關係人的親屬關係</label>
+                    <div class="col-sm-10">
+                        <select class="form-control c_assoc_kinship_pair" name="c_assoc_kinship_pair">
+                            <option value="0">無對應親屬關係</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>
@@ -201,7 +231,9 @@
         $(".select2").select2();
         $(".biog").select2(options('biog'));
         $(".c_kin_code").select2(options('kincode'));
+        $(".c_kinship_pair").select2();
         $(".c_assoc_kin_code").select2(options('kincode'));
+        $(".c_assoc_kinship_pair").select2();
         $(".c_assoc_code").select2(options('assoccode'));
         $(".c_addr_id").select2(options('addr'));
         $(".c_inst_code").select2(options('socialinstcode'));
@@ -280,6 +312,56 @@
                     item = data[i];
                     // console.log(item);
                     $(".c_assocship_pair").append(new Option(item['c_assoc_code'] + ' ' + item['c_assoc_desc_chn'] + ' ' + item['c_assoc_desc'], item['c_assoc_code'], false, true));
+                }
+            });
+
+        }
+ 
+        function kinship_pair(){
+            let c_kin_code = $('.c_kin_code').val();
+            let c_kin_id = $('.c_kin_id').val();
+            // console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+
+                    item = data[i];
+                    // console.log(item);
+                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
+                }
+            });
+
+        }
+
+        function assoc_kinship_pair(){
+            let c_assoc_kin_code = $('.c_assoc_kin_code').val();
+            let c_assoc_kin_id = $('.c_assoc_kin_id').val();
+            // console.log(c_kin_id, c_kin_code);
+            // if (c_kin_id == 0 || c_kin_id == -999) {return}
+            let data = [{
+                id: 0,
+                text: '请选择对应亲属关系'
+            }];
+            // $(".c_kinship_pair").val(null).trigger("change");
+            // console.log($(".c_kinship_pair").val());
+            $.get('/api/select/search/kinpair', {kin_code: c_assoc_kin_code, person_id: c_assoc_kin_id}, function (data, textStatus){
+                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
+                // console.log(data);
+                for (let i=data.length-1; i>-1; i--){
+
+                    item = data[i];
+                    // console.log(item);
+                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
+                    $(".c_assoc_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
                 }
             });
 

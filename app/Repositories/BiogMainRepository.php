@@ -957,8 +957,22 @@ class BiogMainRepository
         $kin_code = null;
         if($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
-            $kin_code = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
+        //20210705新增
+        $kinship_pair = null;
+        if($row->c_kin_id || $row->c_kin_id === 0) {
+            $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_kin_id', $row->c_kin_id]])->first()->c_kin_code;
+            $text_ = KinshipCode::find($k_p_code);
+            $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+        }
+        $assoc_kinship_pair = null;
+        if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
+            $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_assoc_kin_id', $row->c_assoc_kin_id]])->first()->c_assoc_kin_code;
+            $text_ = KinshipCode::find($a_k_p_code);
+            $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+        }
+        //新增結束
         $kin_id = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
@@ -977,7 +991,7 @@ class BiogMainRepository
         $assoc_kin_code = null;
         if($row->c_assoc_kin_code || $row->c_assoc_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_assoc_kin_code);
-            $assoc_kin_code = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $assoc_kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         $assoc_kin_id = null;
         if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
@@ -988,6 +1002,11 @@ class BiogMainRepository
         if($row->c_tertiary_personid || $row->c_tertiary_personid === 0) {
             $text_ = BiogMain::find($row->c_tertiary_personid);
             $tertiary_personid = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+        }
+        $assoc_claimer_id = null;
+        if($row->c_assoc_claimer_id || $row->c_assoc_claimer_id === 0) {
+            $text_ = BiogMain::find($row->c_assoc_claimer_id);
+            $assoc_claimer_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $addr_id = null;
         if($row->c_addr_id || $row->c_addr_id === 0) {
@@ -1028,7 +1047,7 @@ class BiogMainRepository
         }
         return ['row' => $row, 'text_str' => $text_str, 'kin_code' => $kin_code, 'kin_id' => $kin_id,
             'assoc_code' => $assoc_code, 'assoc_id' => $assoc_id, 'assoc_kin_code' => $assoc_kin_code, 'assoc_kin_id' => $assoc_kin_id,
-            'tertiary_personid' => $tertiary_personid, 'addr_id' => $addr_id, 'inst_code' => $inst_code];
+            'tertiary_personid' => $tertiary_personid, 'assoc_claimer_id' => $assoc_claimer_id, 'addr_id' => $addr_id, 'inst_code' => $inst_code, 'kinship_pair' => $kinship_pair, 'assoc_kinship_pair' => $assoc_kinship_pair];
     }
 
     public function assocUpdateById(Request $request, $id, $c_personid)
@@ -1065,11 +1084,13 @@ class BiogMainRepository
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
+        $kin_pair = $data['c_kinship_pair'];
+        $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $assoc_id = $data['c_assoc_id'];
         $old_assoc_id = $row->c_assoc_id;
         //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
         //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
-        $data = array_except($data, ['_method', '_token', 'c_assocship_pair']);
+        $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
@@ -1089,6 +1110,10 @@ class BiogMainRepository
         $ori_data = $data;
         $data['c_personid'] = $c_personid;
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
+        //20210702取得成對資料原本的c_kin_code
+        $data['c_kin_code'] = $kin_pair;
+        $data['c_assoc_kin_code'] = $assoc_kin_pair;
+        //新增結束
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $assoc_id;
         $data = array_except($data, ['c_assoc_id']);
@@ -1106,8 +1131,10 @@ class BiogMainRepository
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
+        $kin_pair = $data['c_kinship_pair'];
+        $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $data['c_personid'] = $id;
-        $data = array_except($data, ['_token', 'c_assocship_pair']);
+        $data = array_except($data, ['_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
         $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
@@ -1121,6 +1148,10 @@ class BiogMainRepository
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;
+        //20210702增加成對親屬關係
+        $data['c_kin_code'] = $kin_pair;
+        $data['c_assoc_kin_code'] = $assoc_kin_pair;
+        //新增結束
         DB::table('ASSOC_DATA')->insert($data);
         //return $data['tts_sysno'];
         return $ori_Data;

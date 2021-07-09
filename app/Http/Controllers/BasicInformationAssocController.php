@@ -52,7 +52,7 @@ class BasicInformationAssocController extends Controller
         }
         $assoc_name = $biogbasicinformation->assoc->map(function ($item, $key) use ($assoc_name_id, $assoc_name_sequence, $assoc_name_name, $assoc_name_title) {
             if (in_array($item->pivot->c_assoc_id, $assoc_name_id)) {
-                return ['c_personid' => $item->pivot->c_assoc_id, 'c_sequence' => $assoc_name_sequence[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'c_text_title' => $assoc_name_title[array_search($item->pivot->c_assoc_id, $assoc_name_id)]];
+                return ['c_personid' => $item->pivot->c_assoc_id, 'c_sequence' => $assoc_name_sequence[$key], 'assoc_name' => $assoc_name_name[array_search($item->pivot->c_assoc_id, $assoc_name_id)], 'c_text_title' => $assoc_name_title[$key]];
             }
             return ['c_personid' => 0, 'c_sequence' => 0, 'assoc_name' => '', 'c_text_title' => ''];
         });

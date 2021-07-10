@@ -959,16 +959,16 @@ class BiogMainRepository
             $text_ = KinshipCode::find($row->c_kin_code);
             $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
-        //20210705新增
+        //20210705新增，20210708[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係修改
         $kinship_pair = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
-            $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_kin_id', $row->c_kin_id]])->first()->c_kin_code;
+            $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_kin_code;
             $text_ = KinshipCode::find($k_p_code);
             $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         $assoc_kinship_pair = null;
         if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
-            $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_assoc_kin_id', $row->c_assoc_kin_id]])->first()->c_assoc_kin_code;
+            $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_assoc_kin_code;
             $text_ = KinshipCode::find($a_k_p_code);
             $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
@@ -1088,6 +1088,7 @@ class BiogMainRepository
         $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $assoc_id = $data['c_assoc_id'];
         $old_assoc_id = $row->c_assoc_id;
+        $old_c_text_title = $row->c_text_title;
         //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
         //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
@@ -1114,6 +1115,10 @@ class BiogMainRepository
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
         //新增結束
+        //20210708增加[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係
+        $data['c_kin_id'] = $c_personid;
+        $data['c_assoc_kin_id'] = $c_personid;
+        //新增結束
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $assoc_id;
         $data = array_except($data, ['c_assoc_id']);
@@ -1122,6 +1127,7 @@ class BiogMainRepository
         DB::table('ASSOC_DATA')->where([
             ['c_assoc_id', '=', $id], 
             ['c_personid', '=', $old_assoc_id],
+            ['c_text_title', '=', $old_c_text_title],
         ])->update($data);
         return $ori_data;
     }
@@ -1151,6 +1157,10 @@ class BiogMainRepository
         //20210702增加成對親屬關係
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
+        //新增結束
+        //20210708增加[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係
+        $data['c_kin_id'] = $id;
+        $data['c_assoc_kin_id'] = $id;
         //新增結束
         DB::table('ASSOC_DATA')->insert($data);
         //return $data['tts_sysno'];

@@ -329,25 +329,34 @@ RequestPlayload:{
 | data[`i`].xy_count | 數字 | 結果中該地點存在的人物數 |
 
 # 八、查詢除授記錄（Office Postings）
-## 輸入參數:
-| 參數名| 參數類型 | 說明 |
-| ------ | ------ | ------ |
-| office | 陣列 | 要查詢的職官ID列表 |
-| useOfficePlace |數字 | 是否啟用與職官相關的地點這一條件。是=1，否=0 |
-| officePlace | 陣列 | 與職官相關的地點列表 |
-| usePeoplePlace | 數字 | 是否啟用與人物相關的地點這一條件。是=1，否=0 |
-| peoplePlace | 陣列 | 與人物相關的地點列表 |
-| indexYear|數字|是否採用指數年，是=1，否=0|
-| indexStartTime|數字|指數年開始日期|
-| indexEndTime|數字|指數年結束日期|
-| useXy|數字|是否使用xy座標，是=1，否=0|
-| start|數字|結果開始筆數|
-| list|數字|列表長度|
 
-**注：`useOfficePlace` `usePeoplePlace` `indexYear` 的優先級高於`officePlace` `peoplePlace` `indexYearStartTime` `indexYearEndTime`，即若以`use`開頭的三個變數取值為0，就不使用相應的條件（不論陣列是否為空）**
-## 輸入示例: 
-**注：採用POST方法，Content-Type: application/json**
+## 輸入參數:
+
+| 參數名         | 參數類型 | 說明                                            |
+| -------------- | -------- | ----------------------------------------------- |
+| office         | 陣列     | 要查詢的職官 ID 列表                            |
+| useOfficePlace | 數字     | 是否啟用與職官相關的地點這一條件。是=1，否=0    |
+| officePlace    | 陣列     | 與職官相關的地點列表                            |
+| usePeoplePlace | 數字     | 是否啟用與人物相關的地點這一條件。是=1，否=0    |
+| peoplePlace    | 陣列     | 與人物相關的地點列表                            |
+| useDate        | 數字     | 是否採用日期這一條件，是=1，否=0                |
+| dateType       | 字串     | 採用指數年抑或是朝代。指數年=index 朝代=dynasty |
+| indexStartTime | 數字     | 指數年開始日期                                  |
+| indexEndTime   | 數字     | 指數年結束日期                                  |
+| dynStart       | 數字     | 開始朝代                                        |
+| dynEnd         | 數字     | 結束朝代                                        |
+| useXy          | 數字     | 是否使用 xy 座標，是=1，否=0                    |
+| start          | 數字     | 結果開始筆數                                    |
+| list           | 數字     | 列表長度                                        |
+
+**注：`useOfficePlace` `usePeoplePlace` `useDate` 的優先級高於`officePlace` `peoplePlace` `indexYearStartTime` `indexYearEndTime` `dynStart` `dynEnd`，即若以`use`開頭的三個變數取值為 0，就不使用相應的條件（不論其陣列是否為空）**
+**注：如果使用朝代作為條件，返回的結果中應包括`dynStart` `dynEnd`中指定的朝代**
+
+## 輸入示例:
+
+**注：採用 POST 方法，Content-Type: application/json**
 `/api/query_office_postings`
+
 ```json
 RequestPlayload:{
     "office":[920,1022,1023],
@@ -355,18 +364,25 @@ RequestPlayload:{
     "officePlace":[],
     "usePeoplePlace":1,
     "peoplePlace":[2928,10522,12553,13947,13949],
-    "indexYear":1,
+    "useDate":1,
+    "dateType":"index",
     "indexStartTime":960,
     "indexEndTime":1250,
+    "dynStart":null,
+    "dynEnd":null,
     "useXy":1,
     "start":11,
     "list":10
 }
 ```
-說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於960和1250年間的人的任官記錄。返回結果的第11筆到第20筆。
-## 輸出格式: 
-數據類型：`物件` 
-示例   
+
+說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於 960 和 1250 年間的人的任官記錄。返回結果的第 11 筆到第 20 筆。
+
+## 輸出格式:
+
+數據類型：`物件`
+示例
+
 ```json
 {
     "total":100,
@@ -378,42 +394,44 @@ RequestPlayload:{
         ]
 }
 ```
-| 屬性名| 屬性類型 | 說明 |
-| ------ | ------ | ------ |
-| total |  數字 | 數據總筆數 |
-| start | 數字 | 當前數據開始筆數 |
-| end | 數字 | 當前數據結束筆數 |
-| data | 陣列 | 除授記錄列表 |
-| data[`i`].PersonID | 數字 | 人物ID |
-| data[`i`].Name | 字符串 | 人物名，英文 |
-| data[`i`].NameChn | 字符串 | 人物名，中文 |
-| data[`i`].Sex | 字符串 | 人物性別 |
-| data[`i`].IndexYear | 數字 | 人物指數年 |
-| data[`i`].AddrID | 數字 | 人物地點ID |
-| data[`i`].AddrType | 字符串 | 地點類型，英文 |
-| data[`i`].AddrTypeChn | 字符串 | 地點類型，中文 |
-| data[`i`].AddrName | 字符串 | 人物地點，英文 |
-| data[`i`].AddrChn | 字符串 | 人物地點，中文 |
-| data[`i`].X | 數字 | 人物地點經度座標 |
-| data[`i`].Y | 數字 | 人物地點緯度座標 |
-| data[`i`].OfficeCode | 數字 | 官職ID |
-| data[`i`].OfficeName | 字符串 | 官職名，英文 |
-| data[`i`].OfficeNameChn | 字符串 | 官職名，中文 |
-| data[`i`].FirstYear | 數字 | 任官開始年 |
-| data[`i`].LastYear | 數字 | 任官結束年 |
-| data[`i`].Dynasty| 字符串 | 朝代 |
-| data[`i`].OfficeAddrID | 數字 | 官職地點ID |
-| data[`i`].OfficeAddrName | 字符串 | 官職地點名，英文 |
-| data[`i`].OfficeAddrChn | 字符串 | 官職地點名，中文 |
-| data[`i`].OfficeX | 數字 | 官職地點經度座標 |
-| data[`i`].OfficeY | 數字 | 官職地點緯度座標 |
-| data[`i`].office_xy_count | 數字 | 職官地址數 |
-| data[`i`].PostingID | 數字 | 除授記錄 |
-| data[`i`].ApptType | 字符串 | 除授類型，英文 |
-| data[`i`].ApptTypeChn | 字符串 | 除授類型，中文 |
-| data[`i`].AssumptionOffice | 字符串 | 赴任情況，英文 |
-| data[`i`].AssumptionOfficeChn  | 字符串 | 赴任情況，中文 |
-| data[`i`].Notes  | 字符串 | 備註 |
+
+| 屬性名                        | 屬性類型 | 說明             |
+| ----------------------------- | -------- | ---------------- |
+| total                         | 數字     | 數據總筆數       |
+| start                         | 數字     | 當前數據開始筆數 |
+| end                           | 數字     | 當前數據結束筆數 |
+| data                          | 陣列     | 除授記錄列表     |
+| data[`i`].PersonID            | 數字     | 人物 ID          |
+| data[`i`].Name                | 字符串   | 人物名，英文     |
+| data[`i`].NameChn             | 字符串   | 人物名，中文     |
+| data[`i`].Sex                 | 字符串   | 人物性別         |
+| data[`i`].IndexYear           | 數字     | 人物指數年       |
+| data[`i`].AddrID              | 數字     | 人物地點 ID      |
+| data[`i`].AddrType            | 字符串   | 地點類型，英文   |
+| data[`i`].AddrTypeChn         | 字符串   | 地點類型，中文   |
+| data[`i`].AddrName            | 字符串   | 人物地點，英文   |
+| data[`i`].AddrChn             | 字符串   | 人物地點，中文   |
+| data[`i`].X                   | 數字     | 人物地點經度座標 |
+| data[`i`].Y                   | 數字     | 人物地點緯度座標 |
+| data[`i`].OfficeCode          | 數字     | 官職 ID          |
+| data[`i`].OfficeName          | 字符串   | 官職名，英文     |
+| data[`i`].OfficeNameChn       | 字符串   | 官職名，中文     |
+| data[`i`].FirstYear           | 數字     | 任官開始年       |
+| data[`i`].LastYear            | 數字     | 任官結束年       |
+| data[`i`].Dynasty             | 字符串   | 朝代             |
+| data[`i`].OfficeAddrID        | 數字     | 官職地點 ID      |
+| data[`i`].OfficeAddrName      | 字符串   | 官職地點名，英文 |
+| data[`i`].OfficeAddrChn       | 字符串   | 官職地點名，中文 |
+| data[`i`].OfficeX             | 數字     | 官職地點經度座標 |
+| data[`i`].OfficeY             | 數字     | 官職地點緯度座標 |
+| data[`i`].office_xy_count     | 數字     | 職官地址數       |
+| data[`i`].PostingID           | 數字     | 除授記錄         |
+| data[`i`].ApptType            | 字符串   | 除授類型，英文   |
+| data[`i`].ApptTypeChn         | 字符串   | 除授類型，中文   |
+| data[`i`].AssumptionOffice    | 字符串   | 赴任情況，英文   |
+| data[`i`].AssumptionOfficeChn | 字符串   | 赴任情況，中文   |
+| data[`i`].Notes               | 字符串   | 備註             |
+
 
 # 九、通過入仕途徑查詢人物
 

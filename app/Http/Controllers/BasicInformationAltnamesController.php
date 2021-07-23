@@ -119,7 +119,7 @@ class BasicInformationAltnamesController extends Controller
         }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
             ['c_alt_name_type_code', '=', $addr_l[2]],
         ])->first();
         $text_str = null;
@@ -165,7 +165,7 @@ class BasicInformationAltnamesController extends Controller
         }
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
             ['c_alt_name_type_code', '=', $addr_l[2]],
         ])->update($data);
         $new_alt = $id.'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
@@ -173,6 +173,9 @@ class BasicInformationAltnamesController extends Controller
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $new_alt = $this->biogMainRepository->unionPKDef($new_alt);
+        //20210715新增錯別字過濾
+        $errWord = array('?', '', '�');
+        $new_alt = str_replace($errWord, '', $new_alt);
         return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$new_alt]);
     }
 
@@ -201,14 +204,14 @@ class BasicInformationAltnamesController extends Controller
         }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
             ['c_alt_name_type_code', '=', $addr_l[2]],
         ])->first();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
             ['c_alt_name_type_code', '=', $addr_l[2]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');

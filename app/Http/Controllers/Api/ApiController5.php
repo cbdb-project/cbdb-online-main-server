@@ -47,6 +47,11 @@ class ApiController5 extends Controller
         $usePeoplePlace = $arr['usePeoplePlace'];
         $useXy = $arr['useXy'];
         $broad = $arr['broad'];
+        //20210723建安新增指數年查詢
+        $indexYear = $arr['indexYear'];
+        $indexStartTime = $arr['indexStartTime'];
+        $indexEndTime = $arr['indexEndTime'];
+        //新增結束
         if($broad == 1) { $XY = '0.06'; }
         if($broad == 0) { $XY = '0.03'; }
         
@@ -67,6 +72,13 @@ class ApiController5 extends Controller
         if($usePeoplePlace) {
             $row->whereIn('BIOG_ADDR_DATA.c_addr_id', $place);
         }
+
+        //20210723建安新增
+        if($indexYear) {
+            $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+            $row->whereBetween('BIOG_MAIN.c_index_year', array($indexStartTime, $indexEndTime));
+        }
+        //新增結束
 
         if($useXy) {
             $rowOut = $row->get();

@@ -25,6 +25,9 @@ $value->pivot->c_alt_name = unionPKDef($value->pivot->c_alt_name);
 $value->pivot->c_alt_name_chn = unionPKDef($value->pivot->c_alt_name_chn);
 $c_alt_name_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name);
 $c_alt_name_chn_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name_chn);
+//20210715新增錯別字過濾
+$errWord = array('?', '', '�');
+$value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_name_chn);
 @endphp
                     <tr>
                         <td>{{ $key+1 }}</td>

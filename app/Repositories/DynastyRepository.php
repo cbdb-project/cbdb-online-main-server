@@ -15,6 +15,6 @@ class DynastyRepository
 {
     public function dynasties()
     {
-        return Dynasty::select(['c_dy', 'c_dynasty_chn', 'c_dynasty'])->get();
+        return Dynasty::select(['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end'])->get();
     }
 }

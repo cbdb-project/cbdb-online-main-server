@@ -106,9 +106,9 @@
                         <label for="">閏</label>
                         <select name="c_fy_intercalary" class="form-control select2" name="c_natal">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ ord($row->c_fy_intercalary) == 0? 'selected': '' }}>0-否
+                            <option value="0" {{ $row->c_fy_intercalary == 0? 'selected': '' }}>0-否
                             </option>
-                            <option value="1" {{ ord($row->c_fy_intercalary) == 1? 'selected': '' }}>1-是
+                            <option value="1" {{ $row->c_fy_intercalary == 1? 'selected': '' }}>1-是
                             </option>
                         </select>
                     </div>

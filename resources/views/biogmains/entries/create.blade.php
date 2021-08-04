@@ -123,18 +123,10 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構(social_institution)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            <option value="0" selected="selected">0 未知 weizhi</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>
-                    <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            <option value="0" selected="selected">0 未知 weizhi</option>
+                            <option value="0-0" selected="selected">0 [Unknown] [未詳] </option>
                         </select>
                     </div>
                 </div>
@@ -187,8 +179,7 @@
         $(".c_entry_addr_id").select2(options('addr'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_inst_code").select2(options('socialinstaddr'));
-        $(".c_inst_name_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
         $(".c_kin_id").select2(options('biog'));
         $(".c_assoc_id").select2(options('biog'));

@@ -136,21 +136,12 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                    <input name="c_inst_name_code" type="hidden">
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
-                            @if($res['inst_str_new'])
-                                <option value="{{ $row->c_inst_code }}" selected="selected">{{ $res['inst_str_new'] }}</option>
-                            @endif
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構名稱代碼(c_inst_name_code)</label>
-                    <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            @if($res['inst_str'])
-                                <option value="{{ $row->c_inst_name_code }}" selected="selected">{{ $res['inst_str'] }}</option>
+                            @if($res['inst_code'])
+                                <option value="{{ $row->c_inst_code.'-'.$row->c_inst_name_code }}" selected="selected">{{ $res['inst_code'] }}</option>
                             @endif
                         </select>
                     </div>
@@ -216,8 +207,7 @@
         $(".c_addr_id").select2(options('addr'));
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_inst_code").select2(options('socialinstaddr'));
-        $(".c_inst_name_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
         $(".c_kin_id").select2(options('biog'));
         $(".c_assoc_id").select2(options('biog'));

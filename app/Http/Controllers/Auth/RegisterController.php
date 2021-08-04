@@ -84,7 +84,8 @@ class RegisterController extends Controller
             'confirmation_token' => str_random(40),
             'password' => bcrypt($data['password']),
         ]);
-        $this->sendVerifyEmailTo($user);
+        //20210804遮除，禁止發送帳戶激活郵件。
+        //$this->sendVerifyEmailTo($user);
         return $user;
     }
 

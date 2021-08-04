@@ -88,6 +88,23 @@ class BasicInformationEntriesController extends Controller
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         //新增結束
+        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
+        $temp = explode("-", $data['c_inst_code']);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $data['c_inst_code'] = $c_inst_code;
+            $data['c_inst_name_code'] = $c_inst_name_code;
+        }
+        //return $request;
+        //修改結束
         $temp = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
             ['c_entry_code', '=', $data['c_entry_code']],
@@ -176,6 +193,23 @@ class BasicInformationEntriesController extends Controller
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         //新增結束
+        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
+        $temp = explode("-", $data['c_inst_code']);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $data['c_inst_code'] = $c_inst_code;
+            $data['c_inst_name_code'] = $c_inst_name_code;
+        }
+        //return $request;
+        //修改結束
         $id_ = str_replace("--","-minus",$id_);
         $addr_a = explode("-", $id_);
         foreach($addr_a as $key => $value) {

@@ -70,6 +70,25 @@ class BasicInformationSocialInstController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+        //return $request;
+        //修改結束
         $_id = $this->biogMainRepository->socialInstStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', ['id' => $id, '_id' => $_id]);
@@ -129,6 +148,23 @@ class BasicInformationSocialInstController extends Controller
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
+        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
+        $temp = explode("-", $data['c_inst_code']);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $data['c_inst_code'] = $c_inst_code;
+            $data['c_inst_name_code'] = $c_inst_name_code;
+        }
+        //return $request;
+        //修改結束
         $addr_l = explode("-", $id_);
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],

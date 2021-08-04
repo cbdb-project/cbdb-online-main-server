@@ -427,30 +427,36 @@ class BiogMainRepository
             $text_ = AssocCode::find($row->c_assoc_code);
             $assoc_str = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
         }
-        //20181112建安修改
-        $inst_str_new = null;
+        //20210804建安新增社交機構輸出文字的程式碼
+        $inst_code = null;
         if($row->c_inst_code || $row->c_inst_code === 0) {
-            $text = SocialInstAddr::find($row->c_inst_code);
-            $addr = AddressCode::where('c_addr_id', $text->c_inst_addr_id)->first()->c_name_chn;
-            $dy = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_begin_year;
-            $dy2 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_floruit_dy;
-            $dy3 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_end_year;
-            $dy4 = SocialInstCode::where('c_inst_code', $row->c_inst_code)->first()->c_inst_last_known_year;
+            $text_ = SocialInstCode::where([
+                ['c_inst_code', '=', $row->c_inst_code],
+                ['c_inst_name_code', '=', $row->c_inst_name_code],
+            ])->first();
+            $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
+            $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
+            $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
+            if(count((array)$res) == 0 ) $addr = "未詳";
+            else {
+                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            }
+            $dy = $text_->c_inst_begin_year;
+            $dy2 = $text_->c_inst_floruit_dy;
+            $dy3 = $text_->c_inst_end_year;
+            $dy4 = $text_->c_inst_last_known_year;
+            if($name_hz == null) $name_hz = "未詳";
+            if($name_py == null) $name_py = "未詳";
+            if($addr == null) $addr = "未詳";
             if($dy == null) $dy = "未詳";
             if($dy2 == null) $dy2 = "未詳";
             if($dy3 == null) $dy3 = "未詳";
             if($dy4 == null) $dy4 = "未詳";
-            $inst_str_new = $row->c_inst_code." ".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
+            $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
-        
-        $inst_str = null;
-        if($row->c_inst_name_code || $row->c_inst_name_code === 0) {
-            $text_ = SocialInst::find($row->c_inst_name_code);
-            $inst_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
-        }
-        
-        //修改結束
-        return ['row' => $row, 'text_str' => $text_str, 'entry_str' => $entry_str, 'addr_str' => $addr_str, 'kin_str' => $kin_str, 'assoc_str' => $assoc_str, 'inst_str' => $inst_str, 'inst_str_new' => $inst_str_new, 'biog_str' => $biog_str, 'biog_str2' => $biog_str2];
+        //新增結束
+
+        return ['row' => $row, 'text_str' => $text_str, 'entry_str' => $entry_str, 'addr_str' => $addr_str, 'kin_str' => $kin_str, 'assoc_str' => $assoc_str, 'biog_str' => $biog_str, 'biog_str2' => $biog_str2, 'inst_code' => $inst_code];
     }
 
     public function entryUpdateById(Request $request, $id, $c_personid)
@@ -816,14 +822,37 @@ class BiogMainRepository
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
-        $inst_str = null;
-        if($row->c_inst_name_code || $row->c_inst_name_code === 0) {
-            $text_ = SocialInst::find($row->c_inst_name_code);
-//            dd($text_);
-            $inst_str = $text_->c_inst_name_code." ".$text_->c_inst_name_hz." ".$text_->c_inst_name_py;
 
+        //20210804建安新增社交機構輸出文字的程式碼
+        $inst_code = null;
+        if($row->c_inst_code || $row->c_inst_code === 0) {
+            $text_ = SocialInstCode::where([
+                ['c_inst_code', '=', $row->c_inst_code],
+                ['c_inst_name_code', '=', $row->c_inst_name_code],
+            ])->first();
+            $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
+            $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
+            $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
+            if(count((array)$res) == 0 ) $addr = "未詳";
+            else {
+                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            }
+            $dy = $text_->c_inst_begin_year;
+            $dy2 = $text_->c_inst_floruit_dy;
+            $dy3 = $text_->c_inst_end_year;
+            $dy4 = $text_->c_inst_last_known_year;
+            if($name_hz == null) $name_hz = "未詳";
+            if($name_py == null) $name_py = "未詳";
+            if($addr == null) $addr = "未詳";
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
-        return ['row' => $row, 'text_str' => $text_str, 'inst_str' => $inst_str];
+        //新增結束
+
+        return ['row' => $row, 'text_str' => $text_str, 'inst_code' => $inst_code];
     }
 
     public function socialInstUpdateById(Request $request, $id_, $c_personid)

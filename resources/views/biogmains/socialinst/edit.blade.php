@@ -15,11 +15,13 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_inst_name_code" class="col-sm-2 control-label">社交機構代碼(c_inst_code)</label>
+                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                    <input name="c_inst_name_code" type="hidden">
                     <div class="col-sm-10">
-                        <select class="form-control c_inst_name_code" name="c_inst_name_code">
-                            @if($res['inst_str'])
-                                <option value="{{ $row->c_inst_name_code }}" selected="selected">{{ $res['inst_str'] }}</option>
+                        <select class="form-control c_inst_code" name="c_inst_code">
+                            @if($res['inst_code'])
+                                <option value="{{ $row->c_inst_code.'-'.$row->c_inst_name_code }}" selected="selected">{{ $res['inst_code'] }}</option>
+
                             @endif
                         </select>
                     </div>
@@ -123,7 +125,7 @@
 @section('js')
     <script>
         $(".select2").select2();
-        $(".c_inst_name_code").select2(options('socialinst'));
+        $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
 
         function formatRepo (repo) {

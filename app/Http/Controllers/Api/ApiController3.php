@@ -92,8 +92,8 @@ class ApiController3 extends Controller
             elseif($dateType == 'dynasty') {
                 //$row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
                 $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
-                $row->where('DYNASTIES.c_start', '>=', $dynStart);
-                $row->where('DYNASTIES.c_end', '<=', $dynEnd);
+                $row->where('DYNASTIES.c_dy', '>=', $dynStart);
+                $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
             }
             else {}
         }

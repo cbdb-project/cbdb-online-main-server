@@ -184,9 +184,9 @@
                         <label for="">閏</label>
                         <select name="c_by_intercalary" class="form-control select2">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ ord($basicinformation->c_by_intercalary) == 0? 'selected': '' }}>0-否
+                            <option value="0" {{ $basicinformation->c_by_intercalary == 0? 'selected': '' }}>0-否
                             </option>
-                            <option value="1" {{ ord($basicinformation->c_by_intercalary) == 1? 'selected': '' }}>1-是
+                            <option value="1" {{ $basicinformation->c_by_intercalary == 1? 'selected': '' }}>1-是
                             </option>
                         </select>
                     </div>
@@ -223,9 +223,9 @@
                         <label for="">閏</label>
                         <select name="c_dy_intercalary" class="form-control select2">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ ord($basicinformation->c_dy_intercalary) == 0? 'selected': '' }}>0-否
+                            <option value="0" {{ $basicinformation->c_dy_intercalary == 0? 'selected': '' }}>0-否
                             </option>
-                            <option value="1" {{ ord($basicinformation->c_dy_intercalary) == 1? 'selected': '' }}>1-是
+                            <option value="1" {{ $basicinformation->c_dy_intercalary == 1? 'selected': '' }}>1-是
                             </option>
                         </select>
                     </div>

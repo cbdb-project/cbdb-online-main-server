@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\AddressCode;
+use App\AddrCode;
+use App\AddrBelong;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
@@ -127,8 +129,24 @@ class BasicInformationAddressesController extends Controller
         ])->first();
         $addr_str = null;
         if($row->c_addr_id || $row->c_addr_id === 0){
-            $addr_ = AddressCode::find($row->c_addr_id);
-            $addr_str = $addr_->c_addr_id." ".$addr_->c_name." ".$addr_->c_name_chn." ".$addr_->c_firstyear."~".$addr_->c_lastyear;
+            //20210805修改「地址」中利用 ADDRESSES 表和 ADDR_CODES 表
+            //$addr_ = AddressCode::find($row->c_addr_id);
+            //$addr_str = $addr_->c_addr_id." ".$addr_->c_name." ".$addr_->c_name_chn." ".$addr_->c_firstyear."~".$addr_->c_lastyear;
+            $item = AddrCode::find($row->c_addr_id);
+            $belongs = "";
+            $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+            $add = "";
+            $dy = AddrBelong::where('c_addr_id', $item->c_addr_id)->value('c_belongs_to');
+            $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+            if($dy == null) {
+                $dy = 0; $add = "";
+            }
+            else {
+                $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+                $add = "[[".$dy." ".$dy2."]]";
+            }
+            $addr_str = $originalText." ".$add;
+            //修改結束
         }
         $text_str = null;
 //        dd($row->c_source);

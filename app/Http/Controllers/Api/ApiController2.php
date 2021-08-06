@@ -37,14 +37,18 @@ class ApiController2 extends Controller
         $json = $request['RequestPlayload'];
         $arr = json_decode($json, true);
         $office = $officePlace = $peoplePlace = $data = $useXyArr = array();
-        $useOfficePlace = $usePeoplePlace = $indexYear = $indexStartTime = $indexEndTime = $useXy = $start = $list = 0;
+        $useOfficePlace = $usePeoplePlace = $indexYear = $useDate = $indexStartTime = $indexEndTime = $dateType = $dynStart = $dynEnd = $useXy = $start = $list = 0;
         
         $office = $arr['office'];
         $officePlace = $arr['officePlace'];
         $peoplePlace = $arr['peoplePlace'];
         $useOfficePlace = $arr['useOfficePlace'];
         $usePeoplePlace = $arr['usePeoplePlace']; 
-        $indexYear = $arr['indexYear']; 
+        //$indexYear = $arr['indexYear']; 
+        $useDate = $arr['useDate'];
+        $dateType = $arr['dateType'];
+        $dynStart = $arr['dynStart'];
+        $dynEnd = $arr['dynEnd'];
         $indexStartTime = $arr['indexStartTime']; 
         $indexEndTime = $arr['indexEndTime']; 
         $useXy = $arr['useXy']; 
@@ -54,6 +58,7 @@ class ApiController2 extends Controller
         
         $row = DB::table('POSTED_TO_OFFICE_DATA')->whereIn('POSTED_TO_OFFICE_DATA.c_office_id', $office);
         $row->join('POSTED_TO_ADDR_DATA', 'POSTED_TO_OFFICE_DATA.c_posting_id', '=', 'POSTED_TO_ADDR_DATA.c_posting_id');
+        $row->join('BIOG_MAIN', 'POSTED_TO_OFFICE_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
 
         if($useOfficePlace) {
             $row->whereIn('c_addr_id', $officePlace);
@@ -63,9 +68,23 @@ class ApiController2 extends Controller
             $row->join('BIOG_ADDR_DATA', 'POSTED_TO_ADDR_DATA.c_personid', '=', 'BIOG_ADDR_DATA.c_personid');
             $row->whereIn('BIOG_ADDR_DATA.c_addr_id', $peoplePlace);
         }
+        /*
         if($indexYear) {
             $row->join('BIOG_MAIN', 'POSTED_TO_OFFICE_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
             $row->whereBetween('BIOG_MAIN.c_index_year', array($indexStartTime, $indexEndTime));
+        }
+        */
+        if($useDate) {
+            if($dateType == 'index') {
+                $row->where('BIOG_MAIN.c_index_year', '>=', $dateStartTime);
+                $row->where('BIOG_MAIN.c_index_year', '<=', $dateEndTime);
+            }
+            elseif($dateType == 'dynasty') {
+                $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
+                $row->where('DYNASTIES.c_dy', '>=', $dynStart);
+                $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
+            }
+            else {}
         }
         if($useXy) {
             $rowOut = $row->get();
@@ -103,6 +122,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
         if($list) {
             $row = $row->slice($start, $list);
         }
+        //return $row;
 
         foreach ($row as $val) {
             $BiogMain = $BiogAddr = $BiogAddrCode = $AddrCode = $AddrCode_office = $office = $POSTED_TO_ADDR_DATA = $c_addr_type = $c_addr_id = 0;

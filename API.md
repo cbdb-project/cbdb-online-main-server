@@ -1,5 +1,5 @@
 # 使用方法
-將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu:81
+將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu
 
 形如: [https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100](https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100)
 

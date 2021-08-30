@@ -22,7 +22,7 @@ Route::middleware('auth:api')->get(/**
 });
 
 Route::group([], function () {
-    Route::post('name', function (Request $request)    {
+    Route::match(['get', 'post'], 'name', function (Request $request) {
         return \App\Repositories\BiogMainRepository::namesByQuery($request);
     });
 

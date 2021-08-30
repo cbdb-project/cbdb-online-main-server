@@ -221,7 +221,17 @@ class BiogMainRepository
         if (!$request->q){
             return BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->paginate($num);
         }
-        $names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
+        //20210827修改拼音檢索時以字為單位
+        //$names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
+        $names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])
+            ->where('c_name_chn', 'like', '%'.$request->q.'%')
+            ->orWhere('c_name', 'like', ''.$request->q.'')
+            ->orWhere('c_surname', 'like', ''.$request->q.'')
+            ->orWhere('c_mingzi', 'like', ''.$request->q.'')
+            ->orWhere('c_personid', $request->q)
+            ->orderByRaw("FIELD(c_surname, '$request->q') DESC")
+            ->orderBy('c_personid', 'ASC')
+            ->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
     }

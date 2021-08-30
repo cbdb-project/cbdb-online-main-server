@@ -266,9 +266,16 @@ class ApiController4_2 extends Controller
             $data_val['rName'] = $FirstBiogMain->c_name;
             $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
             $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
-            $data_val['pId'] = $val['c_personid'];
-            $data_val['pName'] = $BiogMain->c_name;
-            $data_val['pNameChn'] = $BiogMain->c_name_chn;
+            if($BiogMain) {
+                $data_val['pId'] = $val['c_personid'];
+                $data_val['pName'] = $BiogMain->c_name;
+                $data_val['pNameChn'] = $BiogMain->c_name_chn;
+            }
+            else {
+                $data_val['pId'] = $val['c_personid'];
+                $data_val['pName'] = '';
+                $data_val['pNameChn'] = '';
+            }
             //這裡是查詢人物的[地址]BIOG_ADDR_DATA
             $c_addr_type = $c_addr_id = 0;
             $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
@@ -290,11 +297,20 @@ class ApiController4_2 extends Controller
             $data_val['pY'] = $AddrCode->y_coord;
 
             $KinBiogMain = BiogMain::where('c_personid', '=', $val['c_kin_id'])->first();
-            $data_val['Id'] = $val['c_kin_id'];
-            $data_val['Name'] = $KinBiogMain->c_name;
-            $data_val['NameChn'] = $KinBiogMain->c_name_chn;
-            $data_val['Sex'] = $KinBiogMain->c_female ? '1-女' : '0-男';
-            $data_val['IndexYear'] = $KinBiogMain->c_index_year;
+            if($KinBiogMain) {
+                $data_val['Id'] = $val['c_kin_id'];
+                $data_val['Name'] = $KinBiogMain->c_name;
+                $data_val['NameChn'] = $KinBiogMain->c_name_chn;
+                $data_val['Sex'] = $KinBiogMain->c_female ? '1-女' : '0-男';
+                $data_val['IndexYear'] = $KinBiogMain->c_index_year;
+            }
+            else {
+                $data_val['Id'] = $val['c_kin_id'];
+                $data_val['Name'] = '';
+                $data_val['NameChn'] = '';
+                $data_val['Sex'] = '';
+                $data_val['IndexYear'] = '';
+            }
             $KinshipCode = KinshipCode::where('c_kincode', '=', $val['c_kin_code'])->first();
             $data_val['pkinship'] = $KinshipCode->c_kinrel_chn;
 

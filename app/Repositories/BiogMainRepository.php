@@ -1164,7 +1164,7 @@ class BiogMainRepository
         //20190118筆記 修改這邊的更新功能.
         //DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
         DB::table('ASSOC_DATA')->where([
-            ['c_assoc_id', '=', $id], 
+            ['c_assoc_id', '=', $c_personid], 
             ['c_personid', '=', $old_assoc_id],
             ['c_text_title', '=', $old_c_text_title],
         ])->update($data);

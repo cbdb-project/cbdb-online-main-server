@@ -1128,6 +1128,11 @@ class BiogMainRepository
         $assoc_id = $data['c_assoc_id'];
         $old_assoc_id = $row->c_assoc_id;
         $old_c_text_title = $row->c_text_title;
+        //20210910增加$old_c_assocship_pair用來查詢對應的資料
+        $old_c_assoc_code = $row->c_assoc_code;
+        $old_c_assocship_pair = AssocCode::where('c_assoc_code', '=', $old_c_assoc_code)->first();
+        $old_c_assocship_pair1 = $old_c_assocship_pair['c_assoc_pair'];
+        $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'];
         //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
         //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
@@ -1167,7 +1172,10 @@ class BiogMainRepository
             ['c_assoc_id', '=', $c_personid], 
             ['c_personid', '=', $old_assoc_id],
             ['c_text_title', '=', $old_c_text_title],
-        ])->update($data);
+        ])
+        ->Where('c_assoc_code', '=', $old_c_assocship_pair1)
+        ->orWhere('c_assoc_code', '=', $old_c_assocship_pair2)
+        ->update($data);
         return $ori_data;
     }
 

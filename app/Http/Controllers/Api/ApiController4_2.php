@@ -67,7 +67,7 @@ class ApiController4_2 extends Controller
       return $s;
     }
 
-    protected function sub_relativesLoop($newdata, $rowArr, $run) {
+    protected function sub_relativesLoop($newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop) {
         //對$newdata執行迴圈
         $cks = '';
         $sub_newdata = array();
@@ -115,13 +115,19 @@ class ApiController4_2 extends Controller
                 $data['c_dwnstep'] = $val->c_dwnstep;
                 $data['c_colstep'] = $val->c_colstep;
                 $data['c_marstep'] = $val->c_marstep;
-                array_push($rowArr, $data);
-                array_push($sub_newdata, $data);
+                //20210913在這裡過濾不符合四參數的親屬。
+                if($data['c_upstep'] <= $MAncGen && $data['c_dwnstep'] <= $MDecGen && $data['c_colstep'] <= $MColLink && $data['c_marstep'] <= $MMarLink) {
+                    array_push($rowArr, $data);
+                    array_push($sub_newdata, $data);
+                }
             }
         }
-        if(!empty($sub_newdata)) {
-        //if(!empty($sub_newdata) && $run < 9) {
-            $rowArr = $this->sub_relativesLoop($sub_newdata, $rowArr, $run);
+        //if(!empty($sub_newdata)) {
+        //if(!empty($sub_newdata) || $run <= $MLoop) {
+        //if($run <= $MLoop) {
+        $MLoop = $MLoop - 1;
+        if($MLoop >= 1) {
+            $rowArr = $this->sub_relativesLoop($sub_newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop);
             return $rowArr;
         }
         else {
@@ -167,8 +173,10 @@ class ApiController4_2 extends Controller
           }
         }
         //這邊判斷$newdata是否有值，有的則繼續遞迴。
-        if(!empty($newdata)) {
-            $rowArr = $this->sub_relativesLoop($newdata, $rowArr, $run); 
+        //if(!empty($newdata)) {
+        $MLoop = $MLoop - 1;
+        if($MLoop >= 1) {
+            $rowArr = $this->sub_relativesLoop($newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop); 
             return $rowArr;
         }
         else {

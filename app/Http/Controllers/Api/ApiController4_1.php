@@ -39,13 +39,22 @@ class ApiController4_1 extends Controller
     protected function relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run) {
         $check = count($firstPeople);
         $c_kin_id = $data = $firstPeopleArr = array();
+        $checkArr = $checkArr2 = array();
         $run = $run + 1;
+        foreach ($rowArr as $checkVal) {
+            array_push($checkArr, $checkVal['c_personid']);
+            array_push($checkArr2, $checkVal['firstId']);
+        }
         //資料庫邏輯
         //把迴圈拿掉，限制$firstPeople只能有一人，改用whereIn可以大幅提升速度。
         if($check > 1) {
           for($i=0;$i<count($people);$i++) {
             $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+            //下列三行是避免循環
+            $row->whereNotIn('KIN_DATA.c_kin_id', $checkArr2);
+            $row->whereNotIn('KIN_DATA.c_kin_id',  $checkArr);
+            $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
             //四個參數如果其中一個有值，才進行SQL條件過濾，都為0則略過SQL條件過濾，直接取得親屬關係人id。
             if($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0 ) {
                 $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
@@ -93,6 +102,10 @@ class ApiController4_1 extends Controller
         } else {
             $row = DB::table('KIN_DATA')->whereIn('KIN_DATA.c_personid', $people);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+            //下列三行是避免循環
+            $row->whereNotIn('KIN_DATA.c_kin_id', $checkArr2);
+            $row->whereNotIn('KIN_DATA.c_kin_id',  $checkArr);
+            $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
             //四個參數如果其中一個有值，才進行SQL條件過濾，都為0則略過SQL條件過濾，直接取得親屬關係人id。
             if($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0 ) {
                 $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
@@ -144,10 +157,10 @@ class ApiController4_1 extends Controller
             //$MLoop的作用是生成一些史料不見載的親屬關係
             //$rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeopleArr, $run);
             if($check > 1) {
-                $rowArr = $this->relativesLoop($c_kin_id, 0, 0, 0, 0, $MLoop, $rowArr, $firstPeopleArr, $run);
+                $rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeopleArr, $run);
             }
             else {
-                $rowArr = $this->relativesLoop($c_kin_id, 0, 0, 0, 0, $MLoop, $rowArr, $firstPeople, $run);
+                $rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run);
             }
             return $rowArr;
         }

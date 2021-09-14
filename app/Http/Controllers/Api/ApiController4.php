@@ -43,6 +43,11 @@ class ApiController4 extends Controller
         for($i=0;$i<count($people);$i++) {
           $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
           $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+          //下列判斷是避免循環
+          if($run > 1 ) {
+            $row->whereNotIn('KIN_DATA.c_kin_id', $firstPeople);
+            $row->whereNotIn('KIN_DATA.c_personid', $firstPeople);
+          }
           $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
           $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
           $row->where('KINSHIP_CODES.c_marstep', '<=', $MColLink);
@@ -88,6 +93,9 @@ class ApiController4 extends Controller
         $MMarLink = $arr['MMarLink']; 
         $MLoop = $arr['MLoop'];
 
+        $debugMode = 0;
+        if(!empty($arr['debugMode'])) { $debugMode = $arr['debugMode']; }
+
         if(!empty($arr['start'])) { 
             if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
             else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
@@ -129,8 +137,10 @@ class ApiController4 extends Controller
         else {
             $row = $this->relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $people, $run);
             $total = count($row);
-            //return $row;
         }
+
+        //20210913增加除錯模式的資料輸出
+        if($debugMode) { return $row; }
 
         //預先組合計算用的資料
         foreach ($row as $val) {

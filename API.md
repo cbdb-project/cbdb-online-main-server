@@ -606,23 +606,12 @@ RequestPlayload:{
 | data | 陣列 | 結果列表 |
 | data[`i`].rId | 數字 | 中心人物ID |
 | data[`i`].rName | 字符串 | 中心人物名，英文 |
-| data[`i`].rNameChn | 字符串 | 中心人物名，中文 |
-| data[`i`].pId | 數字 | 親屬關係起始人物ID |
-| data[`i`].pName | 字符串 | 親屬關係起始人物名，英文 |
-| data[`i`].pNameChn | 字符串 | 親屬關係起始人物名，中文 |
-| data[`i`].pAddrID | 數字 | 親屬關係起始人物的地點ID |
-| data[`i`].pAddrType | 字符串 | 親屬關係起始人物的地點類型，英文 |
-| data[`i`].pAddrTypeChn | 字符串 | 親屬關係起始人物的地點類型，中文 |
-| data[`i`].pAddrName | 字符串 | 親屬關係起始人物的地點名，英文 |
-| data[`i`].pAddrNameChn | 字符串 | 親屬關係起始人物的地點名，中文 |
-| data[`i`].pX | 數字 | 親屬關係起始人物的地點經度座標 |
-| data[`i`].pY | 數字 | 親屬關係起始人物的地點緯度座標 |
+| data[`i`].rNameChn | 字符串 | 中心人物名，中文 ||
 | data[`i`].Id | 數字 | 親屬關係目標人物ID |
 | data[`i`].Name | 字符串 | 親屬關係目標人物名，英文 |
 | data[`i`].NameChn | 字符串 | 親屬關係目標人物名，中文 |
 | data[`i`].Sex | 字符串 | 親屬關係目標人物性別 |
 | data[`i`].IndexYear | 數字 | 親屬關係目標人物指數年 |
-| data[`i`].pkinship | 字符串 | 親屬關係 |
 | data[`i`].rKinship | 字符串 | 與中心人物的親屬關係 |
 | data[`i`].up | 數字 | 向上查找的距離 |
 | data[`i`].down | 數字 | 向下查找的距離 |
@@ -635,7 +624,6 @@ RequestPlayload:{
 | data[`i`].AddrNameChn | 字符串 | 親屬關係目標人物地點名，中文 |
 | data[`i`].X | 數字 | 親屬關係目標人物地點經度座標 |
 | data[`i`].Y | 數字 | 親屬關係目標人物地點緯度座標 |
-| data[`i`].pDistance | 數字 | 親屬關係目標人物所的點與親屬關係起始人物的地點之距離|
 | data[`i`].rDistance | 數字 | 親屬關係目標人物所的點與中心人物的地點之距離 |
 | data[`i`].xy_count | 數字 | 結果中親屬關係目標人物所在地點的總人物數 |
 | data[`i`].Notes  | 字符串 | 備註 |

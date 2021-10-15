@@ -190,7 +190,7 @@ class ApiController4_2 extends Controller
         $arr = json_decode($json, true);
         $people = $mCircleArr = $data = $dataV = $rowArr = array();
         $k_addr_id_Arr = array();
-        $mCircle = $MAncGen = $MDecGen = $MColLink = $MMarLink = $MLoop = $run = $start = $list = 0;
+        $mCircle = $MAncGen = $MDecGen = $MColLink = $MMarLink = $MLoop = $outputSchema = $run = $start = $list = 0;
         
         $people = $arr['people'];
         $mCircle = $arr['mCircle']; 
@@ -199,6 +199,8 @@ class ApiController4_2 extends Controller
         $MColLink = $arr['MColLink'];
         $MMarLink = $arr['MMarLink']; 
         $MLoop = $arr['MLoop'];
+        //20211015增加outputSchema，1代表對返回的數據進行彙整，使每個人物都能指向查詢式提交的“中心人物”。0 代表直接返回數據庫中的人物關係，不做彙整。
+        if(!empty($arr['outputSchema'])) { $outputSchema = $arr['outputSchema']; }
 
         $debugMode = 0;
         if(!empty($arr['debugMode'])) { $debugMode = $arr['debugMode']; }
@@ -371,6 +373,16 @@ class ApiController4_2 extends Controller
 
             $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn]; 
             $data_val['Notes'] = $val['c_notes'];
+
+            //增列判斷$outputSchema值的輸出欄位
+            if($outputSchema == 1) {
+                $c_kinrel_simplified = $c_kinrel = '';
+                $c_kinrel_simplified = str_replace('-', '', $val['c_kinrel_simplified']);
+                $c_kinrel = KinshipCode::where('c_kinrel_simplified', '=', $c_kinrel_simplified)->first();
+                $data_val['rId_c_kinrel_chn'] = !empty($c_kinrel) ? $c_kinrel->c_kinrel_chn : '';
+                $data_val['c_kinrel_simplified'] = $c_kinrel_simplified;
+                $data_val['c_kinrel_simplified_ori'] = $val['c_kinrel_simplified'];
+            }
 
             array_push($data, $data_val);
         }

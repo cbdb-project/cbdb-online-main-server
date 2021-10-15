@@ -34,6 +34,7 @@ use App\SocialInstAddr;
 //20210625建安修改
 use App\AddrCode;
 use App\BiogAddrCode;
+use App\AddrBelong;
 //修改結束
 
 
@@ -1381,9 +1382,26 @@ class BiogMainRepository
 
     protected function addr_str($id)
     {
+        /*20211015遮除，不使用[ADDRESSES]表，改以[ADDR_CODES]和[ADDR_BELONGS_DATA]查得資料。*/
+        /*
         $row = AddressCode::find($id);
         $belongs = $row->belongs1_Name." ".$row->belongs2_Name." ".$row->belongs3_Name." ".$row->belongs4_Name." ".$row->belongs5_Name;
         return $row->c_addr_id.' '.$row->c_name.' '.$row->c_name_chn.' '.trim($belongs);
+        */
+        $row = AddrCode::find($id);
+        $belongs = "";
+        $originalText = $row->c_addr_id." ".$row->c_name." ".$row->c_name_chn." ".trim($belongs)." ".$row->c_firstyear."~".$row->c_lastyear;
+        $add = "";
+        $dy = AddrBelong::where('c_addr_id', $row->c_addr_id)->value('c_belongs_to');
+        $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+        if($dy == null) {
+            $dy = 0; $add = "";
+        }
+        else {
+            $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+            $add = "[[".$dy." ".$dy2."]]";
+        }
+        return $originalText." ".$add;
     }
 
     protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)

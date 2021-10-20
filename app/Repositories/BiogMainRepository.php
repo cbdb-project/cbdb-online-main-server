@@ -316,8 +316,33 @@ class BiogMainRepository
         $posting_str = null;
 //        dd($row->c_inst_name_code);
         if($row->c_inst_code || $row->c_inst_code === 0) {
-            $text_ = SocialInst::find($row->c_inst_code);
-            $posting_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
+            //20211020進行改寫
+            //$text_ = SocialInst::find($row->c_inst_code);
+            //$posting_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
+            $text_ = SocialInstCode::where([
+                ['c_inst_code', '=', $row->c_inst_code],
+                ['c_inst_name_code', '=', $row->c_inst_name_code],
+            ])->first();
+            $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
+            $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
+            $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
+            if(count((array)$res) == 0 ) $addr = "未詳";
+            else {
+                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            }
+            $dy = $text_->c_inst_begin_year;
+            $dy2 = $text_->c_inst_floruit_dy;
+            $dy3 = $text_->c_inst_end_year;
+            $dy4 = $text_->c_inst_last_known_year;
+            if($name_hz == null) $name_hz = "未詳";
+            if($name_py == null) $name_py = "未詳";
+            if($addr == null) $addr = "未詳";
+            if($dy == null) $dy = "未詳";
+            if($dy2 == null) $dy2 = "未詳";
+            if($dy3 == null) $dy3 = "未詳";
+            if($dy4 == null) $dy4 = "未詳";
+            $posting_str = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
+            //修改結束
         }
 //        dd($posting_str);
         $addr_ = DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->get();
@@ -327,6 +352,7 @@ class BiogMainRepository
             $item = [$id_, $this->addr_str($value->c_addr_id)];
             $addr_str[$key] = $item;
         }
+
         return ['row' => $row, 'text_str' => $text_str, 'office_str' => $office_str, 'posting_str' => $posting_str, 'addr_str' => $addr_str];
     }
 
@@ -344,7 +370,7 @@ class BiogMainRepository
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['c_office_id'] = $data['c_office_id'] == -999 ? '0' : $data['c_office_id'];
-        $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
+        //$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
@@ -823,10 +849,12 @@ class BiogMainRepository
 
     public function socialInstById($id)
     {
-        //建安修改20181113
+        //建安修改20181113 //20211020修改增加c_bi_begin_year與c_bi_end_year
         //$row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
         $addr_l = explode("-", $id);
-        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->first();
+        if($addr_l[1] == '') {$addr_l[1] = NULL; }
+        if($addr_l[2] == '') {$addr_l[2] = NULL; }
+        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_begin_year', $addr_l[1])->where('c_bi_end_year', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -881,11 +909,11 @@ class BiogMainRepository
         $data = $request->all();
         $data['c_personid'] = $id;
         $data = array_except($data, ['_token']);
-        $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        $data['c_source'] = ($data['c_source'] == -999) ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
-        //新增的聯合主鍵
-        $newid = $data['c_personid']."-".$data['c_bi_role_code'];
+        //新增的聯合主鍵 //20211020修改增加c_bi_begin_year與c_bi_end_year
+        $newid = $data['c_personid']."-".$data['c_bi_begin_year']."-".$data['c_bi_end_year']."-".$data['c_bi_role_code'];
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
         return $newid;
     }

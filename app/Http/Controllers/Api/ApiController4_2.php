@@ -271,40 +271,44 @@ class ApiController4_2 extends Controller
         
         //組合輸出資料
         foreach ($row as $val) {
-            $FirstBiogMain = BiogMain::where('c_personid', '=', $val['firstId'])->first();
-            $data_val['rId'] = $val['firstId'];
-            $data_val['rName'] = $FirstBiogMain->c_name;
-            $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
-            $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
-            if($BiogMain) {
+            if($outputSchema == 1) {
+              $FirstBiogMain = BiogMain::where('c_personid', '=', $val['firstId'])->first();
+              $data_val['rId'] = $val['firstId'];
+              $data_val['rName'] = $FirstBiogMain->c_name;
+              $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
+            }
+            if($outputSchema == 0) {
+              $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
+              if($BiogMain) {
                 $data_val['pId'] = $val['c_personid'];
                 $data_val['pName'] = $BiogMain->c_name;
                 $data_val['pNameChn'] = $BiogMain->c_name_chn;
-            }
-            else {
+              }
+              else {
                 $data_val['pId'] = $val['c_personid'];
                 $data_val['pName'] = '';
                 $data_val['pNameChn'] = '';
-            }
-            //這裡是查詢人物的[地址]BIOG_ADDR_DATA
-            $c_addr_type = $c_addr_id = 0;
-            $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$BiogAddr) {
+              }
+              //這裡是查詢人物的[地址]BIOG_ADDR_DATA
+              $c_addr_type = $c_addr_id = 0;
+              $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
+              if(!$BiogAddr) {
                 $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->first();
-            }
-            if($BiogAddr) {
+              }
+              if($BiogAddr) {
                 $c_addr_type = $BiogAddr->c_addr_type;
                 $c_addr_id = $BiogAddr->c_addr_id;
+              }
+              $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first(); 
+              $data_val['pAddrID'] = $c_addr_id;
+              $data_val['pAddrType'] = $BiogAddrCode->c_addr_desc;
+              $data_val['pAddrTypeChn'] = $BiogAddrCode->c_addr_desc_chn;
+              $AddrCode = AddrCode::where('c_addr_id', '=', $c_addr_id)->first();
+              $data_val['pAddrName'] = $AddrCode->c_name;
+              $data_val['pAddrNameChn'] = $AddrCode->c_name_chn;
+              $data_val['pX'] = $AddrCode->x_coord;
+              $data_val['pY'] = $AddrCode->y_coord;
             }
-            $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first(); 
-            $data_val['pAddrID'] = $c_addr_id;
-            $data_val['pAddrType'] = $BiogAddrCode->c_addr_desc;
-            $data_val['pAddrTypeChn'] = $BiogAddrCode->c_addr_desc_chn;
-            $AddrCode = AddrCode::where('c_addr_id', '=', $c_addr_id)->first();
-            $data_val['pAddrName'] = $AddrCode->c_name;
-            $data_val['pAddrNameChn'] = $AddrCode->c_name_chn;
-            $data_val['pX'] = $AddrCode->x_coord;
-            $data_val['pY'] = $AddrCode->y_coord;
 
             $KinBiogMain = BiogMain::where('c_personid', '=', $val['c_kin_id'])->first();
             if($KinBiogMain) {
@@ -321,8 +325,12 @@ class ApiController4_2 extends Controller
                 $data_val['Sex'] = '';
                 $data_val['IndexYear'] = '';
             }
+
             $KinshipCode = KinshipCode::where('c_kincode', '=', $val['c_kin_code'])->first();
-            $data_val['pkinship'] = $KinshipCode->c_kinrel_chn;
+
+            if($outputSchema == 0) {
+              $data_val['pkinship'] = $KinshipCode->c_kinrel_chn;
+            }
 
             $rKinshipCodeNum = 0;
             $rKinship = DB::table('KIN_DATA')->where('c_personid', '=', $val['firstId'])->where('c_kin_id', '=', $val['c_kin_id'])->get();
@@ -331,8 +339,13 @@ class ApiController4_2 extends Controller
                     $rKinshipCodeNum = $val2->c_kin_code;
                 }
             }
+
             $rKinshipCode = KinshipCode::where('c_kincode', '=', $rKinshipCodeNum)->first();
-            $data_val['rKinship'] = $rKinshipCode->c_kinrel_chn;
+
+            if($outputSchema == 1) {
+              $data_val['rKinship'] = $rKinshipCode->c_kinrel_chn;
+            }
+
             $data_val['up'] = $KinshipCode->c_upstep;
             $data_val['down'] = $KinshipCode->c_dwnstep;
             $data_val['col'] = $KinshipCode->c_colstep;
@@ -368,8 +381,12 @@ class ApiController4_2 extends Controller
                 $r_addr_id = $RBiogAddr->c_addr_id;
             }
             $RAddrCode = AddrCode::where('c_addr_id', '=', $r_addr_id)->first();
-            $data_val['pDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $AddrCode->x_coord, $AddrCode->y_coord);
-            $data_val['rDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $RAddrCode->x_coord, $RAddrCode->y_coord);
+            if($outputSchema == 0) {
+              $data_val['pDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $AddrCode->x_coord, $AddrCode->y_coord);
+            }
+            if($outputSchema == 1) {
+              $data_val['rDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $RAddrCode->x_coord, $RAddrCode->y_coord);
+            }
 
             $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn]; 
             $data_val['Notes'] = $val['c_notes'];

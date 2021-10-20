@@ -78,6 +78,26 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20211020在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        //20211020修正$c_inst_name_code預設為0
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+        //return $request;
+        //修改結束
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
@@ -127,6 +147,26 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20211020在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
+        //20211020修正$c_inst_name_code預設為0
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if(!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        }
+        else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+        //return $request;
+        //修改結束
         $id_ = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $id_]);

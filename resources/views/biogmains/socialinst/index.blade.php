@@ -29,7 +29,7 @@
                         <td>{{ $value->pivot->c_bi_end_year }}</td>
                         <td>
                             <div class="btn-group">
-                                @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_bi_role_code)
+                                @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_bi_begin_year."-".$value->pivot->c_bi_end_year."-".$value->pivot->c_bi_role_code)
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}">edit</a>
                                 <a href=""
                                    onclick="

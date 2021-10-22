@@ -849,12 +849,12 @@ class BiogMainRepository
 
     public function socialInstById($id)
     {
-        //建安修改20181113 //20211020修改增加c_bi_begin_year與c_bi_end_year
+        //建安修改20181113 //20211022修改增加c_inst_code與c_inst_name_code
         //$row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
         $addr_l = explode("-", $id);
         if($addr_l[1] == '') {$addr_l[1] = NULL; }
         if($addr_l[2] == '') {$addr_l[2] = NULL; }
-        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_begin_year', $addr_l[1])->where('c_bi_end_year', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
+        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_inst_code', $addr_l[1])->where('c_inst_name_code', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -912,8 +912,8 @@ class BiogMainRepository
         $data['c_source'] = ($data['c_source'] == -999) ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data, True);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
-        //新增的聯合主鍵 //20211020修改增加c_bi_begin_year與c_bi_end_year
-        $newid = $data['c_personid']."-".$data['c_bi_begin_year']."-".$data['c_bi_end_year']."-".$data['c_bi_role_code'];
+        //新增的聯合主鍵 //20211022修改增加c_inst_code與c_inst_name_code
+        $newid = $data['c_personid']."-".$data['c_inst_code']."-".$data['c_inst_name_code']."-".$data['c_bi_role_code'];
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
         return $newid;
     }

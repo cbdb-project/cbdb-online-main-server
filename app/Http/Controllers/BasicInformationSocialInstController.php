@@ -170,11 +170,11 @@ class BasicInformationSocialInstController extends Controller
         if($addr_l[2] == '') {$addr_l[2] = NULL; }
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_bi_begin_year', '=', $addr_l[1]],
-            ['c_bi_end_year', '=', $addr_l[2]],
+            ['c_inst_code', '=', $addr_l[1]],
+            ['c_inst_name_code', '=', $addr_l[2]],
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->update($data);
-        $newid = $id.'-'.$data['c_bi_begin_year'].'-'.$data['c_bi_end_year'].'-'.$data['c_bi_role_code'];
+        $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$newid]);
@@ -201,16 +201,16 @@ class BasicInformationSocialInstController extends Controller
         $addr_l = explode("-", $id_);
         $row = DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_bi_begin_year', '=', $addr_l[1]],
-            ['c_bi_end_year', '=', $addr_l[2]],
+            ['c_inst_code', '=', $addr_l[1]],
+            ['c_inst_name_code', '=', $addr_l[2]],
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->first();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', $id_, $row);
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_bi_begin_year', '=', $addr_l[1]],
-            ['c_bi_end_year', '=', $addr_l[2]],
+            ['c_inst_code', '=', $addr_l[1]],
+            ['c_inst_name_code', '=', $addr_l[2]],
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');

@@ -790,3 +790,109 @@ RequestPlayload:{
 | data[`i`].aKinName | 字符串 | 社會關係人的親屬姓名，英文 |
 | data[`i`].aKinNameChn | 字符串 | 社會關係人的親姓名，中文 |
 | data[`i`].distance | 數字 | 中心人物與社會關係人之間的距離|
+
+
+# 十四、通過地區查詢
+
+## 輸入參數:
+
+| 參數名        | 參數類型 | 說明                                                                                                                                                                      |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| peoplePlace   | 陣列     | 要查詢的地點 ID 的陣列                                                                                                                                                    |
+| placeType     | 陣列     | 地點類型的陣列。取值包括：`individual`人 `entry`入仕 `association` 社會關係`officePosting`職官 `institutional`社交機構 `kinship`親屬 `associate` 社會關係的人             |
+| useDate       | 數字     | 是否啟用“時間”條件。1 代表啟用，0 代表不啟用。這一變數的優先級高於下面的 `dateType` `dateStartTime` ` dateEndTime` `dynStart` `dynEnd` 。如果其取值為 0，則無視上述參數。 |
+| dateType      | 字串     | 時間條件的類型                                                                                                                                                            |
+| dateStartTime | 數字     | 指數年開始日期期                                                                                                                                                          |
+| dateEndTime   | 數字     | 指數年結束日期期                                                                                                                                                          |
+| dynStart      | 數字     | 朝代開始                                                                                                                                                                  |
+| dynEnd        | 數字     | 朝代結束                                                                                                                                                                  |
+| useXy         | 數字     | 是否使用 xy 座標，是=1，否=0                                                                                                                                              |
+| start         | 數字     | 結果開始筆數                                                                                                                                                              |
+| list          | 數字     | 列表長度                                                                                                                                                                  |
+
+**注：`useDate` 的優先級高於 `dateType` `dateStartTime` `dateEndTime` `dynStart` `dynEnd`，即若變數取值為 0，就不使用後面的條件（不論陣列是否為空）**
+**注：當 `dateType` 取值為 `entry` 或 `index` 時，僅考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值，不考慮 `dynStart` 與 `dynEnd` 的取值。反之， 當 `dateType` 取值為 `dynasty` 時，僅考慮 `dynStart` 與 `dynEnd` 的取值，不考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值**
+
+## 輸入示例:
+
+**注：採用 POST 方法，Content-Type: application/json**
+`/api/query_place`
+
+```json
+RequestPlayload:{
+    "peoplePlace":[2928,10522,12553,13947,13949],
+    "placeType": ["individual","entry","officePosting"],
+    "useDate": 1,
+    "dateType": "index",
+    "dateStartTime": 1368,
+    "dateEndTime": 1644,
+    "dynStart": null,
+    "dynEnd": null,
+    "useXy": 1,
+    "start": 1,
+    "list": 10
+}
+```
+
+說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，指數年年介於 1368-1644 的所有人物。返回第 1-10 筆結果
+
+```json
+RequestPlayload:{
+    "peoplePlace":[2928,10522,12553,13947,13949],
+    "placeType": ["individual","entry","officePosting"],
+    "useDate": 1,
+    "dateType": "dynasty",
+    "dateStartTime": null,
+    "dateEndTime": null,
+    "dynStart": 17,
+    "dynEnd": 22,
+    "useXy": 1,
+    "start": 1,
+    "list": 10
+}
+```
+
+說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，朝代介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
+
+## 輸出格式:
+
+數據類型：`物件`
+示例
+
+```json
+{
+    "total":100,
+    "start":1,
+    "end":10,
+    "data":[
+        {},
+        ...
+        ]
+}
+```
+
+| 屬性名                       | 屬性類型 | 說明                   |
+| ---------------------------- | -------- | ---------------------- |
+| total                        | 數字     | 數據總筆數             |
+| start                        | 數字     | 當前數據開始筆數       |
+| end                          | 數字     | 當前數據結束筆數       |
+| data                         | 陣列     | 除授記錄列表           |
+| data[`i`].PersonID           | 數字     | 人物 ID                |
+| data[`i`].Name               | 字串     | 人物名，英文           |
+| data[`i`].NameChn            | 字串     | 人物名，中文           |
+| data[`i`].Sex                | 字串     | 人物性別               |
+| data[`i`].IndexYear          | 數字     | 人物指數年             |
+| data[`i`].IndexYearType      | 字串     | 指數年類型，英文       |
+| data[`i`].IndexYearTypeChn   | 字串     | 指數年類型，中文       |
+| data[`i`].IndexYearCode      | 字串     | 指數年類型代碼         |
+| data[`i`].PlaceName          | 字串     | 地址名稱，英文         |
+| data[`i`].PlaceNameChn       | 字串     | 地址名稱，中文         |
+| data[`i`].AssocName          | 字串     | 社會關係人姓名，英文   |
+| data[`i`].AssocChn           | 字串     | 社會關係人姓名，中文   |
+| data[`i`].AssoStart          | 數字     | 社會關係開始年         |
+| data[`i`].AssoEnd            | 數字     | 社會關係結束年         |
+| data[`i`].PlaceType          | 字串     | 地址關係類別           |
+| data[`i`].PlaceTypeDetail    | 字串     | 地址關係詳細類別，英文 |
+| data[`i`].PlaceTypeDetailChn | 字串     | 地址關係詳細類別，中文 |
+| data[`i`].X                  | 數字     | 人物地點經度座標       |
+| data[`i`].Y                  | 數字     | 人物地點緯度座標       |

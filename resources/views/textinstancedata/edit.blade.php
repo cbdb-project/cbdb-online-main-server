@@ -1,7 +1,6 @@
 @extends('layouts.dashboard')
 
 @section('content')
-
     <div class="panel panel-default">
         <div class="panel-heading">著作版本表</div>
         <div class="panel-body">

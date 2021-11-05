@@ -28,8 +28,8 @@
                 <td>{{item.c_instance_title}}</td>
                 <td>
                     <div class="btn-group">
-                        <a type="button" class="btn btn-sm btn-info" :href="'/textinstancedata/'+item.c_textid+'/edit'">edit</a>
-                        <a type="button" class="btn btn-sm btn-danger" :href="'/textinstancedata/'+item.c_textid+'/delete'">Delete</a>
+                        <a type="button" class="btn btn-sm btn-info" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/edit'">edit</a>
+                        <a type="button" class="btn btn-sm btn-danger" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/delete'">Delete</a>
 
                     </div>
                 </td>

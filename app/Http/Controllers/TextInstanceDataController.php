@@ -67,14 +67,15 @@ class TextInstanceDataController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        if ($data['c_textid'] == null or $data['c_textid'] == 0 or !TextInstanceData::where('c_textid', $data['c_textid'])->get()->isEmpty()){
+//dd($data);
+        if ($data['c_textid'] == null or $data['c_textid'] == 0 or TextInstanceData::where('c_textid', $data['c_textid'])->get()->isEmpty()){
             flash('c_textid 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();
         }
         $flight = TextInstanceData::create($data);
-        $this->operationRepository->store(Auth::id(), '', 1, 'TEXT_INSTANCE_DATA', $data['c_textid'], $data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'TEXT_INSTANCE_DATA', $data['c_textid']."-".$data['c_text_edition_id']."-".$data['c_text_instance_id'], $data);
         flash('Create success @ '.Carbon::now(), 'success');
-        return redirect()->route('textinstancedata.edit', $data['c_textid']);
+        return redirect()->route('textinstancedata.edit', $data['c_textid']."-".$data['c_text_edition_id']."-".$data['c_text_instance_id']);
     }
 
     /**
@@ -120,7 +121,7 @@ class TextInstanceDataController extends Controller
         $this->textinstancedatarepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         //使用更新後的id來跳轉。
-        $id = $request['c_textid'];
+        $id = $request['c_textid']."-".$request['c_text_edition_id']."-".$request['c_text_instance_id'];
         return redirect()->route('textinstancedata.edit', $id);
     }
 
@@ -141,9 +142,20 @@ class TextInstanceDataController extends Controller
             return redirect()->back();
         }
         $table_name = "TEXT_INSTANCE_DATA";
-        $row = DB::table($table_name)->where('c_textid', $id)->first();
+        //$row = DB::table($table_name)->where('c_textid', $id)->first();
+        $id_l = explode("-", $id);
+        $row = DB::table($table_name)->where([
+            ['c_textid', '=', $id_l[0]],
+            ['c_text_edition_id', '=', $id_l[1]],
+            ['c_text_instance_id', '=', $id_l[2]]
+        ])->first();
         $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row);
-        DB::table($table_name)->where('c_textid', $id)->delete();
+        //DB::table($table_name)->where('c_textid', $id)->delete();
+        DB::table($table_name)->where([
+            ['c_textid', '=', $id_l[0]],
+            ['c_text_edition_id', '=', $id_l[1]],
+            ['c_text_instance_id', '=', $id_l[2]]
+        ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return view('textinstancedata.index', ['page_title' => 'Text Instance Data', 'page_description' => '著作版本表', 'codes' => session('codes')]);
     }

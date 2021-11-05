@@ -28,13 +28,26 @@ class TextInstanceDataRepository{
 
     public function byId($id)
     {
-        return TextInstanceData::find($id);
+        //return TextInstanceData::find($id);
+        $id_l = explode("-", $id);
+        $row = TextInstanceData::where([
+            ['c_textid', '=', $id_l[0]],
+            ['c_text_edition_id', '=', $id_l[1]],
+            ['c_text_instance_id', '=', $id_l[2]]
+        ])->first();
+        return $row;
     }
 
     public function updateById($request, $id)
     {
         $data = $request->all();
-        $altcode = TextInstanceData::find($id);
-        $altcode->update($data);
+        $data = array_except($data, ['_method', '_token']);
+        //$altcode = TextInstanceData::find($id);
+        $id_l = explode("-", $id);
+        $altcode = TextInstanceData::where([
+            ['c_textid', '=', $id_l[0]],
+            ['c_text_edition_id', '=', $id_l[1]],
+            ['c_text_instance_id', '=', $id_l[2]]
+        ])->update($data);
     }
 }

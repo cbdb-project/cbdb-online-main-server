@@ -27,6 +27,18 @@
                         </div>
                     </div>
                     <div class="form-group">
+                        <label for="c_text_edition_id " class="col-sm-2 control-label">c_text_edition_id （版本 ID）</label>
+                        <div class="col-sm-10">
+                            <input type="text" name="c_text_edition_id" class="form-control" placeholder="c_text_edition_id （版本 ID）" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="c_text_instance_id" class="col-sm-2 control-label">c_text_instance_id（版本實例 ID）</label>
+                        <div class="col-sm-10">
+                            <input type="text" name="c_text_instance_id" class="form-control" placeholder="c_instance_title（版本實例 ID）" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <div class="col-sm-offset-2 col-sm-10">
                             <button type="submit" class="btn btn-default">Submit</button>
                         </div>

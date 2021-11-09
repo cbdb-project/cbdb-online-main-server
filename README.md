@@ -266,7 +266,7 @@ Contributed by [Yawei SUN](https://github.com/yaweisun)
 
 https://github.com/cbdb-project/cbdb-online-main-server/issues/116
 
-### rebuild vue 的前端（盧建安先生貢獻）
+### rebuild vue 的前端（感謝盧建安先生貢獻）
 
 npm run dev如果出現錯誤訊息：error code ELIFECYCLE
 

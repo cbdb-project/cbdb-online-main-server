@@ -43670,6 +43670,12 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
+//
+//
+//
+//
+//
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: ['user'],
@@ -43841,6 +43847,45 @@ var render = function() {
                 },
                 [_vm._v(_vm._s(item.c_name))]
               )
+            ]),
+            _vm._v(" "),
+            _c("td", [
+              _c(
+                "a",
+                {
+                  attrs: {
+                    href: "/basicinformation/" + item.c_personid + "/edit",
+                    target: "_blank"
+                  }
+                },
+                [_vm._v(_vm._s(item.c_dynasty_chn))]
+              )
+            ]),
+            _vm._v(" "),
+            _c("td", [
+              _c(
+                "a",
+                {
+                  attrs: {
+                    href: "/basicinformation/" + item.c_personid + "/edit",
+                    target: "_blank"
+                  }
+                },
+                [_vm._v(_vm._s(item.ADDR_c_name_chn))]
+              )
+            ]),
+            _vm._v(" "),
+            _c("td", [
+              _c(
+                "a",
+                {
+                  attrs: {
+                    href: "/basicinformation/" + item.c_personid + "/edit",
+                    target: "_blank"
+                  }
+                },
+                [_vm._v(_vm._s(item.c_alt_name_chn))]
+              )
             ])
           ])
         }),
@@ -43936,7 +43981,13 @@ var staticRenderFns = [
         _vm._v(" "),
         _c("th", [_vm._v("c_name_chn")]),
         _vm._v(" "),
-        _c("th", [_vm._v("c_name")])
+        _c("th", [_vm._v("c_name")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("dynasty")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("index address")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("zi")])
       ])
     ])
   }

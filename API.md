@@ -801,7 +801,7 @@ RequestPlayload:{
 | peoplePlace   | 陣列     | 要查詢的地點 ID 的陣列                                                                                                                                                    |
 | placeType     | 陣列     | 地點類型的陣列。取值包括：`individual`人 `entry`入仕 `association` 社會關係`officePosting`職官 `institutional`社交機構 `kinship`親屬 `associate` 社會關係的人             |
 | useDate       | 數字     | 是否啟用“時間”條件。1 代表啟用，0 代表不啟用。這一變數的優先級高於下面的 `dateType` `dateStartTime` ` dateEndTime` `dynStart` `dynEnd` 。如果其取值為 0，則無視上述參數。 |
-| dateType      | 字串     | 時間條件的類型                                                                                                                                                            |
+| dateType      | 字串     | 時間條件的類型（指數年：`index`，朝代：`dynasty`）                                                                                                                        |
 | dateStartTime | 數字     | 指數年開始日期期                                                                                                                                                          |
 | dateEndTime   | 數字     | 指數年結束日期期                                                                                                                                                          |
 | dynStart      | 數字     | 朝代開始                                                                                                                                                                  |

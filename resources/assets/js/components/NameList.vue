@@ -19,8 +19,10 @@
                 <th>c_name_chn</th>
                 <th>c_name</th>
                 <th>dynasty</th>
+                <th>index year</th>
                 <th>index address</th>
                 <th>zi</th>
+                <th>hao</th>
             </tr>
             </thead>
             <tbody>
@@ -29,8 +31,10 @@
                     <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_name_chn}}</a></td>
                     <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_name}}</a></td>
                     <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_dynasty_chn}}</a></td>
+                    <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_index_year}}</a></td>
                     <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.ADDR_c_name_chn}}</a></td>
-                    <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_alt_name_chn}}</a></td>
+                    <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_alt_name_chn_zi}}</a></td>
+                    <td><a v-bind:href="'/basicinformation/'+item.c_personid+'/edit'" target="_blank">{{item.c_alt_name_chn_hao}}</a></td>
                 </tr>
             </tbody>
         </table>

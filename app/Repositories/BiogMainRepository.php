@@ -37,6 +37,8 @@ use App\BiogAddrCode;
 use App\AddrBelong;
 //修改結束
 
+ini_set('memory_limit','512M');
+ini_set('max_execution_time', 300);
 
 /**
  * Class BiogMainRepository
@@ -221,20 +223,44 @@ class BiogMainRepository
         }
         if (!$request->q){
             //return BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->paginate($num);
-            return BiogMain::select(['BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ALTNAME_DATA.c_alt_name_chn'])
+            $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                    ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                    ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
-                   ->leftJoin('ALTNAME_DATA', 'ALTNAME_DATA.c_personid', '=', 'BIOG_MAIN.c_personid')
+                   ->leftJoin('ALTNAME_DATA as A1', function($names)
+                   {
+                       $names->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
+                       ->where('A1.c_alt_name_type_code', '=', 4);
+                   })
+                   ->leftJoin('ALTNAME_DATA as A2', function($names)
+                   {
+                       $names->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
+                       ->where('A2.c_alt_name_type_code', '=', 5);
+                   })
+                   ->orderBy('BIOG_MAIN.c_personid', 'ASC')
+                   ->groupBy('BIOG_MAIN.c_personid')
+                   ->having('BIOG_MAIN.c_personid', '>=', 0)
                    ->paginate($num);
+            $names->appends(['q' => $request->q])->links();
+            return $names;
         }
         //20210827修改拼音檢索時以字為單位
         //$names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
         //20211105修改「人名查詢」界面新增朝代、字、地址三列
         //$names = BiogMain::select(['BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name']);
-        $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ALTNAME_DATA.c_alt_name_chn');
+        $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao');
         $names = $names->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy'); //單筆
         $names = $names->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id'); //單筆
-        $names = $names->leftJoin('ALTNAME_DATA', 'ALTNAME_DATA.c_personid', '=', 'BIOG_MAIN.c_personid'); //多筆
+        //$names = $names->leftJoin('ALTNAME_DATA', 'ALTNAME_DATA.c_personid', '=', 'BIOG_MAIN.c_personid'); //多筆
+        $names = $names->leftJoin('ALTNAME_DATA as A1', function($names)
+        {
+            $names->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
+                  ->where('A1.c_alt_name_type_code', '=', 4);
+        });
+        $names = $names->leftJoin('ALTNAME_DATA as A2', function($names)
+        {
+            $names->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
+                  ->where('A2.c_alt_name_type_code', '=', 5);
+        });
 
         $names = $names->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
 

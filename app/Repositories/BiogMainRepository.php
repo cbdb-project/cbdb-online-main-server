@@ -233,8 +233,8 @@ class BiogMainRepository
                 $zi = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 4)->where('c_personid', '=', $v['c_personid'])->first();
                 $hao = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 5)->where('c_personid', '=', $v['c_personid'])->first();
                
-                $arr['data'][$key]['c_dynasty_chn'] = $c_dy['c_dynasty_chn'];
-                $arr['data'][$key]['ADDR_c_name_chn'] = $addr['c_name_chn'];
+                $arr['data'][$key]['c_dynasty_chn'] = empty($c_dy['c_dynasty_chn']) ? '' : $c_dy['c_dynasty_chn'];
+                $arr['data'][$key]['ADDR_c_name_chn'] = empty($addr['c_name_chn']) ? '' : $addr['c_name_chn'];
                 $arr['data'][$key]['c_alt_name_chn_zi'] = empty($zi->c_alt_name_chn) ? '' : $zi->c_alt_name_chn;
                 $arr['data'][$key]['c_alt_name_chn_hao'] = empty($hao->c_alt_name_chn) ? '' : $hao->c_alt_name_chn;
             }

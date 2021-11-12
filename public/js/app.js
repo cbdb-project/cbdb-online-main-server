@@ -43806,7 +43806,7 @@ var render = function() {
     ]),
     _vm._v(" "),
     _c("table", { staticClass: "table table-hover table-condensed" }, [
-      _c("caption", [_vm._v("共查詢到" + _vm._s(_vm.names.total) + "條記錄")]),
+      _c("caption", [_vm._v("共計" + _vm._s(_vm.names.total) + "條記錄")]),
       _vm._v(" "),
       _vm._m(0),
       _vm._v(" "),

@@ -222,35 +222,31 @@ class BiogMainRepository
             $num = $temp;
         }
         if (!$request->q){
-            //return BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->paginate($num);
-            $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
-                   ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
-                   ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
-                   ->leftJoin('ALTNAME_DATA as A1', function($names)
-                   {
-                       $names->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
-                       ->where('A1.c_alt_name_type_code', '=', 4);
-                   })
-                   ->leftJoin('ALTNAME_DATA as A2', function($names)
-                   {
-                       $names->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
-                       ->where('A2.c_alt_name_type_code', '=', 5);
-                   })
-                   ->orderBy('BIOG_MAIN.c_personid', 'ASC')
-                   ->groupBy('BIOG_MAIN.c_personid')
-                   ->having('BIOG_MAIN.c_personid', '>=', 0)
-                   ->paginate($num);
-            $names->appends(['q' => $request->q])->links();
-            return $names;
+            //20211112註記，運用每次僅呈現20筆的特性，先快速提供人名資料，再查詢相關的朝代與字、號。
+            $names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name', 'c_index_year', 'c_dy', 'c_index_addr_id'])->paginate($num);
+            $json = json_encode($names);
+            $arr = json_decode($json, true);
+            foreach($arr['data'] as $key => $v) {
+                $c_dy = $addr = $zi = $hao = '';
+                $c_dy = Dynasty::select('c_dynasty_chn')->where('c_dy', '=', $v['c_dy'])->first();
+                $addr = AddrCode::select('c_name_chn')->where('c_addr_id', '=', $v['c_index_addr_id'])->first(); 
+                $zi = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 4)->where('c_personid', '=', $v['c_personid'])->first();
+                $hao = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 5)->where('c_personid', '=', $v['c_personid'])->first();
+               
+                $arr['data'][$key]['c_dynasty_chn'] = $c_dy['c_dynasty_chn'];
+                $arr['data'][$key]['ADDR_c_name_chn'] = $addr['c_name_chn'];
+                $arr['data'][$key]['c_alt_name_chn_zi'] = empty($zi->c_alt_name_chn) ? '' : $zi->c_alt_name_chn;
+                $arr['data'][$key]['c_alt_name_chn_hao'] = empty($hao->c_alt_name_chn) ? '' : $hao->c_alt_name_chn;
+            }
+            $names_json = json_encode($arr);
+            return $names_json;
         }
         //20210827修改拼音檢索時以字為單位
         //$names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
-        //20211105修改「人名查詢」界面新增朝代、字、地址三列
-        //$names = BiogMain::select(['BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name']);
+        //20211112註記，已得到查詢條件，維持SQL LeftJoin的特性，一次性提供完整資料。
         $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao');
         $names = $names->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy'); //單筆
         $names = $names->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id'); //單筆
-        //$names = $names->leftJoin('ALTNAME_DATA', 'ALTNAME_DATA.c_personid', '=', 'BIOG_MAIN.c_personid'); //多筆
         $names = $names->leftJoin('ALTNAME_DATA as A1', function($names)
         {
             $names->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')

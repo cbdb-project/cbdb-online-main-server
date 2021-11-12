@@ -12,7 +12,7 @@
             </div>
         </div>
         <table class="table table-hover table-condensed">
-            <caption>共查詢到{{names.total}}條記錄</caption>
+            <caption>共計{{names.total}}條記錄</caption>
             <thead>
             <tr>
                 <th>c_personid</th>

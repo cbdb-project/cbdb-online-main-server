@@ -40,9 +40,13 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Laravel\Passport\Http\Middleware\CreateFreshApiToken::class,
         ],
-
+        /**
+         *20211112建安修改
+         *Laravel has a default throttle limit for all api routes.
+         *60 >> 600 attempts then locked out for 1 minute
+         */
         'api' => [
-            'throttle:60,1',
+            'throttle:600,1',
             'bindings',
         ],
     ];

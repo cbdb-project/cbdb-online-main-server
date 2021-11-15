@@ -45623,6 +45623,22 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
@@ -45785,24 +45801,80 @@ var render = function() {
                 ),
                 _vm._v(" "),
                 _c(
-                  "a",
+                  "button",
                   {
                     staticClass: "btn btn-sm btn-danger",
                     attrs: {
                       type: "button",
-                      href:
-                        "/textinstancedata/" +
+                      "data-toggle": "modal",
+                      "data-target":
+                        "#myModal" +
                         item.c_textid +
                         "-" +
                         item.c_text_edition_id +
                         "-" +
                         item.c_text_instance_id +
-                        "/delete"
+                        ""
                     }
                   },
                   [_vm._v("Delete")]
                 )
-              ])
+              ]),
+              _vm._v(" "),
+              _c(
+                "div",
+                {
+                  staticClass: "modal fade",
+                  attrs: {
+                    id:
+                      "myModal" +
+                      item.c_textid +
+                      "-" +
+                      item.c_text_edition_id +
+                      "-" +
+                      item.c_text_instance_id +
+                      "",
+                    role: "dialog"
+                  }
+                },
+                [
+                  _c("div", { staticClass: "modal-dialog" }, [
+                    _c("div", { staticClass: "modal-content" }, [
+                      _vm._m(1, true),
+                      _vm._v(" "),
+                      _c("div", { staticClass: "modal-footer" }, [
+                        _c(
+                          "a",
+                          {
+                            staticClass: "btn btn-sm btn-danger",
+                            attrs: {
+                              type: "button",
+                              href:
+                                "/textinstancedata/" +
+                                item.c_textid +
+                                "-" +
+                                item.c_text_edition_id +
+                                "-" +
+                                item.c_text_instance_id +
+                                "/delete"
+                            }
+                          },
+                          [_vm._v("Confirm Delete")]
+                        ),
+                        _vm._v(" "),
+                        _c(
+                          "button",
+                          {
+                            staticClass: "btn btn-default",
+                            attrs: { type: "button", "data-dismiss": "modal" }
+                          },
+                          [_vm._v("Close")]
+                        )
+                      ])
+                    ])
+                  ])
+                ]
+              )
             ])
           ])
         }),
@@ -45903,6 +45975,23 @@ var staticRenderFns = [
         _c("th", [_vm._v("操作")])
       ])
     ])
+  },
+  function() {
+    var _vm = this
+    var _h = _vm.$createElement
+    var _c = _vm._self._c || _h
+    return _c("div", { staticClass: "modal-header" }, [
+      _c(
+        "button",
+        {
+          staticClass: "close",
+          attrs: { type: "button", "data-dismiss": "modal" }
+        },
+        [_vm._v("×")]
+      ),
+      _vm._v(" "),
+      _c("h4", { staticClass: "modal-title" }, [_vm._v("確認是否刪除？")])
+    ])
   }
 ]
 render._withStripped = true
@@ -45967,6 +46056,24 @@ module.exports = Component.exports
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 //
 //
 //
@@ -46154,6 +46261,8 @@ var render = function() {
           return _c("tr", [
             _c("td", [_vm._v(_vm._s(item.c_addr_id))]),
             _vm._v(" "),
+            _c("td", [_vm._v(_vm._s(item.c_belongs_to))]),
+            _vm._v(" "),
             _c("td", [_vm._v(_vm._s(item.c_firstyear))]),
             _vm._v(" "),
             _c("td", [_vm._v(_vm._s(item.c_lastyear))]),
@@ -46166,24 +46275,82 @@ var render = function() {
                     staticClass: "btn btn-sm btn-info",
                     attrs: {
                       type: "button",
-                      href: "/addrbelongsdata/" + item.c_addr_id + "/edit"
+                      href:
+                        "/addrbelongsdata/" +
+                        item.c_addr_id +
+                        "-" +
+                        item.c_belongs_to +
+                        "/edit"
                     }
                   },
                   [_vm._v("edit")]
                 ),
                 _vm._v(" "),
                 _c(
-                  "a",
+                  "button",
                   {
                     staticClass: "btn btn-sm btn-danger",
                     attrs: {
                       type: "button",
-                      href: "/addrbelongsdata/" + item.c_addr_id + "/delete"
+                      "data-toggle": "modal",
+                      "data-target":
+                        "#myModal" +
+                        item.c_addr_id +
+                        "-" +
+                        item.c_belongs_to +
+                        ""
                     }
                   },
                   [_vm._v("Delete")]
                 )
-              ])
+              ]),
+              _vm._v(" "),
+              _c(
+                "div",
+                {
+                  staticClass: "modal fade",
+                  attrs: {
+                    id:
+                      "myModal" + item.c_addr_id + "-" + item.c_belongs_to + "",
+                    role: "dialog"
+                  }
+                },
+                [
+                  _c("div", { staticClass: "modal-dialog" }, [
+                    _c("div", { staticClass: "modal-content" }, [
+                      _vm._m(1, true),
+                      _vm._v(" "),
+                      _c("div", { staticClass: "modal-footer" }, [
+                        _c(
+                          "a",
+                          {
+                            staticClass: "btn btn-sm btn-danger",
+                            attrs: {
+                              type: "button",
+                              href:
+                                "/addrbelongsdata/" +
+                                item.c_addr_id +
+                                "-" +
+                                item.c_belongs_to +
+                                "/delete"
+                            }
+                          },
+                          [_vm._v("Confirm Delete")]
+                        ),
+                        _vm._v(" "),
+                        _c(
+                          "button",
+                          {
+                            staticClass: "btn btn-default",
+                            attrs: { type: "button", "data-dismiss": "modal" }
+                          },
+                          [_vm._v("Close")]
+                        )
+                      ])
+                    ])
+                  ])
+                ]
+              )
             ])
           ])
         }),
@@ -46277,12 +46444,31 @@ var staticRenderFns = [
       _c("tr", [
         _c("th", [_vm._v("c_addr_id")]),
         _vm._v(" "),
+        _c("th", [_vm._v("c_belongs_to")]),
+        _vm._v(" "),
         _c("th", [_vm._v("c_firstyear")]),
         _vm._v(" "),
         _c("th", [_vm._v("c_lastyear")]),
         _vm._v(" "),
         _c("th", [_vm._v("操作")])
       ])
+    ])
+  },
+  function() {
+    var _vm = this
+    var _h = _vm.$createElement
+    var _c = _vm._self._c || _h
+    return _c("div", { staticClass: "modal-header" }, [
+      _c(
+        "button",
+        {
+          staticClass: "close",
+          attrs: { type: "button", "data-dismiss": "modal" }
+        },
+        [_vm._v("×")]
+      ),
+      _vm._v(" "),
+      _c("h4", { staticClass: "modal-title" }, [_vm._v("確認是否刪除？")])
     ])
   }
 ]

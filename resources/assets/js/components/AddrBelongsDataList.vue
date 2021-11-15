@@ -16,6 +16,7 @@
             <thead>
             <tr>
                 <th>c_addr_id</th>
+                <th>c_belongs_to</th>
                 <th>c_firstyear</th>
                 <th>c_lastyear</th>
                 <th>操作</th>
@@ -24,14 +25,31 @@
             <tbody>
             <tr v-for="item in names.data">
                 <td>{{item.c_addr_id}}</td>
+                <td>{{item.c_belongs_to}}</td>
                 <td>{{item.c_firstyear}}</td>
                 <td>{{item.c_lastyear}}</td>
                 <td>
                     <div class="btn-group">
-                        <a type="button" class="btn btn-sm btn-info" :href="'/addrbelongsdata/'+item.c_addr_id+'/edit'">edit</a>
-                        <a type="button" class="btn btn-sm btn-danger" :href="'/addrbelongsdata/'+item.c_addr_id+'/delete'">Delete</a>
-
+                        <a type="button" class="btn btn-sm btn-info" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'/edit'">edit</a>
+                        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_addr_id+'-'+item.c_belongs_to+''">Delete</button>
                     </div>
+                    <!--Start-->
+                    <div :id="'myModal'+item.c_addr_id+'-'+item.c_belongs_to+''" class="modal fade" role="dialog">
+                      <div class="modal-dialog">
+                        <!-- Modal content-->
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal">&times;</button>
+                            <h4 class="modal-title">確認是否刪除？</h4>
+                          </div>
+                          <div class="modal-footer">
+                            <a type="button" class="btn btn-sm btn-danger" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'/delete'">Confirm Delete</a>
+                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!--End-->
                 </td>
             </tr>
             </tbody>

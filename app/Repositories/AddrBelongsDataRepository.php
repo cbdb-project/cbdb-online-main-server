@@ -40,22 +40,32 @@ class AddrBelongsDataRepository
             $num = $temp;
         }
         if (!$request->q){
-            return AddrBelongsData::select(['c_addr_id', 'c_firstyear', 'c_lastyear'])->paginate($num);
+            return AddrBelongsData::select(['c_addr_id', 'c_firstyear', 'c_lastyear', 'c_belongs_to'])->paginate($num);
         }
-        $names = AddrBelongsData::select(['c_addr_id', 'c_firstyear', 'c_lastyear'])->where('c_addr_id', 'like', '%'.$request->q.'%')->orWhere('c_firstyear', 'like', '%'.$request->q.'%')->orWhere('c_lastyear', $request->q)->paginate($num);
+        $names = AddrBelongsData::select(['c_addr_id', 'c_firstyear', 'c_lastyear', 'c_belongs_to'])->where('c_addr_id', 'like', '%'.$request->q.'%')->orWhere('c_firstyear', 'like', '%'.$request->q.'%')->orWhere('c_lastyear', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
     }
 
     public function byId($id)
     {
-        return AddrBelongsData::find($id);
+        //return AddrBelongsData::find($id);
+        $id_l = explode("-", $id);
+        $row = AddrBelongsData::where([
+            ['c_addr_id', '=', $id_l[0]],
+            ['c_belongs_to', '=', $id_l[1]]
+        ])->first();
+        return $row;
     }
 
     public function updateById($request, $id)
     {
         $data = $request->all();
-        $addrcode = AddrBelongsData::find($id);
+        $data = array_except($data, ['_method', '_token']);
+        $addrcode = AddrBelongsData::where([
+            ['c_addr_id', '=', $id_l[0]],
+            ['c_belongs_to', '=', $id_l[1]]
+        ])->first();
         $addrcode->update($data);
     }
 

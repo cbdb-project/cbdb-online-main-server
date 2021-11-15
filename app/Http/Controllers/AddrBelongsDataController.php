@@ -43,7 +43,9 @@ class AddrBelongsDataController extends Controller
      */
     public function create()
     {
-        $temp_id = AddrBelongsData::max('c_addr_id') + 1;
+        //20211112地址從屬表c_addr_id預設值為空
+        //$temp_id = AddrBelongsData::max('c_addr_id') + 1;
+        $temp_id = '';
         return view('addrbelongsdata.create', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址從屬表', 'temp_id' => $temp_id]);
     }
 
@@ -64,14 +66,14 @@ class AddrBelongsDataController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0 or !AddrBelongsData::where('c_addr_id', $data['c_addr_id'])->get()->isEmpty()){
+        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0 or AddrBelongsData::where('c_addr_id', $data['c_addr_id'])->get()->isEmpty()){
             flash('c_addr_id 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();
         }
         $flight = AddrBelongsData::create($data);
-        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_BELONGS_DATA', $data['c_addr_id'], $data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_BELONGS_DATA', $data['c_addr_id'].'-'.$data['c_belongs_to'], $data);
         flash('Create success @ '.Carbon::now(), 'success');
-        return redirect()->route('addrbelongsdata.edit', $data['c_addr_id']);
+        return redirect()->route('addrbelongsdata.edit', $data['c_addr_id'].'-'.$data['c_belongs_to']);
     }
 
     /**
@@ -117,7 +119,7 @@ class AddrBelongsDataController extends Controller
         $this->addrbelongsdatarepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         //建安修改20181115，使用更新後的id來跳轉。
-        $id = $request['c_addr_id'];
+        $id = $request['c_addr_id'].'-'.$request['c_belongs_to'];
         return redirect()->route('addrbelongsdata.edit', $id);
     }
 
@@ -137,11 +139,18 @@ class AddrBelongsDataController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        $id_l = explode("-", $id);
         $table_name = "ADDR_BELONGS_DATA";
-        $row = DB::table($table_name)->where('c_addr_id', $id)->first();
-        $row2 = json_encode((array)$row);
-        $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row2);
-        DB::table($table_name)->where('c_addr_id', $id)->delete();
+        $row = DB::table($table_name)->where([
+            ['c_addr_id', '=', $id_l[0]],
+            ['c_belongs_to', '=', $id_l[1]]
+        ]
+        )->first();
+        $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row);
+        DB::table($table_name)->where([
+            ['c_addr_id', '=', $id_l[0]],
+            ['c_belongs_to', '=', $id_l[1]]
+        ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return view('addrbelongsdata.index', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址从属表', 'codes' => session('codes')]);
     }

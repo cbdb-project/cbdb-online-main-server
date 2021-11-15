@@ -29,9 +29,25 @@
                 <td>
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/edit'">edit</a>
-                        <a type="button" class="btn btn-sm btn-danger" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/delete'">Delete</a>
-
+                        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+''">Delete</button>
                     </div>
+                    <!--Start-->
+                    <div :id="'myModal'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+''" class="modal fade" role="dialog">
+                      <div class="modal-dialog">
+                        <!-- Modal content-->
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal">&times;</button>
+                            <h4 class="modal-title">確認是否刪除？</h4>
+                          </div>
+                          <div class="modal-footer">
+                            <a type="button" class="btn btn-sm btn-danger" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/delete'">Confirm Delete</a>
+                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!--End-->
                 </td>
             </tr>
             </tbody>

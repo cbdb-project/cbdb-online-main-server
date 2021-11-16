@@ -66,8 +66,8 @@ class AddrBelongsDataController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0 or AddrBelongsData::where('c_addr_id', $data['c_addr_id'])->get()->isEmpty()){
-            flash('c_addr_id 未填或已存在 '.Carbon::now(), 'error');
+        if ($data['c_addr_id'] == null or $data['c_addr_id'] == 0){
+            flash('c_addr_id 未填 '.Carbon::now(), 'error');
             return redirect()->back();
         }
         $flight = AddrBelongsData::create($data);

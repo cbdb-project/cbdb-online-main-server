@@ -42,6 +42,8 @@ class TextInstanceDataRepository{
     {
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
+        //20211117增加用戶名和保存時間自動填寫
+        $data = (new ToolsRepository)->timestamp($data); //更新
         //$altcode = TextInstanceData::find($id);
         $id_l = explode("-", $id);
         $altcode = TextInstanceData::where([

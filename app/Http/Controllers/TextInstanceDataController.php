@@ -72,6 +72,8 @@ class TextInstanceDataController extends Controller
             flash('c_textid 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        //20211117增加用戶名和保存時間自動填寫
+        $data = $this->toolRepository->timestamp($data, True); //新增
         $flight = TextInstanceData::create($data);
         $this->operationRepository->store(Auth::id(), '', 1, 'TEXT_INSTANCE_DATA', $data['c_textid']."-".$data['c_text_edition_id']."-".$data['c_text_instance_id'], $data);
         flash('Create success @ '.Carbon::now(), 'success');

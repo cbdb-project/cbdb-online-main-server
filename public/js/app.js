@@ -45639,6 +45639,14 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
     props: [],
@@ -45775,7 +45783,15 @@ var render = function() {
           return _c("tr", [
             _c("td", [_vm._v(_vm._s(item.c_textid))]),
             _vm._v(" "),
+            _c("td", [_vm._v(_vm._s(item.c_text_edition_id))]),
+            _vm._v(" "),
+            _c("td", [_vm._v(_vm._s(item.c_text_instance_id))]),
+            _vm._v(" "),
             _c("td", [_vm._v(_vm._s(item.c_instance_title_chn))]),
+            _vm._v(" "),
+            _c("td", [_vm._v(_vm._s(item.c_publisher))]),
+            _vm._v(" "),
+            _c("td", [_vm._v(_vm._s(item.c_print))]),
             _vm._v(" "),
             _c("td", [_vm._v(_vm._s(item.c_instance_title))]),
             _vm._v(" "),
@@ -45968,7 +45984,15 @@ var staticRenderFns = [
       _c("tr", [
         _c("th", [_vm._v("c_textid")]),
         _vm._v(" "),
+        _c("th", [_vm._v("c_text_edition_id")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("c_text_instance_id")]),
+        _vm._v(" "),
         _c("th", [_vm._v("c_instance_title_chn")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("c_publisher")]),
+        _vm._v(" "),
+        _c("th", [_vm._v("c_print")]),
         _vm._v(" "),
         _c("th", [_vm._v("c_instance_title")]),
         _vm._v(" "),

@@ -16,7 +16,11 @@
             <thead>
             <tr>
                 <th>c_textid</th>
+                <th>c_text_edition_id</th>
+                <th>c_text_instance_id</th>
                 <th>c_instance_title_chn</th>
+                <th>c_publisher</th>
+                <th>c_print</th>
                 <th>c_instance_title</th>
                 <th>操作</th>
             </tr>
@@ -24,7 +28,11 @@
             <tbody>
             <tr v-for="item in names.data">
                 <td>{{item.c_textid}}</td>
+                <td>{{item.c_text_edition_id}}</td>
+                <td>{{item.c_text_instance_id}}</td>
                 <td>{{item.c_instance_title_chn}}</td>
+                <td>{{item.c_publisher}}</td>
+                <td>{{item.c_print}}</td>
                 <td>{{item.c_instance_title}}</td>
                 <td>
                     <div class="btn-group">

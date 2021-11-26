@@ -106,7 +106,9 @@ $(document).ready(function (){
                         /*在這裡添加錄入表單更新的欄位與資料*/
                         $("#input_ajax_data").val(data.data[0].c_title_chn);
                         $("input[name='c_instance_title_chn']").val(data.data[0].c_title_chn);
+                        $("input[name='c_instance_title_chn']").css("background","#FFFFBB");
                         $("input[name='c_instance_title']").val(data.data[0].c_title);
+                        $("input[name='c_instance_title']").css("background","#FFFFBB");
                         alert('Load Data 更新[c_instance_title_chn]與[c_instance_title]成功');
                     }
                     else { alert('Load Data 查詢失敗'); }

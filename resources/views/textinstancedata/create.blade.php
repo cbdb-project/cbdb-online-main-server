@@ -10,8 +10,11 @@
                     {{ csrf_field() }}
                     <div class="form-group">
                         <label for="c_textid" class="col-sm-2 control-label">c_textid</label>
-                        <div class="col-sm-10">
+                        <div class="col-sm-8">
                             <input type="text" name="c_textid" class="form-control" value="{{ $temp_id or '' }}" {{ $temp_id or '' }} placeholder="請先從TEXT_CODES表中複製這本書的c_textid填入" required>
+                        </div>
+                        <div class="col-sm-2">
+                            <button type="button" id="button_ajax_load" class="btn btn-info">Load Data</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -50,5 +53,70 @@
 
 @endsection
 @section('js')
+<!-- Javascript -->
+<script type="text/javascript">
+$(document).ready(function (){
 
+    var DoAjax = function(requestUrl, sentData, sHandler, eHandler, pageNotFoundHandler){
+        $.ajax({
+            type: 'GET',
+            url: requestUrl,
+            cache: false,
+            data: sentData,
+            success: sHandler,
+            error: eHandler,
+            statusCode: {
+              404: pageNotFoundHandler
+            }
+        });
+    };
+
+    /* Simulate succeed ajax */
+    $("#button_ajax_load").click(function(){
+
+        /*修改這兩行參數就可以更換ajax查詢*/
+        var c_textid = $("input[name='c_textid']").val();
+        var url = "/api/select/search/text?q=" + c_textid + "";
+        /* disable trigger button, preventing multiple requests */
+        $(this).attr("disabled", true);
+
+        /* show requesting message */
+        $("#div_ajax_show").html("requsting....");
+        $("#input_ajax_data").val("");
+
+        /* wait 2 seconds before sending ajax */
+        setTimeout(function(){
+
+            DoAjax(url, {todo : "exSucceed"},
+                function(data, textStatus, jqXHR){
+                    var html = [];
+                    html.push("Request url : ", url, "<br>",
+                                "Server response : ", data, "<br>",
+                                "Status code : ", jqXHR.status, "<br>",
+                                "Status text : ", jqXHR.statusText);
+
+                    $("#div_ajax_show").html(html.join(''));
+                    //$("#input_ajax_data").val(data);
+                    //console.log(data);
+                    if(data.data == '') { alert('Load Data 沒有查詢到資料'); }
+                    else if(data.data != '') {
+                        /*在這裡添加錄入表單更新的欄位與資料*/
+                        $("#input_ajax_data").val(data.data[0].c_title_chn);
+                        $("input[name='c_instance_title_chn']").val(data.data[0].c_title_chn);
+                        $("input[name='c_instance_title_chn']").css("background","#FFFFBB");
+                        $("input[name='c_instance_title']").val(data.data[0].c_title);
+                        $("input[name='c_instance_title']").css("background","#FFFFBB");
+                        alert('Load Data 更新[c_instance_title_chn]與[c_instance_title]成功');
+                    }
+                    else { alert('Load Data 查詢失敗'); }
+                });
+
+            /* enable trigger button */
+            $("#button_ajax_load").attr("disabled", false);
+        }, 10);
+    });
+
+});
+</script>
+<!-- Javascript End -->
 @endsection

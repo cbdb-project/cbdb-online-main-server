@@ -71,9 +71,9 @@ class AddrBelongsDataController extends Controller
             return redirect()->back();
         }
         $flight = AddrBelongsData::create($data);
-        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_BELONGS_DATA', $data['c_addr_id'].'-'.$data['c_belongs_to'], $data);
+        $this->operationRepository->store(Auth::id(), '', 1, 'ADDR_BELONGS_DATA', $data['c_addr_id'].'-'.$data['c_belongs_to'].'-'.$data['c_firstyear'].'-'.$data['c_lastyear'], $data);
         flash('Create success @ '.Carbon::now(), 'success');
-        return redirect()->route('addrbelongsdata.edit', $data['c_addr_id'].'-'.$data['c_belongs_to']);
+        return redirect()->route('addrbelongsdata.edit', $data['c_addr_id'].'-'.$data['c_belongs_to'].'-'.$data['c_firstyear'].'-'.$data['c_lastyear']);
     }
 
     /**
@@ -118,8 +118,8 @@ class AddrBelongsDataController extends Controller
         }
         $this->addrbelongsdatarepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        //建安修改20181115，使用更新後的id來跳轉。
-        $id = $request['c_addr_id'].'-'.$request['c_belongs_to'];
+        //建安修改20211208，使用更新後的id來跳轉。
+        $id = $request['c_addr_id'].'-'.$request['c_belongs_to'].'-'.$request['c_firstyear'].'-'.$request['c_lastyear'];
         return redirect()->route('addrbelongsdata.edit', $id);
     }
 
@@ -143,13 +143,17 @@ class AddrBelongsDataController extends Controller
         $table_name = "ADDR_BELONGS_DATA";
         $row = DB::table($table_name)->where([
             ['c_addr_id', '=', $id_l[0]],
-            ['c_belongs_to', '=', $id_l[1]]
+            ['c_belongs_to', '=', $id_l[1]],
+            ['c_firstyear', '=', $id_l[2]],
+            ['c_lastyear', '=', $id_l[3]],
         ]
         )->first();
         $this->operationRepository->store(Auth::id(), '', 4, $table_name, $id, $row);
         DB::table($table_name)->where([
             ['c_addr_id', '=', $id_l[0]],
-            ['c_belongs_to', '=', $id_l[1]]
+            ['c_belongs_to', '=', $id_l[1]],
+            ['c_firstyear', '=', $id_l[2]],
+            ['c_lastyear', '=', $id_l[3]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return view('addrbelongsdata.index', ['page_title' => 'Addr Belongs Data', 'page_description' => '地址从属表', 'codes' => session('codes')]);

@@ -13,6 +13,9 @@ use App\AddrCode;
 use App\AddressCode;
 use App\AddrBelongsData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Class AddrCodeRepository
@@ -53,20 +56,25 @@ class AddrBelongsDataRepository
         $id_l = explode("-", $id);
         $row = AddrBelongsData::where([
             ['c_addr_id', '=', $id_l[0]],
-            ['c_belongs_to', '=', $id_l[1]]
+            ['c_belongs_to', '=', $id_l[1]],
+            ['c_firstyear', '=', $id_l[2]],
+            ['c_lastyear', '=', $id_l[3]],
         ])->first();
         return $row;
     }
 
     public function updateById($request, $id)
     {
+        $id_l = explode("-", $id);
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
-        $addrcode = AddrBelongsData::where([
+        $table_name = "ADDR_BELONGS_DATA";
+        $row = DB::table($table_name)->where([
             ['c_addr_id', '=', $id_l[0]],
-            ['c_belongs_to', '=', $id_l[1]]
-        ])->first();
-        $addrcode->update($data);
+            ['c_belongs_to', '=', $id_l[1]],
+            ['c_firstyear', '=', $id_l[2]],
+            ['c_lastyear', '=', $id_l[3]],
+        ])->update($data);
     }
 
     public function searchAddr(Request $request)

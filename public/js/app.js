@@ -46304,6 +46304,10 @@ var render = function() {
                         item.c_addr_id +
                         "-" +
                         item.c_belongs_to +
+                        "-" +
+                        item.c_firstyear +
+                        "-" +
+                        item.c_lastyear +
                         "/edit"
                     }
                   },
@@ -46322,6 +46326,10 @@ var render = function() {
                         item.c_addr_id +
                         "-" +
                         item.c_belongs_to +
+                        "-" +
+                        item.c_firstyear +
+                        "-" +
+                        item.c_lastyear +
                         ""
                     }
                   },
@@ -46335,7 +46343,15 @@ var render = function() {
                   staticClass: "modal fade",
                   attrs: {
                     id:
-                      "myModal" + item.c_addr_id + "-" + item.c_belongs_to + "",
+                      "myModal" +
+                      item.c_addr_id +
+                      "-" +
+                      item.c_belongs_to +
+                      "-" +
+                      item.c_firstyear +
+                      "-" +
+                      item.c_lastyear +
+                      "",
                     role: "dialog"
                   }
                 },
@@ -46356,6 +46372,10 @@ var render = function() {
                                 item.c_addr_id +
                                 "-" +
                                 item.c_belongs_to +
+                                "-" +
+                                item.c_firstyear +
+                                "-" +
+                                item.c_lastyear +
                                 "/delete"
                             }
                           },

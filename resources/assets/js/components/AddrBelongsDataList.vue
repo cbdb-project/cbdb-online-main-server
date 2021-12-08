@@ -30,11 +30,11 @@
                 <td>{{item.c_lastyear}}</td>
                 <td>
                     <div class="btn-group">
-                        <a type="button" class="btn btn-sm btn-info" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'/edit'">edit</a>
-                        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_addr_id+'-'+item.c_belongs_to+''">Delete</button>
+                        <a type="button" class="btn btn-sm btn-info" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+'/edit'">edit</a>
+                        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+''">Delete</button>
                     </div>
                     <!--Start-->
-                    <div :id="'myModal'+item.c_addr_id+'-'+item.c_belongs_to+''" class="modal fade" role="dialog">
+                    <div :id="'myModal'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+''" class="modal fade" role="dialog">
                       <div class="modal-dialog">
                         <!-- Modal content-->
                         <div class="modal-content">
@@ -43,7 +43,7 @@
                             <h4 class="modal-title">確認是否刪除？</h4>
                           </div>
                           <div class="modal-footer">
-                            <a type="button" class="btn btn-sm btn-danger" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'/delete'">Confirm Delete</a>
+                            <a type="button" class="btn btn-sm btn-danger" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+'/delete'">Confirm Delete</a>
                             <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                           </div>
                         </div>

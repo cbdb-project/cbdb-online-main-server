@@ -208,6 +208,19 @@ class ApiController extends Controller
         return $data;
     }
 
+    public function searchTextPerson(Request $request){
+        //20211213新增人物[出處]的資訊自動帶入
+        $data = DB::table('BIOG_SOURCE_DATA')->where('c_personid', '=', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $TextCode = TextCode::where('c_textid', $item->c_textid)->first();
+            //進行查詢資訊的擴充
+            $item->text = $item->c_textid." ".$TextCode->c_title." ".$TextCode->c_title_chn." - ".$item->c_pages;
+            $item->value = $item->c_textid."&and&".$item->c_pages;
+        }
+        return $data;
+    }
+
     public function searchTextSub($request){
         $data = DB::table('TEXT_BIBLCAT_TYPES')->select('c_text_cat_type_parent_id', 'c_text_cat_type_desc_chn')->where('c_text_cat_type_id', $request)->get();
         return $data;

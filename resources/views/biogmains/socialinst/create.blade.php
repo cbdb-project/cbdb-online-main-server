@@ -10,7 +10,7 @@
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" value="{{ $id }}" disabled>
+                        <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
                 <div class="form-group">
@@ -66,7 +66,7 @@
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-10">
-                        <select class="form-control c_source" name="c_source">
+                        <select class="form-control c_source" name="c_source" id="c_source">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
@@ -89,6 +89,14 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                    <div class="col-sm-10">
+                        <select class="form-control textperson_pair" name="">
+                            <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
                     </div>
@@ -102,6 +110,7 @@
 @section('js')
     <script>
         $(".select2").select2();
+        textperson_pair_first_load();
         $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
 
@@ -159,5 +168,46 @@
                 templateSelection: formatRepoSelection
             }
         }
+
+        function textperson_pair_first_load(){
+            let person_id = $('.person_id').val();
+            //console.log(person_id);
+            let data = [{
+                id: 0,
+                text: '請填寫[人物 >> 出處]'
+            }];
+            $.get('/api/select/search/textperson', {q: person_id}, function (data, textStatus){
+                //console.log(data);
+                for (let i=data.data.length-1; i>-1; i--){
+                    item = data.data[i];
+                    //console.log(item);
+                    $(".textperson_pair").append(new Option(item['text'], item['value']));
+                }
+            });
+        }
+
+        $(".textperson_pair").change(function(){
+            var hasValue = $(".textperson_pair").val();
+            //console.log(hasValue);
+            var textperson_value = hasValue.split("&and&");
+            $.get('/api/select/search/text', {q: textperson_value[0]}, function (data, textStatus){
+                //console.log(data);
+                for (var i=data.data.length-1; i>-1; i--){
+                    item = data.data[i];
+                    console.log(item);
+                    var textperson_text = item['text'];
+                }
+                //console.log(textperson_value);
+                /*在這裡添加錄入表單更新的欄位與資料*/
+                $("select[name='c_source'] option[selected]").val(textperson_value[0]);
+                $("select[name='c_source']").val(textperson_value[0]);
+                $("#select2-c_source-container").text(textperson_text);
+                $("#select2-c_source-container").css("background","#FFFFBB");
+                $("input[name='c_pages']").val(textperson_value[1]);
+                $("input[name='c_pages']").css("background","#FFFFBB");
+                alert('更新[出處]與[頁數/條目]成功');
+            });
+        });
+
     </script>
 @endsection

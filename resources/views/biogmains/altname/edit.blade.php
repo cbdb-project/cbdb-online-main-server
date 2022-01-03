@@ -51,6 +51,8 @@ $row->c_alt_name = unionPKDef_decode_for_convert($row->c_alt_name);
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($text_str)
                                 <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
+                            @else
+                                <option value="" selected="selected">请搜索</option>
                             @endif
                         </select>
                     </div>
@@ -194,12 +196,13 @@ $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
                 //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    console.log(item);
+                    //console.log(item);
                     var textperson_text = item['text'];
                 }
-                //console.log(textperson_value);
+                console.log(textperson_value);
                 /*在這裡添加錄入表單更新的欄位與資料*/
                 $("select[name='c_source'] option[selected]").val(textperson_value[0]);
+                $("select[name='c_source']").val(textperson_value[0]);
                 $("#select2-c_source-container").text(textperson_text);
                 $("#select2-c_source-container").css("background","#FFFFBB");
                 $("input[name='c_pages']").val(textperson_value[1]);

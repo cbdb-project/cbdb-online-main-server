@@ -285,6 +285,10 @@ npm install
 
 rm -rf node_modules 是將node_modules資料夾整個刪除
 
+### install node and npm in ubuntu
+
+https://github.com/nodesource/distributions
+
 rm package-lock.json yarn.lock 是將最低需求的版本控制資訊移除，直接取得最新版本，這可能會在較新的主機遇到。
 
 npm cache clear –force 清除快取

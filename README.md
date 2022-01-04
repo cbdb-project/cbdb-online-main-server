@@ -285,10 +285,6 @@ npm install
 
 rm -rf node_modules 是將node_modules資料夾整個刪除
 
-### install node and npm in ubuntu
-
-https://github.com/nodesource/distributions
-
 rm package-lock.json yarn.lock 是將最低需求的版本控制資訊移除，直接取得最新版本，這可能會在較新的主機遇到。
 
 npm cache clear –force 清除快取
@@ -298,3 +294,16 @@ npm install 重新安裝
 
 之後再執行 npm run dev 就可以通過了。
 
+### Install the proper version of node and npm in ubuntu
+
+https://github.com/nodesource/distributions
+
+```
+curl -fsSL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+
+sudo apt-get install -y nodejs
+```
+
+The proper version of nodejs is 12, while the default version of nodejs(apt) in ubuntu 20 is 10.
+
+If you still get an error, please check whether you have python 2.7 for the 'gpy' package.

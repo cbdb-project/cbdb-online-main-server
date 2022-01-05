@@ -76,8 +76,8 @@ class ApiController2 extends Controller
         */
         if($useDate) {
             if($dateType == 'index') {
-                $row->where('BIOG_MAIN.c_index_year', '>=', $dateStartTime);
-                $row->where('BIOG_MAIN.c_index_year', '<=', $dateEndTime);
+                $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
+                $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
             }
             elseif($dateType == 'dynasty') {
                 $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');

@@ -572,10 +572,10 @@ RequestPlayload:{
 | MAncGen | 數字 | 最大祖先距離 |
 | MDecGen | 數字 | 最大後代距離 |
 | MColLink | 數字 | 最大同輩距離 |
-| MMarLink | 數字 | 最大姻親距離 |
+| MMarLink | 數字 | 最大姻親距離 |
 | MLoop | 數字 | 最大循環次數 |
 
-**注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
+**注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
 ## 輸入示例: 
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_relatives`

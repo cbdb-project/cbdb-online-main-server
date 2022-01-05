@@ -378,7 +378,7 @@ RequestPlayload:{
 
 說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於 960 和 1250 年間的人的任官記錄。返回結果的第 11 筆到第 20 筆。
 
-### 查詢示例
+### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"office":[920,1022,1023],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}

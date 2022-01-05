@@ -575,7 +575,7 @@ RequestPlayload:{
 | MMarLink | 數字 | 最大姻親距離 |
 | MLoop | 數字 | 最大循環次數 |
 
-**注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
+**注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
 ## 輸入示例: 
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_relatives`
@@ -583,13 +583,13 @@ RequestPlayload:{
 RequestPlayload:{
     "people":[1762],
     "mCircle":0,
-    "MAncGen":3,
-    "MDecGen":3,
+    "MAncGen":1,
+    "MDecGen":1,
     "MColLink":1,
-    "MMarLink":1,
-    "MLoop":10
+    "MMarLink":1,
+    "MLoop":2
 }
-說明：查找王安石的親屬，採用自定義參數查找。最大向上3層，最大向下3層，最大同輩關係為1層，最大婚姻關係為1層   
+說明：查找王安石的親屬，採用自定義參數查找。最大向上1層，最大向下1層，最大同輩關係為1層，最大婚姻關係為1層   
 ```
 ## 預期輸出示例:    
 數據類型：`物件` 

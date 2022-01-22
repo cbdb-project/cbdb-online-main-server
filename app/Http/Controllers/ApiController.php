@@ -221,6 +221,21 @@ class ApiController extends Controller
         return $data;
     }
 
+    //20220121新增著作編碼表添加作者資訊作為錄入參考
+    public function searchTextAuthor(Request $request){
+        $data = DB::table('BIOG_TEXT_DATA')->where('c_textid', '=', $request->q)->paginate(20);
+        $data->appends(['q' => $request->q])->links();
+        foreach($data as $item){
+            $person = $role = '';
+            $person = BiogMain::where('c_personid', $item->c_personid)->first();
+            $role = DB::table('TEXT_ROLE_CODES')->select(['c_role_id', 'c_role_desc', 'c_role_desc_chn'])->where('c_role_id', $item->c_role_id)->first();
+            //進行查詢資訊的擴充
+            $item->text = $item->c_personid." - ".$person->c_name_chn." - ".$person->c_name." - ".$role->c_role_desc_chn;
+            $item->value = $item->c_personid;
+        }
+        return $data;
+    }
+
     public function searchTextSub($request){
         $data = DB::table('TEXT_BIBLCAT_TYPES')->select('c_text_cat_type_parent_id', 'c_text_cat_type_desc_chn')->where('c_text_cat_type_id', $request)->get();
         return $data;

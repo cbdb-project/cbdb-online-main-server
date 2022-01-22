@@ -95,6 +95,7 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');
     Route::get('search/textperson', 'ApiController@searchTextPerson');
+    Route::get('search/textauthor', 'ApiController@searchTextAuthor');
     Route::get('search/office', 'ApiController@searchOffice');
     Route::get('search/socialinst', 'ApiController@socialinst');
     Route::get('search/socialinstaddr', 'ApiController@socialinstaddr');

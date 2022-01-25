@@ -63,8 +63,10 @@ class SocialInstitutionCodesController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        if ($data['c_inst_name_code'] == null or $data['c_inst_name_code'] == 0 or !SocialInstitutionCode::where('c_inst_name_code', $data['c_inst_name_code'])->get()->isEmpty()){
-            flash('c_inst_name_code 未填或已存在 '.Carbon::now(), 'error');
+        //20220125修正允許同名社會機構錄入
+        //if ($data['c_inst_name_code'] == null or $data['c_inst_name_code'] == 0 or !SocialInstitutionCode::where('c_inst_name_code', $data['c_inst_name_code'])->get()->isEmpty()){
+        if ($data['c_inst_name_code'] == null or $data['c_inst_name_code'] == 0){
+            flash('c_inst_name_code 未填 '.Carbon::now(), 'error');
             return redirect()->back();
         }
         $flight = SocialInstitutionCode::create($data);

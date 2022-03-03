@@ -218,8 +218,10 @@ class BiogMainRepository
      */
     static public function namesByQuery(Request $request, $num=20)
     {
+        //20220303增加addslashes()防禦查詢參數
+        $request->q = addslashes($request->q);
         if ($temp = $request->num){
-            $num = $temp;
+            $num = addslashes($temp);
         }
         if (!$request->q){
             //20211112註記，運用每次僅呈現20筆的特性，先快速提供人名資料，再查詢相關的朝代與字、號。

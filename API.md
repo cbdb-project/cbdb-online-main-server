@@ -895,8 +895,8 @@ RequestPlayload:{
 | data[`i`].PlaceNameChn       | 字串     | 地址名稱，中文         |
 | data[`i`].AssocName          | 字串     | 社會關係人姓名，英文   |
 | data[`i`].AssocChn           | 字串     | 社會關係人姓名，中文   |
-| data[`i`].AssoStart          | 數字     | 社會關係開始年         |
-| data[`i`].AssoEnd            | 數字     | 社會關係結束年         |
+| data[`i`].Start              | 數字     | 開始年                |
+| data[`i`].End                | 數字     | 結束年                |
 | data[`i`].PlaceType          | 字串     | 地址關係類別           |
 | data[`i`].PlaceTypeDetail    | 字串     | 地址關係詳細類別，英文 |
 | data[`i`].PlaceTypeDetailChn | 字串     | 地址關係詳細類別，中文 |

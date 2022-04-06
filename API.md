@@ -438,6 +438,13 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"o
 | data[`i`].AssumptionOfficeChn | 字符串   | 赴任情況，中文   |
 | data[`i`].Notes               | 字符串   | 備註             |
 
+### 補充說明：
+
+若要忽略地址只檢索官職，示例如下：
+
+宋代所有地區的知州(office_id = 950)
+
+`/api/query_office_postings?RequestPlayload={"office":[950],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}`
 
 # 九、通過入仕途徑查詢人物
 

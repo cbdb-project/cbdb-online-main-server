@@ -444,7 +444,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"o
 
 宋代所有地區的知州(office_id = 950)
 
-`/api/query_office_postings?RequestPlayload={"office":[950],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}`
+```/api/query_office_postings?RequestPlayload={**"office":[950],"useOfficePlace":0,"officePlace":[]**,"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}````
 
 # 九、通過入仕途徑查詢人物
 

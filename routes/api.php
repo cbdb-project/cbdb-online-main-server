@@ -188,3 +188,6 @@ Route::group(['prefix' => '/find_assoc'], function (){
 Route::group(['prefix' => '/query_associates'], function (){
     Route::match(['get', 'post'], '/', 'Api\ApiController5@query_associates');
 });
+Route::group(['prefix' => '/query_place'], function (){
+    Route::match(['get', 'post'], '/', 'Api\ApiController6@query_place');
+});

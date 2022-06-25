@@ -474,7 +474,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"o
 ## 輸入示例:
 
 **注：採用 POST 方法，Content-Type: application/json**
-`/api/query_office_postings`
+`/api/query_entry_postings`
 
 ```json
 RequestPlayload:{

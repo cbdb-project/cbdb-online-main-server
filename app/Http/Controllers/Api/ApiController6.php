@@ -52,7 +52,7 @@ class ApiController6 extends Controller
         $dynStart = $arr['dynStart'];
         $dynEnd = $arr['dynEnd'];
         $useXy = $arr['useXy'];
-        $XY = '0.06';
+        $XY = '0.03';
 
         if(!empty($arr['start'])) { 
             if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
@@ -309,9 +309,13 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
                 foreach ($useXyRes as $val) {
                     array_push($useXyResArr, $val->c_addr_id);
                 }
-                //從這邊對原本的row進行過濾
-                $row->whereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
-                #dd($useXyResArr); //檢查$useXyResArr驗證有效
+                /*20220503修改程式邏輯，
+                 *先使用查詢地址的 id 獲得經緯度座標資訊，然後用獲得的經緯度座標正負 0.03 找到更多地址 ID，
+                 *之後用這些地址 ID 來作為地址檢索條件（每個地址 ID 之間是 OR 關係）。
+                 *useXY 的條件限定會比不使用 useXY 獲得的資訊更多。
+                 */
+                $row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
+                //dd($useXyResArr); //檢查$useXyResArr驗證有效
             }
         }
         return $row;

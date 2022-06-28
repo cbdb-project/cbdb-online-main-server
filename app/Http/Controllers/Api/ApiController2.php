@@ -34,7 +34,7 @@ class ApiController2 extends Controller
 
     //20200506依據指定規格製作query_office_postings API
     protected function query_office_postings(Request $request) {
-        $json = $request['RequestPlayload'];
+        $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
         $office = $officePlace = $peoplePlace = $data = $useXyArr = array();
         $useOfficePlace = $usePeoplePlace = $indexYear = $useDate = $indexStartTime = $indexEndTime = $dateType = $dynStart = $dynEnd = $useXy = $start = $list = 0;

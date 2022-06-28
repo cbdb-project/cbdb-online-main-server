@@ -79,7 +79,7 @@ class ApiController4 extends Controller
 
     //20200609依據指定規格製作query_relatives API
     protected function query_relatives(Request $request) {
-        $json = $request['RequestPlayload'];
+        $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
         $people = $mCircleArr = $data = $dataV = $rowArr = array();
         $k_addr_id_Arr = array();

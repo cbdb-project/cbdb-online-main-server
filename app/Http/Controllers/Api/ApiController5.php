@@ -37,7 +37,7 @@ class ApiController5 extends Controller
 
     //20200610製作[查詢人物社會關係]query_associates API
     protected function query_associates(Request $request) {
-        $json = $request['RequestPlayload'];
+        $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
         $aName = $start = $list = $total = 0;
         $data = $useXyArr = $c_addr_id_Arr = $a_addr_id_Arr = array();

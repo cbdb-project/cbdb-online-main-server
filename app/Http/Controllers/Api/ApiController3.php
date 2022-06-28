@@ -38,7 +38,7 @@ class ApiController3 extends Controller
 
     //20200522依據指定規格製作query_entry_postings API
     protected function query_entry_postings(Request $request) {
-        $json = $request['RequestPlayload'];
+        $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
         $entry = $peoplePlace = $data = $useXyArr = array();
         $usePeoplePlace = $locationType = $useDate = $dateType = $dateStartTime = $dateEndTime = $useXy = $start = $list = 0;

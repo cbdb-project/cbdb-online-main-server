@@ -37,7 +37,7 @@ class ApiController6 extends Controller
 
     //20220325製作[通過地區查詢]query_place API
     protected function query_place(Request $request) {
-        $json = $request['RequestPlayload'];
+        $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
         //dd($arr); //驗證資料傳遞的正確性
         $aName = $start = $list = $total = 0;

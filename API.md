@@ -279,7 +279,7 @@
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_people_in_office`
 ```json
-RequestPlayload:{
+RequestPayload:{
     "office":[920,1022,1023],
     "useOfficePlace":0,
     "officePlace":[],
@@ -358,7 +358,7 @@ RequestPlayload:{
 `/api/query_office_postings`
 
 ```json
-RequestPlayload:{
+RequestPayload:{
     "office":[920,1022,1023],
     "useOfficePlace":0,
     "officePlace":[],
@@ -381,7 +381,7 @@ RequestPlayload:{
 ### 查詢示例 (by POST)
 
 ```
-https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"office":[920,1022,1023],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}
+https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"office":[920,1022,1023],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}
 ```
 
 ## 輸出格式:
@@ -444,7 +444,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"o
 
 宋代所有地區的知州(office_id = 950)
 
-```/api/query_office_postings?RequestPlayload={**"office":[950],"useOfficePlace":0,"officePlace":[]**,"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}````
+```/api/query_office_postings?RequestPayload={**"office":[950],"useOfficePlace":0,"officePlace":[]**,"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}````
 
 若要忽略官職檢索本地區的所有任官者，可使用「通過地區查詢」API 進行檢索。（「查詢除授記錄（Office Postings）」API 中官職 ID 是必填項。）
 
@@ -477,7 +477,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPlayload={"o
 `/api/query_entry_postings`
 
 ```json
-RequestPlayload:{
+RequestPayload:{
     "entry": [36],
     "usePeoplePlace": 0,
     "peoplePlace":[],
@@ -497,7 +497,7 @@ RequestPlayload:{
 說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於 1368-1644 的所有人物。返回第 1-10 筆結果
 
 ```json
-RequestPlayload:{
+RequestPayload:{
     "entry":[36],
     "usePeoplePlace":0,
     "peoplePlace":[],
@@ -589,7 +589,7 @@ RequestPlayload:{
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_relatives`
 ```json
-RequestPlayload:{
+RequestPayload:{
     "people":[1762],
     "mCircle":0,
     "MAncGen":1,
@@ -733,7 +733,7 @@ RequestPlayload:{
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_associates`
 ```json
-RequestPlayload:{
+RequestPayload:{
     "association":[22],
     "place":[101125],
     "usePeoplePlace":1,
@@ -747,7 +747,7 @@ RequestPlayload:{
 說明：查找滿足下列關係的Y：所有指數年在960年至1250年間，地點在“建州”的人物（X），其有“為Y之學生”關係。換句話說就是：查找960年至1250年間且地點在“建州”的人物（X）的老師（Y）  
 `/api/query_associates`
 ```json
-RequestPlayload:{
+RequestPayload:{
     "association":[23],
     "place":[101125],
     "usePeoplePlace":1
@@ -834,7 +834,7 @@ RequestPlayload:{
 `/api/query_place`
 
 ```json
-RequestPlayload:{
+RequestPayload:{
     "peoplePlace":[2928,10522,12553,13947,13949],
     "placeType": ["individual","entry","officePosting"],
     "useDate": 1,
@@ -852,7 +852,7 @@ RequestPlayload:{
 說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，指數年年介於 1368-1644 的所有人物。返回第 1-10 筆結果
 
 ```json
-RequestPlayload:{
+RequestPayload:{
     "peoplePlace":[2928,10522,12553,13947,13949],
     "placeType": ["individual","entry","officePosting"],
     "useDate": 1,

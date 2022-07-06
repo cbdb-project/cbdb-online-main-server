@@ -587,7 +587,7 @@ RequestPayload:{
 **注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
 ## 輸入示例: 
 **注：採用POST方法，Content-Type: application/json**
-`/api/query_relatives`
+`/api/query_relatives_2`
 ```json
 RequestPayload:{
     "people":[1762],

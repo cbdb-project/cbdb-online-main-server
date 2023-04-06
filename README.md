@@ -308,7 +308,7 @@ The proper version of nodejs is 12, while the default version of nodejs(apt) in 
 
 If you still get an error, please check whether you have python 2.7 for the 'gpy' package.
 
-### If your laravl.log(storage/logs/laravel.log) stops recording log
+### If your laravel.log(storage/logs/laravel.log) stops recording log
 
 Please make sure that your web server user is the owner of this file
 

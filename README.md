@@ -307,3 +307,11 @@ sudo apt-get install -y nodejs
 The proper version of nodejs is 12, while the default version of nodejs(apt) in ubuntu 20 is 10.
 
 If you still get an error, please check whether you have python 2.7 for the 'gpy' package.
+
+### If your laravl.log(storage/logs/laravel.log) stops recording log
+
+Please make sure that your web server user is the owner of this file
+
+```
+sudo chown caddy laravel.log
+```

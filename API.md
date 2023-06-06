@@ -306,13 +306,13 @@ RequestPayload:{
 }
 ```
 
-說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於 960 和 1250 年間的人的任官記錄。返回結果的第 11 筆到第 20 筆。
-
 ### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"office":[920,1022,1023],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}
 ```
+
+說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於 960 和 1250 年間的人的任官記錄。返回結果的第 11 筆到第 20 筆。
 
 ## 輸出格式:
 
@@ -441,11 +441,17 @@ RequestPayload:{
     "dateStartTime":null,
     "dateEndTime":null,
     "dynStart": 17,
-    "dynEnd": 22,
+    "dynEnd": 20,
     "useXy":1,
     "start":1,
     "list":10
 }
+```
+
+### 查詢示例 (by POST)
+
+```
+https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"entry":[36],"usePeoplePlace":0,"peoplePlace":[],"locationType":"peAddr","useDate":1,"dateType":"entry","dateStartTime":1115,"dynStart":17,"dynEnd":20,"dateEndTime":1644,"useXy":1,"start":1,"list":10}
 ```
 
 說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
@@ -532,7 +538,6 @@ RequestPayload:{
     "MMarLink":1,
     "MLoop":2
 }
-說明：查找王安石的親屬，採用自定義參數查找。最大向上1層，最大向下1層，最大同輩關係為1層，最大婚姻關係為1層   
 ```
 
 ### 查詢示例 (by POST)
@@ -540,6 +545,8 @@ RequestPayload:{
 ```
 https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people":[1762],"mCircle":0,"MAncGen":1,"MDecGen":1,"MColLink":1,"MMarLink":1,"MLoop":2}
 ```
+
+說明：查找王安石的親屬，採用自定義參數查找。最大向上1層，最大向下1層，最大同輩關係為1層，最大婚姻關係為1層   
 
 ## 預期輸出示例:    
 數據類型：`物件` 
@@ -685,13 +692,14 @@ RequestPayload:{
     "broad":0
 }
 ```
-說明：查找滿足下列關係的Y：所有指數年在960年至1250年間，地點在“建州”的人物（X），其有“為Y之學生”關係。換句話說就是：查找960年至1250年間且地點在“建州”的人物（X）的老師（Y）  
 
 ### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"association":[22],"place":[101125],"usePeoplePlace":1,"useXy":1,"indexYear":1,"indexStartTime":960,"indexEndTime":1250,"broad":0}
 ```
+
+說明：查找滿足下列關係的Y：所有指數年在960年至1250年間，地點在“建州”的人物（X），其有“為Y之學生”關係。換句話說就是：查找960年至1250年間且地點在“建州”的人物（X）的老師（Y）  
 
 `/api/query_associates`
 ```json
@@ -701,14 +709,15 @@ RequestPayload:{
     "usePeoplePlace":1
 }
 ```
-說明：查找滿足下列關係的Y：所有地點在“建州”的人物（X），其有“為Y之老師”關係。換句話說就是要查找地點在“建州”的人物（X）的學生（Y）  
 
 ### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"association":[23],"place":[101125],"usePeoplePlace":1,"useXy":1,"indexYear":0,"indexStartTime":null,"indexEndTime":null,"broad":0}
 ```
-  
+
+說明：查找滿足下列關係的Y：所有地點在“建州”的人物（X），其有“為Y之老師”關係。換句話說就是要查找地點在“建州”的人物（X）的學生（Y）  
+
 ## 預期輸出示例:    
 數據類型：`物件` 
 ```json
@@ -803,13 +812,13 @@ RequestPayload:{
 }
 ```
 
-說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，指數年年介於 1200-1644 的所有人物。返回第 1-10 筆結果
-
 ### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_place?RequestPayload={"peoplePlace":[2928,10522,12553,13947,13949],"placeType":["individual","entry","officePosting"],"useDate":1,"dateType":"index","dateStartTime":1200,"dateEndTime":1644,"dynStart":null,"dynEnd":null,"useXy":1,"start":1,"list":10}
 ```
+
+說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，指數年年介於 1200-1644 的所有人物。返回第 1-10 筆結果
 
 ```json
 RequestPayload:{
@@ -827,13 +836,13 @@ RequestPayload:{
 }
 ```
 
-說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，朝代介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
-
 ### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_place?RequestPayload={"peoplePlace":[2928,10522,12553,13947,13949],"placeType":["individual","entry","officePosting"],"useDate":1,"dateType":"dynasty","dateStartTime":null,"dateEndTime":null,"dynStart":17,"dynEnd":22,"useXy":1,"start":1,"list":10}
 ```
+
+說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，朝代介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
 
 ## 輸出格式:
 

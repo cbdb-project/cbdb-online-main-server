@@ -258,77 +258,7 @@
 | data[`i`].eName | 字符串 | 入仕途徑名，英文 |
 | data[`i`].eNameChn | 字符串 | 入仕途徑名，中文 |
 
-# 七、查詢擔任過給定職官的人
-## 輸入參數:
-| 參數名| 參數類型 | 說明 |
-| ------ | ------ | ------ |
-| office | 陣列 | 要查詢的職官ID列表 |
-| useOfficePlace |數字 | 是否啟用與職官相關的地點這一條件。是=1，否=0 |
-| officePlace | 陣列 | 與職官相關的地點列表 |
-| usePeoplePlace | 數字 | 是否啟用與人物相關的地點這一條件。是=1，否=0 |
-| peoplePlace | 陣列 | 與人物相關的地點列表 |
-| indexYear|數字|是否採用指數年，是=1，否=0|
-| indexStartTime|數字|指數年開始日期|
-| indexEndTime|數字|指數年結束日期|
-| useXy|數字|是否使用xy座標，是=1，否=0|
-| start|數字|結果開始筆數|
-| list|數字|列表長度|
-
-**注：`useOfficePlace` `usePeoplePlace` `indexYear` 的優先級高於`officePlace` `peoplePlace` `indexYearStartTime` `indexYearEndTime`，即若以`use`開頭的三個變數取值為0，就不使用相應的條件（不論陣列是否為空）**
-## 輸入示例: 
-**注：採用POST方法，Content-Type: application/json**
-`/api/query_people_in_office`
-```json
-RequestPayload:{
-    "office":[920,1022,1023],
-    "useOfficePlace":0,
-    "officePlace":[],
-    "usePeoplePlace":1,
-    "peoplePlace":[2928,10522,12553,13947,13949],
-    "indexYear":1,
-    "indexStartTime":960,
-    "indexEndTime":1250,
-    "useXy":1,
-    "start":11,
-    "list":10
-}
-```
-說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於960和1250年間的人。返回結果的第11筆到第20筆。
-## 輸出格式: 
-數據類型：`物件` 
-示例   
-```json
-{
-    "total":100,
-    "start":11,
-    "end":20,
-    "data":[
-        {"PersonID":332,"Name": "Zhang Yong", "NameChn": "張詠", "Sex": "M", "IndexYear": 1005, "AddrID": 11273, "AddrType":"Basic Affiliation","AddrTypeChn":"籍貫（基本地址）","AddrName": "Juancheng", "AddrChn": "鄄城", "X": 115.5583, "Y": 35.61019, "xy_count": " 1"},
-        ...
-        ]
-}
-```
-| 屬性名| 屬性類型 | 說明 |
-| ------ | ------ | ------ |
-| total |  數字 | 數據總筆數 |
-| start | 數字 | 當前數據開始筆數 |
-| end | 數字 | 當前數據結束筆數 |
-| data | 陣列 | 任官人物列表 |
-| data[`i`].PersonID | 數字 | 人物ID |
-| data[`i`].Name | 字符串 | 人物名，英文 |
-| data[`i`].NameChn | 字符串 | 人物名，中文 |
-| data[`i`].Sex | 字符串 | 人物性別 |
-| data[`i`].IndexYear | 數字 | 人物指數年 |
-| data[`i`].AddrID | 數字 | 人物地點ID |
-| data[`i`].AddrType | 字符串 | 地點類型，英文 |
-| data[`i`].AddrTypeChn | 字符串 | 地點類型，中文 |
-| data[`i`].AddrName | 字符串 | 人物地點，英文 |
-| data[`i`].AddrChn | 字符串 | 人物地點，中文 |
-| data[`i`].X | 數字 | 人物地點經度座標 |
-| data[`i`].Y | 數字 | 人物地點緯度座標 |
-| data[`i`].xy_count | 數字 | 結果中該地點存在的人物數 |
-
-# 八、查詢除授記錄（Office Postings）
+# 七、查詢除授記錄（Office Postings）
 
 ## 輸入參數:
 
@@ -448,7 +378,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 
 若要忽略官職檢索本地區的所有任官者，可使用「通過地區查詢」API 進行檢索。（「查詢除授記錄（Office Postings）」API 中官職 ID 是必填項。）
 
-# 九、通過入仕途徑查詢人物
+# 八、通過入仕途徑查詢人物
 
 ## 輸入參數:
 
@@ -571,7 +501,7 @@ RequestPayload:{
 | data[`i`].entry_xy_count | 數字 | 結果同一入仕地點的人物數 |
 
 
-# 十、根據給定人物陣列查詢人物親屬
+# 九、根據給定人物陣列查詢人物親屬
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
@@ -645,7 +575,7 @@ RequestPayload:{
 
 **注：返回中心人物記錄時`rKinship`取值為`'ego'`，以p開頭的變數返回`''`（空字符串）即可**
 
-# 十一、根據社會關係類型代碼獲取社會關係
+# 十、根據社會關係類型代碼獲取社會關係
 ## 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -678,7 +608,7 @@ RequestPayload:{
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十二、查找社會關係
+# 十一、查找社會關係
 ## 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -714,7 +644,7 @@ RequestPayload:{
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十三、查詢人物社會關係
+# 十二、查詢人物社會關係
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
@@ -807,7 +737,7 @@ RequestPayload:{
 | data[`i`].distance | 數字 | 中心人物與社會關係人之間的距離|
 
 
-# 十四、通過地區查詢
+# 十三、通過地區查詢
 
 ## 輸入參數:
 

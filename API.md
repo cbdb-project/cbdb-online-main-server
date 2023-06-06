@@ -374,7 +374,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 
 宋代所有地區的知州(office_id = 950)
 
-```/api/query_office_postings?RequestPayload={**"office":[950],"useOfficePlace":0,"officePlace":[]**,"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}````
+```/api/query_office_postings?RequestPayload={**"office":[950],"useOfficePlace":0,"officePlace":[]**,"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}```
 
 若要忽略官職檢索本地區的所有任官者，可使用「通過地區查詢」API 進行檢索。（「查詢除授記錄（Office Postings）」API 中官職 ID 是必填項。）
 

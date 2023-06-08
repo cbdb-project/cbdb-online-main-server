@@ -24,8 +24,8 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
-ini_set('memory_limit','512M');
-ini_set('max_execution_time', 300);
+ini_set('memory_limit','1024M');
+ini_set('max_execution_time', 600);
 
 class ApiController3 extends Controller
 {
@@ -81,16 +81,17 @@ class ApiController3 extends Controller
         }
         if($useDate) {
             if($dateType == 'entry') {
+                if(empty($dateStartTime) || empty($dateEndTime)) { return 'Plaese check dateStartTime and dateEndTime have value.'; }
                 $row->where('ENTRY_DATA.c_year', '>=', $dateStartTime);
                 $row->where('ENTRY_DATA.c_year', '<=', $dateEndTime);
             }
             elseif($dateType == 'index') {
-                //$row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+                if(empty($dateStartTime) || empty($dateEndTime)) { return 'Plaese check dateStartTime and dateEndTime have value.'; }
                 $row->where('BIOG_MAIN.c_index_year', '>=', $dateStartTime);
                 $row->where('BIOG_MAIN.c_index_year', '<=', $dateEndTime);
             }
             elseif($dateType == 'dynasty') {
-                //$row->join('BIOG_MAIN', 'ENTRY_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+                if(empty($dynStart) || empty($dynEnd)) { return 'Plaese check dynStart and dynEnd have value.'; }
                 $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
                 $row->where('DYNASTIES.c_dy', '>=', $dynStart);
                 $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
@@ -135,7 +136,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
         if($list) {
             $row = $row->slice($start, $list);
         }
-
+        //dd($row);
         //組合輸出資料
         foreach ($row as $val) {
             $BiogMain = BiogMain::where('c_personid', '=', $val->c_personid)->first();

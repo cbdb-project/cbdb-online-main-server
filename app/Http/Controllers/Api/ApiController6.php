@@ -70,8 +70,19 @@ class ApiController6 extends Controller
         if(in_array('individual', $placeType)) {
             $row = DB::table('BIOG_MAIN')->whereIn('BIOG_MAIN.c_index_addr_id', $peoplePlace);
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'individual';
@@ -82,8 +93,19 @@ class ApiController6 extends Controller
             $row = DB::table('ENTRY_DATA')->whereIn('ENTRY_DATA.c_entry_addr_id', $peoplePlace);
             $row->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'ENTRY_DATA.c_personid');
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'entry';
@@ -94,8 +116,19 @@ class ApiController6 extends Controller
             $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_addr_id', $peoplePlace);
             $row->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'ASSOC_DATA.c_personid');
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'ASSOC_DATA.c_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'association';
@@ -106,8 +139,19 @@ class ApiController6 extends Controller
             $row = DB::table('POSTED_TO_ADDR_DATA')->whereIn('POSTED_TO_ADDR_DATA.c_addr_id', $peoplePlace);
             $row->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'POSTED_TO_ADDR_DATA.c_personid');
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'POSTED_TO_ADDR_DATA.c_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'officePosting';
@@ -120,8 +164,19 @@ class ApiController6 extends Controller
             $row->join('BIOG_INST_DATA', 'BIOG_INST_DATA.c_inst_code', '=', 'SOCIAL_INSTITUTION_ADDR.c_inst_code');
             $row->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'BIOG_INST_DATA.c_personid');
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'SOCIAL_INSTITUTION_ADDR.c_inst_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'institutional';
@@ -133,8 +188,19 @@ class ApiController6 extends Controller
             $row->join('KIN_DATA', 'KIN_DATA.c_kin_id', '=', 'BIOG_MAIN.c_personid');
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'kinship';
@@ -147,8 +213,19 @@ class ApiController6 extends Controller
             $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
             $row->join('ASSOC_DATA', 'ASSOC_DATA.c_assoc_id', '=', 'BIOG_ADDR_DATA.c_personid');
             $row->join('ASSOC_CODES', 'ASSOC_CODES.c_assoc_code', '=', 'ASSOC_DATA.c_assoc_code');
-            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $this->useXy($row, $useXy, $XY);
+            //20230607從這裡修改，先得到$peoplePlace與useXy()所有c_personid，然後再用useDate()過濾. 
+            $row = $row->get();
+            $row_id_arr = [];
+            foreach($row as $v) {
+                array_push($row_id_arr, $v->c_personid);
+            }
+
+            $row = DB::table('BIOG_MAIN');
+            $row->join('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+            $row->orWhereIn('BIOG_MAIN.c_personid', $row_id_arr);  //先取得useXy()的所有人物，再依據人物的指數年與朝代進行過濾。
+            //20230607修改結束
+            $row = $this->useDate($row, $useDate, $dateType, $dateStartTime, $dateEndTime, $dynStart, $dynEnd);
             $row = $row->get();
             foreach($row as $v) {
                 $v->placeType = 'associate';

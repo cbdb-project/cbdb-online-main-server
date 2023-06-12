@@ -186,10 +186,6 @@
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
                     </div>
-                    <label for="c_secondary_source_author" class="col-sm-2 control-label">二手文獻的原作者</label>
-                    <div class="col-sm-4">
-                        <input type="text" class="form-control" name="c_secondary_source_author" value="">
-                    </div>
                 </div>
                 <div class="form-group">
                     <label for="" class="col-sm-2 control-label">成对社会关系</label>

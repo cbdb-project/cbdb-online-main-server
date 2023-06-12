@@ -96,10 +96,6 @@
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
-                    <label for="c_secondary_source_author" class="col-sm-2 control-label">二手文獻的原作者</label>
-                    <div class="col-sm-4">
-                        <input type="text" class="form-control" name="c_secondary_source_author" value="{{ $row->c_secondary_source_author }}">
-                    </div>
                 </div>
                 <div class="form-group">
                     <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>

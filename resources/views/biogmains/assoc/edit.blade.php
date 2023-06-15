@@ -227,7 +227,7 @@ $row->c_text_title = unionPKDef_decode_for_convert($row->c_text_title);
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">成对社会关系</label>
+                    <label for="" class="col-sm-2 control-label">成對社會關係</label>
                     <div class="col-sm-10">
                         <select class="form-control c_assocship_pair" name="c_assocship_pair">
                             <option value="" selected="selected"></option>

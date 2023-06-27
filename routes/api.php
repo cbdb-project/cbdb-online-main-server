@@ -108,6 +108,7 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('search/event', 'ApiController@searchEvent');
     Route::get('search/kinpair', 'ApiController@searchKinPair');
     Route::get('search/assocpair', 'ApiController@searchAssocPair');
+    Route::get('search/pinyin', 'ApiController@searchPinyin');
 });
 
 Route::group(['prefix' => 'code'], function (){

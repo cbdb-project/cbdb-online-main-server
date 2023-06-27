@@ -34,10 +34,10 @@ class BasicInformationRequest extends FormRequest
     public function messages()
     {
         return [
-            'c_mingzi_chn.required' => '姓不能为空',
-            'c_mingzi.required' => 'Ming不能为空',
-            'c_index_year.min|max' => '指数年取值范围-3000到3000',
-            'c_death_age.min|max' => '享年范围0到200'
+            'c_mingzi_chn.required' => '名不能為空',
+            'c_mingzi.required' => 'Ming不能為空',
+            'c_index_year.min|max' => '指數年取值範圍-3000到3000',
+            'c_death_age.min|max' => '享年範圍0到200'
         ];
     }
 }

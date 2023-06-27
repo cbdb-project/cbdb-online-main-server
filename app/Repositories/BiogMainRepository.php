@@ -188,12 +188,15 @@ class BiogMainRepository
         $data = $request->all();
         $c_name_chn = $request->c_surname_chn.$request->c_mingzi_chn;
         $c_name = $request->c_surname.' '.$request->c_mingzi;
-        $c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
-        $c_name_rm = $request->c_surname_rm.' '.$request->c_mingzi_rm;
+        #20230626修改外文全名呈現順序
+        #$c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
+        #$c_name_rm = $request->c_surname_rm.' '.$request->c_mingzi_rm;
+        $c_name_proper = $request->c_mingzi_proper.' '.$request->c_surname_proper;
+        $c_name_rm = $request->c_mingzi_rm.' '.$request->c_surname_rm;
         $data['c_name_chn'] = $c_name_chn;
         $data['c_name'] = $c_name;
-        $data['c_name_proper'] = $c_name_proper;
-        $data['c_name_rm'] = $c_name_rm;
+        $data['c_name_proper'] = $data['c_name_proper'] ?? $c_name_proper; //如果欄位是空白,系統自動添加,如果有填入資料,以填入資料為優先.
+        $data['c_name_rm'] = $data['c_name_rm'] ?? $c_name_rm; //如果欄位是空白,系統自動添加,這一欄在前端頁面不開放編輯,自動生成先名後姓.
         $data['c_female'] = (int)($data['c_female']);
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
@@ -265,7 +268,14 @@ class BiogMainRepository
         $names = $names->orWhere('BIOG_MAIN.c_name', 'like', $request->q)
             ->orWhere('BIOG_MAIN.c_surname', 'like', $request->q)
             ->orWhere('BIOG_MAIN.c_mingzi', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_personid', $request->q);
+            ->orWhere('BIOG_MAIN.c_personid', $request->q)
+            #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
+            ->orWhere('BIOG_MAIN.c_name_proper', 'like', $request->q)
+            ->orWhere('BIOG_MAIN.c_name_rm', 'like', $request->q)
+            ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $request->q)
+            ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $request->q)
+            ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $request->q)
+            ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
 
         $names = $names->orderByRaw("FIELD(BIOG_MAIN.c_surname, '$request->q') DESC")
             ->orderBy('BIOG_MAIN.c_personid', 'ASC')

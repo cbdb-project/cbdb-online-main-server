@@ -24,6 +24,7 @@ use App\SocialInstAddr;
 use App\SocialInstCode;
 use App\StatusCode;
 use App\TextCode;
+use App\Pinyin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
@@ -448,6 +449,24 @@ class ApiController extends Controller
         $data = AssocCode::find($assoc_code);
         $res = AssocCode::find([$data->c_assoc_pair, $data->c_assoc_pair2]);
         return $res;
+    }
+
+    public function searchPinyin(Request $request)
+    {
+        $word = $request->q;
+        if(!empty($word)) {
+            $pinyin = DB::table('Pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $word)->first();
+            if(!empty($pinyin->lastname_pinyin)) {
+                $res = $pinyin->lastname_pinyin;
+            }
+            else {
+                $res = ucfirst(Pinyin::getPinyin($word)) ?? '';
+            }
+            return $res;
+        }
+        else {
+            return '';
+        }
     }
 
 }

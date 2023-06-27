@@ -68,6 +68,15 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="button_ajax_load" class="col-sm-2 control-label"></label>
+                    <div class="col-sm-4">
+                        <button type="button" id="button_ajax_load" class="btn btn-info">生成拼音</button>
+                    </div>
+                    <label for="button_ajax_load" class="col-sm-2 control-label"></label>
+                    <div class="col-sm-4">
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="c_surname_proper" class="col-sm-2 control-label">外文姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_proper" class="form-control"
@@ -90,7 +99,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_surname_rm" class="col-sm-2 control-label">外文Xing(羅馬字)</label>
+                    <label for="c_surname_rm" class="col-sm-2 control-label">外文羅馬字轉寫姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_rm" class="form-control"
                                value="{{ old('c_surname_rm') ? old('c_surname_rm') : $basicinformation->c_surname_rm }}">
@@ -100,7 +109,7 @@
                         </span>
                         @endif
                     </div>
-                    <label for="c_mingzi_rm" class="col-sm-2 control-label">外文Ming(羅馬字)</label>
+                    <label for="c_mingzi_rm" class="col-sm-2 control-label">外文羅馬字轉寫名</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_mingzi_rm" class="form-control"
                                value="{{ old('c_mingzi_rm') ? old('c_mingzi_rm') : $basicinformation->c_mingzi_rm }}">
@@ -119,23 +128,23 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_name" class="col-sm-2 control-label">姓名(英)</label>
+                    <label for="c_name" class="col-sm-2 control-label">姓名(拼音)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name" class="form-control"
                                value="{{ $basicinformation->c_name }}">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">外文全名</label>
+                    <label for="c_name_proper" class="col-sm-2 control-label">外文全名</label>
                     <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_name_proper }}" disabled>
+                        <input type="text" name="c_name_proper" class="form-control"
+                               value="{{ $basicinformation->c_name_proper }}">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">外文XingMing</label>
+                    <label for="c_name_rm" class="col-sm-2 control-label">外文羅馬字轉寫姓名</label>
                     <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
+                        <input type="text" name="c_name_rm" class="form-control"
                                value="{{ $basicinformation->c_name_rm }}" disabled>
                     </div>
                 </div>
@@ -375,7 +384,6 @@
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-default">Submit</button>
-                        <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-left:40px;">create</a>
                     </div>
                 </div>
 
@@ -391,8 +399,11 @@
                                return false;
                                }
                                "
-                   class="btn btn-danger">delete</a>
+                   class="btn btn-danger">Delete</a>
 
+            </div>
+            <div class="btn-group pull-right">
+                <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Create</a>
             </div>
             <form id="delete-form" action="{{ route('basicinformation.destroy', ['id' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
                 {{ method_field('DELETE') }}
@@ -417,5 +428,81 @@
             // let index =
         }
     </script>
+<!-- Javascript -->
+<script type="text/javascript">
+$(document).ready(function (){
 
+    var DoAjax = function(requestUrl, sentData, sHandler, eHandler, pageNotFoundHandler){
+        $.ajax({
+            type: 'GET',
+            url: requestUrl,
+            cache: false,
+            data: sentData,
+            success: sHandler,
+            error: eHandler,
+            statusCode: {
+              404: pageNotFoundHandler
+            }
+        });
+    };
+
+    /* Simulate succeed ajax */
+    $("#button_ajax_load").click(function(){
+
+        /*修改這兩行參數就可以更換ajax查詢*/
+        var c_textid = $("input[name='c_surname_chn']").val();
+        var c_textid2 = $("input[name='c_mingzi_chn']").val();
+        var url = "/api/select/search/pinyin?q=" + c_textid + "";
+        var url2 = "/api/select/search/pinyin?q=" + c_textid2 + "";
+        /* disable trigger button, preventing multiple requests */
+        $(this).attr("disabled", true);
+
+        /* show requesting message */
+        $("#div_ajax_show").html("requsting....");
+        $("#input_ajax_data").val("");
+
+        /* wait 2 seconds before sending ajax */
+        setTimeout(function(){
+
+            DoAjax(url, {todo : "exSucceed"},
+                function(data, textStatus, jqXHR){
+                    //console.log(data);
+                    if(data == '') { alert('Load Data 沒有查詢到資料'); }
+                    else if(data != '') {
+                        /*在這裡添加錄入表單更新的欄位與資料*/
+                        $("#input_ajax_data").val(data);
+                        $("input[name='c_surname']").val(data);
+                        $("input[name='c_surname']").css("background","#FFFFBB");
+                    }
+                    else { alert('Load Data 查詢失敗'); }
+                });
+
+            /* enable trigger button */
+            $("#button_ajax_load").attr("disabled", false);
+        }, 2);
+
+        setTimeout(function(){
+
+            DoAjax(url2, {todo : "exSucceed"},
+                function(data2, textStatus, jqXHR){
+                    //console.log(data2);
+                    if(data2 == '') { alert('Load Data 沒有查詢到資料'); }
+                    else if(data2 != '') {
+                        /*在這裡添加錄入表單更新的欄位與資料*/
+                        $("#input_ajax_data").val(data2);
+                        $("input[name='c_mingzi']").val(data2);
+                        $("input[name='c_mingzi']").css("background","#FFFFBB");
+                    }
+                    else { alert('Load Data 查詢失敗'); }
+
+                });
+
+            /* enable trigger button */
+            $("#button_ajax_load").attr("disabled", false);
+        }, 2);
+    });
+
+});
+</script>
+<!-- Javascript End -->
 @endsection

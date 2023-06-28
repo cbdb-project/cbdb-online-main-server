@@ -37,6 +37,10 @@ use App\BiogAddrCode;
 use App\AddrBelong;
 //修改結束
 
+//20230628建安修改
+use App\Pinyin;
+//修改結束
+
 ini_set('memory_limit','512M');
 ini_set('max_execution_time', 300);
 
@@ -1553,6 +1557,43 @@ class BiogMainRepository
         $key = str_replace("(brackets_r)","}",$key);
         $result = $key;
         return $result;
+    }
+
+    //20230628觸發「自動生成」功能
+    function auto_pinyin($data)
+    {
+        $c_surname_chn = $c_surname = $c_mingzi_chn = $c_mingzi = $c_name = '';
+        $name = $data['c_name_chn'];
+        $len = mb_strlen($name, 'utf-8');
+        for($i=$len; $i>=1; $i--){
+            $str = mb_substr($name, 0, $i, 'utf-8');
+            $pinyin = DB::table('pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $str)->first();
+            if(!empty($pinyin->lastname_pinyin) && $len - $i <= 2) { //[名]的字長必須是小於等於二
+                $c_surname_chn = $str;
+                $c_surname = $pinyin->lastname_pinyin;
+                break;
+            }
+        }
+
+        if($c_surname_chn != '') {
+            $c_mingzi_chn = str_replace($c_surname_chn, '', $name);
+            $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
+            $c_name = $c_surname.' '.$c_mingzi;
+            $data['c_surname_chn'] = $c_surname_chn;
+            $data['c_surname'] = $c_surname;
+            $data['c_mingzi_chn'] = $c_mingzi_chn;
+            $data['c_mingzi'] = $c_mingzi;
+            $data['c_name'] = $c_name;
+        }
+        else{
+            $c_mingzi_chn = $name;
+            $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
+            $c_name = $c_surname.' '.$c_mingzi;
+            $data['c_mingzi_chn'] = $c_mingzi_chn;
+            $data['c_mingzi'] = $c_mingzi;
+            $data['c_name'] = $c_name;
+        }
+        return $data;
     }
 
 }

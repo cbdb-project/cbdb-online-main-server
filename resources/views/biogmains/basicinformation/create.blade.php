@@ -17,7 +17,7 @@
                 </div>
                 <div class="form-group">
                     <label for="c_name">姓名（拼音）</label>
-                    <input type="text" name="c_name" class="form-control" placeholder="姓名（拼音）" required>
+                    <input type="text" name="c_name" class="form-control" placeholder="姓名（拼音）">
                 </div>
                 <div class="form-group"><button class="btn btn-success pull-right" type="submit">Submit</button></div>
             </form>

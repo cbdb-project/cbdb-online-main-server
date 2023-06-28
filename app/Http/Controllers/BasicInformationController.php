@@ -16,6 +16,9 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
+use App\Pinyin;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
 /**
  * Class BiogBasicInformationController
  * @package App\Http\Controllers
@@ -107,6 +110,9 @@ class BasicInformationController extends Controller
             return redirect()->route('basicinformation.index');
         }
         else {
+            //20230628觸發「自動生成」功能
+            $data = $this->biogMainRepository->auto_pinyin($data);
+            //增加完成
             $flight = BiogMain::create($data);
             $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
             flash('Create success @ '.Carbon::now(), 'success');

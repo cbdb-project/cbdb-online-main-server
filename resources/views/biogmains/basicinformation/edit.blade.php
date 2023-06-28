@@ -5,6 +5,9 @@
     <div class="panel panel-default">
         <div class="panel-heading">基本资料</div>
 
+        <div id='check_info' style='display:none;' class="alert alert-error alert-dismissible">訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。</div>
+        <div id='pinyin_info' style='display:none;' class="alert alert-success alert-dismissible">訊息提示：「生成拼音」已經完成。</div>
+
         <div class="panel-body">
             <form action="/basicinformation/{{ $basicinformation->c_personid }}" class="form-horizontal"
                   method="post">
@@ -467,14 +470,10 @@ $(document).ready(function (){
             DoAjax(url, {todo : "exSucceed"},
                 function(data, textStatus, jqXHR){
                     //console.log(data);
-                    if(data == '') { alert('Load Data 沒有查詢到資料'); }
-                    else if(data != '') {
-                        /*在這裡添加錄入表單更新的欄位與資料*/
-                        $("#input_ajax_data").val(data);
-                        $("input[name='c_surname']").val(data);
-                        $("input[name='c_surname']").css("background","#FFFFBB");
-                    }
-                    else { alert('Load Data 查詢失敗'); }
+                    /*在這裡添加錄入表單更新的欄位與資料*/
+                    $("#input_ajax_data").val(data);
+                    $("input[name='c_surname']").val(data);
+                    $("input[name='c_surname']").css("background","#FFFFBB");
                 });
 
             /* enable trigger button */
@@ -486,20 +485,31 @@ $(document).ready(function (){
             DoAjax(url2, {todo : "exSucceed"},
                 function(data2, textStatus, jqXHR){
                     //console.log(data2);
-                    if(data2 == '') { alert('Load Data 沒有查詢到資料'); }
-                    else if(data2 != '') {
-                        /*在這裡添加錄入表單更新的欄位與資料*/
-                        $("#input_ajax_data").val(data2);
-                        $("input[name='c_mingzi']").val(data2);
-                        $("input[name='c_mingzi']").css("background","#FFFFBB");
-                    }
-                    else { alert('Load Data 查詢失敗'); }
-
+                    /*在這裡添加錄入表單更新的欄位與資料*/
+                    $("#input_ajax_data").val(data2);
+                    $("input[name='c_mingzi']").val(data2);
+                    $("input[name='c_mingzi']").css("background","#FFFFBB");
+                    $("#pinyin_info").css("display","block");
                 });
 
             /* enable trigger button */
             $("#button_ajax_load").attr("disabled", false);
         }, 2);
+
+    });
+
+    $(window).on('beforeunload', function(){
+        var c_mingzi_chn = $("input[name='c_mingzi_chn']").val();
+        var c_mingzi = $("input[name='c_mingzi']").val();
+        if(c_mingzi_chn == '' || c_mingzi == '') {
+            console.log('要離開視窗了，請您確認[名]和[Ming]是否填寫。');
+            $("#check_info").css("display","block");
+            $("input[name='c_mingzi_chn']").css("border-color","#a94442");
+            $("input[name='c_mingzi_chn']").css("background","#FFECEC");
+            $("input[name='c_mingzi']").css("border-color","#a94442");
+            $("input[name='c_mingzi']").css("background","#FFECEC");
+            return '要離開視窗了，請您確認[名]和[Ming]是否填寫。';
+        }
     });
 
 });

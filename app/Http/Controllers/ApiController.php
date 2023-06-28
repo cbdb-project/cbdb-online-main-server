@@ -455,7 +455,7 @@ class ApiController extends Controller
     {
         $word = $request->q;
         if(!empty($word)) {
-            $pinyin = DB::table('Pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $word)->first();
+            $pinyin = DB::table('pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $word)->first();
             if(!empty($pinyin->lastname_pinyin)) {
                 $res = $pinyin->lastname_pinyin;
             }

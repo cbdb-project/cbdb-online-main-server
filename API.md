@@ -662,7 +662,7 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十二、查詢人物社會關係
+# 十二、查詢社會關係
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
@@ -769,8 +769,82 @@ https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"associa
 | data[`i`].aKinNameChn | 字符串 | 社會關係人的親姓名，中文 |
 | data[`i`].distance | 數字 | 中心人物與社會關係人之間的距離|
 
+# 十三、查詢社會關係網絡
 
-# 十三、通過地區查詢
+## 輸入參數:
+
+數據類型：`物件`
+
+| 參數名| 參數類型 | 說明 |
+| ------ | ------ | ------ |
+| people | 陣列 | 要查詢的人物ID列表 |
+| assocCode | 陣列 | 要查詢的社會關係代碼 |
+| assocType | 陣列 | 要查詢的社會關係大類 |
+| maxNodeDist | 數字 | 最大N度分隔步數。取值為 0, 1, 2. 默認為 1 |
+| place | 陣列 | 人物地點列表|
+| usePeoplePlace | 數字 | 是否啟用人物地點列表，是=1，否=0. 默認為 0 |
+| useXy | 數字 | 是否使用xy座標，是=1，否=0. 默認為 0 |
+| broad |數字 | 行政區域範圍是廣義的還是狹義的。廣義=1，狹義=0. 廣義 `+/- 0.06` 狹義 `+/- 0.03`. 默認為 0 |
+| indexYear | 數字 | 是否採用指數年，是=1，否=0. 默認為 0 |
+| indexStartTime | 數字 | 指數年開始日期 |
+| indexEndTime | 數字 | 指數年結束日期 |
+| useDy | 數字 | 是否採用朝代，是=1，否=0. 默認為 0 |
+| dynStart | 數字 | 開始朝代 |
+| dynEnd | 數字 | 結束朝代 |
+| includeMale | 數字 | 是否包含男性，是=1，否=0. 默認為 1 |
+| includeFemale | 數字 | 是否包含女性，是=1，否=0. 默認為 1 |
+
+### 輸入示例:
+
+注：採用POST方法，Content-Type: application/json ```/api/query_assoc_network```
+
+```
+RequestPayload:{
+    "people":[1762, 3767],
+    "assocCode": [429]
+    "assocType":[02],
+    "maxNodeDist":1,
+    "place":[13305],
+    "usePeoplePlace":1,
+    "broad":0,
+    "useDy":1,
+    "dynStart":15,
+    "dynEnd":15,
+    "includeMale",1,
+    "includeFemale",1,
+}
+```
+
+### 查詢示例 (by POST)
+
+```https://input.cbdb.fas.harvard.edu/api/query_assoc_network?RequestPayload={"people":[1762,3767],"assocCode":[280]"assocType":[02],"maxNodeDist":1,"place":[13305],"usePeoplePlace":1,"broad":0,"useDy":1,"dynStart":15,"dynEnd":15,"includeMale",1,"includeFemale",1,}```
+
+說明：查找王安石（1762）和蘇軾（3767）的社會網絡，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。
+
+查詢細節：
+
+developing...
+
+- connect the persons in the network
+
+- remove bi-direction records
+
+## 預期輸出示例:  
+
+數據類型：`物件` 
+
+```json
+{
+    "total":100,
+    "start":1,
+    "end":2,
+    "data":[
+        {"pId":"1493","pName":"Su Zhe","pNameChn":"蘇轍","aId":"3257","aName":"Liu Ju(2)","aNameChn":"劉巨","pIndexYear":"1039","pSex":"M","aIndexYear":"","aSex":"M","pAddrID":"13305","pAddrName":"Meishan","pAddrNameChn":"眉山","pX":"103.831459","pY":"30.050497","aAddrID":"13305","aAddrName":"Meishan","aAddrNameChn":"眉山","aX":"103.831459","aY":"30.050497","pAssocRelation":"Student of","pAssocRelationChn":"為Y之學生","distance":"0","count":1},       
+    ]
+}
+
+
+# 十四、通過地區查詢
 
 ## 輸入參數:
 

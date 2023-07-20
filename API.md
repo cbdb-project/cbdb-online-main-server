@@ -823,7 +823,22 @@ RequestPayload:{
 
 查詢細節：
 
-developing...
+在 ASSOC_DATA 表中透過以下條件(and 關係)進行查詢：
+
+- c_personid 欄位的為值 1762 與 3767。（王安石和蘇軾）
+
+- c_assoc_code 欄位為 429; 以及符合 assocType 為 02 的所有 c_assoc_code, 查詢方法如下：
+
+```
+SELECT ASSOC_CODE_TYPE_REL.c_assoc_code
+FROM ASSOC_CODE_TYPE_REL
+WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
+(SELECT ASSOC_TYPES.c_assoc_type_id FROM ASSOC_TYPES WHERE ASSOC_TYPES.c_assoc_type_parent_id = '02')
+```
+
+- 把 ASSOC_DATA.c_personid 與 ASSOC_DATA.c_assoc_id 分別 join 到 BIOG_MAIN 到 c_personid, 查詢所有 c_dy 為 15 的記錄（c_personid 和 c_assoc_id 必須都為 15）
+
+- developing... (addresses)
 
 - connect the persons in the network
 

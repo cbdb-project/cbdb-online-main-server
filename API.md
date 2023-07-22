@@ -823,7 +823,7 @@ RequestPayload:{
 
 #### 查詢細節：
 
-#### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）：
+#### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）
 
 - c_personid 欄位的為值 1762 與 3767。（王安石和蘇軾）
 

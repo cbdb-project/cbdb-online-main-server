@@ -662,7 +662,7 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十二、查詢人物社會關係
+# 十二、查詢社會關係
 ## 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
@@ -769,8 +769,135 @@ https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"associa
 | data[`i`].aKinNameChn | 字符串 | 社會關係人的親姓名，中文 |
 | data[`i`].distance | 數字 | 中心人物與社會關係人之間的距離|
 
+# 十三、查詢社會關係網路
 
-# 十三、通過地區查詢
+## 輸入參數:
+
+數據類型：`物件`
+
+| 參數名| 參數類型 | 說明 |
+| ------ | ------ | ------ |
+| people | 陣列 | 要查詢的人物ID列表 |
+| assocCode | 陣列 | 要查詢的社會關係代碼 |
+| assocType | 陣列 | 要查詢的社會關係大類 |
+| maxNodeDist | 數字 | 最大N度分隔步數。取值為 0, 1, 2. 默認為 1 |
+| place | 陣列 | 人物地點列表|
+| usePeoplePlace | 數字 | 是否啟用人物地點列表，是=1，否=0. 默認為 0 |
+| useXy | 數字 | 是否使用xy座標，是=1，否=0. 默認為 0 |
+| broad |數字 | 行政區域範圍是廣義的還是狹義的。廣義=1，狹義=0. 廣義 `+/- 0.06` 狹義 `+/- 0.03`. 默認為 0 |
+| indexYear | 數字 | 是否採用指數年，是=1，否=0. 默認為 0 |
+| indexStartTime | 數字 | 指數年開始日期 |
+| indexEndTime | 數字 | 指數年結束日期 |
+| useDy | 數字 | 是否採用朝代，是=1，否=0. 默認為 0 |
+| dynStart | 數字 | 開始朝代 |
+| dynEnd | 數字 | 結束朝代 |
+| includeMale | 數字 | 是否包含男性，是=1，否=0. 默認為 1 |
+| includeFemale | 數字 | 是否包含女性，是=1，否=0. 默認為 1 |
+
+### 輸入示例:
+
+注：採用POST方法，Content-Type: application/json ```/api/query_assoc_network```
+
+```
+RequestPayload:{
+    "people":[1762, 3767],
+    "assocCode": [429]
+    "assocType":[02],
+    "maxNodeDist":1,
+    "place":[13305],
+    "usePeoplePlace":1,
+    "broad":0,
+    "useDy":1,
+    "dynStart":15,
+    "dynEnd":15,
+    "includeMale",1,
+    "includeFemale",1,
+}
+```
+
+### 查詢示例 (by POST)
+
+```https://input.cbdb.fas.harvard.edu/api/query_assoc_network?RequestPayload={"people":[1762,3767],"assocCode":[280]"assocType":[02],"maxNodeDist":1,"place":[13305],"usePeoplePlace":1,"broad":0,"useDy":1,"dynStart":15,"dynEnd":15,"includeMale",1,"includeFemale",1,}```
+
+說明：查找王安石（1762）和蘇軾（3767）的社會網路，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。
+
+查詢細節：
+
+#### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）：
+
+- c_personid 欄位的為值 1762 與 3767。（王安石和蘇軾）
+
+- c_assoc_code 欄位為 429; 以及符合 assocType 為 02 的所有 c_assoc_code, 查詢方法如下：
+
+```
+SELECT ASSOC_CODE_TYPE_REL.c_assoc_code
+FROM ASSOC_CODE_TYPE_REL
+WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
+(SELECT ASSOC_TYPES.c_assoc_type_id FROM ASSOC_TYPES WHERE ASSOC_TYPES.c_assoc_type_parent_id = '02')
+```
+
+- 使用 ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_personid, 查詢所有 c_dy 為 15 的記錄（c_personid 和 c_assoc_id 必須都為 15）
+
+- 使用 ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_index_addr_id, 查詢所有 c_index_addr_id 為 13305 的記錄。broad 的演算法與「查詢社會關係網路」相同：使用 c_index_addr_id join 到 ADDR_CODES.c_addr_id, 找到 x_coord, y_coord. 透過廣義 `+/- 0.06` 狹義 `+/- 0.03` 從 ADDR_CODES 獲取範圍內的 c_addr_id. 再使用獲得的 c_addr_id 作為條件，過濾 BIOG_MAIN 的 c_index_addr_id 對應 personid 的 ASSOC_DATA.c_assoc_id 記錄。
+
+#### 關於 maxNodeDist 的設定
+
+- 當 maxNodeDist 為 0 時，查詢 people（本例中為 "people":[1762, 3767]）中相互的社會網路關係，即 ASSOC_DATA 中 c_personid 与 c_assoc_id 均为 people（本例中為 "people":[1762, 3767]）陣列裡的 id. 來自使用者的地址、時間、性別等查詢條件均有效。
+
+- 當 maxNodeDist 為 2 時，首先查詢方式和 maxNodeDist = 1 相同。在獲得的 maxNodeDist = 1 查詢結果中，將 ASSOC_DATA.c_assoc_id 作為 ASSOC_DATA.personid, 再進行一次 maxNodeDist = 1 查詢。（一定當心不要重覆查回前一次查詢的結果。即避免 a>>b, b>>a）將兩次查詢的結果合併，以 c_personid, c_assoc_id, c_assoc_code, c_text_title 去重。
+
+- 當 maxNodeDist 大於 2 時，返回：「API 暫不支援 maxNodeDist 大於 2 之查詢」。考慮到 maxNodeDist 帶來的運算量以及返回資料的數量，線上 API 暫時忽略 maxNodeDist > 2 的查詢請求
+
+## 預期輸出示例:  
+
+數據類型：`物件` 
+
+```json
+{
+    "total":100,
+    "start":1,
+    "end":2,
+    "data":[
+        {"pId":"1493","pName":"Su Zhe","pNameChn":"蘇轍","aId":"3257","aName":"Liu Ju(2)","aNameChn":"劉巨","pIndexYear":"1039","pSex":"M","aIndexYear":"","aSex":"M","pAddrID":"13305","pAddrName":"Meishan","pAddrNameChn":"眉山","pX":"103.831459","pY":"30.050497","aAddrID":"13305","aAddrName":"Meishan","aAddrNameChn":"眉山","aX":"103.831459","aY":"30.050497","pAssocRelationId":"22", "pAssocRelation":"Student of","pAssocRelationChn":"為Y之學生","distance":"0","count":1},       
+    ]
+}
+```
+
+| 屬性名                        | 屬性類型 | 說明                   |  對應欄位  |
+| ---------------------------- | -------- | ---------------------- | --------- |
+| total                        | 數字     | 數據總筆數              |           |
+| start                        | 數字     | 當前數據開始筆數         |           |
+| end                          | 數字     | 當前數據結束筆數         |           |
+| data                         | 陣列     | 除授記錄列表            |           |
+| data[`i`].pId                | 數字     | 人物 ID                 | ASSOC_DATA.c_personid  |
+| data[`i`].pName              | 字串     | 人物名，英文            | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name |
+| data[`i`].pNameChn           | 字串     | 人物名，中文           | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name_chn |
+| data[`i`].aId                | 數字     | 社會關係人 ID          | ASSOC_DATA.c_assoc_id |
+| data[`i`].aName              | 字串     | 社會關係人名，英文      | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name |
+| data[`i`].aNameChn           | 字串     | 社會關係人名，中文      | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name_chn |
+| data[`i`].pIndexYear         | 字串     | 人物指數年            | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_year |
+| data[`i`].pSex               | 字串     | 人物性別              | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to BIOG_MAIN.get c_female |
+| data[`i`].aIndexYear         | 字串     | 社會關係人指數年       | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_year |
+| data[`i`].aSex               | 字串     | 社會關係人性別         | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to BIOG_MAIN.get c_female |
+| data[`i`].pAddrID            | 字串     | 人物指數地址 ID        | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_addr_id |
+| data[`i`].pAddrName          | 字串     | 人物指數地址，英文      | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.c_name |
+| data[`i`].pAddrNameChn       | 字串     | 人物指數地址，中文      | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.c_name_chn |
+| data[`i`].pX                 | 數字     | 人物指數地址經度       | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.x_coord |
+| data[`i`].pY                 | 數字     | 人物指數地址緯度       | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.y_coord |
+| data[`i`].aAddrID            | 數字     | 社會關係人指數地址 ID  | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_addr_id |
+| data[`i`].aAddrName          | 數字     | 社會關係人指數地址，英文| Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.c_name | 
+| data[`i`].aAddrNameChn       | 數字     | 社會關係人指數地址，中文| Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.c_name_chn | 
+| data[`i`].aX                 | 數字     | 社會關係人指數地址經度  | Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.x_coord |
+| data[`i`].aY                 | 數字     | 社會關係人指數地址緯度  | Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.y_coord |
+| data[`i`].pAssocRelationId   | 數字     | 社會關係類型 ID        | ASSOC_DATA.c_assoc_code |
+| data[`i`].pAssocRelation     | 數字     | 社會關係類型，英文     | ASSOC_DATA.c_assoc_code join ASSOC_CODES to get ASSOC_CODES.c_assoc_desc |
+| data[`i`].pAssocRelationChn  | 數字     | 社會關係類型，中文     | ASSOC_DATA.c_assoc_code join ASSOC_CODES to get ASSOC_CODES.c_assoc_desc_chn |
+| data[`i`].distance           | 數字     | 人物與社會關係人之間距離 | The distance between (data[`i`].pX, data[`i`].pY) and (data[`i`].aX, data[`i`].aY) |
+| data[`i`].count              | 數字     | 社會關係發生次數       | ASSOC_DATA.c_assoc_count |
+
+
+
+# 十四、通過地區查詢
 
 ## 輸入參數:
 

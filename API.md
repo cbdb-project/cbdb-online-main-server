@@ -858,33 +858,42 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
     "start":1,
     "end":2,
     "data":[
-        {"pId":"1493","pName":"Su Zhe","pNameChn":"蘇轍","aId":"3257","aName":"Liu Ju(2)","aNameChn":"劉巨","pIndexYear":"1039","pSex":"M","aIndexYear":"","aSex":"M","pAddrID":"13305","pAddrName":"Meishan","pAddrNameChn":"眉山","pX":"103.831459","pY":"30.050497","aAddrID":"13305","aAddrName":"Meishan","aAddrNameChn":"眉山","aX":"103.831459","aY":"30.050497","pAssocRelation":"Student of","pAssocRelationChn":"為Y之學生","distance":"0","count":1},       
+        {"pId":"1493","pName":"Su Zhe","pNameChn":"蘇轍","aId":"3257","aName":"Liu Ju(2)","aNameChn":"劉巨","pIndexYear":"1039","pSex":"M","aIndexYear":"","aSex":"M","pAddrID":"13305","pAddrName":"Meishan","pAddrNameChn":"眉山","pX":"103.831459","pY":"30.050497","aAddrID":"13305","aAddrName":"Meishan","aAddrNameChn":"眉山","aX":"103.831459","aY":"30.050497","pAssocRelationId":"22", "pAssocRelation":"Student of","pAssocRelationChn":"為Y之學生","distance":"0","count":1},       
     ]
 }
 ```
 
-| 屬性名                        | 屬性類型 | 說明                   |
-| ---------------------------- | -------- | ---------------------- |
-| total                        | 數字     | 數據總筆數             |
-| start                        | 數字     | 當前數據開始筆數       |
-| end                          | 數字     | 當前數據結束筆數       |
-| data                         | 陣列     | 除授記錄列表           |
-| data[`i`].pId                | 數字     | 人物 ID                |
-| data[`i`].pName              | 字串     | 人物名，英文           |
-| data[`i`].pNameChn           | 字串     | 人物名，中文           |
-| data[`i`].aId                | 數字     | 社會關係人 ID          |
-| data[`i`].aName              | 字串     | 社會關係人名，英文      |
-| data[`i`].aNameChn           | 字串     | 社會關係人名，中文      |
-| data[`i`].pIndexYear         | 字串     | 人物指數年            |
-| data[`i`].pSex               | 字串     | 人物性別              |
-| data[`i`].aIndexYear         | 字串     | 社會關係人指數年       |
-| data[`i`].aSex               | 字串     | 社會關係人性別         |
-| data[`i`].pAddrID            | 字串     | 人物指數地址 ID        |
-| data[`i`].pAddrName          | 字串     | 人物指數地址，英文      |
-| data[`i`].pAddrNameChn       | 字串     | 人物指數地址，中文      |
-| data[`i`].pAddrNameChn       | 字串     | 人物指數地址，中文      |
-| data[`i`].pX                 | 數字     | 人物指數地址經度       |
-| data[`i`].pY                 | 數字     | 人物指數地址緯度       |
+| 屬性名                        | 屬性類型 | 說明                   |  對應欄位  |
+| ---------------------------- | -------- | ---------------------- | --------- |
+| total                        | 數字     | 數據總筆數              |           |
+| start                        | 數字     | 當前數據開始筆數         |           |
+| end                          | 數字     | 當前數據結束筆數         |           |
+| data                         | 陣列     | 除授記錄列表            |           |
+| data[`i`].pId                | 數字     | 人物 ID                 | ASSOC_DATA.c_personid  |
+| data[`i`].pName              | 字串     | 人物名，英文            | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name |
+| data[`i`].pNameChn           | 字串     | 人物名，中文           | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name_chn |
+| data[`i`].aId                | 數字     | 社會關係人 ID          | ASSOC_DATA.c_assoc_id |
+| data[`i`].aName              | 字串     | 社會關係人名，英文      | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name |
+| data[`i`].aNameChn           | 字串     | 社會關係人名，中文      | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_name_chn |
+| data[`i`].pIndexYear         | 字串     | 人物指數年            | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_year |
+| data[`i`].pSex               | 字串     | 人物性別              | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to BIOG_MAIN.get c_female |
+| data[`i`].aIndexYear         | 字串     | 社會關係人指數年       | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_year |
+| data[`i`].aSex               | 字串     | 社會關係人性別         | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to BIOG_MAIN.get c_female |
+| data[`i`].pAddrID            | 字串     | 人物指數地址 ID        | ASSOC_DATA.c_personid join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_addr_id |
+| data[`i`].pAddrName          | 字串     | 人物指數地址，英文      | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.c_name |
+| data[`i`].pAddrNameChn       | 字串     | 人物指數地址，中文      | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.c_name_chn |
+| data[`i`].pX                 | 數字     | 人物指數地址經度       | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.x_coord |
+| data[`i`].pY                 | 數字     | 人物指數地址緯度       | Base on data[`i`].pAddrID join ADDR_CODES to get ADDR_CODES.y_coord |
+| data[`i`].aAddrID            | 數字     | 社會關係人指數地址 ID  | ASSOC_DATA.c_assoc_id join BIOG_MAIN.c_personid to get BIOG_MAIN.c_index_addr_id |
+| data[`i`].aAddrName          | 數字     | 社會關係人指數地址，英文| Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.c_name | 
+| data[`i`].aAddrNameChn       | 數字     | 社會關係人指數地址，中文| Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.c_name_chn | 
+| data[`i`].aX                 | 數字     | 社會關係人指數地址經度  | Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.x_coord |
+| data[`i`].aY                 | 數字     | 社會關係人指數地址緯度  | Base on data[`i`].aAddrID join ADDR_CODES to get ADDR_CODES.y_coord |
+| data[`i`].pAssocRelationId   | 數字     | 社會關係類型 ID        | ASSOC_DATA.c_assoc_code |
+| data[`i`].pAssocRelation     | 數字     | 社會關係類型，英文     | ASSOC_DATA.c_assoc_code join ASSOC_CODES to get ASSOC_CODES.c_assoc_desc |
+| data[`i`].pAssocRelationChn  | 數字     | 社會關係類型，中文     | ASSOC_DATA.c_assoc_code join ASSOC_CODES to get ASSOC_CODES.c_assoc_desc_chn |
+| data[`i`].distance           | 數字     | 人物與社會關係人之間距離 | The distance between (data[`i`].pX, data[`i`].pY) and (data[`i`].aX, data[`i`].aY) |
+| data[`i`].count              | 數字     | 社會關係發生次數       | ASSOC_DATA.c_assoc_count |
 
 
 

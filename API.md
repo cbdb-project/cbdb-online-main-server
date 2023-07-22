@@ -821,7 +821,7 @@ RequestPayload:{
 
 說明：查找王安石（1762）和蘇軾（3767）的社會網路，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。
 
-查詢細節：
+#### 查詢細節：
 
 #### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）：
 

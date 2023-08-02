@@ -132,9 +132,8 @@ class ApiController7 extends Controller
             return 'API 暫不支援 maxNodeDist 大於 2 之查詢';
         }
 
-        $row->join('BIOG_ADDR_DATA', 'BIOG_ADDR_DATA.c_personid', '=', 'ASSOC_DATA.c_personid');
         if($usePeoplePlace) {
-            $row->whereIn('BIOG_ADDR_DATA.c_addr_id', $place);
+            $row->orWhereIn('ASSOC_DATA.c_addr_id', $place);
         }
 
         $row = $this->useXy($row, $useXy, $XY);
@@ -153,11 +152,42 @@ class ApiController7 extends Controller
         //資料庫邏輯結束
         if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
 
+        //去除重複的資料清洗
+        $new_row = [];
+        foreach($row as $v) {
+            if(empty($new_row)) { $new_row[] = $v; }
+            foreach($new_row as $s) {
+                if($v->c_personid == $s->c_personid && $v->c_assoc_id == $s->c_assoc_id && $v->c_assoc_code == $s->c_assoc_code && $v->c_text_title == $s->c_text_title) {
+                    break; 
+                } else {
+                    $new_row[] = $v;
+                    break;
+                }
+            }
+        }
+        $row = $new_row;
+        //去除重複的資料清洗結束
+
         $total = count($row);
 
+        //需要客製lise與start的資料處理
         if($list) {
-            $row = $row->slice($start, $list);
+            //$row = $row->slice($start, $list);
+            $new_row = [];
+            $i = 0;
+            $j = 0;
+            foreach($row as $v) {
+                $j++;
+                if($j > $start) {
+                    $new_row[] = $v;
+                    $i++;
+                }
+                if($i >= $list) { break; }
+            }
+            $row = $new_row;
         }
+        //資料處理客製結束
+
 
         //return $row;
 
@@ -165,9 +195,9 @@ class ApiController7 extends Controller
         $record_list = 0;
         foreach ($row as $val) {
 
-            $record_list++;
-            if($record_list < $start + 1) { continue; }
-            if($record_list > $list) { break; } 
+            //$record_list++;
+            //if($record_list < $start + 1) { continue; }
+            //if($record_list > $list) { break; } 
 
             $BiogMain = BiogMain::where('c_personid', '=', $val->c_personid)->first();
             $data_val['pId'] = $val->c_personid;
@@ -231,7 +261,12 @@ class ApiController7 extends Controller
                 $data_val['pAssocRelationChn'] = '';
             }
 
-            $data_val['distance'] = $this->getdizhi($AddrCode->x_coord, $AddrCode->y_coord, $AddrCode2->x_coord, $AddrCode2->y_coord);
+            $x1 = $AddrCode->x_coord ?? 0;
+            $y1 = $AddrCode->y_coord ?? 0;
+            $x2 = $AddrCode2->x_coord ?? 0;
+            $y2 = $AddrCode2->y_coord ?? 0;
+
+            $data_val['distance'] = $this->getdizhi($x1, $y1, $x2, $y2);
             $data_val['count'] = $val->c_assoc_count;
 
             array_push($data, $data_val);

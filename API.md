@@ -840,7 +840,9 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 
 - 使用 ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_personid, 查詢所有 c_dy 為 15 的記錄（c_personid 和 c_assoc_id 必須都為 15）
 
-- 使用 ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_index_addr_id, 查詢所有 c_index_addr_id 為 13305 的記錄。broad 的演算法與「查詢社會關係網路」相同：使用 c_index_addr_id join 到 ADDR_CODES.c_addr_id, 找到 x_coord, y_coord. 透過廣義 `+/- 0.06` 狹義 `+/- 0.03` 從 ADDR_CODES 獲取範圍內的 c_addr_id. 再使用獲得的 c_addr_id 作為條件，過濾 BIOG_MAIN 的 c_index_addr_id 對應 personid 的 ASSOC_DATA.c_assoc_id 記錄。過濾條件為 OR 連接的兩個條件：
+- 使用 ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_index_addr_id, 查詢所有 c_index_addr_id 為 13305 的記錄。broad 的演算法與「查詢社會關係網路」相同：使用 c_index_addr_id join 到 ADDR_CODES.c_addr_id, 找到 x_coord, y_coord. 透過廣義 `+/- 0.06` 狹義 `+/- 0.03` 從 ADDR_CODES 獲取範圍內的 c_addr_id. 再使用獲得的 c_addr_id 作為條件，過濾 BIOG_MAIN 的 c_index_addr_id 對應 personid 的 ASSOC_DATA.c_assoc_id 記錄。
+
+  ##### 過濾條件為 OR 連接的兩個條件：
   
   - ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id 的 c_addr_id 都需要為 13305
     

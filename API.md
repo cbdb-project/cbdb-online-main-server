@@ -841,9 +841,15 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 - 使用 ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_personid, 查詢所有 c_dy 為 15 的記錄（c_personid 和 c_assoc_id 必須都為 15）
 
 - 使用 ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_index_addr_id, 查詢所有 c_index_addr_id 為 13305 的記錄。broad 的演算法與「查詢社會關係網路」相同：使用 c_index_addr_id join 到 ADDR_CODES.c_addr_id, 找到 x_coord, y_coord. 透過廣義 `+/- 0.06` 狹義 `+/- 0.03` 從 ADDR_CODES 獲取範圍內的 c_addr_id. 再使用獲得的 c_addr_id 作為條件，過濾 BIOG_MAIN 的 c_index_addr_id 對應 personid 的 ASSOC_DATA.c_assoc_id 記錄。過濾條件為 OR 連接的兩個條件：
+  
   - ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id 的 c_addr_id 都需要為 13305
-  - 若此人物在 URL 的 "people":[...] 中，那麼此人無論 c_addr_id 是否為 13305 都需要保留在結果中
-
+    
+  - 若此人物在 URL 的 "people":[...] 中，且此人在 ASSOC_DATA 中有符合條件之記錄，那麼
+      
+      - 若其關係人不在 "people":[...] 中，其關係人 c_addr_id 需為 13305.
+      
+      - 若其關係人亦在 "people":[...] 中，則此條 ASSOC_DATA 記錄需要保留。（此狀況中，關係中雙方 c_addr_id 可均非 13305）.
+    
 #### 關於 maxNodeDist 的設定
 
 - 當 maxNodeDist 為 0 時，查詢 people（本例中為 "people":[1762, 3767]）中相互的社會網路關係，即 ASSOC_DATA 中 c_personid 与 c_assoc_id 均为 people（本例中為 "people":[1762, 3767]）陣列裡的 id. 來自使用者的地址、時間、性別等查詢條件均有效。

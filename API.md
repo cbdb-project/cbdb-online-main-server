@@ -860,7 +860,7 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
     
 #### 關於 maxNodeDist 的設定
 
-- 當 maxNodeDist 為 0 時，查詢 people（本例中為 "people":[1762, 3767]）中相互的社會網路關係，即 ASSOC_DATA 中 c_personid 与 c_assoc_id 均为 people（本例中為 "people":[1762, 3767]）陣列裡的 id. 來自使用者的地址、時間、性別等查詢條件均有效。
+- 當 maxNodeDist 為 0 時，查詢 people（本例中為 "people":[1762, 3767]）中相互的社會網路關係，即 ASSOC_DATA 中 c_personid 与 c_assoc_id 均为 people（本例中為 "people":[1762, 3767]）陣列裡的 id. 來自使用者的地址、時間、性別等查詢條件均有效。其地址限制條件與[過濾條件為 OR 連接的三個條件](https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/API.md#%E9%81%8E%E6%BF%BE%E6%A2%9D%E4%BB%B6%E7%82%BA-or-%E9%80%A3%E6%8E%A5%E7%9A%84%E4%B8%89%E5%80%8B%E6%A2%9D%E4%BB%B6)一致
 
 - 當 maxNodeDist 為 2 時，首先查詢方式和 maxNodeDist = 1 相同。在獲得的 maxNodeDist = 1 查詢結果中，將 ASSOC_DATA.c_assoc_id 作為 ASSOC_DATA.personid, 再進行一次 maxNodeDist = 1 查詢。（一定當心不要重覆查回前一次查詢的結果。即避免 a>>b, b>>a）將兩次查詢的結果合併，以 c_personid, c_assoc_id, c_assoc_code, c_text_title 去重。
 

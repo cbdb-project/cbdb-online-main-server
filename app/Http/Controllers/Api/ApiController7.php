@@ -42,8 +42,8 @@ class ApiController7 extends Controller
         //dd($arr); //驗證資料傳遞的正確性
         $start = $list = $total = 0;
         $data = $useXyArr = array();
-
         $people = $arr['people'];  //陣列
+        $user_input_people = $people;//clone the original input people
         $assocCode = $arr['assocCode'];  //陣列
         $assocType = $arr['assocType'];  //陣列
         $maxNodeDist = $arr['maxNodeDist'] ?? 1;  //數字默認為1
@@ -91,7 +91,7 @@ class ApiController7 extends Controller
             $c_assoc_code_row[] = $val->c_assoc_code;
         }
         //dd($c_assoc_code_row);
-
+       
         if($maxNodeDist == 0) {
             $row_b = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
             $row_b->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
@@ -101,6 +101,8 @@ class ApiController7 extends Controller
             }
             $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
             $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+            
+           
         }
         elseif($maxNodeDist == 1) {
             foreach($c_assoc_code_row as $v) {
@@ -108,7 +110,7 @@ class ApiController7 extends Controller
             }
             $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
             $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
+            $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);    
         }
         elseif($maxNodeDist == 2) {
             foreach($c_assoc_code_row as $v) {
@@ -132,9 +134,9 @@ class ApiController7 extends Controller
             return 'API 暫不支援 maxNodeDist 大於 2 之查詢';
         }
 
-        if($usePeoplePlace) {
-            $row->orWhereIn('ASSOC_DATA.c_addr_id', $place);
-        }
+        // if($usePeoplePlace) {
+        //     //$row->orWhereIn('ASSOC_DATA.c_addr_id', $place);
+        // }
 
         $row = $this->useXy($row, $useXy, $XY);
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
@@ -148,6 +150,32 @@ class ApiController7 extends Controller
         }
 
         $row = $row->get();
+
+        //過濾條件
+        $tmp_row = [];
+        if($usePeoplePlace) {
+            foreach($row as $v) {
+                $tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
+                if(in_array($v->c_personid, $user_input_people)){
+                    if(in_array($v->c_assoc_id, $user_input_people)){
+                        $tmp_row[] = $v;
+                    }
+                    else if(!empty($tmp_assoc) && in_array($tmp_assoc->c_index_addr_id, $place)){
+                        $tmp_row[] = $v;
+                    }
+                }
+                else if(in_array($v->c_assoc_id, $user_input_people)){
+                    if(in_array($v->c_personid, $user_input_people)){
+                        $tmp_row[] = $v;
+                    }
+                    else if(in_array($v->c_index_addr_id, $place)){
+                        $tmp_row[] = $v;
+                    }
+                }
+            }
+            $row = $tmp_row;
+        }
+        //過濾條件結束
 
         //資料庫邏輯結束
         if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }

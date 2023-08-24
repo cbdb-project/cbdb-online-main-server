@@ -93,15 +93,15 @@ class ApiController7 extends Controller
         //dd($c_assoc_code_row);
        
         if($maxNodeDist == 0) {
-            $row_b = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
-            $row_b->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row_b = $row_b->get();
-            foreach($row_b as $v) {
-               $people[] = $v->c_assoc_id;
-            }
+            // $row_b = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
+            // $row_b->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+            // $row_b = $row_b->get();
+            // foreach($row_b as $v) {
+            //    $people[] = $v->c_assoc_id;
+            // }
             $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
             $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            
+            $row->whereIn('ASSOC_DATA.c_assoc_id', $people);
            
         }
         elseif($maxNodeDist == 1) {
@@ -121,7 +121,7 @@ class ApiController7 extends Controller
             $row_b->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
             $row_b = $row_b->get();
             foreach($row_b as $v) {
-               $people[] = $v->c_assoc_id; 
+               $people[] = $v->c_assoc_id;
             }
             //dd($people);
             //累加第一輪的people
@@ -151,31 +151,11 @@ class ApiController7 extends Controller
 
         $row = $row->get();
 
-        //過濾條件
-        $tmp_row = [];
-        if($usePeoplePlace) {
-            foreach($row as $v) {
-                $tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
-                if(in_array($v->c_personid, $user_input_people)){
-                    if(in_array($v->c_assoc_id, $user_input_people)){
-                        $tmp_row[] = $v;
-                    }
-                    else if(!empty($tmp_assoc) && in_array($tmp_assoc->c_index_addr_id, $place)){
-                        $tmp_row[] = $v;
-                    }
-                }
-                else if(in_array($v->c_assoc_id, $user_input_people)){
-                    if(in_array($v->c_personid, $user_input_people)){
-                        $tmp_row[] = $v;
-                    }
-                    else if(in_array($v->c_index_addr_id, $place)){
-                        $tmp_row[] = $v;
-                    }
-                }
-            }
-            $row = $tmp_row;
+        //過濾地點條件
+        if($usePeoplePlace &&  $maxNodeDist >= 1) {
+            $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
         }
-        //過濾條件結束
+        //過濾地點條件結束
 
         //資料庫邏輯結束
         if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
@@ -315,6 +295,31 @@ class ApiController7 extends Controller
 
     }
 
+    //過濾地點條件
+    protected function filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place){
+        $tmp_row = [];
+        foreach($row as $v) {
+            $tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
+
+            //只要此人物和關係人都符合 URL 上的 $people ，即放入結果，不論是否符合 $usePeoplePlace 
+            if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
+                $tmp_row[] = $v;
+            }
+            //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $usePeoplePlace ，亦放入結果
+            else if(in_array($v->c_personid, $user_input_people) && (!empty($tmp_assoc) && !in_array($v->c_assoc_id, $user_input_people) && in_array($tmp_assoc->c_index_addr_id, $place)) ){
+                $tmp_row[] = $v;
+            }
+            //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $usePeoplePlace ，亦放入結果
+            else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && in_array($v->c_index_addr_id, $place))){
+                $tmp_row[] = $v;
+            }
+            //如果關係人和關係人都不在 $people 中，若雙方在 Biog_Main 上的 c_index_addr_id 都符合 $usePeoplePlace ，亦放入結果
+            else if( in_array($v->c_index_addr_id, $place) && in_array($tmp_assoc->c_index_addr_id, $place)){
+                $tmp_row[] = $v;
+            }
+        }
+        return $tmp_row;
+    }
 
     protected function useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd) {
 

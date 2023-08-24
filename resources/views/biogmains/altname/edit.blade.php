@@ -22,6 +22,12 @@ $row->c_notes = unionPKDef($row->c_notes);
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                    <div class="col-sm-4">
+                        <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="c_alt_name_chn" class="col-sm-2 control-label">別名漢字(c_alt_name_chn)</label>
                     <div class="col-sm-10">
 @php

@@ -14,6 +14,12 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                    <div class="col-sm-10">
+                        <input name="c_sequence" type="text" class="form-control" value="" required>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="c_alt_name_chn" class="col-sm-2 control-label">別名漢字(c_alt_name_chn)</label>
                     <div class="col-sm-10">
                         <input name="c_alt_name_chn" type="text" class="form-control" value="" required>

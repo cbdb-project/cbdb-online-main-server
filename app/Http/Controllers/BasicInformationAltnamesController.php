@@ -76,6 +76,7 @@ class BasicInformationAltnamesController extends Controller
         $data = $this->toolsRepository->timestamp($data, True);
         $temp = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
+            ['c_sequence', '=', $data['c_sequence']],
             ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
             ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
         ])->first();
@@ -84,11 +85,11 @@ class BasicInformationAltnamesController extends Controller
             return redirect()->back();
         }
         DB::table('ALTNAME_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
-        return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['c_personid']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code']]);
+        return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code']]);
     }
 
     /**
@@ -117,10 +118,12 @@ class BasicInformationAltnamesController extends Controller
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
         }
+        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
@@ -163,12 +166,15 @@ class BasicInformationAltnamesController extends Controller
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
         }
+        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->update($data);
-        $new_alt = $id.'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
+        if($data['c_sequence'] == NULL) { $data['c_sequence'] = 'NULL'; }
+        $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data);
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
@@ -202,17 +208,20 @@ class BasicInformationAltnamesController extends Controller
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
         }
+        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[1].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['id' => $id]);

@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class BiogMain extends Model
 {
@@ -98,7 +99,7 @@ class BiogMain extends Model
 
     public function altnames()
     {
-        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'tts_sysno', 'c_alt_name_type_code');
+        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'tts_sysno', 'c_alt_name_type_code', 'c_sequence')->orderBy(DB::raw('ISNULL(c_sequence), c_sequence'), 'ASC');
     }
 
     public function texts()

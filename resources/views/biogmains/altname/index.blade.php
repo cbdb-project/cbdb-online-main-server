@@ -28,6 +28,9 @@ $c_alt_name_chn_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name_c
 //20210715新增錯別字過濾
 $errWord = array('?', '', '�');
 $value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_name_chn);
+if($value->pivot->c_sequence == NULL) {
+$value->pivot->c_sequence = 'NULL';
+}
 @endphp
                     <tr>
                         <td>{{ $key+1 }}</td>
@@ -35,7 +38,7 @@ $value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_n
                         <td>{{ $c_alt_name_chn_view }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -49,7 +52,7 @@ $value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_n
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code }}" action="{{ route('basicinformation.altnames.destroy', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code }}" action="{{ route('basicinformation.altnames.destroy', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

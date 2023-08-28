@@ -821,7 +821,7 @@ RequestPayload:{
 https://input.cbdb.fas.harvard.edu/api/query_assoc_network?RequestPayload={"people":[1762,3767],"assocCode":[429],"assocType":["02"],"maxNodeDist":1,"place":[13305],"usePeoplePlace":1,"broad":0,"useDy":1,"dynStart":15,"dynEnd":15,"includeMale":1,"includeFemale":1}
 ```
 
-說明：查找王安石（1762）和蘇軾（3767）的社會網路，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。
+說明：查找王安石（1762）和蘇軾（3767）的社會網路，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。並且查詢出這些人物之間的關係。例如，蘇軾致書的對象弟弟蘇轍 1493，以及蘇軾的老師劉巨 26417. 這兩個人物自己其實也有關係（劉巨也是蘇轍的老師）。在蘇軾的 maxNodeDist = 1 查詢中也希望呈現劉巨和蘇轍的關係。
 
 #### 查詢細節：
 
@@ -841,6 +841,8 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 - 使用 ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_personid, 查詢所有 c_dy 為 15 的記錄（c_personid 和 c_assoc_id 必須都為 15）
 
 - 使用 ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id join 到 BIOG_MAIN 的 c_index_addr_id, 查詢所有 c_index_addr_id 為 13305 的記錄。broad 的演算法與「查詢社會關係網路」相同：使用 c_index_addr_id join 到 ADDR_CODES.c_addr_id, 找到 x_coord, y_coord. 透過廣義 `+/- 0.06` 狹義 `+/- 0.03` 從 ADDR_CODES 獲取範圍內的 c_addr_id. 再使用獲得的 c_addr_id 作為條件，過濾 BIOG_MAIN 的 c_index_addr_id 對應 personid 的 ASSOC_DATA.c_assoc_id 記錄。
+
+- 將查詢到的所有人物置入 ASSOC_DATA 查詢所有人物之間的關係。
 
   ##### 過濾條件為 OR 連接的三個條件：
     

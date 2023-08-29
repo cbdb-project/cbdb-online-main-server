@@ -93,50 +93,42 @@ class ApiController7 extends Controller
         //dd($c_assoc_code_row);
        
         if($maxNodeDist == 0) {
-            // $row_b = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
-            // $row_b->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            // $row_b = $row_b->get();
-            // foreach($row_b as $v) {
-            //    $people[] = $v->c_assoc_id;
-            // }
-            $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
+            $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $user_input_people);
             $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row->whereIn('ASSOC_DATA.c_assoc_id', $people);
+            $row->whereIn('ASSOC_DATA.c_assoc_id', $user_input_people);
            
         }
         elseif($maxNodeDist == 1) {
             foreach($c_assoc_code_row as $v) {
                 $assocCode[] = $v;
             }
-            $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
-            $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);    
+            //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id
+            $assoc_people = $this->get_assoc_people($user_input_people, $assocCode);
+            //將$user_input_people、第一輪找出的 ASSOC_DATA.c_assoc_id 合併去重
+            $sum_people = array_merge($user_input_people, $assoc_people);
+            $sum_people = array_unique($sum_people);
+            //限定 ASSOC_DATA.personid 和 ASSOC_DATA.c_assoc_id 必需是 $sum_people 中的人物，並與 BIOG_MAIN 做 join
+            $row = $this->get_related_edges($sum_people, $assocCode);
+
         }
         elseif($maxNodeDist == 2) {
             foreach($c_assoc_code_row as $v) {
                 $assocCode[] = $v;
             }
-            $row_b = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
-            $row_b->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row_b->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
-            $row_b = $row_b->get();
-            foreach($row_b as $v) {
-               $people[] = $v->c_assoc_id;
-            }
-            //dd($people);
-            //累加第一輪的people
-            //將 ASSOC_DATA.c_assoc_id 作為 ASSOC_DATA.personid, 再進行一次 maxNodeDist = 1 查詢。
-            $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
-            $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
-            $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
+            
+            //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id
+            $assoc_people = $this->get_assoc_people($user_input_people, $assocCode);
+            //將前一輪的 ASSOC_DATA.c_assoc_id 作為 ASSOC_DATA.personid, 再進行一次查詢。
+            $assoc_people2 = $this->get_assoc_people($assoc_people, $assocCode);
+            //將$user_input_people、第一輪找出的 ASSOC_DATA.c_assoc_id 和 第二輪找出的 ASSOC_DATA.c_assoc_id 合併去重
+            $sum_people = array_merge($user_input_people, $assoc_people , $assoc_people2);
+            $sum_people = array_unique($sum_people);
+            //限定 ASSOC_DATA.personid 和 ASSOC_DATA.c_assoc_id 必需是 $sum_people 中的人物，並與 BIOG_MAIN 做 join
+            $row = $this->get_related_edges($sum_people, $assocCode);         
         }
         else {
             return 'API 暫不支援 maxNodeDist 大於 2 之查詢';
         }
-
-        // if($usePeoplePlace) {
-        //     //$row->orWhereIn('ASSOC_DATA.c_addr_id', $place);
-        // }
 
         $row = $this->useXy($row, $useXy, $XY);
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
@@ -294,6 +286,33 @@ class ApiController7 extends Controller
         return $ans;
 
     }
+
+
+    protected function get_assoc_people($people, $assocCode){
+        $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
+        $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
+        
+        $row = $row->get();
+        $return_people = [];
+
+        foreach($row as $v) {
+            if(!in_array($v->c_assoc_id, $return_people)){
+                $return_people[] = $v->c_assoc_id;
+            }
+        }
+
+        return $return_people;
+    }
+
+    protected function get_related_edges($people, $assocCode){
+        $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
+        $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
+        $row->whereIn('ASSOC_DATA.c_assoc_id', $people);
+        $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
+        
+        return $row;
+    }
+
 
     //過濾地點條件
     protected function filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place){

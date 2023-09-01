@@ -374,43 +374,39 @@ class ApiController7 extends Controller
         if($indexYear) {
             // $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
             // $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
-            $row = array_filter($row, function($v) use($indexStartTime, $indexEndTime){
-                return $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime;
-            });
+            if(is_array($row)){
+                $row = array_filter($row, function($v) use($indexStartTime, $indexEndTime){
+                    return $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime;
+                });
+            }
         }
 
         if($useDy) {
             // $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
             // $row->where('DYNASTIES.c_dy', '>=', $dynStart);
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
-            $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
-                return $v->c_dy >= $dynStart && $v->c_dy <= $dynEnd && $v->assoc_c_dy >= $dynStart && $v->assoc_c_dy <= $dynEnd;
-            });
+            if(is_array($row)){
+                $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
+                    return $v->c_dy >= $dynStart && $v->c_dy <= $dynEnd && $v->assoc_c_dy >= $dynStart && $v->assoc_c_dy <= $dynEnd;
+                });
+            }
+           
         }
+        
         return $row;
     }
 
 
     //因為 $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function useXy($row, $useXy, $XY, &$place) {
-        //useXy過濾條件
-        //$useXyArr = array();
-        $useXyArr = $place; //以$place為主，往外擴展地理座標
         $useXyResArr = array(); //放擴展地理座標後的結果
-        //dd($useXyArr);
+        $rowOut = [];
         if($useXy) {    
-            //$rowOut = $row->get();
-            // foreach ($rowOut as $val) {
-            //     if($val->c_addr_id != null) {
-            //         array_push($useXyArr, $val->c_addr_id);
-            //     }
-            // }
-
             //判斷是否為空陣列
-            if(!empty($useXyArr)) {
+            if(!empty($place)) {
                 //dd($useXyArr);
                 $useXyVar = '';
-                foreach ($useXyArr as $val) {
+                foreach ($place as $val) {
                     if($useXyVar)  $useXyVar .= ',';  //string concat
                     $useXyVar .= $val;
                 }
@@ -435,17 +431,21 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
                  */
                 //$row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
                 //dd($useXyResArr); //檢查$useXyResArr驗證有效
-            }            
-        }
-        $rowOut = [];
-        $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
-        $useXyResArr = array_unique($useXyResArr);
-        foreach($row as $v){
-            if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
-                $rowOut[] = $v;
+            }
+            
+          
+            $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
+            $useXyResArr = array_unique($useXyResArr);
+            
+            foreach($row as $v){
+                if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
+                    $rowOut[] = $v;
+                } 
             }
         }
-        $place = $useXyResArr; //將$place更新成擴展後的地址id
+        else{
+            $rowOut = $row;
+        }
         return $rowOut;
     }
 

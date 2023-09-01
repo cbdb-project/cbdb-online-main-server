@@ -389,8 +389,7 @@ class ApiController7 extends Controller
                 $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
                     return $v->c_dy >= $dynStart && $v->c_dy <= $dynEnd && $v->assoc_c_dy >= $dynStart && $v->assoc_c_dy <= $dynEnd;
                 });
-            }
-           
+            } 
         }
         
         return $row;

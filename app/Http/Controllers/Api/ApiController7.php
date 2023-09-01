@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
 
 ini_set('memory_limit','512M');
 ini_set('max_execution_time', 300);
@@ -130,20 +131,26 @@ class ApiController7 extends Controller
             return 'API 暫不支援 maxNodeDist 大於 2 之查詢';
         }
 
-        $row = $this->useXy($row, $useXy, $XY);
+        $row = $row->get();
+        $row = $this->get_assoc_necessary_data($row);
+        $row = $this->useXy($row, $useXy, $XY, $place);
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
         
         if($includeMale == 0) {
-            $row->where('BIOG_MAIN.c_female', '!=', 0);
+            //$row->where('BIOG_MAIN.c_female', '!=', 0);
+            $row = array_filter($row, function($v){
+                return $v->c_female!=0 && $v->assoc_c_female!=0;
+            });
         }
 
         if($includeFemale == 0) {
-            $row->where('BIOG_MAIN.c_female', '!=', 1);
+            //$row->where('BIOG_MAIN.c_female', '!=', 1);
+            $row = array_filter($row, function($v){
+                return $v->c_female!=1 && $v->assoc_c_female!=1;
+            });
         }
 
-        $row = $row->get();
-
-        //過濾地點條件
+        //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
         if($usePeoplePlace &&  $maxNodeDist >= 1) {
             $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
         }
@@ -287,7 +294,7 @@ class ApiController7 extends Controller
 
     }
 
-
+    // 從 ASSOC_DATA 裡，找到以 $people 為 c_personid 的所有 c_assoc_id
     protected function get_assoc_people($people, $assocCode){
         $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
         $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
@@ -304,6 +311,7 @@ class ApiController7 extends Controller
         return $return_people;
     }
 
+    // 從 ASSOC_DATA 裡，找到所有在 $people 範圍內的關係，並將 ASSOC_DATA.c_personid join 到 BIOG_MAIN.c_personid
     protected function get_related_edges($people, $assocCode){
         $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
         $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
@@ -313,27 +321,49 @@ class ApiController7 extends Controller
         return $row;
     }
 
+    // 組成新的row，加入以 c_assoc_id 為 BiogMain.c_personid ，並找出 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
+    protected function get_assoc_necessary_data($row){
+        foreach ($row as $v) {
+            $assoc_BiogMain = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
+
+            if(!empty($assoc_BiogMain)){
+                $v->assoc_c_index_addr_id = $assoc_BiogMain->c_index_addr_id;
+                $v->assoc_c_index_year = $assoc_BiogMain->c_index_year;
+                $v->assoc_c_dy = $assoc_BiogMain->c_dy;
+                $v->assoc_c_female = $assoc_BiogMain->c_female;
+            }
+            else{
+                $v->assoc_c_index_addr_id = "";
+                $v->assoc_c_index_year = "";
+                $v->assoc_c_dy = "";
+                $v->assoc_c_female = "";
+            }
+        }
+        
+        return $row;
+    }
+
 
     //過濾地點條件
     protected function filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place){
         $tmp_row = [];
         foreach($row as $v) {
-            $tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
+            //$tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
 
-            //只要此人物和關係人都符合 URL 上的 $people ，即放入結果，不論是否符合 $usePeoplePlace 
+            //只要此人物和關係人都符合 URL 上的 $people ，即放入結果，不論是否符合 $place 
             if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
                 $tmp_row[] = $v;
             }
-            //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $usePeoplePlace ，亦放入結果
-            else if(in_array($v->c_personid, $user_input_people) && (!empty($tmp_assoc) && !in_array($v->c_assoc_id, $user_input_people) && in_array($tmp_assoc->c_index_addr_id, $place)) ){
+            //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
+            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && in_array($v->assoc_c_index_addr_id, $place)) ){
                 $tmp_row[] = $v;
             }
-            //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $usePeoplePlace ，亦放入結果
+            //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
             else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && in_array($v->c_index_addr_id, $place))){
                 $tmp_row[] = $v;
             }
-            //如果關係人和關係人都不在 $people 中，若雙方在 Biog_Main 上的 c_index_addr_id 都符合 $usePeoplePlace ，亦放入結果
-            else if( in_array($v->c_index_addr_id, $place) && in_array($tmp_assoc->c_index_addr_id, $place)){
+            //如果關係人和關係人都不在 $people 中，若雙方在 Biog_Main 上的 c_index_addr_id 都符合 $place ，亦放入結果
+            else if( in_array($v->c_index_addr_id, $place) && in_array($v->assoc_c_index_addr_id, $place)){
                 $tmp_row[] = $v;
             }
         }
@@ -341,38 +371,50 @@ class ApiController7 extends Controller
     }
 
     protected function useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd) {
-
         if($indexYear) {
-            $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
-            $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
+            // $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
+            // $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
+            $row = array_filter($row, function($v) use($indexStartTime, $indexEndTime){
+                return $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime;
+            });
         }
 
         if($useDy) {
-            $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
-            $row->where('DYNASTIES.c_dy', '>=', $dynStart);
-            $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
+            // $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
+            // $row->where('DYNASTIES.c_dy', '>=', $dynStart);
+            // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
+            $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
+                return $v->c_dy >= $dynStart && $v->c_dy <= $dynEnd && $v->assoc_c_dy >= $dynStart && $v->assoc_c_dy <= $dynEnd;
+            });
         }
         return $row;
     }
 
 
-    protected function useXy($row, $useXy, $XY) {
+    //因為 $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
+    protected function useXy($row, $useXy, $XY, &$place) {
         //useXy過濾條件
-        $useXyArr = array();
-        if($useXy) {
-            $rowOut = $row->get();
-            foreach ($rowOut as $val) {
-                if($val->c_addr_id != null) {
-                    array_push($useXyArr, $val->c_addr_id);
-                }
-            }
+        //$useXyArr = array();
+        $useXyArr = $place; //以$place為主，往外擴展地理座標
+        $useXyResArr = array(); //放擴展地理座標後的結果
+        //dd($useXyArr);
+        if($useXy) {    
+            //$rowOut = $row->get();
+            // foreach ($rowOut as $val) {
+            //     if($val->c_addr_id != null) {
+            //         array_push($useXyArr, $val->c_addr_id);
+            //     }
+            // }
+
             //判斷是否為空陣列
             if(!empty($useXyArr)) {
+                //dd($useXyArr);
                 $useXyVar = '';
                 foreach ($useXyArr as $val) {
-                    if($useXyVar)  $useXyVar .= ',';
+                    if($useXyVar)  $useXyVar .= ',';  //string concat
                     $useXyVar .= $val;
                 }
+                //dd($useXyVar);
                 $sqlTmp = sprintf('
 SELECT DISTINCT ADDR_CODES.c_addr_id FROM ADDR_CODES
 INNER JOIN ADDR_CODES AS ADDR_CODES_1
@@ -382,7 +424,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
 
                 //return $sqlTmp; //驗證$useXy可以查找到資料並進行過濾
                 $useXyRes = DB::select($sqlTmp);
-                $useXyResArr = array();
+                //$useXyResArr = array();
                 foreach ($useXyRes as $val) {
                     array_push($useXyResArr, $val->c_addr_id);
                 }
@@ -391,11 +433,20 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
                  *之後用這些地址 ID 來作為地址檢索條件（每個地址 ID 之間是 OR 關係）。
                  *useXY 的條件限定會比不使用 useXY 獲得的資訊更多。
                  */
-                $row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
+                //$row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
                 //dd($useXyResArr); //檢查$useXyResArr驗證有效
+            }            
+        }
+        $rowOut = [];
+        $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
+        $useXyResArr = array_unique($useXyResArr);
+        foreach($row as $v){
+            if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
+                $rowOut[] = $v;
             }
         }
-        return $row;
+        $place = $useXyResArr; //將$place更新成擴展後的地址id
+        return $rowOut;
     }
 
 

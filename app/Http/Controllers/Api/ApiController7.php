@@ -17,6 +17,7 @@ use App\EntryCode;
 use App\KinshipCode;
 use App\AssocCode;
 use App\Operation;
+use App\Dynasty;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -133,7 +134,7 @@ class ApiController7 extends Controller
 
         $row = $row->get();
         $row = $this->get_assoc_necessary_data($row);
-        $row = $this->useXy($row, $useXy, $XY, $place);
+        $row = $this->useXy($row, $useXy, $XY, $place); //注意 $place 是以 by reference 方式傳入
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
         
         if($includeMale == 0) {
@@ -387,16 +388,22 @@ class ApiController7 extends Controller
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
             if(is_array($row)){
                 $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
-                    return $v->c_dy >= $dynStart && $v->c_dy <= $dynEnd && $v->assoc_c_dy >= $dynStart && $v->assoc_c_dy <= $dynEnd;
+                    $p_dynasty_sort = Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
+                    $a_dynasty_sort = Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
+                    $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
+                    $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort;
+                    if($p_dynasty_sort >= $dynStart_sort && $p_dynasty_sort <= $dynEnd_sort && $a_dynasty_sort >= $dynStart_sort && $a_dynasty_sort <= $dynEnd_sort){
+                        return $v;
+                    }
                 });
             } 
         }
-        
+
         return $row;
     }
 
-
-    //因為 $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
+    
+    // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function useXy($row, $useXy, $XY, &$place) {
         $useXyResArr = array(); //放擴展地理座標後的結果
         $rowOut = [];
@@ -447,7 +454,6 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
         }
         return $rowOut;
     }
-
 
     protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit=2, $decimal=2){
         /*

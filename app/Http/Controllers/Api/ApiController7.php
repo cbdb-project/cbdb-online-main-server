@@ -150,7 +150,7 @@ class ApiController7 extends Controller
                 return $v->c_female!=1 && $v->assoc_c_female!=1;
             });
         }
-
+        
         //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
         if($usePeoplePlace &&  $maxNodeDist >= 1) {
             $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
@@ -312,7 +312,7 @@ class ApiController7 extends Controller
         return $return_people;
     }
 
-    // 從 ASSOC_DATA 裡，找到所有在 $people 範圍內的關係，並將 ASSOC_DATA.c_personid join 到 BIOG_MAIN.c_personid
+    // 從 ASSOC_DATA 裡，找到 $people 範圍內的所有關係，並將 ASSOC_DATA.c_personid join 到 BIOG_MAIN.c_personid
     protected function get_related_edges($people, $assocCode){
         $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
         $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
@@ -322,7 +322,7 @@ class ApiController7 extends Controller
         return $row;
     }
 
-    // 組成新的row，加入以 c_assoc_id 為 BiogMain.c_personid ，並找出 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
+    // 組成新的row，加入以 c_assoc_id 為 BiogMain.c_personid ，並找出關係人在 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
     protected function get_assoc_necessary_data($row){
         foreach ($row as $v) {
             $assoc_BiogMain = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
@@ -388,6 +388,7 @@ class ApiController7 extends Controller
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
             if(is_array($row)){
                 $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
+                    //以Dynasty.c_sort做為判斷範圍的依據
                     $p_dynasty_sort = Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
                     $a_dynasty_sort = Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
                     $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
@@ -405,7 +406,6 @@ class ApiController7 extends Controller
     
     // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function useXy($row, $useXy, $XY, &$place) {
-        $useXyResArr = array(); //放擴展地理座標後的結果
         $rowOut = [];
         if($useXy) {    
             //判斷是否為空陣列
@@ -426,7 +426,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
 
                 //return $sqlTmp; //驗證$useXy可以查找到資料並進行過濾
                 $useXyRes = DB::select($sqlTmp);
-                //$useXyResArr = array();
+                $useXyResArr = array(); //放擴展地理座標後的結果
                 foreach ($useXyRes as $val) {
                     array_push($useXyResArr, $val->c_addr_id);
                 }
@@ -437,16 +437,15 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
                  */
                 //$row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
                 //dd($useXyResArr); //檢查$useXyResArr驗證有效
-            }
             
-          
-            $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
-            $useXyResArr = array_unique($useXyResArr);
-            
-            foreach($row as $v){
-                if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
-                    $rowOut[] = $v;
-                } 
+                $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
+                $useXyResArr = array_unique($useXyResArr); 
+                $place = $useXyResArr; //擴展地理座標後的結果放回$place
+                foreach($row as $v){
+                    if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
+                        $rowOut[] = $v;
+                    } 
+                }
             }
         }
         else{

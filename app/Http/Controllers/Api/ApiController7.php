@@ -133,7 +133,13 @@ class ApiController7 extends Controller
         }
 
         $row = $row->get();
-        $row = $this->get_assoc_necessary_data($row);
+ 
+        //資料庫邏輯結束
+        if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
+
+        $row = $this->get_assoc_necessary_data($row);  
+
+        //過濾條件開始
         $row = $this->useXy($row, $useXy, $XY, $place); //注意 $place 是以 by reference 方式傳入
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
         
@@ -151,14 +157,11 @@ class ApiController7 extends Controller
             });
         }
         
-        //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
+        //如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
         if($usePeoplePlace &&  $maxNodeDist >= 1) {
             $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
         }
-        //過濾地點條件結束
-
-        //資料庫邏輯結束
-        if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
+        //過濾條件結束
 
         //去除重複的資料清洗
         $new_row = [];

@@ -408,10 +408,10 @@ class ApiController7 extends Controller
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
             $row = $row->filter(function ($v) use($dynStart, $dynEnd, $user_input_people) {
                 //以Dynasty.c_sort做為判斷範圍的依據
-                $p_dynasty = Dynasty::where('c_dy', '=', $v->c_dy)??Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
-                $a_dynasty = Dynasty::where('c_dy', '=', $v->assoc_c_dy)??Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
-                $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)??Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
-                $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)??Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort;
+                $p_dynasty = Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort ?? null;
+                $a_dynasty = Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort ?? null;
+                $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort ?? null;
+                $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort ?? null;
                 
                 if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
                     return $v;

@@ -103,7 +103,7 @@ class ApiController7 extends Controller
             foreach($c_assoc_code_row as $v) {
                 $assocCode[] = $v;
             }
-            //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id
+            //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id array
             $assoc_people = $this->get_assoc_people($user_input_people, $assocCode);
             //將$user_input_people、第一輪找出的 ASSOC_DATA.c_assoc_id 合併去重
             $sum_people = array_merge($user_input_people, $assoc_people);
@@ -138,11 +138,10 @@ class ApiController7 extends Controller
         //得到關係人的資料
         $row = $this->get_assoc_necessary_data($row);  
         
-        //得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
+        //如果useXy == 1 將得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
         $this->useXy($row, $useXy, $XY, $place); 
         
-        //過濾時間條件
-        //URL上的人物不受過濾時間條件限制
+        //過濾時間條件，URL上的人物不受過濾時間條件限制
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people);
         
         if($includeMale == 0) {
@@ -166,7 +165,7 @@ class ApiController7 extends Controller
         }
         
 
-        //去除重複的資料清洗 $row的型態在清洗後之後變成 array
+        //去除重複的資料清洗，$row 的型態在清洗後之後變成 array
         $new_row = [];
         foreach($row as $v) {
             if(empty($new_row)) { $new_row[] = $v; }
@@ -315,6 +314,7 @@ class ApiController7 extends Controller
             }
         }
 
+        // array
         return $return_people;
     }
 
@@ -365,7 +365,7 @@ class ApiController7 extends Controller
                 $tmp_row->push($v);
             }
             //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
-            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && in_array($v->assoc_c_index_addr_id, $place)) ){
+            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && in_array($v->assoc_c_index_addr_id, $place))){
                 $tmp_row->push($v);
             }
             //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
@@ -384,23 +384,48 @@ class ApiController7 extends Controller
         if($indexYear && $row->isNotEmpty()) {
             // $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
             // $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
-            $row = $row->filter(function($v) use($indexStartTime, $indexEndTime){
-                    return $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime;
+            $row = $row->filter(function($v) use($indexStartTime, $indexEndTime, $user_input_people){
+                if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
+                    return $v;
+                }
+                else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
+                $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime)){
+                    return $v;
+                }
+                else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) &&  
+                $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime)){
+                    return $v;
+                } 
+                else if($v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime){
+                    return $v;
+                }
             });
-            
         }
 
         if($useDy && $row->isNotEmpty()) {
             // $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
             // $row->where('DYNASTIES.c_dy', '>=', $dynStart);
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
-            $row = $row->filter(function ($v) use($dynStart, $dynEnd) {
+            $row = $row->filter(function ($v) use($dynStart, $dynEnd, $user_input_people) {
                 //以Dynasty.c_sort做為判斷範圍的依據
-                $p_dynasty_sort = Dynasty::where('c_dy', '=', $v->c_dy) ?? Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
-                $a_dynasty_sort = Dynasty::where('c_dy', '=', $v->assoc_c_dy)?? Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
+                $p_dynasty = Dynasty::where('c_dy', '=', $v->c_dy)??Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
+                $a_dynasty = Dynasty::where('c_dy', '=', $v->assoc_c_dy)??Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
                 $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)??Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
                 $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)??Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort;
-                if($p_dynasty_sort >= $dynStart_sort && $p_dynasty_sort <= $dynEnd_sort && $a_dynasty_sort >= $dynStart_sort && $a_dynasty_sort <= $dynEnd_sort){
+                
+                if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
+                    return $v;
+                }
+                else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
+                $a_dynasty >= $dynStart_sort && $a_dynasty <= $dynEnd_sort)){
+                    return $v;
+                }
+                else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) &&  
+                $p_dynasty >= $dynStart_sort && $p_dynasty <= $dynEnd_sort)){
+                    return $v;
+                } 
+                else if($p_dynasty >= $dynStart_sort && $p_dynasty <= $dynEnd_sort && 
+                $a_dynasty >= $dynStart_sort && $a_dynasty <= $dynEnd_sort){
                     return $v;
                 }
             });

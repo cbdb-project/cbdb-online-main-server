@@ -23,7 +23,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Arr;
 
 ini_set('memory_limit','512M');
 ini_set('max_execution_time', 300);
@@ -133,37 +132,41 @@ class ApiController7 extends Controller
         }
 
         $row = $row->get();
- 
-        //資料庫邏輯結束
+        //資料庫邏輯結束 $row 的型態此時是 collect
         if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
 
+        //得到關係人的資料
         $row = $this->get_assoc_necessary_data($row);  
-
-        //過濾條件開始
-        $row = $this->useXy($row, $useXy, $XY, $place); //注意 $place 是以 by reference 方式傳入
-        $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
+        
+        //得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
+        $this->useXy($row, $useXy, $XY, $place); 
+        
+        //過濾時間條件
+        //URL上的人物不受過濾時間條件限制
+        $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people);
         
         if($includeMale == 0) {
             //$row->where('BIOG_MAIN.c_female', '!=', 0);
-            $row = array_filter($row, function($v){
+            $row = $row->filter(function($v){
                 return $v->c_female!=0 && $v->assoc_c_female!=0;
             });
         }
 
         if($includeFemale == 0) {
             //$row->where('BIOG_MAIN.c_female', '!=', 1);
-            $row = array_filter($row, function($v){
+            $row = $row->filter(function($v){
                 return $v->c_female!=1 && $v->assoc_c_female!=1;
             });
         }
         
-        //如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
-        if($usePeoplePlace &&  $maxNodeDist >= 1) {
+        //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
+        //URL上的人物不受過濾地點條件限制
+        if(($usePeoplePlace || $useXy) &&  $maxNodeDist >= 1) {
             $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
         }
-        //過濾條件結束
+        
 
-        //去除重複的資料清洗
+        //去除重複的資料清洗 $row的型態在清洗後之後變成 array
         $new_row = [];
         foreach($row as $v) {
             if(empty($new_row)) { $new_row[] = $v; }
@@ -350,57 +353,58 @@ class ApiController7 extends Controller
 
     //過濾地點條件
     protected function filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place){
-        $tmp_row = [];
+        $tmp_row =collect();
+        if($row->isEmpty()){
+            return $row;
+        }
         foreach($row as $v) {
             //$tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
 
             //只要此人物和關係人都符合 URL 上的 $people ，即放入結果，不論是否符合 $place 
             if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
-                $tmp_row[] = $v;
+                $tmp_row->push($v);
             }
             //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
             else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && in_array($v->assoc_c_index_addr_id, $place)) ){
-                $tmp_row[] = $v;
+                $tmp_row->push($v);
             }
             //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
             else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && in_array($v->c_index_addr_id, $place))){
-                $tmp_row[] = $v;
+                $tmp_row->push($v);
             }
             //如果關係人和關係人都不在 $people 中，若雙方在 Biog_Main 上的 c_index_addr_id 都符合 $place ，亦放入結果
             else if( in_array($v->c_index_addr_id, $place) && in_array($v->assoc_c_index_addr_id, $place)){
-                $tmp_row[] = $v;
+                $tmp_row->push($v);
             }
         }
         return $tmp_row;
     }
 
-    protected function useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd) {
-        if($indexYear) {
+    protected function useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people) {
+        if($indexYear && $row->isNotEmpty()) {
             // $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
             // $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
-            if(is_array($row)){
-                $row = array_filter($row, function($v) use($indexStartTime, $indexEndTime){
+            $row = $row->filter(function($v) use($indexStartTime, $indexEndTime){
                     return $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime;
-                });
-            }
+            });
+            
         }
 
-        if($useDy) {
+        if($useDy && $row->isNotEmpty()) {
             // $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
             // $row->where('DYNASTIES.c_dy', '>=', $dynStart);
             // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
-            if(is_array($row)){
-                $row = array_filter($row, function ($v) use($dynStart, $dynEnd) {
-                    //以Dynasty.c_sort做為判斷範圍的依據
-                    $p_dynasty_sort = Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
-                    $a_dynasty_sort = Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
-                    $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
-                    $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort;
-                    if($p_dynasty_sort >= $dynStart_sort && $p_dynasty_sort <= $dynEnd_sort && $a_dynasty_sort >= $dynStart_sort && $a_dynasty_sort <= $dynEnd_sort){
-                        return $v;
-                    }
-                });
-            } 
+            $row = $row->filter(function ($v) use($dynStart, $dynEnd) {
+                //以Dynasty.c_sort做為判斷範圍的依據
+                $p_dynasty_sort = Dynasty::where('c_dy', '=', $v->c_dy) ?? Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort;
+                $a_dynasty_sort = Dynasty::where('c_dy', '=', $v->assoc_c_dy)?? Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort;
+                $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)??Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort;
+                $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)??Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort;
+                if($p_dynasty_sort >= $dynStart_sort && $p_dynasty_sort <= $dynEnd_sort && $a_dynasty_sort >= $dynStart_sort && $a_dynasty_sort <= $dynEnd_sort){
+                    return $v;
+                }
+            });
+            
         }
 
         return $row;
@@ -409,52 +413,35 @@ class ApiController7 extends Controller
     
     // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function useXy($row, $useXy, $XY, &$place) {
-        $rowOut = [];
-        if($useXy) {    
-            //判斷是否為空陣列
-            if(!empty($place)) {
-                //dd($useXyArr);
-                $useXyVar = '';
-                foreach ($place as $val) {
-                    if($useXyVar)  $useXyVar .= ',';  //string concat
-                    $useXyVar .= $val;
-                }
-                //dd($useXyVar);
-                $sqlTmp = sprintf('
+        if($useXy && !empty($place)) {    
+            $useXyVar = '';
+            foreach ($place as $val) {
+                if($useXyVar)  $useXyVar .= ',';  //string concat
+                $useXyVar .= $val;
+            }
+                
+            $sqlTmp = sprintf('
 SELECT DISTINCT ADDR_CODES.c_addr_id FROM ADDR_CODES
 INNER JOIN ADDR_CODES AS ADDR_CODES_1
 ON ADDR_CODES_1.c_addr_id in ('. $useXyVar .')
 WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_coord)<=(ADDR_CODES_1.x_coord+'.$XY.')) AND ((ADDR_CODES.y_coord)>=(ADDR_CODES_1.y_coord-'.$XY.') And (ADDR_CODES.y_coord)<=(ADDR_CODES_1.y_coord+'.$XY.')))
 ');
 
-                //return $sqlTmp; //驗證$useXy可以查找到資料並進行過濾
-                $useXyRes = DB::select($sqlTmp);
-                $useXyResArr = array(); //放擴展地理座標後的結果
-                foreach ($useXyRes as $val) {
-                    array_push($useXyResArr, $val->c_addr_id);
-                }
-                /*20220503修改程式邏輯，
-                 *先使用查詢地址的 id 獲得經緯度座標資訊，然後用獲得的經緯度座標正負 0.03 找到更多地址 ID，
-                 *之後用這些地址 ID 來作為地址檢索條件（每個地址 ID 之間是 OR 關係）。
-                 *useXY 的條件限定會比不使用 useXY 獲得的資訊更多。
-                 */
-                //$row->orWhereIn('BIOG_MAIN.c_index_addr_id', $useXyResArr);
-                //dd($useXyResArr); //檢查$useXyResArr驗證有效
-            
-                $useXyResArr = array_merge($useXyResArr, $place);//確保使用者輸入的place也在結果的地址陣列之內
-                $useXyResArr = array_unique($useXyResArr); 
-                $place = $useXyResArr; //擴展地理座標後的結果放回$place
-                foreach($row as $v){
-                    if(in_array($v->c_index_addr_id, $useXyResArr) && in_array($v->assoc_c_index_addr_id, $useXyResArr)){
-                        $rowOut[] = $v;
-                    } 
-                }
+            //return $sqlTmp; //驗證$useXy可以查找到資料並進行過濾
+            $useXyRes = DB::select($sqlTmp);
+                
+            $useXyResArr = array(); //放擴展地理座標後的結果
+            foreach ($useXyRes as $val) {
+                array_push($useXyResArr, $val->c_addr_id);
             }
+            /*20220503修改程式邏輯，
+             *先使用查詢地址的 id 獲得經緯度座標資訊，然後用獲得的經緯度座標正負 0.03 找到更多地址 ID，
+             *之後用這些地址 ID 來作為地址檢索條件（每個地址 ID 之間是 OR 關係）。
+             *useXY 的條件限定會比不使用 useXY 獲得的資訊更多。
+             */
+            //dd($useXyResArr); //檢查$useXyResArr驗證有效
+            $place = $useXyResArr; //擴展地理座標後的結果放回$place
         }
-        else{
-            $rowOut = $row;
-        }
-        return $rowOut;
     }
 
     protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit=2, $decimal=2){

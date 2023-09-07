@@ -141,20 +141,10 @@ class ApiController7 extends Controller
         //如果useXy == 1 將得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
         $this->get_extended_place($row, $useXy, $XY, $place); 
         
-        //過濾地點與時間條件，URL上的人物不受過濾條件限制
-        $row = $this->filter_conditions($row, $user_input_people, $usePeoplePlace, $useXy, $place, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
-
-        if($includeMale == 0) {
-            $row = $row->filter(function($v){
-                return $v->c_female!=0 && $v->assoc_c_female!=0;
-            });
-        }
-
-        if($includeFemale == 0) {
-            $row = $row->filter(function($v){
-                return $v->c_female!=1 && $v->assoc_c_female!=1;
-            });
-        }        
+        //過濾地點、時間、性別條件，在 URL 上的人物不受過濾條件限制
+        $row = $this->filter_conditions($row, $user_input_people, $usePeoplePlace, $useXy, $place,
+        $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd,
+        $includeMale, $includeFemale);
 
         //去除重複的資料清洗，$row 的型態在清洗後之後變成 array
         $new_row = [];
@@ -345,7 +335,8 @@ class ApiController7 extends Controller
     protected function filter_conditions($row, $user_input_people, 
         $usePeoplePlace, $useXy, $place, 
         $indexYear, $indexStartTime, $indexEndTime, 
-        $useDy, $dynStart, $dynEnd){
+        $useDy, $dynStart, $dynEnd,
+        $includeMale, $includeFemale){
 
         $tmp_row =collect();
         if($row->isEmpty()){
@@ -359,27 +350,51 @@ class ApiController7 extends Controller
             else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
             $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
-            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy))){
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy) &&
+            $this->filter_includeMale($includeMale, $v->assoc_c_female) &&
+            $this->filter_includeFemale($includeFemale, $v->assoc_c_female))){
                 $tmp_row->push($v);
             }
 
             else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && 
             $this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
-            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy))){
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy)&&
+            $this->filter_includeMale($includeMale, $v->c_female) &&
+            $this->filter_includeFemale($includeFemale, $v->c_female))){
                 $tmp_row->push($v);
             }
 
             else if($this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
             $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy) &&
+            $this->filter_includeMale($includeMale, $v->c_female) &&
+            $this->filter_includeFemale($includeFemale, $v->c_female)&&
             $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
-            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy)){
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy)&&
+            $this->filter_includeMale($includeMale, $v->assoc_c_female) &&
+            $this->filter_includeFemale($includeFemale, $v->assoc_c_female)){
                 $tmp_row->push($v);
             }
         }
         return $tmp_row;
+    }
+
+    protected function filter_includeMale($includeMale, $c_female){
+        if($includeMale == 0){
+            if($c_female==1) return true;
+            else return false;
+        }
+        return true;      
+    }
+
+    protected function filter_includeFemale($includeFemale, $c_female){
+        if($includeFemale == 0){
+            if($c_female==0) return true;
+            else return false;
+        }
+        return true;
     }
 
     protected function filter_place($usePeoplePlace, $useXy, $place, $index_addr_id){

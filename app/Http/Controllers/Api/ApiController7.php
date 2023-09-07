@@ -135,10 +135,10 @@ class ApiController7 extends Controller
         //資料庫邏輯結束 $row 的型態此時是 collect
         if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
 
-        //得到關係人的資料
+        //找出關係人在 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
         $row = $this->get_assoc_necessary_data($row);  
         
-        //如果useXy == 1 將得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
+        //如果useXy == 1 得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
         $this->get_extended_place($row, $useXy, $XY, $place); 
         
         //過濾地點、時間、性別條件，在 URL 上的人物不受過濾條件限制

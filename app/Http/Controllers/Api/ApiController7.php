@@ -139,20 +139,18 @@ class ApiController7 extends Controller
         $row = $this->get_assoc_necessary_data($row);  
         
         //如果useXy == 1 將得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
-        $this->useXy($row, $useXy, $XY, $place); 
+        $this->get_extended_place($row, $useXy, $XY, $place); 
         
         //過濾時間條件，URL上的人物不受過濾時間條件限制
         $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people);
         
         if($includeMale == 0) {
-            //$row->where('BIOG_MAIN.c_female', '!=', 0);
             $row = $row->filter(function($v){
                 return $v->c_female!=0 && $v->assoc_c_female!=0;
             });
         }
 
         if($includeFemale == 0) {
-            //$row->where('BIOG_MAIN.c_female', '!=', 1);
             $row = $row->filter(function($v){
                 return $v->c_female!=1 && $v->assoc_c_female!=1;
             });
@@ -161,7 +159,7 @@ class ApiController7 extends Controller
         //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
         //URL上的人物不受過濾地點條件限制
         if(($usePeoplePlace || $useXy) &&  $maxNodeDist >= 1) {
-            $row = $this->filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place);
+            $row = $this->filter_place($row, $user_input_people, $place);
         }
         
 
@@ -352,7 +350,7 @@ class ApiController7 extends Controller
 
 
     //過濾地點條件
-    protected function filter_usePeoplePlace_maxNodeDist($row, $user_input_people, $place){
+    protected function filter_place($row, $user_input_people, $place){
         $tmp_row =collect();
         if($row->isEmpty()){
             return $row;
@@ -437,7 +435,7 @@ class ApiController7 extends Controller
 
     
     // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
-    protected function useXy($row, $useXy, $XY, &$place) {
+    protected function get_extended_place($row, $useXy, $XY, &$place) {
         if($useXy && !empty($place)) {    
             $useXyVar = '';
             foreach ($place as $val) {

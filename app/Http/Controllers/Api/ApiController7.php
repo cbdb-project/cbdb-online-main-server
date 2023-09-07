@@ -141,9 +141,9 @@ class ApiController7 extends Controller
         //如果useXy == 1 將得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
         $this->get_extended_place($row, $useXy, $XY, $place); 
         
-        //過濾時間條件，URL上的人物不受過濾時間條件限制
-        $row = $this->useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people);
-        
+        //過濾地點與時間條件，URL上的人物不受過濾條件限制
+        $row = $this->filter_conditions($row, $user_input_people, $usePeoplePlace, $useXy, $place, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd);
+
         if($includeMale == 0) {
             $row = $row->filter(function($v){
                 return $v->c_female!=0 && $v->assoc_c_female!=0;
@@ -154,14 +154,7 @@ class ApiController7 extends Controller
             $row = $row->filter(function($v){
                 return $v->c_female!=1 && $v->assoc_c_female!=1;
             });
-        }
-        
-        //過濾地點條件，如果前面 useXy == 1，這時候的 $place 會是擴展xy軸後的地址id；如果 useXy == 0，則 $place 是 URL上的 $place
-        //URL上的人物不受過濾地點條件限制
-        if(($usePeoplePlace || $useXy) &&  $maxNodeDist >= 1) {
-            $row = $this->filter_place($row, $user_input_people, $place);
-        }
-        
+        }        
 
         //去除重複的資料清洗，$row 的型態在清洗後之後變成 array
         $new_row = [];
@@ -348,92 +341,74 @@ class ApiController7 extends Controller
         return $row;
     }
 
+    //過濾條件
+    protected function filter_conditions($row, $user_input_people, 
+        $usePeoplePlace, $useXy, $place, 
+        $indexYear, $indexStartTime, $indexEndTime, 
+        $useDy, $dynStart, $dynEnd){
 
-    //過濾地點條件
-    protected function filter_place($row, $user_input_people, $place){
         $tmp_row =collect();
         if($row->isEmpty()){
             return $row;
         }
-        foreach($row as $v) {
-            //$tmp_assoc = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
 
-            //只要此人物和關係人都符合 URL 上的 $people ，即放入結果，不論是否符合 $place 
+        foreach($row as $v) {
             if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
                 $tmp_row->push($v);
             }
-            //如果此人物是 URL 上的 $people 之一，關係人不是 URL 上的 $people 之一；但關係人在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
-            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && in_array($v->assoc_c_index_addr_id, $place))){
+            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy))){
                 $tmp_row->push($v);
             }
-            //如果關係人是 URL 上的 $people 之一，此人物不是 URL 上的 $people 之一；但此人物在 Biog_Main 上的 c_index_addr_id 符合 $place ，亦放入結果
-            else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && in_array($v->c_index_addr_id, $place))){
+
+            else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && 
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy))){
                 $tmp_row->push($v);
             }
-            //如果關係人和關係人都不在 $people 中，若雙方在 Biog_Main 上的 c_index_addr_id 都符合 $place ，亦放入結果
-            else if( in_array($v->c_index_addr_id, $place) && in_array($v->assoc_c_index_addr_id, $place)){
+
+            else if($this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy) &&
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy)){
                 $tmp_row->push($v);
             }
         }
         return $tmp_row;
     }
 
-    protected function useDate($row, $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd, $user_input_people) {
-        if($indexYear && $row->isNotEmpty()) {
-            // $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
-            // $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
-            $row = $row->filter(function($v) use($indexStartTime, $indexEndTime, $user_input_people){
-                if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
-                    return $v;
-                }
-                else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
-                $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime)){
-                    return $v;
-                }
-                else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) &&  
-                $v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime)){
-                    return $v;
-                } 
-                else if($v->c_index_year >= $indexStartTime && $v->c_index_year <= $indexEndTime && $v->assoc_c_index_year >= $indexStartTime && $v->assoc_c_index_year <= $indexEndTime){
-                    return $v;
-                }
-            });
+    protected function filter_place($usePeoplePlace, $useXy, $place, $index_addr_id){
+        if($usePeoplePlace || $useXy){
+            return in_array($index_addr_id, $place);
         }
-
-        if($useDy && $row->isNotEmpty()) {
-            // $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
-            // $row->where('DYNASTIES.c_dy', '>=', $dynStart);
-            // $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
-            $row = $row->filter(function ($v) use($dynStart, $dynEnd, $user_input_people) {
-                //以Dynasty.c_sort做為判斷範圍的依據
-                $p_dynasty = Dynasty::where('c_dy', '=', $v->c_dy)->first()->c_sort ?? null;
-                $a_dynasty = Dynasty::where('c_dy', '=', $v->assoc_c_dy)->first()->c_sort ?? null;
-                $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort ?? null;
-                $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort ?? null;
-                
-                if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
-                    return $v;
-                }
-                else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
-                $a_dynasty >= $dynStart_sort && $a_dynasty <= $dynEnd_sort)){
-                    return $v;
-                }
-                else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) &&  
-                $p_dynasty >= $dynStart_sort && $p_dynasty <= $dynEnd_sort)){
-                    return $v;
-                } 
-                else if($p_dynasty >= $dynStart_sort && $p_dynasty <= $dynEnd_sort && 
-                $a_dynasty >= $dynStart_sort && $a_dynasty <= $dynEnd_sort){
-                    return $v;
-                }
-            });
-            
-        }
-
-        return $row;
+        return true;
     }
 
-    
+
+    protected function filter_index_year($indexYear, $indexStartTime, $indexEndTime, $c_index_year){
+        if($indexYear) { 
+            if($c_index_year >= $indexStartTime && $c_index_year <= $indexEndTime) return true;
+            else return false;
+        }
+        return true;
+    }
+
+    protected function filter_dy($useDy, $dynStart, $dynEnd, $c_dy){
+        if($useDy){
+            $dynasty_sort = Dynasty::where('c_dy', '=', $c_dy)->first()->c_sort ?? null;
+            $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort ?? null;
+            $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort ?? null;
+            if($dynasty_sort >= $dynStart_sort && $dynasty_sort <= $dynEnd_sort) return true;
+            else return false;   
+        }
+        return true;
+    }
+
     // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function get_extended_place($row, $useXy, $XY, &$place) {
         if($useXy && !empty($place)) {    
@@ -499,6 +474,4 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
         }
         return round($distance, $decimal);
     }
-
-
 }

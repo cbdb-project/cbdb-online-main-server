@@ -344,9 +344,11 @@ class ApiController7 extends Controller
         }
 
         foreach($row as $v) {
+            //人物與關係人都在URL的people中
             if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
                 $tmp_row->push($v);
             }
+            //人物在URL的people中，關係人符合過濾條件
             else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
             $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
@@ -355,7 +357,7 @@ class ApiController7 extends Controller
             $this->filter_includeFemale($includeFemale, $v->assoc_c_female))){
                 $tmp_row->push($v);
             }
-
+            //關係人在URL的people中，人物符合過濾條件
             else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && 
             $this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
@@ -364,7 +366,7 @@ class ApiController7 extends Controller
             $this->filter_includeFemale($includeFemale, $v->c_female))){
                 $tmp_row->push($v);
             }
-
+            //人物與關係人都不在URL的people中，但都符合過濾條件
             else if($this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
             $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
             $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy) &&

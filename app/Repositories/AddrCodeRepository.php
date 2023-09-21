@@ -9,6 +9,7 @@ namespace App\Repositories;
 use App\AddrCode;
 use App\AddressCode;
 use App\AddrBelong;
+use App\AddrBelongsData;
 use Illuminate\Http\Request;
 /**
  * Class AddrCodeRepository
@@ -50,6 +51,33 @@ class AddrCodeRepository
         $addrcode = AddressCode::find($id);
         $addrcode->update($data);
     }
+    // public function searchAddr(Request $request)
+    // {
+    //     $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
+    //     $data->appends(['q' => $request->q])->links();
+    //     foreach($data as $item){
+    //         $item['id'] = $item->c_addr_id;
+    //         if($item['id'] === 0) $item['id'] = -999;
+    //         $belongs = "";
+    //         //20190115修改,地址查詢的時候希望組出來地址和上層行政單位
+    //         //$item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+    //         $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+    //         $add = "";
+    //         $dy = AddrBelong::where('c_addr_id', $item['id'])->value('c_belongs_to');
+    //         $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+    //         if($dy == null) { 
+    //             $dy = 0; 
+    //             $add = ""; 
+    //         }
+    //         else {
+    //             $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+    //             $add = "[[".$dy." ".$dy2."]]"; 
+    //         }
+    //         $item['text'] = $originalText." ".$add;
+    //     }
+    //     return $data;
+    // }
+
     public function searchAddr(Request $request)
     {
         $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
@@ -58,23 +86,37 @@ class AddrCodeRepository
             $item['id'] = $item->c_addr_id;
             if($item['id'] === 0) $item['id'] = -999;
             $belongs = "";
-            //20190115修改,地址查詢的時候希望組出來地址和上層行政單位
-            //$item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
             $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
-            $add = "";
-            $dy = AddrBelong::where('c_addr_id', $item['id'])->value('c_belongs_to');
-            $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-            if($dy == null) { 
-                $dy = 0; $add = ""; 
+            $add = [];
+            $dy = AddrBelong::where('c_addr_id', '=' ,$item->c_addr_id)->get();
+            if($dy->isEmpty()) { 
+                $add[] = ""; 
             }
             else {
-                $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-                $add = "[[".$dy." ".$dy2."]]"; 
+                foreach($dy as $d){
+                    //找出上一層資料
+                    $dy2 = AddrCode::where('c_addr_id','=',$d->c_belongs_to)->first();
+                    if(!$dy2->empty){
+                        $add_str = "[[".$dy2->c_addr_id." ".$dy2->c_name_chn." ".$dy2->c_firstyear."~".$dy2->c_lastyear."]]";
+                        $add[] = $add_str;
+                    }else{
+                        $add[] = ""; 
+                    }
+                } 
             }
-            $item['text'] = $originalText." ".$add;
+            $item['text'] = trim($originalText." ".$add[0]);
+            if(count($add) > 1){
+                for($i = 1; $i < count($add); $i++){
+                    $append_item = $item->replicate();
+                    $append_item['text'] = trim($originalText." ".$add[$i]);
+                    $data->push($append_item);
+                }
+            }
         }
+       
         return $data;
     }
+
     public function searchOfficeAddr(Request $request)
     {
         $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);

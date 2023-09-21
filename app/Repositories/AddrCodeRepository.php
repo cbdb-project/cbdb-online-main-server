@@ -9,7 +9,6 @@ namespace App\Repositories;
 use App\AddrCode;
 use App\AddressCode;
 use App\AddrBelong;
-use App\AddrBelongsData;
 use Illuminate\Http\Request;
 /**
  * Class AddrCodeRepository

@@ -112,7 +112,10 @@ class AddrCodeRepository
                 }
             }
         }
-       
+        
+        $sortedResult = $data->getCollection()->sortBy('id')->values();
+        $data->setCollection($sortedResult);
+
         return $data;
     }
 

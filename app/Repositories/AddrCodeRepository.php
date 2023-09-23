@@ -108,6 +108,7 @@ class AddrCodeRepository
                 for($i = 1; $i < count($add); $i++){
                     $append_item = $item->replicate();
                     $append_item['text'] = trim($originalText." ".$add[$i]);
+                    $append_item['c_addr_id'] = $item->c_addr_id;
                     $data->push($append_item);
                 }
             }

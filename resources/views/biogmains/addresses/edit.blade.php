@@ -34,6 +34,9 @@
                             <option value="{{ $row->c_addr_id }}" selected="selected">{{ $addr_str }}</option>
                             @endif
                         </select>
+                        @if($other_belongs_str)
+                        其他上層歸屬資訊：{{$other_belongs_str}}
+                        @endif
                     </div>
                 </div>
                 <div class="form-group">

@@ -128,6 +128,7 @@ class BasicInformationAddressesController extends Controller
             ['c_sequence', '=', $addr_l[3]]
         ])->first();
         $addr_str = null;
+        $other_belongs_str =null;
         if($row->c_addr_id || $row->c_addr_id === 0){
             //20210805修改「地址」中利用 ADDRESSES 表和 ADDR_CODES 表
             //$addr_ = AddressCode::find($row->c_addr_id);
@@ -136,30 +137,60 @@ class BasicInformationAddressesController extends Controller
             $belongs = "";
             $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
             $add = "";
-            $dy = AddrBelong::where('c_addr_id', $item->c_addr_id)->value('c_belongs_to');
-            $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-            if($dy == null) {
-                $dy = 0; $add = "";
+            //$dy = AddrBelong::where('c_addr_id', $item->c_addr_id)->value('c_belongs_to');
+            //$dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+            // if($dy == null) {
+            //     $dy = 0; $add = "";
+            // }
+            // else {
+            //     $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
+            //     $add = "[[".$dy." ".$dy2."]]";
+            // }
+            // $addr_str = $originalText." ".$add;
+            //修改結束
+            
+            //20231002賢瑛修改
+            $add = [];    
+            $dy = AddrBelong::where('c_addr_id', '=' ,$item->c_addr_id)->get();
+            if($dy->isEmpty()) { 
+                $add[] = ""; 
             }
             else {
-                $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-                $add = "[[".$dy." ".$dy2."]]";
+                foreach($dy as $d){
+                    //找出上一層資料
+                    $dy2 = AddrCode::where('c_addr_id','=',$d->c_belongs_to)->first();
+                    if(!$dy2->empty){
+                        $add_str = "[[".$dy2->c_addr_id." ".$dy2->c_name_chn." ".$dy2->c_firstyear."~".$dy2->c_lastyear."]]";
+                        $add[] = $add_str;
+                    }else{
+                        $add[] = ""; 
+                    }
+                } 
             }
-            $addr_str = $originalText." ".$add;
-            //修改結束
+            $addr_str = trim($originalText." ".$add[0]);
+           
+            if(count($add) > 1){
+                for($i = 1; $i < count($add); $i++){
+                    if($i>1) {
+                        $other_belongs_str = $other_belongs_str."、".trim($add[$i]);
+                    }
+                    else{
+                        $other_belongs_str = $other_belongs_str.trim($add[$i]);   
+                    }
+                }
+            }    
         }
         $text_str = null;
-//        dd($row->c_source);
+//      dd($row->c_source);
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
         }
 
         return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址',
             'page_url' => '/basicinformation/'.$id.'/addresses',
-            'archer' => "<li><a href='#'>Address</a></li>",
+            'archer' => "<li><a href='#'>Address</a></li>", 'other_belongs_str' => $other_belongs_str
         ]);
     }
 

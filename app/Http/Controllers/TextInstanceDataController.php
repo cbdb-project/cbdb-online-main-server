@@ -68,7 +68,9 @@ class TextInstanceDataController extends Controller
         }
         $data = $request->all();
 //dd($data);
-        if ($data['c_textid'] == null or $data['c_textid'] == 0 or TextInstanceData::where('c_textid', $data['c_textid'])->get()->isEmpty()){
+        #20240226系統允許在 TEXT_INSTANCE_DATA 中還沒有這條記錄的時候，也能直接透過著作版本表創建這本書的第一條 instance 記錄。
+        #if ($data['c_textid'] == null or $data['c_textid'] == 0 or TextInstanceData::where('c_textid', $data['c_textid'])->get()->isEmpty()){
+        if ($data['c_textid'] == null or $data['c_textid'] == 0){
             flash('c_textid 未填或已存在 '.Carbon::now(), 'error');
             return redirect()->back();
         }

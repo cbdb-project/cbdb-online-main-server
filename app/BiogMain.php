@@ -84,7 +84,7 @@ class BiogMain extends Model
 
     public function addresses()
     {
-        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_addr_type', 'c_firstyear', 'c_lastyear', 'c_sequence', 'tts_sysno');
+        return $this->belongsToMany('App\AddressCode', 'BIOG_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_addr_type', 'c_firstyear', 'c_lastyear', 'c_sequence');
     }
 
     public function addresses_type()
@@ -99,12 +99,12 @@ class BiogMain extends Model
 
     public function altnames()
     {
-        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'tts_sysno', 'c_alt_name_type_code', 'c_sequence')->orderBy(DB::raw('ISNULL(c_sequence), c_sequence'), 'ASC');
+        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'c_alt_name_type_code', 'c_sequence')->orderBy(DB::raw('ISNULL(c_sequence), c_sequence'), 'ASC');
     }
 
     public function texts()
     {
-        return $this->belongsToMany('App\TextCode', 'BIOG_TEXT_DATA', 'c_personid', 'c_textid')->withPivot('tts_sysno', 'c_textid', 'c_role_id');
+        return $this->belongsToMany('App\TextCode', 'BIOG_TEXT_DATA', 'c_personid', 'c_textid')->withPivot('c_textid', 'c_role_id');
     }
 
     public function texts_role()
@@ -114,7 +114,7 @@ class BiogMain extends Model
 
     public function offices()
     {
-        return $this->belongsToMany('App\OfficeCode', 'POSTED_TO_OFFICE_DATA', 'c_personid', 'c_office_id')->withPivot('c_sequence', 'c_posting_id', 'c_firstyear', 'c_lastyear', 'tts_sysno')->orderBy('c_sequence');
+        return $this->belongsToMany('App\OfficeCode', 'POSTED_TO_OFFICE_DATA', 'c_personid', 'c_office_id')->withPivot('c_sequence', 'c_posting_id', 'c_firstyear', 'c_lastyear')->orderBy('c_sequence');
     }
 
     public function offices_addr()
@@ -124,22 +124,22 @@ class BiogMain extends Model
 
     public function entries()
     {
-        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'tts_sysno', 'c_kin_code', 'c_kin_id', 'c_assoc_code', 'c_assoc_id', 'c_year', 'c_inst_code', 'c_inst_name_code')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'c_kin_code', 'c_kin_id', 'c_assoc_code', 'c_assoc_id', 'c_year', 'c_inst_code', 'c_inst_name_code')->orderBy('c_sequence');
     }
 
     public function statuses()
     {
-        return $this->belongsToMany('App\StatusCode', 'STATUS_DATA', 'c_personid', 'c_status_code')->withPivot('c_sequence', 'c_lastyear', 'c_firstyear', 'tts_sysno')->orderBy('c_sequence');
+        return $this->belongsToMany('App\StatusCode', 'STATUS_DATA', 'c_personid', 'c_status_code')->withPivot('c_sequence', 'c_lastyear', 'c_firstyear')->orderBy('c_sequence');
     }
 
     public function events()
     {
-        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence', 'tts_sysno')->orderBy('c_sequence');
+        return $this->belongsToMany('App\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
     }
 
     public function kinship()
     {
-        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('tts_sysno', 'c_personid', 'c_kin_id', 'c_kin_code');
+        return $this->belongsToMany('App\KinshipCode', 'KIN_DATA', 'c_personid', 'c_kin_code')->withPivot('c_personid', 'c_kin_id', 'c_kin_code');
     }
 
     public function kinship_name()
@@ -149,7 +149,7 @@ class BiogMain extends Model
 
     public function assoc()
     {
-        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')->withPivot('tts_sysno', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title');
+        return $this->belongsToMany('App\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')->withPivot('c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title');
     }
 
     public function assoc_name()
@@ -165,10 +165,6 @@ class BiogMain extends Model
     public function inst()
     {
         return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year', 'c_inst_code', 'c_inst_name_code');
-        //建安修改20211022
-        //return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year');
-        //建安修改20181113
-        //return $this->belongsToMany('App\BiogInstCode', 'BIOG_INST_DATA', 'c_personid', 'c_bi_role_code')->withPivot('c_bi_begin_year', 'c_bi_end_year', 'tts_sysno');
     }
 
     public function inst_name(){

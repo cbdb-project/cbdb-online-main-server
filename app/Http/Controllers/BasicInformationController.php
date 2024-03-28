@@ -101,7 +101,8 @@ class BasicInformationController extends Controller
             return redirect()->back();
         }
 //        $data['c_personid'] = BiogMain::max('c_personid') + 1;
-        $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
+        #20240328移除tts_sysno
+        #$data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $data = $this->toolRepository->timestamp($data, True);
         //20190531判別是否為眾包用戶
         if (Auth::user()->is_admin == 2) {
@@ -196,9 +197,11 @@ class BasicInformationController extends Controller
         //如果沒有使用toArray(), 需搭配save()儲存, 則會儲存物件本身, 就無法另存.
         $data = BiogMain::find($id)->toArray();
         $new_id = BiogMain::max('c_personid') + 1;
-        $new_ttsid = BiogMain::max('tts_sysno') + 1;
+        #20240328移除tts_sysno
+        #$new_ttsid = BiogMain::max('tts_sysno') + 1;
         $data['c_personid'] = $new_id;
-        $data['tts_sysno'] = $new_ttsid;
+        #20240328移除tts_sysno
+        #$data['tts_sysno'] = $new_ttsid;
         $data = $this->toolRepository->timestamp($data, True); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
         $flight = BiogMain::create($data);

@@ -86,7 +86,7 @@ class BasicInformationEventsController extends Controller
      */
     public function edit($id, $id_)
     {
-        $res = $this->biogMainRepository->eventById($id_);
+        $res = $this->biogMainRepository->eventById($id.'-'.$id_);
         return view('biogmains.events.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件',
             'page_url' => '/basicinformation/'.$id.'/events',
@@ -111,9 +111,9 @@ class BasicInformationEventsController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->eventUpdateById($request, $id, $id_);
+        $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.events.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.events.edit', ['id' => $id, '_id' => $_id]);
     }
 
     /**

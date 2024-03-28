@@ -551,6 +551,7 @@ class BiogMainRepository
 
     public function entryUpdateById(Request $request, $id, $c_personid)
     {
+        #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
@@ -566,7 +567,7 @@ class BiogMainRepository
 
     public function entryStoreById(Request $request, $id)
     {
-        //建安修改20181109
+        #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $data = $request->all();
         $data = array_except($data, ['_token']);
         $data['tts_sysno'] = DB::table('ENTRY_DATA')->max('tts_sysno') + 1;
@@ -589,6 +590,7 @@ class BiogMainRepository
 
     public function entryDeleteById($id, $c_personid)
     {
+        #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
         DB::table('ENTRY_DATA')->where('tts_sysno', $id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ENTRY_DATA', $id, $row);
@@ -651,7 +653,8 @@ class BiogMainRepository
     {
         $data = $request->all();
         $data = array_except($data, ['_token']);
-        $data['tts_sysno'] = DB::table('STATUS_DATA')->max('tts_sysno') + 1;
+        #20240328移除tts_sysno
+        #$data['tts_sysno'] = DB::table('STATUS_DATA')->max('tts_sysno') + 1;
         $data['c_personid'] = $id;
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
@@ -773,8 +776,9 @@ class BiogMainRepository
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
         $data = array_except($data, ['_token', 'c_kinship_pair']);
-        $data['tts_sysno'] = DB::table('KIN_DATA')->max('tts_sysno') + 1;
-        $tts = $data['tts_sysno'];
+        #20240328移除tts_sysno
+        #$data['tts_sysno'] = DB::table('KIN_DATA')->max('tts_sysno') + 1;
+        #$tts = $data['tts_sysno'];
         $data['c_personid'] = $id;
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
@@ -783,7 +787,7 @@ class BiogMainRepository
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
         (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'], $data);
-        $data['tts_sysno'] += 1;
+        #$data['tts_sysno'] += 1;
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $data['c_kin_id'];
         $data['c_kin_id'] = $id;
@@ -949,6 +953,7 @@ class BiogMainRepository
 
     public function socialInstUpdateById(Request $request, $id_, $c_personid)
     {
+        #20240328移除tts_sysno，檢查此函式未被BasicInformationSocialInstController.php使用
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
@@ -981,7 +986,9 @@ class BiogMainRepository
 
     public function eventById($id)
     {
-        $row = DB::table('EVENTS_DATA')->where('tts_sysno', $id)->first();
+        #20240328移除tts_sysno
+        $id_arr = explode("-", $id);
+        $row = DB::table('EVENTS_DATA')->where('c_personid', $id_arr[0])->where('c_sequence', $id_arr[1])->first();
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -1011,8 +1018,10 @@ class BiogMainRepository
         $data = array_except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository)->timestamp($data);
-        DB::table('EVENTS_DATA')->where('tts_sysno',$id_)->update($data);
+        #20240328移除tts_sysno
+        DB::table('EVENTS_DATA')->where('c_personid',$id)->where('c_sequence',$id_)->update($data);
         (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data);
+        return $data['c_sequence'];
     }
 
     public function eventStoreById(Request $request, $id)
@@ -1023,18 +1032,21 @@ class BiogMainRepository
         $data['c_event_record_id'] = DB::table('EVENTS_DATA')->max('c_event_record_id') + 1;
         $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
         $data = array_except($data, ['_token', 'c_addr_id']);
-        $data['tts_sysno'] = DB::table('EVENTS_DATA')->max('tts_sysno') + 1;
+        #20240328移除tts_sysno
+        #$data['tts_sysno'] = DB::table('EVENTS_DATA')->max('tts_sysno') + 1;
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('EVENTS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $data['tts_sysno'], $data);
-        return $data['tts_sysno'];
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $data['c_sequence'], $data);
+        #20240328移除tts_sysno
+        #return $data['tts_sysno'];
+        return $data['c_sequence'];
     }
 
     public function eventDeleteById($id, $c_personid)
     {
-        $row = DB::table('EVENTS_DATA')->where('tts_sysno', $id)->first();
-        DB::table('EVENTS_DATA')->where('tts_sysno', $id)->delete();
+        $row = DB::table('EVENTS_DATA')->where('c_personid',$c_personid)->where('c_sequence',$id)->first();
+        DB::table('EVENTS_DATA')->where('c_personid',$c_personid)->where('c_sequence',$id)->delete();
         DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $id, $row);
     }
@@ -1270,7 +1282,7 @@ class BiogMainRepository
         $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $data['c_personid'] = $id;
         $data = array_except($data, ['_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
-        $data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
+        #$data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
         $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
@@ -1279,7 +1291,7 @@ class BiogMainRepository
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
-        $data['tts_sysno'] += 1;
+        #$data['tts_sysno'] += 1;
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;

@@ -5,7 +5,7 @@
         <div class="panel-heading">事件 Event</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.events.update', [$id, $row->tts_sysno]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.events.update', [$id, $row->c_sequence]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <input type="text" class="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">

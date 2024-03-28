@@ -25,13 +25,13 @@
                         <td>{{ $value->c_event_name_chn }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.events.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->tts_sysno]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.events.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_sequence]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->tts_sysno }}').submit();
+                                               document.getElementById('delete-form-{{ $value->pivot->c_sequence }}').submit();
                                            }else{
                                                return false;
                                            }
@@ -39,7 +39,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->tts_sysno }}" action="{{ route('basicinformation.events.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->tts_sysno]) }}" method="POST" style="display: none;">
+                            <form id="delete-form-{{ $value->pivot->c_sequence }}" action="{{ route('basicinformation.events.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_sequence]) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

@@ -140,7 +140,9 @@ class ApiController extends Controller
 
     public function appttype()
     {
-        return DB::table('APPOINTMENT_TYPE_CODES')->get();
+        #20250321依據Appointment表重構，修改為存取APPOINTMENT_CODES表
+        #return DB::table('APPOINTMENT_TYPE_CODES')->get();
+        return DB::table('APPOINTMENT_CODES')->select(['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc', 'c_appt_desc_chn_alt', 'c_appt_desc_alt'])->get(); 
     }
 
     public function assumeoffice()

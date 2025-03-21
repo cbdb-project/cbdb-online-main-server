@@ -11,8 +11,11 @@ class AppointmentTypeCode extends Model
      *
      * @var string
      */
-    protected $table = 'APPOINTMENT_TYPE_CODES';
-    protected $primaryKey = 'c_appt_type_code';
+    #20250321依據Appointment表重構，修改為存取APPOINTMENT_CODES表
+    #protected $table = 'APPOINTMENT_TYPE_CODES';
+    #protected $primaryKey = 'c_appt_type_code';
+    protected $table = 'APPOINTMENT_CODES';
+    protected $primaryKey = 'c_appt_code';
 
     /**
      * 该模型是否被自动维护时间戳

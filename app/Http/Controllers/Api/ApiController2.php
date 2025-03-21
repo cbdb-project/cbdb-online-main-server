@@ -178,9 +178,13 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
             $data_val['office_xy_count'] = $POSTED_TO_ADDR_DATA; // 數字 職官地址數
             $data_val['PostingID'] = $val->c_appt_type_code; // 數字 除授記錄
             if($val->c_appt_type_code != null) {
-                $c_appt_type_code = DB::table('APPOINTMENT_TYPE_CODES')->where('c_appt_type_code', '=', $val->c_appt_type_code)->first();
-                $c_appt_type_desc = $c_appt_type_code->c_appt_type_desc;
-                $c_appt_type_desc_chn = $c_appt_type_code->c_appt_type_desc_chn;
+                #20250321依據Appointment表重構，修改為存取APPOINTMENT_CODES表
+                #$c_appt_type_code = DB::table('APPOINTMENT_TYPE_CODES')->where('c_appt_type_code', '=', $val->c_appt_type_code)->first();
+                #$c_appt_type_desc = $c_appt_type_code->c_appt_type_desc;
+                #$c_appt_type_desc_chn = $c_appt_type_code->c_appt_type_desc_chn;
+                $c_appt_type_code = DB::table('APPOINTMENT_CODES')->where('c_appt_code', '=', $val->c_appt_type_code)->first();
+                $c_appt_type_desc = $c_appt_type_code->c_appt_desc;
+                $c_appt_type_desc_chn = $c_appt_type_code->c_appt_desc_chn;
             }
             else { $c_appt_type_desc = $c_appt_type_desc_chn = ''; }
             $data_val['ApptType'] = $c_appt_type_desc; // 字符串 除授類型，英文

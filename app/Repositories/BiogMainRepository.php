@@ -1274,7 +1274,8 @@ class BiogMainRepository
         //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
         //$data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
         $data = array_except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
-        $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+        #20250411 ASSOC_DATA 表 c_assoc_year 欄位重構遮除c_assoc_intercalary(原本資料有null)
+        #$data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
@@ -1327,7 +1328,8 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data = array_except($data, ['_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
         #$data['tts_sysno'] = DB::table('ASSOC_DATA')->max('tts_sysno') + 1;
-        $data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
+        #20250411 ASSOC_DATA 表 c_assoc_year 欄位重構遮除c_assoc_intercalary(原本資料有null)
+        #$data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束

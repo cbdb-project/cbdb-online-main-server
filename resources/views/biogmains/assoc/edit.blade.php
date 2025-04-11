@@ -84,42 +84,81 @@ $row->c_notes = unionPKDef($row->c_notes);
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_assoc_year" class="col-sm-2 control-label">社會關係年份</label>
+                    <label for="c_assoc_fy_year" class="col-sm-2 control-label">社會關係始年</label>
                     <div class="col-md-1">
-                        <input type="number" name="c_assoc_year" class="form-control"
-                               value="{{ $row->c_assoc_year }}">
+                        <input type="number" name="c_assoc_first_year" class="form-control"
+                               value="{{ $row->c_assoc_first_year }}">
                     </div>
 
                     <div class="col-md-2 from-inline">
-                        <label for="c_assoc_nh_code">年号</label>
-                        <select-vue name="c_assoc_nh_code" model="nianhao" selected="{{ $row->c_assoc_nh_code }}"></select-vue>
-                        <input type="number" name="c_assoc_nh_year" class="form-control"
-                               value="{{ $row->c_assoc_nh_year }}">
-                        <span for="c_assoc_nh_year">年</span>
+                        <label for="c_assoc_fy_nh_code">年号</label>
+                        <select-vue name="c_assoc_fy_nh_code" model="nianhao" selected="{{ $row->c_assoc_fy_nh_code }}"></select-vue>
+                        <input type="number" name="c_assoc_fy_nh_year" class="form-control"
+                               value="{{ $row->c_assoc_fy_nh_year }}">
+                        <span for="c_assoc_fy_nh_year">年</span>
                     </div>
                     <div class="col-md-3">
                         <label for="">時限</label>
-                        <select-vue name="c_assoc_range" model="range" selected="{{ $row->c_assoc_range }}"></select-vue>
+                        <select-vue name="c_assoc_fy_range" model="range" selected="{{ $row->c_assoc_fy_range }}"></select-vue>
                     </div>
                     <div class="col-md-2">
                         <label for="">閏</label>
-                        <select name="c_assoc_intercalary" class="form-control select2">
+                        <select name="c_assoc_fy_intercalary" class="form-control select2">
                             <option disabled value="">请选择</option>
-                            <option value="0" {{ $row->c_assoc_intercalary == 0? 'selected': '' }}>0-否
+                            <option value="0" {{ $row->c_assoc_fy_intercalary == 0? 'selected': '' }}>0-否
                             </option>
-                            <option value="1" {{ $row->c_assoc_intercalary == 1? 'selected': '' }}>1-是
+                            <option value="1" {{ $row->c_assoc_fy_intercalary == 1? 'selected': '' }}>1-是
                             </option>
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="number" name="c_assoc_month" class="form-control"
-                               value="{{ $row->c_assoc_month }}">
+                        <input type="number" name="c_assoc_fy_month" class="form-control"
+                               value="{{ $row->c_assoc_fy_month }}">
                         <span for="">月</span>
-                        <input type="number" name="c_assoc_day" class="form-control"
-                               value="{{ $row->c_assoc_day }}">
+                        <input type="number" name="c_assoc_fy_day" class="form-control"
+                               value="{{ $row->c_assoc_fy_day }}">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
-                        <select-vue name="c_assoc_day_gz" model="ganzhi" selected="{{ $row->c_assoc_day_gz }}"></select-vue>
+                        <select-vue name="c_assoc_fy_day_gz" model="ganzhi" selected="{{ $row->c_assoc_fy_day_gz }}"></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_assoc_ly_year" class="col-sm-2 control-label">社會關係終年</label>
+                    <div class="col-md-1">
+                        <input type="number" name="c_assoc_last_year" class="form-control"
+                               value="{{ $row->c_assoc_last_year }}">
+                    </div>
+
+                    <div class="col-md-2 from-inline">
+                        <label for="c_assoc_ly_nh_code">年号</label>
+                        <select-vue name="c_assoc_ly_nh_code" model="nianhao" selected="{{ $row->c_assoc_ly_nh_code }}"></select-vue>
+                        <input type="number" name="c_assoc_ly_nh_year" class="form-control"
+                               value="{{ $row->c_assoc_ly_nh_year }}">
+                        <span for="c_assoc_ly_nh_year">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="">時限</label>
+                        <select-vue name="c_assoc_ly_range" model="range" selected="{{ $row->c_assoc_ly_range }}"></select-vue>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="">閏</label>
+                        <select name="c_assoc_ly_intercalary" class="form-control select2">
+                            <option disabled value="">请选择</option>
+                            <option value="0" {{ $row->c_assoc_ly_intercalary == 0? 'selected': '' }}>0-否
+                            </option>
+                            <option value="1" {{ $row->c_assoc_ly_intercalary == 1? 'selected': '' }}>1-是
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <input type="number" name="c_assoc_ly_month" class="form-control"
+                               value="{{ $row->c_assoc_ly_month }}">
+                        <span for="">月</span>
+                        <input type="number" name="c_assoc_ly_day" class="form-control"
+                               value="{{ $row->c_assoc_ly_day }}">
+                        <span for="">日</span>
+                        <label for="">日(干支) </label>
+                        <select-vue name="c_assoc_ly_day_gz" model="ganzhi" selected="{{ $row->c_assoc_ly_day_gz }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

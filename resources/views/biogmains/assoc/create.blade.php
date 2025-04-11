@@ -65,26 +65,26 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_assoc_year" class="col-sm-2 control-label">社會關係年份</label>
+                    <label for="c_assoc_fy_year" class="col-sm-2 control-label">社會關係始年</label>
                     <div class="col-md-1">
-                        <input type="number" name="c_assoc_year" class="form-control"
+                        <input type="number" name="c_assoc_first_year" class="form-control"
                                value="">
                     </div>
 
                     <div class="col-md-2 from-inline">
-                        <label for="c_assoc_nh_code">年号</label>
-                        <select-vue name="c_assoc_nh_code" model="nianhao" selected=""></select-vue>
-                        <input type="number" name="c_assoc_nh_year" class="form-control"
+                        <label for="c_assoc_fy_nh_code">年号</label>
+                        <select-vue name="c_assoc_fy_nh_code" model="nianhao" selected=""></select-vue>
+                        <input type="number" name="c_assoc_fy_nh_year" class="form-control"
                                value="">
-                        <span for="c_assoc_nh_year">年</span>
+                        <span for="c_assoc_fy_nh_year">年</span>
                     </div>
                     <div class="col-md-3">
                         <label for="">時限</label>
-                        <select-vue name="c_assoc_range" model="range" selected=""></select-vue>
+                        <select-vue name="c_assoc_fy_range" model="range" selected=""></select-vue>
                     </div>
                     <div class="col-md-2">
                         <label for="">閏</label>
-                        <select name="c_assoc_intercalary" class="form-control select2">
+                        <select name="c_assoc_fy_intercalary" class="form-control select2">
                             <option disabled value="">请选择</option>
                             <option value="0">0-否
                             </option>
@@ -93,14 +93,53 @@
                         </select>
                     </div>
                     <div class="col-sm-2">
-                        <input type="number" name="c_assoc_month" class="form-control"
+                        <input type="number" name="c_assoc_fy_month" class="form-control"
                                value="">
                         <span for="">月</span>
-                        <input type="number" name="c_assoc_day" class="form-control"
+                        <input type="number" name="c_assoc_fy_day" class="form-control"
                                value="">
                         <span for="">日</span>
                         <label for="">日(干支) </label>
-                        <select-vue name="c_assoc_day_gz" model="ganzhi" selected=""></select-vue>
+                        <select-vue name="c_assoc_fy_day_gz" model="ganzhi" selected=""></select-vue>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="c_assoc_ly_year" class="col-sm-2 control-label">社會關係終年</label>
+                    <div class="col-md-1">
+                        <input type="number" name="c_assoc_last_year" class="form-control"
+                               value="">
+                    </div>
+
+                    <div class="col-md-2 from-inline">
+                        <label for="c_assoc_ly_nh_code">年号</label>
+                        <select-vue name="c_assoc_ly_nh_code" model="nianhao" selected=""></select-vue>
+                        <input type="number" name="c_assoc_ly_nh_year" class="form-control"
+                               value="">
+                        <span for="c_assoc_ly_nh_year">年</span>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="">時限</label>
+                        <select-vue name="c_assoc_ly_range" model="range" selected=""></select-vue>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="">閏</label>
+                        <select name="c_assoc_ly_intercalary" class="form-control select2">
+                            <option disabled value="">请选择</option>
+                            <option value="0">0-否
+                            </option>
+                            <option value="1">1-是
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <input type="number" name="c_assoc_ly_month" class="form-control"
+                               value="">
+                        <span for="">月</span>
+                        <input type="number" name="c_assoc_ly_day" class="form-control"
+                               value="">
+                        <span for="">日</span>
+                        <label for="">日(干支) </label>
+                        <select-vue name="c_assoc_ly_day_gz" model="ganzhi" selected=""></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

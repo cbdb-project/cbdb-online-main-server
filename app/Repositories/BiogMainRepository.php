@@ -1333,6 +1333,10 @@ class BiogMainRepository
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
+        #20250417「社會關係始年」缺省值製作，若「社會關係始年」為空，則自動填充為-9999。
+        if($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
+            $data['c_assoc_first_year'] = '-9999';
+        }
         $data = (new ToolsRepository)->timestamp($data, True);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;

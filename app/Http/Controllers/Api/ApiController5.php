@@ -299,7 +299,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
         else { $list = 10000; }
 
         //資料庫邏輯
-        $row = DB::table('ASSOC_CODE_TYPE_REL')->where('ASSOC_CODE_TYPE_REL.c_assoc_type_id', 'like', $aType.'%');
+        $row = DB::table('ASSOC_CODE_TYPE_REL')->where('ASSOC_CODE_TYPE_REL.c_assoc_type_code', 'like', $aType.'%');
         $row->join('ASSOC_CODES', 'ASSOC_CODES.c_assoc_code', '=', 'ASSOC_CODE_TYPE_REL.c_assoc_code');
         $row = $row->get();
         //資料庫邏輯結束

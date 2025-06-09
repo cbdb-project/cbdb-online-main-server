@@ -21,7 +21,7 @@ class AppointCodeRepository{
         if (!$request->q){
             return AppointmentTypeCode::paginate($num);
         }
-        $names = AppointmentTypeCode::where('c_appt_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_desc', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_code', $request->q)->paginate($num);
+        $names = AppointmentTypeCode::where('c_appt_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_desc', 'like', '%'.$request->q.'%')->orWhere('c_appt_code', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
     }

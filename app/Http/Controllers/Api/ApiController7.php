@@ -87,19 +87,19 @@ class ApiController7 extends Controller
         #dd($c_assoc_type_parent_id_sum);
         if(!empty($c_assoc_type_parent_id_sum)) {
             foreach ($first_row as $val) {
-                $assocType_row[] = $val->c_assoc_type_id;
+                $assocType_row[] = $val->c_assoc_type_code;
             }
         }
         else{
-            $first_row = DB::table('ASSOC_TYPES')->whereIn('ASSOC_TYPES.c_assoc_type_id', $assocType)->get();
+            $first_row = DB::table('ASSOC_TYPES')->whereIn('ASSOC_TYPES.c_assoc_type_code', $assocType)->get();
             foreach ($first_row as $val) {
-                $assocType_row[] = $val->c_assoc_type_id;
+                $assocType_row[] = $val->c_assoc_type_code;
             }
         }
         //dd($assocType_row);
         //20241028增補結束
 
-        $second_row = DB::table('ASSOC_CODE_TYPE_REL')->whereIn('ASSOC_CODE_TYPE_REL.c_assoc_type_id', $assocType_row)->get();
+        $second_row = DB::table('ASSOC_CODE_TYPE_REL')->whereIn('ASSOC_CODE_TYPE_REL.c_assoc_type_code', $assocType_row)->get();
         foreach ($second_row as $val) {
             $c_assoc_code_row[] = $val->c_assoc_code;
         }

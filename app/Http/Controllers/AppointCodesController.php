@@ -88,7 +88,7 @@ class AppointCodesController extends Controller
         $this->appcoderepository->updateById($request, $id);
         flash('Update success @ '.Carbon::now(), 'success');
         //建安修改20181115，使用更新後的id來跳轉。
-        $id = $request['c_appt_type_code'];
+        $id = $request['c_appt_code'];
         return redirect()->route('appointcodes.edit', $id);
     }
 

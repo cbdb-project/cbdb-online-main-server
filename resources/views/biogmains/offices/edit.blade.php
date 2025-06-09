@@ -162,9 +162,9 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_appt_type_code" class="col-sm-2 control-label">除授類別(c_appt_type_code)</label>
+                    <label for="c_appt_code" class="col-sm-2 control-label">除授類別(c_appt_code)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_appt_type_code" model="appttype" selected="{{ $row->c_appt_type_code }}"></select-vue>
+                        <select-vue name="c_appt_code" model="appttype" selected="{{ $row->c_appt_code }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group">

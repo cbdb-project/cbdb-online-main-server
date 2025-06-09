@@ -126,7 +126,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
 
         foreach ($row as $val) {
             $BiogMain = $BiogAddr = $BiogAddrCode = $AddrCode = $AddrCode_office = $office = $POSTED_TO_ADDR_DATA = $c_addr_type = $c_addr_id = 0;
-            $c_appt_type_code = 0;
+            $c_appt_code = 0;
             $BiogMain = BiogMain::where('c_personid', '=', $val->c_personid)->first();
             $data_val['PersonID'] = $val->c_personid;
             $data_val['Name'] = $BiogMain->c_name;
@@ -176,15 +176,15 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
                 $POSTED_TO_ADDR_DATA = DB::table('POSTED_TO_ADDR_DATA')->where('c_addr_id', '=', $c_addr_id)->count('c_personid');
             }
             $data_val['office_xy_count'] = $POSTED_TO_ADDR_DATA; // 數字 職官地址數
-            $data_val['PostingID'] = $val->c_appt_type_code; // 數字 除授記錄
-            if($val->c_appt_type_code != null) {
+            $data_val['PostingID'] = $val->c_appt_code; // 數字 除授記錄
+            if($val->c_appt_code != null) {
                 #20250321依據Appointment表重構，修改為存取APPOINTMENT_CODES表
                 #$c_appt_type_code = DB::table('APPOINTMENT_TYPE_CODES')->where('c_appt_type_code', '=', $val->c_appt_type_code)->first();
                 #$c_appt_type_desc = $c_appt_type_code->c_appt_type_desc;
                 #$c_appt_type_desc_chn = $c_appt_type_code->c_appt_type_desc_chn;
-                $c_appt_type_code = DB::table('APPOINTMENT_CODES')->where('c_appt_code', '=', $val->c_appt_type_code)->first();
-                $c_appt_type_desc = $c_appt_type_code->c_appt_desc;
-                $c_appt_type_desc_chn = $c_appt_type_code->c_appt_desc_chn;
+                $c_appt_code = DB::table('APPOINTMENT_CODES')->where('c_appt_code', '=', $val->c_appt_code)->first();
+                $c_appt_type_desc = $c_appt_code->c_appt_desc;
+                $c_appt_type_desc_chn = $c_appt_code->c_appt_desc_chn;
             }
             else { $c_appt_type_desc = $c_appt_type_desc_chn = ''; }
             $data_val['ApptType'] = $c_appt_type_desc; // 字符串 除授類型，英文

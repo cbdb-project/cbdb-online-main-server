@@ -52,7 +52,12 @@ class OperationRepository
     public function getArrDiff($arr1, $arr2, $arr3)
     {
         //進行陣列雜訊的濾除
-        if(!is_array($arr1) || !is_array($arr2) || !is_array($arr3)) { return ""; }
+        //if(!is_array($arr1) || !is_array($arr2) || !is_array($arr3)) { return ""; }
+	//20251001Compare 功能有時無法顯示修改內容修改
+	if(!is_array($arr1)) return "";  // arr1 必須有修改後資料才 diff
+	$arr2 = is_array($arr2) ? $arr2 : [];
+	$arr3 = is_array($arr3) ? $arr3 : [];
+
         $NewArr1ture = array();
         $NewArr2ture = array();
         $NewArr3ture = array();

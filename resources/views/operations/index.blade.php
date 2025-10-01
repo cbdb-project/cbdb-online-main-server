@@ -91,7 +91,7 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ empty($record->resource_original) ? 'disabled' : '' }}>
+                                    {{ empty($item->resource_original) ? 'disabled' : '' }}>
                                     compare
                                 </button>
                             </td>
@@ -107,7 +107,7 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                             <div class="modal-content">
                               <div class="modal-header">
                                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">resource_data</h4>
+              e                 <h4 class="modal-title">resource_data</h4>
                               </div>
                               <div class="modal-body" style="word-break: break-all;">
                                 <textarea rows="16" cols="90">{{ $item->resource_data }}</textarea>

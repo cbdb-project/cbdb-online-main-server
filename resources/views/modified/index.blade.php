@@ -96,7 +96,7 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ empty($record->resource_original) ? 'disabled' : '' }}>
+                                    {{ empty($item->resource_original) ? 'disabled' : '' }}>
                                     compare
                                 </button>
                             </td>

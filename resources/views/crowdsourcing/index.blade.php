@@ -30,7 +30,10 @@
                             <td>{{ $item->resource }}</td>
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
-                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}">compare</button>
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
+                                    {{ empty($record->resource_original) ? 'disabled' : '' }}>
+                                    compare
+                                </button>                                
                             </td>
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>

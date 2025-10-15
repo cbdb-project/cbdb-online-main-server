@@ -426,8 +426,10 @@ class BiogMainRepository
         //$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
+        //20251214新增差異比對紀錄
+        $ori = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data, $ori);
         return $data['c_office_id']."-".$_postingid;
     }
 

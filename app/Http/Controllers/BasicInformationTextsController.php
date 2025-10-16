@@ -139,6 +139,14 @@ class BasicInformationTextsController extends Controller
         $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         $temp_l = explode("-", $id_);
+
+        //20251214新增差異比對紀錄
+        $ori = DB::table($this->table_name)->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+            ['c_role_id', '=', $temp_l[2]],
+        ])->first();
+
         DB::table($this->table_name)->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -146,7 +154,7 @@ class BasicInformationTextsController extends Controller
         ])->update($data);
         $data['c_personid'] = $temp_l[0];
         $new_id_ = $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'];
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data);
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $new_id_]);
     }

@@ -223,6 +223,15 @@ class BasicInformationAddressesController extends Controller
         foreach($addr_l as $key => $value) {
             $addr_l[$key] = str_replace("minus","-",$value);
         }
+
+        //20251213新增差異比對紀錄
+        $ori = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_addr_id', '=', $addr_l[1]],
+            ['c_addr_type', '=', $addr_l[2]],
+            ['c_sequence', '=', $addr_l[3]]
+        ])->first();
+
         DB::table('BIOG_ADDR_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_addr_id', '=', $addr_l[1]],
@@ -231,7 +240,7 @@ class BasicInformationAddressesController extends Controller
         ])->update($data);
         $data['c_personid'] = $addr_l[0];
         $new_addr = $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $new_addr]);
     }
@@ -270,6 +279,7 @@ class BasicInformationAddressesController extends Controller
             ['c_addr_type', '=', $addr_l[2]],
             ['c_sequence', '=', $addr_l[3]]
         ])->delete();
+
         $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.addresses.index', ['id' => $id]);

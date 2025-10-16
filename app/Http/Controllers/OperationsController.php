@@ -9,6 +9,8 @@ use App\OfficeCodeTypeRel;
 use App\OfficeTypeTree;
 use App\Repositories\OperationRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class OperationsController extends Controller
 {
@@ -54,6 +56,48 @@ class OperationsController extends Controller
                         if(count(OfficeTypeTree::find($resource_id))) {
                             $arr3 = OfficeTypeTree::find($resource_id)->toArray();
                         }
+                        break;
+                    //20251213新增差異比對紀錄
+                    case "BIOG_ADDR_DATA":
+                        $addr_l = explode("-", $resource_id);
+                        $arr3 = DB::table('BIOG_ADDR_DATA')->where([
+                            ['c_personid', '=', $addr_l[0]],
+                            ['c_addr_id', '=', $addr_l[1]],
+                            ['c_addr_type', '=', $addr_l[2]],
+                            ['c_sequence', '=', $addr_l[3]]
+                        ])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+                        break;
+                    case "ALTNAME_DATA":
+                        $addr_l = explode("-", $resource_id);
+                        $arr3 = DB::table('ALTNAME_DATA')->where([
+                            ['c_personid', '=', $addr_l[0]],
+                            ['c_sequence', '=', $addr_l[1]],
+                            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+                            ['c_alt_name_type_code', '=', $addr_l[3]],
+                        ])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+                        break;
+                    //20251214新增差異比對紀錄
+                    case "BIOG_TEXT_DATA":
+                        $temp_l = explode("-", $resource_id);
+                        $arr3 = DB::table('BIOG_TEXT_DATA')->where([
+                            ['c_personid', '=', $temp_l[0]],
+                            ['c_textid', '=', $temp_l[1]],
+                            ['c_role_id', '=', $temp_l[2]],
+                        ])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+                        break;
+                    case "POSTED_TO_OFFICE_DATA":
+                        $temp_l = explode("-", $resource_id);
+                        $_officeid = $temp_l[0];
+                        $_postingid = $temp_l[1];
+                        $arr3 = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
                         break;
                     default:
                         $arr3 = array();

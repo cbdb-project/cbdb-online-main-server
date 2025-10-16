@@ -167,6 +167,15 @@ class BasicInformationAltnamesController extends Controller
             $addr_l[$key] = str_replace("minus","-",$value);
         }
         if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+
+        //20251213新增差異比對紀錄
+        $ori = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
+        ])->first();
+
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_sequence', '=', $addr_l[1]],
@@ -175,7 +184,7 @@ class BasicInformationAltnamesController extends Controller
         ])->update($data);
         if($data['c_sequence'] == NULL) { $data['c_sequence'] = 'NULL'; }
         $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $new_alt = $this->biogMainRepository->unionPKDef($new_alt);

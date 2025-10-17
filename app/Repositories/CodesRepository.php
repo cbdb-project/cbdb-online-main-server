@@ -19,8 +19,11 @@ class CodesRepository
         $tables = DB::select('SHOW TABLES');
         foreach($tables as $table)
         {
-            if(str_contains($table->Tables_in_cbdb_data,'_CODES') or str_contains($table->Tables_in_cbdb_data,'_codes')) {
-                array_push($res, $table->Tables_in_cbdb_data);
+            $tableName = array_values((array)$table)[0];
+	    // Only include application code tables that follow the uppercase '_CODES' convention;
+	    // exclude system tables such as 'oauth_auth_codes'.
+            if(str_contains($tableName,'_CODES')) {
+                array_push($res, $tableName);
             }
 
         }

@@ -11,7 +11,9 @@ class AddressCode extends Model
      *
      * @var string
      */
-    protected $table = 'ADDRESSES';
+    //20251017修改將ADDRESSES全部取代為ADDR_CODES
+    //protected $table = 'ADDRESSES';
+    protected $table = 'ADDR_CODES';
     protected $primaryKey = 'c_addr_id';
 
     /**

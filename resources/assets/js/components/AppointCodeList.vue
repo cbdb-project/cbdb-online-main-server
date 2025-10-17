@@ -15,20 +15,20 @@
             <caption>共查询到{{names.total}}条记录</caption>
             <thead>
             <tr>
-                <th>c_appt_type_code</th>
-                <th>c_appt_type_desc_chn</th>
-                <th>c_appt_type_desc</th>
+                <th>c_appt_code</th>
+                <th>c_appt_desc_chn</th>
+                <th>c_appt_desc</th>
                 <th>操作</th>
             </tr>
             </thead>
             <tbody>
             <tr v-for="item in names.data">
-                <td>{{item.c_appt_type_code}}</td>
-                <td>{{item.c_appt_type_desc_chn}}</td>
-                <td>{{item.c_appt_type_desc}}</td>
+                <td>{{item.c_appt_code}}</td>
+                <td>{{item.c_appt_desc_chn}}</td>
+                <td>{{item.c_appt_desc}}</td>
                 <td>
                     <div class="btn-group">
-                        <a type="button" class="btn btn-sm btn-info" :href="'/appointcodes/'+item.c_appt_type_code+'/edit'">edit</a>
+                        <a type="button" class="btn btn-sm btn-info" :href="'/appointcodes/'+item.c_appt_code+'/edit'">edit</a>
 
                     </div>
                 </td>

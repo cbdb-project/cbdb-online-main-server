@@ -1,4 +1,12 @@
 {
     "/js/app.js": "/js/app.js",
-    "/css/app.css": "/css/app.css"
+    "/css/app.css": "/css/app.css",
+    "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.eot?5be1347c682810f199c7f486f40c5974": "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.eot?5be1347c682810f199c7f486f40c5974",
+    "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.woff2?be810be3a3e14c682a257d6eff341fe4": "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.woff2?be810be3a3e14c682a257d6eff341fe4",
+    "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.woff?82b1212e45a2bc35dd731913b27ad813": "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.woff?82b1212e45a2bc35dd731913b27ad813",
+    "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.ttf?4692b9ec53fd5972caa2f2372ae20d16": "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.ttf?4692b9ec53fd5972caa2f2372ae20d16",
+    "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.svg?060b2710bdbbe3dfe48b58d59bd5f1fb": "/fonts/vendor/AdminLTE/bootstrap/glyphicons-halflings-regular.svg?060b2710bdbbe3dfe48b58d59bd5f1fb",
+    "/images/vendor/AdminLTE/dist/boxed-bg.jpg?0de93c39950fc78a1f792e154d9e7df5": "/images/vendor/AdminLTE/dist/boxed-bg.jpg?0de93c39950fc78a1f792e154d9e7df5",
+    "/images/vendor/AdminLTE/plugins/iCheck/square/blue.png?47dfe954bc521a5356050b61b12c0cd0": "/images/vendor/AdminLTE/plugins/iCheck/square/blue.png?47dfe954bc521a5356050b61b12c0cd0",
+    "/images/vendor/AdminLTE/plugins/iCheck/square/blue@2x.png?eb5592d094a6555c844bc1ba04c7259e": "/images/vendor/AdminLTE/plugins/iCheck/square/blue@2x.png?eb5592d094a6555c844bc1ba04c7259e"
 }

@@ -88,63 +88,63 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
 /edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
                             </td>
                             <td>{{ $item->resource }}</td>
+                            @php
+                                $diffSource = $item->resource_diff ?? $item->resource_original;
+                                $diffRows = is_array($diffSource) ? ($diffSource['rows'] ?? []) : [];
+                                $hasDiffContent = !empty($diffRows) || (is_string($diffSource) && trim($diffSource) !== '');
+                                $resourceDataParsed = json_decode($item->resource_data, true);
+                                if (!is_array($resourceDataParsed)) {
+                                    $resourceDataParsed = is_string($item->resource_data) ? trim($item->resource_data) : $item->resource_data;
+                                }
+                            @endphp
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ empty($item->resource_original) ? 'disabled' : '' }}>
+                                    {{ $hasDiffContent ? '' : 'disabled' }}>
                                     compare
                                 </button>
+
+                                <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                        <h4 class="modal-title">resource_data</h4>
+                                      </div>
+                                      <div class="modal-body" style="word-break: break-all;">
+                                        @include('components.key-value-table', ['data' => $resourceDataParsed])
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog">
+                                  <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                        <h4 class="modal-title">compare</h4>
+                                      </div>
+                                      <div class="modal-body" style="word-break: break-all;">
+                                        <div>
+                                        @include('components.diff-table', ['diff' => $diffSource])
+                                        </div>
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                             </td>
                             <td>{{ $item->resource_id }}</td>
                             <td>{{ $item->op_type }}</td>
                             <td>{{ $item->user->name }}</td>
                             <td>{{ $item->updated_at }}</td>
                         </tr>
-                        <!--Start-->
-                        <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
-                          <div class="modal-dialog">
-                            <!-- Modal content-->
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-              e                 <h4 class="modal-title">resource_data</h4>
-                              </div>
-                              <div class="modal-body" style="word-break: break-all;">
-                                <textarea rows="16" cols="90">{{ $item->resource_data }}</textarea>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <!--End-->
-                        <!--Start-->
-                        <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog">
-                          <div class="modal-dialog">
-                            <!-- Modal content-->
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                <h4 class="modal-title">compare</h4>
-                              </div>
-                              <div class="modal-body" style="word-break: break-all;">
-                                <div>
-                                @if (!empty($item->resource_original))
-                                    欄位比對的結果：<br/>
-                                    {!! $item->resource_original !!}
-                                @else
-                                    沒有比對紀錄
-                                @endif
-                                </div>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <!--End-->
                     @endforeach
                 </tbody>
 

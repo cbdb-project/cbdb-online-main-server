@@ -111,8 +111,9 @@ class OperationsController extends Controller
                 $arr1 = json_decode($arr1, true);
                 $arr2 = json_decode($arr2, true);
                 $ans = $this->operationRepository->getArrDiff($arr1, $arr2, $arr3);
-                //將比對後的結果存回至resource_original欄位
-                $lists[$x]['resource_original'] = $ans;
+                $lists[$x]->setAttribute('resource_diff', $ans);
+            } else {
+                $lists[$x]->setAttribute('resource_diff', null);
             }
         }
         //echo "<pre><code>";

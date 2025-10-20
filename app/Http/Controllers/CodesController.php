@@ -34,21 +34,40 @@ class CodesController extends Controller
 
     public function show($table_name)
     {
-        try{
-//            $data = DB::table($table_name)->paginate(1000);
-            $data = DB::table($table_name)->get();
-            $thead = array();
-            $count = 0;
-            foreach($data[0] as $key => $value){
-                if ($count >2){
-//                    break;
+        try {
+            $perPage = config('codes.per_page', 20);
+            $query = DB::table($table_name);
+            $data = $query->paginate($perPage);
+
+            $firstRow = $data->first();
+            $thead = [];
+            if ($firstRow) {
+                $count = 0;
+                foreach ($firstRow as $key => $value) {
+                    if ($count > 2) {
+                        break;
+                    }
+
+                    if (
+                        str_contains($key, 'name') ||
+                        str_contains($key, 'desc') ||
+                        str_contains($key, 'code') ||
+                        str_contains($key, 'id') ||
+                        str_contains($key, 'sequence') ||
+                        str_contains($key, 'chn') ||
+                        str_contains($key, 'dy')
+                    ) {
+                        $thead[] = $key;
+                        $count++;
+                    }
                 }
-                if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy')){
-                    array_push($thead, $key);
-                    $count++;
+
+                if (empty($thead)) {
+                    $thead = array_keys((array) $firstRow);
                 }
+            } else {
+                $thead = Schema::getColumnListing($table_name);
             }
-//                dd($data);
             return view('codes.show', [
                 'page_title' => 'Codes',
                 'page_description' => $table_name,
@@ -56,7 +75,8 @@ class CodesController extends Controller
                 'archer' => "<li class='active'>".$table_name."</li>",
                 'q' => $table_name,
                 'thead' => $thead,
-                'data' => $data]);
+                'data' => $data,
+            ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
             return redirect()->back();

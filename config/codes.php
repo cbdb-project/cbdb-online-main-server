@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'connection' => env('CBDB_CONNECTION'),
+    'database' => env('CBDB_DATABASE'),
     'per_page' => env('CODES_PER_PAGE', 20),
     'tables' => [
         'ADDR_CODES',

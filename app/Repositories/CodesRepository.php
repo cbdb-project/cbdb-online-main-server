@@ -49,9 +49,30 @@ class CodesRepository
         }
 
         try {
-            $tables = \Illuminate\Support\Facades\DB::select('SHOW TABLES');
+            $defaultConnection = config('database.default');
+            $connectionName = config('codes.connection') ?: $defaultConnection;
+            $connection = \Illuminate\Support\Facades\DB::connection($connectionName);
+
+            $tables = $connection->select('SHOW TABLES');
+            $databaseName = config('codes.database');
+            if (empty($databaseName)) {
+                $databaseName = config("database.connections.{$connectionName}.database");
+            }
+            if (empty($databaseName)) {
+                $databaseName = $connection->getDatabaseName();
+            }
+            $columnName = $databaseName ? "Tables_in_{$databaseName}" : null;
+
             foreach ($tables as $row) {
-                $actual = array_values((array) $row)[0];
+                $rowArray = (array) $row;
+                if ($columnName && isset($rowArray[$columnName])) {
+                    $actual = $rowArray[$columnName];
+                } else {
+                    $actual = array_values($rowArray)[0] ?? null;
+                }
+                if (!$actual) {
+                    continue;
+                }
                 $upper = strtoupper($actual);
                 if (isset($map[$upper])) {
                     $map[$upper] = $actual;

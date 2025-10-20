@@ -50,10 +50,10 @@ class CodesController extends Controller
             }
 //                dd($data);
             return view('codes.show', [
-                'page_title' => $table_name,
+                'page_title' => 'Codes',
                 'page_description' => $table_name,
                 'page_url' => '/codes',
-                'archer' => "<li><a href=''>".$table_name."</a></li>",
+                'archer' => "<li class='active'>".$table_name."</li>",
                 'q' => $table_name,
                 'thead' => $thead,
                 'data' => $data]);

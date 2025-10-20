@@ -9,24 +9,63 @@
 namespace App\Repositories;
 
 
-use Illuminate\Support\Facades\DB;
-
 class CodesRepository
 {
+    /**
+     * Get the list of allowed code tables.
+     *
+     * @return array
+     */
+    public function allowedTables(): array
+    {
+        $configTables = config('codes.tables', []);
+        if (!empty($configTables)) {
+            return array_values(array_unique($configTables));
+        }
+
+        $envTables = env('CODES_TABLES');
+        if (!empty($envTables)) {
+            return array_values(array_unique(array_filter(array_map('trim', explode(',', $envTables)))));
+        }
+
+        return [];
+    }
+
+    /**
+     * Return mapping of uppercase table name to actual table name in database.
+     *
+     * @return array<string,string>
+     */
+    public function allowedTableMap(): array
+    {
+        $allowed = $this->allowedTables();
+        if (empty($allowed)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($allowed as $table) {
+            $map[strtoupper($table)] = $table;
+        }
+
+        try {
+            $tables = \Illuminate\Support\Facades\DB::select('SHOW TABLES');
+            foreach ($tables as $row) {
+                $actual = array_values((array) $row)[0];
+                $upper = strtoupper($actual);
+                if (isset($map[$upper])) {
+                    $map[$upper] = $actual;
+                }
+            }
+        } catch (\Exception $e) {
+            // Ignore DB errors; fallback to configured casing.
+        }
+
+        return $map;
+    }
+
     public function codes()
     {
-        $res = array();
-        $tables = DB::select('SHOW TABLES');
-        foreach($tables as $table)
-        {
-            $tableName = array_values((array)$table)[0];
-	    // Only include application code tables that follow the uppercase '_CODES' convention;
-	    // exclude system tables such as 'oauth_auth_codes'.
-            if(str_contains($tableName,'_CODES')) {
-                array_push($res, $tableName);
-            }
-
-        }
-        return $res;
+        return $this->allowedTables();
     }
 }

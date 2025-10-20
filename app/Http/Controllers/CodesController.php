@@ -72,7 +72,7 @@ class CodesController extends Controller
                 'page_title' => 'Codes',
                 'page_description' => $table_name,
                 'page_url' => '/codes',
-                'archer' => "<li class='active'>".$table_name."</li>",
+                'archer' => "<li class='active'>".htmlspecialchars($table_name, ENT_QUOTES, 'UTF-8')."</li>",
                 'q' => $table_name,
                 'thead' => $thead,
                 'data' => $data,

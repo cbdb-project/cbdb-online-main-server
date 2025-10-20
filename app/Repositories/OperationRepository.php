@@ -51,50 +51,76 @@ class OperationRepository
 
     public function getArrDiff($arr1, $arr2, $arr3)
     {
-        //進行陣列雜訊的濾除
-        //if(!is_array($arr1) || !is_array($arr2) || !is_array($arr3)) { return ""; }
-	//20251001Compare 功能有時無法顯示修改內容修改
-	if(!is_array($arr1)) return "";  // arr1 必須有修改後資料才 diff
-	$arr2 = is_array($arr2) ? $arr2 : [];
-	$arr3 = is_array($arr3) ? $arr3 : [];
+        //20251001Compare 功能有時無法顯示修改內容修改
+        if (!is_array($arr1)) {
+            return null;  // 沒有修改後資料就不產生比對結果
+        }
 
-        $NewArr1ture = array();
-        $NewArr2ture = array();
-        $NewArr3ture = array();
-        $NewArr1 = array_diff_assoc($arr1, $arr2);
-        $NewArr2 = array_diff_assoc($arr2, $arr1);
-        $NewArr3 = array_diff_assoc($arr1, $arr3);
-        $data = "<br/><p>[修改後]</p>";
-        foreach($NewArr1 as $key => $value){
-            if($key == "_method" || $key == "_token") {
+        $arr2 = is_array($arr2) ? $arr2 : [];
+        $arr3 = is_array($arr3) ? $arr3 : [];
+
+        $formatValue = function ($value) {
+            if (is_array($value) || is_object($value)) {
+                return json_encode($value, JSON_UNESCAPED_UNICODE);
+            }
+            if ($value === null) {
+                return '(null)';
+            }
+            if (is_bool($value)) {
+                return $value ? 'true' : 'false';
+            }
+            return (string)$value;
+        };
+
+        $normalize = function ($value) {
+            if (is_array($value) || is_object($value)) {
+                return json_encode($value);
+            }
+            if ($value === null) {
+                return '';
+            }
+            if (is_bool($value)) {
+                return $value ? '1' : '0';
+            }
+            return trim((string)$value);
+        };
+
+        $valuesEqual = function ($left, $right) use ($normalize) {
+            return $normalize($left) === $normalize($right);
+        };
+
+        $ignoredKeys = ['_method', '_token'];
+        $keys = array_keys($arr1);
+        $rows = [];
+
+        foreach ($keys as $key) {
+            if (in_array($key, $ignoredKeys, true)) {
                 continue;
             }
-            else {
-                $NewArr1ture[$key] = $value;
-                $data .= "欄位：".$key."  內容：".$value."<br/>";
-            }
-        }
-        $data .= "<br/><p>[原本的]</p>";
-        foreach($NewArr1ture as $key => $value){
-            $NewArr2ture[$key] = $value;
-            $data .= "欄位：".$key."  內容：".$NewArr2[$key]."<br/>";
-        }
-        $data .= "<br/><p>[實時比對]</p>";
-        $check = 0;
-        foreach($NewArr3 as $key => $value){
-            if($key == "_method" || $key == "_token") {
+
+            $afterRaw = array_key_exists($key, $arr1) ? $arr1[$key] : null;
+            $beforeRaw = array_key_exists($key, $arr2) ? $arr2[$key] : null;
+
+            if ($valuesEqual($afterRaw, $beforeRaw)) {
                 continue;
             }
-            else {
-                if(!empty($arr3[$key])) {
-                    $NewArr3ture[$key] = $value;
-                    $data .= "欄位：".$key."  內容：".$arr3[$key]."<br/>";
-                    $check++;
-                }
-            }
+
+            $currentExists = array_key_exists($key, $arr3);
+            $currentRaw = $currentExists ? $arr3[$key] : null;
+
+            $rows[] = [
+                'field' => $key,
+                'before' => $formatValue($beforeRaw),
+                'after' => $formatValue($afterRaw),
+                'current' => $currentExists ? $formatValue($currentRaw) : '(未取得)',
+                'matches_current' => $currentExists && $normalize($afterRaw) === $normalize($currentRaw),
+                'matches_before' => $currentExists && $normalize($beforeRaw) === $normalize($currentRaw),
+            ];
         }
-        if(empty($check)) { $data .= "資料與[修改後]完全一致"; }
-        //雜訊濾除結束
-        return $data;
+
+        if (empty($rows)) {
+            return null;
+        }
+        return ['rows' => $rows];
     }
 }

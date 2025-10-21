@@ -6,23 +6,35 @@ use App\Http\Controllers\CodesController;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use App\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CodesControllerTest extends TestCase
 {
+    protected $operationSpy;
+    protected $originalDb;
+    protected $fakeDb;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         config(['codes.tables' => ['TEST_CODES']]);
+        config(['codes.connection' => null]);
+
         $compiledPath = base_path('tests/storage/views');
         if (!is_dir($compiledPath)) {
             mkdir($compiledPath, 0777, true);
         }
         config(['view.compiled' => $compiledPath]);
+
+        $this->originalDb = DB::getFacadeRoot();
+        $this->fakeDb = new FakeDatabaseManager(['TEST_CODES' => []]);
+        DB::swap($this->fakeDb);
 
         $this->app->instance(CodesRepository::class, new class extends CodesRepository {
             public function allowedTables(): array
@@ -35,10 +47,27 @@ class CodesControllerTest extends TestCase
                 return ['TEST_CODES' => 'TEST_CODES'];
             }
         });
+
+        $this->operationSpy = new class extends OperationRepository {
+            public $calls = [];
+
+            public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0)
+            {
+                $this->calls[] = compact('user_id', 'c_personid', 'op_type', 'resource', 'resource_id', 'resource_data', 'ori', 'crowdsourcing_status');
+            }
+        };
+        $this->app->instance(OperationRepository::class, $this->operationSpy);
+    }
+
+    protected function tearDown(): void
+    {
+        DB::swap($this->originalDb);
+        parent::tearDown();
     }
 
     public function testGuestCannotStoreRows()
     {
+        $this->operationSpy->calls = [];
         $payload = [
             'code_id' => 'A1',
             'code_sub' => 'B1',
@@ -49,10 +78,12 @@ class CodesControllerTest extends TestCase
             ->post('/codes/TEST_CODES', $payload);
 
         $response->assertRedirect('/codes/TEST_CODES/create');
+        $this->assertEmpty($this->operationSpy->calls);
     }
 
     public function testInactiveUserCannotStoreRows()
     {
+        $this->operationSpy->calls = [];
         $inactiveUser = new User([
             'name' => 'inactive',
             'email' => 'inactive@example.com',
@@ -72,10 +103,12 @@ class CodesControllerTest extends TestCase
             ->post('/codes/TEST_CODES', $payload);
 
         $response->assertRedirect('/codes/TEST_CODES/create');
+        $this->assertEmpty($this->operationSpy->calls);
     }
 
-    public function testActiveUserStoreDoesNotInvokeOperationRepository()
+    public function testActiveUserStoreLogsOperation()
     {
+        $this->operationSpy->calls = [];
         $activeUser = new User([
             'name' => 'active',
             'email' => 'active@example.com',
@@ -90,103 +123,28 @@ class CodesControllerTest extends TestCase
             'code_sub' => 'B3',
             'description' => 'active stored',
         ];
-        $recordedInserts = new \ArrayObject();
-        $originalDb = $this->app['db'];
-        $dbStub = new class($recordedInserts) {
-            private $records;
-
-            public function __construct(\ArrayObject $records)
-            {
-                $this->records = $records;
-            }
-
-            public function table($name)
-            {
-                return new class($name, $this->records) {
-                    private $name;
-                    private $records;
-
-                    public function __construct($name, \ArrayObject $records)
-                    {
-                        $this->name = $name;
-                        $this->records = $records;
-                    }
-
-                    public function insert(array $data)
-                    {
-                        $this->records->append(['table' => $this->name, 'data' => $data]);
-                        return true;
-                    }
-                };
-            }
-        };
-        DB::swap($dbStub);
-
-        $operationStub = new class extends OperationRepository {
-            public $called = false;
-
-            public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0)
-            {
-                $this->called = true;
-            }
-        };
-        $this->app->instance(OperationRepository::class, $operationStub);
-
-        $this->app->bind(CodesController::class, function ($app) use ($operationStub) {
-            return new class($app->make(CodesRepository::class), $operationStub) extends CodesController {
-                protected function getIdName($table_name)
-                {
-                    return 'code_id';
-                }
-
-                protected function getIdName_1($table_name)
-                {
-                    return 'code_sub';
-                }
-
-                protected function getIdName_2($table_name)
-                {
-                    return 'description';
-                }
-            };
-        });
-
-        $payload = $expectedInsert;
-
-        $response = $this->post('/codes/TEST_CODES', $payload);
+        $response = $this->post('/codes/TEST_CODES', $expectedInsert);
 
         $response->assertRedirect(route('codes.edit', [
             'table_name' => 'TEST_CODES',
             'id' => 'A3_._B3',
         ]));
 
-        $this->assertFalse($operationStub->called, 'OperationRepository::store should not be invoked for generic codes store');
-        $this->assertCount(1, (array) $recordedInserts);
-        $insertRecord = $recordedInserts[0];
-        $this->assertSame('TEST_CODES', $insertRecord['table']);
-        $this->assertSame($expectedInsert, $insertRecord['data']);
-
-        $this->app->bind(CodesController::class, function ($app) {
-            return new CodesController(
-                $app->make(CodesRepository::class),
-                $app->make(OperationRepository::class)
-            );
-        });
-        $this->app->instance(OperationRepository::class, new OperationRepository());
-        DB::swap($originalDb);
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(1, $call['op_type']);
+        $this->assertSame('TEST_CODES', $call['resource']);
+        $this->assertSame('A3_._B3', $call['resource_id']);
+        $this->assertSame($expectedInsert['description'], $call['resource_data']['description']);
     }
 
     public function testSearchFiltersResults()
     {
-        $rows = [
+        DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
             ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
             ['code_id' => 'A3', 'code_sub' => 'X3', 'description' => 'Gamma entry'],
-        ];
-
-        $fakeDb = new FakeDatabaseManager($rows);
-        $originalDb = $this->app['db'];
-        DB::swap($fakeDb);
+        ]);
 
         $response = $this->get('/codes/TEST_CODES?search=Beta');
 
@@ -195,19 +153,14 @@ class CodesControllerTest extends TestCase
         $response->assertDontSee('Alpha entry');
         $response->assertDontSee('Gamma entry');
         $response->assertSee('value="Beta"', false);
-
-        DB::swap($originalDb);
+        $this->assertEmpty($this->operationSpy->calls);
     }
 
     public function testGuestViewDoesNotShowActions()
     {
-        $rows = [
+        DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
-        ];
-
-        $fakeDb = new FakeDatabaseManager($rows);
-        $originalDb = $this->app['db'];
-        DB::swap($fakeDb);
+        ]);
 
         $response = $this->get('/codes/TEST_CODES');
 
@@ -215,23 +168,121 @@ class CodesControllerTest extends TestCase
         $response->assertDontSee('edit');
         $response->assertDontSee('delete');
         $response->assertDontSee('新增');
+        $this->assertEmpty($this->operationSpy->calls);
+    }
 
-        DB::swap($originalDb);
+    public function testActiveUserUpdateLogsOperation()
+    {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Old'],
+        ]);
+
+        $this->operationSpy->calls = [];
+
+        $user = new User([
+            'name' => 'editor',
+            'email' => 'editor@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 3;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->put('/codes/TEST_CODES/A1_._X1', [
+            'description' => 'Updated',
+        ]);
+
+        $response->assertRedirect(route('codes.edit', [
+            'table_name' => 'TEST_CODES',
+            'id' => 'A1_._X1',
+        ]));
+
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(2, $call['op_type']);
+        $this->assertSame('TEST_CODES', $call['resource']);
+        $this->assertSame('A1_._X1', $call['resource_id']);
+        $this->assertSame('Updated', $call['resource_data']['description']);
+        $this->assertSame('Old', $call['ori']['description']);
+    }
+
+    public function testActiveUserDestroyLogsOperation()
+    {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'To delete'],
+        ]);
+
+        $this->operationSpy->calls = [];
+
+        $user = new User([
+            'name' => 'deleter',
+            'email' => 'deleter@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 4;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->delete('/codes/TEST_CODES/A1_._X1');
+
+        $response->assertRedirect(route('codes.show', ['table_name' => 'TEST_CODES']));
+
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(4, $call['op_type']);
+        $this->assertSame('TEST_CODES', $call['resource']);
+        $this->assertSame('A1_._X1', $call['resource_id']);
+        $this->assertSame('To delete', $call['resource_data']['description']);
+    }
+
+    public function testUpdateGracefullyHandlesDuplicateKey()
+    {
+        $this->fakeDb->tables['TEST_CODES'][] = ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Old'];
+        $this->fakeDb->setFailure('update', 'Duplicate entry #1062');
+        $this->operationSpy->calls = [];
+
+        $user = new User([
+            'name' => 'editor',
+            'email' => 'editor@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 6;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->from('/codes/TEST_CODES/A1_._X1/edit')->put('/codes/TEST_CODES/A1_._X1', [
+            'description' => 'Updated',
+        ]);
+
+        $response->assertRedirect('/codes/TEST_CODES/A1_._X1/edit');
+        $response->assertSessionHasErrors(['duplicate']);
+        $response->assertSessionHas('_old_input.description', 'Updated');
+        $this->assertEmpty($this->operationSpy->calls);
+
+        $this->fakeDb->clearFailures();
+        $this->assertCount(1, $this->fakeDb->failuresCleared);
     }
 }
 
 class FakeDatabaseManager
 {
-    private $rows;
+    public $tables = [];
+    public $failures = [];
+    public $failuresCleared = [];
 
-    public function __construct(array $rows)
+    public function __construct(array $tables = [])
     {
-        $this->rows = $rows;
+        $this->tables = $tables;
     }
 
     public function table($name)
     {
-        return new FakeQueryBuilder($this->rows);
+        if (!array_key_exists($name, $this->tables)) {
+            $this->tables[$name] = [];
+        }
+
+        $rows =& $this->tables[$name];
+        return new FakeQueryBuilder($rows, $this, $name);
     }
 
     public function connection($name = null)
@@ -239,81 +290,229 @@ class FakeDatabaseManager
         return $this;
     }
 
+    public function getDoctrineSchemaManager()
+    {
+        return new FakeDoctrineSchemaManager();
+    }
+
     public function select($query)
     {
         return [];
+    }
+
+    public function getSchemaBuilder()
+    {
+        return new FakeSchemaBuilder();
+    }
+
+    public function setFailure(string $operation, string $message = 'Simulated failure'): void
+    {
+        $this->failures[$operation] = $message;
+    }
+
+    public function clearFailures(): void
+    {
+        $this->failures = [];
+        $this->failuresCleared[] = true;
+    }
+
+    public function shouldFail(string $operation): bool
+    {
+        return array_key_exists($operation, $this->failures);
+    }
+
+    public function failureMessage(string $operation): string
+    {
+        return $this->failures[$operation] ?? 'Simulated failure';
+    }
+}
+
+class FakeDoctrineSchemaManager
+{
+    public function listTableDetails($table)
+    {
+        return new FakeTableDetails();
+    }
+}
+
+class FakeTableDetails
+{
+    public function hasPrimaryKey()
+    {
+        return false;
+    }
+
+    public function getPrimaryKey()
+    {
+        return null;
+    }
+}
+
+class FakeSchemaBuilder
+{
+    public function getColumnListing($table)
+    {
+        return ['code_id', 'code_sub', 'description'];
     }
 }
 
 class FakeQueryBuilder
 {
     private $rows;
-    private $filters = [];
+    private $conditions = [];
+    private $table;
+    private $manager;
 
-    public function __construct(array $rows)
+    public function __construct(array &$rows, FakeDatabaseManager $manager, string $table)
     {
-        $this->rows = $rows;
+        $this->rows =& $rows;
+        $this->manager = $manager;
+        $this->table = $table;
     }
 
     public function __clone()
     {
-        $this->filters = [];
+        $this->conditions = [];
     }
 
-    public function first()
+    public function where($column, $operator = null, $value = null, $boolean = 'and')
     {
-        $filtered = $this->applyFilters($this->rows);
-        $first = reset($filtered);
-        return $first ? (object) $first : null;
-    }
-
-    public function where($callback)
-    {
-        if (is_callable($callback)) {
-            $callback($this);
+        if (is_callable($column)) {
+            $column($this);
+            return $this;
         }
+
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->conditions[] = [
+            'column' => $column,
+            'operator' => strtolower((string) $operator),
+            'value' => $value,
+            'boolean' => strtolower($boolean),
+        ];
+
         return $this;
     }
 
     public function orWhere($column, $operator = null, $value = null)
     {
-        if (strtolower($operator) === 'like') {
-            $this->filters[] = ['column' => $column, 'value' => $value];
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
         }
-        return $this;
+
+        return $this->where($column, $operator, $value, 'or');
+    }
+
+    public function first()
+    {
+        $filtered = $this->applyConditions();
+        $first = reset($filtered);
+        return $first ? (object) $first : null;
+    }
+
+    public function insert(array $data)
+    {
+        if ($this->manager->shouldFail('insert')) {
+            throw new QueryException('insert into '.$this->table, [], new \Exception($this->manager->failureMessage('insert')));
+        }
+
+        if (isset($data[0]) && is_array($data[0])) {
+            foreach ($data as $row) {
+                $this->rows[] = $row;
+            }
+        } else {
+            $this->rows[] = $data;
+        }
+        return true;
+    }
+
+    public function update(array $data)
+    {
+        if ($this->manager->shouldFail('update')) {
+            throw new QueryException('update '.$this->table, [], new \Exception($this->manager->failureMessage('update')));
+        }
+
+        foreach ($this->rows as &$row) {
+            if ($this->rowMatches($row)) {
+                foreach ($data as $key => $value) {
+                    $row[$key] = $value;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public function delete()
+    {
+        if ($this->manager->shouldFail('delete')) {
+            throw new QueryException('delete from '.$this->table, [], new \Exception($this->manager->failureMessage('delete')));
+        }
+
+        $this->rows = array_values(array_filter($this->rows, function ($row) {
+            return !$this->rowMatches($row);
+        }));
     }
 
     public function paginate($perPage)
     {
-        $filtered = $this->applyFilters($this->rows);
         $items = array_map(function ($row) {
             return (object) $row;
-        }, $filtered);
+        }, $this->applyConditions());
 
         return new LengthAwarePaginator(
             $items,
-            count($filtered),
+            count($items),
             $perPage,
             1,
             ['path' => url()->current()]
         );
     }
 
-    private function applyFilters(array $rows): array
+    private function applyConditions(): array
     {
-        if (empty($this->filters)) {
-            return array_values($rows);
+        if (empty($this->conditions)) {
+            return $this->rows;
         }
 
-        return array_values(array_filter($rows, function ($row) {
-            foreach ($this->filters as $filter) {
-                $needle = trim($filter['value'], '%');
-                $value = isset($row[$filter['column']]) ? (string) $row[$filter['column']] : '';
-                if (stripos($value, $needle) !== false) {
-                    return true;
-                }
-            }
-            return false;
+        return array_values(array_filter($this->rows, function ($row) {
+            return $this->rowMatches($row);
         }));
+    }
+
+    private function rowMatches(array $row): bool
+    {
+        if (empty($this->conditions)) {
+            return true;
+        }
+
+        $result = null;
+        foreach ($this->conditions as $condition) {
+            $match = $this->matchCondition($row, $condition);
+            if ($condition['boolean'] === 'or') {
+                $result = ($result ?? false) || $match;
+            } else {
+                $result = ($result ?? true) && $match;
+            }
+        }
+
+        return (bool) $result;
+    }
+
+    private function matchCondition(array $row, array $condition): bool
+    {
+        $value = $row[$condition['column']] ?? null;
+        $expected = $condition['value'];
+
+        if ($condition['operator'] === 'like') {
+            $needle = trim((string) $expected, '%');
+            return stripos((string) $value, $needle) !== false;
+        }
+
+        return (string) $value === (string) $expected;
     }
 }

@@ -90,21 +90,28 @@ class CodesController extends Controller
         $table = $this->guardTable($table_name);
         if($table){
             try{
-                //20210323修改聯合主鍵的邏輯
-                $temp = explode("_._", $id);
-                $id_name = $this->getIdName($table);
-                $id_name_1 = $this->getIdName_1($table);
-                $id_name_2 = $this->getIdName_2($table);
-                //$data = DB::table($table_name)->where($id_name, $id)->first();
-                $data = DB::table($table)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->first();
-                //$data = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->first();
-                //修改結束
+                $keyColumns = $this->getKeyColumns($table);
+                $conditions = $this->buildConditionsFromId($keyColumns, $id);
+
+                $query = DB::table($table);
+                foreach ($conditions as $column => $value) {
+                    $query->where($column, $value);
+                }
+                $data = $query->first();
+
+                if (!$data) {
+                    flash('找不到该数据表', 'warning');
+                    return redirect()->back();
+                }
+
+                $compositeId = $this->buildCompositeId($keyColumns, $this->convertRowToArray($data));
+
                 return view('codes.edit', [
                     'page_title' => 'Codes',
                     'page_description' => $table,
                     'page_url' => '/codes',
                     'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-                    'id' => $id, 'row' => $data,
+                    'id' => $compositeId, 'row' => $data,
                     'table' => $table]);
             }catch (\PDOException $e) {
                 flash('找不到该数据表', 'warning');
@@ -126,24 +133,36 @@ class CodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
-//        dd($data);
-        //20210323修改聯合主鍵的邏輯
-        $id_name = $this->getIdName($table);
-        $id_name_1 = $this->getIdName_1($table);
-        $id_name_2 = $this->getIdName_2($table);
-        $temp = explode("_._", $id);
-        //DB::table($table_name)->where($id_name, $id)->update($data);
-        DB::table($table)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->update($data);
-        //DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->update($data);
-        //修改結束
+        $keyColumns = $this->getKeyColumns($table);
+        $conditions = $this->buildConditionsFromId($keyColumns, $id);
+        $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
+
+        $query = DB::table($table);
+        foreach ($conditions as $column => $value) {
+            $query->where($column, $value);
+        }
+        $data = array_except($request->all(), ['_method', '_token']);
+
+        try {
+            $query->update($data);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($this->isDuplicateKeyException($e)) {
+                flash('更新失敗：主鍵或唯一值已存在。', 'error');
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['duplicate' => '更新失敗：主鍵或唯一值已存在。']);
+            }
+            throw $e;
+        }
+
+        $updatedRow = $this->fetchRowByKeys($table, $keyColumns, $conditions) ?: ($originalRow ? array_merge($originalRow, $data) : $data);
+
+        $this->recordOperation(2, $table, $keyColumns, $updatedRow, $originalRow ?: []);
+
         flash('Update success @ '.Carbon::now(), 'success');
 
-        //20210323組合新的id，避免修改聯合主鍵的值。 
-        $id = $data[$id_name].'_._'.$data[$id_name_1];
-        //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
-        //return redirect()->route('codes.show', ['table_name' => $table_name]);
+        $id = $this->buildCompositeId($keyColumns, $updatedRow);
+
         return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
     }
 
@@ -180,8 +199,7 @@ class CodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $data = $request->all();
-        $data = array_except($data, ['_token']);
+        $data = array_except($request->all(), ['_token']);
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
         //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
@@ -199,7 +217,25 @@ class CodesController extends Controller
         $id = $data[$id_name].'_._'.$data[$id_name_1];
         //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
         //修改結束
-        DB::table($table)->insert($data);
+        try {
+            DB::table($table)->insert($data);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($this->isDuplicateKeyException($e)) {
+                flash('新增失敗：主鍵或唯一值已存在。', 'error');
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['duplicate' => '新增失敗：主鍵或唯一值已存在。']);
+            }
+            throw $e;
+        }
+
+        $keyColumns = $this->getKeyColumns($table);
+        $storedRow = $this->fetchRowByKeys($table, $keyColumns, $this->buildConditionsFromRow($keyColumns, $data));
+        $rowData = $storedRow ?: $data;
+        $this->recordOperation(1, $table, $keyColumns, $rowData);
+
+        $id = $this->buildCompositeId($keyColumns, $rowData);
+
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
     }
@@ -215,28 +251,18 @@ class CodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        //20210323修改聯合主鍵的邏輯
-        $temp = explode("_._", $id);
-        $id_name = $this->getIdName($table);
-        $id_name_1 = $this->getIdName_1($table);
-        $id_name_2 = $this->getIdName_2($table);
+        $keyColumns = $this->getKeyColumns($table);
+        $conditions = $this->buildConditionsFromId($keyColumns, $id);
+        $row = $this->fetchRowByKeys($table, $keyColumns, $conditions);
 
-        $row = DB::table($table)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->first();
-        //$row = DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->first();
-        //修改結束
-        $op = [
-            'op_type' => 4,
-            'resource' => $table,
-            'resource_id' => $id,
-            'resource_data' => json_encode((array)$row)
-        ];
-        //$this->operationRepository->store($op);
-        //20181207建安修改片段
-        $row2 = json_encode((array)$row);
-        $this->operationRepository->store(Auth::id(), '', 4, $table, $id, $row2);
-        //修改結束
-        DB::table($table)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->delete();
-        //DB::table($table_name)->where($id_name, $temp[0])->where($id_name_1, $temp[1])->where($id_name_2, $temp[2])->delete();
+        $this->recordOperation(4, $table, $keyColumns, $row ?: $conditions, $row ?: []);
+
+        $query = DB::table($table);
+        foreach ($conditions as $column => $value) {
+            $query->where($column, $value);
+        }
+        $query->delete();
+
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('codes.show', ['table_name' => $table]);
     }
@@ -297,5 +323,136 @@ class CodesController extends Controller
         }
 
         return Schema::getColumnListing($table);
+    }
+
+    protected function getKeyColumns(string $table): array
+    {
+        static $cache = [];
+        if (isset($cache[$table])) {
+            return $cache[$table];
+        }
+
+        $columns = Schema::getColumnListing($table);
+        $keys = [];
+
+        try {
+            $connection = DB::connection();
+            $details = $connection->getDoctrineSchemaManager()->listTableDetails($table);
+            if ($details->hasPrimaryKey()) {
+                $keys = $details->getPrimaryKey()->getColumns();
+            }
+        } catch (\Throwable $e) {
+            $keys = [];
+        }
+
+        if (empty($keys)) {
+            $keys[] = $columns[0] ?? 'id';
+            if (isset($columns[1])) {
+                $keys[] = $columns[1];
+            }
+        }
+
+        return $cache[$table] = array_values(array_unique(array_filter($keys)));
+    }
+
+    protected function buildCompositeId(array $keyColumns, array $row): string
+    {
+        $parts = [];
+        foreach ($keyColumns as $column) {
+            if (array_key_exists($column, $row)) {
+                $parts[] = (string) $row[$column];
+            }
+        }
+
+        return implode('_._', array_filter($parts, function ($part) {
+            return $part !== '';
+        }));
+    }
+
+    protected function buildConditionsFromRow(array $keyColumns, array $row): array
+    {
+        $conditions = [];
+        foreach ($keyColumns as $column) {
+            if (array_key_exists($column, $row)) {
+                $conditions[$column] = $row[$column];
+            }
+        }
+        return $conditions;
+    }
+
+    protected function buildConditionsFromId(array $keyColumns, string $id): array
+    {
+        $conditions = [];
+        $parts = explode('_._', $id);
+        foreach ($keyColumns as $index => $column) {
+            if (isset($parts[$index]) && $parts[$index] !== '') {
+                $conditions[$column] = $parts[$index];
+            }
+        }
+        return $conditions;
+    }
+
+    protected function fetchRowByKeys(string $table, array $keyColumns, array $conditions)
+    {
+        if (empty($conditions)) {
+            return null;
+        }
+
+        $query = DB::table($table);
+        foreach ($conditions as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        $row = $query->first();
+        return $row ? $this->convertRowToArray($row) : null;
+    }
+
+    protected function recordOperation(int $type, string $table, array $keyColumns, array $data, array $original = [])
+    {
+        if (!Auth::check()) {
+            return;
+        }
+
+        $resourceId = $this->buildCompositeId($keyColumns, $data);
+        if ($resourceId === '' && !empty($original)) {
+            $resourceId = $this->buildCompositeId($keyColumns, $original);
+        }
+
+        $this->operationRepository->store(
+            Auth::id(),
+            0,
+            $type,
+            $table,
+            $resourceId,
+            $data,
+            $original
+        );
+    }
+
+    protected function convertRowToArray($row): array
+    {
+        if (is_null($row)) {
+            return [];
+        }
+
+        if (is_array($row)) {
+            return $row;
+        }
+
+        if ($row instanceof \ArrayAccess) {
+            return (array) $row;
+        }
+
+        return json_decode(json_encode($row), true) ?: [];
+    }
+
+    protected function isDuplicateKeyException(\Illuminate\Database\QueryException $exception): bool
+    {
+        if ($exception->getCode() === '23000') {
+            return true;
+        }
+
+        $message = $exception->getMessage();
+        return strpos($message, 'Duplicate entry') !== false;
     }
 }

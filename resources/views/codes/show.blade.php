@@ -12,6 +12,21 @@
         </div>
         <!-- /.box-header -->
         <div class="box-body">
+            <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" class="form-inline" style="margin-bottom: 15px;">
+                <div class="input-group input-group-sm" style="width: 420px;">
+                    <input type="text"
+                           name="search"
+                           class="form-control"
+                           placeholder="搜尋"
+                           value="{{ $search ?? '' }}">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="submit">搜尋</button>
+                        @if(!empty($search))
+                            <a class="btn btn-default" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
+                        @endif
+                    </span>
+                </div>
+            </form>
             <table class="table table-bordered table-striped table-condensed">
                 <thead>
                 <tr>

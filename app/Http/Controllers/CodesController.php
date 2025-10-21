@@ -47,43 +47,27 @@ class CodesController extends Controller
             'data' => $data]);
     }
 
-    public function show($table_name)
+    public function show(Request $request, $table_name)
     {
         $table = $this->guardTable($table_name);
+        $search = trim((string) $request->query('search', ''));
         try {
             $perPage = config('codes.per_page', 20);
             $query = DB::table($table);
-            $data = $query->paginate($perPage);
+            $sampleRow = (clone $query)->first();
+            $thead = $this->buildTableHead($table, $sampleRow);
+            $searchableColumns = $this->determineSearchableColumns($table, $thead);
 
-            $firstRow = $data->first();
-            $thead = [];
-            if ($firstRow) {
-                $count = 0;
-                foreach ($firstRow as $key => $value) {
-                    if ($count > 2) {
-                        break;
+            if ($search !== '' && !empty($searchableColumns)) {
+                $query->where(function ($subQuery) use ($searchableColumns, $search) {
+                    foreach ($searchableColumns as $column) {
+                        $subQuery->orWhere($column, 'like', '%' . $search . '%');
                     }
-
-                    if (
-                        str_contains($key, 'name') ||
-                        str_contains($key, 'desc') ||
-                        str_contains($key, 'code') ||
-                        str_contains($key, 'id') ||
-                        str_contains($key, 'sequence') ||
-                        str_contains($key, 'chn') ||
-                        str_contains($key, 'dy')
-                    ) {
-                        $thead[] = $key;
-                        $count++;
-                    }
-                }
-
-                if (empty($thead)) {
-                    $thead = array_keys((array) $firstRow);
-                }
-            } else {
-                $thead = Schema::getColumnListing($table);
+                });
             }
+
+            $data = $query->paginate($perPage)->appends(['search' => $search]);
+
             return view('codes.show', [
                 'page_title' => 'Codes',
                 'page_description' => $table,
@@ -92,6 +76,7 @@ class CodesController extends Controller
                 'q' => $table,
                 'thead' => $thead,
                 'data' => $data,
+                'search' => $search,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
@@ -269,5 +254,48 @@ class CodesController extends Controller
     protected function getIdName_2($table_name)
     {
         return $columns = Schema::getColumnListing($table_name)[2];
+    }
+
+    protected function buildTableHead(string $table, $sampleRow): array
+    {
+        $thead = [];
+        if ($sampleRow) {
+            $count = 0;
+            foreach ((array) $sampleRow as $key => $value) {
+                if ($count > 2) {
+                    break;
+                }
+
+                if (
+                    str_contains($key, 'name') ||
+                    str_contains($key, 'desc') ||
+                    str_contains($key, 'code') ||
+                    str_contains($key, 'id') ||
+                    str_contains($key, 'sequence') ||
+                    str_contains($key, 'chn') ||
+                    str_contains($key, 'dy')
+                ) {
+                    $thead[] = $key;
+                    $count++;
+                }
+            }
+
+            if (empty($thead)) {
+                $thead = array_keys((array) $sampleRow);
+            }
+        } else {
+            $thead = Schema::getColumnListing($table);
+        }
+
+        return array_values(array_unique($thead));
+    }
+
+    protected function determineSearchableColumns(string $table, array $thead): array
+    {
+        if (!empty($thead)) {
+            return $thead;
+        }
+
+        return Schema::getColumnListing($table);
     }
 }

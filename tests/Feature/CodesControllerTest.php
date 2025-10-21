@@ -6,12 +6,31 @@ use App\Http\Controllers\CodesController;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use App\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CodesControllerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['codes.tables' => ['TEST_CODES']]);
+        $this->app->instance(CodesRepository::class, new class extends CodesRepository {
+            public function allowedTables(): array
+            {
+                return ['TEST_CODES'];
+            }
+
+            public function allowedTableMap(): array
+            {
+                return ['TEST_CODES' => 'TEST_CODES'];
+            }
+        });
+    }
+
     public function testGuestCannotStoreRows()
     {
         $payload = [
@@ -149,5 +168,126 @@ class CodesControllerTest extends TestCase
         });
         $this->app->instance(OperationRepository::class, new OperationRepository());
         DB::swap($originalDb);
+    }
+
+    public function testSearchFiltersResults()
+    {
+        $rows = [
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
+            ['code_id' => 'A3', 'code_sub' => 'X3', 'description' => 'Gamma entry'],
+        ];
+
+        $fakeDb = new FakeDatabaseManager($rows);
+        $originalDb = $this->app['db'];
+        DB::swap($fakeDb);
+
+        $response = $this->get('/codes/TEST_CODES?search=Beta');
+
+        $response->assertStatus(200);
+        $response->assertSee('Beta entry');
+        $response->assertDontSee('Alpha entry');
+        $response->assertDontSee('Gamma entry');
+        $response->assertSee('value="Beta"', false);
+
+        DB::swap($originalDb);
+    }
+}
+
+class FakeDatabaseManager
+{
+    private $rows;
+
+    public function __construct(array $rows)
+    {
+        $this->rows = $rows;
+    }
+
+    public function table($name)
+    {
+        return new FakeQueryBuilder($this->rows);
+    }
+
+    public function connection($name = null)
+    {
+        return $this;
+    }
+
+    public function select($query)
+    {
+        return [];
+    }
+}
+
+class FakeQueryBuilder
+{
+    private $rows;
+    private $filters = [];
+
+    public function __construct(array $rows)
+    {
+        $this->rows = $rows;
+    }
+
+    public function __clone()
+    {
+        $this->filters = [];
+    }
+
+    public function first()
+    {
+        $filtered = $this->applyFilters($this->rows);
+        $first = reset($filtered);
+        return $first ? (object) $first : null;
+    }
+
+    public function where($callback)
+    {
+        if (is_callable($callback)) {
+            $callback($this);
+        }
+        return $this;
+    }
+
+    public function orWhere($column, $operator = null, $value = null)
+    {
+        if (strtolower($operator) === 'like') {
+            $this->filters[] = ['column' => $column, 'value' => $value];
+        }
+        return $this;
+    }
+
+    public function paginate($perPage)
+    {
+        $filtered = $this->applyFilters($this->rows);
+        $items = array_map(function ($row) {
+            return (object) $row;
+        }, $filtered);
+
+        return new LengthAwarePaginator(
+            $items,
+            count($filtered),
+            $perPage,
+            1,
+            ['path' => url()->current()]
+        );
+    }
+
+    private function applyFilters(array $rows): array
+    {
+        if (empty($this->filters)) {
+            return array_values($rows);
+        }
+
+        return array_values(array_filter($rows, function ($row) {
+            foreach ($this->filters as $filter) {
+                $needle = trim($filter['value'], '%');
+                $value = isset($row[$filter['column']]) ? (string) $row[$filter['column']] : '';
+                if (stripos($value, $needle) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        }));
     }
 }

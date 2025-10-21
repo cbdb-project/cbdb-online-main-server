@@ -18,6 +18,12 @@ class CodesControllerTest extends TestCase
         parent::setUp();
 
         config(['codes.tables' => ['TEST_CODES']]);
+        $compiledPath = base_path('tests/storage/views');
+        if (!is_dir($compiledPath)) {
+            mkdir($compiledPath, 0777, true);
+        }
+        config(['view.compiled' => $compiledPath]);
+
         $this->app->instance(CodesRepository::class, new class extends CodesRepository {
             public function allowedTables(): array
             {
@@ -189,6 +195,26 @@ class CodesControllerTest extends TestCase
         $response->assertDontSee('Alpha entry');
         $response->assertDontSee('Gamma entry');
         $response->assertSee('value="Beta"', false);
+
+        DB::swap($originalDb);
+    }
+
+    public function testGuestViewDoesNotShowActions()
+    {
+        $rows = [
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ];
+
+        $fakeDb = new FakeDatabaseManager($rows);
+        $originalDb = $this->app['db'];
+        DB::swap($fakeDb);
+
+        $response = $this->get('/codes/TEST_CODES');
+
+        $response->assertStatus(200);
+        $response->assertDontSee('edit');
+        $response->assertDontSee('delete');
+        $response->assertDontSee('新增');
 
         DB::swap($originalDb);
     }

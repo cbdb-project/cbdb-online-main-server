@@ -10,10 +10,10 @@
 - **分頁機制**：使用 Laravel 內建分頁器，預設每頁 20 筆，可於 `config('codes.per_page')` 調整（若未定義則 fallback 20）。
 - **操作流程**：新增、編輯、刪除均由同一控制器完成，路徑為 `/codes/{table}/{id}/...`。主鍵拆解使用 `_._` 連結前兩個欄位的方式猜測複合鍵。
 - **優點**：開發維護成本低、可以快速覆蓋多張 *_CODES 表，不需為每張表寫一個 controller/view。
+- **搜尋功能**：2025 年新增 `?search=` query 支援，可在頁面頂部篩選表格列，底層會對推斷出的欄位下 `LIKE` 條件並保留原本的分頁。搜尋框值會帶入 `appends()`，翻頁時不會遺失條件。
 - **既知問題**（依先前分析與實測）：
   - 欄位自動推斷不一定準確，表頭順序可能與實際需求不符。
   - `create`/`store` 流程沒有特殊驗證或操作紀錄；相比舊版專用頁面，少了操作寫回 `operations` 的記錄。
-  - 少了快速搜尋與即時篩選功能，對大型代碼表使用者體驗較弱。
 
 ## 專用 `/altnamecodes` 等介面
 - **資料來源與流程**：各表有對應的 Controller（例如 `AltnameCodesController`、`AddressCodesController`），後端多半使用 Repository 讀取資料（如 `App\Repositories\AltCodeRepository`）。部分控制器在 `update`/`store` 時會寫入 `OperationRepository` 產生操作紀錄，流程較嚴謹。

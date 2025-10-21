@@ -132,6 +132,8 @@ Route::resource('manage', 'ManagementController', ['name' => [
     'update' => 'manage.update'
 ]]);
 
+Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
+
 Route::resource('operations', 'OperationsController', ['name' => [
     'show' => 'operations.show',
     'create' => 'operations.create',

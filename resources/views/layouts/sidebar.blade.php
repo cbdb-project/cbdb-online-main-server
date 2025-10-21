@@ -59,6 +59,7 @@
 
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>
+                <li class="{{ $page_title == 'MergePreview' ? 'active' : '' }}"><a href="{{ route('merge-preview.index') }}"><i class="ion ion-shuffle"></i> <span>人物記錄合併</span></a></li>
                 <li class="{{ $page_title == 'Management' ? 'active' : '' }}"><a href="{{ route('manage.index') }}"><i class="ion ion-ios-people-outline"></i> <span>管理用戶</span></a></li>
             @endif
         </ul>

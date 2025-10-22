@@ -11,9 +11,10 @@
 - **操作流程**：新增、編輯、刪除均由同一控制器完成，路徑為 `/codes/{table}/{id}/...`。主鍵拆解使用 `_._` 連結前兩個欄位的方式猜測複合鍵。
 - **優點**：開發維護成本低、可以快速覆蓋多張 *_CODES 表，不需為每張表寫一個 controller/view。
 - **搜尋功能**：2025 年新增 `?search=` query 支援，可在頁面頂部篩選表格列，底層會對推斷出的欄位下 `LIKE` 條件並保留原本的分頁。搜尋框值會帶入 `appends()`，翻頁時不會遺失條件。
+- **操作紀錄**：`store`、`update`、`destroy` 現已呼叫 `OperationRepository`，將 CRUD 操作寫入 `operations` 表，內容含原始列資料與合併後值，與 `/altnamecodes` 等專用頁面保持一致。
 - **既知問題**（依先前分析與實測）：
   - 欄位自動推斷不一定準確，表頭順序可能與實際需求不符。
-  - `create`/`store` 流程沒有特殊驗證或操作紀錄；相比舊版專用頁面，少了操作寫回 `operations` 的記錄。
+  - `create`/`store` 尚缺少針對各表的欄位驗證與提示訊息，易出現不合規輸入。
 
 ## 專用 `/altnamecodes` 等介面
 - **資料來源與流程**：各表有對應的 Controller（例如 `AltnameCodesController`、`AddressCodesController`），後端多半使用 Repository 讀取資料（如 `App\Repositories\AltCodeRepository`）。部分控制器在 `update`/`store` 時會寫入 `OperationRepository` 產生操作紀錄，流程較嚴謹。
@@ -28,8 +29,8 @@
 ## 差異摘要
 - **介面型態**：`/codes/*` 是 Blade server-render 表格；`/altnamecodes` 系列為 Vue + API 單頁互動列表。
 - **表格範圍**：`/codes/*` 以 URL 動態選表，可快速覆蓋多張 *_CODES 表；專用介面則固定對應單一資料表。
-- **搜尋／分頁能力**：泛用介面僅有內建分頁，沒有搜尋欄位；專用介面提供即時搜尋與客製化頁碼切換，惟仍有已知的末頁瀏覽限制。
-- **安全與權限**：專用介面經由 Laravel `Route::resource` 定義，僅暴露核准的操作；`/codes/*` 的授權則由共用的 controller 處理。
+- **搜尋／分頁能力**：泛用介面已提供單欄位關鍵字搜尋並保留翻頁；專用介面另有 debounce、複合條件與自訂頁碼等互動功能。
+- **安全與權限**：專用介面經由 Laravel `Route::resource` 定義，僅暴露核准的操作；`/codes/*` 的授權則由共用的 controller 處理，並於操作失敗時提供明確訊息。
 - **維護成本**：泛用介面一處改，多處受益；專用介面則能加入針對性驗證（例如地址代碼 ID 需唯一）與操作紀錄，但相對分散。
 
 ## 為何同時存在兩套？（推測）

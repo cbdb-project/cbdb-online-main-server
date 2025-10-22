@@ -7,13 +7,15 @@
             <h3 class="box-title">代碼表</h3>
 
             <div class="box-tools pull-right">
-                <a class="btn btn-default" href="/codes/{{ $q }}/create">新增</a>
+                @if(Auth::check())
+                    <a class="btn btn-default" href="/codes/{{ $q }}/create">新增</a>
+                @endif
             </div>
         </div>
         <!-- /.box-header -->
         <div class="box-body">
-            <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" class="form-inline" style="margin-bottom: 15px;">
-                <div class="input-group input-group-sm" style="width: 420px;">
+            <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="margin-bottom: 15px;">
+                <div class="input-group input-group-sm" style="width: 100%; max-width: 420px;">
                     <input type="text"
                            name="search"
                            class="form-control"
@@ -27,67 +29,75 @@
                     </span>
                 </div>
             </form>
-            <table class="table table-bordered table-striped table-condensed">
-                <thead>
-                <tr>
-                    @foreach ($thead as $item)
-                        <th>{{ $item }}</th>
-                    @endforeach
-                    <th style="width: 120px">操作</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse ($data as $item)
+            <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                <table class="table table-bordered table-striped table-condensed">
+                    <thead>
                     <tr>
-                        @php($count = 0)
-                        @php($sum = 0)
-                        @php($id_ = '')
-                        @foreach((array)$item as $key => $value)
-                            @if($count > count($thead)-1)
-                                @break
-                            @endif
-                            @if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy'))
-                                <td>{{ $value }}</td>
-                                @php($count++)
-                            @endif
-                            @if($sum <= 1)
-                                @if($sum != 0 && $sum <= 1)
-                                    @php($id_ .= '_._')
-                                @endif
-                                @php($id_ .= $value)
-                            @endif
-                            @php($sum++)
+                        @foreach ($thead as $item)
+                            <th>{{ $item }}</th>
                         @endforeach
-                        <td>
-                            <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="/codes/{{ $q }}/{{ $id_ }}/edit">edit</a>
-                                <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
-                                   onclick="alert('确认删除');
-                                            event.preventDefault();
-                                           document.getElementById('delete-form-{{ $id_ }}').submit();"
-                                   class="btn btn-sm btn-danger">delete</a>
-                            </div>
-                            <form id="delete-form-{{ $id_ }}" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
-                                {{ method_field('DELETE') }}
-                                {{ csrf_field() }}
-                            </form>
-                        </td>
+                        @if(Auth::check())
+                            <th style="width: 120px">操作</th>
+                        @endif
                     </tr>
-                @empty
+                    </thead>
+                    <tbody>
+                    @forelse ($data as $item)
+                        <tr>
+                            @php($count = 0)
+                            @php($sum = 0)
+                            @php($id_ = '')
+                            @foreach((array)$item as $key => $value)
+                                @if($count > count($thead)-1)
+                                    @break
+                                @endif
+                                @if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy'))
+                                    <td>{{ $value }}</td>
+                                    @php($count++)
+                                @endif
+                                @if($sum <= 1)
+                                    @if($sum != 0 && $sum <= 1)
+                                        @php($id_ .= '_._')
+                                    @endif
+                                    @php($id_ .= $value)
+                                @endif
+                                @php($sum++)
+                            @endforeach
+                            @if(Auth::check())
+                                <td>
+                                    <div class="btn-group">
+                                        <a type="button" class="btn btn-sm btn-info" href="/codes/{{ $q }}/{{ $id_ }}/edit">edit</a>
+                                        <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
+                                           onclick="alert('确认删除');
+                                                    event.preventDefault();
+                                                   document.getElementById('delete-form-{{ $id_ }}').submit();"
+                                           class="btn btn-sm btn-danger">delete</a>
+                                    </div>
+                                    <form id="delete-form-{{ $id_ }}" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
+                                        {{ method_field('DELETE') }}
+                                        {{ csrf_field() }}
+                                    </form>
+                                </td>
+                            @endif
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ count($thead) + 1 }}" class="text-center text-muted">沒有資料</td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                    <tfoot>
                     <tr>
-                        <td colspan="{{ count($thead) + 1 }}" class="text-center text-muted">沒有資料</td>
+                        @foreach ($thead as $item)
+                            <th>{{ $item }}</th>
+                        @endforeach
+                        @if(Auth::check())
+                            <th style="width: 120px">操作</th>
+                        @endif
                     </tr>
-                @endforelse
-                </tbody>
-                <tfoot>
-                <tr>
-                    @foreach ($thead as $item)
-                        <th>{{ $item }}</th>
-                    @endforeach
-                    <th style="width: 120px">操作</th>
-                </tr>
-                </tfoot>
-            </table>
+                    </tfoot>
+                </table>
+            </div>
             <div class="pull-right">{{ $data->links() }}</div>
         </div>
         <!-- /.box-body -->

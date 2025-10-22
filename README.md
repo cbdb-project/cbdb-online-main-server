@@ -318,3 +318,7 @@ sudo chown caddy laravel.log
 ### 代碼表界面白名單維護（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
 
 https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/CODES_TABLES.md
+
+### MERGE 工具說明（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
+
+https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/MERGE.md

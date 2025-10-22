@@ -170,6 +170,7 @@ desired effect
 <!-- Scripts -->
 <script src="{{ mix('js/app.js') }}"></script>
 @yield('js')
+@stack('scripts')
 <script>
     $('#flash-overlay-modal').modal();
 </script>

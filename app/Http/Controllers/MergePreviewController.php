@@ -61,7 +61,7 @@ class MergePreviewController extends Controller
 
             $primary = $primaryInput;
             $secondary = $secondaryInput;
-            $minTargetId = $autoArrange ? min($primaryInput, $secondaryInput) : null;
+            $minTargetId = $autoArrange ? min((int)$primaryInput, (int)$secondaryInput) : null;
 
         $primarySummary = $this->buildPersonSummary($primary, $mergeReason);
         $secondarySummary = $this->buildPersonSummary($secondary, $mergeReason);

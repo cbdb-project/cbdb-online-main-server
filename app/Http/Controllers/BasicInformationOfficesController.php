@@ -167,9 +167,17 @@ class BasicInformationOfficesController extends Controller
         }
         //return $request;
         //修改結束
-        $id_ = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
-        flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $id_]);
+        $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        $officeKey = is_array($result) ? ($result['id'] ?? $id_) : $result;
+        $noChanges = is_array($result) && !empty($result['no_changes']);
+
+        if ($noChanges) {
+            flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
+        } else {
+            flash('Update success @ '.Carbon::now(), 'success');
+        }
+
+        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $officeKey]);
     }
 
     //20190225新增另存功能

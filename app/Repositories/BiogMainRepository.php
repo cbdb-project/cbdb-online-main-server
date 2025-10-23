@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Repositories\Concerns\DetectsModelChanges;
 
 //20181112建安修改
 use App\SocialInstCode;
@@ -50,6 +51,7 @@ ini_set('max_execution_time', 300);
  */
 class BiogMainRepository
 {
+    use DetectsModelChanges;
     /**
      * @param $id
      * @return \Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|null|static|static[]
@@ -416,21 +418,47 @@ class BiogMainRepository
         $_postingid = $data['_postingid'];
         $_officeid = $data['_officeid']; //目前与officeid无关
 
-        if (!empty($data['c_addr'])){
-            $this->insertAddr($data['c_addr'], $_id, $_postingid, $_officeid);
+        $incomingAddr = array_key_exists('c_addr', $data) ? (array)$data['c_addr'] : null;
+
+        $oriRecord = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
+        $ori = $oriRecord ? json_decode(json_encode($oriRecord), true) : [];
+
+        $addressCollection = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->pluck('c_addr_id');
+
+        $existingAddresses = $addressCollection ? $addressCollection->all() : [];
+        $hasAddressChange = $incomingAddr !== null
+            && $this->selectionListHasChanges($incomingAddr, $existingAddresses, -999);
+
+        if ($hasAddressChange) {
+            $this->insertAddr($incomingAddr, $_id, $_postingid, $_officeid);
         }
+
         $data = array_except($data, ['_method', '_token', 'c_addr', '_id', '_postingid', '_officeid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['c_office_id'] = $data['c_office_id'] == -999 ? '0' : $data['c_office_id'];
         //$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+
+        $hasPostingChange = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date']);
+
+        if (!$hasPostingChange && !$hasAddressChange) {
+            return [
+                'id' => $_officeid."-".$_postingid,
+                'no_changes' => true,
+            ];
+        }
+
         $data = (new ToolsRepository)->timestamp($data);
-        //20251214新增差異比對紀錄
-        $ori = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
         DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data, $ori);
-        return $data['c_office_id']."-".$_postingid;
+        return [
+            'id' => $data['c_office_id']."-".$_postingid,
+            'no_changes' => false,
+        ];
     }
 
     public function officeStoreById(Request $request, $id)

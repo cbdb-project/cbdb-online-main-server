@@ -18,6 +18,23 @@ class CodesController extends Controller
 
     protected $allowedTables = [];
     protected $allowedTablesMap = [];
+    /**
+     * Custom column configurations for specific tables.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected $tableColumnOverrides = [
+        'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
+        'TEXT_INSTANCE_DATA' => [
+            'c_textid',
+            'c_text_edition_id',
+            'c_text_instance_id',
+            'c_instance_title_chn',
+            'c_publisher',
+            'c_print',
+            'c_instance_title',
+        ],
+    ];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
     {
@@ -284,6 +301,15 @@ class CodesController extends Controller
 
     protected function buildTableHead(string $table, $sampleRow): array
     {
+        $upperTable = strtoupper($table);
+        if (isset($this->tableColumnOverrides[$upperTable])) {
+            $availableColumns = Schema::getColumnListing($table);
+            $overrideColumns = array_values(array_intersect($this->tableColumnOverrides[$upperTable], $availableColumns));
+            if (!empty($overrideColumns)) {
+                return $overrideColumns;
+            }
+        }
+
         $thead = [];
         if ($sampleRow) {
             $count = 0;
@@ -318,6 +344,11 @@ class CodesController extends Controller
 
     protected function determineSearchableColumns(string $table, array $thead): array
     {
+        $upperTable = strtoupper($table);
+        if (isset($this->tableColumnOverrides[$upperTable])) {
+            return $this->tableColumnOverrides[$upperTable];
+        }
+
         if (!empty($thead)) {
             return $thead;
         }

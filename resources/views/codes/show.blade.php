@@ -43,25 +43,20 @@
                     </thead>
                     <tbody>
                     @forelse ($data as $item)
+                        @php
+                            $row = (array) $item;
+                            $idParts = [];
+                            foreach ($row as $value) {
+                                $idParts[] = $value;
+                                if (count($idParts) >= 2) {
+                                    break;
+                                }
+                            }
+                            $id_ = implode('_._', $idParts);
+                        @endphp
                         <tr>
-                            @php($count = 0)
-                            @php($sum = 0)
-                            @php($id_ = '')
-                            @foreach((array)$item as $key => $value)
-                                @if($count > count($thead)-1)
-                                    @break
-                                @endif
-                                @if(str_contains($key, 'name') or str_contains($key, 'desc') or str_contains($key, 'code') or str_contains($key, 'id') or str_contains($key, 'sequence') or str_contains($key, 'chn') or str_contains($key, 'dy'))
-                                    <td>{{ $value }}</td>
-                                    @php($count++)
-                                @endif
-                                @if($sum <= 1)
-                                    @if($sum != 0 && $sum <= 1)
-                                        @php($id_ .= '_._')
-                                    @endif
-                                    @php($id_ .= $value)
-                                @endif
-                                @php($sum++)
+                            @foreach ($thead as $column)
+                                <td>{{ $row[$column] ?? '' }}</td>
                             @endforeach
                             @if(Auth::check())
                                 <td>

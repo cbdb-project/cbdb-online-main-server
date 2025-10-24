@@ -5,6 +5,7 @@ return [
     'database' => env('CBDB_DATABASE'),
     'per_page' => env('CODES_PER_PAGE', 20),
     'tables' => [
+        'ADDR_BELONGS_DATA',
         'ADDR_CODES',
         'ALTNAME_CODES',
         'APPOINTMENT_CODES',
@@ -36,6 +37,7 @@ return [
         'STATUS_CODES',
         'TEXT_BIBLCAT_CODES',
         'TEXT_CODES',
+        'TEXT_INSTANCE_DATA',
         'TEXT_ROLE_CODES',
         'YEAR_RANGE_CODES',
     ],

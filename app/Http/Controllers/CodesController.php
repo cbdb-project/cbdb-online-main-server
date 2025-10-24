@@ -34,6 +34,13 @@ class CodesController extends Controller
             'c_print',
             'c_instance_title',
         ],
+        'MERGED_PERSON_DATA' => [
+            'c_personid',
+            'c_merged_to_personid',
+            'c_notes',
+            'c_source',
+            'c_pages',
+        ],
     ];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)

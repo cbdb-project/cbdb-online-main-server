@@ -25,6 +25,7 @@ return [
         'KINSHIP_CODES',
         'LITERARYGENRE_CODES',
         'MEASURE_CODES',
+        'MERGED_PERSON_DATA',
         'OCCASION_CODES',
         'OFFICE_CODES',
         'PARENTAL_STATUS_CODES',

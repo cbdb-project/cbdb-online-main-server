@@ -268,31 +268,24 @@ https://github.com/cbdb-project/cbdb-online-main-server/issues/116
 
 ### rebuild vue 的前端（感謝盧建安先生貢獻）
 
-npm run dev如果出現錯誤訊息：error code ELIFECYCLE
+`npm run dev`如果出現錯誤訊息：`error code ELIFECYCLE`
 
 執行命令：
 ```
 rm -rf node_modules
-
-rm package-lock.json yarn.lock
-
+rm package-lock.json
 npm cache clear --force
-
 npm install
 ```
 
 詳細說明：
 
-rm -rf node_modules 是將node_modules資料夾整個刪除
+* rm -rf node_modules 是將node_modules資料夾整個刪除
+* rm package-lock.json 是將最低需求的版本控制資訊移除，直接取得最新版本，這可能會在較新的主機遇到。
+* npm cache clear –force 清除快取
+* npm install 重新安裝
 
-rm package-lock.json yarn.lock 是將最低需求的版本控制資訊移除，直接取得最新版本，這可能會在較新的主機遇到。
-
-npm cache clear –force 清除快取
-
-npm install 重新安裝
-
-
-之後再執行 npm run dev 就可以通過了。
+之後再執行 `npm run dev` 就可以通過了。
 
 ### Install the proper version of node and npm in ubuntu
 
@@ -315,10 +308,8 @@ Please make sure that your web server user is the owner of this file
 ```
 sudo chown caddy laravel.log
 ```
-### 代碼表界面白名單維護（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
+### 開發说明（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
 
-https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/CODES_TABLES.md
-
-### MERGE 工具說明（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
-
-https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/MERGE.md
+* [代碼表格前端實作比較](./CODES.md)
+* [代碼表界面白名單維護](./CODES_TABLES.md)
+* [MERGE 工具說明](./MERGE.md)

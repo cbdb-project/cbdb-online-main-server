@@ -25,6 +25,7 @@ class CodesController extends Controller
      */
     protected $tableColumnOverrides = [
         'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
+        'ADDR_CODES' => ['c_addr_id', 'c_name', 'c_name_chn', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
         'TEXT_INSTANCE_DATA' => [
             'c_textid',
             'c_text_edition_id',
@@ -40,6 +41,13 @@ class CodesController extends Controller
             'c_notes',
             'c_source',
             'c_pages',
+        ],
+        'OFFICE_CODES' => [
+            'c_office_id',
+            'c_dy',
+            'c_office_chn',
+            'c_office_chn_alt',
+            'c_office_trans',
         ],
     ];
 

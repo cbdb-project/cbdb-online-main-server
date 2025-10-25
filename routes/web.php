@@ -140,6 +140,7 @@ Route::resource('operations', 'OperationsController', ['name' => [
     'edit' => 'operations.edit',
     'update' => 'operations.update'
 ]]);
+Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
 Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
     'show' => 'crowdsourcing.show',

@@ -138,6 +138,15 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                     </div>
                                   </div>
                                 </div>
+                                @if(Auth::check() && Auth::user()->is_admin == 1 && in_array((int)$item->op_type, [3,4]))
+                                    <form method="post" action="{{ route('operations.restore', $item->id) }}" style="display:inline;">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="btn btn-warning"
+                                            onclick="return confirm('將以你的名義對該資源進行一次修改，恢復至本次改動之前，是否繼續？');">
+                                            復原
+                                        </button>
+                                    </form>
+                                @endif
                             </td>
                             <td>{{ $item->resource_id }}</td>
                             <td>

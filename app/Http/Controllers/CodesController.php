@@ -25,6 +25,15 @@ class CodesController extends Controller
      */
     protected $dynastyNameMap = null;
     /**
+     * Tables treated as read-only within the generic codes UI.
+     *
+     * @var array<int, string>
+     */
+    protected $readOnlyTables = [
+        'DYNASTIES',
+        'GANZHI_CODES',
+    ];
+    /**
      * Custom column configurations for specific tables.
      *
      * @var array<string, array<int, string>>
@@ -111,6 +120,8 @@ class CodesController extends Controller
                 $dynastyMap = $this->getDynastyNameMap();
             }
 
+            $isReadOnly = $this->isReadOnlyTable($table);
+
             return view('codes.show', [
                 'page_title' => 'Codes',
                 'page_description' => $table,
@@ -121,6 +132,7 @@ class CodesController extends Controller
                 'data' => $data,
                 'search' => $search,
                 'dynastyMap' => $dynastyMap,
+                'isReadOnly' => $isReadOnly,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
@@ -132,6 +144,10 @@ class CodesController extends Controller
     {
 //        dd($table_name);
         $table = $this->guardTable($table_name);
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止編輯。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
+        }
         if($table){
             try{
                 $keyColumns = $this->getKeyColumns($table);
@@ -177,6 +193,10 @@ class CodesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止編輯。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
+        }
         $keyColumns = $this->getKeyColumns($table);
         $conditions = $this->buildConditionsFromId($keyColumns, $id);
         $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
@@ -215,6 +235,10 @@ class CodesController extends Controller
     {
 //        dd($table_name);
         $table = $this->guardTable($table_name);
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止新增。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
+        }
         $data = Schema::getColumnListing($table);
         $id_ = $data[0];
         //20210323遮除「第一欄預設隱藏」
@@ -242,6 +266,10 @@ class CodesController extends Controller
         elseif (Auth::user()->is_active != 1){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
+        }
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止新增。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $data = array_except($request->all(), ['_token']);
         //20210323遮除「第一欄預設隱藏」
@@ -294,6 +322,10 @@ class CodesController extends Controller
         elseif (Auth::user()->is_active != 1){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
+        }
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止刪除。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $keyColumns = $this->getKeyColumns($table);
         $conditions = $this->buildConditionsFromId($keyColumns, $id);
@@ -411,6 +443,17 @@ class CodesController extends Controller
         }
 
         return $cache[$table] = array_values(array_unique(array_filter($keys)));
+    }
+
+    /**
+     * Determine whether the given table should be treated as read-only.
+     *
+     * @param string $table
+     * @return bool
+     */
+    protected function isReadOnlyTable(string $table): bool
+    {
+        return in_array(strtoupper($table), $this->readOnlyTables, true);
     }
 
     /**

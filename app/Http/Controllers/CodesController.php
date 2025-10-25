@@ -48,6 +48,13 @@ class CodesController extends Controller
             'c_source',
             'c_pages',
         ],
+        'OFFICE_CODES' => [
+            'c_office_id',
+            'c_dy',
+            'c_office_chn',
+            'c_office_chn_alt',
+            'c_office_trans',
+        ],
     ];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)

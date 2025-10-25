@@ -5,7 +5,8 @@
     <div class="panel panel-default">
         <div class="panel-heading">最近眾包錄入記錄</div>
         <div class="panel-body">
-            <table id="example1" class="table table-bordered table-striped">
+            <div class="table-responsive">
+                <table id="example1" class="table table-bordered table-striped">
                 <p>* 修改类型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示删除<br />
                 * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄還沒有被處理，3表示記錄reject，4表示記錄處理失敗。
                 </p>
@@ -43,8 +44,7 @@
                                     {{ $hasDiffContent ? '' : 'disabled' }}>
                                     compare
                                 </button>                                
-
-                                <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
+                                <div id="myModal{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
@@ -61,7 +61,7 @@
                                   </div>
                                 </div>
 
-                                <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog">
+                                <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
@@ -95,7 +95,8 @@
                         </tr>
                     @endforeach
                 </tbody>
-            </table>
+                </table>
+            </div>
             <div class="pull-right">
                 {{ $lists->links() }}
             </div>

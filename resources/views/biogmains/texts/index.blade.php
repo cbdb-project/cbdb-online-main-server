@@ -6,7 +6,8 @@
         <div class="panel-heading">著述清單</div>
 
         <div class="panel-body">
-            <table class="table table-hover table-condensed">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
                 <a href="{{ route('basicinformation.texts.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
                 <caption>共查询到{{ $basicinformation->texts_count }}条记录</caption>
                 <thead>
@@ -47,7 +48,8 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 @endsection

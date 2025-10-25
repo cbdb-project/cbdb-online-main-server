@@ -19,13 +19,19 @@ class CodesController extends Controller
     protected $allowedTables = [];
     protected $allowedTablesMap = [];
     /**
+     * Cache of dynasty ID to name mapping for current request.
+     *
+     * @var array<int|string, string>|null
+     */
+    protected $dynastyNameMap = null;
+    /**
      * Custom column configurations for specific tables.
      *
      * @var array<string, array<int, string>>
      */
     protected $tableColumnOverrides = [
         'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
-        'ADDR_CODES' => ['c_addr_id', 'c_name', 'c_name_chn', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
+        'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end'],
         'TEXT_INSTANCE_DATA' => [
             'c_textid',
             'c_text_edition_id',
@@ -100,6 +106,11 @@ class CodesController extends Controller
 
             $data = $query->paginate($perPage)->appends(['search' => $search]);
 
+            $dynastyMap = [];
+            if (in_array('c_dy', $thead, true)) {
+                $dynastyMap = $this->getDynastyNameMap();
+            }
+
             return view('codes.show', [
                 'page_title' => 'Codes',
                 'page_description' => $table,
@@ -109,6 +120,7 @@ class CodesController extends Controller
                 'thead' => $thead,
                 'data' => $data,
                 'search' => $search,
+                'dynastyMap' => $dynastyMap,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
@@ -399,6 +411,35 @@ class CodesController extends Controller
         }
 
         return $cache[$table] = array_values(array_unique(array_filter($keys)));
+    }
+
+    /**
+     * Retrieve mapping of dynasty IDs to Chinese dynasty names.
+     *
+     * @return array<int|string, string>
+     */
+    protected function getDynastyNameMap(): array
+    {
+        if ($this->dynastyNameMap !== null) {
+            return $this->dynastyNameMap;
+        }
+
+        try {
+            $map = DB::table('DYNASTIES')
+                ->select('c_dy', 'c_dynasty_chn')
+                ->get()
+                ->pluck('c_dynasty_chn', 'c_dy')
+                ->toArray();
+        } catch (\Throwable $e) {
+            $map = [];
+        }
+
+        $normalized = [];
+        foreach ($map as $id => $name) {
+            $normalized[(string) $id] = $name;
+        }
+
+        return $this->dynastyNameMap = $normalized;
     }
 
     protected function buildCompositeId(array $keyColumns, array $row): string

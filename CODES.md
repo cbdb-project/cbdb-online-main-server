@@ -7,6 +7,7 @@
 ## 泛用 `/codes/*` 介面
 - **資料來源與流程**：`CodesController` 直接根據網址中的 `table_name` 使用 `DB::table($table_name)` 查詢（`app/Http/Controllers/CodesController.php`），前端採 Blade server-render，列表與 CRUD 表單都在同一套模板內（例如 `resources/views/codes/show.blade.php`）。
 - **欄位推斷**：頁面首次載入時會從第一列資料中挑出包含 `name`、`desc`、`code` 等字串的欄位當作表頭；若推斷不到則退回 `Schema::getColumnListing()`。
+- **欄位顯示補強**：若資料列包含 `c_dy` 欄位，`CodesController` 會事先載入 `DYNASTIES` 表的對照表，列表上會以「代碼 - 朝代名稱」顯示，維持原始 ID 同時提供可讀名稱。
 - **分頁機制**：使用 Laravel 內建分頁器，預設每頁 20 筆，可於 `config('codes.per_page')` 調整（若未定義則 fallback 20）。
 - **操作流程**：新增、編輯、刪除均由同一控制器完成，路徑為 `/codes/{table}/{id}/...`。主鍵拆解使用 `_._` 連結前兩個欄位的方式猜測複合鍵。
 - **優點**：開發維護成本低、可以快速覆蓋多張 *_CODES 表，不需為每張表寫一個 controller/view。

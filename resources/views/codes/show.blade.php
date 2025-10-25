@@ -4,6 +4,8 @@
 
     @php
         $dynastyMap = $dynastyMap ?? [];
+        $isReadOnly = $isReadOnly ?? false;
+        $showActions = Auth::check() && !$isReadOnly;
     @endphp
 
     <div class="box">
@@ -11,7 +13,7 @@
             <h3 class="box-title">代碼表</h3>
 
             <div class="box-tools pull-right">
-                @if(Auth::check())
+                @if($showActions)
                     <a class="btn btn-default" href="/codes/{{ $q }}/create">新增</a>
                 @endif
             </div>
@@ -40,7 +42,7 @@
                         @foreach ($thead as $item)
                             <th>{{ $item }}</th>
                         @endforeach
-                        @if(Auth::check())
+                        @if($showActions)
                             <th style="width: 120px">操作</th>
                         @endif
                     </tr>
@@ -71,7 +73,7 @@
                                 @endphp
                                 <td>{{ $value }}</td>
                             @endforeach
-                            @if(Auth::check())
+                            @if($showActions)
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="/codes/{{ $q }}/{{ $id_ }}/edit">edit</a>
@@ -90,7 +92,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ count($thead) + 1 }}" class="text-center text-muted">沒有資料</td>
+                            <td colspan="{{ count($thead) + ($showActions ? 1 : 0) }}" class="text-center text-muted">沒有資料</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -99,7 +101,7 @@
                         @foreach ($thead as $item)
                             <th>{{ $item }}</th>
                         @endforeach
-                        @if(Auth::check())
+                        @if($showActions)
                             <th style="width: 120px">操作</th>
                         @endif
                     </tr>

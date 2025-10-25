@@ -15,6 +15,7 @@ return [
         'BIOG_INST_CODES',
         'CHORONYM_CODES',
         'COUNTRY_CODES',
+        'DYNASTIES',
         'ENTRY_CODES',
         'ETHNICITY_TRIBE_CODES',
         'EVENT_CODES',

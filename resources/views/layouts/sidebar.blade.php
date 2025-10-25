@@ -43,19 +43,20 @@
             <li class="{{ $page_title == 'Crowdsourcing' ? 'active' : '' }}"><a href="{{ route('crowdsourcing.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近眾包錄入記錄</span></a></li>
             <li class="{{ $page_title == 'Modified' ? 'active' : '' }}"><a href="{{ route('modified.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近修改記錄</span></a></li>
 
-            <li class="header">CODES</li>
-            <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>代碼表 (*_CODES)</span></a></li>
+            <li class="header">編碼表 CODES</li>
+            <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>全部表格 (CODES)</span></a></li>
             {{--<li class="{{ $page_title == 'ADDR_CODES' ? 'active' : '' }}"><a href="/codes/ADDR_CODES"><i class="fa fa-database"></i> <span>ADDR_CODES</span></a></li>--}}
             {{--<li class="{{ $page_title == 'ALTNAME_CODES' ? 'active' : '' }}"><a href="/codes/ALTNAME_CODES"><i class="fa fa-database"></i> <span>ALTNAME_CODES</span></a></li>--}}
             {{--<li class="{{ $page_title == 'Address Codes' ? 'active' : '' }}"><a href="{{ route('addresscodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址編碼表 (ADDRESSES)</span></a></li>--}}
             <li class="{{ $page_title == 'Altname Codes' ? 'active' : '' }}"><a href="/codes/ALTNAME_CODES"><i class="ion ion-ios-people-outline"></i> <span>別名編碼表 (ALTNAME_CODES)</span></a></li>
             <li class="{{ $page_title == 'Appointment Type Codes' ? 'active' : '' }}"><a href="/codes/APPOINTMENT_CODES"><i class="ion ion-ios-people-outline"></i> <span>任命類型編碼表<br> (APPOINTMENT_CODES)</span></a></li>
             <li class="{{ $page_title == 'Text Codes' ? 'active' : '' }}"><a href="/codes/TEXT_CODES"><i class="ion ion-ios-people-outline"></i> <span>著作編碼表 (TEXT_CODES)</span></a></li>
-            <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
-            <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
             <li class="{{ $page_title == 'Addr Codes' ? 'active' : '' }}"><a href="/codes/ADDR_CODES"><i class="ion ion-ios-people-outline"></i> <span>地址編碼表 (ADDR_CODES)</span></a></li>
             <li class="{{ $page_title == 'Office Codes' ? 'active' : '' }}"><a href="/codes/OFFICE_CODES"><i class="ion ion-ios-people-outline"></i> <span>任官編碼表 (OFFICE_CODES)</span></a></li>
             <li class="{{ $page_title == 'Social Institution Codes' ? 'active' : '' }}"><a href="/codes/SOCIAL_INSTITUTION_CODES"><i class="ion ion-ios-people-outline"></i> <span>社會機構編碼表<br>(SOCIAL_INSTITUTION_CODES)</span></a></li>
+            <li class="header">資料表 DATA</li>
+            <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
+            <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
 
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>

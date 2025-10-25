@@ -2,6 +2,10 @@
 
 @section('content')
 
+    @php
+        $dynastyMap = $dynastyMap ?? [];
+    @endphp
+
     <div class="box">
         <div class="box-header">
             <h3 class="box-title">代碼表</h3>
@@ -56,7 +60,16 @@
                         @endphp
                         <tr>
                             @foreach ($thead as $column)
-                                <td>{{ $row[$column] ?? '' }}</td>
+                                @php
+                                    $value = $row[$column] ?? '';
+                                    if ($column === 'c_dy' && $value !== '') {
+                                        $key = is_scalar($value) ? (string) $value : null;
+                                        if ($key !== null && isset($dynastyMap[$key])) {
+                                            $value = $value . ' - ' . $dynastyMap[$key];
+                                        }
+                                    }
+                                @endphp
+                                <td>{{ $value }}</td>
                             @endforeach
                             @if(Auth::check())
                                 <td>

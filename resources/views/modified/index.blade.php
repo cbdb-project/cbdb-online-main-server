@@ -98,8 +98,16 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                             <td>{{ $item->resource }}</td>
                             @php
                                 $diffSource = $item->resource_diff ?? $item->resource_original;
-                                $diffRows = is_array($diffSource) ? ($diffSource['rows'] ?? []) : [];
-                                $hasDiffContent = !empty($diffRows) || (is_string($diffSource) && trim($diffSource) !== '');
+                                $hasDiffContent = false;
+                                if (is_array($diffSource)) {
+                                    if (($diffSource['type'] ?? null) === 'POSTED_TO_ADDR_DATA') {
+                                        $hasDiffContent = !empty($diffSource['addresses'] ?? []);
+                                    } else {
+                                        $hasDiffContent = !empty($diffSource['rows'] ?? []);
+                                    }
+                                } elseif (is_string($diffSource) && trim($diffSource) !== '') {
+                                    $hasDiffContent = true;
+                                }
                                 $resourceDataParsed = json_decode($item->resource_data, true);
                                 if (!is_array($resourceDataParsed)) {
                                     $resourceDataParsed = is_string($item->resource_data) ? trim($item->resource_data) : $item->resource_data;

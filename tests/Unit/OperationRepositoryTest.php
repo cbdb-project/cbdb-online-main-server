@@ -103,4 +103,52 @@ class OperationRepositoryTest extends TestCase
         $this->assertSame('{"a":2}', $row['after']);
         $this->assertSame('{"a":3}', $row['current']);
     }
+
+    public function testBuildPostedToAddrDiffProvidesKeyMetadataAndAddressMatrix()
+    {
+        $after = [
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 20, 'c_addr_id' => 100],
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 20, 'c_addr_id' => 200],
+        ];
+        $before = [
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 15, 'c_addr_id' => 200],
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 15, 'c_addr_id' => 300],
+        ];
+        $current = [
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 20, 'c_addr_id' => 100],
+            ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 20, 'c_addr_id' => 400],
+        ];
+
+        $diff = $this->repository->buildPostedToAddrDiff($after, $before, $current);
+
+        $this->assertNotNull($diff);
+        $this->assertSame('POSTED_TO_ADDR_DATA', $diff['type']);
+
+        $this->assertSame(
+            ['c_personid' => 1, 'c_office_id' => 20, 'c_posting_id' => 10],
+            $diff['keys']['after']
+        );
+        $this->assertSame(
+            ['c_personid' => 1, 'c_office_id' => 15, 'c_posting_id' => 10],
+            $diff['keys']['before']
+        );
+        $this->assertSame(
+            ['c_personid' => 1, 'c_office_id' => 20, 'c_posting_id' => 10],
+            $diff['keys']['current']
+        );
+
+        $this->assertCount(4, $diff['addresses']);
+
+        $first = $diff['addresses'][0];
+        $this->assertSame(100, $first['id']);
+        $this->assertNull($first['before']);
+        $this->assertNotNull($first['after']);
+        $this->assertNotNull($first['current']);
+
+        $second = $diff['addresses'][1];
+        $this->assertSame(200, $second['id']);
+        $this->assertNotNull($second['before']);
+        $this->assertNotNull($second['after']);
+        $this->assertNull($second['current']);
+    }
 }

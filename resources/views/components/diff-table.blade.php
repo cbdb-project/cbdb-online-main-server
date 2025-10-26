@@ -2,7 +2,9 @@
     $diff = $diff ?? null;
 @endphp
 
-@if (is_array($diff))
+@if (is_array($diff) && ($diff['type'] ?? null) === 'POSTED_TO_ADDR_DATA')
+    @include('components.posted-to-addr-diff', ['diff' => $diff])
+@elseif (is_array($diff))
     @php
         $rows = $diff['rows'] ?? [];
         $note = $diff['note'] ?? null;

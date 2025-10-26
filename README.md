@@ -8,6 +8,10 @@
 
 https://input.cbdb.fas.harvard.edu/basicinformation
 
+## UI 調整（2025）
+
+詳情請參見 [CHANGELOG](./CHANGELOG.md)。
+
 ### Database migrations
 
 数据库配置文件在.env中

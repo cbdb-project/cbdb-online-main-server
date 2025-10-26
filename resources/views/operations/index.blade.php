@@ -3,10 +3,9 @@
 @section('content')
 @include('biogmains.defense')
     <div class="panel panel-default">
-        <div class="panel-heading">人名列表</div>
         <div class="panel-body">
-            <table class="table table-bordered table-striped">
-                <p>* 修改类型 1表示新增， 3表示修改，4表示删除</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
                 <thead>
                 <tr>
                     <th>人物</th>
@@ -98,18 +97,18 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                 }
                             @endphp
                             <td>
-                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">resource_data</button>
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">內容快照</button>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ $hasDiffContent ? '' : 'disabled' }}>
-                                    compare
+                                    {{ $hasDiffContent && (int)$item->op_type !== 4 ? '' : 'disabled' }}>
+                                    比較
                                 </button>
 
-                                <div id="myModal{{ $item->id }}" class="modal fade" role="dialog">
+                                <div id="myModal{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
                                         <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                        <h4 class="modal-title">resource_data</h4>
+                                        <h4 class="modal-title">內容快照</h4>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @include('components.key-value-table', ['data' => $resourceDataParsed])
@@ -121,12 +120,12 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                   </div>
                                 </div>
 
-                                <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog">
+                                <div id="myModal-mapping{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
                                         <button type="button" class="close" data-dismiss="modal">&times;</button>
-                                        <h4 class="modal-title">compare</h4>
+                                        <h4 class="modal-title">比較</h4>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         <div>
@@ -141,14 +140,25 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                 </div>
                             </td>
                             <td>{{ $item->resource_id }}</td>
-                            <td>{{ $item->op_type }}</td>
+                            <td>
+                                @php
+                                    $opTypeLabels = [
+                                        1 => '1-新增',
+                                        2 => '2-整體覆寫',
+                                        3 => '3-修改',
+                                        4 => '4-刪除',
+                                    ];
+                                @endphp
+                                {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}
+                            </td>
                             <td>{{ $item->user->name }}</td>
                             <td>{{ $item->updated_at }}</td>
                         </tr>
                     @endforeach
                 </tbody>
 
-            </table>
+                </table>
+            </div>
             <div class="pull-right">
                 {{ $lists->links() }}
             </div>

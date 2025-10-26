@@ -6,7 +6,8 @@
         <div class="panel-heading">社會區分清單</div>
 
         <div class="panel-body">
-            <table class="table table-hover table-condensed">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
                 <a href="{{ route('basicinformation.statuses.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
                 <caption>共查询到{{ $basicinformation->statuses_count }}条记录</caption>
                 <thead>
@@ -53,7 +54,8 @@
                     </tr>
                 @endforeach
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 

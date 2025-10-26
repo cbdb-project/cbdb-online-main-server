@@ -7,7 +7,8 @@
         <div class="panel-heading">别名</div>
 
         <div class="panel-body">
-            <table class="table table-hover table-condensed">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
                 <a href="{{ route('basicinformation.altnames.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
                 <caption>共查询到{{ $basicinformation->altnames_count }}条记录</caption>
                 <thead>
@@ -67,7 +68,8 @@ if($value->pivot->c_sequence === 0) {
                     </tr>
                 @endforeach
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 @endsection

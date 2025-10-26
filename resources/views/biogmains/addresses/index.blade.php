@@ -6,7 +6,8 @@
         <div class="panel-heading">地址清單</div>
         <div class="panel-body">
             <a href="{{ route('basicinformation.addresses.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
-            <table class="table table-hover table-condensed">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
                 <caption>共查询到{{ $basicinformation->biog_addresses_count }}条记录</caption>
                 <thead>
                 <tr>
@@ -48,7 +49,8 @@
                     </tr>
                 @endfor
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 @endsection

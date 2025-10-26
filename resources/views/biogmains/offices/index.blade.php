@@ -7,7 +7,8 @@
 
         <div class="panel-body">
             <a href="{{ route('basicinformation.offices.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
-            <table class="table table-hover table-condensed">
+            <div class="table-responsive">
+                <table class="table table-hover table-condensed">
                 <caption>共查询到{{ $basicinformation->offices_count }}条记录</caption>
                 <thead>
                 <tr>
@@ -54,7 +55,8 @@
                     </tr>
                 @endforeach
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 @endsection

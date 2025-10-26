@@ -127,7 +127,7 @@ class OfficeAddressOperationLoggingTest extends TestCase
         ], $before);
     }
 
-public function testAddressChangeOnlyTouchesTargetOffice(): void
+    public function testAddressChangeOnlyTouchesTargetOffice(): void
     {
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
             'c_personid' => 100000,

@@ -54,3 +54,5 @@
 |37 | YEAR_RANGE_CODES |
 
 > 建議：若新增或移除代碼表，請同步更新本文件與 `config/codes.php`，並在部署環境重新執行 `php artisan config:cache` 以確保新設定生效。
+
+> 備註：`DYNASTIES` 與 `GANZHI_CODES` 目前在泛用 `/codes` 介面中為只讀表，僅允許瀏覽與搜尋。

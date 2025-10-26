@@ -56,6 +56,9 @@ else {
     case "POSTED_TO_OFFICE_DATA":
       echo $id."/offices/".$res_id;
       break;
+    case "POSTED_TO_ADDR_DATA":
+      echo $id."/offices/".$res_id;
+      break;
     case "ENTRY_DATA":
       echo $id."/entries/".$res_id;
       break;

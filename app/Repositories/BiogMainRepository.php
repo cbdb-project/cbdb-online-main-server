@@ -24,6 +24,8 @@ use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use Illuminate\Support\Facades\DB;
 use App\Repositories\Concerns\DetectsModelChanges;
 
@@ -432,10 +434,6 @@ class BiogMainRepository
         $hasAddressChange = $incomingAddr !== null
             && $this->selectionListHasChanges($incomingAddr, $existingAddresses, -999);
 
-        if ($hasAddressChange) {
-            $this->insertAddr($incomingAddr, $_id, $_postingid, $_officeid);
-        }
-
         $data = array_except($data, ['_method', '_token', 'c_addr', '_id', '_postingid', '_officeid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
@@ -452,9 +450,60 @@ class BiogMainRepository
             ];
         }
 
-        $data = (new ToolsRepository)->timestamp($data);
-        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data, $ori);
+        if ($hasPostingChange) {
+            $data = (new ToolsRepository)->timestamp($data);
+            DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
+            (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data, $ori);
+        } else {
+            $data = $ori;
+        }
+
+        if ($hasAddressChange) {
+            $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
+            $currentOfficeId = (int) ($data['c_office_id'] ?? $previousOfficeId);
+
+            $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $_id)
+                ->where('c_posting_id', $_postingid)
+                ->where('c_office_id', $previousOfficeId)
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'c_personid' => (int) $row->c_personid,
+                        'c_posting_id' => (int) $row->c_posting_id,
+                        'c_office_id' => (int) $row->c_office_id,
+                        'c_addr_id' => (int) $row->c_addr_id,
+                    ];
+                })
+                ->all();
+
+            $this->insertAddr($incomingAddr, $_id, $_postingid, $_officeid);
+
+            $afterRows = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $_id)
+                ->where('c_posting_id', $_postingid)
+                ->where('c_office_id', $currentOfficeId)
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'c_personid' => (int) $row->c_personid,
+                        'c_posting_id' => (int) $row->c_posting_id,
+                        'c_office_id' => (int) $row->c_office_id,
+                        'c_addr_id' => (int) $row->c_addr_id,
+                    ];
+                })
+                ->all();
+
+            (new OperationRepository())->store(
+                Auth::id(),
+                $c_personid,
+                3,
+                'POSTED_TO_ADDR_DATA',
+                $data['c_office_id']."-".$_postingid,
+                ['rows' => $afterRows],
+                ['rows' => $beforeRows]
+            );
+        }
         return [
             'id' => $data['c_office_id']."-".$_postingid,
             'no_changes' => false,
@@ -1579,7 +1628,11 @@ class BiogMainRepository
 
     protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)
     {
-        DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $_id)->where('c_posting_id', $_postingid)->delete();
+        DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->where('c_office_id', $_officeid)
+            ->delete();
         foreach ($c_addr as $item) {
             DB::table('POSTED_TO_ADDR_DATA')->insert(
                 [

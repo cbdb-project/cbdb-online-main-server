@@ -63,6 +63,37 @@ class ModifiedController extends Controller
                             $arr3 = OfficeTypeTree::find($resource_id)->toArray();
                         }
                         break;
+                    case "POSTED_TO_ADDR_DATA":
+                        $addrParts = explode('-', $resource_id);
+                        $postingOfficeId = $addrParts[0] ?? null;
+                        $postingId = $addrParts[1] ?? null;
+                        $personId = $listsArr['data'][$x]['c_personid'] ?? null;
+                        if ($personId === null) {
+                            $decoded = json_decode($arr1, true);
+                            if (is_array($decoded) && isset($decoded['rows'][0]['c_personid'])) {
+                                $personId = (int) $decoded['rows'][0]['c_personid'];
+                            }
+                        }
+                        if ($personId !== null && $postingId !== null) {
+                            $query = DB::table('POSTED_TO_ADDR_DATA')
+                                ->where('c_personid', $personId)
+                                ->where('c_posting_id', $postingId);
+                            if ($postingOfficeId !== null && $postingOfficeId !== '') {
+                                $query->where('c_office_id', $postingOfficeId);
+                            }
+                            $rows = $query->get()->map(function ($row) {
+                                return [
+                                    'c_personid' => (int) $row->c_personid,
+                                    'c_posting_id' => (int) $row->c_posting_id,
+                                    'c_office_id' => (int) $row->c_office_id,
+                                    'c_addr_id' => (int) $row->c_addr_id,
+                                ];
+                            })->values()->all();
+                            $arr3 = ['rows' => $rows];
+                        } else {
+                            $arr3 = [];
+                        }
+                        break;
                     default:
                         $arr3 = array();
                         break;

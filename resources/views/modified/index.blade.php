@@ -102,10 +102,13 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                     $resourceDataParsed = is_string($item->resource_data) ? trim($item->resource_data) : $item->resource_data;
                                 }
                             @endphp
+                                @php
+                                    $canCompare = $hasDiffContent && (int)$item->op_type !== 4;
+                                @endphp
                             <td>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">內容快照</button>
                                 <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ $hasDiffContent && (int)$item->op_type !== 4 ? '' : 'disabled' }}>
+                                    {{ $canCompare ? '' : 'disabled' }}>
                                     比較
                                 </button>
 
@@ -144,7 +147,7 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                     </div>
                                   </div>
                                 </div>
-                                @if(Auth::check() && Auth::user()->is_admin == 1 && in_array((int)$item->op_type, [3,4]))
+                                @if(Auth::check() && Auth::user()->is_admin == 1 && in_array((int)$item->op_type, [3,4]) && $item->resource !== 'POSTED_TO_ADDR_DATA' && $canCompare)
                                     <form method="post" action="{{ route('operations.restore', $item->id) }}" style="display:inline;">
                                         {{ csrf_field() }}
                                         <button type="submit" class="btn btn-warning"

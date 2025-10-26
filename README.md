@@ -317,7 +317,6 @@ sudo chown caddy laravel.log
 * [代碼表格前端實作比較](./CODES.md)
 * [代碼表界面白名單維護](./CODES_TABLES.md)
 * [MERGE 工具說明](./MERGE.md)
+* [AGENTS 指南](./AGENTS.md)
 
-### AGENTS 指南（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
-
-本文件彙整了 AI 代理在此專案工作時必備的背景知識、流程與測試指引。
+https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/AGENTS.md

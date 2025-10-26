@@ -319,4 +319,3 @@ sudo chown caddy laravel.log
 * [MERGE 工具說明](./MERGE.md)
 * [AGENTS 指南](./AGENTS.md)
 
-https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/AGENTS.md

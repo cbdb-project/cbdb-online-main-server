@@ -499,13 +499,13 @@ class BiogMainRepository
                 $c_personid,
                 3,
                 'POSTED_TO_ADDR_DATA',
-                $data['c_office_id']."-".$_postingid,
+                $currentOfficeId."-".$_postingid,
                 ['rows' => $afterRows],
                 ['rows' => $beforeRows]
             );
         }
         return [
-            'id' => $data['c_office_id']."-".$_postingid,
+            'id' => $currentOfficeId."-".$_postingid,
             'no_changes' => false,
         ];
     }

@@ -18,7 +18,8 @@ const { VueLoaderPlugin } = require('vue-loader');
   
 mix.js('resources/assets/js/app.js', 'public/js')
    .sass('resources/assets/sass/app.scss', 'public/css')
-   .vue({ version: 3 });
+   .vue({ version: 3 })
+   .version();
 
 module.exports = {
   module: {

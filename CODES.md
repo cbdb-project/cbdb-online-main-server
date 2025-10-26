@@ -10,6 +10,7 @@
 - **欄位顯示補強**：若資料列包含 `c_dy` 欄位，`CodesController` 會事先載入 `DYNASTIES` 表的對照表，列表上會以「代碼 - 朝代名稱」顯示，維持原始 ID 同時提供可讀名稱。
 - **分頁機制**：使用 Laravel 內建分頁器，預設每頁 20 筆，可於 `config('codes.per_page')` 調整（若未定義則 fallback 20）。
 - **操作流程**：新增、編輯、刪除均由同一控制器完成，路徑為 `/codes/{table}/{id}/...`。主鍵拆解使用 `_._` 連結前兩個欄位的方式猜測複合鍵。
+- **只讀控制**：部分資料表（目前為 `DYNASTIES`、`GANZHI_CODES`）於控制器層標記為只讀，UI 會隱藏新增／編輯／刪除按鈕，並阻擋直接透過路由送出的寫入操作。
 - **優點**：開發維護成本低、可以快速覆蓋多張 *_CODES 表，不需為每張表寫一個 controller/view。
 - **搜尋功能**：2025 年新增 `?search=` query 支援，可在頁面頂部篩選表格列，底層會對推斷出的欄位下 `LIKE` 條件並保留原本的分頁。搜尋框值會帶入 `appends()`，翻頁時不會遺失條件。
 - **操作紀錄**：`store`、`update`、`destroy` 現已呼叫 `OperationRepository`，將 CRUD 操作寫入 `operations` 表，內容含原始列資料與合併後值，與 `/altnamecodes` 等專用頁面保持一致。

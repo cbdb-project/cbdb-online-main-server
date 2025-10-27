@@ -100,17 +100,39 @@ class MergePreviewControllerTest extends TestCase
 
     public function testBuildSqlPreviewIncludesAutoArrangeStatements()
     {
-        $statements = $this->controller->callBuildSqlPreview(200, 100, ['c_name' => 'Merged'], true, 100);
+        $result = [
+            'values' => ['c_name' => 'Merged'],
+            'updates' => ['c_name' => 'Merged'],
+            'merge_record' => null,
+        ];
+        $statements = $this->controller->callBuildSqlPreview(200, 100, $result, true, 100);
 
         $this->assertSame('START TRANSACTION;', $statements[0]);
-        $this->assertContains("UPDATE BIOG_MAIN SET c_name = 'Merged' WHERE c_personid = 200;", $statements[1]);
+
+        $hasMainUpdate = false;
+        foreach ($statements as $statement) {
+            if (strpos($statement, "UPDATE BIOG_MAIN SET c_name = 'Merged' WHERE c_personid = 200;") !== false) {
+                $hasMainUpdate = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasMainUpdate, '應該要更新保留人物的 BIOG_MAIN 欄位。');
+
         $this->assertContains('-- 調整至較小 ID 100', $statements, 'Auto arrange block should suggest moving to min ID');
-        $this->assertContains("UPDATE BIOG_MAIN SET c_personid = 100 WHERE c_personid = 200;", $statements);
+
+        $hasMinUpdate = false;
+        foreach ($statements as $statement) {
+            if (strpos($statement, "UPDATE BIOG_MAIN SET c_personid = 100 WHERE c_personid = 200;") !== false) {
+                $hasMinUpdate = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasMinUpdate, 'Auto arrange 段落應該將人物 ID 調整為較小值。');
     }
 
     public function testBuildSqlPreviewSkipsAutoArrangeWhenDisabled()
     {
-        $statements = $this->controller->callBuildSqlPreview(300, 200, [], false, null);
+        $statements = $this->controller->callBuildSqlPreview(300, 200, ['values' => [], 'updates' => [], 'merge_record' => null], false, null);
 
         $this->assertNotContains('-- 調整至較小 ID', $statements);
         $this->assertSame('START TRANSACTION;', $statements[0]);

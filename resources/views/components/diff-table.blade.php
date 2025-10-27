@@ -9,7 +9,13 @@
     @endphp
     @if (!empty($rows))
         <div class="table-responsive">
-            <table class="table table-bordered table-striped table-condensed">
+            <table class="table table-bordered table-striped table-condensed diff-table diff-table--quad">
+                <colgroup>
+                    <col style="width:10%;">
+                    <col style="width:30%;">
+                    <col style="width:30%;">
+                    <col style="width:30%;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>欄位</th>

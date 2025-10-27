@@ -10,6 +10,7 @@ namespace App\Repositories;
 
 
 use App\Operation;
+use Illuminate\Support\Facades\DB;
 
 class OperationRepository
 {
@@ -122,5 +123,173 @@ class OperationRepository
             return null;
         }
         return ['rows' => $rows];
+    }
+
+    /**
+     * Build a structured diff payload for POSTED_TO_ADDR_DATA resources.
+     *
+     * @param array $afterRows
+     * @param array $beforeRows
+     * @param array $currentRows
+     * @return array|null
+     */
+    public function buildPostedToAddrDiff(array $afterRows, array $beforeRows, array $currentRows)
+    {
+        $reference = $this->firstNonEmptyRow($afterRows, $beforeRows, $currentRows);
+
+        $keys = [
+            'before' => $this->extractPostedToAddrKeys($beforeRows, $reference),
+            'after' => $this->extractPostedToAddrKeys($afterRows, $reference),
+            'current' => $this->extractPostedToAddrKeys($currentRows, $reference),
+        ];
+
+        $addresses = $this->buildPostedToAddrAddressMatrix($afterRows, $beforeRows, $currentRows);
+
+        if ($reference === null && empty($addresses)) {
+            return null;
+        }
+
+        return [
+            'type' => 'POSTED_TO_ADDR_DATA',
+            'keys' => $keys,
+            'addresses' => $addresses,
+        ];
+    }
+
+    /**
+     * Cache for address labels.
+     *
+     * @var array<int,string>
+     */
+    protected $addressLabelCache = [];
+
+    protected function firstNonEmptyRow(array ...$rowSets)
+    {
+        foreach ($rowSets as $rows) {
+            if (!empty($rows)) {
+                $first = reset($rows);
+                if (is_array($first) && !empty($first)) {
+                    return $first;
+                }
+            }
+        }
+        return null;
+    }
+
+    protected function extractPostedToAddrKeys(array $rows, ?array $fallback)
+    {
+        $source = !empty($rows) ? reset($rows) : $fallback;
+
+        return [
+            'c_personid' => $this->normalizePostedToAddrInteger($source['c_personid'] ?? null),
+            'c_office_id' => $this->normalizePostedToAddrInteger($source['c_office_id'] ?? null),
+            'c_posting_id' => $this->normalizePostedToAddrInteger($source['c_posting_id'] ?? null),
+        ];
+    }
+
+    protected function buildPostedToAddrAddressMatrix(array $afterRows, array $beforeRows, array $currentRows)
+    {
+        $uniqueIds = $this->collectPostedToAddrIds($afterRows, $beforeRows, $currentRows);
+        if (empty($uniqueIds)) {
+            return [];
+        }
+
+        $this->warmAddressLabelCache($uniqueIds);
+
+        $beforeMap = $this->buildPostedToAddrMap($beforeRows);
+        $afterMap = $this->buildPostedToAddrMap($afterRows);
+        $currentMap = $this->buildPostedToAddrMap($currentRows);
+
+        $matrix = [];
+        foreach ($uniqueIds as $addrId) {
+            $matrix[] = [
+                'id' => $addrId,
+                'before' => $beforeMap[$addrId] ?? null,
+                'after' => $afterMap[$addrId] ?? null,
+                'current' => $currentMap[$addrId] ?? null,
+            ];
+        }
+
+        return $matrix;
+    }
+
+    protected function collectPostedToAddrIds(array ...$rowSets)
+    {
+        $ids = [];
+        foreach ($rowSets as $rows) {
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $addrId = $this->normalizePostedToAddrInteger($row['c_addr_id'] ?? null);
+                if ($addrId === null) {
+                    continue;
+                }
+                $ids[] = $addrId;
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids, SORT_NUMERIC);
+
+        return $ids;
+    }
+
+    protected function warmAddressLabelCache(array $addrIds)
+    {
+        $existing = array_map('intval', array_keys($this->addressLabelCache));
+        $missing = array_diff($addrIds, $existing);
+        if (empty($missing)) {
+            return;
+        }
+
+        try {
+            $rows = DB::table('ADDR_CODES')
+                ->select('c_addr_id', 'c_name_chn')
+                ->whereIn('c_addr_id', $missing)
+                ->get();
+
+            foreach ($rows as $row) {
+                $id = (int) $row->c_addr_id;
+                $this->addressLabelCache[$id] = $this->formatAddressLabel($id, $row->c_name_chn);
+            }
+        } catch (\Throwable $e) {
+            // Swallow exceptions (e.g. table missing in tests) and fall back to generic labels.
+        }
+        foreach ($missing as $id) {
+            if (!array_key_exists($id, $this->addressLabelCache)) {
+                $this->addressLabelCache[$id] = $this->formatAddressLabel($id, null);
+            }
+        }
+    }
+
+    protected function buildPostedToAddrMap(array $rows)
+    {
+        $map = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $addrId = $this->normalizePostedToAddrInteger($row['c_addr_id'] ?? null);
+            if ($addrId === null) {
+                continue;
+            }
+            $map[$addrId] = $this->addressLabelCache[$addrId] ?? $this->formatAddressLabel($addrId, null);
+        }
+        return $map;
+    }
+
+    protected function normalizePostedToAddrInteger($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        return (int) $value;
+    }
+
+    protected function formatAddressLabel(int $addrId, ?string $name)
+    {
+        $label = $name ? trim($name) : '未詳';
+        return $addrId.' '.$label;
     }
 }

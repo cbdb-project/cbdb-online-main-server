@@ -41,6 +41,7 @@ class ModifiedController extends Controller
         for($x=0;$x<$all;$x++) {
             $c_personid = '';
             $arr3 = array();
+            $resource = $listsArr['data'][$x]['resource'];
             $arr1 = $listsArr['data'][$x]['resource_data'];
             $arr2 = $listsArr['data'][$x]['resource_original'];
             //20191225實時比對的程式判斷
@@ -63,6 +64,37 @@ class ModifiedController extends Controller
                             $arr3 = OfficeTypeTree::find($resource_id)->toArray();
                         }
                         break;
+                    case "POSTED_TO_ADDR_DATA":
+                        $addrParts = explode('-', $resource_id);
+                        $postingOfficeId = $addrParts[0] ?? null;
+                        $postingId = $addrParts[1] ?? null;
+                        $personId = $listsArr['data'][$x]['c_personid'] ?? null;
+                        if ($personId === null) {
+                            $decoded = json_decode($arr1, true);
+                            if (is_array($decoded) && isset($decoded['rows'][0]['c_personid'])) {
+                                $personId = (int) $decoded['rows'][0]['c_personid'];
+                            }
+                        }
+                        if ($personId !== null && $postingId !== null) {
+                            $query = DB::table('POSTED_TO_ADDR_DATA')
+                                ->where('c_personid', $personId)
+                                ->where('c_posting_id', $postingId);
+                            if ($postingOfficeId !== null && $postingOfficeId !== '') {
+                                $query->where('c_office_id', $postingOfficeId);
+                            }
+                            $rows = $query->get()->map(function ($row) {
+                                return [
+                                    'c_personid' => (int) $row->c_personid,
+                                    'c_posting_id' => (int) $row->c_posting_id,
+                                    'c_office_id' => (int) $row->c_office_id,
+                                    'c_addr_id' => (int) $row->c_addr_id,
+                                ];
+                            })->values()->all();
+                            $arr3 = ['rows' => $rows];
+                        } else {
+                            $arr3 = [];
+                        }
+                        break;
                     default:
                         $arr3 = array();
                         break;
@@ -70,11 +102,21 @@ class ModifiedController extends Controller
             }
             else { $arr3 = array(); }
 
-            if(!empty($arr2)) {
-                //將json轉換為陣列進行比對
-                $arr1 = json_decode($arr1, true);
-                $arr2 = json_decode($arr2, true);
-                $ans = $this->operationRepository->getArrDiff($arr1, $arr2, $arr3);
+            $arr1Decoded = json_decode($arr1, true);
+            $arr2Decoded = json_decode($arr2, true);
+            $arr1Decoded = is_array($arr1Decoded) ? $arr1Decoded : [];
+            $arr2Decoded = is_array($arr2Decoded) ? $arr2Decoded : [];
+
+            if ($resource === 'POSTED_TO_ADDR_DATA') {
+                $currentRows = is_array($arr3) ? ($arr3['rows'] ?? []) : [];
+                $diffPayload = $this->operationRepository->buildPostedToAddrDiff(
+                    $arr1Decoded['rows'] ?? [],
+                    $arr2Decoded['rows'] ?? [],
+                    $currentRows
+                );
+                $lists[$x]->setAttribute('resource_diff', $diffPayload);
+            } elseif (!empty($arr2)) {
+                $ans = $this->operationRepository->getArrDiff($arr1Decoded, $arr2Decoded, $arr3);
                 $lists[$x]->setAttribute('resource_diff', $ans);
             } else {
                 $lists[$x]->setAttribute('resource_diff', null);

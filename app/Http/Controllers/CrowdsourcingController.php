@@ -44,6 +44,7 @@ class CrowdsourcingController extends Controller
         for($x=0;$x<$all;$x++) {
             $c_personid = '';
             $arr3 = array();
+            $resource = $listsArr['data'][$x]['resource'];
             $arr1 = $listsArr['data'][$x]['resource_data'];
             $arr2 = $listsArr['data'][$x]['resource_original'];
             //20191225實時比對的程式判斷
@@ -73,12 +74,21 @@ class CrowdsourcingController extends Controller
             }
             else { $arr3 = array(); }
 
-            if(!empty($arr2)) {
-                //將json轉換為陣列進行比對
-                $arr1 = json_decode($arr1, true);
-                $arr2 = json_decode($arr2, true);
-                $ans = $this->operationRepository->getArrDiff($arr1, $arr2, $arr3);
-                //將比對後的結果存回至resource_original欄位
+            $arr1Decoded = json_decode($arr1, true);
+            $arr2Decoded = json_decode($arr2, true);
+            $arr1Decoded = is_array($arr1Decoded) ? $arr1Decoded : [];
+            $arr2Decoded = is_array($arr2Decoded) ? $arr2Decoded : [];
+
+            if ($resource === 'POSTED_TO_ADDR_DATA') {
+                $currentRows = is_array($arr3) ? ($arr3['rows'] ?? []) : [];
+                $diffPayload = $this->operationRepository->buildPostedToAddrDiff(
+                    $arr1Decoded['rows'] ?? [],
+                    $arr2Decoded['rows'] ?? [],
+                    $currentRows
+                );
+                $lists[$x]->setAttribute('resource_diff', $diffPayload);
+            } elseif (!empty($arr2)) {
+                $ans = $this->operationRepository->getArrDiff($arr1Decoded, $arr2Decoded, $arr3);
                 $lists[$x]->setAttribute('resource_diff', $ans);
             }
             else {

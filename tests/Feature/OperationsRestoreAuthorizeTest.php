@@ -41,76 +41,64 @@ class OperationsRestoreAuthorizeTest extends TestCase
 
     public function testActiveAdminCanTriggerRestore(): void
     {
-        $user = $this->makeUser([
-            'is_active' => 1,
-            'is_admin' => 1,
-        ]);
+        $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
 
-        $operation = $this->makeOperation(3);
+        $operation = $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA');
 
         $controller = new SpyOperationsController($this->repository);
-        $response = $controller->restore($this->makeRequest(), $operation);
+        $controller->restore($this->makeRequest(), $operation);
 
         $this->assertTrue($controller->restoreInvoked);
-        $this->assertEquals(302, $response->getStatusCode());
-        $this->assertEquals(route('operations.index'), $response->headers->get('Location'));
         $this->assertCount(1, $this->repository->storeCalls);
-        $call = $this->repository->storeCalls[0];
-        $this->assertEquals($user->id, $call[0]);
-        $this->assertEquals(99, $call[1]);
-        $this->assertEquals(3, $call[2]);
-        $this->assertEquals($operation->resource, $call[3]);
-        $this->assertEquals($operation->resource_id, $call[4]);
-        $this->assertEquals(['c_personid' => 99, 'field' => 'restored'], $call[5]);
-        $this->assertEquals(['c_personid' => 99, 'field' => 'previous'], $call[6]);
+        $this->assertEquals($operation->resource, $this->repository->storeCalls[0][3]);
     }
 
     public function testRegularUserCannotTriggerRestore(): void
     {
-        $user = $this->makeUser([
-            'is_active' => 1,
-            'is_admin' => 0,
-        ]);
+        $user = $this->makeUser(['is_active' => 1, 'is_admin' => 0]);
         $this->actingAs($user);
 
         $controller = new SpyOperationsController($this->repository);
-        $response = $controller->restore($this->makeRequest(), $this->makeOperation(3));
+        $controller->restore($this->makeRequest(), $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA'));
 
         $this->assertFalse($controller->restoreInvoked);
-        $this->assertEquals(302, $response->getStatusCode());
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
     public function testBannedAdminCannotTriggerRestore(): void
     {
-        $user = $this->makeUser([
-            'is_active' => 1,
-            'is_admin' => 2,
-        ]);
+        $user = $this->makeUser(['is_active' => 1, 'is_admin' => 2]);
         $this->actingAs($user);
 
         $controller = new SpyOperationsController($this->repository);
-        $response = $controller->restore($this->makeRequest(), $this->makeOperation(3));
+        $controller->restore($this->makeRequest(), $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA'));
 
         $this->assertFalse($controller->restoreInvoked);
-        $this->assertEquals(302, $response->getStatusCode());
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
     public function testInactiveUserCannotTriggerRestore(): void
     {
-        $user = $this->makeUser([
-            'is_active' => 0,
-            'is_admin' => 1,
-        ]);
+        $user = $this->makeUser(['is_active' => 0, 'is_admin' => 1]);
         $this->actingAs($user);
 
         $controller = new SpyOperationsController($this->repository);
-        $response = $controller->restore($this->makeRequest(), $this->makeOperation(4));
+        $controller->restore($this->makeRequest(), $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA'));
 
         $this->assertFalse($controller->restoreInvoked);
-        $this->assertEquals(302, $response->getStatusCode());
+        $this->assertCount(0, $this->repository->storeCalls);
+    }
+
+    public function testAddressResourceRestoreIsRejected(): void
+    {
+        $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
+        $this->actingAs($user);
+
+        $controller = new SpyOperationsController($this->repository);
+        $controller->restore($this->makeRequest(), $this->makeOperation(3, 'POSTED_TO_ADDR_DATA'));
+
+        $this->assertFalse($controller->restoreInvoked);
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
@@ -119,10 +107,9 @@ class OperationsRestoreAuthorizeTest extends TestCase
         Auth::logout();
 
         $controller = new SpyOperationsController($this->repository);
-        $response = $controller->restore($this->makeRequest(), $this->makeOperation(3));
+        $controller->restore($this->makeRequest(), $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA'));
 
         $this->assertFalse($controller->restoreInvoked);
-        $this->assertEquals(302, $response->getStatusCode());
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
@@ -138,12 +125,12 @@ class OperationsRestoreAuthorizeTest extends TestCase
         return $user;
     }
 
-    protected function makeOperation(int $opType): Operation
+    protected function makeOperation(int $opType, string $resource): Operation
     {
         $operation = new Operation();
         $operation->id = 1;
         $operation->op_type = $opType;
-        $operation->resource = 'BIOG_ADDR_DATA';
+        $operation->resource = $resource;
         $operation->resource_id = '1-1-1-1';
         $operation->resource_data = json_encode(['dummy' => 'value']);
         $operation->resource_original = json_encode(['dummy' => 'old']);

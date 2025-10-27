@@ -450,91 +450,137 @@ class BiogMainRepository
             ];
         }
 
-        if ($hasPostingChange) {
-            $data = (new ToolsRepository)->timestamp($data);
-            DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->update($data);
-            (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$_postingid, $data, $ori);
-        } else {
-            $data = $ori;
-        }
+        return DB::transaction(function () use ($data, $ori, $c_personid, $_officeid, $_postingid, $hasPostingChange, $hasAddressChange, $incomingAddr, $_id, $existingAddresses) {
+            $previousOfficeId = (string) ($ori['c_office_id'] ?? $_officeid);
+            $currentOfficeId = $previousOfficeId;
+            if ($hasPostingChange) {
+                $timestamped = (new ToolsRepository)->timestamp($data);
 
-        if ($hasAddressChange) {
-            $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
-            $currentOfficeId = (int) ($data['c_office_id'] ?? $previousOfficeId);
+                DB::table('POSTED_TO_OFFICE_DATA')
+                    ->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])
+                    ->update($timestamped);
 
-            $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $_id)
-                ->where('c_posting_id', $_postingid)
-                ->where('c_office_id', $previousOfficeId)
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'c_personid' => (int) $row->c_personid,
-                        'c_posting_id' => (int) $row->c_posting_id,
-                        'c_office_id' => (int) $row->c_office_id,
-                        'c_addr_id' => (int) $row->c_addr_id,
-                    ];
-                })
-                ->all();
+                $currentOfficeId = (string) ($timestamped['c_office_id'] ?? $previousOfficeId);
 
-            $this->insertAddr($incomingAddr, $_id, $_postingid, $_officeid);
+                (new OperationRepository())->store(
+                    Auth::id(),
+                    $c_personid,
+                    3,
+                    'POSTED_TO_OFFICE_DATA',
+                    $currentOfficeId.'-'.$_postingid,
+                    $timestamped,
+                    $ori
+                );
+            }
 
-            $afterRows = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $_id)
-                ->where('c_posting_id', $_postingid)
-                ->where('c_office_id', $currentOfficeId)
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'c_personid' => (int) $row->c_personid,
-                        'c_posting_id' => (int) $row->c_posting_id,
-                        'c_office_id' => (int) $row->c_office_id,
-                        'c_addr_id' => (int) $row->c_addr_id,
-                    ];
-                })
-                ->all();
+            $shouldUpdateAddress = $hasAddressChange || $previousOfficeId !== $currentOfficeId;
 
-            (new OperationRepository())->store(
-                Auth::id(),
-                $c_personid,
-                3,
-                'POSTED_TO_ADDR_DATA',
-                $currentOfficeId."-".$_postingid,
-                ['rows' => $afterRows],
-                ['rows' => $beforeRows]
-            );
-        }
-        return [
-            'id' => $currentOfficeId."-".$_postingid,
-            'no_changes' => false,
-        ];
+            if ($shouldUpdateAddress) {
+                $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->where('c_office_id', $previousOfficeId)
+                    ->get()
+                    ->map(function ($row) {
+                        return [
+                            'c_personid' => (int) $row->c_personid,
+                            'c_posting_id' => (int) $row->c_posting_id,
+                            'c_office_id' => (int) $row->c_office_id,
+                            'c_addr_id' => (int) $row->c_addr_id,
+                        ];
+                    })
+                    ->all();
+
+                if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
+                    DB::table('POSTED_TO_ADDR_DATA')
+                        ->where('c_personid', $_id)
+                        ->where('c_posting_id', $_postingid)
+                        ->where('c_office_id', $previousOfficeId)
+                        ->delete();
+                }
+
+                $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+                $this->insertAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId);
+
+                $afterRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->where('c_office_id', $currentOfficeId)
+                    ->get()
+                    ->map(function ($row) {
+                        return [
+                            'c_personid' => (int) $row->c_personid,
+                            'c_posting_id' => (int) $row->c_posting_id,
+                            'c_office_id' => (int) $row->c_office_id,
+                            'c_addr_id' => (int) $row->c_addr_id,
+                        ];
+                    })
+                    ->all();
+
+                (new OperationRepository())->store(
+                    Auth::id(),
+                    $c_personid,
+                    3,
+                    'POSTED_TO_ADDR_DATA',
+                    $currentOfficeId.'-'.$_postingid,
+                    ['rows' => $afterRows],
+                    ['rows' => $beforeRows]
+                );
+            }
+
+            return [
+                'id' => $currentOfficeId.'-'.$_postingid,
+                'no_changes' => false,
+            ];
+        });
     }
 
     public function officeStoreById(Request $request, $id)
     {
-        $data = $request->all();
-        $c_addr = $data['c_addr'];
-        $data = array_except($data, ['_token', 'c_addr']);
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['c_posting_id'] = DB::table('POSTED_TO_OFFICE_DATA')->max('c_posting_id') + 1;
-        $data['c_personid'] = $id;
-        DB::table('POSTING_DATA')->insert(['c_personid' => $data['c_personid'], 'c_posting_id' => $data['c_posting_id']]);
-        $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
-        $data = (new ToolsRepository)->timestamp($data, True);
-        DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id']."-".$data['c_posting_id'], $data);
-        return $data['c_office_id']."-".$data['c_posting_id'];
+        return DB::transaction(function () use ($request, $id) {
+            $payload = $request->all();
+            $c_addr = $payload['c_addr'] ?? [];
+            $data = array_except($payload, ['_token', 'c_addr']);
+
+            $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
+            $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+
+            $nextPostingId = DB::table('POSTING_DATA')->lockForUpdate()->max('c_posting_id');
+            $data['c_posting_id'] = ((int)$nextPostingId) + 1;
+            $data['c_personid'] = $id;
+
+            DB::table('POSTING_DATA')->insert([
+                'c_personid' => $data['c_personid'],
+                'c_posting_id' => $data['c_posting_id'],
+            ]);
+
+            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
+
+            $data = (new ToolsRepository)->timestamp($data, true);
+            DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
+
+            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
+
+            return $data['c_office_id'] . '-' . $data['c_posting_id'];
+        });
     }
 
     public function officeDeleteById($id, $c_personid)
     {
-        $addr_l = explode("-", $id);
-        $row = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->first();
-        DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])->delete();
-        DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
-        DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $id, $row);
+        DB::transaction(function () use ($id, $c_personid) {
+            $addr_l = explode('-', $id);
+            $row = DB::table('POSTED_TO_OFFICE_DATA')
+                ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
+                ->first();
+
+            DB::table('POSTED_TO_OFFICE_DATA')
+                ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
+                ->delete();
+            DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+            DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+
+            (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $id, $row);
+        });
     }
 
     public function entryById($id)

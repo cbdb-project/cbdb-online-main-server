@@ -66,6 +66,14 @@ class CodesController extends Controller
             'c_office_trans',
         ],
     ];
+    /**
+     * Explicit primary key definitions for code tables.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected $tablePrimaryKeyOverrides = [
+        'TEXT_CODES' => ['c_textid'],
+    ];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
     {
@@ -122,6 +130,7 @@ class CodesController extends Controller
             }
 
             $isReadOnly = $this->isReadOnlyTable($table);
+            $keyColumns = $this->getKeyColumns($table);
 
             return view('codes.show', [
                 'page_title' => 'Codes',
@@ -134,6 +143,7 @@ class CodesController extends Controller
                 'search' => $search,
                 'dynastyMap' => $dynastyMap,
                 'isReadOnly' => $isReadOnly,
+                'keyColumns' => $keyColumns,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
@@ -425,6 +435,14 @@ class CodesController extends Controller
 
         $columns = Schema::getColumnListing($table);
         $keys = [];
+        $upperTable = strtoupper($table);
+
+        if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
+            $overrideKeys = array_values(array_unique(array_filter($this->tablePrimaryKeyOverrides[$upperTable])));
+            if (!empty($overrideKeys)) {
+                return $cache[$table] = $overrideKeys;
+            }
+        }
 
         try {
             $connection = DB::connection();

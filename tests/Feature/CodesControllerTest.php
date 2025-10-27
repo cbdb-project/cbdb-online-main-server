@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase
     {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -33,18 +33,30 @@ class CodesControllerTest extends TestCase
         config(['view.compiled' => $compiledPath]);
 
         $this->originalDb = DB::getFacadeRoot();
-        $this->fakeDb = new FakeDatabaseManager(['TEST_CODES' => []]);
+        $this->fakeDb = new FakeDatabaseManager(
+            [
+                'TEST_CODES' => [],
+                'TEXT_CODES' => [],
+            ],
+            [
+                'TEST_CODES' => ['code_id', 'code_sub', 'description'],
+                'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn'],
+            ]
+        );
         DB::swap($this->fakeDb);
 
         $this->app->instance(CodesRepository::class, new class extends CodesRepository {
             public function allowedTables(): array
             {
-                return ['TEST_CODES'];
+                return ['TEST_CODES', 'TEXT_CODES'];
             }
 
             public function allowedTableMap(): array
             {
-                return ['TEST_CODES' => 'TEST_CODES'];
+                return [
+                    'TEST_CODES' => 'TEST_CODES',
+                    'TEXT_CODES' => 'TEXT_CODES',
+                ];
             }
         });
 
@@ -171,6 +183,30 @@ class CodesControllerTest extends TestCase
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    public function testTextCodesUsesExplicitPrimaryKeyOverride()
+    {
+        DB::table('TEXT_CODES')->insert([
+            ['c_textid' => 'T001', 'c_title' => 'Sample Title', 'c_title_chn' => 'Sample Title CHN'],
+        ]);
+
+        $user = new User([
+            'name' => 'text-admin',
+            'email' => 'text-admin@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 5;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->get('/codes/TEXT_CODES');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('keyColumns', ['c_textid']);
+        $response->assertSee('href="/codes/TEXT_CODES/T001/edit"', false);
+        $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
+        $this->assertEmpty($this->operationSpy->calls);
+    }
+
     public function testActiveUserUpdateLogsOperation()
     {
         DB::table('TEST_CODES')->insert([
@@ -269,10 +305,12 @@ class FakeDatabaseManager
     public $tables = [];
     public $failures = [];
     public $failuresCleared = [];
+    public $schemaColumns = [];
 
-    public function __construct(array $tables = [])
+    public function __construct(array $tables = [], array $schemaColumns = [])
     {
         $this->tables = $tables;
+        $this->schemaColumns = $schemaColumns;
     }
 
     public function table($name)
@@ -302,7 +340,7 @@ class FakeDatabaseManager
 
     public function getSchemaBuilder()
     {
-        return new FakeSchemaBuilder();
+        return new FakeSchemaBuilder($this->schemaColumns);
     }
 
     public function setFailure(string $operation, string $message = 'Simulated failure'): void
@@ -350,8 +388,19 @@ class FakeTableDetails
 
 class FakeSchemaBuilder
 {
+    private $schemaColumns = [];
+
+    public function __construct(array $schemaColumns = [])
+    {
+        $this->schemaColumns = $schemaColumns;
+    }
+
     public function getColumnListing($table)
     {
+        if (isset($this->schemaColumns[$table]) && !empty($this->schemaColumns[$table])) {
+            return $this->schemaColumns[$table];
+        }
+
         return ['code_id', 'code_sub', 'description'];
     }
 }

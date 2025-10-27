@@ -9,6 +9,17 @@
                 <form action="/codes/{{ $table }}/{{ $id }}" class="form-horizontal" method="post">
                     {{ method_field('PATCH') }}
                     {{ csrf_field() }}
+                    @if($table === 'TEXT_CODES')
+                    <div class="form-group">
+                        <label for="author" class="col-sm-2 control-label">author</label>
+                        <div class="col-sm-8">
+                            <select class="form-control author" name="" readonly="readonly"></select>
+                        </div>
+                        <div class="col-sm-2">
+                            <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>
+                        </div>
+                    </div>
+                    @endif
                     @foreach($row as $key => $value)
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
@@ -30,5 +41,32 @@
 
 @endsection
 @section('js')
+@if($table === 'TEXT_CODES')
+<script>
+    author_first_load();
+    function author_first_load(){
+        let c_textid = $("input[name='c_textid']").val();
+        let data = [{
+            id: 0,
+            text: 'author'
+        }];
+        $.get('/api/select/search/textauthor', {q: c_textid}, function (data, textStatus){
+            for (let i=data.data.length-1; i>-1; i--){
+                item = data.data[i];
+                $(".author").append(new Option(item['text'], item['value']));
+            }
+        });
+    }
 
+    $("#button_ajax_load").click(function(){
+        let author = $(".author").val();
+        if (!author) {
+            return;
+        }
+        let url = "/basicinformation/" + author + "/texts";
+        let new_window = window.open('_blank');
+        new_window.location = url ;
+    });
+</script>
+@endif
 @endsection

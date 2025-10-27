@@ -15,7 +15,7 @@
                 <div class="form-group">
                     <label for="secondary_id" class="col-sm-2 control-label">次要人物 ID</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control" id="secondary_id" name="secondary_id" value="{{ old('secondary_id', $form_secondary ?? (isset($preview['secondary_id']) ? $preview['secondary_id'] : '')) }}" placeholder="輸入要合併進來的 c_personid">
+                        <input type="text" class="form-control" id="secondary_id" name="secondary_id" value="{{ old('secondary_id', $form_secondary ?? (isset($preview['secondary_id']) ? $preview['secondary_id'] : '')) }}" placeholder="輸入要合併掉的 c_personid">
                     </div>
                 </div>
                 <div class="form-group">
@@ -237,6 +237,12 @@
                 @if(!empty($columns))
                     <div class="table-responsive">
                         <table class="table table-bordered table-condensed table-striped">
+                            <colgroup>
+                                <col style="width:10%;">
+                                <col style="width:30%;">
+                                <col style="width:30%;">
+                                <col style="width:30%;">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>欄位</th>
@@ -277,6 +283,11 @@
                         <h6>別名（ALTNAME_DATA）</h6>
                         @if($altPrimaryCount || $altSecondaryCount)
                             <table class="table table-bordered table-condensed table-striped">
+                                <colgroup>
+                                    <col style="width:10%;">
+                                    <col style="width:45%;">
+                                    <col style="width:45%;">
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <th>欄位</th>
@@ -293,7 +304,7 @@
                                                     @php
                                                         $altName = $item->c_alt_name_chn ?: $item->c_alt_name ?: '(無)';
                                                         $altTypeLabel = $item->alt_type_label_chn ?: $item->alt_type_label;
-                                                        $sequence = $item->c_sequence !== null ? $item->c_sequence : '—';
+                                                        $sequence = $item->c_sequence !== null ? $item->c_sequence : '(null)';
                                                     @endphp
                                                     Seq {{ $sequence }} — {{ $altName }}
                                                     (code {{ $item->c_alt_name_type_code }}
@@ -313,7 +324,7 @@
                                                     @php
                                                         $altName = $item->c_alt_name_chn ?: $item->c_alt_name ?: '(無)';
                                                         $altTypeLabel = $item->alt_type_label_chn ?: $item->alt_type_label;
-                                                        $sequence = $item->c_sequence !== null ? $item->c_sequence : '—';
+                                                        $sequence = $item->c_sequence !== null ? $item->c_sequence : '(null)';
                                                     @endphp
                                                     Seq {{ $sequence }} — {{ $altName }}
                                                     (code {{ $item->c_alt_name_type_code }}
@@ -344,6 +355,11 @@
                         @endphp
                         @if($kinPrimaryCount || $kinSecondaryCount)
                             <table class="table table-bordered table-condensed table-striped">
+                                <colgroup>
+                                    <col style="width:10%;">
+                                    <col style="width:45%;">
+                                    <col style="width:45%;">
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <th>欄位</th>
@@ -429,13 +445,18 @@
                                 $secondaryRows = collect($assocDetailsSecondary[$key] ?? []);
                             @endphp
                             <div class="table-responsive" style="margin-top: 10px;">
-                                <div class="small text-muted" style="margin-bottom: 4px;">欄位：{{ $label }} — 保留 {{ $primaryCount }} 筆 / 來源 {{ $secondaryCount }} 筆</div>
+                                <h6>{{ $label }}</h6>
                                 <table class="table table-bordered table-condensed table-striped">
+                                    <colgroup>
+                                        <col style="width:10%;">
+                                        <col style="width:45%;">
+                                        <col style="width:45%;">
+                                    </colgroup>
                                     <thead>
                                         <tr>
-                                            <th>內容</th>
-                                            <th>保留人物 ({{ $preview['primary_id'] ?? '-' }})</th>
-                                            <th>合併來源 ({{ $preview['secondary_id'] ?? '-' }})</th>
+                                            <th>欄位</th>
+                                            <th>保留人物 ({{ $preview['primary_id'] ?? '-' }}) — {{ $primaryCount }} 筆</th>
+                                            <th>合併來源 ({{ $preview['secondary_id'] ?? '-' }}) — {{ $secondaryCount }} 筆</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -483,6 +504,7 @@
                         'posted_to_addr' => 'POSTED_TO_ADDR_DATA',
                         'posting' => 'POSTING_DATA',
                         'posted_to_office' => 'POSTED_TO_OFFICE_DATA',
+                        'merged_person' => 'MERGED_PERSON_DATA',
                     ];
                     $countsPrimary = $preview['table_counts_primary'] ?? [];
                     $countsSecondary = $preview['table_counts_secondary'] ?? [];
@@ -499,6 +521,11 @@
                             <h6>{{ $label }}</h6>
                             @if($primaryCount || $secondaryCount || $primaryRows->count() || $secondaryRows->count())
                                 <table class="table table-bordered table-condensed table-striped">
+                                    <colgroup>
+                                        <col style="width:10%;">
+                                        <col style="width:45%;">
+                                        <col style="width:45%;">
+                                    </colgroup>
                                     <thead>
                                         <tr>
                                             <th>欄位</th>
@@ -513,7 +540,15 @@
                                                 @if($primaryRows->count())
                                                     <ul class="list-unstyled small" style="word-break: break-all;">
                                                         @foreach($primaryRows as $row)
-                                                            <li><code style="white-space: pre-wrap; word-break: break-all;">{{ json_encode((array)$row, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) }}</code></li>
+                                                            @php
+                                                                $summary = $row['summary'] ?? '(無摘要)';
+                                                                $rawData = $row['raw'] ?? $row;
+                                                                $rawJson = json_encode($rawData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                                                            @endphp
+                                                            <li>
+                                                                <span>{{ $summary }}</span>
+                                                                <code style="display:block; white-space: pre-wrap; word-break: break-all;" class="text-muted">{{ $rawJson }}</code>
+                                                            </li>
                                                         @endforeach
                                                     </ul>
                                                 @else
@@ -524,7 +559,15 @@
                                                 @if($secondaryRows->count())
                                                     <ul class="list-unstyled small" style="word-break: break-all;">
                                                         @foreach($secondaryRows as $row)
-                                                            <li><code style="white-space: pre-wrap; word-break: break-all;">{{ json_encode((array)$row, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) }}</code></li>
+                                                            @php
+                                                                $summary = $row['summary'] ?? '(無摘要)';
+                                                                $rawData = $row['raw'] ?? $row;
+                                                                $rawJson = json_encode($rawData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+                                                            @endphp
+                                                            <li>
+                                                                <span>{{ $summary }}</span>
+                                                                <code style="display:block; white-space: pre-wrap; word-break: break-all;" class="text-muted">{{ $rawJson }}</code>
+                                                            </li>
                                                         @endforeach
                                                     </ul>
                                                 @else
@@ -564,14 +607,14 @@
                 copyBtn.addEventListener('click', function () {
                     const base = this.getAttribute('data-base') || window.location.pathname;
                     const params = new URLSearchParams();
-                    const fromVal = (document.getElementById('primary_id').value || '').trim();
-                    const toVal = (document.getElementById('secondary_id').value || '').trim();
+                    const primaryVal = (document.getElementById('primary_id').value || '').trim();
+                    const secondaryVal = (document.getElementById('secondary_id').value || '').trim();
                     const reasonVal = (document.getElementById('merge_reason').value || '').trim();
                     const autoBox = document.querySelector('input[name=\"auto_arrange\"]');
                     const mergeToMin = autoBox ? (autoBox.checked ? 'true' : 'false') : 'true';
 
-                    if (fromVal !== '') params.set('from', fromVal);
-                    if (toVal !== '') params.set('to', toVal);
+                    if (primaryVal !== '') params.set('primary_id', primaryVal);
+                    if (secondaryVal !== '') params.set('secondary_id', secondaryVal);
                     params.set('merge_to_min', mergeToMin);
                     if (reasonVal !== '') params.set('reason', reasonVal);
 

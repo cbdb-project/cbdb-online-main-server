@@ -11,6 +11,17 @@ use Carbon\Carbon;
 
 class MergePreviewController extends Controller
 {
+    protected $addressCache = [];
+    protected $officeCache = [];
+    protected $textCache = [];
+    protected $entryCache = [];
+    protected $eventCache = [];
+    protected $statusCache = [];
+    protected $possessionCache = [];
+    protected $roleCache = [];
+    protected $socialInstCache = [];
+    protected $personCache = [];
+
     public function __construct()
     {
         $this->middleware('auth');
@@ -38,8 +49,8 @@ class MergePreviewController extends Controller
                 }
             }
         }
-        $primaryRaw = $request->filled('primary_id') ? $request->input('primary_id') : $request->input('from', '');
-        $secondaryRaw = $request->filled('secondary_id') ? $request->input('secondary_id') : $request->input('to', '');
+        $primaryRaw = $request->input('primary_id', '');
+        $secondaryRaw = $request->input('secondary_id', '');
         $reasonRaw = $request->filled('merge_reason') ? $request->input('merge_reason') : $request->input('reason', '');
 
         $primaryInput = trim((string)$primaryRaw);
@@ -51,20 +62,20 @@ class MergePreviewController extends Controller
                 $request->isMethod('post')
                 || $request->query->has('primary_id')
                 || $request->query->has('secondary_id')
-                || $request->query->has('from')
-                || $request->query->has('to')
             );
 
         if ($shouldPreview) {
             $originalPrimary = $primaryInput;
             $originalSecondary = $secondaryInput;
 
-            $primary = $primaryInput;
-            $secondary = $secondaryInput;
-            $minTargetId = $autoArrange ? min((int)$primaryInput, (int)$secondaryInput) : null;
+        $primary = $primaryInput;
+        $secondary = $secondaryInput;
+        $primaryNumeric = (int) $primaryInput;
+        $secondaryNumeric = (int) $secondaryInput;
+        $minTargetId = $autoArrange ? min($primaryNumeric, $secondaryNumeric) : null;
 
-        $primarySummary = $this->buildPersonSummary($primary, $mergeReason);
-        $secondarySummary = $this->buildPersonSummary($secondary, $mergeReason);
+            $primarySummary = $this->buildPersonSummary($primary, $mergeReason);
+            $secondarySummary = $this->buildPersonSummary($secondary, $mergeReason);
 
             $mergedResult = $this->calculateMergedPerson($primarySummary, $secondarySummary, $mergeReason);
             $secondaryDetails = $this->loadSecondaryDetails($secondarySummary);
@@ -95,8 +106,9 @@ class MergePreviewController extends Controller
                 'other_details_secondary' => $secondaryDetails['other'],
                 'table_counts_primary' => $primaryCounts,
                 'table_counts_secondary' => $secondaryCounts,
-                'sql_preview' => $this->buildSqlPreview($primary, $secondary, $mergedResult['updates'], $autoArrange, $minTargetId),
+                'sql_preview' => $this->buildSqlPreview($primary, $secondary, $mergedResult, $autoArrange, $minTargetId),
                 'merge_reason' => $mergeReason,
+                'merge_record' => $mergedResult['merge_record'] ?? null,
                 'biog_columns' => $this->getBiogColumns(),
                 'share_url' => $this->buildShareUrl($request, $originalPrimary, $originalSecondary, $autoArrange, $mergeReason),
                 'merge_blocked' => $mergeBlocked,
@@ -240,10 +252,19 @@ class MergePreviewController extends Controller
         return (string)$genderCode;
     }
 
-    protected function buildSqlPreview($primary, $secondary, array $mergedUpdates, $autoArrange, $minTargetId = null)
+    protected function buildSqlPreview($primary, $secondary, array $mergedResult, $autoArrange, $minTargetId = null)
     {
         $statements = [];
         $statements[] = 'START TRANSACTION;';
+
+        $mergedUpdates = $mergedResult['updates'] ?? [];
+        $mergeRecord = $mergedResult['merge_record'] ?? null;
+
+        $primaryNumeric = (int) $primary;
+        $secondaryNumeric = (int) $secondary;
+        $primaryValue = $this->formatSqlValue($primaryNumeric);
+        $secondaryValue = $this->formatSqlValue($secondaryNumeric);
+        $minTargetValue = !is_null($minTargetId) ? $this->formatSqlValue((int)$minTargetId) : null;
 
         if (!empty($mergedUpdates)) {
             $setParts = [];
@@ -254,7 +275,7 @@ class MergePreviewController extends Controller
                 $statements[] = sprintf(
                     'UPDATE BIOG_MAIN SET %s WHERE c_personid = %s;',
                     implode(', ', $setParts),
-                    $primary
+                    $primaryValue
                 );
             }
         }
@@ -282,9 +303,32 @@ class MergePreviewController extends Controller
                     'UPDATE %s SET %s = %s WHERE %s = %s;',
                     $table,
                     $column,
-                    $primary,
+                    $primaryValue,
                     $column,
-                    $secondary
+                    $secondaryValue
+                );
+            }
+        }
+
+        if ($mergeRecord) {
+            $personIdValue = $this->formatSqlValue($mergeRecord['person_id'] ?? null);
+            $mergedToValue = $this->formatSqlValue($mergeRecord['merged_to'] ?? null);
+            $noteValue = $this->formatSqlValue($mergeRecord['note'] ?? null);
+            $createdByValue = $this->formatSqlValue($mergeRecord['created_by'] ?? null);
+            $createdDateValue = $this->formatSqlValue($mergeRecord['created_date'] ?? null);
+            $modifiedByValue = $this->formatSqlValue($mergeRecord['modified_by'] ?? null);
+            $modifiedDateValue = $this->formatSqlValue($mergeRecord['modified_date'] ?? null);
+
+            if ($personIdValue !== 'NULL' && $mergedToValue !== 'NULL') {
+                $statements[] = sprintf(
+                    'INSERT INTO MERGED_PERSON_DATA (c_personid, c_merged_to_personid, c_notes, c_source, c_pages, c_created_by, c_created_date, c_modified_by, c_modified_date) VALUES (%s, %s, %s, NULL, NULL, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE c_notes = VALUES(c_notes), c_modified_by = VALUES(c_modified_by), c_modified_date = VALUES(c_modified_date);',
+                    $personIdValue,
+                    $mergedToValue,
+                    $noteValue,
+                    $createdByValue,
+                    $createdDateValue,
+                    $modifiedByValue,
+                    $modifiedDateValue
                 );
             }
         }
@@ -298,15 +342,14 @@ class MergePreviewController extends Controller
                     $column,
                     $table,
                     $column,
-                    $secondary
+                    $secondaryValue
                 );
             }
         }
-
         $statements[] = 'DELETE FROM BIOG_MAIN WHERE c_personid = '.$secondary.';';
         $statements[] = 'COMMIT;';
 
-        if ($autoArrange && $minTargetId !== null && $primary !== $minTargetId) {
+        if ($autoArrange && $minTargetId !== null && $primaryNumeric !== $minTargetId) {
             $statements[] = 'START TRANSACTION;';
             $statements[] = sprintf('-- 調整至較小 ID %s', $minTargetId);
             foreach ($map as $table => $columns) {
@@ -315,13 +358,22 @@ class MergePreviewController extends Controller
                         'UPDATE %s SET %s = %s WHERE %s = %s;',
                         $table,
                         $column,
-                        $minTargetId,
+                        $minTargetValue,
                         $column,
-                        $primary
+                        $primaryValue
                     );
                 }
             }
-            $statements[] = sprintf('UPDATE BIOG_MAIN SET c_personid = %s WHERE c_personid = %s;', $minTargetId, $primary);
+            if ($mergeRecord) {
+                $statements[] = sprintf(
+                    'UPDATE MERGED_PERSON_DATA SET c_personid = %s, c_merged_to_personid = %s WHERE c_personid = %s AND c_merged_to_personid = %s;',
+                    $primaryValue,
+                    $minTargetValue ?? $this->formatSqlValue($minTargetId),
+                    $personIdValue ?? $this->formatSqlValue($mergeRecord['person_id'] ?? null),
+                    $mergedToValue ?? $this->formatSqlValue($mergeRecord['merged_to'] ?? null)
+                );
+            }
+            $statements[] = sprintf('UPDATE BIOG_MAIN SET c_personid = %s WHERE c_personid = %s;', $minTargetValue, $primaryValue);
             $statements[] = 'COMMIT;';
         }
 
@@ -331,8 +383,8 @@ class MergePreviewController extends Controller
     protected function buildShareUrl(Request $request, $originalPrimary, $originalSecondary, $autoArrange, $reason)
     {
         $params = [
-            'from' => $originalPrimary,
-            'to' => $originalSecondary,
+            'primary_id' => $originalPrimary,
+            'secondary_id' => $originalSecondary,
         ];
         $params['merge_to_min'] = $autoArrange ? 'true' : 'false';
         if ($reason !== '') {
@@ -403,17 +455,9 @@ class MergePreviewController extends Controller
         if (!is_null($mergedSourceId) && $mergedSourceId !== '') {
             $idSegments[] = '#'.$mergedSourceId;
         }
-        $mergeTag = '[merged';
-        if (!empty($idSegments)) {
-            $mergeTag .= ' '.implode(' and ', $idSegments);
-        }
-        $mergeTag .= ' on '.$currentDate.' with reason]';
-        $reasonText = trim((string)$mergeReason);
-        if ($reasonText !== '') {
-            $mergeTag .= ' '.$reasonText;
-        }
+        $mergeTag = $this->buildMergeTag($primaryPersonId, $mergedSourceId, $currentDate, $mergeReason);
         $notesLines[] = $mergeTag;
-        $result['c_notes'] = implode("\n", $notesLines);
+        $result['c_notes'] = implode('\\n', $notesLines);
 
         $updates = [];
         foreach ($result as $field => $value) {
@@ -433,9 +477,25 @@ class MergePreviewController extends Controller
             }
         }
 
+        $mergeRecord = null;
+        $mergeReasonText = trim((string)$mergeReason);
+        if (!is_null($primaryPersonId) && $primaryPersonId !== '' && !is_null($mergedSourceId) && $mergedSourceId !== '') {
+            $mergeRecord = [
+                'person_id' => (int)$mergedSourceId,
+                'merged_to' => (int)$primaryPersonId,
+                'note' => $mergeReasonText === '' ? null : $mergeReasonText,
+                'reason' => $mergeReason,
+                'created_by' => $result['c_modified_by'],
+                'created_date' => $currentDate,
+                'modified_by' => $result['c_modified_by'],
+                'modified_date' => $currentDate,
+            ];
+        }
+
         return [
             'values' => $result,
             'updates' => $updates,
+            'merge_record' => $mergeRecord,
         ];
     }
 
@@ -456,6 +516,362 @@ class MergePreviewController extends Controller
         $string = (string)$value;
         $escaped = str_replace("'", "''", $string);
         return "'".$escaped."'";
+    }
+
+    protected function buildMergeTag($targetId, $sourceId, $date, $reason)
+    {
+        $segments = [];
+        if ($targetId !== null && $targetId !== '') {
+            $segments[] = '#'.$targetId;
+        }
+        if ($sourceId !== null && $sourceId !== '') {
+            $segments[] = '#'.$sourceId;
+        }
+
+        $note = '[merged';
+        if (!empty($segments)) {
+            $note .= ' '.implode(' and ', $segments);
+        }
+        $dateText = trim((string)$date);
+        if ($dateText !== '') {
+            $note .= ' on '.$dateText;
+        }
+        $note .= ' with reason]';
+        $reasonText = trim((string)$reason);
+        if ($reasonText !== '') {
+            $note .= ' '.$reasonText;
+        }
+        return $note;
+    }
+
+    protected function summarizeOtherRow($table, array $data)
+    {
+        $get = function ($key) use ($data) {
+            return array_key_exists($key, $data) ? $data[$key] : null;
+        };
+        $format = function ($value) {
+            if ($value === null || $value === '') {
+                return '(null)';
+            }
+            return (string)$value;
+        };
+        $formatId = function ($id, $label = null) {
+            if ($id === null || $id === '') {
+                return '(null)';
+            }
+            $idStr = (string)$id;
+            if ($label !== null && $label !== '') {
+                return $idStr.' '.$label;
+            }
+            return $idStr;
+        };
+        $notes = trim((string)$get('c_notes'));
+        $noteSuffix = $notes !== '' ? ' | Notes: '.$notes : '';
+
+        switch ($table) {
+            case 'BIOG_ADDR_DATA':
+                $addrId = $get('c_addr_id');
+                $addrLabel = $this->getAddressLabel($addrId);
+                return sprintf(
+                    'Seq %s — Addr %s (type %s)%s',
+                    $format($get('c_sequence')),
+                    $formatId($addrId, $addrLabel),
+                    $format($get('c_addr_type')),
+                    $noteSuffix
+                );
+            case 'BIOG_INST_DATA':
+                $instCode = $get('c_inst_code');
+                $instNameCode = $get('c_inst_name_code');
+                $instLabel = $this->getSocialInstLabel($instCode, $instNameCode);
+                return sprintf(
+                    'Inst %s — NameCode %s%s',
+                    $formatId($instCode, $instLabel),
+                    $format($instNameCode),
+                    $noteSuffix
+                );
+            case 'BIOG_SOURCE_DATA':
+                $textId = $get('c_textid');
+                $textLabel = $this->getTextLabel($textId);
+                return sprintf(
+                    'Source %s — Pages %s%s',
+                    $formatId($textId, $textLabel),
+                    $format($get('c_pages')),
+                    $noteSuffix
+                );
+            case 'BIOG_TEXT_DATA':
+                $textId = $get('c_textid');
+                $textLabel = $this->getTextLabel($textId);
+                $roleId = $get('c_role_id');
+                $roleLabel = $this->getRoleLabel($roleId);
+                return sprintf(
+                    'Text %s — Role %s — Seq %s%s',
+                    $formatId($textId, $textLabel),
+                    $formatId($roleId, $roleLabel),
+                    $format($get('c_sequence')),
+                    $noteSuffix
+                );
+            case 'ENTRY_DATA':
+                $entryCode = $get('c_entry_code');
+                $entryLabel = $this->getEntryLabel($entryCode);
+                return sprintf(
+                    'Entry %s — Seq %s — Year %s%s',
+                    $formatId($entryCode, $entryLabel),
+                    $format($get('c_sequence')),
+                    $format($get('c_year')),
+                    $noteSuffix
+                );
+            case 'EVENTS_DATA':
+                $eventCode = $get('c_event_code');
+                $eventLabel = $this->getEventLabel($eventCode);
+                return sprintf(
+                    'Event %s — Seq %s — Year %s%s',
+                    $formatId($eventCode, $eventLabel),
+                    $format($get('c_sequence')),
+                    $format($get('c_year')),
+                    $noteSuffix
+                );
+            case 'POSSESSION_DATA':
+                $recordId = $get('c_possession_record_id');
+                $actCode = $get('c_possession_act_code');
+                $actLabel = $this->getPossessionLabel($actCode);
+                $desc = $get('c_possession_desc_chn') ?: $get('c_possession_desc');
+                $main = $desc ? trim((string)$desc) : $formatId($actCode, $actLabel);
+                return sprintf(
+                    'Possession %s — %s%s',
+                    $format($recordId),
+                    $main,
+                    $noteSuffix
+                );
+            case 'STATUS_DATA':
+                $statusCode = $get('c_status_code');
+                $statusLabel = $this->getStatusLabel($statusCode);
+                return sprintf(
+                    'Status %s — Seq %s — Year %s%s',
+                    $formatId($statusCode, $statusLabel),
+                    $format($get('c_sequence')),
+                    $format($get('c_year')),
+                    $noteSuffix
+                );
+            case 'POSTED_TO_ADDR_DATA':
+                $officeId = $get('c_office_id');
+                $officeLabel = $this->getOfficeLabel($officeId);
+                $addrId = $get('c_addr_id');
+                $addrLabel = $this->getAddressLabel($addrId);
+                return sprintf(
+                    'Posting %s — Office %s — Addr %s%s',
+                    $format($get('c_posting_id')),
+                    $formatId($officeId, $officeLabel),
+                    $formatId($addrId, $addrLabel),
+                    $noteSuffix
+                );
+            case 'POSTING_DATA':
+                $officeId = $get('c_office_id');
+                $officeLabel = $this->getOfficeLabel($officeId);
+                return sprintf(
+                    'Posting %s — Office %s%s',
+                    $format($get('c_posting_id')),
+                    $formatId($officeId, $officeLabel),
+                    $noteSuffix
+                );
+            case 'POSTED_TO_OFFICE_DATA':
+                $officeId = $get('c_office_id');
+                $officeLabel = $this->getOfficeLabel($officeId);
+                return sprintf(
+                    'Posting %s — Office %s — Person %s%s',
+                    $format($get('c_posting_id')),
+                    $formatId($officeId, $officeLabel),
+                    $format($get('c_personid')),
+                    $noteSuffix
+                );
+            case 'MERGED_PERSON_DATA':
+                $fromId = $get('c_personid');
+                $toId = $get('c_merged_to_personid');
+                $fromLabel = $this->getPersonLabel($fromId);
+                $toLabel = $this->getPersonLabel($toId);
+                $reason = trim((string)$get('c_notes'));
+                $reasonSuffix = $reason !== '' ? ' | Reason: '.$reason : '';
+                return sprintf(
+                    'Merged %s → %s%s',
+                    $formatId($fromId, $fromLabel),
+                    $formatId($toId, $toLabel),
+                    $reasonSuffix
+                );
+            default:
+                $parts = [];
+                foreach ($data as $key => $val) {
+                    $parts[] = $key.':'.$format($val);
+                }
+                return sprintf('%s — %s', $table, implode(', ', $parts));
+        }
+    }
+
+    protected function getAddressLabel($id)
+    {
+        if ($id === null || $id === '' || (int)$id === 0) {
+            return '未詳';
+        }
+        $id = (int)$id;
+        if (!array_key_exists($id, $this->addressCache)) {
+            $row = \DB::table('ADDR_CODES')
+                ->select('c_name_chn', 'c_name')
+                ->where('c_addr_id', $id)
+                ->first();
+            $this->addressCache[$id] = $row ? trim($row->c_name_chn ?: $row->c_name ?: '') : null;
+        }
+        return $this->addressCache[$id];
+    }
+
+    protected function getOfficeLabel($id)
+    {
+        if ($id === null || $id === '' || (int)$id === 0) {
+            return null;
+        }
+        $id = (int)$id;
+        if (!array_key_exists($id, $this->officeCache)) {
+            $row = \DB::table('OFFICE_CODES')
+                ->select('c_office_chn', 'c_office_pinyin')
+                ->where('c_office_id', $id)
+                ->first();
+            $this->officeCache[$id] = $row ? trim($row->c_office_chn ?: $row->c_office_pinyin ?: '') : null;
+        }
+        return $this->officeCache[$id];
+    }
+
+    protected function getTextLabel($id)
+    {
+        if ($id === null || $id === '' || (int)$id === 0) {
+            return null;
+        }
+        $id = (int)$id;
+        if (!array_key_exists($id, $this->textCache)) {
+            $row = \DB::table('TEXT_CODES')
+                ->select('c_title_chn', 'c_title')
+                ->where('c_textid', $id)
+                ->first();
+            $this->textCache[$id] = $row ? trim($row->c_title_chn ?: $row->c_title ?: '') : null;
+        }
+        return $this->textCache[$id];
+    }
+
+    protected function getEntryLabel($code)
+    {
+        if ($code === null || $code === '' || (int)$code === 0) {
+            return null;
+        }
+        $code = (int)$code;
+        if (!array_key_exists($code, $this->entryCache)) {
+            $row = \DB::table('ENTRY_CODES')
+                ->select('c_entry_desc_chn', 'c_entry_desc')
+                ->where('c_entry_code', $code)
+                ->first();
+            $this->entryCache[$code] = $row ? trim($row->c_entry_desc_chn ?: $row->c_entry_desc ?: '') : null;
+        }
+        return $this->entryCache[$code];
+    }
+
+    protected function getEventLabel($code)
+    {
+        if ($code === null || $code === '' || (int)$code === 0) {
+            return null;
+        }
+        $code = (int)$code;
+        if (!array_key_exists($code, $this->eventCache)) {
+            $row = \DB::table('EVENT_CODES')
+                ->select('c_event_name_chn', 'c_event_name')
+                ->where('c_event_code', $code)
+                ->first();
+            $this->eventCache[$code] = $row ? trim($row->c_event_name_chn ?: $row->c_event_name ?: '') : null;
+        }
+        return $this->eventCache[$code];
+    }
+
+    protected function getPossessionLabel($code)
+    {
+        if ($code === null || $code === '' || (int)$code === 0) {
+            return null;
+        }
+        $code = (int)$code;
+        if (!array_key_exists($code, $this->possessionCache)) {
+            $row = \DB::table('POSSESSION_ACT_CODES')
+                ->select('c_possession_act_desc_chn', 'c_possession_act_desc')
+                ->where('c_possession_act_code', $code)
+                ->first();
+            $this->possessionCache[$code] = $row ? trim($row->c_possession_act_desc_chn ?: $row->c_possession_act_desc ?: '') : null;
+        }
+        return $this->possessionCache[$code];
+    }
+
+    protected function getStatusLabel($code)
+    {
+        if ($code === null || $code === '' || (int)$code === 0) {
+            return null;
+        }
+        $code = (int)$code;
+        if (!array_key_exists($code, $this->statusCache)) {
+            $row = \DB::table('STATUS_CODES')
+                ->select('c_status_desc_chn', 'c_status_desc')
+                ->where('c_status_code', $code)
+                ->first();
+            $this->statusCache[$code] = $row ? trim($row->c_status_desc_chn ?: $row->c_status_desc ?: '') : null;
+        }
+        return $this->statusCache[$code];
+    }
+
+    protected function getRoleLabel($id)
+    {
+        if ($id === null || $id === '' || (int)$id === 0) {
+            return null;
+        }
+        $id = (int)$id;
+        if (!array_key_exists($id, $this->roleCache)) {
+            $row = \DB::table('TEXT_ROLE_CODES')
+                ->select('c_role_desc_chn', 'c_role_desc')
+                ->where('c_role_id', $id)
+                ->first();
+            $this->roleCache[$id] = $row ? trim($row->c_role_desc_chn ?: $row->c_role_desc ?: '') : null;
+        }
+        return $this->roleCache[$id];
+    }
+
+    protected function getSocialInstLabel($code, $nameCode)
+    {
+        if ($code === null || $code === '' || $nameCode === null || $nameCode === '') {
+            return null;
+        }
+        $key = $code.'-'.$nameCode;
+        if (!array_key_exists($key, $this->socialInstCache)) {
+            $row = \DB::table('SOCIAL_INSTITUTION_CODES')
+                ->select('c_inst_name_hz', 'c_inst_name_py')
+                ->where('c_inst_code', $code)
+                ->where('c_inst_name_code', $nameCode)
+                ->first();
+            $this->socialInstCache[$key] = $row ? trim($row->c_inst_name_hz ?: $row->c_inst_name_py ?: '') : null;
+        }
+        return $this->socialInstCache[$key];
+    }
+
+    protected function getPersonLabel($id)
+    {
+        if ($id === null || $id === '' || (int)$id === 0) {
+            return null;
+        }
+        $id = (int)$id;
+        if (!array_key_exists($id, $this->personCache)) {
+            $row = \DB::table('BIOG_MAIN')
+                ->select('c_name_chn', 'c_name')
+                ->where('c_personid', $id)
+                ->first();
+            if ($row) {
+                $label = trim($row->c_name_chn ?: '');
+                if ($row->c_name && trim($row->c_name) !== '') {
+                    $label = trim($label.' '.$row->c_name);
+                }
+                $this->personCache[$id] = $label !== '' ? $label : null;
+            } else {
+                $this->personCache[$id] = null;
+            }
+        }
+        return $this->personCache[$id];
     }
 
     protected function loadSecondaryDetails(array $summary)
@@ -516,24 +932,45 @@ class MergePreviewController extends Controller
         }
 
         $otherConfigs = [
-            'BIOG_ADDR_DATA' => ['column' => 'c_personid'],
-            'BIOG_INST_DATA' => ['column' => 'c_personid'],
-            'BIOG_SOURCE_DATA' => ['column' => 'c_personid'],
-            'BIOG_TEXT_DATA' => ['column' => 'c_personid'],
-            'ENTRY_DATA' => ['column' => 'c_personid'],
-            'EVENTS_DATA' => ['column' => 'c_personid'],
-            'POSSESSION_DATA' => ['column' => 'c_personid'],
-            'STATUS_DATA' => ['column' => 'c_personid'],
-            'POSTED_TO_ADDR_DATA' => ['column' => 'c_personid'],
-            'POSTING_DATA' => ['column' => 'c_personid'],
-            'POSTED_TO_OFFICE_DATA' => ['column' => 'c_personid'],
+            'BIOG_ADDR_DATA' => ['columns' => ['c_personid']],
+            'BIOG_INST_DATA' => ['columns' => ['c_personid']],
+            'BIOG_SOURCE_DATA' => ['columns' => ['c_personid']],
+            'BIOG_TEXT_DATA' => ['columns' => ['c_personid']],
+            'ENTRY_DATA' => ['columns' => ['c_personid']],
+            'EVENTS_DATA' => ['columns' => ['c_personid']],
+            'POSSESSION_DATA' => ['columns' => ['c_personid']],
+            'STATUS_DATA' => ['columns' => ['c_personid']],
+            'POSTED_TO_ADDR_DATA' => ['columns' => ['c_personid']],
+            'POSTING_DATA' => ['columns' => ['c_personid']],
+            'POSTED_TO_OFFICE_DATA' => ['columns' => ['c_personid']],
+            'MERGED_PERSON_DATA' => ['columns' => ['c_personid', 'c_merged_to_personid']],
         ];
         $otherDetails = [];
         foreach ($otherConfigs as $table => $info) {
+            $columns = $info['columns'] ?? (isset($info['column']) ? [$info['column']] : []);
+            if (empty($columns)) {
+                continue;
+            }
             $otherDetails[$table] = \DB::table($table)
-                ->where($info['column'], $personId)
+                ->where(function ($query) use ($columns, $personId) {
+                    foreach ($columns as $index => $column) {
+                        if ($index === 0) {
+                            $query->where($column, $personId);
+                        } else {
+                            $query->orWhere($column, $personId);
+                        }
+                    }
+                })
                 ->limit(20)
-                ->get();
+                ->get()
+                ->map(function ($row) use ($table) {
+                    $rowArray = (array)$row;
+                    return [
+                        'summary' => $this->summarizeOtherRow($table, $rowArray),
+                        'raw' => $rowArray,
+                    ];
+                })
+                ->toArray();
         }
 
         return [
@@ -560,6 +997,7 @@ class MergePreviewController extends Controller
                 'posted_to_addr' => 0,
                 'posting' => 0,
                 'posted_to_office' => 0,
+                'merged_person' => 0,
             ];
         }
 
@@ -573,17 +1011,18 @@ class MergePreviewController extends Controller
         ];
 
         $simpleTables = [
-            'biog_addr' => ['table' => 'BIOG_ADDR_DATA', 'column' => 'c_personid'],
-            'biog_inst' => ['table' => 'BIOG_INST_DATA', 'column' => 'c_personid'],
-            'biog_source' => ['table' => 'BIOG_SOURCE_DATA', 'column' => 'c_personid'],
-            'biog_text' => ['table' => 'BIOG_TEXT_DATA', 'column' => 'c_personid'],
-            'entry' => ['table' => 'ENTRY_DATA', 'column' => 'c_personid'],
-            'events' => ['table' => 'EVENTS_DATA', 'column' => 'c_personid'],
-            'possession' => ['table' => 'POSSESSION_DATA', 'column' => 'c_personid'],
-            'status' => ['table' => 'STATUS_DATA', 'column' => 'c_personid'],
-            'posted_to_addr' => ['table' => 'POSTED_TO_ADDR_DATA', 'column' => 'c_personid'],
-            'posting' => ['table' => 'POSTING_DATA', 'column' => 'c_personid'],
-            'posted_to_office' => ['table' => 'POSTED_TO_OFFICE_DATA', 'column' => 'c_personid'],
+            'biog_addr' => ['table' => 'BIOG_ADDR_DATA', 'columns' => ['c_personid']],
+            'biog_inst' => ['table' => 'BIOG_INST_DATA', 'columns' => ['c_personid']],
+            'biog_source' => ['table' => 'BIOG_SOURCE_DATA', 'columns' => ['c_personid']],
+            'biog_text' => ['table' => 'BIOG_TEXT_DATA', 'columns' => ['c_personid']],
+            'entry' => ['table' => 'ENTRY_DATA', 'columns' => ['c_personid']],
+            'events' => ['table' => 'EVENTS_DATA', 'columns' => ['c_personid']],
+            'possession' => ['table' => 'POSSESSION_DATA', 'columns' => ['c_personid']],
+            'status' => ['table' => 'STATUS_DATA', 'columns' => ['c_personid']],
+            'posted_to_addr' => ['table' => 'POSTED_TO_ADDR_DATA', 'columns' => ['c_personid']],
+            'posting' => ['table' => 'POSTING_DATA', 'columns' => ['c_personid']],
+            'posted_to_office' => ['table' => 'POSTED_TO_OFFICE_DATA', 'columns' => ['c_personid']],
+            'merged_person' => ['table' => 'MERGED_PERSON_DATA', 'columns' => ['c_personid', 'c_merged_to_personid']],
         ];
 
         $counts = [
@@ -591,7 +1030,22 @@ class MergePreviewController extends Controller
         ];
 
         foreach ($simpleTables as $key => $info) {
-            $counts[$key] = \DB::table($info['table'])->where($info['column'], $id)->count();
+            $columns = $info['columns'] ?? (isset($info['column']) ? [$info['column']] : []);
+            if (empty($columns)) {
+                $counts[$key] = 0;
+                continue;
+            }
+            $counts[$key] = \DB::table($info['table'])
+                ->where(function ($query) use ($columns, $id) {
+                    foreach ($columns as $index => $column) {
+                        if ($index === 0) {
+                            $query->where($column, $id);
+                        } else {
+                            $query->orWhere($column, $id);
+                        }
+                    }
+                })
+                ->count();
         }
 
         return $counts;

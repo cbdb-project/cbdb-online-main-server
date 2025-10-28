@@ -66,6 +66,14 @@ class CodesController extends Controller
             'c_office_trans',
         ],
     ];
+    /**
+     * Explicit primary key definitions for code tables.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected $tablePrimaryKeyOverrides = [
+        'TEXT_CODES' => ['c_textid'],
+    ];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
     {
@@ -122,6 +130,7 @@ class CodesController extends Controller
             }
 
             $isReadOnly = $this->isReadOnlyTable($table);
+            $keyColumns = $this->getKeyColumns($table);
 
             return view('codes.show', [
                 'page_title' => 'Codes',
@@ -134,6 +143,7 @@ class CodesController extends Controller
                 'search' => $search,
                 'dynastyMap' => $dynastyMap,
                 'isReadOnly' => $isReadOnly,
+                'keyColumns' => $keyColumns,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');
@@ -165,14 +175,15 @@ class CodesController extends Controller
                     return redirect()->back();
                 }
 
-                $compositeId = $this->buildCompositeId($keyColumns, $this->convertRowToArray($data));
+                $rowArray = $this->prepareAuditFieldsForDisplay($this->convertRowToArray($data));
+                $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
 
                 return view('codes.edit', [
                     'page_title' => 'Codes',
                     'page_description' => $table,
                     'page_url' => '/codes',
                     'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-                    'id' => $compositeId, 'row' => $data,
+                    'id' => $compositeId, 'row' => $rowArray,
                     'table' => $table]);
             }catch (\PDOException $e) {
                 flash('找不到该数据表', 'warning');
@@ -207,6 +218,7 @@ class CodesController extends Controller
             $query->where($column, $value);
         }
         $data = array_except($request->all(), ['_method', '_token']);
+        $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
 
         try {
             $query->update($data);
@@ -425,6 +437,14 @@ class CodesController extends Controller
 
         $columns = Schema::getColumnListing($table);
         $keys = [];
+        $upperTable = strtoupper($table);
+
+        if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
+            $overrideKeys = array_values(array_unique(array_filter($this->tablePrimaryKeyOverrides[$upperTable])));
+            if (!empty($overrideKeys)) {
+                return $cache[$table] = $overrideKeys;
+            }
+        }
 
         try {
             $connection = DB::connection();
@@ -498,6 +518,57 @@ class CodesController extends Controller
         return implode('_._', array_filter($parts, function ($part) {
             return $part !== '';
         }));
+    }
+
+    /**
+     * Prepare immutable/mutable audit columns before rendering edit form.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    protected function prepareAuditFieldsForDisplay(array $row): array
+    {
+        if (array_key_exists('c_modified_by', $row) && Auth::check()) {
+            $row['c_modified_by'] = Auth::user()->name;
+        }
+
+        if (array_key_exists('c_modified_date', $row)) {
+            $row['c_modified_date'] = Carbon::now()->format('Ymd');
+        }
+
+        return $row;
+    }
+
+    /**
+     * Ensure audit columns cannot be tampered with via requests.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $original
+     * @return array<string, mixed>
+     */
+    protected function enforceAuditFieldsForUpdate(array $data, array $original): array
+    {
+        foreach (['c_created_by', 'c_created_date'] as $field) {
+            if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
+                $data[$field] = $original[$field];
+            }
+        }
+
+        if (array_key_exists('c_modified_by', $data)) {
+            if (Auth::check()) {
+                $data['c_modified_by'] = Auth::user()->name;
+            } elseif (array_key_exists('c_modified_by', $original)) {
+                $data['c_modified_by'] = $original['c_modified_by'];
+            }
+        }
+
+        if (array_key_exists('c_modified_date', $data)) {
+            $data['c_modified_date'] = Carbon::now()->format('Ymd');
+        } elseif (array_key_exists('c_modified_date', $original)) {
+            $data['c_modified_date'] = $original['c_modified_date'];
+        }
+
+        return $data;
     }
 
     protected function buildConditionsFromRow(array $keyColumns, array $row): array

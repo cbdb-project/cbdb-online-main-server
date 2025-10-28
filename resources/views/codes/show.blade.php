@@ -6,6 +6,7 @@
         $dynastyMap = $dynastyMap ?? [];
         $isReadOnly = $isReadOnly ?? false;
         $showActions = Auth::check() && !$isReadOnly;
+        $keyColumns = $keyColumns ?? [];
     @endphp
 
     <div class="box">
@@ -52,10 +53,25 @@
                         @php
                             $row = (array) $item;
                             $idParts = [];
-                            foreach ($row as $value) {
-                                $idParts[] = $value;
-                                if (count($idParts) >= 2) {
-                                    break;
+                            if (!empty($keyColumns)) {
+                                foreach ($keyColumns as $column) {
+                                    if (array_key_exists($column, $row)) {
+                                        $value = (string) $row[$column];
+                                        if ($value !== '') {
+                                            $idParts[] = $value;
+                                        }
+                                    }
+                                }
+                            }
+                            if (empty($idParts)) {
+                                foreach ($row as $value) {
+                                    $stringValue = (string) $value;
+                                    if ($stringValue !== '') {
+                                        $idParts[] = $stringValue;
+                                    }
+                                    if (count($idParts) >= 2) {
+                                        break;
+                                    }
                                 }
                             }
                             $id_ = implode('_._', $idParts);

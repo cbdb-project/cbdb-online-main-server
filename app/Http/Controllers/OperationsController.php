@@ -74,13 +74,7 @@ class OperationsController extends Controller
                         $arr3 = json_decode($arr3, true);
                         break;
                     case "ALTNAME_DATA":
-                        $addr_l = explode("-", $resource_id);
-                        $arr3 = DB::table('ALTNAME_DATA')->where([
-                            ['c_personid', '=', $addr_l[0]],
-                            ['c_sequence', '=', $addr_l[1]],
-                            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-                            ['c_alt_name_type_code', '=', $addr_l[3]],
-                        ])->first();
+                        $arr3 = $this->fetchAltnameCurrentRow($listsArr['data'][$x]);
                         $arr3 = json_encode($arr3);
                         $arr3 = json_decode($arr3, true);
                         break;
@@ -383,6 +377,39 @@ class OperationsController extends Controller
             $segments[$index] = str_replace('minus', '-', $segment);
         }
         return $segments;
+    }
+
+    protected function fetchAltnameCurrentRow(array $operation)
+    {
+        $decoded = $this->decodeJson($operation['resource_data'] ?? null);
+        $decoded = is_array($decoded) ? $decoded : [];
+
+        $personId = $decoded['c_personid'] ?? null;
+        $sequence = $decoded['c_sequence'] ?? null;
+        $typeCode = $decoded['c_alt_name_type_code'] ?? null;
+
+        if ($personId === null || $sequence === null || $typeCode === null) {
+            $parts = $this->parseCompoundKey($operation['resource_id'] ?? null);
+            if ($personId === null && isset($parts[0]) && is_numeric($parts[0])) {
+                $personId = (int) $parts[0];
+            }
+            if ($sequence === null && isset($parts[1]) && is_numeric($parts[1])) {
+                $sequence = (int) $parts[1];
+            }
+            if ($typeCode === null && isset($parts[3]) && is_numeric($parts[3])) {
+                $typeCode = (int) $parts[3];
+            }
+        }
+
+        if ($personId === null || $sequence === null || $typeCode === null) {
+            return null;
+        }
+
+        return DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $personId],
+            ['c_sequence', '=', $sequence],
+            ['c_alt_name_type_code', '=', $typeCode],
+        ])->first();
     }
 
     protected function resourceKeyColumns($resource)

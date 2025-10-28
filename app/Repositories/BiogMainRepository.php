@@ -545,8 +545,11 @@ class BiogMainRepository
             $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
             $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
 
-            $nextPostingId = DB::table('POSTING_DATA')->lockForUpdate()->max('c_posting_id');
-            $data['c_posting_id'] = ((int)$nextPostingId) + 1;
+            $lastPostingId = DB::table('POSTING_DATA')
+                ->lockForUpdate()
+                ->orderByDesc('c_posting_id')
+                ->value('c_posting_id');
+            $data['c_posting_id'] = ((int) $lastPostingId) + 1;
             $data['c_personid'] = $id;
 
             DB::table('POSTING_DATA')->insert([

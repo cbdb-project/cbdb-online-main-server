@@ -2,6 +2,11 @@
 
 @section('content')
 
+    @php
+        $currentUserName = optional(Auth::user())->name;
+        $currentDateYmd = \Carbon\Carbon::now()->format('Ymd');
+    @endphp
+
     <div class="panel panel-default">
         <div class="panel-heading">{{ $table }}</div>
         <div class="panel-body">
@@ -21,11 +26,24 @@
                     </div>
                     @endif
                     @foreach($row as $key => $value)
+                        @php
+                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date'], true);
+                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date'], true);
+                            $inputValue = $value;
+                            if ($isModifiedField) {
+                                if ($key === 'c_modified_by' && $currentUserName !== null) {
+                                    $inputValue = $currentUserName;
+                                } elseif ($key === 'c_modified_date') {
+                                    $inputValue = $currentDateYmd;
+                                }
+                            }
+                            $shouldDisable = $isCreatedField || $isModifiedField;
+                        @endphp
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
-                                       value="{{ $value }}">
+                                       value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
                             </div>
                         </div>
                     @endforeach

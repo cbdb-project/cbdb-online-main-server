@@ -175,14 +175,15 @@ class CodesController extends Controller
                     return redirect()->back();
                 }
 
-                $compositeId = $this->buildCompositeId($keyColumns, $this->convertRowToArray($data));
+                $rowArray = $this->prepareAuditFieldsForDisplay($this->convertRowToArray($data));
+                $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
 
                 return view('codes.edit', [
                     'page_title' => 'Codes',
                     'page_description' => $table,
                     'page_url' => '/codes',
                     'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-                    'id' => $compositeId, 'row' => $data,
+                    'id' => $compositeId, 'row' => $rowArray,
                     'table' => $table]);
             }catch (\PDOException $e) {
                 flash('找不到该数据表', 'warning');
@@ -217,6 +218,7 @@ class CodesController extends Controller
             $query->where($column, $value);
         }
         $data = array_except($request->all(), ['_method', '_token']);
+        $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
 
         try {
             $query->update($data);
@@ -516,6 +518,57 @@ class CodesController extends Controller
         return implode('_._', array_filter($parts, function ($part) {
             return $part !== '';
         }));
+    }
+
+    /**
+     * Prepare immutable/mutable audit columns before rendering edit form.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    protected function prepareAuditFieldsForDisplay(array $row): array
+    {
+        if (array_key_exists('c_modified_by', $row) && Auth::check()) {
+            $row['c_modified_by'] = Auth::user()->name;
+        }
+
+        if (array_key_exists('c_modified_date', $row)) {
+            $row['c_modified_date'] = Carbon::now()->format('Ymd');
+        }
+
+        return $row;
+    }
+
+    /**
+     * Ensure audit columns cannot be tampered with via requests.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $original
+     * @return array<string, mixed>
+     */
+    protected function enforceAuditFieldsForUpdate(array $data, array $original): array
+    {
+        foreach (['c_created_by', 'c_created_date'] as $field) {
+            if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
+                $data[$field] = $original[$field];
+            }
+        }
+
+        if (array_key_exists('c_modified_by', $data)) {
+            if (Auth::check()) {
+                $data['c_modified_by'] = Auth::user()->name;
+            } elseif (array_key_exists('c_modified_by', $original)) {
+                $data['c_modified_by'] = $original['c_modified_by'];
+            }
+        }
+
+        if (array_key_exists('c_modified_date', $data)) {
+            $data['c_modified_date'] = Carbon::now()->format('Ymd');
+        } elseif (array_key_exists('c_modified_date', $original)) {
+            $data['c_modified_date'] = $original['c_modified_date'];
+        }
+
+        return $data;
     }
 
     protected function buildConditionsFromRow(array $keyColumns, array $row): array

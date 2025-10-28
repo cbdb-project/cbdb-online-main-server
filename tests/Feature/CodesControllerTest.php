@@ -11,6 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 use Tests\TestCase;
 
 class CodesControllerTest extends TestCase
@@ -40,7 +41,7 @@ class CodesControllerTest extends TestCase
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
-                'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn'],
+                'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
             ]
         );
         DB::swap($this->fakeDb);
@@ -186,7 +187,15 @@ class CodesControllerTest extends TestCase
     public function testTextCodesUsesExplicitPrimaryKeyOverride()
     {
         DB::table('TEXT_CODES')->insert([
-            ['c_textid' => 'T001', 'c_title' => 'Sample Title', 'c_title_chn' => 'Sample Title CHN'],
+            [
+                'c_textid' => 'T001',
+                'c_title' => 'Sample Title',
+                'c_title_chn' => 'Sample Title CHN',
+                'c_created_by' => 'origin',
+                'c_created_date' => '20200101',
+                'c_modified_by' => 'previous',
+                'c_modified_date' => '20200102',
+            ],
         ]);
 
         $user = new User([
@@ -205,6 +214,60 @@ class CodesControllerTest extends TestCase
         $response->assertSee('href="/codes/TEXT_CODES/T001/edit"', false);
         $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
         $this->assertEmpty($this->operationSpy->calls);
+    }
+
+    public function testAuditFieldsAreReadonlyAndPrefilledOnEdit()
+    {
+        Carbon::setTestNow(Carbon::create(2024, 3, 22, 12));
+
+        DB::table('TEXT_CODES')->insert([
+            [
+                'c_textid' => 'T001',
+                'c_title' => 'Sample Title',
+                'c_title_chn' => 'Sample Title CHN',
+                'c_created_by' => 'origin',
+                'c_created_date' => '20200101',
+                'c_modified_by' => 'previous',
+                'c_modified_date' => '20200102',
+            ],
+        ]);
+
+        $user = new User([
+            'name' => 'text-admin',
+            'email' => 'text-admin@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 6;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->get('/codes/TEXT_CODES/T001/edit');
+
+        $response->assertStatus(200);
+        $content = $response->getContent();
+        $createdByPos = strpos($content, 'name="c_created_by"');
+        $this->assertNotFalse($createdByPos);
+        $this->assertNotFalse(strpos($content, 'value="origin"', $createdByPos));
+        $this->assertNotFalse(strpos($content, 'readonly', $createdByPos));
+
+        $createdDatePos = strpos($content, 'name="c_created_date"');
+        $this->assertNotFalse($createdDatePos);
+        $this->assertNotFalse(strpos($content, 'value="20200101"', $createdDatePos));
+        $this->assertNotFalse(strpos($content, 'readonly', $createdDatePos));
+
+        $modifiedByPos = strpos($content, 'name="c_modified_by"');
+        $this->assertNotFalse($modifiedByPos);
+        $this->assertNotFalse(strpos($content, 'value="text-admin"', $modifiedByPos));
+        $this->assertNotFalse(strpos($content, 'readonly', $modifiedByPos));
+
+        $modifiedDatePos = strpos($content, 'name="c_modified_date"');
+        $this->assertNotFalse($modifiedDatePos);
+        $this->assertNotFalse(strpos($content, 'value="'.Carbon::now()->format('Ymd').'"', $modifiedDatePos));
+        $this->assertNotFalse(strpos($content, 'readonly', $modifiedDatePos));
+        $response->assertDontSee('value="previous"', false);
+        $response->assertDontSee('value="20200102"', false);
+
+        Carbon::setTestNow();
     }
 
     public function testActiveUserUpdateLogsOperation()

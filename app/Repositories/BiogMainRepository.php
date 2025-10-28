@@ -451,7 +451,7 @@ class BiogMainRepository
         }
 
         return DB::transaction(function () use ($data, $ori, $c_personid, $_officeid, $_postingid, $hasPostingChange, $hasAddressChange, $incomingAddr, $_id, $existingAddresses) {
-            $previousOfficeId = (string) ($ori['c_office_id'] ?? $_officeid);
+            $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
             $currentOfficeId = $previousOfficeId;
             if ($hasPostingChange) {
                 $timestamped = (new ToolsRepository)->timestamp($data);
@@ -460,7 +460,7 @@ class BiogMainRepository
                     ->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])
                     ->update($timestamped);
 
-                $currentOfficeId = (string) ($timestamped['c_office_id'] ?? $previousOfficeId);
+                $currentOfficeId = (int) ($timestamped['c_office_id'] ?? $currentOfficeId);
 
                 (new OperationRepository())->store(
                     Auth::id(),

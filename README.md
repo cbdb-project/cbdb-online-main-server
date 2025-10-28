@@ -318,4 +318,5 @@ sudo chown caddy laravel.log
 * [代碼表界面白名單維護](./CODES_TABLES.md)
 * [MERGE 工具說明](./MERGE.md)
 * [AGENTS 指南](./AGENTS.md)
+* [Posting/Office 流程備忘](./POSTING_OFFICE.md)
 

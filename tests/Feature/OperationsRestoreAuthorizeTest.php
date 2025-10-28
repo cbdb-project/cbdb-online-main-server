@@ -44,7 +44,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
 
-        $operation = $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA');
+        $operation = $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA', ['c_personid' => 123]);
 
         $controller = new SpyOperationsController($this->repository);
         $controller->restore($this->makeRequest(), $operation);
@@ -52,6 +52,20 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertTrue($controller->restoreInvoked);
         $this->assertCount(1, $this->repository->storeCalls);
         $this->assertEquals($operation->resource, $this->repository->storeCalls[0][3]);
+    }
+
+    public function testRestoreUsesOriginalPersonIdWhenAvailable(): void
+    {
+        $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
+        $this->actingAs($user);
+
+        $operation = $this->makeOperation(3, 'POSTED_TO_OFFICE_DATA', ['c_personid' => 456]);
+
+        $controller = new SpyOperationsController($this->repository, ['restoredPersonId' => 99]);
+        $controller->restore($this->makeRequest(), $operation);
+
+        $this->assertCount(1, $this->repository->storeCalls);
+        $this->assertSame(456, $this->repository->storeCalls[0][1]);
     }
 
     public function testRegularUserCannotTriggerRestore(): void
@@ -125,7 +139,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         return $user;
     }
 
-    protected function makeOperation(int $opType, string $resource): Operation
+    protected function makeOperation(int $opType, string $resource, array $overrides = []): Operation
     {
         $operation = new Operation();
         $operation->id = 1;
@@ -134,6 +148,9 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $operation->resource_id = '1-1-1-1';
         $operation->resource_data = json_encode(['dummy' => 'value']);
         $operation->resource_original = json_encode(['dummy' => 'old']);
+        foreach ($overrides as $key => $value) {
+            $operation->{$key} = $value;
+        }
         return $operation;
     }
 
@@ -146,13 +163,21 @@ class OperationsRestoreAuthorizeTest extends TestCase
 class SpyOperationsController extends OperationsController
 {
     public $restoreInvoked = false;
+    private $config;
+
+    public function __construct(OperationRepository $operationRepository, array $config = [])
+    {
+        parent::__construct($operationRepository);
+        $this->config = $config;
+    }
 
     protected function performRestore(Operation $operation)
     {
         $this->restoreInvoked = true;
+        $personId = $this->config['restoredPersonId'] ?? 99;
         return [
-            'restored' => ['c_personid' => 99, 'field' => 'restored'],
-            'previous' => ['c_personid' => 99, 'field' => 'previous'],
+            'restored' => ['c_personid' => $personId, 'field' => 'restored'],
+            'previous' => ['c_personid' => $personId, 'field' => 'previous'],
         ];
     }
 }

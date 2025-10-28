@@ -436,16 +436,16 @@ class OperationsController extends Controller
 
     protected function resolvePersonId(Operation $operation, array $restored, array $previous): ?int
     {
+        if (!empty($operation->c_personid)) {
+            return (int) $operation->c_personid;
+        }
+
         if (isset($restored['c_personid'])) {
             return (int) $restored['c_personid'];
         }
 
         if (isset($previous['c_personid'])) {
             return (int) $previous['c_personid'];
-        }
-
-        if (!empty($operation->c_personid)) {
-            return (int) $operation->c_personid;
         }
 
         $decoded = $this->decodeJson($operation->resource_data);

@@ -119,6 +119,12 @@ class OfficePostingStoreTest extends TestCase
             'resource_id' => '10-1',
             'op_type' => 1,
         ]);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'POSTED_TO_ADDR_DATA',
+            'resource_id' => '10-1',
+            'op_type' => 1,
+        ]);
     }
 
     public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void

@@ -564,6 +564,33 @@ class BiogMainRepository
 
             (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
 
+            $addressRows = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $id)
+                ->where('c_posting_id', $data['c_posting_id'])
+                ->where('c_office_id', $data['c_office_id'])
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'c_personid' => (int) $row->c_personid,
+                        'c_posting_id' => (int) $row->c_posting_id,
+                        'c_office_id' => (int) $row->c_office_id,
+                        'c_addr_id' => (int) $row->c_addr_id,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            if (!empty($addressRows)) {
+                (new OperationRepository())->store(
+                    Auth::id(),
+                    $id,
+                    1,
+                    'POSTED_TO_ADDR_DATA',
+                    $data['c_office_id'] . '-' . $data['c_posting_id'],
+                    ['rows' => $addressRows]
+                );
+            }
+
             return $data['c_office_id'] . '-' . $data['c_posting_id'];
         });
     }

@@ -25,6 +25,8 @@ Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsContr
 Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
 
 Route::get('home', 'HomeController@index')->name('home');
+Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
+Route::get('cbdbapi/person', 'CbdbApiController@person');
 
 Route::resource('informations', 'InformationsController', ['names' => [
     'create' => 'information.create'

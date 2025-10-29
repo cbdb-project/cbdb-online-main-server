@@ -8,6 +8,7 @@ use App\OfficeCode;
 use App\OfficeCodeTypeRel;
 use App\OfficeTypeTree;
 use App\Repositories\OperationRepository;
+use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,12 @@ use Carbon\Carbon;
 class OperationsController extends Controller
 {
     protected $operationRepository;
+    protected $biogMainRepository;
 
-    public function __construct(OperationRepository $operationRepository)
+    public function __construct(OperationRepository $operationRepository, biogMainRepository $biogMainRepository)
     {
         $this->operationRepository = $operationRepository;
+        $this->biogMainRepository = $biogMainRepository;
     }
 
     public function store()
@@ -74,7 +77,22 @@ class OperationsController extends Controller
                         $arr3 = json_decode($arr3, true);
                         break;
                     case "ALTNAME_DATA":
-                        $arr3 = $this->fetchAltnameCurrentRow($listsArr['data'][$x]);
+                        //$arr3 = $this->fetchAltnameCurrentRow($listsArr['data'][$x]);
+                        $alt = str_replace("--","-minus",$resource_id);
+                        //20251029聯合主鍵保留字弱點防禦函式，解析保留字。
+                        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
+                        $addr_l = explode("-", $alt);
+                        foreach($addr_l as $key => $value) {
+                            $addr_l[$key] = str_replace("minus","-",$value);
+                        }
+                        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+                        //dd($addr_l);
+                        $arr3 = DB::table('ALTNAME_DATA')->where([
+                            ['c_personid', '=', $addr_l[0]],
+                            ['c_sequence', '=', $addr_l[1]],
+                            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+                            ['c_alt_name_type_code', '=', $addr_l[3]],
+                        ])->first();
                         $arr3 = json_encode($arr3);
                         $arr3 = json_decode($arr3, true);
                         break;

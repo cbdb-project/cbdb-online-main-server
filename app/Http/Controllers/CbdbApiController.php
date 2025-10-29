@@ -2,20 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class CbdbApiController extends Controller
 {
-    public function person(Request $request): JsonResponse
+    public function person(Request $request)
     {
+        $mode = strtolower((string) $request->query('mode', $request->query('o', 'html')));
         $validated = $this->validate($request, [
             'id' => ['required', 'integer', 'min:1'],
         ]);
 
         $personId = (int) $validated['id'];
+
+        if (!in_array($mode, ['json', 'xml'], true)) {
+            return response()->view('cbdbapi.person', [
+                'personId' => $personId,
+            ]);
+        }
+
         $basicInfo = $this->fetchSingle($this->sqlBasicInfo(), [$personId]);
 
         if (!$basicInfo) {
@@ -38,37 +45,49 @@ class CbdbApiController extends Controller
         $associations = $this->fetchAll($this->sqlAssociations(), [$personId]);
         $texts = $this->fetchAll($this->sqlTexts(), [$personId]);
 
+        $basicInfoString = $this->stringifyRow($basicInfo);
+        $sourcesString = array_map([$this, 'stringifyRow'], $sources);
+        $sourcesAsString = array_map([$this, 'stringifyRow'], $sourcesAs);
+        $aliasesString = array_map([$this, 'stringifyRow'], $aliases);
+        $addressesString = array_map([$this, 'stringifyRow'], $addresses);
+        $entriesString = array_map([$this, 'stringifyRow'], $entries);
+        $postingsString = array_map([$this, 'stringifyRow'], $postings);
+        $statusesString = array_map([$this, 'stringifyRow'], $statuses);
+        $kinshipsString = array_map([$this, 'stringifyRow'], $kinships);
+        $associationsString = array_map([$this, 'stringifyRow'], $associations);
+        $textsString = array_map([$this, 'stringifyRow'], $texts);
+
         $personPayload = [
-            'BasicInfo' => $this->stringifyRow($basicInfo),
+            'BasicInfo' => $basicInfoString,
             'PersonSources' => [
-                'Source' => array_map([$this, 'stringifyRow'], $sources),
+                'Source' => $sourcesString,
             ],
             'PersonSourcesAs' => [
-                'SourceAs' => array_map([$this, 'stringifyRow'], $sourcesAs),
+                'SourceAs' => $sourcesAsString,
             ],
             'PersonAliases' => [
-                'Alias' => array_map([$this, 'stringifyRow'], $aliases),
+                'Alias' => $aliasesString,
             ],
             'PersonAddresses' => [
-                'Address' => array_map([$this, 'stringifyRow'], $addresses),
+                'Address' => $addressesString,
             ],
             'PersonEntryInfo' => [
-                'Entry' => array_map([$this, 'stringifyRow'], $entries),
+                'Entry' => $entriesString,
             ],
             'PersonPostings' => [
-                'Posting' => array_map([$this, 'stringifyRow'], $postings),
+                'Posting' => $postingsString,
             ],
             'PersonSocialStatus' => [
-                'SocialStatus' => array_map([$this, 'stringifyRow'], $statuses),
+                'SocialStatus' => $statusesString,
             ],
             'PersonKinshipInfo' => [
-                'Kinship' => array_map([$this, 'stringifyRow'], $kinships),
+                'Kinship' => $kinshipsString,
             ],
             'PersonSocialAssociation' => [
-                'Association' => array_map([$this, 'stringifyRow'], $associations),
+                'Association' => $associationsString,
             ],
             'PersonTexts' => [
-                'Text' => array_map([$this, 'stringifyRow'], $texts),
+                'Text' => $textsString,
             ],
         ];
 
@@ -153,7 +172,10 @@ class CbdbApiController extends Controller
             if (!is_array($wrapper)) {
                 continue;
             }
-            $elementKey = array_key_first($wrapper);
+            $elementKey = $this->arrayKeyFirst($wrapper);
+            if ($elementKey === null) {
+                continue;
+            }
             $items = $wrapper[$elementKey];
             if (is_array($items) && empty($items)) {
                 $personPayload[$section] = '';
@@ -161,6 +183,15 @@ class CbdbApiController extends Controller
         }
 
         return $personPayload;
+    }
+
+    protected function arrayKeyFirst(array $array)
+    {
+        foreach ($array as $key => $value) {
+            return $key;
+        }
+
+        return null;
     }
 
     protected function sqlBasicInfo(): string

@@ -299,7 +299,7 @@ class CbdbApiPersonTest extends TestCase
     {
         $this->seedPersonFixture();
 
-        $response = $this->getJson('/cbdbapi/person.php?id=1001');
+        $response = $this->getJson('/cbdbapi/person.php?id=1001&o=json');
 
         $response->assertStatus(200)
             ->assertJsonFragment(['DataSource' => 'CBDB'])
@@ -331,16 +331,28 @@ class CbdbApiPersonTest extends TestCase
         }
     }
 
+    public function test_it_renders_html_page(): void
+    {
+        $this->seedPersonFixture();
+
+        $response = $this->get('/cbdbapi/person.php?id=1001');
+
+        $response->assertStatus(200);
+        $response->assertSee('AuthoritySelectionToggle');
+        $response->assertSee('Anchor_CBDB_PersonInfo_1001');
+        $response->assertSee('?id=1001&amp;o=json', false);
+    }
+
     public function test_validation_error_when_id_missing(): void
     {
-        $response = $this->getJson('/cbdbapi/person.php');
+        $response = $this->getJson('/cbdbapi/person.php?o=json');
 
         $response->assertStatus(422);
     }
 
     public function test_not_found_returns_404(): void
     {
-        $response = $this->getJson('/cbdbapi/person.php?id=999999');
+        $response = $this->getJson('/cbdbapi/person.php?id=999999&o=json');
 
         $response->assertStatus(404)
             ->assertJson([

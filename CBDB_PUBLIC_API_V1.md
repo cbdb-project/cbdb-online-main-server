@@ -2,13 +2,14 @@
 
 ## 基本資訊
 - 端點：`GET /cbdbapi/person.php`
+- 預設回應為 HTML；若需 JSON，請於查詢參數加上 `o=json`（或 `mode=json` 亦相容）。
 - 參數：`id` (整數，必填)
 - 內容格式：JSON
 - `null` 欄位會輸出為空字串，符合 legacy API 的行為。
 
 ## 範例請求
 ```
-GET /cbdbapi/person.php?id=1488
+GET /cbdbapi/person.php?id=1488&o=json
 ```
 
 ## 回應結構

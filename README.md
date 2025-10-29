@@ -314,9 +314,9 @@ sudo chown caddy laravel.log
 ```
 ### 開發说明（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
 
+* [AGENTS 指南](./AGENTS.md)
 * [代碼表格前端實作比較](./CODES.md)
 * [代碼表界面白名單維護](./CODES_TABLES.md)
+* [資料庫結構說明](./DATABASE_SCHEMA.md)
 * [MERGE 工具說明](./MERGE.md)
-* [AGENTS 指南](./AGENTS.md)
 * [Posting/Office 流程備忘](./POSTING_OFFICE.md)
-

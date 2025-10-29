@@ -319,4 +319,10 @@ sudo chown caddy laravel.log
 * [MERGE 工具說明](./MERGE.md)
 * [AGENTS 指南](./AGENTS.md)
 * [Posting/Office 流程備忘](./POSTING_OFFICE.md)
+* [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
+* [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
+* [Changelog](./CHANGELOG.md)
+
+
+
 

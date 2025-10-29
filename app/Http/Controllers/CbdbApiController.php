@@ -239,7 +239,7 @@ SQL;
         return <<<SQL
 SELECT (SELECT c_name_type_desc_chn FROM ALTNAME_CODES WHERE c_name_type_code = ALTNAME_DATA.c_alt_name_type_code) AS AliasType,
        ALTNAME_DATA.c_alt_name_type_code AS AliasTypeId,
-        ALTNAME_DATA.c_alt_name_chn AS AliasName
+       ALTNAME_DATA.c_alt_name_chn AS AliasName
 FROM ALTNAME_DATA
 WHERE c_personid = ?
 SQL;
@@ -250,71 +250,52 @@ SQL;
         return <<<SQL
 SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        (SELECT c_addr_desc_chn FROM BIOG_ADDR_CODES WHERE c_addr_type = BIOG_ADDR_DATA.c_addr_type) AS AddrType,
-       c_addr_id AS AddrId,
+       BIOG_ADDR_DATA.c_addr_id AS AddrId,
        (SELECT c_name_chn FROM ADDR_CODES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id) AS AddrName,
-       (SELECT belongs1_Name FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs1_name,
-       (SELECT belongs1_Id FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs1_id,
-       (SELECT belongs2_Name FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs2_name,
-       (SELECT belongs2_Id FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs2_id,
-       (SELECT belongs3_Name FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs3_name,
-       (SELECT belongs3_Id FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs3_id,
-       (SELECT belongs4_Name FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs4_name,
-       (SELECT belongs4_Id FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs4_id,
-       (SELECT belongs5_Name FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs5_name,
-       (SELECT belongs5_Id FROM ADDRESSES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id
-               AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-               ORDER BY c_firstyear LIMIT 1) AS belongs5_id,
-       c_sequence AS MoveCount,
-       c_firstyear AS FirstYear,
-       c_lastyear AS LastYear,
+       ADDR.belongs1_Name AS belongs1_name,
+       ADDR.belongs1_Id AS belongs1_id,
+       ADDR.belongs2_Name AS belongs2_name,
+       ADDR.belongs2_Id AS belongs2_id,
+       ADDR.belongs3_Name AS belongs3_name,
+       ADDR.belongs3_Id AS belongs3_id,
+       ADDR.belongs4_Name AS belongs4_name,
+       ADDR.belongs4_Id AS belongs4_id,
+       ADDR.belongs5_Name AS belongs5_name,
+       ADDR.belongs5_Id AS belongs5_id,
+       BIOG_ADDR_DATA.c_sequence AS MoveCount,
+       BIOG_ADDR_DATA.c_firstyear AS FirstYear,
+       BIOG_ADDR_DATA.c_lastyear AS LastYear,
        (SELECT c_title_chn FROM TEXT_CODES WHERE c_textid = BIOG_ADDR_DATA.c_source) AS Source,
-       c_pages AS Pages,
-       c_notes AS Notes
+       BIOG_ADDR_DATA.c_pages AS Pages,
+       BIOG_ADDR_DATA.c_notes AS Notes
 FROM BIOG_ADDR_DATA
-WHERE c_personid = ?
+LEFT JOIN ADDRESSES AS ADDR
+     ON ADDR.c_addr_id = BIOG_ADDR_DATA.c_addr_id
+     AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (ADDR.c_firstyear < BIOG_ADDR_DATA.c_firstyear))
+     -- If multiple rows match, you may need to select the earliest one. If so, use a subquery or window function as needed.
+WHERE BIOG_ADDR_DATA.c_personid = ?
 SQL;
     }
 
     protected function sqlEntries(): string
     {
-        return <<<SQL
-SELECT (SELECT ENTRY_TYPES.c_entry_type_desc_chn
-        FROM ENTRY_TYPES
-        INNER JOIN ENTRY_CODE_TYPE_REL ON ENTRY_TYPES.c_entry_type = ENTRY_CODE_TYPE_REL.c_entry_type
-        WHERE ENTRY_CODE_TYPE_REL.c_entry_code = ENTRY_DATA.c_entry_code
-        LIMIT 1) AS EntryType,
-       (SELECT ENTRY_TYPES.c_entry_type
-        FROM ENTRY_TYPES
-        INNER JOIN ENTRY_CODE_TYPE_REL ON ENTRY_TYPES.c_entry_type = ENTRY_CODE_TYPE_REL.c_entry_type
-        WHERE ENTRY_CODE_TYPE_REL.c_entry_code = ENTRY_DATA.c_entry_code
-        LIMIT 1) AS EntryTypeId,
-       (SELECT c_entry_desc_chn FROM ENTRY_CODES WHERE c_entry_code = ENTRY_DATA.c_entry_code LIMIT 1) AS EntryCode,
-       (SELECT c_entry_code FROM ENTRY_CODES WHERE c_entry_code = ENTRY_DATA.c_entry_code LIMIT 1) AS EntryCodeId,
-       c_year AS RuShiYear,
-       c_age AS RuShiAge,
-       (SELECT c_title_chn FROM TEXT_CODES WHERE c_textid = ENTRY_DATA.c_source) AS Source,
-       c_pages AS Pages,
-       c_notes AS Notes
-FROM ENTRY_DATA
-WHERE c_personid = ?
+    return <<<SQL
+SELECT
+    et.c_entry_type_desc_chn AS EntryType,
+    et.c_entry_type AS EntryTypeId,
+    ec.c_entry_desc_chn AS EntryCode,
+    ed.c_entry_code AS EntryCodeId,
+    ed.c_year AS RuShiYear,
+    ed.c_age AS RuShiAge,
+    tc.c_title_chn AS Source,
+    ed.c_pages AS Pages,
+    ed.c_notes AS Notes
+FROM ENTRY_DATA ed
+LEFT JOIN ENTRY_CODES ec ON ed.c_entry_code = ec.c_entry_code
+LEFT JOIN ENTRY_CODE_TYPE_REL ectr ON ed.c_entry_code = ectr.c_entry_code
+LEFT JOIN ENTRY_TYPES et ON ectr.c_entry_type = et.c_entry_type
+LEFT JOIN TEXT_CODES tc ON ed.c_source = tc.c_textid
+WHERE ed.c_personid = ?
 SQL;
     }
 

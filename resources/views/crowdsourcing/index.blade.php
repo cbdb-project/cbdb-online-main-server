@@ -7,19 +7,19 @@
         <div class="panel-body">
             <div class="table-responsive">
                 <table id="example1" class="table table-bordered table-striped">
-                <p>* 修改类型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示删除<br />
-                * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄還沒有被處理，3表示記錄reject，4表示記錄處理失敗。
+                <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示刪除<br />
+                * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄尚未處理，3表示記錄reject，4表示記錄處理失敗。
                 </p>
                 <thead>
                 <tr>
 
-                    <th>修改资源</th>
+                    <th>修改資源</th>
                     <th>修改值</th>
-                    <th>资源tts</th>
-                    <th>修改类型</th>
+                    <th>資源 TTS</th>
+                    <th>修改類型</th>
                     <th>修改人</th>
                     <th>次數</th>
-                    <th>錄入时间</th>
+                    <th>錄入時間</th>
                     <th>狀態</th>
                     <th>操作</th>
                 </tr>

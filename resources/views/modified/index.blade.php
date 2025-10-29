@@ -6,19 +6,19 @@
         <div class="panel-body">
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
-                <p>* 修改类型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示删除<br />
-                * 狀態 0代表是專業用戶修改的記錄，1代表crowdsourcing記錄並且已經被插入數據庫。
+                <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示刪除<br />
+                * 狀態 0代表是專業用戶修改的記錄，1代表crowdsourcing記錄並且已插入數據庫。
                 </p>
                 <thead>
                 <tr>
                     <th>人物</th>
-                    <th>修改资源</th>
+                    <th>修改資源</th>
                     <th>修改值</th>
-                    <th>资源tts</th>
-                    <th>修改类型</th>
+                    <th>資源 TTS</th>
+                    <th>修改類型</th>
                     <th>修改人</th>
-                    <th>錄入时间</th>
-                    <th>修改时间</th>
+                    <th>錄入時間</th>
+                    <th>修改時間</th>
                     <th>狀態</th>
                 </tr>
                 </thead>

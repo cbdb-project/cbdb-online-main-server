@@ -9,12 +9,12 @@
                 <thead>
                 <tr>
                     <th>人物</th>
-                    <th>修改资源</th>
+                    <th>修改資源</th>
                     <th>修改值</th>
-                    <th>资源tts</th>
-                    <th>修改类型</th>
+                    <th>資源 TTS</th>
+                    <th>修改類型</th>
                     <th>修改人</th>
-                    <th>修改时间</th>
+                    <th>修改時間</th>
                 </tr>
                 </thead>
                 <tbody>

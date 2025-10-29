@@ -5,13 +5,29 @@
 <title>CBDB Person Authority - {{ $personId }}</title>
 </head>
 <body>
+@php
+    $searchResults = $searchResults ?? [];
+    $searchTerm = $searchTerm ?? null;
+@endphp
+
+@if(!empty($searchResults))
+<div id="search-results">
+    <div><b>搜尋結果</b>@if($searchTerm) ：「{{ e($searchTerm) }}」@endif</div>
+    <div class="search-result-list">
+        @foreach($searchResults as $result)
+            <a href="#" class="person-search-result" data-person-id="{{ $result['id'] }}" style="display:inline-block;margin-right:18px;text-decoration:none;">
+                {{ e($result['label']) }} ({{ $result['id'] }})
+            </a>
+        @endforeach
+    </div>
+</div>
+@elseif($searchTerm)
+<div id="search-results-message"><b>搜尋結果</b>：找不到符合「{{ e($searchTerm) }}」的資料。</div>
+@endif
+
 <div id="AuthorityContainer">
     <div id="person-anchor">
-        <a id="Anchor_CBDB_PersonInfo" href="#null-CBDB_PersonInfo"
-           class="AuthorityCurFocus"
-           onclick="AuthoritySelectionToggle('Anchor_CBDB_PersonInfo', 'Div_CBDB_PersonInfo'); return false;">
-            <span id="person-anchor-text">CBDB</span>
-        </a>
+        <span id="person-anchor-text">CBDB</span>
     </div>
 
     <div id="Div_CBDB_PersonInfo">
@@ -20,19 +36,62 @@
 </div>
 
 <script>
+var searchResultsData = @json($searchResults);
+var initialPersonIdData = @json($personId);
+var searchTermData = @json($searchTerm);
+
 (function () {
-    var personId = (function () {
-        var params = new URLSearchParams(window.location.search);
-        var id = params.get('id');
-        if (!id) {
-            return '';
-        }
-        return id.replace(/[^0-9]/g, '');
-    })();
+    var personId = '';
 
     var anchorText = document.getElementById('person-anchor-text');
-    if (anchorText && personId) {
-        anchorText.textContent = personId;
+
+    function setPersonId(newId) {
+        if (!newId) {
+            return;
+        }
+        var normalized = String(newId).replace(/[^0-9]/g, '');
+        if (!normalized) {
+            return;
+        }
+        personId = normalized;
+        if (anchorText) {
+            anchorText.textContent = personId;
+        }
+        updateSearchResultHighlight();
+    }
+
+    function updateSearchResultHighlight() {
+        var links = document.querySelectorAll('.person-search-result');
+        Array.prototype.forEach.call(links, function (link) {
+            link.style.display = 'inline-block';
+            link.style.marginRight = '18px';
+            link.style.textDecoration = 'none';
+            if (link.getAttribute('data-person-id') === personId) {
+                link.classList.add('is-current');
+                link.setAttribute('aria-current', 'true');
+                link.style.fontWeight = 'bold';
+            } else {
+                link.classList.remove('is-current');
+                link.removeAttribute('aria-current');
+                link.style.fontWeight = 'normal';
+            }
+        });
+    }
+
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id');
+        if (id) {
+            setPersonId(id);
+        }
+    })();
+
+    if (!personId && initialPersonIdData) {
+        setPersonId(initialPersonIdData);
+    }
+
+    if (!personId && searchResultsData.length > 0) {
+        setPersonId(searchResultsData[0].id);
     }
 
     function escapeHtml(value) {
@@ -514,7 +573,7 @@
             return '';
         }
         var first = items[0];
-        if (!first.SourceId) {
+        if (!first.Pages) {
             return '';
         }
         var href = 'https://newarchive.ihp.sinica.edu.tw/sncaccgi/sncacFtp?ACTION=TQ,sncacFtpqf,SN=' + encodeURIComponent(first.Pages) + ',2nd,search_simple';
@@ -544,27 +603,21 @@
         return html;
     }
 
-    function AuthoritySelectionToggle(anchorId, divId) {
-        var anchor = document.getElementById(anchorId);
-        var panel = document.getElementById(divId);
-        if (!anchor || !panel) {
-            return false;
-        }
-        if (panel.style.display === 'none') {
-            panel.style.display = 'block';
-            anchor.className = 'AuthorityCurFocus';
-        } else {
-            panel.style.display = 'none';
-            anchor.className = 'AuthoritySelection';
-        }
-        return false;
-    }
-
-    window.AuthoritySelectionToggle = AuthoritySelectionToggle;
-
-    function fetchPerson() {
+    function requestPersonData() {
         var content = document.getElementById('person-content');
+
+        if (!personId) {
+            if (searchTermData && searchResultsData.length === 0) {
+                content.innerHTML = '找不到符合條件的資料。';
+            } else {
+                content.innerHTML = '請選擇人物。';
+            }
+            return;
+        }
+
         var url = new URL(window.location.href);
+        url.searchParams.set('id', personId);
+        url.searchParams.delete('name');
         url.searchParams.set('o', 'json');
 
         fetch(url.toString(), {
@@ -583,6 +636,10 @@
                     payload.Package.PersonAuthority.PersonInfo &&
                     payload.Package.PersonAuthority.PersonInfo.Person;
 
+                if (person && person.BasicInfo && person.BasicInfo.PersonId) {
+                    setPersonId(person.BasicInfo.PersonId);
+                }
+
                 content.innerHTML = renderPerson(person);
             })
             .catch(function (error) {
@@ -599,7 +656,24 @@
             });
     }
 
-    fetchPerson();
+    function loadPerson(newId) {
+        if (!newId) {
+            return;
+        }
+        setPersonId(newId);
+        requestPersonData();
+    }
+
+    document.addEventListener('click', function (event) {
+        var target = event.target;
+        if (target && target.classList && target.classList.contains('person-search-result')) {
+            event.preventDefault();
+            loadPerson(target.getAttribute('data-person-id'));
+        }
+    });
+
+    updateSearchResultHighlight();
+    requestPersonData();
 })();
 </script>
 </body>

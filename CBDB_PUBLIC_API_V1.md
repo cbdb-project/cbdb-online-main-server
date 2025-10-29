@@ -3,13 +3,15 @@
 ## 基本資訊
 - 端點：`GET /cbdbapi/person.php`
 - 預設回應為 HTML；若需 JSON，請於查詢參數加上 `o=json`（或 `mode=json` 亦相容）。
-- 參數：`id` (整數，必填)
+- 參數：`id` (整數) 或 `name` (字串)，至少擇一；若同時提供則以 `id` 為主
+- HTML 模式在 `name` 查詢時會於頁面上方列出最多 20 筆候選人物供點選；JSON 模式則回傳符合條件的第一筆結果。
 - 內容格式：JSON
 - `null` 欄位會輸出為空字串，符合 legacy API 的行為。
 
 ## 範例請求
 ```
 GET /cbdbapi/person.php?id=1488&o=json
+GET /cbdbapi/person.php?name=張三&o=json
 ```
 
 ## 回應結構
@@ -50,7 +52,7 @@ GET /cbdbapi/person.php?id=1488&o=json
 ## 欄位說明
 - `BasicInfo`：包含人物 ID、姓名、指數年份、朝代、出生/卒年、資料來源等欄位。
 - `PersonSources.Source`：來源列表，欄位包含 `Source`、`SourceId`、`Pages`、`Notes`。
-- `PersonSourcesAs.SourceAs`：若無資料為空字串。
+- `PersonSourcesAs.SourceAs`：保留原版 API 的欄位設計，通常僅用於中央研究院人名權威資料；其內容對應 `PersonSources.Source` 清單中的同一筆來源。
 - `PersonAliases.Alias`：別名列表，每筆含 `AliasType`、`AliasTypeId`、`AliasName`。
 - `PersonAddresses.Address`：地址資訊，欄位含 `AddrTypeId`、`AddrType`、`AddrId`、`AddrName`、`belongs1_name`/`belongs1_id` 等。
 - `PersonEntryInfo.Entry`：若無資料為空字串。
@@ -61,6 +63,7 @@ GET /cbdbapi/person.php?id=1488&o=json
 - 資料庫現行欄位為 `POSTED_TO_OFFICE_DATA.c_appt_code`（原版為 `c_appt_type_code`）。原版 API 未同步更新欄位名稱，導致應為「1（正授）」等的除授類別經常回傳預設值「0（未詳）」。本次 API 實作將此問題修正；本文件保留此歷史差異以利追蹤。
 - 原版 `/person.php` 透過 `xmlToJson.xsl` 將 XML 轉成 JSON；XSL 會在遍歷 `<Posting>` 節點時重複輸出同一筆資料，使得 `PersonPostings.Posting` 中的 `FirstYear` 等欄位被複製多次。新版控制器直接以 PHP 陣列輸出 JSON，不再出現此重複紀錄。
 - 原版 API 期望 null 欄位輸出為空字串，現行 JSON API 亦採此方式，避免前端資料處理需要特殊判斷。
+- `name` 查詢會優先以 BIOG_MAIN 的中文、英文與拼音欄位做全字比對，再依序比對 ALTNAME，若仍找不到才改用模糊查詢；命中後回傳第一筆結果。
 
 ## 錯誤回應
 - `422 Unprocessable Entity`：缺少 `id` 或 `id` 非正整數。

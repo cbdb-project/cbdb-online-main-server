@@ -92,7 +92,6 @@ else {
 $item->resource_id = unionPKDef_decode_for_convert($item->resource_id);
 $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
 @endphp
-@endphp
 /edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
                             </td>
                             <td>{{ $item->resource }}</td>
@@ -181,8 +180,41 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                 {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}
                             </td>
                             <td>{{ $item->user->name }}</td>
-                            <td>{{ $item->created_at }}</td>
-                            <td>{{ $item->updated_at }}</td>
+                            @php
+                                $createdUtc = '';
+                                $updatedUtc = '';
+                                $createdDisplay = '';
+                                $updatedDisplay = '';
+                                $createdAtRaw = $item->created_at;
+                                $updatedAtRaw = $item->updated_at;
+                                $appTimezone = config('app.timezone', 'Asia/Shanghai');
+                                if ($createdAtRaw instanceof \Carbon\Carbon) {
+                                    $createdDisplay = $createdAtRaw;
+                                    $createdUtc = $createdAtRaw->copy()->setTimezone('UTC')->toIso8601String();
+                                } elseif (is_string($createdAtRaw) && trim($createdAtRaw) !== '') {
+                                    $createdDisplay = trim($createdAtRaw);
+                                    try {
+                                        $parsedCreated = \Carbon\Carbon::parse($createdAtRaw, $appTimezone);
+                                        $createdUtc = $parsedCreated->setTimezone('UTC')->toIso8601String();
+                                    } catch (\Exception $e) {
+                                        $createdUtc = $createdDisplay;
+                                    }
+                                }
+                                if ($updatedAtRaw instanceof \Carbon\Carbon) {
+                                    $updatedDisplay = $updatedAtRaw;
+                                    $updatedUtc = $updatedAtRaw->copy()->setTimezone('UTC')->toIso8601String();
+                                } elseif (is_string($updatedAtRaw) && trim($updatedAtRaw) !== '') {
+                                    $updatedDisplay = trim($updatedAtRaw);
+                                    try {
+                                        $parsedUpdated = \Carbon\Carbon::parse($updatedAtRaw, $appTimezone);
+                                        $updatedUtc = $parsedUpdated->setTimezone('UTC')->toIso8601String();
+                                    } catch (\Exception $e) {
+                                        $updatedUtc = $updatedDisplay;
+                                    }
+                                }
+                            @endphp
+                            <td class="js-utc-datetime" data-utc="{{ $createdUtc }}">{{ $createdDisplay }}</td>
+                            <td class="js-utc-datetime" data-utc="{{ $updatedUtc }}">{{ $updatedDisplay }}</td>
                             <td>{{ $item->crowdsourcing_status }}</td>
                         </tr>
                     @endforeach
@@ -198,5 +230,70 @@ $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
 @endsection
 
 @section('js')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var userTimeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
+    var userOffsetMinutes = new Date().getTimezoneOffset();
 
+    function formatTimestamp(utcTimeString, targetTimeZone) {
+        try {
+            var utcDate = new Date(utcTimeString);
+            if (isNaN(utcDate.getTime())) {
+                console.warn('Invalid time:', utcTimeString);
+                return utcTimeString;
+            }
+
+            var zone = targetTimeZone || userTimeZone;
+            var parts = new Intl.DateTimeFormat(undefined, {
+                timeZone: zone,
+                timeZoneName: 'short'
+            }).formatToParts(utcDate);
+            var timeZoneName = '';
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].type === 'timeZoneName') {
+                    timeZoneName = parts[i].value || '';
+                    break;
+                }
+            }
+
+            var dateTimeWithoutTZ = utcDate.toLocaleString('sv-SE', {
+                timeZone: zone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            return dateTimeWithoutTZ + ' ' + timeZoneName;
+        } catch (error) {
+            console.warn('Time conversion failed:', utcTimeString, error);
+            return utcTimeString;
+        }
+    }
+
+    var nodes = document.querySelectorAll('.js-utc-datetime');
+    Array.prototype.forEach.call(nodes, function (node) {
+        var original = node.getAttribute('data-utc') || (node.textContent || '').trim();
+        if (!original) {
+            return;
+        }
+
+        var displayText = formatTimestamp(original);
+        node.textContent = displayText;
+        if (userOffsetMinutes !== -480) {
+            var chinaText = formatTimestamp(original, 'Asia/Shanghai');
+            if (chinaText && chinaText !== original) {
+                node.setAttribute('title', chinaText);
+            } else {
+                node.removeAttribute('title');
+            }
+        } else {
+            node.removeAttribute('title');
+        }
+    });
+});
+</script>
 @endsection

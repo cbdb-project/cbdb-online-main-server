@@ -57,6 +57,13 @@
             <li class="header">資料表 DATA</li>
             <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
             <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
+            <li class="header">檢視表 VIEW</li>
+            <li class="{{ $page_title == 'Altname Data 檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'altname-data') }}"><i class="fa fa-table"></i> <span>別名資料檢視</span></a></li>
+            <li class="{{ $page_title == '社會關係資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'assoc-data') }}"><i class="fa fa-table"></i> <span>社會關係資料檢視</span></a></li>
+            <li class="{{ $page_title == '人物地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-addr-data') }}"><i class="fa fa-table"></i> <span>人物地址資料檢視</span></a></li>
+            <li class="{{ $page_title == '社會機構任職資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-inst-data') }}"><i class="fa fa-table"></i> <span>社會機構任職資料檢視</span></a></li>
+            <li class="{{ $page_title == '人物來源資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-source-data') }}"><i class="fa fa-table"></i> <span>人物來源資料檢視</span></a></li>
+            <li class="{{ $page_title == '人物著作資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-text-data') }}"><i class="fa fa-table"></i> <span>人物著作資料檢視</span></a></li>
 
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>

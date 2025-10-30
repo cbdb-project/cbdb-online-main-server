@@ -20,6 +20,7 @@
 
 
 - `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。
+- `/view/{key}` 檢視表頁面：`ViewTableController` 會依 `config/view_tables.php` 設定執行查詢並套用分頁／搜尋；實際 SQL 可透過頁面右上角「顯示 SQL」按鈕檢視，判斷是否符合預期。只有登入使用者能瀏覽該模組。
 - 操作紀錄（`operations` 表）：透過 `OperationRepository::store()` 統一寫入，欄位 `op_type` 代表新增/覆寫/修改/刪除。
   - 任官（`POSTING_DATA`、`POSTED_TO_OFFICE_DATA`、`POSTED_TO_ADDR_DATA`）相關的新增、更新、刪除已全面改成由 `BiogMainRepository::officeStoreById()`／`officeUpdateById()`／`officeDeleteById()` 以資料庫交易處理：先鎖定/寫入主表，再同步管理地址清單並一次寫入操作紀錄。請勿在 Controller 直接操作 `DB::table()`。
   - `officeUpdateById()` 只有在實際欄位變動時才對 `POSTED_TO_OFFICE_DATA` 寫入 timestamp，純地址異動會在同一交易中只更新 `POSTED_TO_ADDR_DATA`，操作紀錄也會對應保留 before/after JSON。測試這段流程時務必透過 `actingAs()` 提供使用者資訊，避免 `ToolsRepository::timestamp()` 取不到登入者姓名。
@@ -39,6 +40,12 @@
 | 執行單一測試 | `./vendor/bin/phpunit --filter TestName` |
 
 > 若修改 Vue/JS，記得在本機跑 `npm run dev` 產出 `public/js/app.js`；專案不會自動編譯。
+
+### 檢視表 ViewTable 模組補充
+- 新增或調整檢視請更新 `config/view_tables.php`（欄位標題、描述、每頁筆數、對應 builder）。
+- 搜尋欄位維護在 `config/view_table_searchable.php`，欄位名稱需與查詢 builder 中的 alias 對應。
+- 查詢邏輯集中在 `app/ViewTables/ViewTableQueries.php`，若要將 SQL 直接換成資料庫 view，也可在 builder 中 `DB::table('YOUR_VIEW')` 取代。
+- 頁面會在 modal 中顯示加上 `limit/offset` 的 SQL 及 bindings，除錯時可比對資料庫是否存在同樣結果。
 
 ## 測試策略
 1. **PHPUnit**  

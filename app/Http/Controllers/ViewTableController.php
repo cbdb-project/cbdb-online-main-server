@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Str;
+
+class ViewTableController extends Controller
+{
+    public function show(Request $request, string $key)
+    {
+        $definitions = Config::get('view_tables', []);
+
+        $definition = null;
+        $resolvedKey = null;
+
+        foreach ($definitions as $definitionKey => $candidate) {
+            $candidates = array_merge([$definitionKey], Arr::get($candidate, 'aliases', []));
+            foreach ($candidates as $alias) {
+                if (strcasecmp($alias, $key) === 0) {
+                    $definition = $candidate;
+                    $resolvedKey = $definitionKey;
+                    break 2;
+                }
+            }
+        }
+
+        if ($definition === null) {
+            abort(404);
+        }
+
+        $effectiveKey = $resolvedKey ?? $key;
+        $builderCallable = $definition['builder'] ?? null;
+        if (!is_callable($builderCallable)) {
+            abort(404, 'View definition missing valid builder.');
+        }
+
+        $builder = call_user_func($builderCallable, $request);
+
+        if ($request->filled('search')) {
+            $searchable = Config::get('view_table_searchable.' . $effectiveKey, []);
+            if (!empty($searchable)) {
+                $term = '%' . $request->query('search') . '%';
+                $builder->where(function ($query) use ($searchable, $term) {
+                    foreach ($searchable as $column) {
+                        $query->orWhere($column, 'like', $term);
+                    }
+                });
+            }
+        }
+
+        $perPage = (int) ($definition['page_size'] ?? 50);
+        $perPage = $perPage > 0 ? $perPage : 50;
+        $currentPage = max((int) $request->query('page', 1), 1);
+
+        $debugQuery = clone $builder;
+        $debugQuery->limit($perPage)->offset(($currentPage - 1) * $perPage);
+        $debugSql = $debugQuery->toSql();
+        $debugBindings = $debugQuery->getBindings();
+        $debugRenderedSql = $this->renderSql($debugSql, $debugBindings);
+
+        $rows = $builder->paginate($perPage)->appends($request->except('page'));
+
+        return view('view.index', [
+            'title' => $definition['title'] ?? $effectiveKey,
+            'description' => $definition['description'] ?? null,
+            'columns' => $definition['columns'] ?? [],
+            'rows' => $rows,
+            'key' => $effectiveKey,
+            'page_title' => $definition['title'] ?? $effectiveKey,
+            'page_description' => $definition['description'] ?? '',
+            'page_url' => route('view.show', $effectiveKey),
+            'debug_sql' => $debugSql,
+            'debug_sql_formatted' => $debugRenderedSql,
+            'debug_bindings' => $debugBindings,
+            'debug_per_page' => $perPage,
+            'debug_current_page' => $currentPage,
+        ]);
+    }
+
+    protected function renderSql(string $sql, array $bindings): string
+    {
+        if (empty($bindings)) {
+            return $sql;
+        }
+
+        $preparedBindings = array_map(function ($binding) {
+            if ($binding === null) {
+                return 'NULL';
+            }
+            if (is_bool($binding)) {
+                return $binding ? '1' : '0';
+            }
+            if (is_int($binding) || is_float($binding)) {
+                return (string) $binding;
+            }
+
+            return "'" . str_replace("'", "''", $binding) . "'";
+        }, $bindings);
+
+        return Str::replaceArray('?', $preparedBindings, $sql);
+    }
+}

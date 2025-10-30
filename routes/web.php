@@ -27,6 +27,7 @@ Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'Crowdsour
 Route::get('home', 'HomeController@index')->name('home');
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
 Route::get('cbdbapi/person', 'CbdbApiController@person');
+Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 
 Route::resource('informations', 'InformationsController', ['names' => [
     'create' => 'information.create'

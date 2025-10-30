@@ -2,20 +2,69 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 
 class CbdbApiController extends Controller
 {
-    public function person(Request $request): JsonResponse
+    public function person(Request $request)
     {
-        $validated = $this->validate($request, [
-            'id' => ['required', 'integer', 'min:1'],
+        $mode = strtolower((string) $request->query('mode', $request->query('o', 'html')));
+
+        $validator = Validator::make($request->all(), [
+            'id' => ['nullable', 'integer', 'min:1'],
+            'name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $personId = (int) $validated['id'];
+        $validator->after(function ($validator) use ($request) {
+            if (!$request->filled('id') && !$request->filled('name')) {
+                $validator->errors()->add('id', 'Either id or name parameter must be provided.');
+            }
+        });
+
+        $validator->validate();
+
+        $idParam = $request->query('id');
+        $nameParam = $request->query('name');
+
+        $searchResults = [];
+        $resolvedId = null;
+
+        if ($idParam) {
+            $resolvedId = (int) $idParam;
+        } elseif ($nameParam) {
+            $searchResults = $this->searchPersonCandidates($nameParam, 20);
+            $resolvedId = $searchResults[0]['id'] ?? null;
+        }
+
+        if (!in_array($mode, ['json', 'xml'], true)) {
+            if ($resolvedId === null) {
+                return response()->view('cbdbapi.person', [
+                    'personId' => '',
+                    'searchResults' => $searchResults,
+                    'searchTerm' => $nameParam,
+                ], 404);
+            }
+
+            return response()->view('cbdbapi.person', [
+                'personId' => $resolvedId,
+                'searchResults' => $searchResults,
+                'searchTerm' => $nameParam,
+            ]);
+        }
+
+        $personId = $resolvedId ?? $this->resolvePersonId($idParam, $nameParam);
+        if ($personId === null) {
+            return response()->json([
+                'error' => [
+                    'code' => 404,
+                    'message' => 'Person not found.',
+                ],
+            ], 404);
+        }
+
         $basicInfo = $this->fetchSingle($this->sqlBasicInfo(), [$personId]);
 
         if (!$basicInfo) {
@@ -38,37 +87,49 @@ class CbdbApiController extends Controller
         $associations = $this->fetchAll($this->sqlAssociations(), [$personId]);
         $texts = $this->fetchAll($this->sqlTexts(), [$personId]);
 
+        $basicInfoString = $this->stringifyRow($basicInfo);
+        $sourcesString = array_map([$this, 'stringifyRow'], $sources);
+        $sourcesAsString = array_map([$this, 'stringifyRow'], $sourcesAs);
+        $aliasesString = array_map([$this, 'stringifyRow'], $aliases);
+        $addressesString = array_map([$this, 'stringifyRow'], $addresses);
+        $entriesString = array_map([$this, 'stringifyRow'], $entries);
+        $postingsString = array_map([$this, 'stringifyRow'], $postings);
+        $statusesString = array_map([$this, 'stringifyRow'], $statuses);
+        $kinshipsString = array_map([$this, 'stringifyRow'], $kinships);
+        $associationsString = array_map([$this, 'stringifyRow'], $associations);
+        $textsString = array_map([$this, 'stringifyRow'], $texts);
+
         $personPayload = [
-            'BasicInfo' => $this->stringifyRow($basicInfo),
+            'BasicInfo' => $basicInfoString,
             'PersonSources' => [
-                'Source' => array_map([$this, 'stringifyRow'], $sources),
+                'Source' => $sourcesString,
             ],
             'PersonSourcesAs' => [
-                'SourceAs' => array_map([$this, 'stringifyRow'], $sourcesAs),
+                'SourceAs' => $sourcesAsString,
             ],
             'PersonAliases' => [
-                'Alias' => array_map([$this, 'stringifyRow'], $aliases),
+                'Alias' => $aliasesString,
             ],
             'PersonAddresses' => [
-                'Address' => array_map([$this, 'stringifyRow'], $addresses),
+                'Address' => $addressesString,
             ],
             'PersonEntryInfo' => [
-                'Entry' => array_map([$this, 'stringifyRow'], $entries),
+                'Entry' => $entriesString,
             ],
             'PersonPostings' => [
-                'Posting' => array_map([$this, 'stringifyRow'], $postings),
+                'Posting' => $postingsString,
             ],
             'PersonSocialStatus' => [
-                'SocialStatus' => array_map([$this, 'stringifyRow'], $statuses),
+                'SocialStatus' => $statusesString,
             ],
             'PersonKinshipInfo' => [
-                'Kinship' => array_map([$this, 'stringifyRow'], $kinships),
+                'Kinship' => $kinshipsString,
             ],
             'PersonSocialAssociation' => [
-                'Association' => array_map([$this, 'stringifyRow'], $associations),
+                'Association' => $associationsString,
             ],
             'PersonTexts' => [
-                'Text' => array_map([$this, 'stringifyRow'], $texts),
+                'Text' => $textsString,
             ],
         ];
 
@@ -153,7 +214,10 @@ class CbdbApiController extends Controller
             if (!is_array($wrapper)) {
                 continue;
             }
-            $elementKey = array_key_first($wrapper);
+            $elementKey = $this->arrayKeyFirst($wrapper);
+            if ($elementKey === null) {
+                continue;
+            }
             $items = $wrapper[$elementKey];
             if (is_array($items) && empty($items)) {
                 $personPayload[$section] = '';
@@ -161,6 +225,155 @@ class CbdbApiController extends Controller
         }
 
         return $personPayload;
+    }
+
+    protected function arrayKeyFirst(array $array)
+    {
+        foreach ($array as $key => $value) {
+            return $key;
+        }
+
+        return null;
+    }
+
+    protected function resolvePersonId(?string $idParam, ?string $nameParam): ?int
+    {
+        if ($idParam !== null && $idParam !== '') {
+            return (int) $idParam;
+        }
+
+        if ($nameParam === null) {
+            return null;
+        }
+
+        return $this->findPersonIdByName($nameParam);
+    }
+
+protected function findPersonIdByName(string $name): ?int
+{
+        $candidate = $this->searchPersonCandidates($name, 1);
+        return $candidate[0]['id'] ?? null;
+}
+
+    protected function searchPersonCandidates(string $name, int $limit = 20): array
+    {
+        $term = trim($name);
+
+        if ($term === '') {
+            return [];
+        }
+
+        $limit = max(1, $limit);
+        $collector = [];
+
+        $this->appendPersonIdsFromQuery(
+            DB::table('BIOG_MAIN')
+                ->select('c_personid')
+                ->where(function ($query) use ($term) {
+                    $query->where('c_name_chn', $term)
+                        ->orWhere('c_name', $term)
+                        ->orWhere('c_name_rm', $term);
+                })
+                ->orderBy('c_personid'),
+            $collector,
+            $limit
+        );
+
+        $this->appendPersonIdsFromQuery(
+            DB::table('ALTNAME_DATA')
+                ->select('c_personid')
+                ->where(function ($query) use ($term) {
+                    $query->where('c_alt_name_chn', $term)
+                        ->orWhere('c_alt_name', $term);
+                })
+                ->orderBy('c_personid'),
+            $collector,
+            $limit
+        );
+
+        $likeTerm = '%' . $term . '%';
+
+        $this->appendPersonIdsFromQuery(
+            DB::table('BIOG_MAIN')
+                ->select('c_personid')
+                ->where(function ($query) use ($likeTerm) {
+                    $query->where('c_name_chn', 'like', $likeTerm)
+                        ->orWhere('c_name', 'like', $likeTerm)
+                        ->orWhere('c_name_rm', 'like', $likeTerm);
+                })
+                ->orderBy('c_personid'),
+            $collector,
+            $limit
+        );
+
+        $this->appendPersonIdsFromQuery(
+            DB::table('ALTNAME_DATA')
+                ->select('c_personid')
+                ->where(function ($query) use ($likeTerm) {
+                    $query->where('c_alt_name_chn', 'like', $likeTerm)
+                        ->orWhere('c_alt_name', 'like', $likeTerm);
+                })
+                ->orderBy('c_personid'),
+            $collector,
+            $limit
+        );
+
+        if (empty($collector)) {
+            return [];
+        }
+
+        $collector = array_slice($collector, 0, $limit);
+
+        $people = DB::table('BIOG_MAIN')
+            ->select('c_personid', 'c_name_chn', 'c_name', 'c_name_rm')
+            ->whereIn('c_personid', $collector)
+            ->get()
+            ->keyBy('c_personid');
+
+        $results = [];
+        foreach ($collector as $personId) {
+            $personId = (int) $personId;
+            if (!isset($people[$personId])) {
+                continue;
+            }
+            $row = (array) $people[$personId];
+            $label = $row['c_name_chn'] ?? '';
+            if ($label === '') {
+                $label = $row['c_name'] ?? '';
+            }
+            if ($label === '') {
+                $label = $row['c_name_rm'] ?? '';
+            }
+            if ($label === '') {
+                $label = 'ID ' . $personId;
+            }
+            $results[] = [
+                'id' => $personId,
+                'label' => $label,
+            ];
+        }
+
+        return $results;
+    }
+
+    protected function appendPersonIdsFromQuery($builder, array &$collector, int $limit): void
+    {
+        if (count($collector) >= $limit) {
+            return;
+        }
+
+        $fetchLimit = max($limit * 5, 20);
+        $ids = $builder->limit($fetchLimit)->pluck('c_personid')->toArray();
+
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if (!in_array($id, $collector, true)) {
+                $collector[] = $id;
+            }
+            if (count($collector) >= $limit) {
+                break;
+            }
+        }
     }
 
     protected function sqlBasicInfo(): string

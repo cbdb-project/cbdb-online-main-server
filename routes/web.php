@@ -193,6 +193,11 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
     'update' => 'addrbelongsdata.update'
 ]]);
 
+Route::middleware('auth')->group(function () {
+    Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
+    Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
+});
+
 Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
 
 Route::resource('addrcodes', 'AddrCodesController', ['name' => [

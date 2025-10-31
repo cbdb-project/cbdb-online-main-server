@@ -13,9 +13,13 @@ class CreateViewAddressesView extends Migration
      */
     public function up()
     {
-// Using CREATE OR REPLACE is safer for re-running migrations
+        Schema::table('ADDR_BELONGS_DATA', function (Blueprint $table) {
+            $table->index('c_belongs_to', 'idx_belongs_to');
+        });
+
+        // Using CREATE OR REPLACE is safer for re-running migrations
         DB::statement("
-          CREATE OR REPLACE VIEW VIEW_ADDRESSES AS
+          CREATE OR REPLACE VIEW View_Address AS
           SELECT
             a0.c_addr_id,
             a0.c_name,
@@ -77,6 +81,9 @@ class CreateViewAddressesView extends Migration
      */
     public function down()
     {
-        DB::statement("DROP VIEW IF EXISTS VIEW_ADDRESSES");
+        DB::statement("DROP VIEW IF EXISTS View_Address");
+        Schema::table('ADDR_BELONGS_DATA', function (Blueprint $table) {
+            $table->dropIndex('idx_belongs_to');
+        });
     }
 }

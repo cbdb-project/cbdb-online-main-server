@@ -482,10 +482,18 @@ SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        BIOG_ADDR_DATA.c_pages AS Pages,
        BIOG_ADDR_DATA.c_notes AS Notes
 FROM BIOG_ADDR_DATA
-LEFT JOIN ADDRESSES AS ADDR
+LEFT JOIN View_Address AS ADDR
      ON ADDR.c_addr_id = BIOG_ADDR_DATA.c_addr_id
-     AND ((BIOG_ADDR_DATA.c_firstyear IS NULL OR BIOG_ADDR_DATA.c_firstyear = 0) OR (ADDR.c_firstyear < BIOG_ADDR_DATA.c_firstyear))
-     -- If multiple rows match, you may need to select the earliest one. If so, use a subquery or window function as needed.
+     AND (
+         BIOG_ADDR_DATA.c_firstyear IS NULL
+         OR ADDR.c_lastyear IS NULL
+         OR BIOG_ADDR_DATA.c_firstyear <= ADDR.c_lastyear
+     )
+     AND (
+         BIOG_ADDR_DATA.c_lastyear IS NULL
+         OR ADDR.c_firstyear IS NULL
+         OR BIOG_ADDR_DATA.c_lastyear >= ADDR.c_firstyear
+     )
 WHERE BIOG_ADDR_DATA.c_personid = ?
 SQL;
     }

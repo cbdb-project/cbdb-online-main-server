@@ -61,6 +61,7 @@
             <li class="{{ $page_title == 'Altname Data 檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'altname-data') }}"><i class="fa fa-table"></i> <span>別名資料檢視</span></a></li>
             <li class="{{ $page_title == '社會關係資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'assoc-data') }}"><i class="fa fa-table"></i> <span>社會關係資料檢視</span></a></li>
             <li class="{{ $page_title == '人物地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-addr-data') }}"><i class="fa fa-table"></i> <span>人物地址資料檢視</span></a></li>
+            <li class="{{ $page_title == '地址層級檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'addresses') }}"><i class="fa fa-table"></i> <span>地址層級檢視</span></a></li>
             <li class="{{ $page_title == '社會機構任職資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-inst-data') }}"><i class="fa fa-table"></i> <span>社會機構任職資料檢視</span></a></li>
             <li class="{{ $page_title == '人物來源資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-source-data') }}"><i class="fa fa-table"></i> <span>人物來源資料檢視</span></a></li>
             <li class="{{ $page_title == '人物著作資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-text-data') }}"><i class="fa fa-table"></i> <span>人物著作資料檢視</span></a></li>

@@ -7,6 +7,7 @@ return [
     'tables' => [
         'ADDR_BELONGS_DATA',
         'ADDR_CODES',
+        'ADDRESSES',
         'ALTNAME_CODES',
         'APPOINTMENT_CODES',
         'ASSOC_CODES',

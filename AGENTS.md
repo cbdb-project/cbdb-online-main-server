@@ -19,7 +19,7 @@
 - 官名設定在寫入操作紀錄時會將地址清單（POSTED_TO_ADDR_DATA）以 JSON rows 輸出，方便稽核與還原。 目前這類操作在 Operations 頁面暫停提供一鍵復原。
 
 
-- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。
+- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單目前已納入 `ADDRESSES`，可直接於 `/codes/ADDRESSES` 檢視原始地址主表資料。
 - `/view/{key}` 檢視表頁面：`ViewTableController` 會依 `config/view_tables.php` 設定執行查詢並套用分頁／搜尋；實際 SQL 可透過頁面右上角「顯示 SQL」按鈕檢視，判斷是否符合預期。只有登入使用者能瀏覽該模組。
 - 操作紀錄（`operations` 表）：透過 `OperationRepository::store()` 統一寫入，欄位 `op_type` 代表新增/覆寫/修改/刪除。
   - 任官（`POSTING_DATA`、`POSTED_TO_OFFICE_DATA`、`POSTED_TO_ADDR_DATA`）相關的新增、更新、刪除已全面改成由 `BiogMainRepository::officeStoreById()`／`officeUpdateById()`／`officeDeleteById()` 以資料庫交易處理：先鎖定/寫入主表，再同步管理地址清單並一次寫入操作紀錄。請勿在 Controller 直接操作 `DB::table()`。
@@ -46,6 +46,7 @@
 - 搜尋欄位維護在 `config/view_table_searchable.php`，欄位名稱需與查詢 builder 中的 alias 對應。
 - 查詢邏輯集中在 `app/ViewTables/ViewTableQueries.php`，若要將 SQL 直接換成資料庫 view，也可在 builder 中 `DB::table('YOUR_VIEW')` 取代。
 - 頁面會在 modal 中顯示加上 `limit/offset` 的 SQL 及 bindings，除錯時可比對資料庫是否存在同樣結果。
+- `View_Address`（地址層級檢視）已註冊於 `/view/Addresses`，列出 `ADDR_CODES` 與 `ADDR_BELONGS_DATA` 組成的五層隸屬結構；若調整 SQL 或欄位，記得同步更新設定檔與側邊欄連結。
 
 ## 測試策略
 1. **PHPUnit**  

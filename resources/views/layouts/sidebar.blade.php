@@ -58,13 +58,26 @@
             <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
             <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
             <li class="header">檢視表 VIEW</li>
-            <li class="{{ $page_title == 'Altname Data 檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'altname-data') }}"><i class="fa fa-table"></i> <span>別名資料檢視</span></a></li>
-            <li class="{{ $page_title == '社會關係資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'assoc-data') }}"><i class="fa fa-table"></i> <span>社會關係資料檢視</span></a></li>
-            <li class="{{ $page_title == '人物地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-addr-data') }}"><i class="fa fa-table"></i> <span>人物地址資料檢視</span></a></li>
+            <li class="{{ $page_title == '檢視表總覽' ? 'active' : '' }}"><a href="{{ route('view.index') }}"><i class="fa fa-th-list"></i> <span>檢視表總覽</span></a></li>
             <li class="{{ $page_title == '地址層級檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'addresses') }}"><i class="fa fa-table"></i> <span>地址層級檢視</span></a></li>
-            <li class="{{ $page_title == '社會機構任職資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-inst-data') }}"><i class="fa fa-table"></i> <span>社會機構任職資料檢視</span></a></li>
-            <li class="{{ $page_title == '人物來源資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-source-data') }}"><i class="fa fa-table"></i> <span>人物來源資料檢視</span></a></li>
-            <li class="{{ $page_title == '人物著作資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-text-data') }}"><i class="fa fa-table"></i> <span>人物著作資料檢視</span></a></li>
+            <li class="{{ $page_title == '別名資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'altname-data') }}"><i class="fa fa-table"></i> <span>別名資料檢視<br>(View_AltnameData)</span></a></li>
+            <li class="{{ $page_title == '社會關係資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'assoc-data') }}"><i class="fa fa-table"></i> <span>社會關係資料檢視<br>(View_AssociationData)</span></a></li>
+            <li class="{{ $page_title == '人物地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-addr-data') }}"><i class="fa fa-table"></i> <span>人物地址資料檢視<br>(View_BiogAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物/社會機構/地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-inst-addr-data') }}"><i class="fa fa-table"></i> <span>人物/社會機構/地址資料檢視<br>(View_BiogInstAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物社會機構資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-inst-data') }}"><i class="fa fa-table"></i> <span>人物社會機構資料檢視<br>(View_BiogInstData)</span></a></li>
+            <li class="{{ $page_title == '人物來源資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-source-data') }}"><i class="fa fa-table"></i> <span>人物來源資料檢視<br>(View_BiogSourceData)</span></a></li>
+            <li class="{{ $page_title == '人物著作資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'biog-text-data') }}"><i class="fa fa-table"></i> <span>人物著作資料檢視<br>(View_BiogTextData)</span></a></li>
+            <li class="{{ $page_title == '人物入仕資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'entry-data') }}"><i class="fa fa-table"></i> <span>人物入仕資料檢視<br>(View_EntryData)</span></a></li>
+            <li class="{{ $page_title == '人物事件地址檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'event-addr-data') }}"><i class="fa fa-table"></i> <span>人物事件地址檢視<br>(View_EventAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物事件資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'events-data') }}"><i class="fa fa-table"></i> <span>人物事件資料檢視<br>(View_EventData)</span></a></li>
+            <li class="{{ $page_title == '人物親屬資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'kin-addr-data') }}"><i class="fa fa-table"></i> <span>人物親屬資料檢視<br>(View_KinAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物基本資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'people-data') }}"><i class="fa fa-table"></i> <span>人物基本資料檢視<br>(View_PeopleData)</span></a></li>
+            <li class="{{ $page_title == '人物索引地址檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'people-addr-data') }}"><i class="fa fa-table"></i> <span>人物索引地址檢視<br>(View_PeopleAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物財產地址檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'posessions-addr-data') }}"><i class="fa fa-table"></i> <span>人物財產地址檢視<br>(View_PossessionsAddrData)</span></a></li>
+            <li class="{{ $page_title == '人物財產資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'posessions-data') }}"><i class="fa fa-table"></i> <span>人物財產資料檢視<br>(View_PossessionsData)</span></a></li>
+            <li class="{{ $page_title == '任官地址資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'posting-addr-data') }}"><i class="fa fa-table"></i> <span>任官地址資料檢視<br>(View_PostingAddrData)</span></a></li>
+            <li class="{{ $page_title == '任官職務資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'posting-office-data') }}"><i class="fa fa-table"></i> <span>任官職務資料檢視<br>(View_PostingOfficeData)</span></a></li>
+            <li class="{{ $page_title == '人物身份資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'status-data') }}"><i class="fa fa-table"></i> <span>人物身份資料檢視<br>(View_StatusData)</span></a></li>
 
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>

@@ -128,13 +128,73 @@ desired effect
             <!-- Your Page Content Here -->
             @yield('content')
 
+            @php
+                $canViewQueryDetails = Auth::check() && Auth::user()->is_admin == 1;
+            @endphp
+
+            @if(!empty($queryProfileSummary['count']))
+                <p class="text-muted" style="margin-top: 20px;">
+                    本次查詢共 {{ $queryProfileSummary['count'] }} 筆，耗時 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms
+                    @if($canViewQueryDetails)
+                        <a href="#" data-toggle="modal" data-target="#query-profile-modal" style="margin-left: 8px;">查看詳細</a>
+                    @endif
+                </p>
+            @endif
+
         </section>
         <!-- /.content -->
     </div>
     <!-- /.content-wrapper -->
 
     <!-- Footer -->
-    @include('layouts.footer')
+@include('layouts.footer')
+
+@if(!empty($queryProfileSummary['count']) && $canViewQueryDetails)
+    <div class="modal fade" id="query-profile-modal" tabindex="-1" role="dialog" aria-labelledby="queryProfileModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="queryProfileModalLabel">SQL 查詢明細</h4>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">
+                        共 {{ $queryProfileSummary['count'] }} 筆查詢，累計 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms。
+                        以下數據依執行順序列出，時間單位為毫秒。
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-condensed">
+                            <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th style="width: 120px;">耗時 (ms)</th>
+                                <th>SQL</th>
+                                <th style="width: 220px;">綁定參數</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach(array_slice($queryProfileSummary['queries'], 0, 100) as $index => $query)
+                                <tr>
+                                    <td>{{ $index + 1 }}</td>
+                                    <td>{{ number_format($query['time'], 2) }}</td>
+                                    <td><code style="white-space: pre-wrap; word-break: break-all;">{{ $query['sql'] }}</code></td>
+                                    <td><code style="white-space: pre-wrap; word-break: break-all;">{{ $query['bindings_json'] }}</code></td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                        @if(count($queryProfileSummary['queries']) > 100)
+                            <p class="text-muted">僅顯示前 100 筆查詢。</p>
+                        @endif
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
     <!-- Control Sidebar -->
     <aside class="control-sidebar control-sidebar-dark">

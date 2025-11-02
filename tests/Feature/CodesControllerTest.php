@@ -216,6 +216,79 @@ class CodesControllerTest extends TestCase
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    public function testActiveUserCanSubmitCreateProposal()
+    {
+        $this->operationSpy->calls = [];
+        $user = new User([
+            'name' => 'proposer',
+            'email' => 'proposer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 10;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $payload = [
+            'code_id' => 'PX',
+            'code_sub' => '01',
+            'description' => 'Proposal create',
+            '__proposal_comment' => 'Please review',
+        ];
+
+        $response = $this->from('/codes/TEST_CODES/create')
+            ->post('/codes/TEST_CODES/proposal', $payload);
+
+        $response->assertRedirect(route('codes.show', ['table_name' => 'TEST_CODES']));
+
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(0, $call['c_personid']);
+        $this->assertSame(\App\Operation::TYPE_PROPOSAL_CREATE, $call['op_type']);
+        $this->assertSame('TEST_CODES', $call['resource']);
+        $this->assertSame('PX_._01', substr($call['resource_id'], 0, 7));
+        $this->assertSame('pending', $call['resource_data']['__review_status']);
+        $this->assertSame(['code_id', 'code_sub'], $call['resource_data']['__key_columns']);
+        $this->assertSame('Proposal create', $call['resource_data']['description']);
+        $this->assertSame('Please review', $call['resource_data']['__proposal_meta']['comment']);
+    }
+
+    public function testActiveUserCanSubmitUpdateProposal()
+    {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'UX', 'code_sub' => '02', 'description' => 'Original'],
+        ]);
+
+        $this->operationSpy->calls = [];
+        $user = new User([
+            'name' => 'editor',
+            'email' => 'editor@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 11;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $payload = [
+            'code_id' => 'UX',
+            'code_sub' => '02',
+            'description' => 'Updated Desc',
+            '__proposal_comment' => 'Need approval',
+        ];
+
+        $response = $this->from('/codes/TEST_CODES/UX_._02/edit')
+            ->post('/codes/TEST_CODES/UX_._02/proposal', $payload);
+
+        $response->assertRedirect(route('codes.edit', ['table_name' => 'TEST_CODES', 'id' => 'UX_._02']));
+
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(\App\Operation::TYPE_PROPOSAL_UPDATE, $call['op_type']);
+        $this->assertSame('pending', $call['resource_data']['__review_status']);
+        $this->assertSame('Updated Desc', $call['resource_data']['description']);
+        $this->assertSame('Original', $call['ori']['description']);
+        $this->assertSame(['code_id', 'code_sub'], $call['resource_data']['__key_columns']);
+    }
+
     public function testAuditFieldsAreReadonlyAndPrefilledOnEdit()
     {
         Carbon::setTestNow(Carbon::create(2024, 3, 22, 12));

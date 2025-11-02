@@ -323,7 +323,7 @@ sudo chown caddy laravel.log
 * [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
 * [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
 * [Changelog](./CHANGELOG.md)
-
+* [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
 
 
 

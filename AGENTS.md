@@ -76,10 +76,12 @@
    - 嚴禁在未授權情況下直接修改資料庫結構或大量資料。
    - 避免在 Controller 中直接寫 SQL；如需操作資料庫，優先利用 Repository 或 Eloquent。
    - 所有新路由需通過授權檢查，避免只靠前端限制。
+   - 目前前端樣式與互動高度依賴 AdminLTE（`resources/assets/sass/app.scss`、`resources/assets/js/bootstrap.js` 持續匯入相關資產），若要移除需先規畫替代的樣式框架、重構 Blade 樣板與 JS 初始化流程，並逐頁驗證後才能刪除舊資產，避免界面崩壞。
 5. **文檔更新建議**：
    - 有任何 UI／流程重大調整時，請同步更新 `README.md` 與 `CHANGELOG.md`。
    - 若整理出新的知識或踩坑，務必補充至 `AGENTS.md`，讓後續代理能快速掌握背景。
    - 重要設定或部署注意事項建議集中在專用文件（如 `MERGE.md`、`API.md`）維護。
+6. **提交規範補充**：所有 Git commit message 必須使用繁體中文敘述。
 
 ## 常見坑位
 - `resource_id` 可能是複合主鍵並經過特殊編碼（`(slash)`、`minus` 等），還原/比對前需解析。

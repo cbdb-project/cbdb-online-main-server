@@ -1,3 +1,31 @@
+html,
+body {
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+}
+
 .content-alert {
     padding: 10px;
+}
+
+.table-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll-x table {
+    min-width: 720px;
+}
+
+.view-table-responsive table {
+    min-width: 100%;
+    width: max-content;
+}
+
+.view-table-responsive th,
+.view-table-responsive td {
+    min-width: 160px;
+    max-width: 320px;
+    white-space: normal;
+    word-break: break-word;
 }

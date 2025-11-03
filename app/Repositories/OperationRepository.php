@@ -38,10 +38,12 @@ class OperationRepository
         $operation->op_type = $op_type;
         $operation->resource = $resource;
         $operation->resource_id = $resource_id;
-        $operation->resource_data = json_encode($resource_data);
-        if(!empty($ori)) $operation->resource_original = json_encode($ori);
+        $operation->resource_data = json_encode($resource_data, JSON_UNESCAPED_UNICODE);
+        if(!empty($ori)) $operation->resource_original = json_encode($ori, JSON_UNESCAPED_UNICODE);
         if($crowdsourcing_status != 0) $operation->crowdsourcing_status = $crowdsourcing_status;
         $operation->save();
+
+        return $operation;
     }
 
     public function objectToArray($object)
@@ -95,7 +97,7 @@ class OperationRepository
         $rows = [];
 
         foreach ($keys as $key) {
-            if (in_array($key, $ignoredKeys, true)) {
+            if (in_array($key, $ignoredKeys, true) || strpos($key, '__') === 0) {
                 continue;
             }
 

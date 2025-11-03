@@ -1,0 +1,231 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Operation;
+use App\User;
+use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Tests\TestCase;
+
+class OperationsProposalControllerTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        DB::purge('sqlite');
+        DB::setDefaultConnection('sqlite');
+        DB::reconnect('sqlite');
+
+        Schema::dropIfExists('users');
+        Schema::create('users', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('name')->nullable();
+            $table->string('email')->unique();
+            $table->string('password')->nullable();
+            $table->string('confirmation_token')->nullable();
+            $table->boolean('is_active')->default(0);
+            $table->boolean('is_admin')->default(0);
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::dropIfExists('operations');
+        Schema::create('operations', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('user_id')->nullable();
+            $table->integer('c_personid')->default(0);
+            $table->integer('op_type');
+            $table->string('resource');
+            $table->string('resource_id')->nullable();
+            $table->longText('resource_data')->nullable();
+            $table->longText('resource_original')->nullable();
+            $table->integer('crowdsourcing_status')->default(0);
+            $table->timestamps();
+        });
+
+        Schema::dropIfExists('TEST_CODES');
+        Schema::create('TEST_CODES', function (Blueprint $table) {
+            $table->string('code_id');
+            $table->string('code_sub');
+            $table->string('description')->nullable();
+        });
+    }
+
+    protected function tearDown(): void
+    {
+        Schema::dropIfExists('TEST_CODES');
+        Schema::dropIfExists('operations');
+        Schema::dropIfExists('users');
+        parent::tearDown();
+    }
+
+    protected function makeAdmin(): User
+    {
+        $user = new User([
+            'name' => 'admin',
+            'email' => 'admin@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 100;
+        $user->is_active = 1;
+        $user->is_admin = 1;
+        $user->save();
+
+        return $user;
+    }
+
+    protected function proposalOperation(array $attributes = []): Operation
+    {
+        $operation = new Operation();
+        $operation->user_id = $attributes['user_id'] ?? 100;
+        $operation->c_personid = 0;
+        $operation->op_type = $attributes['op_type'] ?? Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = $attributes['resource'] ?? 'TEST_CODES';
+        $operation->resource_id = $attributes['resource_id'] ?? 'TEST';
+        $operation->resource_data = json_encode($attributes['resource_data'], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode($attributes['resource_original'] ?? [], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        return $operation;
+    }
+
+    public function testApproveCreateProposalInsertsRow()
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'code_id' => 'AP',
+            'code_sub' => '01',
+            'description' => 'Approved create',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->toDateTimeString()],
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_id' => 'AP_._01',
+            'resource_data' => $resourceData,
+        ]);
+
+        $storedPayload = json_decode($operation->resource_data, true);
+        $this->assertSame('AP', $storedPayload['code_id']);
+        $this->assertSame(['code_id', 'code_sub'], $storedPayload['__key_columns']);
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+
+        $response->assertRedirect();
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertContains('已核准', $flash[0]['message'] ?? '');
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null);
+
+        $this->assertDatabaseHas('TEST_CODES', [
+            'code_id' => 'AP',
+            'code_sub' => '01',
+            'description' => 'Approved create',
+        ]);
+
+        $this->assertSame($admin->name, $payload['__reviewed_by']);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'TEST_CODES',
+            'op_type' => Operation::TYPE_CREATE,
+        ]);
+    }
+
+    public function testApproveUpdateProposalUpdatesRow()
+    {
+        \DB::table('TEST_CODES')->insert([
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'Before',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'After',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource_id' => 'UP_._02',
+            'resource_data' => $resourceData,
+            'resource_original' => [
+                'code_id' => 'UP',
+                'code_sub' => '02',
+                'description' => 'Before',
+            ],
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'Looks good',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('TEST_CODES', [
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'After',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame('Looks good', $payload['__review_comment']);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'TEST_CODES',
+            'op_type' => Operation::TYPE_UPDATE,
+        ]);
+    }
+
+    public function testRejectProposalUpdatesStatus()
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'code_id' => 'RJ',
+            'code_sub' => '03',
+            'description' => 'Reject me',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_id' => 'RJ_._03',
+            'resource_data' => $resourceData,
+        ]);
+
+        $response = $this->post(route('operations.proposals.reject', $operation), [
+            'review_comment' => 'Not acceptable',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('rejected', $payload['__review_status']);
+        $this->assertSame('Not acceptable', $payload['__review_comment']);
+    }
+}

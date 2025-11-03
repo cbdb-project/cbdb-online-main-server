@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Operation;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Arr;
 use phpDocumentor\Reflection\Types\Null_;
 
 class CodesController extends Controller
@@ -238,7 +241,7 @@ class CodesController extends Controller
         foreach ($conditions as $column => $value) {
             $query->where($column, $value);
         }
-        $data = array_except($request->all(), ['_method', '_token']);
+        $data = array_except($request->all(), ['_method', '_token', '__proposal_comment']);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
 
         try {
@@ -289,6 +292,45 @@ class CodesController extends Controller
             'id' => $id, 'table' => $table]);
     }
 
+    public function proposalStore(Request $request, $table_name)
+    {
+        $table = $this->guardTable($table_name);
+        if ($redirect = $this->ensureEditableAccess($table)) {
+            return $redirect;
+        }
+
+        $payload = $this->extractFormData($request);
+        $keyColumns = $this->getKeyColumns($table);
+
+        if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
+            flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
+            return redirect()->back()->withInput();
+        }
+
+        $conditions = $this->buildConditionsFromRow($keyColumns, $payload);
+        $existing = $this->fetchRowByKeys($table, $keyColumns, $conditions);
+        if ($existing) {
+            flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+            return redirect()->back()->withInput();
+        }
+
+        $meta = $this->buildProposalMeta('create', $table, $request);
+        $operation = $this->recordProposalOperation(
+            Operation::TYPE_PROPOSAL_CREATE,
+            $table,
+            $keyColumns,
+            $payload,
+            [],
+            $meta
+        );
+
+        if ($operation) {
+            flash('已提交新增提案，等待管理員審核 @ '.Carbon::now(), 'info');
+        }
+
+        return redirect()->route('codes.show', ['table_name' => $table]);
+    }
+
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
     public function store(Request $request, $table_name)
     {
@@ -305,7 +347,7 @@ class CodesController extends Controller
             flash('該代碼表為只讀，禁止新增。', 'warning');
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
-        $data = array_except($request->all(), ['_token']);
+        $data = array_except($request->all(), ['_token', '__proposal_comment']);
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
         //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
@@ -343,6 +385,49 @@ class CodesController extends Controller
         $id = $this->buildCompositeId($keyColumns, $rowData);
 
         flash('Store success @ '.Carbon::now(), 'success');
+        return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
+    }
+
+    public function proposalUpdate(Request $request, $table_name, $id)
+    {
+        $table = $this->guardTable($table_name);
+        if ($redirect = $this->ensureEditableAccess($table)) {
+            return $redirect;
+        }
+
+        $keyColumns = $this->getKeyColumns($table);
+        $conditions = $this->buildConditionsFromId($keyColumns, $id);
+        $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
+        if (!$originalRow) {
+            flash('提案失敗：找不到對應的資料列。', 'error');
+            return redirect()->back()->withInput();
+        }
+
+        $payload = $this->enforceAuditFieldsForUpdate(
+            $this->extractFormData($request),
+            $originalRow
+        );
+
+        $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
+        if ($diff === null) {
+            flash('提案失敗：未偵測到任何修改內容。', 'warning');
+            return redirect()->back()->withInput();
+        }
+
+        $meta = $this->buildProposalMeta('update', $table, $request);
+        $operation = $this->recordProposalOperation(
+            Operation::TYPE_PROPOSAL_UPDATE,
+            $table,
+            $keyColumns,
+            $payload,
+            $originalRow,
+            $meta
+        );
+
+        if ($operation) {
+            flash('已提交修改提案，等待管理員審核 @ '.Carbon::now(), 'info');
+        }
+
         return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
     }
 
@@ -628,6 +713,89 @@ class CodesController extends Controller
 
         $row = $query->first();
         return $row ? $this->convertRowToArray($row) : null;
+    }
+
+    protected function ensureEditableAccess(string $table): ?RedirectResponse
+    {
+        if (!Auth::check()) {
+            flash('請登入後再進行操作 @ '.Carbon::now(), 'error');
+            return redirect()->back()->withInput();
+        }
+        if (Auth::user()->is_active != 1) {
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+            return redirect()->back()->withInput();
+        }
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止編輯或提案。', 'warning');
+            return redirect()->route('codes.show', ['table_name' => $table]);
+        }
+        return null;
+    }
+
+    protected function extractFormData(Request $request): array
+    {
+        return Arr::except($request->all(), ['_token', '_method', '__proposal_comment']);
+    }
+
+    protected function hasPrimaryKeyValues(array $keyColumns, array $data): bool
+    {
+        foreach ($keyColumns as $column) {
+            if (!array_key_exists($column, $data) || $data[$column] === '' || $data[$column] === null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected function buildProposalMeta(string $action, string $table, Request $request): array
+    {
+        $user = Auth::user();
+        $meta = [
+            'action' => $action,
+            'table' => $table,
+            'submitted_by' => $user ? ($user->name ?: $user->email ?: $user->id) : null,
+            'submitted_by_id' => $user ? $user->id : null,
+            'submitted_at' => Carbon::now()->toDateTimeString(),
+        ];
+
+        $comment = trim((string) $request->input('__proposal_comment', ''));
+        if ($comment !== '') {
+            $meta['comment'] = $comment;
+        }
+
+        return array_filter($meta, function ($value) {
+            return $value !== null && $value !== '';
+        });
+    }
+
+    protected function recordProposalOperation(int $type, string $table, array $keyColumns, array $data, array $original = [], array $meta = [])
+    {
+        if (!Auth::check()) {
+            return null;
+        }
+
+        $resourceRow = $type === Operation::TYPE_PROPOSAL_CREATE ? $data : ($original ?: $data);
+        $resourceId = $this->buildCompositeId($keyColumns, $resourceRow);
+        if ($resourceId === '') {
+            $resourceId = 'proposal:' . uniqid();
+        }
+
+        $payload = $data;
+        if (!empty($meta)) {
+            $payload['__proposal_meta'] = $meta;
+        }
+        $payload['__key_columns'] = $keyColumns;
+        $payload['__review_status'] = 'pending';
+
+        return $this->operationRepository->store(
+            Auth::id(),
+            0,
+            $type,
+            $table,
+            $resourceId,
+            $payload,
+            $original
+        );
     }
 
     protected function recordOperation(int $type, string $table, array $keyColumns, array $data, array $original = [])

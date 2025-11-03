@@ -324,6 +324,6 @@ sudo chown caddy laravel.log
 * [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
 * [檢視表總覽](./VIEWS.md)
 * [Changelog](./CHANGELOG.md)
-
+* [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
 
 

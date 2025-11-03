@@ -16,7 +16,13 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'name', 'email', 'institution', 'password', 'avatar', 'confirmation_token',
+        'name',
+        'email',
+        'institution',
+        'settings',
+        'password',
+        'avatar',
+        'confirmation_token',
     ];
 
     /**
@@ -26,6 +32,10 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password', 'remember_token',
+    ];
+
+    protected $casts = [
+        'settings' => 'array',
     ];
 
     public function operation()

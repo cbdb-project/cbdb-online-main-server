@@ -76,12 +76,18 @@ class RegisterController extends Controller
      */
     protected function create(array $data)
     {
+        $ip = request()->ip();
+
         $user =  User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'institution' => $data['institution'],
             'avatar' => 'avatar5.png',
             'confirmation_token' => str_random(40),
+            'settings' => [
+                'registration_ip' => $ip,
+                'last_login_ip' => $ip,
+            ],
             'password' => bcrypt($data['password']),
         ]);
         //20210804遮除，禁止發送帳戶激活郵件。

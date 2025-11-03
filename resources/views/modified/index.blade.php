@@ -6,7 +6,7 @@
         <div class="panel-body">
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
-                <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示刪除<br />
+                <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案<br />
                 * 狀態 0代表是專業用戶修改的記錄，1代表crowdsourcing記錄並且已插入數據庫。
                 </p>
                 <thead>

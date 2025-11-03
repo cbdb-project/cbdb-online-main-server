@@ -64,4 +64,17 @@ class LoginController extends Controller
 
         return $this->sendFailedLoginResponse($request);
     }
+
+    /**
+     * The user has been authenticated.
+     */
+    protected function authenticated(Request $request, $user)
+    {
+        $settings = $user->settings ?? [];
+        unset($settings['last_login_at'], $settings['registration_at']);
+        $settings['last_login_ip'] = $request->ip();
+
+        $user->settings = $settings;
+        $user->save();
+    }
 }

@@ -3,10 +3,6 @@
 @section('content')
 
     <div class="box">
-        <div class="box-header">
-            <h3 class="box-title">编码表</h3>
-        </div>
-        <!-- /.box-header -->
         <div class="box-body">
 
             <table id="example1" class="table table-bordered table-striped">
@@ -25,9 +21,6 @@
                 </thead>
                 <tbody>
                 @foreach($data as $user)
-                    @if($user->id == Auth::id())
-                        @continue
-                    @endif
                     <tr>
                         <td>{{ $user->id }}</td>
                         <td>{{ $user->name }}</td>

@@ -29,9 +29,37 @@ class OperationsController extends Controller
 //        Operation::all();
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $lists = Operation::where('crowdsourcing_status', 0)->orderBy('updated_at', 'desc')->limit(100)->paginate(20);
+        $proposalsOnly = filter_var($request->input('proposals_only', false), FILTER_VALIDATE_BOOLEAN);
+
+        $query = Operation::where('crowdsourcing_status', 0);
+        $statusFilters = [];
+
+        if ($proposalsOnly) {
+            $rawStatuses = $request->input('status', []);
+            if (!is_array($rawStatuses)) {
+                $rawStatuses = [$rawStatuses];
+            }
+            $allowedStatuses = ['pending', 'approved', 'rejected'];
+            $statusFilters = array_values(array_intersect($rawStatuses, $allowedStatuses));
+
+            $query->whereIn('op_type', [
+                Operation::TYPE_PROPOSAL_CREATE,
+                Operation::TYPE_PROPOSAL_UPDATE,
+            ]);
+
+            if (!empty($statusFilters)) {
+                $query->where(function ($subQuery) use ($statusFilters) {
+                    foreach ($statusFilters as $status) {
+                        $subQuery->orWhere('resource_data', 'like', '%"__review_status":"' . $status . '"%');
+                    }
+                });
+            }
+        }
+
+        $lists = $query->orderBy('updated_at', 'desc')->paginate(20);
+        $lists->appends($request->except('page'));
         //將物件轉為陣列進行陣列比對
         $listsArr = $this->operationRepository->objectToArray($lists);
         $all = count($listsArr['data']);
@@ -158,9 +186,15 @@ class OperationsController extends Controller
         //echo "<pre><code>";
         //print_r($lists[0]['resource_original']); //成功
         //echo "</code></pre>";
+        $pageTitle = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
+        $pageDescription = $proposalsOnly ? '最近提案列表' : '最近編輯列表';
+        $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
+
         return view('operations.index', ['lists' => $lists,
-            'page_title' => 'NewUpdate', 'page_description' => '最近編輯列表',
-            'page_url' => '/operations'
+            'page_title' => $pageTitle, 'page_description' => $pageDescription,
+            'page_url' => $pageUrl,
+            'proposals_only' => $proposalsOnly,
+            'status_filters' => $statusFilters,
         ]);
     }
 

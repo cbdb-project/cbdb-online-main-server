@@ -17,12 +17,31 @@
         <!-- /.search form -->
 
         <!-- Sidebar Menu -->
+        @php
+            $hasPendingProposals = false;
+            if (Auth::check() && Auth::user()->is_admin == 1 && Auth::user()->is_active == 1) {
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('operations')) {
+                        $hasPendingProposals = \App\Operation::where('crowdsourcing_status', 0)
+                            ->whereIn('op_type', [
+                                \App\Operation::TYPE_PROPOSAL_CREATE,
+                                \App\Operation::TYPE_PROPOSAL_UPDATE,
+                            ])
+                            ->where('resource_data', 'like', '%"__review_status":"pending"%')
+                            ->exists();
+                    }
+                } catch (\Throwable $e) {
+                    $hasPendingProposals = false;
+                }
+            }
+        @endphp
         <ul class="sidebar-menu">
             <li class="header">MAIN NAVIGATION</li>
             <!-- Optionally, you can add icons to the links -->
             {{--<li class="{{ $page_title == 'Dashboard' ? 'active' : '' }}"><a href="/home"><i class="fa fa-dashboard"></i> <span>控制面板</span></a></li>--}}
             <li class="{{ $page_title == 'Basicinformation' ? 'active' : '' }}"><a href="{{ route('basicinformation.index') }}"><i class="ion ion-ios-people-outline"></i> <span>個人基本信息</span></a></li>
             <li class="{{ $page_title == 'NewUpdate' ? 'active' : '' }}"><a href="{{ route('operations.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近編輯列表</span></a></li>
+            <li class="{{ $page_title == 'OperationsProposals' ? 'active' : '' }}"><a href="{{ route('operations.index', ['proposals_only' => 1]) }}"><i class="ion ion-ios-people-outline"></i> <span>最近提案列表{{ $hasPendingProposals ? '（待審核）' : '' }}</span></a></li>
             <li class="{{ $page_title == 'Crowdsourcing' ? 'active' : '' }}"><a href="{{ route('crowdsourcing.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近眾包錄入記錄</span></a></li>
             <li class="{{ $page_title == 'Modified' ? 'active' : '' }}"><a href="{{ route('modified.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近修改記錄</span></a></li>
 

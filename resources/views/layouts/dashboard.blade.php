@@ -19,47 +19,6 @@ scratch. This page gets rid of all links and provides the needed markup only.
 
     <!-- Styles -->
     <link href="{{ mix('css/app.css') }}" rel="stylesheet">
-    <style>
-        .halloween-banner {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            padding: 0.5rem 1rem;
-            background: linear-gradient(90deg, #2d1b4e, #f97316);
-            color: #fffef0;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-            position: relative;
-            z-index: 1050;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-        .halloween-mode .halloween-banner {
-            display: flex;
-        }
-        .halloween-mode .main-header,
-        .halloween-mode .main-header .navbar,
-        .halloween-mode .main-header .logo {
-            background: linear-gradient(135deg, #2d1b4e, #f97316) !important;
-        }
-        .halloween-mode .sidebar {
-            border-right: 3px solid #f97316;
-        }
-        .halloween-sparkles {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background-image:
-                radial-gradient(2px 2px at 10% 20%, rgba(255,255,255,0.35) 0, rgba(255,255,255,0) 60%),
-                radial-gradient(3px 3px at 80% 30%, rgba(255,160,0,0.35) 0, rgba(255,160,0,0) 70%),
-                radial-gradient(2px 2px at 30% 80%, rgba(255,255,255,0.25) 0, rgba(255,255,255,0) 60%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-        }
-        .halloween-mode .halloween-sparkles {
-            opacity: 1;
-        }
-    </style>
 
     <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -91,15 +50,8 @@ desired effect
 <body class="hold-transition skin-blue sidebar-mini">
 <div class="wrapper" id="app">
 
-<!-- Header -->
+    <!-- Header -->
 @include('layouts.header')
-
-    <div id="halloween-banner" class="halloween-banner">
-        <span aria-hidden="true">&#x1F383;</span>
-        <span>Happy Halloween 2025!</span>
-        <span aria-hidden="true">&#x1F383;</span>
-        <span class="halloween-sparkles" aria-hidden="true"></span>
-    </div>
 
 <!-- Sidebar -->
 @include('layouts.sidebar')
@@ -281,35 +233,6 @@ desired effect
 @stack('scripts')
 <script>
     $('#flash-overlay-modal').modal();
-    (function () {
-        function shouldShowHalloween() {
-            var params = new URLSearchParams(window.location.search);
-            if (params.has('halloween_preview')) {
-                var value = params.get('halloween_preview');
-                if (value === '0' || value === 'false') {
-                    return false;
-                }
-                return true;
-            }
-
-            var now = new Date();
-            return now.getFullYear() === 2025 &&
-                now.getMonth() === 9 &&
-                now.getDate() === 31;
-        }
-
-        var isHalloween = shouldShowHalloween();
-
-        if (!isHalloween) {
-            return;
-        }
-
-        document.body.classList.add('halloween-mode');
-        var banner = document.getElementById('halloween-banner');
-        if (banner) {
-            banner.style.display = 'flex';
-        }
-    })();
 </script>
 </body>
 </html>

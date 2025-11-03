@@ -4,6 +4,37 @@
 @include('biogmains.defense')
     <div class="panel panel-default">
         <div class="panel-body">
+            @if(!empty($proposals_only))
+                @php
+                    $statusOptions = [
+                        'pending' => '待審核',
+                        'approved' => '已核准',
+                        'rejected' => '已退修',
+                    ];
+                    $selectedStatuses = $status_filters ?? [];
+                @endphp
+                <form method="GET" action="{{ route('operations.index') }}" class="form-inline" style="margin-bottom: 15px;" id="proposal-status-filters">
+                    <input type="hidden" name="proposals_only" value="1">
+                    @foreach($statusOptions as $value => $label)
+                        <label class="checkbox-inline" style="margin-right: 12px;">
+                            <input type="checkbox" name="status[]" value="{{ $value }}" {{ in_array($value, $selectedStatuses, true) ? 'checked' : '' }}>
+                            {{ $label }}
+                        </label>
+                    @endforeach
+                    <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-default btn-sm" style="margin-left: 8px;">清除篩選</a>
+                </form>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var form = document.getElementById('proposal-status-filters');
+                        if (!form) {
+                            return;
+                        }
+                        form.addEventListener('change', function () {
+                            form.submit();
+                        });
+                    });
+                </script>
+            @endif
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
                 <thead>

@@ -11,6 +11,7 @@
                 </div>
             </div>
         </div>
+        <div class="table-responsive table-scroll-x">
         <table class="table table-hover table-condensed">
             <caption>共計{{names.total}}條記錄</caption>
             <thead>
@@ -38,6 +39,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
         <nav class="pull-right" aria-label="Page navigation">
             <ul class="pagination">
                 <li v-if="showFirst"><a href="javascript:" @click="current_page--">«</a></li>

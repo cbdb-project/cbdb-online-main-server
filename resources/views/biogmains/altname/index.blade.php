@@ -16,6 +16,7 @@
                     <th>序號</th>
                     <th>別名拼音</th>
                     <th>別名漢字</th>
+                    <th>別名類型</th>
                     <th style="width: 120px">操作</th>
                 </tr>
                 </thead>
@@ -31,6 +32,15 @@ $c_alt_name_chn_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name_c
 $errWord = array('?', '', '�');
 $value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_name_chn);
 
+//別名類型顯示
+$altTypeLabel = trim((string) ($value->c_name_type_desc_chn ?? ''));
+if ($altTypeLabel === '') {
+    $altTypeLabel = trim((string) ($value->c_name_type_desc ?? ''));
+}
+if ($altTypeLabel === '') {
+    $altTypeLabel = $value->pivot->c_alt_name_type_code;
+}
+
 //20240508修正c_sequence的判斷，資料有NULL、0、1-7
 if($value->pivot->c_sequence === 0) {
   $value->pivot->c_sequence = 0;
@@ -44,6 +54,7 @@ if($value->pivot->c_sequence === 0) {
                         <td>{{ $key+1 }}</td>
                         <td>{{ $c_alt_name_view }}</td>
                         <td>{{ $c_alt_name_chn_view }}</td>
+                        <td>{{ $altTypeLabel }}</td>
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}">edit</a>

@@ -9,6 +9,31 @@ use Illuminate\Support\Str;
 
 class ViewTableController extends Controller
 {
+    public function index()
+    {
+        $definitions = Config::get('view_tables', []);
+
+        $items = collect($definitions)->map(function ($definition, $key) {
+            $aliases = Arr::get($definition, 'aliases', []);
+            $primaryAlias = $aliases[0] ?? ('View_' . Str::studly(str_replace('-', '_', $key)));
+            return [
+                'key' => $key,
+                'primary_alias' => $primaryAlias,
+                'title' => Arr::get($definition, 'title', $key),
+                'description' => Arr::get($definition, 'description', ''),
+                'aliases' => $aliases,
+                'builder' => Arr::get($definition, 'builder'),
+            ];
+        })->sortBy(function ($item) {
+            return Str::lower($item['primary_alias']);
+        })->values();
+
+        return view('view.list', [
+            'views' => $items,
+            'page_title' => '檢視表總覽',
+        ]);
+    }
+
     public function show(Request $request, string $key)
     {
         $definitions = Config::get('view_tables', []);

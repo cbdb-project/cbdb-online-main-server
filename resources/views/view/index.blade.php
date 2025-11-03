@@ -26,7 +26,7 @@
                 </button>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive table-scroll-x view-table-responsive">
                 <table class="table table-bordered table-striped table-condensed">
                     <thead>
                     <tr>

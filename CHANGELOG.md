@@ -6,7 +6,18 @@
 - 新增「地址層級檢視」(`/view/Addresses`)，直接使用資料庫 `View_Address` 展開地址與最多五層隸屬關係，並在側邊欄加入快速連結。
 - `/codes` 白名單新增 `ADDRESSES`，現可直接於 `/codes/ADDRESSES` 查詢地址主表。
 - 管理員工具新增 `/admin/explainsql`，可輸入只讀 SQL 並檢視 MySQL `EXPLAIN` 查詢計畫。
-- 官名地址（POSTED_TO_ADDR_DATA）變動現在會額外留下操作紀錄，內容採取整筆列資料的 JSON （包含 c_personid、c_posting_id、c_office_id、c_addr_id），以利差異比對與復原。 同時暫時隱藏此類操作的復原按鈕，避免使用者誤觸不支援的還原流程。
+- 新增 `/view` 檢視表總覽頁面，可瀏覽所有註冊的 View_* 定義與說明。
+- 新增「人物事件資料檢視」(`/view/events-data`)，透過 `View_EventData` 整合人物事件、年號、干支與來源資訊。
+- 新增「人物事件地址檢視」(`/view/event-addr-data`)，整合事件、地址與干支資訊，補充事件地點查詢。
+- 新增「人物親屬資料檢視」(`/view/kin-addr-data`)，透過 `View_KinAddrData` 彙整親屬關係、人物主檔與來源資訊。
+- 新增「人物基本資料檢視」(`/view/people-data`)，透過 `View_PeopleData` 將 BIOG_MAIN 與相關編碼資訊統整成單一查詢。
+- 新增「人物索引地址檢視」(`/view/people-addr-data`)，以索引地址欄位串接地址名稱與類型描述。
+- 新增「人物財產資料檢視」(`/view/posessions-data`)，透過 `View_PossessionsData` 彙整財產行為、度量、年號與來源資訊。
+- 新增「人物財產地址檢視」(`/view/posessions-addr-data`)，透過 `View_PossessionsAddrData` 加入財產地址名稱對照。
+- 新增「任官地址資料檢視」(`/view/posting-addr-data`)，直接串接 `POSTED_TO_ADDR_DATA` 與 `ADDR_CODES` 快速檢視官職與地址對應。
+- 新增「任官職務資料檢視」(`/view/posting-office-data`)，透過 `POSTED_TO_OFFICE_DATA` 搭配官職、任命代碼與年號資訊，提供更完整的任官視角。
+- 新增「人物身份資料檢視」(`/view/status-data`)，整合 `STATUS_DATA` 與身份代碼、年號、來源資訊，快速查閱身份紀錄。
+
 - ALTNAME_DATA 在 `/modified` 顯示現況時改以 log 中的主鍵（`c_personid`／`c_alt_name_type_code`／`c_alt_name_chn`）查詢，不再依賴 `resource_id` 裡的舊別名，避免別名更新或含 dash 時抓不到現況，並補上 `OperationsAltnameResolverTest` 覆蓋。
 - Basicinformation → 任官（office）操作全面交易化：`BiogMainRepository::officeStoreById`／`officeUpdateById`／`officeDeleteById` 會鎖定職官、同步維護地址清單並一併寫入 Operations；`officeUpdateById` 僅在主表欄位有異動時才更新 timestamp，純地址調整會重建 `POSTED_TO_ADDR_DATA` 並留下前後 JSON。
 

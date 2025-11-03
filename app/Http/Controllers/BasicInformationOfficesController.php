@@ -191,6 +191,71 @@ class BasicInformationOfficesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+
+        //20251103遮除原本的資料另存程式，改用transaction程式碼
+        //dd($cpk);
+        return DB::transaction(function () use ($id, $cpk) {
+            $request = $this->biogMainRepository->officeById($cpk);
+            //dd($request);
+            //$payload = $request->all();
+            $payload = json_encode($request['row']);
+            $payload = json_decode($payload, true);
+            $c_addr = $payload['c_addr'] ?? [];
+            $data = array_except($payload, ['_token', 'c_addr']);
+            $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
+            $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+
+            $lastPostingId = DB::table('POSTING_DATA')
+                ->lockForUpdate()
+                ->orderByDesc('c_posting_id')
+                ->value('c_posting_id');
+            $data['c_posting_id'] = ((int) $lastPostingId) + 1;
+            $data['c_personid'] = $id;
+
+            DB::table('POSTING_DATA')->insert([
+                'c_personid' => $data['c_personid'],
+                'c_posting_id' => $data['c_posting_id'],
+            ]);
+            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
+
+            $data = (new ToolsRepository)->timestamp($data, true);
+            DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
+
+            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
+
+            $addressRows = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $id)
+                ->where('c_posting_id', $data['c_posting_id'])
+                ->where('c_office_id', $data['c_office_id'])
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'c_personid' => (int) $row->c_personid,
+                        'c_posting_id' => (int) $row->c_posting_id,
+                        'c_office_id' => (int) $row->c_office_id,
+                        'c_addr_id' => (int) $row->c_addr_id,
+                    ];
+                })
+                ->values()
+                ->all();
+            if (!empty($addressRows)) {
+                (new OperationRepository())->store(
+                    Auth::id(),
+                    $id,
+                    1,
+                    'POSTED_TO_ADDR_DATA',
+                    $data['c_office_id'] . '-' . $data['c_posting_id'],
+                    ['rows' => $addressRows]
+                );
+            }
+
+            //return $data['c_office_id'] . '-' . $data['c_posting_id'];
+            $_id = $data['c_office_id'] . '-' . $data['c_posting_id'];
+            return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
+        });
+
+        //20251103遮除原本的資料另存程式，改用transaction程式碼。
+        /*
         $res = $this->biogMainRepository->officeById($cpk);
         $res2 = json_encode($res['row']);
 	$res2 = json_decode($res2, true);
@@ -216,6 +281,7 @@ class BasicInformationOfficesController extends Controller
         $_id = $data['c_office_id']."-".$data['c_posting_id'];
         flash('Store success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
+        */
     }
 
     public function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)

@@ -35,11 +35,20 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         Schema::create('TEXT_CODES', function (Blueprint $table) {
             $table->integer('c_textid')->primary();
             $table->string('c_title_chn')->nullable();
+            $table->string('c_title')->nullable();
             $table->string('c_text_type_id')->nullable();
+            $table->string('c_text_dy')->nullable();
+            $table->string('c_source')->nullable();
+            $table->longText('c_notes')->nullable();
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+        });
+
+        Schema::create('BIOG_MAIN', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->string('c_dy')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {
@@ -60,6 +69,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('operations');
+        Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('users');
 
@@ -116,20 +126,39 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $user = $this->makeUser();
         $this->actingAs($user);
 
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 12345,
+            'c_dy' => '88',
+        ]);
+
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
-            'entries' => "12345\t測試書名",
+            'entries' => "12345\t測試稿: 卷一\t54321",
         ]);
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
 
-        $record = DB::table('TEXT_CODES')->where('c_title_chn', '測試書名')->first();
+        $record = DB::table('TEXT_CODES')->where('c_textid', 1)->first();
         $this->assertNotNull($record);
+        $this->assertSame('測試稿: 卷一', $record->c_title_chn);
+        $this->assertSame('ce shi gao', $record->c_title);
         $this->assertSame('01', $record->c_text_type_id);
         $this->assertSame('Batch Admin', $record->c_created_by);
+        $this->assertSame('88', $record->c_text_dy);
+        $this->assertSame('54321', $record->c_source);
+        $this->assertRegExp('/^\[[0-9]{14}\]$/', $record->c_notes);
+        $this->assertNull($record->c_modified_by);
+        $this->assertNull($record->c_modified_date);
 
         $operation = DB::table('operations')->where('resource', 'TEXT_CODES')->first();
         $this->assertNotNull($operation);
         $this->assertSame((string) $record->c_textid, $operation->resource_id);
+        $encoded = json_decode($operation->resource_data, true);
+        $this->assertSame('ce shi gao', $encoded['c_title']);
+        $this->assertSame('54321', $encoded['c_source']);
+        $this->assertSame($record->c_notes, $encoded['c_notes']);
+
+        $followUp = $this->get(route('admin.batch-load-book-titles'));
+        $followUp->assertSee('本次批次編號');
     }
 
     public function test_invalid_lines_are_reported(): void
@@ -142,6 +171,26 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         ]);
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
+
+        $followUp = $this->get(route('admin.batch-load-book-titles'));
+        $followUp->assertSee('匯入失敗');
+        $followUp->assertSee('未找到三欄資料');
+        $this->assertSame(0, DB::table('TEXT_CODES')->count());
+    }
+
+    public function test_blank_source_is_rejected(): void
+    {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "12345\t測試稿\t",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertSessionHas('batch_errors');
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
 
         $followUp = $this->get(route('admin.batch-load-book-titles'));
         $followUp->assertSee('匯入失敗');

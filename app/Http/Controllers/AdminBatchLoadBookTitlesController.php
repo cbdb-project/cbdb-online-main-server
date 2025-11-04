@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Pinyin;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AdminBatchLoadBookTitlesController extends Controller
 {
@@ -36,11 +38,12 @@ class AdminBatchLoadBookTitlesController extends Controller
 
         return view('admin.batch_load_book_titles', [
             'page_title' => '批次匯入書稿資料',
-            'page_description' => '貼上以 tab 分隔的作者 ID 與書名，新增至 TEXT_CODES',
+            'page_description' => '貼上以 tab 分隔的作者 ID、書名與來源 TEXT_ID，新增至 TEXT_CODES',
             'page_url' => route('admin.batch-load-book-titles'),
             'input' => old('entries', ''),
             'results' => session('batch_results', []),
             'batchErrors' => session('batch_errors', []),
+            'batchId' => session('batch_id'),
         ]);
     }
 
@@ -64,9 +67,10 @@ class AdminBatchLoadBookTitlesController extends Controller
                 ->with('batch_errors', $errors);
         }
 
+        $batchId = $this->generateBatchId();
         $results = [];
 
-        DB::transaction(function () use (&$results, $rows) {
+        DB::transaction(function () use (&$results, $rows, $batchId) {
             $nextId = (int) DB::table('TEXT_CODES')->max('c_textid');
             if ($nextId < 0) {
                 $nextId = 0;
@@ -75,10 +79,19 @@ class AdminBatchLoadBookTitlesController extends Controller
             foreach ($rows as $row) {
                 $nextId++;
 
+                $normalizedTitle = $this->normalizeTitle($row['title']);
+                $titleWithoutVolume = $this->stripVolumeInfo($row['title']);
+                $pinyinTitle = $this->buildPinyin($titleWithoutVolume);
+                $dynasty = $this->lookupDynasty($row['author_id']);
+
                 $payload = [
                     'c_textid' => $nextId,
-                    'c_title_chn' => $row['title'],
+                    'c_title_chn' => $normalizedTitle,
+                    'c_title' => $pinyinTitle,
                     'c_text_type_id' => '01',
+                    'c_text_dy' => $dynasty,
+                    'c_source' => $row['source'],
+                    'c_notes' => '[' . $batchId . ']',
                 ];
 
                 $payload = $this->toolsRepository->timestamp($payload, true);
@@ -97,7 +110,9 @@ class AdminBatchLoadBookTitlesController extends Controller
                 $results[] = [
                     'line' => $row['line'],
                     'author_id' => $row['author_id'],
-                    'title' => $row['title'],
+                    'title' => $normalizedTitle,
+                    'source' => $row['source'],
+                    'dynasty' => $dynasty,
                     'c_textid' => $nextId,
                 ];
             }
@@ -106,7 +121,8 @@ class AdminBatchLoadBookTitlesController extends Controller
         return redirect()
             ->route('admin.batch-load-book-titles')
             ->with('batch_results', $results)
-            ->with('batch_errors', []);
+            ->with('batch_errors', [])
+            ->with('batch_id', $batchId);
     }
 
     /**
@@ -141,13 +157,14 @@ class AdminBatchLoadBookTitlesController extends Controller
 
             $parts = preg_split("/\t+/", $line);
 
-            if (!$parts || count($parts) < 2) {
-                $errors[] = "第 {$lineNumber} 行未找到兩欄資料";
+            if (!$parts || count($parts) < 3) {
+                $errors[] = "第 {$lineNumber} 行未找到三欄資料（作者 ID、書名、來源 TEXT_ID）";
                 continue;
             }
 
             $authorId = trim($parts[0]);
             $title = trim($parts[1]);
+            $source = trim($parts[2]);
 
             if ($authorId === '') {
                 $errors[] = "第 {$lineNumber} 行作者 ID 為空";
@@ -164,10 +181,16 @@ class AdminBatchLoadBookTitlesController extends Controller
                 continue;
             }
 
+            if ($source === '') {
+                $errors[] = "第 {$lineNumber} 行來源 TEXT_ID 為空";
+                continue;
+            }
+
             $rows[] = [
                 'line' => $lineNumber,
                 'author_id' => (int) $authorId,
                 'title' => $title,
+                'source' => $source,
             ];
         }
 
@@ -176,5 +199,76 @@ class AdminBatchLoadBookTitlesController extends Controller
         }
 
         return [$rows, $errors];
+    }
+
+    /**
+     * Generate a batch identifier for audit trail.
+     */
+    protected function generateBatchId(): string
+    {
+        return now()->format('YmdHis');
+    }
+
+    /**
+     * Remove redundant punctuation/spaces from the supplied title.
+     */
+    protected function normalizeTitle(string $title): string
+    {
+        $title = preg_replace('/\s+/u', '', $title);
+        $title = preg_replace('/[:：]\s*/u', ': ', $title);
+        return trim($title);
+    }
+
+    /**
+     * Remove volume/annotation info trailing after colon characters.
+     */
+    protected function stripVolumeInfo(string $title): string
+    {
+        return trim(preg_replace('/[:：].*$/u', '', $title));
+    }
+
+    /**
+     * Convert Chinese title to a space-separated pinyin string.
+     */
+    protected function buildPinyin(string $title): string
+    {
+        $chars = preg_split('//u', $title, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $syllables = [];
+
+        foreach ($chars as $char) {
+            if (preg_match('/\p{Han}/u', $char)) {
+                $syllables[] = strtolower(Pinyin::getPinyin($char));
+            } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
+                $syllables[] = strtolower($char);
+            }
+        }
+
+        $syllables = array_filter($syllables, static function ($syllable) {
+            return $syllable !== '';
+        });
+
+        if (empty($syllables)) {
+            return strtolower(trim(preg_replace('/\s+/u', ' ', $title)));
+        }
+
+        return implode(' ', $syllables);
+    }
+
+    /**
+     * Look up dynasty (c_dy) for the given person ID.
+     */
+    protected function lookupDynasty(int $personId): ?string
+    {
+        try {
+            $value = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        return (string) $value;
     }
 }

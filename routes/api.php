@@ -26,24 +26,6 @@ Route::group([], function () {
         return \App\Repositories\BiogMainRepository::namesByQuery($request);
     });
 
-    Route::post('addresscode', function (Request $request) {
-        return \App\Repositories\AddrCodeRepository::addrByQuery($request);
-    });
-
-    Route::post('altnamecode', function (Request $request) {
-        $altcoderepository = new \App\Repositories\AltCodeRepository();
-        return $altcoderepository->altByQuery($request);
-    });
-
-    Route::post('appointcode', function (Request $request) {
-        $appcoderepository = new \App\Repositories\AppointCodeRepository();
-        return $appcoderepository->appointByQuery($request);
-    });
-    //20181105建安新增
-    Route::post('textcode', function (Request $request) {
-        $textcoderepository = new \App\Repositories\TextCodeRepository();
-        return $textcoderepository->textByQuery($request);
-    });
     //20201111建安新增
     Route::post('textinstancedata', function (Request $request) {
         $textinstancedatarepository = new \App\Repositories\TextInstanceDataRepository();
@@ -52,18 +34,6 @@ Route::group([], function () {
     Route::post('addrbelongsdata', function (Request $request) {
         $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
         return $addrbelongsdatarepository->AddrByQuery($request);
-    });
-    Route::post('addrcode', function (Request $request) {
-        $addrcoderepository = new \App\Repositories\AddrCode2Repository();
-        return $addrcoderepository->addrByQuery($request);
-    });
-    Route::post('officecode', function (Request $request) {
-        $officecoderepository = new \App\Repositories\OfficeCodeRepository();
-        return $officecoderepository->officeByQuery($request);
-    });
-    Route::post('socialinstitutioncode', function (Request $request) {
-        $socialinstitutioncoderepository = new \App\Repositories\SocialInstitutionCodeRepository();
-        return $socialinstitutioncoderepository->socialinstitutionByQuery($request);
     });
 });
 

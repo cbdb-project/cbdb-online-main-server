@@ -88,20 +88,6 @@ Route::resource('sources', 'SourcesController', ['name' => [
     'update' => 'source.update'
 ]]);
 
-Route::resource('altnamecodes', 'AltnameCodesController', ['name' => [
-    'show' => 'altnamecode.show',
-    'create' => 'altnamecode.create',
-    'edit' => 'altnamecode.edit',
-    'update' => 'altnamecode.update'
-]]);
-
-Route::resource('appointcodes', 'AppointCodesController', ['name' => [
-    'show' => 'appointcode.show',
-    'create' => 'appointcode.create',
-    'edit' => 'appointcode.edit',
-    'update' => 'appointcode.update'
-]]);
-
 Route::resource('entries', 'EntriesController', ['name' => [
     'show' => 'entry.show',
     'create' => 'entry.create',
@@ -178,15 +164,6 @@ Route::get('test', function (Request $request){
     return $data;
 });
 
-Route::resource('textcodes', 'TextCodesController', ['name' => [
-    'show' => 'textcode.show',
-    'create' => 'textcode.create',
-    'edit' => 'textcode.edit',
-    'update' => 'textcode.update'
-]]);
-
-Route::get('textcodes/{id}/delete', 'TextCodesController@destroy');
-
 Route::resource('textinstancedata', 'TextInstanceDataController', ['name' => [
     'show' => 'textinstancedata.show',
     'create' => 'textinstancedata.create',
@@ -215,24 +192,3 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');
-
-Route::resource('addrcodes', 'AddrCodesController', ['name' => [
-    'show' => 'addrcode.show',
-    'create' => 'addrcode.create',
-    'edit' => 'addrcode.edit',
-    'update' => 'addrcode.update'
-]]);
-
-Route::resource('officecodes', 'OfficeCodesController', ['name' => [
-    'show' => 'officecode.show',
-    'create' => 'officecode.create',
-    'edit' => 'officecode.edit',
-    'update' => 'officecode.update'
-]]);
-
-Route::resource('socialinstitutioncodes', 'SocialInstitutionCodesController', ['name' => [
-    'show' => 'socialinstitutioncode.show',
-    'create' => 'socialinstitutioncode.create',
-    'edit' => 'socialinstitutioncode.edit',
-    'update' => 'socialinstitutioncode.update'
-]]);

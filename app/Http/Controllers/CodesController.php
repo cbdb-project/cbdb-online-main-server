@@ -43,7 +43,7 @@ class CodesController extends Controller
      */
     protected $tableColumnOverrides = [
         'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
-        'ADDR_CODES' => ['c_addr_id', 'c_name', 'c_name_chn', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
+        'ADDR_CODES' => ['c_addr_id', 'c_name_chn', 'c_name', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
         'ADDRESSES' => [
             'c_addr_id',
             'c_addr_cbd',
@@ -89,6 +89,10 @@ class CodesController extends Controller
             'c_office_chn_alt',
             'c_office_trans',
         ],
+        'ALTNAME_CODES' => ['c_name_type_code', 'c_name_type_desc_chn', 'c_name_type_desc'],
+        'APPOINTMENT_CODES' => ['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc'],
+        'TEXT_CODES' => ['c_textid', 'c_title_chn', 'c_title'],
+        'SOCIAL_INSTITUTION_CODES' => ['c_inst_name_code', 'c_inst_code', 'c_inst_type_code'],
     ];
     /**
      * Explicit primary key definitions for code tables.
@@ -98,6 +102,12 @@ class CodesController extends Controller
     protected $tablePrimaryKeyOverrides = [
         'TEXT_CODES' => ['c_textid'],
     ];
+    /**
+     * Table column listings cached per request.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected $tableColumnsCache = [];
 
     public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
     {
@@ -276,20 +286,32 @@ class CodesController extends Controller
             flash('該代碼表為只讀，禁止新增。', 'warning');
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
-        $data = Schema::getColumnListing($table);
-        $id_ = $data[0];
-        //20210323遮除「第一欄預設隱藏」
-        //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
-            //$data = array_splice($data, 1);
-        //}
-        $id = DB::table($table)->max($id_) + 1;
+        $columns = $this->getTableColumns($table);
+        $keyColumns = $this->getKeyColumns($table);
+        $columns = $this->orderColumnsForCreate($columns, $keyColumns);
+
+        $defaults = [];
+        $firstKey = $keyColumns[0] ?? null;
+        if ($firstKey && in_array($firstKey, $columns, true)) {
+            $nextValue = $this->guessNextKeyValue($table, $firstKey);
+            if ($nextValue !== null) {
+                $defaults[$firstKey] = $nextValue;
+            }
+        }
+
+        $firstColumn = $columns[0] ?? null;
+        $id = $firstColumn && isset($defaults[$firstColumn]) ? $defaults[$firstColumn] : null;
+
         return view('codes.create',[
             'page_title' => 'Codes',
             'page_description' => $table,
             'page_url' => '/codes',
             'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-            'row' => $data,
-            'id' => $id, 'table' => $table]);
+            'row' => $columns,
+            'id' => $id,
+            'defaults' => $defaults,
+            'table' => $table,
+        ]);
     }
 
     public function proposalStore(Request $request, $table_name)
@@ -480,6 +502,14 @@ class CodesController extends Controller
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $data = array_except($request->all(), ['_token', '__proposal_comment']);
+        $keyColumns = $this->getKeyColumns($table);
+        if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
+            flash('新增失敗：請確認主鍵欄位已填寫完整。', 'error');
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['missing_keys' => '新增失敗：請確認主鍵欄位已填寫完整。']);
+        }
+        $data = $this->enforceAuditFieldsForCreate($table, $data);
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
         //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
@@ -509,7 +539,6 @@ class CodesController extends Controller
             throw $e;
         }
 
-        $keyColumns = $this->getKeyColumns($table);
         $storedRow = $this->fetchRowByKeys($table, $keyColumns, $this->buildConditionsFromRow($keyColumns, $data));
         $rowData = $storedRow ?: $data;
         $this->recordOperation(1, $table, $keyColumns, $rowData);
@@ -756,6 +785,88 @@ class CodesController extends Controller
         return implode('_._', array_filter($parts, function ($part) {
             return $part !== '';
         }));
+    }
+
+    /**
+     * Apply audit columns for create operations when the table supports them.
+     *
+     * @param string $table
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    protected function enforceAuditFieldsForCreate(string $table, array $data): array
+    {
+        $columns = $this->getTableColumns($table);
+
+        if (in_array('c_created_by', $columns, true) && Auth::check()) {
+            $data['c_created_by'] = Auth::user()->name;
+        }
+
+        if (in_array('c_created_date', $columns, true)) {
+            $data['c_created_date'] = Carbon::now()->format('Ymd');
+        }
+
+        return $data;
+    }
+
+    /**
+     * Retrieve (and cache) table columns.
+     *
+     * @param string $table
+     * @return array<int, string>
+     */
+    protected function getTableColumns(string $table): array
+    {
+        if (!array_key_exists($table, $this->tableColumnsCache)) {
+            try {
+                $this->tableColumnsCache[$table] = Schema::getColumnListing($table);
+            } catch (\Throwable $e) {
+                $this->tableColumnsCache[$table] = [];
+            }
+        }
+
+        return $this->tableColumnsCache[$table];
+    }
+
+    /**
+     * Ensure primary key columns appear first when rendering create form.
+     *
+     * @param array<int, string> $columns
+     * @param array<int, string> $keyColumns
+     * @return array<int, string>
+     */
+    protected function orderColumnsForCreate(array $columns, array $keyColumns): array
+    {
+        $keyColumns = array_values(array_intersect($keyColumns, $columns));
+        $nonKey = array_values(array_diff($columns, $keyColumns));
+        return array_merge($keyColumns, $nonKey);
+    }
+
+    /**
+     * Guess the next key value for auto-increment-like columns.
+     *
+     * @param string $table
+     * @param string $column
+     * @return string|null
+     */
+    protected function guessNextKeyValue(string $table, string $column): ?string
+    {
+
+        try {
+            $max = DB::table($table)->max($column);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($max === null) {
+            return '1';
+        }
+
+        if (is_numeric($max)) {
+            return (string) ((int) $max + 1);
+        }
+
+        return null;
     }
 
     /**

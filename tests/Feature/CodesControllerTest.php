@@ -43,7 +43,7 @@ class CodesControllerTest extends TestCase
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
-                'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
+                'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
                 'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
             ]
         );
@@ -147,6 +147,29 @@ class CodesControllerTest extends TestCase
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    public function testActiveUserStoreRequiresPrimaryKeys()
+    {
+        $this->operationSpy->calls = [];
+        $user = new User([
+            'name' => 'active',
+            'email' => 'active@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 11;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->from('/codes/TEST_CODES/create')->post('/codes/TEST_CODES', [
+            'code_id' => 'A2',
+            'description' => 'missing sub key',
+        ]);
+
+        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertSessionHasErrors(['missing_keys']);
+        $this->assertEmpty($this->operationSpy->calls);
+        $this->assertEmpty($this->fakeDb->tables['TEST_CODES']);
+    }
+
     public function testActiveUserStoreLogsOperation()
     {
         $this->operationSpy->calls = [];
@@ -177,6 +200,85 @@ class CodesControllerTest extends TestCase
         $this->assertSame('TEST_CODES', $call['resource']);
         $this->assertSame('A3_._B3', $call['resource_id']);
         $this->assertSame($expectedInsert['description'], $call['resource_data']['description']);
+    }
+
+    public function testStoreFillsCreateAuditFieldsWhenAvailable()
+    {
+        Carbon::setTestNow(Carbon::create(2025, 1, 15, 9, 30));
+
+        $this->operationSpy->calls = [];
+        $user = new User([
+            'name' => 'audit-user',
+            'email' => 'audit@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 12;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $payload = [
+            'c_textid' => 'T100',
+            'c_title' => 'Sample',
+            'c_title_chn' => '範例',
+        ];
+
+        $response = $this->post('/codes/TEXT_CODES', $payload);
+
+        $response->assertRedirect(route('codes.edit', [
+            'table_name' => 'TEXT_CODES',
+            'id' => 'T100',
+        ]));
+
+        $this->assertCount(1, $this->fakeDb->tables['TEXT_CODES']);
+        $row = $this->fakeDb->tables['TEXT_CODES'][0];
+        $this->assertSame('audit-user', $row['c_created_by']);
+        $this->assertSame(Carbon::now()->format('Ymd'), $row['c_created_date']);
+        $this->assertSame('Sample', $row['c_title']);
+        $this->assertSame('範例', $row['c_title_chn']);
+
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame('audit-user', $call['resource_data']['c_created_by']);
+        $this->assertSame(Carbon::now()->format('Ymd'), $call['resource_data']['c_created_date']);
+
+        Carbon::setTestNow();
+    }
+
+    public function testCreateViewPlacesPrimaryKeyFirstWithDefaultValue()
+    {
+        $this->fakeDb->tables['TEXT_CODES'][] = [
+            'c_textid' => 41,
+            'c_title' => 'Existing',
+            'c_title_chn' => '既有',
+            'c_bibl_cat_code' => null,
+            'c_created_by' => 'origin',
+            'c_created_date' => '20200101',
+            'c_modified_by' => 'origin',
+            'c_modified_date' => '20200102',
+        ];
+
+        $user = new User([
+            'name' => 'viewer',
+            'email' => 'viewer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 13;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->get('/codes/TEXT_CODES/create');
+
+        $response->assertStatus(200);
+        $content = $response->getContent();
+
+        preg_match_all('/name="([^"]+)" class="form-control"/', $content, $matches);
+        $this->assertNotEmpty($matches[1]);
+        $this->assertSame('c_textid', $matches[1][0]);
+
+        $firstInputMarkupStart = strpos($content, $matches[0][0]);
+        $this->assertNotFalse($firstInputMarkupStart);
+        $firstInputMarkup = substr($content, $firstInputMarkupStart, 150);
+        $this->assertNotFalse(strpos($firstInputMarkup, 'value="42"'));
     }
 
     public function testSearchFiltersResults()
@@ -241,6 +343,11 @@ class CodesControllerTest extends TestCase
         $response->assertViewHas('keyColumns', ['c_textid']);
         $response->assertSee('href="/codes/TEXT_CODES/T001/edit"', false);
         $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
+        $response->assertSee('<th>c_textid</th>', false);
+        $response->assertSee('<th>c_title_chn</th>', false);
+        $response->assertSee('<th>c_title</th>', false);
+        $response->assertDontSee('<th>c_created_by</th>', false);
+        $response->assertSee('Sample Title CHN');
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -917,6 +1024,28 @@ class FakeQueryBuilder
         return array_map(function ($row) {
             return (object) $row;
         }, $this->applyConditions());
+    }
+
+    public function max($column)
+    {
+        $filtered = $this->applyConditions();
+        if (empty($filtered)) {
+            return null;
+        }
+
+        $values = array_map(function ($row) use ($column) {
+            return $row[$column] ?? null;
+        }, $filtered);
+
+        $values = array_filter($values, function ($value) {
+            return $value !== null;
+        });
+
+        if (empty($values)) {
+            return null;
+        }
+
+        return max($values);
     }
 
     private function applyConditions(): array

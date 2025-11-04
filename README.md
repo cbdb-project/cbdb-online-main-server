@@ -10,7 +10,7 @@ https://input.cbdb.fas.harvard.edu/basicinformation
 
 ## UI 調整（2025）
 
-詳情請參見 [CHANGELOG](./CHANGELOG.md)。
+詳情請參見 [CHANGELOG](./CHANGELOG.md)。若需批次導入資料，請參考 [BATCH_UPLOADERS](./BATCH_UPLOADERS.md)。
 
 ### Database migrations
 
@@ -326,4 +326,3 @@ sudo chown caddy laravel.log
 * [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
 * [檢視表總覽](./VIEWS.md)
 * [使用者權限說明](./USER_PRIVILEGES.md)
-

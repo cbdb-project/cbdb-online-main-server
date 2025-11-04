@@ -84,6 +84,7 @@
             @if(Auth::check() and Auth::user()->is_admin == 1)
                 <li class="header">Management</li>
                 <li class="{{ $page_title == 'SQL 執行計畫' ? 'active' : '' }}"><a href="{{ route('admin.explainsql') }}"><i class="fa fa-search"></i> <span>SQL EXPLAIN</span></a></li>
+                <li class="{{ $page_title == '批次匯入書稿資料' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-book-titles') }}"><i class="fa fa-upload"></i> <span>批次匯入書稿</span></a></li>
                 <li class="{{ $page_title == 'MergePreview' ? 'active' : '' }}"><a href="{{ route('merge-preview.index') }}"><i class="ion ion-shuffle"></i> <span>人物記錄合併</span></a></li>
                 <li class="{{ $page_title == 'Management' ? 'active' : '' }}"><a href="{{ route('manage.index') }}"><i class="ion ion-ios-people-outline"></i> <span>管理用戶</span></a></li>
             @endif

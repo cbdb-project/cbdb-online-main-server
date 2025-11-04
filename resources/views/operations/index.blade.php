@@ -10,6 +10,7 @@
                         'pending' => '待審核',
                         'approved' => '已核准',
                         'rejected' => '已退修',
+                        'cancelled' => '已撤回',
                     ];
                     $selectedStatuses = $status_filters ?? [];
                 @endphp
@@ -179,7 +180,20 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         $reviewedUtc = $reviewedAt;
                                     }
                                 }
+                                $cancelledDisplay = '';
+                                if (!empty($proposalMeta['cancelled_at'])) {
+                                    try {
+                                        $cancelledCarbon = \Carbon\Carbon::parse($proposalMeta['cancelled_at'], config('app.timezone', 'Asia/Shanghai'));
+                                        $cancelledDisplay = $cancelledCarbon;
+                                    } catch (\Exception $e) {
+                                        $cancelledDisplay = $proposalMeta['cancelled_at'];
+                                    }
+                                }
+                                $cancelledBy = $proposalMeta['cancelled_by'] ?? null;
                                 $isProposal = in_array((int) $item->op_type, [\App\Operation::TYPE_PROPOSAL_CREATE, \App\Operation::TYPE_PROPOSAL_UPDATE], true);
+                                $submittedById = $proposalMeta['submitted_by_id'] ?? null;
+                                $isProposalOwner = Auth::check() && $submittedById !== null && (int) Auth::id() === (int) $submittedById;
+                                $canEditProposal = $isProposalOwner && in_array($reviewStatus, ['pending', 'rejected'], true);
                                 $resourceDataDisplay = $resourceDataParsed;
                                 if (is_array($resourceDataDisplay)) {
                                     $resourceDataDisplay = array_filter($resourceDataDisplay, function ($value, $key) {
@@ -197,9 +211,11 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             <span class="label label-success">已核准</span>
                                         @elseif($reviewStatus === 'rejected')
                                             <span class="label label-danger">已退修</span>
+                                        @elseif($reviewStatus === 'cancelled')
+                                            <span class="label label-default">已撤回</span>
                                         @else
-                                    <span class="label label-warning">待審核</span>
-                                @endif
+                                            <span class="label label-warning">待審核</span>
+                                        @endif
                                 @if(!empty($proposalMeta['comment']))
                                     <small class="text-muted" style="display:block;">
                                         提案說明：{{ $proposalMeta['comment'] }}
@@ -212,6 +228,17 @@ $item->resource_data = unionPKDef($item->resource_data);
                                                     （<span class="js-utc-datetime" data-utc="{{ $submittedUtc }}">{{ $submittedDisplay }}</span>）
                                                 @endif
                                             </small>
+                                        @endif
+                                        @if($reviewStatus === 'cancelled')
+                                            <small class="text-muted" style="display:block;">
+                                                撤回者：{{ $cancelledBy ?? '（未知）' }}
+                                                @if($cancelledDisplay !== '')
+                                                    （{{ $cancelledDisplay }}）
+                                                @endif
+                                            </small>
+                                            @if(!empty($proposalMeta['cancel_reason']))
+                                                <small class="text-muted" style="display:block;">撤回原因：{{ $proposalMeta['cancel_reason'] }}</small>
+                                            @endif
                                         @endif
                                         @if($reviewComment)
                                             <small class="text-muted" style="display:block;">審核備註：{{ $reviewComment }}</small>
@@ -275,6 +302,24 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             復原
                                         </button>
                                     </form>
+                                @endif
+                                @if($canEditProposal)
+                                    <div class="proposal-actions" style="margin-top:8px;">
+                                        <a href="{{ route('codes.proposals.edit', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
+                                           class="btn btn-default btn-sm">
+                                            修改提案
+                                        </a>
+                                        <form method="post"
+                                              action="{{ route('codes.proposals.cancel', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
+                                              style="display:inline;">
+                                            {{ csrf_field() }}
+                                            {{ method_field('DELETE') }}
+                                            <button type="submit" class="btn btn-warning btn-sm"
+                                                    onclick="return confirm('確定要撤回此提案？');">
+                                                撤回提案
+                                            </button>
+                                        </form>
+                                    </div>
                                 @endif
                                 @if($isProposal && Auth::check() && Auth::user()->is_admin == 1 && Auth::user()->is_active == 1 && $reviewStatus === 'pending')
                                     <div class="proposal-actions" style="margin-top:8px;">

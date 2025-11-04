@@ -314,6 +314,11 @@ class CodesController extends Controller
             return redirect()->back()->withInput();
         }
 
+        if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $payload)) {
+            flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+            return redirect()->back()->withInput();
+        }
+
         $meta = $this->buildProposalMeta('create', $table, $request);
         $operation = $this->recordProposalOperation(
             Operation::TYPE_PROPOSAL_CREATE,
@@ -329,6 +334,133 @@ class CodesController extends Controller
         }
 
         return redirect()->route('codes.show', ['table_name' => $table]);
+    }
+
+    public function proposalEdit($table_name, $operationId)
+    {
+        $table = $this->guardTable($table_name);
+        $operation = $this->findOperationOrAbort((int) $operationId);
+        $payload = $this->ensureProposalEditable($operation, $table);
+
+        $columns = Schema::getColumnListing($table);
+        $values = [];
+        foreach ($columns as $column) {
+            $values[$column] = $payload[$column] ?? '';
+        }
+
+        return view('codes.proposal-edit', [
+            'table' => $table,
+            'columns' => $columns,
+            'values' => $values,
+            'operationId' => $operation['id'],
+            'keyColumns' => $payload['__key_columns'] ?? $this->getKeyColumns($table),
+            'proposalMeta' => $payload['__proposal_meta'] ?? [],
+            'reviewStatus' => $payload['__review_status'] ?? 'pending',
+            'reviewComment' => $payload['__review_comment'] ?? null,
+            'isCreateProposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
+            'page_title' => 'Codes',
+            'page_description' => $table . ' 提案調整',
+            'page_url' => route('codes.show', ['table_name' => $table]),
+            'archer' => "<li><a href='/codes'>Codes</a></li><li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li><li><a href='#'>提案調整</a></li>",
+        ]);
+    }
+
+    public function proposalUpdateExisting(Request $request, $table_name, $operationId)
+    {
+        $table = $this->guardTable($table_name);
+        $operation = $this->findOperationOrAbort((int) $operationId);
+        $payload = $this->ensureProposalEditable($operation, $table);
+        $keyColumns = $payload['__key_columns'] ?? $this->getKeyColumns($table);
+
+        $data = $this->extractFormData($request);
+        $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
+
+        if ($isCreate) {
+            if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
+                flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
+                return redirect()->back()->withInput();
+            }
+
+            $conditions = $this->buildConditionsFromRow($keyColumns, $data);
+            if (!empty($conditions) && $this->fetchRowByKeys($table, $keyColumns, $conditions)) {
+                flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+                return redirect()->back()->withInput();
+            }
+
+            if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $data, $operation['id'])) {
+                flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+                return redirect()->back()->withInput();
+            }
+        } else {
+            $original = $this->decodeResourceOriginal($operation);
+            if (!empty($original)) {
+                $data = $this->enforceAuditFieldsForUpdate($data, $original);
+            }
+        }
+
+        $meta = $payload['__proposal_meta'] ?? [];
+        $comment = trim((string) $request->input('__proposal_comment', ''));
+        if ($comment !== '') {
+            $meta['comment'] = $comment;
+        } else {
+            unset($meta['comment']);
+        }
+        unset($meta['cancelled_at'], $meta['cancelled_by'], $meta['cancelled_by_id'], $meta['cancel_reason']);
+        $meta['updated_at'] = Carbon::now()->toDateTimeString();
+
+        $newPayload = $data;
+        $newPayload['__proposal_meta'] = $meta;
+        $newPayload['__key_columns'] = $keyColumns;
+        $this->resetProposalReviewState($newPayload);
+
+        $updates = [
+            'resource_data' => json_encode($newPayload, JSON_UNESCAPED_UNICODE),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ];
+
+        if ($isCreate) {
+            $resourceId = $this->buildCompositeId($keyColumns, $newPayload);
+            if ($resourceId === '') {
+                $resourceId = 'proposal:' . $operation['id'];
+            }
+            $updates['resource_id'] = $resourceId;
+        }
+
+        DB::table('operations')->where('id', $operation['id'])->update($updates);
+
+        flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
+        return redirect()->route('operations.index', ['proposals_only' => 1]);
+    }
+
+    public function proposalCancel(Request $request, $table_name, $operationId)
+    {
+        $table = $this->guardTable($table_name);
+        $operation = $this->findOperationOrAbort((int) $operationId);
+        $payload = $this->ensureProposalEditable($operation, $table);
+
+        if (!isset($payload['__proposal_meta']) || !is_array($payload['__proposal_meta'])) {
+            $payload['__proposal_meta'] = [];
+        }
+
+        $reason = trim((string) $request->input('reason', ''));
+        if ($reason === '') {
+            unset($payload['__proposal_meta']['cancel_reason']);
+        } else {
+            $payload['__proposal_meta']['cancel_reason'] = $reason;
+        }
+
+        $payload['__proposal_meta']['cancelled_at'] = Carbon::now()->toDateTimeString();
+        $payload['__proposal_meta']['cancelled_by'] = Auth::user()->name ?? Auth::id();
+        $payload['__proposal_meta']['cancelled_by_id'] = Auth::id();
+        $this->markProposalCancelled($payload);
+
+        DB::table('operations')->where('id', $operation['id'])->update([
+            'resource_data' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ]);
+
+        flash('提案已撤回 @ '.Carbon::now(), 'info');
+        return redirect()->route('operations.index', ['proposals_only' => 1]);
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
@@ -713,6 +845,93 @@ class CodesController extends Controller
 
         $row = $query->first();
         return $row ? $this->convertRowToArray($row) : null;
+    }
+
+    protected function hasActiveCreateProposalConflict(string $table, array $keyColumns, array $row, ?int $excludeOperationId = null): bool
+    {
+        if (!Schema::hasTable('operations')) {
+            return false;
+        }
+
+        $resourceId = $this->buildCompositeId($keyColumns, $row);
+        if ($resourceId === '') {
+            return false;
+        }
+
+        return $this->operationRepository->hasPendingCreateProposal($table, $resourceId, $excludeOperationId);
+    }
+
+    protected function findOperationOrAbort(int $operationId): array
+    {
+        if (!Schema::hasTable('operations')) {
+            abort(404);
+        }
+
+        $row = DB::table('operations')->where('id', $operationId)->first();
+        if (!$row) {
+            abort(404);
+        }
+
+        return (array) $row;
+    }
+
+    protected function ensureProposalEditable(array $operation, string $table): array
+    {
+        if (!Auth::check()) {
+            abort(403, '請登入後再試。');
+        }
+
+        if (($operation['resource'] ?? null) !== $table) {
+            abort(404);
+        }
+
+        $payload = json_decode($operation['resource_data'] ?? '', true);
+        $payload = is_array($payload) ? $payload : [];
+
+        $meta = $payload['__proposal_meta'] ?? [];
+        $submittedById = $meta['submitted_by_id'] ?? ($operation['user_id'] ?? null);
+
+        if ($submittedById === null || (int) $submittedById !== (int) Auth::id()) {
+            abort(403, '僅提案者本人可編輯或撤回該提案。');
+        }
+
+        $status = $payload['__review_status'] ?? 'pending';
+        if (!in_array($status, ['pending', 'rejected'], true)) {
+            abort(403, '該提案目前不可修改或撤回。');
+        }
+
+        return $payload;
+    }
+
+    protected function resetProposalReviewState(array &$payload): void
+    {
+        $payload['__review_status'] = 'pending';
+        unset(
+            $payload['__review_comment'],
+            $payload['__reviewed_by'],
+            $payload['__reviewed_by_id'],
+            $payload['__reviewed_at'],
+            $payload['__cancelled_at'],
+            $payload['__cancelled_by'],
+            $payload['__cancelled_by_id']
+        );
+    }
+
+    protected function markProposalCancelled(array &$payload): void
+    {
+        $payload['__review_status'] = 'cancelled';
+        unset(
+            $payload['__review_comment'],
+            $payload['__reviewed_by'],
+            $payload['__reviewed_by_id'],
+            $payload['__reviewed_at']
+        );
+    }
+
+    protected function decodeResourceOriginal(array $operation): array
+    {
+        $original = json_decode($operation['resource_original'] ?? '', true);
+        return is_array($original) ? $original : [];
     }
 
     protected function ensureEditableAccess(string $table): ?RedirectResponse

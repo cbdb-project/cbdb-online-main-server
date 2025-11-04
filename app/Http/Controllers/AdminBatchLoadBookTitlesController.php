@@ -111,8 +111,13 @@ class AdminBatchLoadBookTitlesController extends Controller
                     'line' => $row['line'],
                     'author_id' => $row['author_id'],
                     'title' => $normalizedTitle,
+                    'title_pinyin' => $pinyinTitle,
                     'source' => $row['source'],
                     'dynasty' => $dynasty,
+                    'text_type' => $payload['c_text_type_id'],
+                    'notes' => $payload['c_notes'],
+                    'created_by' => $payload['c_created_by'] ?? null,
+                    'created_date' => $payload['c_created_date'] ?? null,
                     'c_textid' => $nextId,
                 ];
             }

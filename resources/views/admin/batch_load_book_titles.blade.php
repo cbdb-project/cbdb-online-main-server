@@ -56,8 +56,13 @@
                             <th>行號</th>
                             <th>作者 ID</th>
                             <th>書名（已清理）</th>
+                            <th>書名拼音</th>
                             <th>來源 TEXT_ID</th>
                             <th>書籍朝代</th>
+                            <th>文本類型</th>
+                            <th>批次編號</th>
+                            <th>建立者</th>
+                            <th>建立日期</th>
                             <th>新 c_textid</th>
                         </tr>
                         </thead>
@@ -67,8 +72,13 @@
                                 <td>{{ $row['line'] }}</td>
                                 <td>{{ $row['author_id'] }}</td>
                                 <td>{{ $row['title'] }}</td>
+                                <td>{{ $row['title_pinyin'] }}</td>
                                 <td>{{ $row['source'] }}</td>
                                 <td>{{ $row['dynasty'] ?? '—' }}</td>
+                                <td>{{ $row['text_type'] }}</td>
+                                <td>{{ $row['notes'] }}</td>
+                                <td>{{ $row['created_by'] }}</td>
+                                <td>{{ $row['created_date'] }}</td>
                                 <td>{{ $row['c_textid'] }}</td>
                             </tr>
                         @endforeach

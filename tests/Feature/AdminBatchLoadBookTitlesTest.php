@@ -159,6 +159,8 @@ class AdminBatchLoadBookTitlesTest extends TestCase
 
         $followUp = $this->get(route('admin.batch-load-book-titles'));
         $followUp->assertSee('本次批次編號');
+        $followUp->assertSee('書名拼音');
+        $followUp->assertSee('批次編號');
     }
 
     public function test_invalid_lines_are_reported(): void

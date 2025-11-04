@@ -41,7 +41,7 @@ class OperationsController extends Controller
             if (!is_array($rawStatuses)) {
                 $rawStatuses = [$rawStatuses];
             }
-            $allowedStatuses = ['pending', 'approved', 'rejected'];
+            $allowedStatuses = ['pending', 'approved', 'rejected', 'cancelled'];
             $statusFilters = array_values(array_intersect($rawStatuses, $allowedStatuses));
 
             $query->whereIn('op_type', [

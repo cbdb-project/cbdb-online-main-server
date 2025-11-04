@@ -65,6 +65,9 @@ Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@updat
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
 Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->name('codes.propose.update');
+Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');
+Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')->name('codes.proposals.update');
+Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')->name('codes.proposals.cancel');
 Route::post('codes/{table_name}', 'CodesController@store')->name('codes.store');
 Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
 

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\CodesController;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
+use App\Operation;
 use App\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -38,13 +39,16 @@ class CodesControllerTest extends TestCase
             [
                 'TEST_CODES' => [],
                 'TEXT_CODES' => [],
+                'operations' => [],
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
                 'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
+                'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
             ]
         );
         DB::swap($this->fakeDb);
+        $this->app->instance('db', $this->fakeDb);
 
         $this->app->instance(CodesRepository::class, new class extends CodesRepository {
             public function allowedTables(): array
@@ -68,6 +72,29 @@ class CodesControllerTest extends TestCase
             {
                 $this->calls[] = compact('user_id', 'c_personid', 'op_type', 'resource', 'resource_id', 'resource_data', 'ori', 'crowdsourcing_status');
             }
+
+            public function hasPendingCreateProposal(string $resource, string $resourceId, ?int $excludeId = null): bool
+            {
+                $query = DB::table('operations')
+                    ->where('resource', $resource)
+                    ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+                    ->where('resource_id', $resourceId);
+
+                if ($excludeId !== null) {
+                    $query->where('id', '!=', $excludeId);
+                }
+
+                $rows = $query->get();
+                foreach ($rows as $row) {
+                    $payload = json_decode($row->resource_data ?? '', true);
+                    $status = is_array($payload) ? ($payload['__review_status'] ?? null) : null;
+                    if (in_array($status, ['pending', 'rejected'], true)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
         };
         $this->app->instance(OperationRepository::class, $this->operationSpy);
     }
@@ -75,6 +102,7 @@ class CodesControllerTest extends TestCase
     protected function tearDown(): void
     {
         DB::swap($this->originalDb);
+        $this->app->instance('db', $this->originalDb);
         parent::tearDown();
     }
 
@@ -252,6 +280,117 @@ class CodesControllerTest extends TestCase
         $this->assertSame('Please review', $call['resource_data']['__proposal_meta']['comment']);
     }
 
+    public function testDuplicateCreateProposalIsBlockedWhenPendingExists()
+    {
+        $this->operationSpy->calls = [];
+        $user = new User([
+            'name' => 'proposer',
+            'email' => 'proposer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 12;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $payload = [
+            'code_id' => 'PX',
+            'code_sub' => '01',
+            'description' => 'Proposal create',
+            '__proposal_comment' => 'Please review',
+        ];
+
+        $this->post('/codes/TEST_CODES/proposal', $payload);
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+
+        DB::table('operations')->insert([
+            'id' => 1,
+            'user_id' => $user->id,
+            'resource' => $call['resource'],
+            'resource_id' => $call['resource_id'],
+            'op_type' => $call['op_type'],
+            'resource_data' => json_encode($call['resource_data']),
+            'resource_original' => json_encode($call['ori']),
+            'created_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ]);
+
+        $this->operationSpy->calls = [];
+
+        $response = $this->from('/codes/TEST_CODES/create')
+            ->post('/codes/TEST_CODES/proposal', $payload);
+
+        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertSessionHas('_old_input.code_id', 'PX');
+        $this->assertEmpty($this->operationSpy->calls);
+    }
+
+    public function testProposalOwnerCanViewEditFormForCreateProposal()
+    {
+        $user = new User([
+            'name' => 'proposer',
+            'email' => 'proposer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 13;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        DB::table('operations')->delete();
+        $resourceData = [
+            'code_id' => 'PX',
+            'code_sub' => '01',
+            'description' => 'Proposal',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => [
+                'submitted_by' => $user->name,
+                'submitted_by_id' => $user->id,
+                'submitted_at' => Carbon::now()->toDateTimeString(),
+            ],
+        ];
+        DB::table('operations')->insert([
+            'id' => 2,
+            'user_id' => $user->id,
+            'resource' => 'TEST_CODES',
+            'resource_id' => 'PX_._01',
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_data' => json_encode($resourceData),
+            'resource_original' => json_encode([]),
+            'created_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ]);
+
+        $controller = new class(app(CodesRepository::class), $this->operationSpy, $resourceData, $user) extends CodesController {
+            private $mockOperation;
+
+            public function __construct($codesRepository, $operationRepository, array $resourceData, User $user)
+            {
+                parent::__construct($codesRepository, $operationRepository);
+                $this->mockOperation = [
+                    'id' => 2,
+                    'resource' => 'TEST_CODES',
+                    'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+                    'resource_data' => json_encode($resourceData),
+                    'resource_original' => json_encode([]),
+                    'user_id' => $user->id,
+                ];
+            }
+
+            protected function findOperationOrAbort(int $operationId): array
+            {
+                return $this->mockOperation;
+            }
+        };
+
+        $view = $controller->proposalEdit('TEST_CODES', 2);
+        $this->assertSame('codes.proposal-edit', $view->getName());
+        $data = $view->getData();
+        $this->assertSame('PX', $data['values']['code_id']);
+        $this->assertSame('01', $data['values']['code_sub']);
+        $this->assertSame('Proposal', $data['values']['description']);
+    }
+
     public function testActiveUserCanSubmitUpdateProposal()
     {
         DB::table('TEST_CODES')->insert([
@@ -287,6 +426,116 @@ class CodesControllerTest extends TestCase
         $this->assertSame('Updated Desc', $call['resource_data']['description']);
         $this->assertSame('Original', $call['ori']['description']);
         $this->assertSame(['code_id', 'code_sub'], $call['resource_data']['__key_columns']);
+    }
+
+    public function testProposalOwnerCanCancelPendingProposal()
+    {
+        $user = new User([
+            'name' => 'proposer',
+            'email' => 'proposer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 15;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        DB::table('operations')->delete();
+        $resourceData = [
+            'code_id' => 'PX',
+            'code_sub' => '01',
+            'description' => 'Proposal',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => [
+                'submitted_by' => $user->name,
+                'submitted_by_id' => $user->id,
+                'submitted_at' => Carbon::now()->toDateTimeString(),
+            ],
+        ];
+        DB::table('operations')->insert([
+            'id' => 4,
+            'user_id' => $user->id,
+            'resource' => 'TEST_CODES',
+            'resource_id' => 'PX_._01',
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_data' => json_encode($resourceData),
+            'resource_original' => json_encode([]),
+            'created_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ]);
+
+        $response = $this->from(route('operations.index', ['proposals_only' => 1]))
+            ->delete(route('codes.proposals.cancel', ['table_name' => 'TEST_CODES', 'operation' => 4]));
+
+        $response->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+
+        $row = DB::table('operations')->first();
+        $stored = json_decode($row->resource_data, true);
+        $this->assertSame('cancelled', $stored['__review_status']);
+        $this->assertArrayHasKey('cancelled_at', $stored['__proposal_meta']);
+        $this->assertSame($user->name, $stored['__proposal_meta']['cancelled_by']);
+        $this->assertSame($user->id, $stored['__proposal_meta']['cancelled_by_id']);
+    }
+
+    public function testProposalOwnerUpdateResetsStatusToPending()
+    {
+        $user = new User([
+            'name' => 'proposer',
+            'email' => 'proposer@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 14;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        DB::table('operations')->delete();
+        $resourceData = [
+            'code_id' => 'PX',
+            'code_sub' => '01',
+            'description' => 'Proposal',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'rejected',
+            '__review_comment' => 'Missing info',
+            '__proposal_meta' => [
+                'submitted_by' => $user->name,
+                'submitted_by_id' => $user->id,
+                'submitted_at' => Carbon::now()->subDay()->toDateTimeString(),
+            ],
+        ];
+        DB::table('operations')->insert([
+            'id' => 3,
+            'user_id' => $user->id,
+            'resource' => 'TEST_CODES',
+            'resource_id' => 'PX_._01',
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_data' => json_encode($resourceData),
+            'resource_original' => json_encode([]),
+            'created_at' => Carbon::now()->subDay()->toDateTimeString(),
+            'updated_at' => Carbon::now()->subDay()->toDateTimeString(),
+        ]);
+
+        $response = $this->from(route('codes.proposals.edit', ['table_name' => 'TEST_CODES', 'operation' => 3]))
+            ->patch(route('codes.proposals.update', ['table_name' => 'TEST_CODES', 'operation' => 3]), [
+                'code_id' => 'PX',
+                'code_sub' => '02',
+                'description' => 'Updated proposal',
+                '__proposal_comment' => 'Updated info',
+            ]);
+
+        $response->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+
+        $row = DB::table('operations')->first();
+        $this->assertNotNull($row);
+        $stored = json_decode($row->resource_data, true);
+        $this->assertSame('PX', $stored['code_id']);
+        $this->assertSame('02', $stored['code_sub']);
+        $this->assertSame('Updated proposal', $stored['description']);
+        $this->assertSame('pending', $stored['__review_status']);
+        $this->assertArrayNotHasKey('__review_comment', $stored);
+        $this->assertArrayHasKey('updated_at', $stored['__proposal_meta']);
+        $this->assertSame('Updated info', $stored['__proposal_meta']['comment']);
+
+        $this->assertSame('PX_._02', $row->resource_id);
     }
 
     public function testAuditFieldsAreReadonlyAndPrefilledOnEdit()
@@ -539,6 +788,11 @@ class FakeSchemaBuilder
 
         return ['code_id', 'code_sub', 'description'];
     }
+
+    public function hasTable($table)
+    {
+        return array_key_exists($table, $this->schemaColumns);
+    }
 }
 
 class FakeQueryBuilder
@@ -656,6 +910,13 @@ class FakeQueryBuilder
             1,
             ['path' => url()->current()]
         );
+    }
+
+    public function get()
+    {
+        return array_map(function ($row) {
+            return (object) $row;
+        }, $this->applyConditions());
     }
 
     private function applyConditions(): array

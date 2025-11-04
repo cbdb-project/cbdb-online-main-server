@@ -161,6 +161,7 @@ Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
     'update' => 'crowdsourcing.update'
 ]]);
 
+
 Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
 Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
 
@@ -205,6 +206,8 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
 Route::middleware('auth')->group(function () {
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
+    Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');
+    Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')->name('admin.batch-load-book-titles.store');
 });
 
 Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');

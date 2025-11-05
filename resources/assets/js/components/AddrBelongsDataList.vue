@@ -20,7 +20,7 @@
                 <th>c_belongs_to</th>
                 <th>c_firstyear</th>
                 <th>c_lastyear</th>
-                <th>操作</th>
+                <th v-if="userCanEdit">操作</th>
             </tr>
             </thead>
             <tbody>
@@ -29,7 +29,7 @@
                 <td>{{item.c_belongs_to}}</td>
                 <td>{{item.c_firstyear}}</td>
                 <td>{{item.c_lastyear}}</td>
-                <td>
+                <td v-if="userCanEdit">
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/addrbelongsdata/'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+'/edit'">edit</a>
                         <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_addr_id+'-'+item.c_belongs_to+'-'+item.c_firstyear+'-'+item.c_lastyear+''">Delete</button>
@@ -71,7 +71,12 @@
 
 <script>
     export default {
-        props:[],
+        props: {
+            userCanEdit: {
+                type: Boolean,
+                default: false
+            }
+        },
         created() {
             this.notes = '正在查询，请稍后';
             this.searchByName();

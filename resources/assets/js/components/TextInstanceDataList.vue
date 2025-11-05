@@ -23,7 +23,7 @@
                 <th>c_publisher</th>
                 <th>c_print</th>
                 <th>c_instance_title</th>
-                <th>操作</th>
+                <th v-if="userCanEdit">操作</th>
             </tr>
             </thead>
             <tbody>
@@ -35,7 +35,7 @@
                 <td>{{item.c_publisher}}</td>
                 <td>{{item.c_print}}</td>
                 <td>{{item.c_instance_title}}</td>
-                <td>
+                <td v-if="userCanEdit">
                     <div class="btn-group">
                         <a type="button" class="btn btn-sm btn-info" :href="'/textinstancedata/'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+'/edit'">edit</a>
                         <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" :data-target="'#myModal'+item.c_textid+'-'+item.c_text_edition_id+'-'+item.c_text_instance_id+''">Delete</button>
@@ -77,7 +77,12 @@
 
 <script>
     export default {
-        props:[],
+        props: {
+            userCanEdit: {
+                type: Boolean,
+                default: false
+            }
+        },
         created() {
             this.notes = '正在查询，请稍后';
             this.searchByName();

@@ -41,11 +41,13 @@
                             <input type="text" name="c_text_instance_id" class="form-control" placeholder="c_instance_title（版本實例 ID）" required>
                         </div>
                     </div>
+                    @if(Auth::check() && Auth::user()->is_active == 1)
                     <div class="form-group">
                         <div class="col-sm-offset-2 col-sm-10">
                             <button type="submit" class="btn btn-default">Submit</button>
                         </div>
                     </div>
+                    @endif
                 </form>
             </div>
         </div>

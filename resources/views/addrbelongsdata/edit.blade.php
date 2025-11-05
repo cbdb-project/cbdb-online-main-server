@@ -18,11 +18,13 @@
                             </div>
                         </div>
                     @endforeach
+                    @if(Auth::check() && Auth::user()->is_active == 1)
                     <div class="form-group">
                         <div class="col-sm-offset-2 col-sm-10">
                             <button type="submit" class="btn btn-default">Submit</button>
                         </div>
                     </div>
+                    @endif
                 </form>
             </div>
         </div>

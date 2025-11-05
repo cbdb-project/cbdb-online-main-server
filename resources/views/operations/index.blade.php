@@ -181,12 +181,15 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     }
                                 }
                                 $cancelledDisplay = '';
+                                $cancelledUtc = '';
                                 if (!empty($proposalMeta['cancelled_at'])) {
                                     try {
                                         $cancelledCarbon = \Carbon\Carbon::parse($proposalMeta['cancelled_at'], config('app.timezone', 'Asia/Shanghai'));
                                         $cancelledDisplay = $cancelledCarbon;
+                                        $cancelledUtc = $cancelledCarbon->copy()->setTimezone('UTC')->toIso8601String();
                                     } catch (\Exception $e) {
                                         $cancelledDisplay = $proposalMeta['cancelled_at'];
+                                        $cancelledUtc = $proposalMeta['cancelled_at'];
                                     }
                                 }
                                 $cancelledBy = $proposalMeta['cancelled_by'] ?? null;
@@ -232,8 +235,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @if($reviewStatus === 'cancelled')
                                             <small class="text-muted" style="display:block;">
                                                 撤回者：{{ $cancelledBy ?? '（未知）' }}
-                                                @if($cancelledDisplay !== '')
-                                                    （{{ $cancelledDisplay }}）
+                                                @if($cancelledUtc)
+                                                    （<span class="js-utc-datetime" data-utc="{{ $cancelledUtc }}">{{ $cancelledDisplay }}</span>）
                                                 @endif
                                             </small>
                                             @if(!empty($proposalMeta['cancel_reason']))

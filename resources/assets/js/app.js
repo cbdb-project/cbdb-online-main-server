@@ -8,14 +8,8 @@ import { createApp } from 'vue';
 import Example from './components/Example.vue';
 import NameList from './components/NameList.vue';
 import AddrCodeList from './components/AddrCodeList.vue';
-import AltnameCodeList from './components/AltnameCodeList.vue';
-import AppointCodeList from './components/AppointCodeList.vue';
-import TextCodeList from './components/TextCodeList.vue';
 import TextInstanceDataList from './components/TextInstanceDataList.vue';
 import AddrBelongsDataList from './components/AddrBelongsDataList.vue';
-import Addr2CodeList from './components/Addr2CodeList.vue';
-import OfficeCodeList from './components/OfficeCodeList.vue';
-import SocialInstitutionCodeList from './components/SocialInstitutionCodeList.vue';
 import Codebox from './components/codebox.vue';
 import SelectVue from './components/Select.vue';
 import Select2Vue from './components/Select2Vue.vue';
@@ -30,14 +24,8 @@ const app = createApp({
         'example': Example,
         'name-list': NameList,
         'address-code-list': AddrCodeList,
-        'altname-code-list': AltnameCodeList,
-        'appoint-code-list': AppointCodeList,
-        'text-code-list': TextCodeList,
         'text-instance-data-list': TextInstanceDataList,
         'addr-belongs-data-list': AddrBelongsDataList,
-        'addr-code-list': Addr2CodeList,
-        'office-code-list': OfficeCodeList,
-        'social-institution-code-list': SocialInstitutionCodeList,
         'codebox': Codebox,
         'select-vue': SelectVue,
         'select2-vue': Select2Vue,
@@ -48,4 +36,3 @@ const app = createApp({
         'passport-personal-access-tokens': PassportPersonalAccessTokens
     }
 }).mount('#app');
-

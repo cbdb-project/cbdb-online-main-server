@@ -13,11 +13,9 @@
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
                             <div class="col-sm-10">
-                                <input type="text" name="{{ $key }}" class="form-control" 
-                                @if($i == 1)
-                                    value="{{ $id }}"
-                                @endif
-                                >
+                                @php($defaultValue = $defaults[$key] ?? ($i === 1 ? $id : null))
+                                <input type="text" name="{{ $key }}" class="form-control"
+                                       value="{{ old($key, $defaultValue) }}">
                             </div>
                         </div>
                     @php($i++)

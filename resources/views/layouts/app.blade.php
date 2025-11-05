@@ -52,8 +52,6 @@
                                     <li><a href="/home">Home</a></li>
                                     <li role="separator" class="divider"></li>
                                     <li><a href="/addresscodes">Address Codes</a></li>
-                                    <li><a href="/altnamecodes">Altname Codes</a></li>
-                                    <li><a href="/appointcodes">Appointment Type Codes</a></li>
                                 </ul>
                             </li>
                             <li class="dropdown">

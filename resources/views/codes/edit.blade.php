@@ -47,6 +47,7 @@
                             </div>
                         </div>
                     @endforeach
+                    @if(Auth::check() && Auth::user()->is_active == 1)
                     <div class="form-group">
                         <label for="__proposal_comment" class="col-sm-2 control-label">提案說明</label>
                         <div class="col-sm-10">
@@ -63,6 +64,7 @@
                             </button>
                         </div>
                     </div>
+                    @endif
                 </form>
             </div>
         </div>

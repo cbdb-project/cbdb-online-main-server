@@ -1,16 +1,28 @@
 # cbdb-online-main-server
 
-按照[旧版本录入系统](http://cbdb.fas.harvard.edu/cbdbc/cbdbedit)重构，技术选型Laravel + Mysql + Vuejs + webpack （mix）
+[中國歷代人物傳在線記录入系统](https://input.cbdb.fas.harvard.edu/)原始碼。
 
-更新至[Laravel 5.5](https://laravel.com/docs/5.5)框架
+## 開發指南(2025 更新)
 
-### CBDB inputting system URL
+* [AGENTS 指南](./AGENTS.md)
+* [AdminLTE 在 CBDB Online 項目中的使用分析](./ADMINLTE.md)
+* [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
+* [CHANGELOG](./CHANGELOG.md)
+* [代碼表格前端實作比較](./CODES.md)
+* [代碼表界面白名單維護](./CODES_TABLES.md)
+* [資料庫結構說明](./DATABASE_SCHEMA.md)
+* [Posting/Office 流程備忘](./POSTING_OFFICE.md)
+* [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
+* [使用者權限說明](./USER_PRIVILEGES.md)
 
-https://input.cbdb.fas.harvard.edu/basicinformation
+## 工具使用說明
 
-## UI 調整（2025）
+* 若需批次導入資料，請參考 [BATCH_UPLOADERS](./BATCH_UPLOADERS.md)
+* [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
+* [MERGE 工具說明](./MERGE.md)
+* [檢視表總覽](./VIEWS.md)
 
-詳情請參見 [CHANGELOG](./CHANGELOG.md)。若需批次導入資料，請參考 [BATCH_UPLOADERS](./BATCH_UPLOADERS.md)。
+## 原始说明
 
 ### Database migrations
 
@@ -312,17 +324,3 @@ Please make sure that your web server user is the owner of this file
 ```
 sudo chown caddy laravel.log
 ```
-### 開發说明（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
-
-* [AGENTS 指南](./AGENTS.md)
-* [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
-* [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
-* [Changelog](./CHANGELOG.md)
-* [代碼表格前端實作比較](./CODES.md)
-* [代碼表界面白名單維護](./CODES_TABLES.md)
-* [資料庫結構說明](./DATABASE_SCHEMA.md)
-* [MERGE 工具說明](./MERGE.md)
-* [Posting/Office 流程備忘](./POSTING_OFFICE.md)
-* [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
-* [檢視表總覽](./VIEWS.md)
-* [使用者權限說明](./USER_PRIVILEGES.md)

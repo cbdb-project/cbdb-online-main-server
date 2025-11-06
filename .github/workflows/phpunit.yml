@@ -53,7 +53,10 @@ jobs:
           sed -i 's/SESSION_DRIVER=file/SESSION_DRIVER=array/' .env
 
       - name: Run database migrations
-        run: php artisan migrate --force
+        run: |
+          mysql -h 127.0.0.1 -u root -ppassword cbdb_test -e "SET FOREIGN_KEY_CHECKS=0;"
+          php artisan migrate --force
+          mysql -h 127.0.0.1 -u root -ppassword cbdb_test -e "SET FOREIGN_KEY_CHECKS=1;"
 
       - name: Run PHPUnit suite
         run: ./vendor/bin/phpunit

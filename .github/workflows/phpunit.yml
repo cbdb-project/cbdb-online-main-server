@@ -46,15 +46,11 @@ jobs:
 
       - name: Configure test environment
         run: |
-          echo "DB_CONNECTION=mysql" >> .env
-          echo "DB_HOST=127.0.0.1" >> .env
-          echo "DB_PORT=3306" >> .env
-          echo "DB_DATABASE=cbdb_test" >> .env
-          echo "DB_USERNAME=root" >> .env
-          echo "DB_PASSWORD=password" >> .env
-          echo "CACHE_DRIVER=array" >> .env
-          echo "SESSION_DRIVER=array" >> .env
-          echo "QUEUE_DRIVER=sync" >> .env
+          sed -i 's/DB_DATABASE=homestead/DB_DATABASE=cbdb_test/' .env
+          sed -i 's/DB_USERNAME=homestead/DB_USERNAME=root/' .env
+          sed -i 's/DB_PASSWORD=secret/DB_PASSWORD=password/' .env
+          sed -i 's/CACHE_DRIVER=file/CACHE_DRIVER=array/' .env
+          sed -i 's/SESSION_DRIVER=file/SESSION_DRIVER=array/' .env
 
       - name: Run database migrations
         run: php artisan migrate --force

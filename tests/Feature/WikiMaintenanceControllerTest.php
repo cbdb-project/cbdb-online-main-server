@@ -20,11 +20,15 @@ class WikiMaintenanceControllerTest extends TestCase
     {
         parent::setUp();
 
+        // 设置缓存为数组驱动，避免文件权限问题
+        config(['cache.default' => 'array']);
+
         // 创建测试用户（使用 Laravel 5.5 语法）
         $this->user = factory(User::class)->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'is_active' => 1
+            'is_active' => 1,
+            'is_admin' => 1
         ]);
     }
 
@@ -257,7 +261,7 @@ class WikiMaintenanceControllerTest extends TestCase
         $this->assertEquals(12345, $result['c_personid']);
         $this->assertEquals(68942, $result['c_textid']);
         $this->assertEquals('Q123456', $result['c_pages']);
-        $this->assertStringContains('批次導入於', $result['c_notes']);
+        $this->assertContains('批次導入於', $result['c_notes']);
 
         // 测试中文维基百科记录
         $zhWikiRecord = [
@@ -338,7 +342,7 @@ class WikiMaintenanceControllerTest extends TestCase
 
         foreach ($testCases as $statusCode => $expectedMessage) {
             $result = $method->invokeArgs($controller, [$statusCode]);
-            $this->assertStringContains((string)$statusCode, $result);
+            $this->assertContains((string)$statusCode, $result);
         }
     }
 

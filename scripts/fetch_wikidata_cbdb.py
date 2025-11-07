@@ -132,11 +132,14 @@ class WikidataCBDBFetcher:
                 if ja_title:
                     wikipedia['ja'] = ja_title
 
+                # Build record - only include wikipedia field if it has content
                 record = {
                     'cbdb_personid': cbdb_personid,
-                    'wikidata_qid': qid,
-                    'wikipedia': wikipedia
+                    'wikidata_qid': qid
                 }
+
+                if wikipedia:  # Only add wikipedia field if it's not empty
+                    record['wikipedia'] = wikipedia
 
                 records.append(record)
 

@@ -640,13 +640,13 @@ class WikiMaintenanceController extends Controller
             $sourceData = $wikidataQid;
         } elseif ($targetSourceId == 60795) {
             // 中文維基百科 - 導入中文條目標題
-            if (!isset($record['wikipedia']['zh']) || empty($record['wikipedia']['zh'])) {
+            if (empty($record['wikipedia']['zh'] ?? '')) {
                 return null; // 沒有中文維基百科條目
             }
             $sourceData = $record['wikipedia']['zh'];
         } elseif ($targetSourceId == 68943) {
             // 英文維基百科 - 導入英文條目標題
-            if (!isset($record['wikipedia']['en']) || empty($record['wikipedia']['en'])) {
+            if (empty($record['wikipedia']['en'] ?? '')) {
                 return null; // 沒有英文維基百科條目
             }
             $sourceData = $record['wikipedia']['en'];

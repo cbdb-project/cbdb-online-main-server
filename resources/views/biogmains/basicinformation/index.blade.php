@@ -5,7 +5,11 @@
     <div class="panel panel-default">
         <div class="panel-heading">人名查詢</div>
         <div class="panel-body">
-            <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
+            @auth
+                @if(Auth::user()->is_active == 1)
+                    <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
+                @endif
+            @endauth
             <div class="clearfix"></div>
             <name-list user="{{ Auth::id() }}"></name-list>
         </div>

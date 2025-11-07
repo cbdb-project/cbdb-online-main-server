@@ -190,9 +190,9 @@ class WikidataCBDBFetcher:
             print(f"Total records: {len(records)}")
 
             # Print some statistics
-            zh_wiki_count = sum(1 for r in records if r['wikipedia'].get('zh'))
-            en_wiki_count = sum(1 for r in records if r['wikipedia'].get('en'))
-            ja_wiki_count = sum(1 for r in records if r['wikipedia'].get('ja'))
+            zh_wiki_count = sum(1 for r in records if r.get('wikipedia', {}).get('zh'))
+            en_wiki_count = sum(1 for r in records if r.get('wikipedia', {}).get('en'))
+            ja_wiki_count = sum(1 for r in records if r.get('wikipedia', {}).get('ja'))
             print(f"Records with Chinese Wikipedia: {zh_wiki_count}")
             print(f"Records with English Wikipedia: {en_wiki_count}")
             print(f"Records with Japanese Wikipedia: {ja_wiki_count}")

@@ -1,5 +1,7 @@
 # CBDB Scripts
 
+[中文說明](./README.zh.md)
+
 This directory contains utility scripts for the CBDB Online project.
 
 ## fetch_wikidata_cbdb.py

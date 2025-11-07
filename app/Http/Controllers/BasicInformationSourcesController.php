@@ -30,8 +30,16 @@ class BasicInformationSourcesController extends Controller
     public function index($id)
     {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
-        return view('biogmains.sources.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處']);
+
+        $basicinformation = \App\BiogMain::with(['sources' => function($query) {
+            $query->select('TEXT_CODES.*')->withPivot('c_pages', 'c_notes', 'c_main_source', 'c_self_bio');
+        }])->find($id);
+
+        return view('biogmains.sources.index', [
+            'basicinformation' => $basicinformation ?: $biogbasicinformation,
+            'page_title' => 'Basicinformation',
+            'page_description' => '基本信息表 出處'
+        ]);
     }
 
     /**

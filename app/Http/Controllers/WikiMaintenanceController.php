@@ -122,11 +122,21 @@ class WikiMaintenanceController extends Controller
     {
         // 驗證輸入
         $request->validate([
-            'import_url' => 'required|url',
+            'import_url' => 'required|string',
             'target_source' => 'required|integer|in:' . implode(',', $this->targetSourceIds)
         ]);
 
         $url = $request->input('import_url');
+
+        // 自定義URL驗證，避免Laravel 5.5的URL正則表達式問題
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//', $url)) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => [
+                    'import_url' => ['請輸入有效的HTTPS網址']
+                ]
+            ], 422);
+        }
         $targetSourceId = (int) $request->input('target_source');
         $sourceName = $this->sourceNames[$targetSourceId];
 
@@ -630,7 +640,22 @@ class WikiMaintenanceController extends Controller
         }
 
         // 驗證 Wikidata QID 格式 (應該以 Q 開頭)
-        if (empty($wikidataQid) || !preg_match('/^Q\d+$/', $wikidataQid)) {
+        if (empty($wikidataQid)) {
+            return null;
+        }
+
+        // 安全的正則表達式驗證
+        try {
+            if (!preg_match('/^Q\d+$/', $wikidataQid)) {
+                return null;
+            }
+        } catch (\Exception $e) {
+            // 记录问题数据以便调试
+            \Log::error("Regex error in WikiMaintenance", [
+                'wikidataQid' => $wikidataQid,
+                'cbdb_personid' => $cbdbPersonId,
+                'error' => $e->getMessage()
+            ]);
             return null;
         }
 

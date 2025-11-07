@@ -35,4 +35,4 @@ jobs:
           php artisan key:generate
 
       - name: Run PHPUnit suite
-        run: ./vendor/bin/phpunit
+        run: composer test

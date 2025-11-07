@@ -87,6 +87,7 @@
                 <li class="{{ $page_title == '批次匯入書稿資料' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-book-titles') }}"><i class="fa fa-upload"></i> <span>批次匯入書稿</span></a></li>
                 <li class="{{ $page_title == '批次匯入官職' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-offices') }}"><i class="fa fa-briefcase"></i> <span>批次匯入官職</span></a></li>
                 <li class="{{ $page_title == '批次匯入社會機構' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-social-institutes') }}"><i class="fa fa-university"></i> <span>批次匯入社會機構</span></a></li>
+                <li class="{{ $page_title == 'Wiki 對照資料維護' ? 'active' : '' }}"><a href="{{ route('admin.wiki-maintenance') }}"><i class="fa fa-wikipedia-w"></i> <span>Wiki 對照資料維護</span></a></li>
                 <li class="{{ $page_title == 'MergePreview' ? 'active' : '' }}"><a href="{{ route('merge-preview.index') }}"><i class="ion ion-shuffle"></i> <span>人物記錄合併</span></a></li>
                 <li class="{{ $page_title == 'Management' ? 'active' : '' }}"><a href="{{ route('manage.index') }}"><i class="ion ion-ios-people-outline"></i> <span>管理用戶</span></a></li>
             @endif

@@ -52,14 +52,41 @@
 - 頁面右上角的「顯示 SQL」會呈現實際執行語句及 bindings，可用來對照 `ViewTableQueries` 或資料庫查詢。
 
 ## 測試策略
-1. **PHPUnit**  
-   - 預設使用 SQLite 內存資料庫（若測試自行切換，記得還原）。  
+1. **PHPUnit 基本原則**
+   - 預設使用 SQLite 內存資料庫（若測試自行切換，記得還原）。
    - Feature 測試已停用 CSRF middleware；若需要真正驗證 CSRF，請額外撰寫整合測試。
-2. **範例測試**  
+
+2. **In-Memory 數據庫測試模式**（⭐ 推薦標準做法）
+   - **遵循現有模式**：參考 `tests/Feature/UserIpLoggingTest.php` 等現有測試
+   - **配置方式**：在 `setUp()` 方法中設置：
+     ```php
+     config()->set('database.default', 'sqlite');
+     config()->set('database.connections.sqlite', [
+         'driver' => 'sqlite',
+         'database' => ':memory:',
+         'prefix' => '',
+     ]);
+     ```
+   - **表結構創建**：使用 `Schema::create()` 創建測試所需的最小化表結構
+   - **測試數據**：使用 `DB::table()->insert()` 預填充必要的測試數據
+   - **隔離性**：每個測試方法都有獨立的內存數據庫，完全隔離
+   - **優勢**：快速、可靠、不依賴外部數據庫，CI 環境友好
+
+3. **避免複雜數據庫依賴**
+   - ❌ **不要**：依賴完整的 MySQL 數據庫遷移
+   - ❌ **不要**：依賴複雜的外鍵約束和大型 schema
+   - ✅ **要**：創建測試所需的最小化表結構
+   - ✅ **要**：模擬業務邏輯而非數據庫結構
+
+4. **範例測試**
    - `tests/Feature/CodesControllerTest.php`：涵蓋 `/codes/*` 授權、搜尋、操作記錄等行為。
    - `tests/Feature/OperationsRestoreAuthorizeTest.php`：驗證操作復原的授權與記錄流程。
-3. **撰寫測試建議**  
+   - `tests/Feature/WikiMaintenanceControllerTest.php`：In-memory SQLite 測試的標準範例
+
+5. **撰寫測試建議**
    - 覆蓋授權、Side effect（資料變動）、例外情境（資料缺失或查不到）。
+   - 優先使用 in-memory 數據庫模式，避免外部依賴
+   - 測試邏輯而非數據庫結構，保持測試簡潔和可維護
    - 需 mock DB transaction 時，可使用 `DB::swap()` 注入假交易器。
 
 ## 迭代流程與守則
@@ -87,6 +114,10 @@
 - `resource_id` 可能是複合主鍵並經過特殊編碼（`(slash)`、`minus` 等），還原/比對前需解析。
 - Feature 測試手動建立資料表時，記得設置必要的 primary key 與時間戳；否則模型邏輯可能出錯。
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
+- **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
+- **PHPUnit 版本兼容性**：注意使用 `assertContains` 而不是 `assertStringContains`（PHPUnit 6.5）。
+- **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
+- **Laravel 5.5 Cache 清理錯誤**：測試完成後可能出現 "Class cache does not exist" 錯誤（exit code 255），這是 Laravel 5.5 deferred service provider 清理機制的框架級問題，不影響測試結果。CI 配置和 composer test script 已設定忽略此錯誤碼。升級到 Laravel 5.6+ 可解決此問題。
 
 ## 快速回顧
 - 需要了解的主要模組：`CodesController`、`OperationsController`、`OperationRepository`、`resources/views/operations/*`。

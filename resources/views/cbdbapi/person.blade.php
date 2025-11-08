@@ -397,12 +397,16 @@ var searchTermData = @json($searchTerm);
         return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + (value || '<span class="empty">（空）</span>') + '</span></div>';
     }
 
+    function isValidValue(val) {
+        return val && val !== '0' && val !== 0 && val !== '未詳';
+    }
+
     function renderBasicInfo(info) {
         var html = '<div class="section-block"><div class="section-header">基本資訊</div><div class="section-content">';
         html += line('CBDB ID', escapeHtml(info.PersonId));
         var names = escapeHtml(info.ChName || '') + ' / ' + escapeHtml(info.EngName || '');
         html += line('中文名 / 英文名', names);
-        html += line('指數年', escapeHtml(info.IndexYear));
+        html += line('指數年', isValidValue(info.IndexYear) ? escapeHtml(info.IndexYear) : '未詳');
         var indexAddrParts = [];
         if (info.IndexAddr) {
             indexAddrParts.push(formatIdLabel(info.IndexAddr, info.IndexAddrId));
@@ -412,10 +416,10 @@ var searchTermData = @json($searchTerm);
         var birthParts = [];
         birthParts.push(formatIdLabel(info.DynastyBirth, info.DynastyBirthId));
         birthParts.push(formatIdLabel(info.EraBirth, info.EraBirthId));
-        if (info.EraYearBirth) {
+        if (info.EraYearBirth && isValidValue(info.EraYearBirth)) {
             birthParts.push(escapeHtml(info.EraYearBirth) + ' 年');
         }
-        if (info.YearBirth) {
+        if (info.YearBirth && isValidValue(info.YearBirth)) {
             birthParts.push('(' + escapeHtml(info.YearBirth) + ')');
         }
         html += line('生年', joinParts(birthParts, ' '));
@@ -423,15 +427,15 @@ var searchTermData = @json($searchTerm);
         var deathParts = [];
         deathParts.push(formatIdLabel(info.DynastyDeath, info.DynastyDeathId));
         deathParts.push(formatIdLabel(info.EraDeath, info.EraDeathId));
-        if (info.EraYearDeath) {
+        if (info.EraYearDeath && isValidValue(info.EraYearDeath)) {
             deathParts.push(escapeHtml(info.EraYearDeath) + ' 年');
         }
-        if (info.YearDeath) {
+        if (info.YearDeath && isValidValue(info.YearDeath)) {
             deathParts.push('(' + escapeHtml(info.YearDeath) + ')');
         }
         html += line('卒年', joinParts(deathParts, ' '));
 
-        html += line('享年', escapeHtml(info.YearsLived));
+        html += line('享年', isValidValue(info.YearsLived) ? escapeHtml(info.YearsLived) : '未詳');
         html += line('朝代', formatIdLabel(info.Dynasty, info.DynastyId));
         html += line('性別', info.Gender === '1' ? '女性' : (info.Gender === '0' ? '男性' : '<span class="empty">（空）</span>'));
         html += line('郡望', info.JunWang ? formatIdLabel(info.JunWang, info.JunWangId) : '<span class="empty">（空）</span>');
@@ -556,10 +560,10 @@ var searchTermData = @json($searchTerm);
             if (item.MoveCount) {
                 extra.push('順序：' + escapeHtml(item.MoveCount));
             }
-            if (item.FirstYear) {
+            if (item.FirstYear && isValidValue(item.FirstYear)) {
                 extra.push('起始年：' + escapeHtml(item.FirstYear));
             }
-            if (item.LastYear) {
+            if (item.LastYear && isValidValue(item.LastYear)) {
                 extra.push('終止年：' + escapeHtml(item.LastYear));
             }
             if (extra.length) {
@@ -606,10 +610,10 @@ var searchTermData = @json($searchTerm);
             }
             itemHtml += pieces.join('：');
             var tail = [];
-            if (item.RuShiYear) {
+            if (item.RuShiYear && isValidValue(item.RuShiYear)) {
                 tail.push('年份：' + escapeHtml(item.RuShiYear));
             }
-            if (item.RuShiAge) {
+            if (item.RuShiAge && isValidValue(item.RuShiAge)) {
                 tail.push('年齡：' + escapeHtml(item.RuShiAge));
             }
             if (tail.length) {
@@ -636,55 +640,60 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
+
         var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
             var itemHtml = '<div class="item-box">';
-            var header = '';
-            if (item.FirstYearRange) {
-                header += '<span class="badge me-2">' + escapeHtml(item.FirstYearRange) + '</span>';
-            } else if (item.FirstYear) {
-                header += '<span class="badge me-2">' + escapeHtml(item.FirstYear) + '</span>';
-            } else {
-                header += '<span class="badge me-2">未詳</span>';
-            }
+
+            // 官职名称
             if (item.OfficeName) {
-                header += '<strong>' + escapeHtml(item.OfficeName) + '</strong>';
+                itemHtml += '<strong>' + escapeHtml(item.OfficeName) + '</strong>';
             }
-            itemHtml += header;
+
             var details = [];
-            if (item.FirstYear || item.FirstYearNianhao || item.FirstYearNiaohaoYear) {
-                var startParts = [];
-                if (item.FirstYearNianhao) {
-                    startParts.push(escapeHtml(item.FirstYearNianhao));
-                }
-                if (item.FirstYearNiaohaoYear) {
-                    startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + ' 年');
-                }
-                if (item.FirstYear) {
-                    startParts.push('(' + escapeHtml(item.FirstYear) + ')');
-                }
-                details.push('起始年：' + startParts.join(' '));
-            } else {
-                details.push('起始年：未詳');
+
+            // 起始年
+            var startParts = [];
+            if (item.FirstYearNianhao && isValidValue(item.FirstYearNianhao)) {
+                startParts.push(escapeHtml(item.FirstYearNianhao));
             }
-            if (item.LastYear || item.LastYearNianhao || item.LastYearNianhaoYear) {
-                var endParts = [];
-                if (item.LastYearNianhao) {
-                    endParts.push(escapeHtml(item.LastYearNianhao));
-                }
-                if (item.LastYearNianhaoYear) {
-                    endParts.push(escapeHtml(item.LastYearNianhaoYear) + ' 年');
-                }
-                if (item.LastYear) {
-                    endParts.push('(' + escapeHtml(item.LastYear) + ')');
-                }
-                details.push('終止年：' + endParts.join(' '));
-            } else {
-                details.push('終止年：未詳');
+            if (item.FirstYearNiaohaoYear && isValidValue(item.FirstYearNiaohaoYear)) {
+                startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + ' 年');
             }
+            if (item.FirstYear && isValidValue(item.FirstYear)) {
+                startParts.push('(' + escapeHtml(item.FirstYear) + ')');
+            }
+            var startYearText = startParts.length > 0 ? startParts.join(' ') : '未詳';
+            // 只有当年份不是"未詳"时，才添加年份限定詞
+            if (startParts.length > 0 && item.FirstYearRange && isValidValue(item.FirstYearRange)) {
+                startYearText += '   年份限定詞：' + escapeHtml(item.FirstYearRange);
+            }
+            details.push('起始年：' + startYearText);
+
+            // 終止年
+            var endParts = [];
+            if (item.LastYearNianhao && isValidValue(item.LastYearNianhao)) {
+                endParts.push(escapeHtml(item.LastYearNianhao));
+            }
+            if (item.LastYearNianhaoYear && isValidValue(item.LastYearNianhaoYear)) {
+                endParts.push(escapeHtml(item.LastYearNianhaoYear) + ' 年');
+            }
+            if (item.LastYear && isValidValue(item.LastYear)) {
+                endParts.push('(' + escapeHtml(item.LastYear) + ')');
+            }
+            var endYearText = endParts.length > 0 ? endParts.join(' ') : '未詳';
+            // 只有当年份不是"未詳"时，才添加年份限定詞
+            if (endParts.length > 0 && item.LastYearRange && isValidValue(item.LastYearRange)) {
+                endYearText += '   年份限定詞：' + escapeHtml(item.LastYearRange);
+            }
+            details.push('終止年：' + endYearText);
+
+            // 地點
             if (item.AddrName) {
                 details.push('地點：<strong>' + escapeHtml(item.AddrName) + '</strong>');
             }
+
+            // 出處
             if (item.Source) {
                 var src = '出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
@@ -692,9 +701,12 @@ var searchTermData = @json($searchTerm);
                 }
                 details.push(src);
             }
+
+            // 註
             if (item.Notes) {
                 details.push('註：' + escapeHtml(item.Notes));
             }
+
             itemHtml += '<div class="small-text mt-2">' + details.join('<br>') + '</div>';
             itemHtml += '</div>';
             html += itemHtml;
@@ -717,10 +729,10 @@ var searchTermData = @json($searchTerm);
                 }
                 text.push(label);
             }
-            if (item.FirstYear) {
+            if (item.FirstYear && isValidValue(item.FirstYear)) {
                 text.push('起始年：' + escapeHtml(item.FirstYear));
             }
-            if (item.LastYear) {
+            if (item.LastYear && isValidValue(item.LastYear)) {
                 text.push('終止年：' + escapeHtml(item.LastYear));
             }
             html += '<div class="item-box">' + (text.length ? text.join('，') : '<span class="empty">（空）</span>') + '</div>';
@@ -777,7 +789,7 @@ var searchTermData = @json($searchTerm);
             if (item.TextTitle) {
                 base.push('【' + escapeHtml(item.TextTitle) + '】');
             }
-            if (item.Year) {
+            if (item.Year && isValidValue(item.Year)) {
                 base.push('<span class="badge">年份：' + escapeHtml(item.Year) + '</span>');
             }
             itemHtml += base.join(' ');
@@ -817,7 +829,7 @@ var searchTermData = @json($searchTerm);
                 }
                 line.push(name);
             }
-            if (item.Year) {
+            if (item.Year && isValidValue(item.Year)) {
                 line.push('著作年代：' + escapeHtml(item.Year));
             }
             if (item.Role) {
@@ -911,7 +923,8 @@ var searchTermData = @json($searchTerm);
         html += renderCollection('社會關係', (person.PersonSocialAssociation && person.PersonSocialAssociation.Association) || []);
         html += renderCollection('著述', (person.PersonTexts && person.PersonTexts.Text) || []);
 
-        html += '<div class="api-info-box"><strong>需要原始 JSON？</strong>請使用 <code>?id=' + escapeHtml(String(personId)) + '&amp;o=json</code></div>';
+        var jsonUrl = '?id=' + escapeHtml(String(personId)) + '&o=json';
+        html += '<div class="api-info-box"><strong>需要原始 JSON？</strong>請使用 <a href="' + jsonUrl + '" target="_blank" rel="noopener noreferrer"><code>' + jsonUrl.replace('&', '&amp;') + '</code></a></div>';
 
         return html;
     }

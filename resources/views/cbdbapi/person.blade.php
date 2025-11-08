@@ -289,7 +289,7 @@
             </div>
             <div>
                 @foreach($searchResults as $result)
-                    <a href="#" class="person-link" data-person-id="{{ $result['id'] }}">
+                    <a href="#" class="person-link person-search-result" data-person-id="{{ $result['id'] }}">
                         {{ e($result['label']) }} <span class="badge">{{ $result['id'] }}</span>
                     </a>
                 @endforeach

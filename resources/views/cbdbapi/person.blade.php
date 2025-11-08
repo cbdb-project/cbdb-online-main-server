@@ -1,8 +1,274 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title>CBDB Person Authority - {{ $personId }}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>CBDB 人物資料庫 - {{ $personId ? $personId : '搜尋' }}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        body {
+            background-color: #fafafa;
+            padding: 0;
+            margin: 0;
+        }
+
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+        }
+
+        .header-section {
+            background-color: #fff;
+            border-bottom: 2px solid #333;
+            padding: 25px 40px;
+        }
+
+        .site-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        .site-subtitle {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .search-results-section {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 18px;
+            margin-top: 20px;
+        }
+
+        .search-results-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #999;
+            padding-bottom: 6px;
+        }
+
+        .person-link {
+            display: inline-block;
+            padding: 6px 14px;
+            margin: 4px 6px 4px 0;
+            background-color: #fff;
+            color: #555;
+            border: 1px solid #999;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .person-link:hover {
+            background-color: #666;
+            color: white;
+            border-color: #666;
+        }
+
+        .person-link.is-current {
+            background-color: #333;
+            color: white;
+            border-color: #333;
+            font-weight: 500;
+        }
+
+        .content-section {
+            padding: 30px 40px;
+        }
+
+        .loading-message {
+            padding: 40px 0;
+            color: #666;
+        }
+
+        .section-block {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+        }
+
+        .section-header {
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #999;
+            padding: 10px 18px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .section-content {
+            padding: 18px;
+        }
+
+        .info-row {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #444;
+            display: inline-block;
+            min-width: 180px;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .item-box {
+            background-color: #fafafa;
+            border: 1px solid #e0e0e0;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+
+        .item-box:hover {
+            background-color: #f5f5f5;
+        }
+
+        .badge {
+            font-weight: normal;
+            font-size: 0.8rem;
+            background-color: #999 !important;
+            color: white;
+        }
+
+        .bg-info {
+            background-color: #888 !important;
+        }
+
+        .empty {
+            color: #aaa;
+            font-style: italic;
+        }
+
+        .alert-box {
+            padding: 14px;
+            margin: 20px 0;
+            border: 1px solid;
+        }
+
+        .alert-info {
+            background-color: #f5f5f5;
+            border-color: #ccc;
+            color: #555;
+        }
+
+        .alert-warning {
+            background-color: #f8f8f8;
+            border-color: #bbb;
+            color: #666;
+        }
+
+        .alert-danger {
+            background-color: #f5f5f5;
+            border-color: #999;
+            color: #333;
+        }
+
+        .api-info-box {
+            background-color: #f8f8f8;
+            border: 1px solid #ccc;
+            padding: 14px;
+            margin-top: 30px;
+        }
+
+        code {
+            background-color: #eee;
+            padding: 2px 6px;
+            color: #555;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .text-muted {
+            color: #777 !important;
+        }
+
+        .small-text {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .btn-primary {
+            background-color: #666 !important;
+            border-color: #666 !important;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #555 !important;
+            border-color: #555 !important;
+        }
+
+        @media (max-width: 768px) {
+            .header-section, .content-section {
+                padding: 20px 20px;
+            }
+
+            .site-title {
+                font-size: 1.4rem;
+            }
+
+            .info-label {
+                display: block;
+                min-width: auto;
+                margin-bottom: 4px;
+            }
+
+            .person-link {
+                padding: 5px 12px;
+                font-size: 0.85rem;
+            }
+        }
+
+        hr {
+            border-top: 1px solid #ddd;
+            margin: 20px 0;
+        }
+
+        strong {
+            font-weight: 600;
+            color: #222;
+        }
+
+        .footer-section {
+            background-color: #f5f5f5;
+            border-top: 1px solid #ddd;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .footer-section a {
+            color: #555;
+            text-decoration: underline;
+        }
+
+        .footer-section a:hover {
+            color: #333;
+        }
+    </style>
 </head>
 <body>
 @php
@@ -10,28 +276,44 @@
     $searchTerm = $searchTerm ?? null;
 @endphp
 
-@if(!empty($searchResults))
-<div id="search-results">
-    <div><b>搜尋結果</b>@if($searchTerm) ：「{{ e($searchTerm) }}」@endif</div>
-    <div class="search-result-list">
-        @foreach($searchResults as $result)
-            <a href="#" class="person-search-result" data-person-id="{{ $result['id'] }}" style="display:inline-block;margin-right:18px;text-decoration:none;">
-                {{ e($result['label']) }} ({{ $result['id'] }})
-            </a>
-        @endforeach
-    </div>
-</div>
-@elseif($searchTerm)
-<div id="search-results-message"><b>搜尋結果</b>：找不到符合「{{ e($searchTerm) }}」的資料。</div>
-@endif
+<div class="main-container">
+    <!-- Header Section -->
+    <div class="header-section">
+        <h1 class="site-title">中國歷代人物傳記資料庫</h1>
+        <p class="site-subtitle">China Biographical Database Project (CBDB)</p>
 
-<div id="AuthorityContainer">
-    <div id="person-anchor">
-        <span id="person-anchor-text">CBDB</span>
+        @if(!empty($searchResults))
+        <div class="search-results-section">
+            <div class="search-results-title">
+                搜尋結果@if($searchTerm)：「{{ e($searchTerm) }}」@endif
+            </div>
+            <div>
+                @foreach($searchResults as $result)
+                    <a href="#" class="person-link" data-person-id="{{ $result['id'] }}">
+                        {{ e($result['label']) }} <span class="badge">{{ $result['id'] }}</span>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+        @elseif($searchTerm)
+        <div class="alert-box alert-warning">
+            <strong>搜尋結果：</strong>找不到符合「{{ e($searchTerm) }}」的資料。
+        </div>
+        @endif
     </div>
 
-    <div id="Div_CBDB_PersonInfo">
-        <div id="person-content">載入中…</div>
+    <!-- Content Section -->
+    <div class="content-section">
+        <div id="Div_CBDB_PersonInfo">
+            <div id="person-content" class="loading-message">
+                <p>載入中…</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Section -->
+    <div class="footer-section">
+        © China Biographical Database. Except where otherwise noted, content on this site is licensed under a <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license</a>.
     </div>
 </div>
 
@@ -43,8 +325,6 @@ var searchTermData = @json($searchTerm);
 (function () {
     var personId = '';
 
-    var anchorText = document.getElementById('person-anchor-text');
-
     function setPersonId(newId) {
         if (!newId) {
             return;
@@ -54,26 +334,18 @@ var searchTermData = @json($searchTerm);
             return;
         }
         personId = normalized;
-        if (anchorText) {
-            anchorText.textContent = personId;
-        }
         updateSearchResultHighlight();
     }
 
     function updateSearchResultHighlight() {
-        var links = document.querySelectorAll('.person-search-result');
+        var links = document.querySelectorAll('.person-link');
         Array.prototype.forEach.call(links, function (link) {
-            link.style.display = 'inline-block';
-            link.style.marginRight = '18px';
-            link.style.textDecoration = 'none';
             if (link.getAttribute('data-person-id') === personId) {
                 link.classList.add('is-current');
                 link.setAttribute('aria-current', 'true');
-                link.style.fontWeight = 'bold';
             } else {
                 link.classList.remove('is-current');
                 link.removeAttribute('aria-current');
-                link.style.fontWeight = 'normal';
             }
         });
     }
@@ -111,7 +383,7 @@ var searchTermData = @json($searchTerm);
             return '';
         }
         if (label && id) {
-            return escapeHtml(label) + '(Id: ' + escapeHtml(id) + ')';
+            return escapeHtml(label) + ' <span class="badge">ID: ' + escapeHtml(id) + '</span>';
         }
         return escapeHtml(label || id || '');
     }
@@ -122,84 +394,89 @@ var searchTermData = @json($searchTerm);
     }
 
     function line(label, value) {
-        return '<div><b>' + label + '</b>: ' + (value || '<span class="empty">（空）</span>') + '</div>';
+        return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + (value || '<span class="empty">（空）</span>') + '</span></div>';
     }
 
     function renderBasicInfo(info) {
-        var rows = [];
-        rows.push(line('CBDB ID', escapeHtml(info.PersonId)));
-        var names = '/' + escapeHtml(info.ChName || '') + '/' + escapeHtml(info.EngName || '');
-        rows.push(line('索引/中文/英文名稱', names));
-        rows.push(line('指數年 (index year)', escapeHtml(info.IndexYear)));
+        var html = '<div class="section-block"><div class="section-header">基本資訊</div><div class="section-content">';
+        html += line('CBDB ID', escapeHtml(info.PersonId));
+        var names = escapeHtml(info.ChName || '') + ' / ' + escapeHtml(info.EngName || '');
+        html += line('中文名 / 英文名', names);
+        html += line('指數年', escapeHtml(info.IndexYear));
         var indexAddrParts = [];
         if (info.IndexAddr) {
             indexAddrParts.push(formatIdLabel(info.IndexAddr, info.IndexAddrId));
         }
-        rows.push(line('指數地址 (index address)', indexAddrParts.join(' ')));
+        html += line('指數地址', indexAddrParts.join(' '));
 
         var birthParts = [];
         birthParts.push(formatIdLabel(info.DynastyBirth, info.DynastyBirthId));
         birthParts.push(formatIdLabel(info.EraBirth, info.EraBirthId));
         if (info.EraYearBirth) {
-            birthParts.push(escapeHtml(info.EraYearBirth) + '年');
+            birthParts.push(escapeHtml(info.EraYearBirth) + ' 年');
         }
         if (info.YearBirth) {
             birthParts.push('(' + escapeHtml(info.YearBirth) + ')');
         }
-        rows.push(line('生年', joinParts(birthParts, '')));
+        html += line('生年', joinParts(birthParts, ' '));
 
         var deathParts = [];
         deathParts.push(formatIdLabel(info.DynastyDeath, info.DynastyDeathId));
         deathParts.push(formatIdLabel(info.EraDeath, info.EraDeathId));
         if (info.EraYearDeath) {
-            deathParts.push(escapeHtml(info.EraYearDeath) + '年');
+            deathParts.push(escapeHtml(info.EraYearDeath) + ' 年');
         }
         if (info.YearDeath) {
             deathParts.push('(' + escapeHtml(info.YearDeath) + ')');
         }
-        rows.push(line('卒年', joinParts(deathParts, '')));
+        html += line('卒年', joinParts(deathParts, ' '));
 
-        rows.push(line('享年', escapeHtml(info.YearsLived)));
-        rows.push(line('朝代', formatIdLabel(info.Dynasty, info.DynastyId)));
-        rows.push(line('為女性', info.Gender === '' ? '<span class="empty">（空）</span>' : escapeHtml(info.Gender)));
-        rows.push(line('郡望', info.JunWang ? formatIdLabel(info.JunWang, info.JunWangId) : '<span class="empty">（空）</span>'));
+        html += line('享年', escapeHtml(info.YearsLived));
+        html += line('朝代', formatIdLabel(info.Dynasty, info.DynastyId));
+        html += line('性別', info.Gender === '1' ? '女性' : (info.Gender === '0' ? '男性' : '<span class="empty">（空）</span>'));
+        html += line('郡望', info.JunWang ? formatIdLabel(info.JunWang, info.JunWangId) : '<span class="empty">（空）</span>');
 
         if (info.Notes || info.Source || info.SourcePages) {
-            rows.push('<div>註: ' + (info.Notes ? escapeHtml(info.Notes) : '<span class="empty">（空）</span>') + '</div>');
-
+            if (info.Notes) {
+                html += line('註', escapeHtml(info.Notes));
+            }
             if (info.Source || info.SourcePages) {
-                rows.push('<div><b>人名權威資料鏈接</b>: ' +
+                html += line('人名權威資料鏈接',
                     (info.Source ? escapeHtml(info.Source) : '<span class="empty">（空）</span>') +
-                    (info.SourcePages ? '，頁 ' + escapeHtml(info.SourcePages) : '') +
-                    '</div>');
+                    (info.SourcePages ? '，頁 ' + escapeHtml(info.SourcePages) : ''));
             }
         }
 
-        return '<hr>' + rows.join('');
+        html += '</div></div>';
+        return html;
     }
 
     function renderSources(title, items) {
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
+            var itemHtml = '<div class="item-box">';
             var pieces = [];
             if (item.Source) {
-                var sourceLabel = item.Source;
+                var sourceLabel = escapeHtml(item.Source);
                 if (item.SourceId) {
-                    sourceLabel += '(Id: ' + item.SourceId + ')';
+                    sourceLabel += ' <span class="badge">ID: ' + escapeHtml(item.SourceId) + '</span>';
                 }
-                pieces.push('<nobr>' + escapeHtml(sourceLabel) + '</nobr>');
+                pieces.push(sourceLabel);
             }
             if (item.Pages) {
                 pieces.push('頁 ' + escapeHtml(item.Pages));
             }
+            itemHtml += (pieces.length ? pieces.join('，') : '<span class="empty">（空）</span>');
             if (item.Notes) {
-                pieces.push(escapeHtml(item.Notes));
+                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
             }
-            html += '<div>' + (pieces.length ? pieces.join('，') : '<span class="empty">（空）</span>') + '</div>';
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -207,21 +484,25 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var text = items.map(function (item) {
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
+        items.forEach(function (item) {
             var parts = [];
             if (item.AliasType) {
-                var aliasType = item.AliasType;
+                var aliasType = '<strong>' + escapeHtml(item.AliasType) + '</strong>';
                 if (item.AliasTypeId) {
-                    aliasType += '(Id:' + item.AliasTypeId + ')';
+                    aliasType += ' <span class="badge">ID: ' + escapeHtml(item.AliasTypeId) + '</span>';
                 }
                 parts.push(aliasType);
             }
             if (item.AliasName) {
-                parts.push(item.AliasName);
+                parts.push(escapeHtml(item.AliasName));
             }
-            return escapeHtml(parts.join(''));
-        }).join('，');
-        return '<hr><div><b>' + title + '</b>: ' + (text || '<span class="empty">（空）</span>') + '</div>';
+            if (parts.length > 0) {
+                html += '<div class="item-box">' + parts.join('：') + '</div>';
+            }
+        });
+        html += '</div></div>';
+        return html;
     }
 
     function buildAddressPath(item) {
@@ -230,64 +511,68 @@ var searchTermData = @json($searchTerm);
             var nameKey = 'belongs' + i + '_name';
             var idKey = 'belongs' + i + '_id';
             if (item[nameKey]) {
-                var label = item[nameKey];
+                var label = escapeHtml(item[nameKey]);
                 if (item[idKey]) {
-                    label += '(Id: ' + item[idKey] + ')';
+                    label += ' <span class="badge">ID: ' + escapeHtml(item[idKey]) + '</span>';
                 }
                 path.push(label);
             }
         }
         if (item.AddrName) {
-            var addr = item.AddrName;
+            var addr = escapeHtml(item.AddrName);
             if (item.AddrId) {
-                addr += '(' + item.AddrId + ')';
+                addr += ' <span class="badge">' + escapeHtml(item.AddrId) + '</span>';
             }
             path.push(addr);
         }
-        return path.map(escapeHtml).join(' / ');
+        return path.join(' → ');
     }
 
     function renderAddresses(title, items) {
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
-            var headerParts = [];
+            var itemHtml = '<div class="item-box">';
             if (item.AddrType) {
-                var typeLabel = item.AddrType;
+                var typeLabel = '<strong>' + escapeHtml(item.AddrType) + '</strong>';
                 if (item.AddrTypeId !== undefined) {
-                    typeLabel += '(Id:' + item.AddrTypeId + ')';
+                    typeLabel += ' <span class="badge">ID: ' + escapeHtml(item.AddrTypeId) + '</span>';
                 }
-                headerParts.push('<b>' + escapeHtml(typeLabel) + '</b>');
+                itemHtml += typeLabel + '<br>';
             }
             var path = buildAddressPath(item);
-            var body = headerParts.join(' ') + (path ? ': ' + path : '');
+            if (path) {
+                itemHtml += path;
+            }
             var extra = [];
             if (item.MoveCount) {
-                extra.push('順序 ' + escapeHtml(item.MoveCount));
+                extra.push('順序：' + escapeHtml(item.MoveCount));
             }
             if (item.FirstYear) {
-                extra.push('起始年 ' + escapeHtml(item.FirstYear));
+                extra.push('起始年：' + escapeHtml(item.FirstYear));
             }
             if (item.LastYear) {
-                extra.push('終止年 ' + escapeHtml(item.LastYear));
+                extra.push('終止年：' + escapeHtml(item.LastYear));
             }
             if (extra.length) {
-                body += '（' + extra.join('，') + '）';
+                itemHtml += '<div class="small-text mt-2">' + extra.join('，') + '</div>';
             }
             if (item.Source) {
-                var src = '出處: ' + escapeHtml(item.Source);
+                var src = '出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
                     src += '，頁 ' + escapeHtml(item.Pages);
                 }
-                body += '<br>' + src;
+                itemHtml += '<div class="small-text mt-1">' + src + '</div>';
             }
             if (item.Notes) {
-                body += '<br>註: ' + escapeHtml(item.Notes);
+                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
             }
-            html += '<div>▪ ' + body + '</div>';
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -295,48 +580,49 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
-        items.forEach(function (item, index) {
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
+        items.forEach(function (item) {
+            var itemHtml = '<div class="item-box">';
             var pieces = [];
             if (item.EntryType) {
-                var entry = item.EntryType;
+                var entry = '<strong>' + escapeHtml(item.EntryType) + '</strong>';
                 if (item.EntryTypeId) {
-                    entry += '(Id:' + item.EntryTypeId + ')';
+                    entry += ' <span class="badge">ID: ' + escapeHtml(item.EntryTypeId) + '</span>';
                 }
-                pieces.push('<b>' + escapeHtml(entry) + '</b>');
+                pieces.push(entry);
             }
             if (item.EntryCode) {
-                var code = item.EntryCode;
+                var code = escapeHtml(item.EntryCode);
                 if (item.EntryCodeId) {
-                    code += '(' + item.EntryCodeId + ')';
+                    code += ' <span class="badge">' + escapeHtml(item.EntryCodeId) + '</span>';
                 }
-                pieces.push(escapeHtml(code));
+                pieces.push(code);
             }
+            itemHtml += pieces.join('：');
             var tail = [];
             if (item.RuShiYear) {
-                tail.push('年份 ' + escapeHtml(item.RuShiYear));
+                tail.push('年份：' + escapeHtml(item.RuShiYear));
             }
             if (item.RuShiAge) {
-                tail.push('年齡 ' + escapeHtml(item.RuShiAge));
+                tail.push('年齡：' + escapeHtml(item.RuShiAge));
             }
-            var detail = pieces.join(': ');
             if (tail.length) {
-                detail += '（' + tail.join('，') + '）';
+                itemHtml += '<div class="small-text mt-2">' + tail.join('，') + '</div>';
             }
             if (item.Source) {
-                detail += '<br>出處: ' + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
-                    detail += '，頁 ' + escapeHtml(item.Pages);
+                    itemHtml += '，頁 ' + escapeHtml(item.Pages);
                 }
+                itemHtml += '</div>';
             }
             if (item.Notes) {
-                detail += '<br>註: ' + escapeHtml(item.Notes);
+                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
             }
-            if (index > 0) {
-                html += '<div><hr></div>';
-            }
-            html += '<div>▪ ' + detail + '</div>';
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -344,65 +630,70 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
-            var header = '▪ ';
+            var itemHtml = '<div class="item-box">';
+            var header = '';
             if (item.FirstYearRange) {
-                header += escapeHtml(item.FirstYearRange) + ' ';
+                header += '<span class="badge me-2">' + escapeHtml(item.FirstYearRange) + '</span>';
             } else if (item.FirstYear) {
-                header += escapeHtml(item.FirstYear) + ' ';
+                header += '<span class="badge me-2">' + escapeHtml(item.FirstYear) + '</span>';
             } else {
-                header += '未詳 ';
+                header += '<span class="badge me-2">未詳</span>';
             }
             if (item.OfficeName) {
-                header += '<b>' + escapeHtml(item.OfficeName) + '</b>';
+                header += '<strong>' + escapeHtml(item.OfficeName) + '</strong>';
             }
+            itemHtml += header;
             var details = [];
             if (item.FirstYear || item.FirstYearNianhao || item.FirstYearNiaohaoYear) {
                 var startParts = [];
                 if (item.FirstYearNianhao) {
-                    startParts.push(item.FirstYearNianhao);
+                    startParts.push(escapeHtml(item.FirstYearNianhao));
                 }
                 if (item.FirstYearNiaohaoYear) {
-                    startParts.push(item.FirstYearNiaohaoYear + '年');
+                    startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + ' 年');
                 }
                 if (item.FirstYear) {
-                    startParts.push('(' + item.FirstYear + ')');
+                    startParts.push('(' + escapeHtml(item.FirstYear) + ')');
                 }
-                details.push('起始年: ' + escapeHtml(startParts.join(' ')));
+                details.push('起始年：' + startParts.join(' '));
             } else {
-                details.push('起始年: 未詳');
+                details.push('起始年：未詳');
             }
             if (item.LastYear || item.LastYearNianhao || item.LastYearNianhaoYear) {
                 var endParts = [];
                 if (item.LastYearNianhao) {
-                    endParts.push(item.LastYearNianhao);
+                    endParts.push(escapeHtml(item.LastYearNianhao));
                 }
                 if (item.LastYearNianhaoYear) {
-                    endParts.push(item.LastYearNianhaoYear + '年');
+                    endParts.push(escapeHtml(item.LastYearNianhaoYear) + ' 年');
                 }
                 if (item.LastYear) {
-                    endParts.push('(' + item.LastYear + ')');
+                    endParts.push('(' + escapeHtml(item.LastYear) + ')');
                 }
-                details.push('終止年: ' + escapeHtml(endParts.join(' ')));
+                details.push('終止年：' + endParts.join(' '));
             } else {
-                details.push('終止年: 未詳');
+                details.push('終止年：未詳');
             }
             if (item.AddrName) {
-                details.push('地點: <b>' + escapeHtml(item.AddrName) + '</b>');
+                details.push('地點：<strong>' + escapeHtml(item.AddrName) + '</strong>');
             }
             if (item.Source) {
-                var src = '出處: ' + escapeHtml(item.Source);
+                var src = '出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
                     src += '，頁 ' + escapeHtml(item.Pages);
                 }
                 details.push(src);
             }
             if (item.Notes) {
-                details.push('註: ' + escapeHtml(item.Notes));
+                details.push('註：' + escapeHtml(item.Notes));
             }
-            html += '<div>' + header + '<br>' + details.join('<br>') + '</div>';
+            itemHtml += '<div class="small-text mt-2">' + details.join('<br>') + '</div>';
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -410,24 +701,25 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
             var text = [];
             if (item.StatusName) {
-                var label = item.StatusName;
+                var label = '<strong>' + escapeHtml(item.StatusName) + '</strong>';
                 if (item.StatusId) {
-                    label += '(Id: ' + item.StatusId + ')';
+                    label += ' <span class="badge">ID: ' + escapeHtml(item.StatusId) + '</span>';
                 }
                 text.push(label);
             }
             if (item.FirstYear) {
-                text.push('起始年 ' + item.FirstYear);
+                text.push('起始年：' + escapeHtml(item.FirstYear));
             }
             if (item.LastYear) {
-                text.push('終止年 ' + item.LastYear);
+                text.push('終止年：' + escapeHtml(item.LastYear));
             }
-            html += '<div>' + (text.length ? escapeHtml(text.join('，')) : '<span class="empty">（空）</span>') + '</div>';
+            html += '<div class="item-box">' + (text.length ? text.join('，') : '<span class="empty">（空）</span>') + '</div>';
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -435,24 +727,30 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
+            var itemHtml = '<div class="item-box">';
             var relation = item.KinRelName || item.KinRel || '親屬';
             var person = item.KinPersonName || '';
-            var line = relation + ': ' + person;
+            itemHtml += '<strong>' + escapeHtml(relation) + '：</strong>' + escapeHtml(person);
             var extras = [];
             if (item.Source) {
-                var src = '出處: ' + item.Source;
+                var src = '出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '（頁 ' + item.Pages + '）';
+                    src += '（頁 ' + escapeHtml(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push('註: ' + item.Notes);
+                extras.push('註：' + escapeHtml(item.Notes));
             }
-            html += '<div>' + escapeHtml(line) + (extras.length ? '<br>' + escapeHtml(extras.join('； ')) : '') + '</div>';
+            if (extras.length) {
+                itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
+            }
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -460,36 +758,41 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
+            var itemHtml = '<div class="item-box">';
             var base = [];
             if (item.AssocName) {
-                base.push(item.AssocName);
+                base.push('<strong>' + escapeHtml(item.AssocName) + '</strong>');
             }
             if (item.AssocPersonName) {
-                base.push(item.AssocPersonName);
+                base.push(escapeHtml(item.AssocPersonName));
             }
             if (item.TextTitle) {
-                base.push('【' + item.TextTitle + '】');
+                base.push('【' + escapeHtml(item.TextTitle) + '】');
             }
             if (item.Year) {
-                base.push('年份 ' + item.Year);
+                base.push('<span class="badge">年份：' + escapeHtml(item.Year) + '</span>');
             }
-            var line = base.join(' ');
+            itemHtml += base.join(' ');
             var extras = [];
             if (item.Source) {
-                var src = '出處: ' + item.Source;
+                var src = '出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '（頁 ' + item.Pages + '）';
+                    src += '（頁 ' + escapeHtml(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push('註: ' + item.Notes);
+                extras.push('註：' + escapeHtml(item.Notes));
             }
-            html += '<div>▪ ' + (line ? escapeHtml(line) : '<span class="empty">（空）</span>') +
-                (extras.length ? '<br>' + escapeHtml(extras.join('； ')) : '') + '</div>';
+            if (extras.length) {
+                itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
+            }
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -497,34 +800,38 @@ var searchTermData = @json($searchTerm);
         if (!Array.isArray(items) || items.length === 0) {
             return '';
         }
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
+            var itemHtml = '<div class="item-box">';
             var line = [];
             if (item.TextName) {
-                var name = item.TextName;
+                var name = '<strong>' + escapeHtml(item.TextName) + '</strong>';
                 if (item.TextId) {
-                    name += ':';
+                    name += ' <span class="badge">ID: ' + escapeHtml(item.TextId) + '</span>';
                 }
-                line.push('<b>' + escapeHtml(name) + '</b>');
+                line.push(name);
             }
             if (item.Year) {
-                line.push('著作年代: ' + escapeHtml(item.Year));
+                line.push('著作年代：' + escapeHtml(item.Year));
             }
             if (item.Role) {
-                line.push('角色: ' + escapeHtml(item.Role));
+                line.push('角色：' + escapeHtml(item.Role));
             }
-            var details = line.join('，');
+            itemHtml += line.join('，');
             if (item.Source) {
-                details += '<br>出處: ' + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">出處：' + escapeHtml(item.Source);
                 if (item.Pages) {
-                    details += '，頁 ' + escapeHtml(item.Pages);
+                    itemHtml += '，頁 ' + escapeHtml(item.Pages);
                 }
+                itemHtml += '</div>';
             }
             if (item.Notes) {
-                details += '<br>註: ' + escapeHtml(item.Notes);
+                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
             }
-            html += '<div>' + details + '</div>';
+            itemHtml += '</div>';
+            html += itemHtml;
         });
+        html += '</div></div>';
         return html;
     }
 
@@ -549,7 +856,7 @@ var searchTermData = @json($searchTerm);
             return '';
         }
 
-        var html = '<hr><div><b>' + title + '</b>:</div>';
+        var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
 
         items.forEach(function (item) {
             var segments = [];
@@ -559,12 +866,12 @@ var searchTermData = @json($searchTerm);
                     return;
                 }
                 var label = key;
-                segments.push(escapeHtml(label) + ': ' + escapeHtml(value));
+                segments.push(escapeHtml(label) + '：' + escapeHtml(value));
             });
-            html += '<div>' + (segments.length ? '▪ ' + segments.join('； ') : '<span class="empty">（空）</span>') + '</div>';
+            html += '<div class="item-box">' + (segments.length ? segments.join('； ') : '<span class="empty">（空）</span>') + '</div>';
         });
 
-        html += '';
+        html += '</div></div>';
         return html;
     }
 
@@ -577,13 +884,13 @@ var searchTermData = @json($searchTerm);
             return '';
         }
         var href = 'https://newarchive.ihp.sinica.edu.tw/sncaccgi/sncacFtp?ACTION=TQ,sncacFtpqf,SN=' + encodeURIComponent(first.Pages) + ',2nd,search_simple';
-        var link = '<a href="' + escapeHtml(href) + '">跳轉</a>';
-        return '<hr><div><b>' + title + '</b>: ' + link + '</div>';
+        var link = '<a href="' + escapeHtml(href) + '" class="btn btn-primary btn-sm" target="_blank">跳轉至來源</a>';
+        return '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">' + link + '</div></div>';
     }
 
     function renderPerson(person) {
         if (!person) {
-        return '找不到對應人物。';
+            return '<div class="alert-box alert-danger">找不到對應人物。</div>';
         }
 
         var html = renderBasicInfo(person.BasicInfo || {});
@@ -598,7 +905,7 @@ var searchTermData = @json($searchTerm);
         html += renderCollection('社會關係', (person.PersonSocialAssociation && person.PersonSocialAssociation.Association) || []);
         html += renderCollection('著述', (person.PersonTexts && person.PersonTexts.Text) || []);
 
-        html += '<hr>需要原始 JSON？請使用 <code>?id=' + escapeHtml(String(personId)) + '&amp;o=json</code>';
+        html += '<div class="api-info-box"><strong>需要原始 JSON？</strong>請使用 <code>?id=' + escapeHtml(String(personId)) + '&amp;o=json</code></div>';
 
         return html;
     }
@@ -608,9 +915,9 @@ var searchTermData = @json($searchTerm);
 
         if (!personId) {
             if (searchTermData && searchResultsData.length === 0) {
-                content.innerHTML = '找不到符合條件的資料。';
+                content.innerHTML = '<div class="alert-box alert-warning">找不到符合條件的資料。</div>';
             } else {
-                content.innerHTML = '請選擇人物。';
+                content.innerHTML = '<div class="alert-box alert-info">請選擇人物。</div>';
             }
             return;
         }
@@ -646,12 +953,12 @@ var searchTermData = @json($searchTerm);
                 if (error && typeof error.json === 'function') {
                     error.json().then(function (data) {
                         var message = (data && data.error && data.error.message) || '載入失敗。';
-                        content.innerHTML = escapeHtml(message);
+                        content.innerHTML = '<div class="alert-box alert-danger">' + escapeHtml(message) + '</div>';
                     }).catch(function () {
-                        content.innerHTML = '載入失敗。';
+                        content.innerHTML = '<div class="alert-box alert-danger">載入失敗。</div>';
                     });
                 } else {
-                    content.innerHTML = '載入失敗。';
+                    content.innerHTML = '<div class="alert-box alert-danger">載入失敗。</div>';
                 }
             });
     }
@@ -666,7 +973,10 @@ var searchTermData = @json($searchTerm);
 
     document.addEventListener('click', function (event) {
         var target = event.target;
-        if (target && target.classList && target.classList.contains('person-search-result')) {
+        while (target && !target.classList.contains('person-link')) {
+            target = target.parentElement;
+        }
+        if (target && target.classList.contains('person-link')) {
             event.preventDefault();
             loadPerson(target.getAttribute('data-person-id'));
         }
@@ -676,5 +986,8 @@ var searchTermData = @json($searchTerm);
     requestPersonData();
 })();
 </script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

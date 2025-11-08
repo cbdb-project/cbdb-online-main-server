@@ -494,6 +494,24 @@ LEFT JOIN View_Address AS ADDR
          OR ADDR.c_firstyear IS NULL
          OR BIOG_ADDR_DATA.c_lastyear >= ADDR.c_firstyear
      )
+     AND NOT EXISTS (
+         SELECT 1 FROM View_Address VA2
+         WHERE VA2.c_addr_id = ADDR.c_addr_id
+         AND (
+             BIOG_ADDR_DATA.c_firstyear IS NULL
+             OR VA2.c_lastyear IS NULL
+             OR BIOG_ADDR_DATA.c_firstyear <= VA2.c_lastyear
+         )
+         AND (
+             BIOG_ADDR_DATA.c_lastyear IS NULL
+             OR VA2.c_firstyear IS NULL
+             OR BIOG_ADDR_DATA.c_lastyear >= VA2.c_firstyear
+         )
+         AND (
+             VA2.c_firstyear < ADDR.c_firstyear
+             OR (VA2.c_firstyear = ADDR.c_firstyear AND VA2.c_lastyear < ADDR.c_lastyear)
+         )
+     )
 WHERE BIOG_ADDR_DATA.c_personid = ?
 SQL;
     }

@@ -507,23 +507,29 @@ var searchTermData = @json($searchTerm);
 
     function buildAddressPath(item) {
         var path = [];
-        for (var i = 1; i <= 5; i++) {
-            var nameKey = 'belongs' + i + '_name';
-            var idKey = 'belongs' + i + '_id';
-            if (item[nameKey]) {
-                var label = escapeHtml(item[nameKey]);
-                if (item[idKey]) {
-                    label += ' <span class="badge">ID: ' + escapeHtml(item[idKey]) + '</span>';
-                }
-                path.push(label);
-            }
-        }
+        // 先添加具体地点
         if (item.AddrName) {
             var addr = escapeHtml(item.AddrName);
             if (item.AddrId) {
                 addr += ' <span class="badge">' + escapeHtml(item.AddrId) + '</span>';
             }
             path.push(addr);
+        }
+        // 再添加上级地址，从 belongs1 到 belongs5（从小到大）
+        for (var i = 1; i <= 5; i++) {
+            var nameKey = 'belongs' + i + '_name';
+            var idKey = 'belongs' + i + '_id';
+            if (item[nameKey]) {
+                // 如果遇到 [未詳] 或 ID 为 0，停止渲染
+                if (item[nameKey] === '[未詳]' || item[idKey] === '0' || item[idKey] === 0) {
+                    break;
+                }
+                var label = escapeHtml(item[nameKey]);
+                if (item[idKey]) {
+                    label += ' <span class="badge">ID: ' + escapeHtml(item[idKey]) + '</span>';
+                }
+                path.push(label);
+            }
         }
         return path.join(' → ');
     }

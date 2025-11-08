@@ -36,24 +36,36 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
                     <tr>
                         <td>{{ $key+1 }}</td>
                         <td>{{ $value->c_title_chn }}</td>
-                        <td>{{ $c_pages_view }}</td>
+                        <td>
+                            @if($value->c_url_api && $value->c_textid)
+                                @php
+                                    $url_part = $c_pages_view;
+                                    if (preg_match('/[\x{4e00}-\x{9fff}]/u', $url_part)) {
+                                        $url_part = rawurlencode($url_part);
+                                    }
+                                    $full_url = $value->c_url_api . $url_part . ($value->c_url_api_coda ?? '');
+                                @endphp
+                                <a href="{{ $full_url }}" target="_blank">{{ $c_pages_view }}</a>
+                            @else
+                                {{ $c_pages_view }}
+                            @endif
+                        </td>
                         @auth
                             @if(Auth::user()->is_active == 1)
-                                <td>
-                                    <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}">edit</a>
-                                        <a href=""
-                                           onclick="
-                                                   let msg = '您真的确定要删除吗？\n\n请确认！';
-                                                   if (confirm(msg)===true){
-                                                       event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages }}').submit();
-                                                   }else{
-                                                       return false;
-                                                   }
-                                                   "
-                                           class="btn btn-sm btn-danger">delete</a>
-
+                        <td>
+                            <div class="btn-group">
+                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}">edit</a>
+                                <a href=""
+                                   onclick="
+                                           let msg = '您真的确定要删除吗？\n\n请确认！';
+                                           if (confirm(msg)===true){
+                                               event.preventDefault();
+                                               document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages }}').submit();
+                                           }else{
+                                               return false;
+                                           }
+                                           "
+                                   class="btn btn-sm btn-danger">delete</a>
                                     </div>
                                     <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages }}" action="{{ route('basicinformation.sources.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_textid."-".$value->pivot->c_pages]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}

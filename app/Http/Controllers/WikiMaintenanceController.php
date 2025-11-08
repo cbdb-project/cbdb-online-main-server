@@ -39,12 +39,15 @@ class WikiMaintenanceController extends Controller
         }
 
         $page = (int) $request->input('page', 1);
-        $perPage = 10;
+        $perPage = 20;
 
-        // 查询指定 source_id 的记录
-        $query = DB::table('BIOG_SOURCE_DATA')
-            ->where('c_textid', $sourceId)
-            ->orderBy('c_personid');
+        // 查询指定 source_id 的记录，关联人名信息和文本链接信息
+        $query = DB::table('BIOG_SOURCE_DATA as bsd')
+            ->leftJoin('BIOG_MAIN as bm', 'bsd.c_personid', '=', 'bm.c_personid')
+            ->leftJoin('TEXT_CODES as tc', 'bsd.c_textid', '=', 'tc.c_textid')
+            ->select('bsd.*', 'bm.c_name_chn', 'tc.c_url_api', 'tc.c_url_api_coda')
+            ->where('bsd.c_textid', $sourceId)
+            ->orderBy('bsd.c_personid');
 
         $total = $query->count();
         $records = $query->skip(($page - 1) * $perPage)

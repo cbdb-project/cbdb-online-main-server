@@ -36,16 +36,16 @@ class CbdbApiController extends Controller
                     'searchResults' => [],
                     'searchTerm' => '',
                     'validationErrors' => $validator->errors()->all(),
-                ], 400);
+                ], 422);
             } else {
                 // JSON/XML mode: return JSON error
                 return response()->json([
                     'error' => [
-                        'code' => 400,
+                        'code' => 422,
                         'message' => 'Validation failed.',
                         'details' => $validator->errors()->all(),
                     ],
-                ], 400);
+                ], 422);
             }
         }
 

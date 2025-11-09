@@ -14,6 +14,7 @@ return [
         'ASSUME_OFFICE_CODES',
         'BIOG_ADDR_CODES',
         'BIOG_INST_CODES',
+        'CBDB_NAME_LIST',
         'CHORONYM_CODES',
         'COUNTRY_CODES',
         'DYNASTIES',

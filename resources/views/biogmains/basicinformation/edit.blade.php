@@ -384,37 +384,53 @@
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                @auth
+                    @if(Auth::user()->is_active == 1)
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-10">
+                                <button type="submit" class="btn btn-default">Submit</button>
+                            </div>
+                        </div>
+                    @endif
+                @endauth
+
+            </form>
+            @auth
+                @if(Auth::user()->is_active == 1)
+                    <div class="btn-group pull-right">
+                        <a href=""
+                           onclick="
+                                       let msg = '您真的确定要删除吗？\n\n请确认！';
+                                       if (confirm(msg)===true){
+                                       event.preventDefault();
+                                       document.getElementById('delete-form').submit();
+                                       }else{
+                                       return false;
+                                       }
+                                       "
+                           class="btn btn-danger">Delete</a>
+
                     </div>
-                </div>
-
-            </form>
-            <div class="btn-group pull-right">
-                <a href=""
-                   onclick="
-                               let msg = '您真的确定要删除吗？\n\n请确认！';
-                               if (confirm(msg)===true){
-                               event.preventDefault();
-                               document.getElementById('delete-form').submit();
-                               }else{
-                               return false;
-                               }
-                               "
-                   class="btn btn-danger">Delete</a>
-
-            </div>
-            <div class="btn-group pull-right">
-                <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
-            </div>
-            <div class="btn-group pull-right">
-                <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Duplicate Basic Info</a>
-            </div>
-            <form id="delete-form" action="{{ route('basicinformation.destroy', ['id' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
-                {{ method_field('DELETE') }}
-                {{ csrf_field() }}
-            </form>
+                @endif
+            @endauth
+            @auth
+                @if(Auth::user()->is_active == 1)
+                    <div class="btn-group pull-right">
+                        <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
+                    </div>
+                    <div class="btn-group pull-right">
+                        <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Duplicate Basic Info</a>
+                    </div>
+                @endif
+            @endauth
+            @auth
+                @if(Auth::user()->is_active == 1)
+                    <form id="delete-form" action="{{ route('basicinformation.destroy', ['id' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
+                        {{ method_field('DELETE') }}
+                        {{ csrf_field() }}
+                    </form>
+                @endif
+            @endauth
         </div>
     </div>
 @endsection

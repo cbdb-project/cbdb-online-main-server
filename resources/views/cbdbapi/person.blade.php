@@ -179,9 +179,9 @@
         }
 
         .alert-danger {
-            background-color: #f5f5f5;
-            border-color: #999;
-            color: #333;
+            background-color: #ffebee;
+            border-color: #ef5350;
+            color: #c62828;
         }
 
         .api-info-box {
@@ -282,7 +282,16 @@
         <h1 class="site-title">中國歷代人物傳記資料庫</h1>
         <p class="site-subtitle">China Biographical Database Project (CBDB)</p>
 
-        @if(!empty($searchResults))
+        @if(!empty($validationErrors ?? []))
+        <div class="alert-box alert-danger">
+            <strong>錯誤：</strong>
+            <ul style="margin: 10px 0 0 20px; padding: 0;">
+                @foreach($validationErrors as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @elseif(!empty($searchResults))
         <div class="search-results-section">
             <div class="search-results-title">
                 搜尋結果@if($searchTerm)：「{{ e($searchTerm) }}」@endif

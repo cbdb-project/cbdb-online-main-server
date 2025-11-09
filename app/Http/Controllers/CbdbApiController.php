@@ -14,7 +14,11 @@ class CbdbApiController extends Controller
         $mode = strtolower((string) $request->query('mode', $request->query('o', 'html')));
 
         $validator = Validator::make($request->all(), [
-            'id' => ['nullable', 'integer', 'min:1'],
+            'id' => ['nullable', 'regex:/^\d{1,7}$/', function ($attribute, $value, $fail) {
+                if ((int) $value < 1) {
+                    $fail('The id must be at least 1.');
+                }
+            }],
             'name' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -24,7 +28,26 @@ class CbdbApiController extends Controller
             }
         });
 
-        $validator->validate();
+        if ($validator->fails()) {
+            if (!in_array($mode, ['json', 'xml'], true)) {
+                // HTML mode: return error page
+                return response()->view('cbdbapi.person', [
+                    'personId' => '',
+                    'searchResults' => [],
+                    'searchTerm' => '',
+                    'validationErrors' => $validator->errors()->all(),
+                ], 400);
+            } else {
+                // JSON/XML mode: return JSON error
+                return response()->json([
+                    'error' => [
+                        'code' => 400,
+                        'message' => 'Validation failed.',
+                        'details' => $validator->errors()->all(),
+                    ],
+                ], 400);
+            }
+        }
 
         $idParam = $request->query('id');
         $nameParam = $request->query('name');

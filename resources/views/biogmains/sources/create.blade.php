@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                    <label for="c_textid" class="col-sm-2 control-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_textid" required>
                         </select>
@@ -34,7 +34,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="c_female" class="col-sm-2 control-label">是主要出處</label>
+                    <label for="c_main_source" class="col-sm-2 control-label">是主要出處</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_main_source">
                             <option value=0>0-否
@@ -43,7 +43,7 @@
                             </option>
                         </select>
                     </div>
-                    <label for="c_ethnicity_code" class="col-sm-2 control-label">是本人傳記</label>
+                    <label for="c_self_bio" class="col-sm-2 control-label">是本人傳記</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_self_bio">
                             <option value="0">0-否

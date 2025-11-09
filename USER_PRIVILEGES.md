@@ -18,8 +18,7 @@
 ## 二、帳號角色（`users.is_admin`）
 | 值 | 名稱 / 定位 | 主要行為 |
 |----|-------------|-----------|
-| `0` | 一般用戶 | 只要 `is_active = 1` 即可直接對 `/basicinformation/*`、`/codes/*` 等模組進行新增 / 修改，
-               Controller 會直接呼叫對應的 Repository → Model，寫入資料表並留下操作紀錄。 |
+| `0` | 一般用戶 | 只要 `is_active = 1` 即可直接對 `/basicinformation/*`、`/codes/*` 等模組進行新增 / 修改，Controller 會直接呼叫對應的 Repository → Model，寫入資料表並留下操作紀錄。 |
 | `1` | 專家用戶（管理員） | 擁有一般用戶權限；另外可：<br>• 進入 `/manage` 調整帳號啟用 / 角色。<br>• 在 `/operations`、`/modified` 審核提案（核准 / 退修）、執行操作復原。<br>• 存取 `/merge-preview` 等管理工具。 |
 | `2` | 眾包用戶 | 前台頁面可編輯，但 Controller 會偵測 `is_admin == 2`，把提交內容轉成 `operations`（`crowdsourcing_status = 2`），等待專家審核後套用，並不直接寫主資料表。 |
 

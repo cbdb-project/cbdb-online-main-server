@@ -16,7 +16,6 @@ use App\Dynasty;
 use App\EntryCode;
 use App\EventCode;
 use App\KinshipCode;
-use App\NameList;
 use App\OfficeCode;
 use App\SocialInst;
 use App\StatusCode;

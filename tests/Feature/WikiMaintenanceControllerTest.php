@@ -32,6 +32,9 @@ class WikiMaintenanceControllerTest extends TestCase
         // 设置缓存为数组驱动
         config(['cache.default' => 'array']);
 
+        // 使用数组驱动避免文件权限问题
+        config(['session.driver' => 'array']);
+
         // 创建必要的表结构
         $this->createTestTables();
 
@@ -82,11 +85,49 @@ class WikiMaintenanceControllerTest extends TestCase
             $table->primary(['c_personid', 'c_textid']);
         });
 
+        // 创建 TEXT_CODES 表
+        Schema::create('TEXT_CODES', function (Blueprint $table) {
+            $table->integer('c_textid')->primary();
+            $table->string('c_title_chn', 255)->nullable();
+            $table->string('c_url_api', 500)->nullable();
+            $table->string('c_url_api_coda', 100)->nullable();
+            $table->timestamps();
+        });
+
         // 插入测试数据
         \DB::table('BIOG_MAIN')->insert([
             ['c_personid' => 12345, 'c_name_chn' => '司马光', 'c_name_eng' => 'Sima Guang'],
             ['c_personid' => 12346, 'c_name_chn' => '苏轼', 'c_name_eng' => 'Su Shi'],
             ['c_personid' => 12347, 'c_name_chn' => '朱熹', 'c_name_eng' => 'Zhu Xi'],
+        ]);
+
+        // 插入 TEXT_CODES 测试数据
+        \DB::table('TEXT_CODES')->insert([
+            [
+                'c_textid' => 60795,
+                'c_title_chn' => '中文維基百科 (Wikipedia)',
+                'c_url_api' => 'https://zh.wikipedia.org/wiki/',
+                'c_url_api_coda' => ''
+            ],
+            [
+                'c_textid' => 68942,
+                'c_title_chn' => '維基數據 (Wikidata)',
+                'c_url_api' => 'https://www.wikidata.org/wiki/',
+                'c_url_api_coda' => ''
+            ],
+            [
+                'c_textid' => 68943,
+                'c_title_chn' => '英文維基百科 (Wikipedia)',
+                'c_url_api' => 'https://en.wikipedia.org/wiki/',
+                'c_url_api_coda' => ''
+            ],
+        ]);
+
+        // 插入一些 BIOG_SOURCE_DATA 测试数据
+        \DB::table('BIOG_SOURCE_DATA')->insert([
+            ['c_personid' => 12345, 'c_textid' => 60795, 'c_pages' => '司马光', 'c_notes' => 'Test note 1'],
+            ['c_personid' => 12346, 'c_textid' => 68942, 'c_pages' => 'Q123456', 'c_notes' => 'Test note 2'],
+            ['c_personid' => 12347, 'c_textid' => 68943, 'c_pages' => 'Zhu_Xi', 'c_notes' => 'Test note 3'],
         ]);
     }
 

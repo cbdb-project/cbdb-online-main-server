@@ -9,47 +9,21 @@
         <div class="row" style="margin-bottom: 20px;">
             @foreach($targetSourceIds as $id)
             <div class="col-md-4">
-                <div class="info-box">
-                    <span class="info-box-icon bg-{{ $id == 60795 ? 'blue' : ($id == 68942 ? 'green' : 'orange') }}">
-                        <i class="fa fa-{{ $id == 68942 ? 'globe' : 'wikipedia-w' }}"></i>
-                    </span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">{{ $sourceNames[$id] }}</span>
-                        <span class="info-box-number">{{ number_format($stats[$id]) }} 筆記錄</span>
+                <a href="{{ route('admin.wiki-maintenance', ['source_id' => $id]) }}" style="text-decoration: none;">
+                    <div class="info-box{{ $currentSourceId == $id ? ' info-box-selected' : '' }}">
+                        <span class="info-box-icon bg-{{ $id == 60795 ? 'blue' : ($id == 68942 ? 'green' : 'orange') }}">
+                            <i class="fa fa-{{ $id == 68942 ? 'globe' : 'wikipedia-w' }}"></i>
+                        </span>
+                        <div class="info-box-content">
+                            <span class="info-box-text">{{ $sourceNames[$id] }}</span>
+                            <span class="info-box-number">{{ number_format($stats[$id]) }} 筆記錄</span>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             @endforeach
         </div>
 
-        {{-- 來源選擇和操作按鈕 --}}
-        <div class="row" style="margin-bottom: 20px;">
-            <div class="col-md-12">
-                <form method="GET" action="{{ route('admin.wiki-maintenance') }}" class="form-inline" style="margin-bottom: 15px;">
-                    <div class="form-group">
-                        <label for="source_id">選擇資料來源：</label>
-                        <select name="source_id" id="source_id" class="form-control" onchange="this.form.submit()">
-                            @foreach($targetSourceIds as $id)
-                                <option value="{{ $id }}" {{ $currentSourceId == $id ? 'selected' : '' }}>
-                                    {{ $sourceNames[$id] }} ({{ number_format($stats[$id]) }} 筆)
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </form>
-
-                <div class="btn-group" role="group">
-                    <form method="POST" action="{{ route('admin.wiki-maintenance.delete-all') }}" style="display: inline;">
-                        {{ csrf_field() }}
-                        <input type="hidden" name="source_id" value="{{ $currentSourceId }}">
-                        <button type="submit" class="btn btn-danger"
-                                onclick="return confirm('確定要刪除「{{ $sourceNames[$currentSourceId] }}」的所有 {{ number_format($stats[$currentSourceId]) }} 筆記錄嗎？此操作無法復原！')">
-                            <i class="fa fa-trash"></i> 全部刪除 ({{ $sourceNames[$currentSourceId] }})
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
 
         {{-- URL 導入功能 --}}
         <div class="row" style="margin-bottom: 20px;">
@@ -67,7 +41,7 @@
                             <div class="form-group">
                                 <label for="import_url" class="col-sm-2 control-label">資料 URL：</label>
                                 <div class="col-sm-8">
-                                    <input type="url" name="import_url" id="import_url" class="form-control"
+                                    <input type="text" name="import_url" id="import_url" class="form-control"
                                            placeholder="https://cbdb-dev.linshuang.net/wikidata_20251105.json.gz"
                                            required>
                                     <span class="help-block">
@@ -91,10 +65,25 @@
 
                             <div class="form-group">
                                 <div class="col-sm-offset-2 col-sm-10">
-                                    <button type="submit" class="btn btn-info" id="import-btn">
-                                        <i class="fa fa-download"></i> 下載並導入資料
-                                    </button>
-                                    <span class="help-block">
+                                    <div class="btn-toolbar" role="toolbar">
+                                        <div class="btn-group" role="group">
+                                            <button type="submit" class="btn btn-info" id="import-btn">
+                                                <i class="fa fa-download"></i> 下載並導入資料
+                                            </button>
+                                        </div>
+                                        <div class="btn-group pull-right" role="group">
+                                            <form method="POST" action="{{ route('admin.wiki-maintenance.delete-all') }}" style="display: inline;">
+                                                {{ csrf_field() }}
+                                                <input type="hidden" name="source_id" value="{{ $currentSourceId }}">
+                                                <button type="submit" class="btn btn-danger"
+                                                        onclick="return confirm('確定要刪除「{{ $sourceNames[$currentSourceId] }}」的所有 {{ number_format($stats[$currentSourceId]) }} 筆記錄嗎？此操作無法復原！')">
+                                                    <i class="fa fa-trash"></i> 全部刪除 ({{ $sourceNames[$currentSourceId] }})
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="clearfix"></div>
+                                    <span class="help-block" style="margin-top: 10px;">
                                         <strong>注意：</strong>此操作將先清空目標來源的所有現有記錄，然後導入新資料。請確保備份重要資料。
                                     </span>
                                 </div>
@@ -159,13 +148,9 @@
                 <thead>
                     <tr>
                         <th>人物 ID</th>
+                        <th>人名(CHN)</th>
                         <th>文本 ID</th>
-                        <th>頁碼</th>
-                        <th>來源</th>
-                        <th>創建者</th>
-                        <th>創建日期</th>
-                        <th>修改者</th>
-                        <th>修改日期</th>
+                        <th>頁碼（標題/ID）</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,17 +161,26 @@
                                     {{ $record->c_personid }}
                                 </a>
                             </td>
+                            <td>{{ $record->c_name_chn ?? '-' }}</td>
                             <td>{{ $record->c_textid }}</td>
-                            <td>{{ $record->c_pages ?? '-' }}</td>
-                            <td>{{ $record->c_source ?? '-' }}</td>
-                            <td>{{ $record->c_created_by ?? '-' }}</td>
-                            <td>{{ $record->c_created_date ?? '-' }}</td>
-                            <td>{{ $record->c_modified_by ?? '-' }}</td>
-                            <td>{{ $record->c_modified_date ?? '-' }}</td>
+                            <td>
+                                @if($record->c_url_api && $record->c_textid && $record->c_pages)
+                                    @php
+                                        $url_part = $record->c_pages;
+                                        if (preg_match('/[\x{4e00}-\x{9fff}]/u', $url_part)) {
+                                            $url_part = rawurlencode($url_part);
+                                        }
+                                        $full_url = $record->c_url_api . $url_part . ($record->c_url_api_coda ?? '');
+                                    @endphp
+                                    <a href="{{ $full_url }}" target="_blank">{{ $record->c_pages }}</a>
+                                @else
+                                    {{ $record->c_pages ?? '-' }}
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted">沒有找到記錄</td>
+                            <td colspan="4" class="text-center text-muted">沒有找到記錄</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -257,6 +251,56 @@
         @endif
     </div>
 </div>
+@endsection
+
+@section('css')
+<style>
+.info-box {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.info-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.info-box-selected {
+    border: 3px solid #3c8dbc;
+    box-shadow: 0 2px 8px rgba(60, 141, 188, 0.3);
+}
+
+.info-box-selected:hover {
+    border-color: #2f7ba8;
+    box-shadow: 0 4px 12px rgba(60, 141, 188, 0.5);
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+.btn-toolbar {
+    margin-bottom: 0;
+}
+
+.btn-toolbar .btn-group {
+    display: inline-block;
+    vertical-align: top;
+}
+
+@media (max-width: 768px) {
+    .btn-toolbar .btn-group.pull-right {
+        float: none !important;
+        display: block;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .btn-toolbar .btn-group .btn {
+        margin-bottom: 5px;
+    }
+}
+</style>
 @endsection
 
 @section('js')

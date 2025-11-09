@@ -9,7 +9,22 @@
 @php
 $row->c_notes = unionPKDef($row->c_notes);
 $row->c_pages = unionPKDef($row->c_pages);
+$wikiSourceIds = [60795, 68942, 68943];
+$isWikiSource = in_array($row->c_textid, $wikiSourceIds);
 @endphp
+
+            {{-- Wiki数据源警告 --}}
+            @if($isWikiSource)
+                <div class="alert alert-warning alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <strong><i class="fa fa-exclamation-triangle"></i> 警告：</strong>
+                    本記錄為批量導入的 Wiki 對照資料，如果修改此記錄，下次導入時會丟失您的修改。
+                    請確認是否需要進行手動修改。
+                </div>
+            @endif
+
             <form action="{{ route('basicinformation.sources.update', [$id, $row->c_personid."-".$row->c_textid."-".$row->c_pages]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}

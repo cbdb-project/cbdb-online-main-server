@@ -253,6 +253,27 @@ class BiogMainRepository
             $names_json = json_encode($arr);
             return $names_json;
         }
+
+        // 20251109優化：當輸入為純數字時，直接按 c_personid 精確查詢，避免複雜的多條件搜尋
+        if (ctype_digit($request->q)) {
+            $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
+                ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+                ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
+                ->leftJoin('ALTNAME_DATA as A1', function($join) {
+                    $join->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
+                         ->where('A1.c_alt_name_type_code', '=', 4);
+                })
+                ->leftJoin('ALTNAME_DATA as A2', function($join) {
+                    $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
+                         ->where('A2.c_alt_name_type_code', '=', 5);
+                })
+                ->where('BIOG_MAIN.c_personid', '=', $request->q)
+                ->groupBy('BIOG_MAIN.c_personid')
+                ->paginate($num);
+            $names->appends(['q' => $request->q])->links();
+            return $names;
+        }
+
         //20210827修改拼音檢索時以字為單位
         //$names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
         //20211112註記，已得到查詢條件，維持SQL LeftJoin的特性，一次性提供完整資料。

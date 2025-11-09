@@ -4,13 +4,13 @@
 
 ## 開發指南(2025 更新)
 
-* [AGENTS 指南](./AGENTS.md)
+* [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
+* [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
 * [AdminLTE 在 CBDB Online 項目中的使用分析](./ADMINLTE.md)
 * [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
 * [CHANGELOG](./CHANGELOG.md)
 * [代碼表格前端實作比較](./CODES.md)
 * [代碼表界面白名單維護](./CODES_TABLES.md)
-* [資料庫結構說明](./DATABASE_SCHEMA.md)
 * [Posting/Office 流程備忘](./POSTING_OFFICE.md)
 * [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
 * [使用者權限說明](./USER_PRIVILEGES.md)
@@ -22,6 +22,22 @@
 * [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
 * [MERGE 工具說明](./MERGE.md)
 * [檢視表總覽](./VIEWS.md)
+
+## 技術環境
+
+### 生產環境
+- **PHP**: 7.x
+- **Laravel**: 5.5
+- **數據庫**: MariaDB 10.3.39 (Debian)
+- **Web Server**: Caddy
+- **Node.js**: 12.x
+
+### 數據庫兼容性原則
+⚠️ **重要**：為保持未來遷移到其他數據庫實現的靈活性，請遵循以下原則：
+- 避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件）
+- 優先使用標準 SQL 語法
+- 如需使用數據庫特性，應在代碼中提供降級方案或文檔說明
+- 索引策略應基於通用的 B-Tree 或其他跨數據庫支持的類型
 
 ## 原始说明
 

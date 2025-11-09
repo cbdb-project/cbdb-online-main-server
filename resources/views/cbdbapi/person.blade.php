@@ -330,6 +330,7 @@
 var searchResultsData = @json($searchResults);
 var initialPersonIdData = @json($personId);
 var searchTermData = @json($searchTerm);
+var hasValidationErrors = @json(isset($validationErrors) && !empty($validationErrors));
 
 (function () {
     var personId = '';
@@ -1011,7 +1012,11 @@ var searchTermData = @json($searchTerm);
     });
 
     updateSearchResultHighlight();
-    requestPersonData();
+
+    // Only request person data if there are no validation errors
+    if (!hasValidationErrors) {
+        requestPersonData();
+    }
 })();
 </script>
 

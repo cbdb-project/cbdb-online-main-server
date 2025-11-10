@@ -192,17 +192,22 @@ curl "https://cbdb.example.com/cbdbapi/person.php?id=abc123&o=json"
 
 **觸發條件**：
 - 找不到對應的人物記錄
+- 查詢的 ID 已經被合併到其他人物
 
 **JSON 模式回應範例**：
 ```json
 {
   "error": {
     "code": 404,
-    "message": "Person not found."
+    "message": "Person not found.",
+    "merge_hint": {
+      "merged_to_person_id": 12345,
+      "reason": "Duplicate record merged"
+    }
   }
 }
 ```
 
 **HTML 模式回應**：
-- 對於 `id` 查詢：顯示「找不到該人物」的提示頁面
+- 對於 `id` 查詢：顯示「找不到該人物」的提示頁面；若該 ID 已被合併，會顯示藍色提醒框，列出新的 CBDB ID 並附上合併理由（若存在），可直接點擊前往該人物
 - 對於 `name` 查詢：顯示「找不到符合條件的人物」提示

@@ -939,6 +939,20 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         return html;
     }
 
+    function renderMergeHintBox(hint) {
+        if (!hint || !hint.merged_to_person_id) {
+            return '';
+        }
+        var mergedId = String(hint.merged_to_person_id);
+        var link = '<a href="?id=' + encodeURIComponent(mergedId) + '" class="person-link" data-person-id="' + escapeHtml(mergedId) + '">ID ' + escapeHtml(mergedId) + '</a>';
+        var html = '<div class="alert-box alert-info"><strong>提示：</strong>此 ID 已合併至 ' + link + '。';
+        if (hint.reason) {
+            html += '<div class="small-text mt-2">理由：' + escapeHtml(hint.reason) + '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
     function requestPersonData() {
         var content = document.getElementById('person-content');
 
@@ -981,8 +995,11 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             .catch(function (error) {
                 if (error && typeof error.json === 'function') {
                     error.json().then(function (data) {
-                        var message = (data && data.error && data.error.message) || '載入失敗。';
-                        content.innerHTML = '<div class="alert-box alert-danger">' + escapeHtml(message) + '</div>';
+                        var errorPayload = data && data.error ? data.error : null;
+                        var message = (errorPayload && errorPayload.message) || '載入失敗。';
+                        var html = '<div class="alert-box alert-danger">' + escapeHtml(message) + '</div>';
+                        html += renderMergeHintBox(errorPayload && errorPayload.merge_hint);
+                        content.innerHTML = html;
                     }).catch(function () {
                         content.innerHTML = '<div class="alert-box alert-danger">載入失敗。</div>';
                     });

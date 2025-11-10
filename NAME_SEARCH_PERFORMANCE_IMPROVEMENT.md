@@ -83,7 +83,7 @@ WHERE search_term LIKE '石%'  -- 預計 3ms
 CREATE TABLE CBDB_NAME_SEARCH_FTS (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     c_personid INT NOT NULL,
-    name_type_code SMALLINT UNSIGNED NOT NULL,
+    name_type_code SMALLINT UNSIGNED NULL,
     name_type_desc VARCHAR(32) NOT NULL,
     name_type_desc_chn VARCHAR(32) NOT NULL,
     search_term VARCHAR(100) NOT NULL,
@@ -101,12 +101,8 @@ CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS(name_type_code);
 
 ### name_type_code 欄位說明與對應描述
 
-| 值 | 類型 | 來源表/欄位 |
-|----|------|------------|
-| 1 | 本名 | `BIOG_MAIN.c_name_chn` |
-| 2 | 字 | `ALTNAME_DATA` (c_alt_name_type_code=4) |
-| 3 | 號 | `ALTNAME_DATA` (c_alt_name_type_code=5) |
-| 4 | 其他別名 | `ALTNAME_DATA` (其他 type_code) |
+- **本名**：`name_type_code` 為 `NULL`，來源固定為 `BIOG_MAIN`
+- **別名**：`name_type_code` 直接沿用 `ALTNAME_DATA.c_alt_name_type_code`，例如 `4=字`、`5=號`，其他數值依 `ALTNAME_CODES` 定義
 
 對應的描述欄位建議如下：
 
@@ -156,17 +152,17 @@ INSERT INTO CBDB_NAME_SEARCH_FTS (
     search_term, full_name, source, source_key, is_simplified
 ) VALUES
 -- 本名（完整 + 後綴）
-(1762, 1, 'main_name', '本名', '王安石', '王安石', 'biog_main', 'biog_main:1762', 0),
-(1762, 1, 'main_name', '本名', '安石', '王安石', 'biog_main', 'biog_main:1762', 0),
-(1762, 1, 'main_name', '本名', '石', '王安石', 'biog_main', 'biog_main:1762', 0),
+(1762, NULL, 'main_name', '本名', '王安石', '王安石', 'biog_main', 'biog_main:1762', 0),
+(1762, NULL, 'main_name', '本名', '安石', '王安石', 'biog_main', 'biog_main:1762', 0),
+(1762, NULL, 'main_name', '本名', '石', '王安石', 'biog_main', 'biog_main:1762', 0),
 
 -- 字（完整 + 後綴）
-(1762, 2, 'zi', '字', '介甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
-(1762, 2, 'zi', '字', '甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
+(1762, 4, 'zi', '字', '介甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
+(1762, 4, 'zi', '字', '甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
 
 -- 號（完整）
-(1762, 3, 'hao', '號', '半山', '半山', 'altname_data', 'altname:1762-5-半山', 0),
-(1762, 3, 'hao', '號', '山', '半山', 'altname_data', 'altname:1762-5-半山', 0);
+(1762, 5, 'hao', '號', '半山', '半山', 'altname_data', 'altname:1762-5-半山', 0),
+(1762, 5, 'hao', '號', '山', '半山', 'altname_data', 'altname:1762-5-半山', 0);
 
 -- 查詢「石」
 SELECT DISTINCT c_personid, full_name, name_type_code
@@ -175,7 +171,7 @@ WHERE search_term LIKE '石%'
 ORDER BY LENGTH(search_term) DESC, c_personid;
 
 -- 結果：
--- 1762, "王安石", 1  (匹配到 search_term="石")
+-- 1762, "王安石", NULL  (匹配到 search_term="石")
 ```
 
 ---
@@ -440,11 +436,11 @@ class RebuildNameSearchIndex extends Command
     {
         $records = [];
         $typeMeta = [
-            1 => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
-            2 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
-            3 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
-            4 => ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'],
+            'main' => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
+            4 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
+            5 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
         ];
+        $defaultAltMeta = ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'];
 
         // 1. 本名
         if ($person->c_surname && $person->c_mingzi) {
@@ -456,12 +452,12 @@ class RebuildNameSearchIndex extends Command
             foreach ($suffixes as $suffix) {
                 $records[] = [
                     'c_personid' => $person->c_personid,
-                    'name_type_code' => 1,
-                    'name_type_desc' => $typeMeta[1]['desc'],
-                    'name_type_desc_chn' => $typeMeta[1]['desc_chn'],
+                    'name_type_code' => null,
+                    'name_type_desc' => $typeMeta['main']['desc'],
+                    'name_type_desc_chn' => $typeMeta['main']['desc_chn'],
                     'search_term' => $suffix,
                     'full_name' => $person->c_name_chn,
-                    'source' => $typeMeta[1]['source'],
+                    'source' => $typeMeta['main']['source'],
                     'source_key' => "biog_main:{$person->c_personid}",
                     'is_simplified' => 0,
                     'created_at' => now(),
@@ -475,23 +471,20 @@ class RebuildNameSearchIndex extends Command
             ->get();
 
         foreach ($altnames as $alt) {
-            $type = match($alt->c_alt_name_type_code) {
-                4 => 2,  // 字
-                5 => 3,  // 號
-                default => 4,  // 其他別名
-            };
+            $typeCode = (int) $alt->c_alt_name_type_code;
+            $meta = $typeMeta[$typeCode] ?? $defaultAltMeta;
 
             $suffixes = $this->splitAltname($alt->c_alt_name_chn);
 
             foreach ($suffixes as $suffix) {
                 $records[] = [
                     'c_personid' => $person->c_personid,
-                    'name_type_code' => $type,
-                    'name_type_desc' => $typeMeta[$type]['desc'],
-                    'name_type_desc_chn' => $typeMeta[$type]['desc_chn'],
+                    'name_type_code' => $typeCode,
+                    'name_type_desc' => $meta['desc'],
+                    'name_type_desc_chn' => $meta['desc_chn'],
                     'search_term' => $suffix,
                     'full_name' => $alt->c_alt_name_chn,
-                    'source' => $typeMeta[$type]['source'],
+                    'source' => $meta['source'],
                     'source_key' => "altname:{$person->c_personid}-{$alt->c_alt_name_type_code}-{$alt->c_alt_name_chn}",
                     'is_simplified' => 0,
                     'created_at' => now(),
@@ -528,19 +521,14 @@ class RebuildNameSearchIndex extends Command
     protected function displayStatistics()
     {
         $stats = DB::table('CBDB_NAME_SEARCH_FTS')
-            ->selectRaw('name_type_code, COUNT(*) as count')
-            ->groupBy('name_type_code')
+            ->selectRaw('COALESCE(name_type_desc_chn, "本名") AS label, COUNT(*) as count')
+            ->groupBy('label')
             ->get();
 
         $this->table(
             ['類型', '記錄數'],
             $stats->map(fn($s) => [
-                match($s->name_type_code) {
-                    1 => '本名',
-                    2 => '字',
-                    3 => '號',
-                    4 => '別名',
-                },
+                $s->label ?? '本名',
                 number_format($s->count)
             ])
         );
@@ -618,11 +606,11 @@ use Illuminate\Support\Facades\DB;
 class NameSearchIndexService
 {
     protected $typeMeta = [
-        1 => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
-        2 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
-        3 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
-        4 => ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'],
+        'main' => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
+        4 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
+        5 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
     ];
+    protected $defaultAltMeta = ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'];
 
     public function indexPerson($person)
     {
@@ -635,7 +623,7 @@ class NameSearchIndexService
             // 刪除舊索引
             DB::table('CBDB_NAME_SEARCH_FTS')
                 ->where('c_personid', $person->c_personid)
-                ->where('name_type_code', 1)  // 只刪除本名
+                ->whereNull('name_type_code')  // 只刪除本名
                 ->delete();
 
             // 重建索引
@@ -652,11 +640,7 @@ class NameSearchIndexService
 
     public function indexAltname(int $personId, int $typeCode, string $altname, ?string $sourceKey = null)
     {
-        $type = match($typeCode) {
-            4 => 2,
-            5 => 3,
-            default => 4,
-        };
+        $meta = $this->typeMeta[$typeCode] ?? $this->defaultAltMeta;
 
         $suffixes = $this->splitAltname($altname);
         $records = [];
@@ -664,12 +648,12 @@ class NameSearchIndexService
         foreach ($suffixes as $suffix) {
             $records[] = [
                 'c_personid' => $personId,
-                'name_type_code' => $type,
-                'name_type_desc' => $this->typeMeta[$type]['desc'],
-                'name_type_desc_chn' => $this->typeMeta[$type]['desc_chn'],
+                'name_type_code' => $typeCode,
+                'name_type_desc' => $meta['desc'],
+                'name_type_desc_chn' => $meta['desc_chn'],
                 'search_term' => $suffix,
                 'full_name' => $altname,
-                'source' => $this->typeMeta[$type]['source'],
+                'source' => $meta['source'],
                 'source_key' => $sourceKey ?? "altname:{$personId}-{$typeCode}-{$altname}",
                 'is_simplified' => 0,
                 'created_at' => now(),
@@ -782,10 +766,9 @@ class NameSearchIndexController extends Controller
             ->count('c_personid');
 
         $byType = DB::table('CBDB_NAME_SEARCH_FTS')
-            ->selectRaw('name_type_code, COUNT(*) as count')
-            ->groupBy('name_type_code')
-            ->get()
-            ->mapWithKeys(fn($item) => [$item->name_type_code => $item->count]);
+            ->selectRaw('COALESCE(name_type_desc, "main_name") AS type_key, COALESCE(name_type_desc_chn, "本名") AS type_label, COUNT(*) as count')
+            ->groupBy('type_key', 'type_label')
+            ->get();
 
         $tableSize = DB::select("
             SELECT
@@ -801,13 +784,13 @@ class NameSearchIndexController extends Controller
             'coverage' => $totalPersons > 0
                 ? round($totalIndexed / $totalPersons * 100, 2)
                 : 0,
-            'total_records' => array_sum($byType->toArray()),
-            'by_type' => [
-                'main_name' => $byType[1] ?? 0,
-                'zi' => $byType[2] ?? 0,
-                'hao' => $byType[3] ?? 0,
-                'altname' => $byType[4] ?? 0,
-            ],
+            'total_records' => $byType->sum('count'),
+            'by_type' => $byType->mapWithKeys(fn($item) => [
+                $item->type_key => [
+                    'label' => $item->type_label,
+                    'count' => $item->count,
+                ],
+            ])->toArray(),
             'table_size_mb' => $tableSize,
             'last_updated' => DB::table('CBDB_NAME_SEARCH_FTS')
                 ->max('created_at'),
@@ -880,22 +863,12 @@ class NameSearchIndexController extends Controller
                         <th>類型</th>
                         <th>記錄數</th>
                     </tr>
-                    <tr>
-                        <td>本名</td>
-                        <td>{{ number_format($stats['by_type']['main_name']) }}</td>
-                    </tr>
-                    <tr>
-                        <td>字</td>
-                        <td>{{ number_format($stats['by_type']['zi']) }}</td>
-                    </tr>
-                    <tr>
-                        <td>號</td>
-                        <td>{{ number_format($stats['by_type']['hao']) }}</td>
-                    </tr>
-                    <tr>
-                        <td>其他別名</td>
-                        <td>{{ number_format($stats['by_type']['altname']) }}</td>
-                    </tr>
+                    @foreach($stats['by_type'] as $typeKey => $item)
+                        <tr>
+                            <td>{{ $item['label'] }} <span class="badge">{{ $typeKey }}</span></td>
+                            <td>{{ number_format($item['count']) }}</td>
+                        </tr>
+                    @endforeach
                 </table>
             </div>
 

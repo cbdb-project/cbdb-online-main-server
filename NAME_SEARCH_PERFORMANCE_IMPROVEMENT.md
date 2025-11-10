@@ -77,26 +77,29 @@ WHERE search_term LIKE '石%'  -- 預計 3ms
 
 ## 三、表結構設計
 
-### CBDB_NAME_SEARCH 表
+### CBDB_NAME_SEARCH_FTS 表
 
 ```sql
-CREATE TABLE CBDB_NAME_SEARCH (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主鍵',
-    c_personid INT NOT NULL COMMENT '人物 ID',
-    name_type TINYINT NOT NULL COMMENT '名字類型：1=本名, 2=字, 3=號, 4=別名',
-    search_term VARCHAR(100) NOT NULL COMMENT '搜尋詞（拆分後的後綴）',
-    full_name VARCHAR(100) NOT NULL COMMENT '完整名字（用於顯示和排序）',
-    created_at TIMESTAMP NULL DEFAULT NULL,
-    updated_at TIMESTAMP NULL DEFAULT NULL,
-
-    INDEX idx_search_term (search_term, c_personid),
-    INDEX idx_personid (c_personid),
-    INDEX idx_name_type (name_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='姓名搜尋倒排索引表';
+CREATE TABLE CBDB_NAME_SEARCH_FTS (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    c_personid INT NOT NULL,
+    name_type_code SMALLINT UNSIGNED NOT NULL,
+    name_type_desc VARCHAR(32) NOT NULL,
+    name_type_desc_chn VARCHAR(32) NOT NULL,
+    search_term VARCHAR(100) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    source VARCHAR(32) NOT NULL,
+    source_key VARCHAR(255) NULL,
+    is_simplified TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX idx_cbdb_name_search_term ON CBDB_NAME_SEARCH_FTS(search_term, c_personid);
+CREATE INDEX idx_cbdb_name_person ON CBDB_NAME_SEARCH_FTS(c_personid);
+CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS(name_type_code);
 ```
 
-### name_type 欄位說明
+### name_type_code 欄位說明與對應描述
 
 | 值 | 類型 | 來源表/欄位 |
 |----|------|------------|
@@ -105,34 +108,74 @@ COMMENT='姓名搜尋倒排索引表';
 | 3 | 號 | `ALTNAME_DATA` (c_alt_name_type_code=5) |
 | 4 | 其他別名 | `ALTNAME_DATA` (其他 type_code) |
 
+對應的描述欄位建議如下：
+
+| 欄位 | 範例值 | 說明 |
+|------|--------|------|
+| `name_type_desc` | `main_name` / `zi` / `hao` / `altname` | 方便後端依英文字串判斷 |
+| `name_type_desc_chn` | `本名` / `字` / `號` / `別名` | 直接呈現在 UI 或報表 |
+| `source` | `biog_main` / `altname_data` | 標記資料來源表 |
+| `source_key` | `biog_main:1762` / `altname:1762-4-介甫` | 以字串保存來源主鍵或複合鍵 |
+| `is_simplified` | 0 / 1 | 0=原文，1=簡化字版本 |
+
+> `ALTNAME_DATA` 無自增鍵，建議統一使用 `altname:{c_personid}-{c_alt_name_type_code}-{c_alt_name_chn}` 形式存入 `source_key`，能唯一對應原始別名紀錄；本名則可用 `biog_main:{c_personid}`。
+
+### 繁簡轉換：CBDB_TRAD_SIMP_MAP
+
+為了支援 `is_simplified=1` 的倒排記錄，建議新增一張通用對照表儲存 OpenCC 釋出的繁簡映射：
+
+```sql
+CREATE TABLE CBDB_TRAD_SIMP_MAP (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    trad_char CHAR(1) NOT NULL,
+    simp_char CHAR(1) NOT NULL,
+    variant_set VARCHAR(64) NOT NULL DEFAULT 'OpenCC',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_trad_variant (trad_char, variant_set),
+    KEY idx_simp_char (simp_char)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+匯入流程：
+1. 下載對應的 OpenCC `TSCharacters.txt`/`STCharacters.txt`。
+2. 將每組字拆成 `trad_char → simp_char` 對（多對多則拆成多列）。
+3. 透過簡單的 seed/command 將資料批量寫入 CBDB_TRAD_SIMP_MAP。
+
+使用方式：
+- 在產生倒排 suffix 時，先寫入繁體字版本（`is_simplified=0`），再以 CBDB_TRAD_SIMP_MAP 查詢對應簡體字重新組合字串、設定 `is_simplified=1` 後寫入同一筆搜尋詞。
+- 查詢時若輸入為簡體，可直接 `WHERE search_term LIKE :input% AND is_simplified=1`；若輸入繁體則比對 `is_simplified=0`。也可在應用層將輸入轉為繁簡各一版並合併結果，以兼容混合輸入。
+
 ### 示例資料
 
 ```sql
 -- 王安石（1021-1086，北宋政治家）
 -- 本名：王安石，字：介甫，號：半山
 
-INSERT INTO CBDB_NAME_SEARCH VALUES
+INSERT INTO CBDB_NAME_SEARCH_FTS (
+    c_personid, name_type_code, name_type_desc, name_type_desc_chn,
+    search_term, full_name, source, source_key, is_simplified
+) VALUES
 -- 本名（完整 + 後綴）
-(NULL, 1001, 1, '王安石', '王安石', NOW(), NOW()),
-(NULL, 1001, 1, '安石', '王安石', NOW(), NOW()),
-(NULL, 1001, 1, '石', '王安石', NOW(), NOW()),
+(1762, 1, 'main_name', '本名', '王安石', '王安石', 'biog_main', 'biog_main:1762', 0),
+(1762, 1, 'main_name', '本名', '安石', '王安石', 'biog_main', 'biog_main:1762', 0),
+(1762, 1, 'main_name', '本名', '石', '王安石', 'biog_main', 'biog_main:1762', 0),
 
 -- 字（完整 + 後綴）
-(NULL, 1001, 2, '介甫', '介甫', NOW(), NOW()),
-(NULL, 1001, 2, '甫', '介甫', NOW(), NOW()),
+(1762, 2, 'zi', '字', '介甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
+(1762, 2, 'zi', '字', '甫', '介甫', 'altname_data', 'altname:1762-4-介甫', 0),
 
 -- 號（完整）
-(NULL, 1001, 3, '半山', '半山', NOW(), NOW()),
-(NULL, 1001, 3, '山', '半山', NOW(), NOW());
+(1762, 3, 'hao', '號', '半山', '半山', 'altname_data', 'altname:1762-5-半山', 0),
+(1762, 3, 'hao', '號', '山', '半山', 'altname_data', 'altname:1762-5-半山', 0);
 
 -- 查詢「石」
-SELECT DISTINCT c_personid, full_name, name_type
-FROM CBDB_NAME_SEARCH
+SELECT DISTINCT c_personid, full_name, name_type_code
+FROM CBDB_NAME_SEARCH_FTS
 WHERE search_term LIKE '石%'
 ORDER BY LENGTH(search_term) DESC, c_personid;
 
 -- 結果：
--- 1001, "王安石", 1  (匹配到 search_term="石")
+-- 1762, "王安石", 1  (匹配到 search_term="石")
 ```
 
 ---
@@ -233,15 +276,15 @@ c_name_rm: "Sū Shì" → ["Sū Shì"]
 
 ```sql
 -- 主查詢索引（複合索引）
-CREATE INDEX idx_search_term ON CBDB_NAME_SEARCH (search_term, c_personid);
+CREATE INDEX idx_cbdb_name_search_term ON CBDB_NAME_SEARCH_FTS (search_term, c_personid);
 ```
 
 **查詢最佳化：**
 ```sql
 -- ✅ 使用索引
-EXPLAIN SELECT * FROM CBDB_NAME_SEARCH
+EXPLAIN SELECT * FROM CBDB_NAME_SEARCH_FTS
 WHERE search_term LIKE '石%';
--- key: idx_search_term (using index)
+-- key: idx_cbdb_name_search_term (using index)
 
 -- ❌ 不使用索引
 WHERE search_term LIKE '%石%';
@@ -252,10 +295,10 @@ WHERE search_term LIKE '%石%';
 
 ```sql
 -- 按人物 ID 查詢（維護時使用）
-CREATE INDEX idx_personid ON CBDB_NAME_SEARCH (c_personid);
+CREATE INDEX idx_cbdb_name_person ON CBDB_NAME_SEARCH_FTS (c_personid);
 
 -- 按名字類型過濾
-CREATE INDEX idx_name_type ON CBDB_NAME_SEARCH (name_type);
+CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS (name_type_code);
 ```
 
 ### 5.3 索引大小估算
@@ -295,7 +338,7 @@ public static function namesByQuery(Request $request, $num=20)
     }
 
     // 新增：使用倒排表搜尋
-    $personIds = DB::table('CBDB_NAME_SEARCH')
+    $personIds = DB::table('CBDB_NAME_SEARCH_FTS')
         ->where('search_term', 'LIKE', $request->q . '%')
         ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
         ->limit(500)  // 限制最多 500 個候選人
@@ -373,7 +416,7 @@ class RebuildNameSearchIndex extends Command
     {
         if ($this->option('force')) {
             $this->warn('清空現有索引資料...');
-            DB::table('CBDB_NAME_SEARCH')->truncate();
+            DB::table('CBDB_NAME_SEARCH_FTS')->truncate();
         }
 
         $chunk = (int) $this->option('chunk');
@@ -396,6 +439,12 @@ class RebuildNameSearchIndex extends Command
     protected function indexPerson($person)
     {
         $records = [];
+        $typeMeta = [
+            1 => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
+            2 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
+            3 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
+            4 => ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'],
+        ];
 
         // 1. 本名
         if ($person->c_surname && $person->c_mingzi) {
@@ -407,11 +456,15 @@ class RebuildNameSearchIndex extends Command
             foreach ($suffixes as $suffix) {
                 $records[] = [
                     'c_personid' => $person->c_personid,
-                    'name_type' => 1,
+                    'name_type_code' => 1,
+                    'name_type_desc' => $typeMeta[1]['desc'],
+                    'name_type_desc_chn' => $typeMeta[1]['desc_chn'],
                     'search_term' => $suffix,
                     'full_name' => $person->c_name_chn,
+                    'source' => $typeMeta[1]['source'],
+                    'source_key' => "biog_main:{$person->c_personid}",
+                    'is_simplified' => 0,
                     'created_at' => now(),
-                    'updated_at' => now(),
                 ];
             }
         }
@@ -433,17 +486,21 @@ class RebuildNameSearchIndex extends Command
             foreach ($suffixes as $suffix) {
                 $records[] = [
                     'c_personid' => $person->c_personid,
-                    'name_type' => $type,
+                    'name_type_code' => $type,
+                    'name_type_desc' => $typeMeta[$type]['desc'],
+                    'name_type_desc_chn' => $typeMeta[$type]['desc_chn'],
                     'search_term' => $suffix,
                     'full_name' => $alt->c_alt_name_chn,
+                    'source' => $typeMeta[$type]['source'],
+                    'source_key' => "altname:{$person->c_personid}-{$alt->c_alt_name_type_code}-{$alt->c_alt_name_chn}",
+                    'is_simplified' => 0,
                     'created_at' => now(),
-                    'updated_at' => now(),
                 ];
             }
         }
 
         if (!empty($records)) {
-            DB::table('CBDB_NAME_SEARCH')->insert($records);
+            DB::table('CBDB_NAME_SEARCH_FTS')->insert($records);
         }
     }
 
@@ -470,15 +527,15 @@ class RebuildNameSearchIndex extends Command
 
     protected function displayStatistics()
     {
-        $stats = DB::table('CBDB_NAME_SEARCH')
-            ->selectRaw('name_type, COUNT(*) as count')
-            ->groupBy('name_type')
+        $stats = DB::table('CBDB_NAME_SEARCH_FTS')
+            ->selectRaw('name_type_code, COUNT(*) as count')
+            ->groupBy('name_type_code')
             ->get();
 
         $this->table(
             ['類型', '記錄數'],
             $stats->map(fn($s) => [
-                match($s->name_type) {
+                match($s->name_type_code) {
                     1 => '本名',
                     2 => '字',
                     3 => '號',
@@ -488,7 +545,7 @@ class RebuildNameSearchIndex extends Command
             ])
         );
 
-        $total = DB::table('CBDB_NAME_SEARCH')->count();
+        $total = DB::table('CBDB_NAME_SEARCH_FTS')->count();
         $this->info("總計：" . number_format($total) . " 條倒排記錄");
     }
 }
@@ -560,6 +617,13 @@ use Illuminate\Support\Facades\DB;
 
 class NameSearchIndexService
 {
+    protected $typeMeta = [
+        1 => ['desc' => 'main_name', 'desc_chn' => '本名', 'source' => 'biog_main'],
+        2 => ['desc' => 'zi', 'desc_chn' => '字', 'source' => 'altname_data'],
+        3 => ['desc' => 'hao', 'desc_chn' => '號', 'source' => 'altname_data'],
+        4 => ['desc' => 'altname', 'desc_chn' => '別名', 'source' => 'altname_data'],
+    ];
+
     public function indexPerson($person)
     {
         // 同 RebuildNameSearchIndex::indexPerson()
@@ -569,9 +633,9 @@ class NameSearchIndexService
     {
         DB::transaction(function() use ($person) {
             // 刪除舊索引
-            DB::table('CBDB_NAME_SEARCH')
+            DB::table('CBDB_NAME_SEARCH_FTS')
                 ->where('c_personid', $person->c_personid)
-                ->where('name_type', 1)  // 只刪除本名
+                ->where('name_type_code', 1)  // 只刪除本名
                 ->delete();
 
             // 重建索引
@@ -581,12 +645,12 @@ class NameSearchIndexService
 
     public function removePerson(int $personId)
     {
-        DB::table('CBDB_NAME_SEARCH')
+        DB::table('CBDB_NAME_SEARCH_FTS')
             ->where('c_personid', $personId)
             ->delete();
     }
 
-    public function indexAltname(int $personId, int $typeCode, string $altname)
+    public function indexAltname(int $personId, int $typeCode, string $altname, ?string $sourceKey = null)
     {
         $type = match($typeCode) {
             4 => 2,
@@ -600,15 +664,19 @@ class NameSearchIndexService
         foreach ($suffixes as $suffix) {
             $records[] = [
                 'c_personid' => $personId,
-                'name_type' => $type,
+                'name_type_code' => $type,
+                'name_type_desc' => $this->typeMeta[$type]['desc'],
+                'name_type_desc_chn' => $this->typeMeta[$type]['desc_chn'],
                 'search_term' => $suffix,
                 'full_name' => $altname,
+                'source' => $this->typeMeta[$type]['source'],
+                'source_key' => $sourceKey ?? "altname:{$personId}-{$typeCode}-{$altname}",
+                'is_simplified' => 0,
                 'created_at' => now(),
-                'updated_at' => now(),
             ];
         }
 
-        DB::table('CBDB_NAME_SEARCH')->insert($records);
+        DB::table('CBDB_NAME_SEARCH_FTS')->insert($records);
     }
 
     protected function splitAltname(string $altname): array
@@ -709,22 +777,22 @@ class NameSearchIndexController extends Controller
     protected function getStatistics()
     {
         $totalPersons = DB::table('BIOG_MAIN')->count();
-        $totalIndexed = DB::table('CBDB_NAME_SEARCH')
+        $totalIndexed = DB::table('CBDB_NAME_SEARCH_FTS')
             ->distinct('c_personid')
             ->count('c_personid');
 
-        $byType = DB::table('CBDB_NAME_SEARCH')
-            ->selectRaw('name_type, COUNT(*) as count')
-            ->groupBy('name_type')
+        $byType = DB::table('CBDB_NAME_SEARCH_FTS')
+            ->selectRaw('name_type_code, COUNT(*) as count')
+            ->groupBy('name_type_code')
             ->get()
-            ->mapWithKeys(fn($item) => [$item->name_type => $item->count]);
+            ->mapWithKeys(fn($item) => [$item->name_type_code => $item->count]);
 
         $tableSize = DB::select("
             SELECT
                 ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
             FROM information_schema.TABLES
             WHERE table_schema = DATABASE()
-            AND table_name = 'CBDB_NAME_SEARCH'
+            AND table_name = 'CBDB_NAME_SEARCH_FTS'
         ")[0]->size_mb ?? 0;
 
         return [
@@ -741,8 +809,8 @@ class NameSearchIndexController extends Controller
                 'altname' => $byType[4] ?? 0,
             ],
             'table_size_mb' => $tableSize,
-            'last_updated' => DB::table('CBDB_NAME_SEARCH')
-                ->max('updated_at'),
+            'last_updated' => DB::table('CBDB_NAME_SEARCH_FTS')
+                ->max('created_at'),
         ];
     }
 }

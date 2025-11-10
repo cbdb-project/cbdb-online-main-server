@@ -50,6 +50,7 @@ class CbdbApiController extends Controller
         }
 
         $idParam = $request->query('id');
+        $requestedNumericId = ($idParam !== null && $idParam !== '') ? (int) $idParam : null;
         $nameParam = $request->query('name');
 
         $searchResults = [];
@@ -80,23 +81,13 @@ class CbdbApiController extends Controller
 
         $personId = $resolvedId ?? $this->resolvePersonId($idParam, $nameParam);
         if ($personId === null) {
-            return response()->json([
-                'error' => [
-                    'code' => 404,
-                    'message' => 'Person not found.',
-                ],
-            ], 404);
+            return $this->jsonPersonNotFoundResponse($requestedNumericId);
         }
 
         $basicInfo = $this->fetchSingle($this->sqlBasicInfo(), [$personId]);
 
         if (!$basicInfo) {
-            return response()->json([
-                'error' => [
-                    'code' => 404,
-                    'message' => 'Person not found.',
-                ],
-            ], 404);
+            return $this->jsonPersonNotFoundResponse($requestedNumericId ?? $personId);
         }
 
         $sources = $this->fetchAll($this->sqlSources(), [$personId]);
@@ -397,6 +388,51 @@ protected function findPersonIdByName(string $name): ?int
                 break;
             }
         }
+    }
+
+    protected function jsonPersonNotFoundResponse(?int $requestedId = null)
+    {
+        $error = [
+            'code' => 404,
+            'message' => 'Person not found.',
+        ];
+
+        if ($requestedId !== null) {
+            $hint = $this->buildMergeHint($requestedId);
+            if ($hint !== null) {
+                $error['merge_hint'] = $hint;
+            }
+        }
+
+        return response()->json(['error' => $error], 404);
+    }
+
+    protected function buildMergeHint(int $personId): ?array
+    {
+        if (!Schema::hasTable('MERGED_PERSON_DATA')) {
+            return null;
+        }
+
+        $record = DB::table('MERGED_PERSON_DATA')
+            ->select('c_personid', 'c_notes')
+            ->where('c_merged_to_personid', $personId)
+            ->orderByDesc('c_modified_date')
+            ->orderByDesc('c_created_date')
+            ->first();
+
+        if (!$record) {
+            return null;
+        }
+
+        $reason = $record->c_notes !== null ? trim((string) $record->c_notes) : null;
+        if ($reason === '') {
+            $reason = null;
+        }
+
+        return [
+            'merged_to_person_id' => (int) $record->c_personid,
+            'reason' => $reason,
+        ];
     }
 
     protected function sqlBasicInfo(): string

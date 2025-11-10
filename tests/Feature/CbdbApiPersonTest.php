@@ -93,6 +93,18 @@ class CbdbApiPersonTest extends TestCase
             $table->string('c_alt_name_chn')->nullable();
         });
 
+        Schema::create('MERGED_PERSON_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_merged_to_personid');
+            $table->text('c_notes')->nullable();
+            $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->string('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->string('c_modified_date')->nullable();
+        });
+
         Schema::create('ADDR_CODES', function (Blueprint $table) {
             $table->integer('c_addr_id')->primary();
             $table->string('c_name')->nullable();
@@ -330,6 +342,7 @@ SQL
         Schema::dropIfExists('NIAN_HAO');
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('ALTNAME_CODES');
+        Schema::dropIfExists('MERGED_PERSON_DATA');
         Schema::dropIfExists('DYNASTIES');
         Schema::dropIfExists('BIOG_MAIN');
 
@@ -399,6 +412,25 @@ SQL
                     'message' => 'Person not found.',
                 ],
             ]);
+    }
+
+    public function test_not_found_returns_merge_hint_when_person_was_merged(): void
+    {
+        $this->seedPersonFixture();
+
+        \DB::table('MERGED_PERSON_DATA')->insert([
+            'c_personid' => 1001,
+            'c_merged_to_personid' => 2000,
+            'c_notes' => 'Duplicate record merged',
+            'c_created_by' => 'tester',
+            'c_created_date' => '20240101',
+        ]);
+
+        $response = $this->getJson('/cbdbapi/person.php?id=2000&o=json');
+
+        $response->assertStatus(404)
+            ->assertJsonFragment(['merged_to_person_id' => 1001])
+            ->assertJsonFragment(['reason' => 'Duplicate record merged']);
     }
 
     public function test_it_returns_person_profile_by_name(): void

@@ -132,6 +132,17 @@ class BiogMainRepository
         return $basicinformation;
     }
 
+    public function byIdWithSources($id)
+    {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])
+            ->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')
+            ->with(['sources' => function ($query) {
+                $query->select('TEXT_CODES.*')->withPivot('c_pages', 'c_notes', 'c_main_source', 'c_self_bio');
+            }])->find($id);
+
+        return $basicinformation;
+    }
+
     public function byIdWithOff($id)
     {
         $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('offices', 'offices_addr')->find($id);

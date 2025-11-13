@@ -29,14 +29,14 @@ class BasicInformationSourcesController extends Controller
      */
     public function index($id)
     {
-        $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
+        $basicinformation = $this->biogMainRepository->byIdWithSources($id);
 
-        $basicinformation = \App\BiogMain::with(['sources' => function($query) {
-            $query->select('TEXT_CODES.*')->withPivot('c_pages', 'c_notes', 'c_main_source', 'c_self_bio');
-        }])->find($id);
+        if (blank($basicinformation)) {
+            abort(404);
+        }
 
         return view('biogmains.sources.index', [
-            'basicinformation' => $basicinformation ?: $biogbasicinformation,
+            'basicinformation' => $basicinformation,
             'page_title' => 'Basicinformation',
             'page_description' => '基本信息表 出處'
         ]);

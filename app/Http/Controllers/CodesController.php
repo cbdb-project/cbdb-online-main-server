@@ -79,7 +79,7 @@ class CodesController extends Controller
         ],
         'MERGED_PERSON_DATA' => [
             'c_personid',
-            'c_merged_to_personid',
+            'c_merged_from_personid',
             'c_notes',
             'c_source',
             'c_pages',

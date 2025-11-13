@@ -415,7 +415,7 @@ protected function findPersonIdByName(string $name): ?int
 
         $record = DB::table('MERGED_PERSON_DATA')
             ->select('c_personid', 'c_notes')
-            ->where('c_merged_to_personid', $personId)
+            ->where('c_merged_from_personid', $personId)
             ->orderByDesc('c_modified_date')
             ->orderByDesc('c_created_date')
             ->first();

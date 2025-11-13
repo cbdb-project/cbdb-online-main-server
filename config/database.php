@@ -52,6 +52,9 @@ return [
             'prefix' => '',
             'strict' => false,
             'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? [
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
+            ] : [],
         ],
 
         'pgsql' => [

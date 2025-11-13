@@ -95,7 +95,7 @@ class CbdbApiPersonTest extends TestCase
 
         Schema::create('MERGED_PERSON_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
-            $table->integer('c_merged_to_personid');
+            $table->integer('c_merged_from_personid');
             $table->text('c_notes')->nullable();
             $table->integer('c_source')->nullable();
             $table->string('c_pages')->nullable();
@@ -420,7 +420,7 @@ SQL
 
         \DB::table('MERGED_PERSON_DATA')->insert([
             'c_personid' => 1001,
-            'c_merged_to_personid' => 2000,
+            'c_merged_from_personid' => 2000,
             'c_notes' => 'Duplicate record merged',
             'c_created_by' => 'tester',
             'c_created_date' => '20240101',

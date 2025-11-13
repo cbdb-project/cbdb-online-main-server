@@ -12,7 +12,7 @@
 
 - **相關資料預覽**  
   額外列出 `ALTNAME_DATA`（別名）與 `KIN_DATA`（親屬）之筆數與內容摘要，並將 `KinID` 連結到對應的人物編輯頁面。頁面也會顯示 `ASSOC_DATA` 對四個欄位（`c_personid`、`c_kin_id`、`c_assoc_id`、`c_assoc_kin_id`）的資料、以及其它會受影響的資料表（如 `BIOG_ADDR_DATA`、`ENTRY_DATA`、`EVENTS_DATA` 等）在保留與來源人物的筆數與前 20 筆 JSON 摘要，以協助評估合併範圍。
-  其中 `MERGED_PERSON_DATA` 額外統計 `c_personid` 與 `c_merged_to_personid` 兩種角色，便於確認歷史合併紀錄。
+  其中 `MERGED_PERSON_DATA` 額外統計 `c_personid` 與 `c_merged_from_personid` 兩種角色，便於確認歷史合併紀錄。
 
 - **SQL 操作預覽**  
   工具會產生兩段 SQL 交易：
@@ -32,7 +32,7 @@
 - `merge_to_min=true` 或勾選「將較大 ID 自動合併至較小 ID」時，頁面僅模擬欄位值，實際 SQL 仍會先以原 ID 順序合併，並在第一段交易完成後另行執行「轉至最小 ID」的交易，避免前端邏輯自動交換 ID。
 - `merge_reason` 欄位會被寫入 `c_notes`、用於複製連結與提示文字，請在此描述合併依據、史料證據或分析方法。
 - 如果 `ALTNAME`、`KIN` 或 `ASSOC` 等表在合併前有待人工比對的差異，管理員可以利用 JSON 摘要快速檢視各欄位，必要時手動調整資料並重新預覽。
-- `MERGED_PERSON_DATA` 會同步列出（`c_personid` 與 `c_merged_to_personid`兩種角色），目前僅保存合併理由（`c_notes`），預設不刪除歷史記錄。
+- `MERGED_PERSON_DATA` 會同步列出（`c_personid` 與 `c_merged_from_personid`兩種角色），目前僅保存合併理由（`c_notes`），預設不刪除歷史記錄。
 
 ## 注意事項
 
@@ -60,7 +60,7 @@
      1. `BEGIN` 交易。
      2. 更新 `BIOG_MAIN`：保留人物欄位與 `c_notes`，刷 `c_modified_*`。
      3. 更新所有關聯表的 `c_personid`（`ASSOC_DATA` 還包含其他欄位）、`MERGED_PERSON_DATA` 等指向。
-        - `MERGED_PERSON_DATA`：以 `INSERT ... ON DUPLICATE KEY UPDATE` 保存 reason，不刪歷史；若 `merge_to_min`，只交換 `c_personid`/`c_merged_to_personid`。
+       - `MERGED_PERSON_DATA`：以 `INSERT ... ON DUPLICATE KEY UPDATE` 保存 reason，不刪歷史；若 `merge_to_min`，只交換 `c_personid`/`c_merged_from_personid`。
      4. 刪除來源人物的 `BIOG_MAIN`。
      5. 若勾選「merge_to_min」，第二段交易把保留人物轉成較小 ID，並更新關聯表與 `MERGED_PERSON_DATA` 的鍵值。
      6. 全程捕捉例外，失敗時 `ROLLBACK`。

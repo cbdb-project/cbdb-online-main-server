@@ -312,18 +312,18 @@ class MergePreviewController extends Controller
 
         if ($mergeRecord) {
             $personIdValue = $this->formatSqlValue($mergeRecord['person_id'] ?? null);
-            $mergedToValue = $this->formatSqlValue($mergeRecord['merged_to'] ?? null);
+            $mergedFromValue = $this->formatSqlValue($mergeRecord['merged_from'] ?? null);
             $noteValue = $this->formatSqlValue($mergeRecord['note'] ?? null);
             $createdByValue = $this->formatSqlValue($mergeRecord['created_by'] ?? null);
             $createdDateValue = $this->formatSqlValue($mergeRecord['created_date'] ?? null);
             $modifiedByValue = $this->formatSqlValue($mergeRecord['modified_by'] ?? null);
             $modifiedDateValue = $this->formatSqlValue($mergeRecord['modified_date'] ?? null);
 
-            if ($personIdValue !== 'NULL' && $mergedToValue !== 'NULL') {
+            if ($personIdValue !== 'NULL' && $mergedFromValue !== 'NULL') {
                 $statements[] = sprintf(
-                    'INSERT INTO MERGED_PERSON_DATA (c_personid, c_merged_to_personid, c_notes, c_source, c_pages, c_created_by, c_created_date, c_modified_by, c_modified_date) VALUES (%s, %s, %s, NULL, NULL, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE c_notes = VALUES(c_notes), c_modified_by = VALUES(c_modified_by), c_modified_date = VALUES(c_modified_date);',
+                    'INSERT INTO MERGED_PERSON_DATA (c_personid, c_merged_from_personid, c_notes, c_source, c_pages, c_created_by, c_created_date, c_modified_by, c_modified_date) VALUES (%s, %s, %s, NULL, NULL, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE c_notes = VALUES(c_notes), c_modified_by = VALUES(c_modified_by), c_modified_date = VALUES(c_modified_date);',
                     $personIdValue,
-                    $mergedToValue,
+                    $mergedFromValue,
                     $noteValue,
                     $createdByValue,
                     $createdDateValue,
@@ -365,13 +365,14 @@ class MergePreviewController extends Controller
                 }
             }
             if ($mergeRecord) {
-                $statements[] = sprintf(
-                    'UPDATE MERGED_PERSON_DATA SET c_personid = %s, c_merged_to_personid = %s WHERE c_personid = %s AND c_merged_to_personid = %s;',
-                    $primaryValue,
-                    $minTargetValue ?? $this->formatSqlValue($minTargetId),
-                    $personIdValue ?? $this->formatSqlValue($mergeRecord['person_id'] ?? null),
-                    $mergedToValue ?? $this->formatSqlValue($mergeRecord['merged_to'] ?? null)
-                );
+                $updatedPersonIdValue = $personIdValue ?? $this->formatSqlValue($mergeRecord['person_id'] ?? null);
+                if ($updatedPersonIdValue !== 'NULL') {
+                    $statements[] = sprintf(
+                        'UPDATE MERGED_PERSON_DATA SET c_personid = %s WHERE c_personid = %s;',
+                        $minTargetValue,
+                        $updatedPersonIdValue
+                    );
+                }
             }
             $statements[] = sprintf('UPDATE BIOG_MAIN SET c_personid = %s WHERE c_personid = %s;', $minTargetValue, $primaryValue);
             $statements[] = 'COMMIT;';
@@ -481,8 +482,8 @@ class MergePreviewController extends Controller
         $mergeReasonText = trim((string)$mergeReason);
         if (!is_null($primaryPersonId) && $primaryPersonId !== '' && !is_null($mergedSourceId) && $mergedSourceId !== '') {
             $mergeRecord = [
-                'person_id' => (int)$mergedSourceId,
-                'merged_to' => (int)$primaryPersonId,
+                'person_id' => (int)$primaryPersonId,
+                'merged_from' => (int)$mergedSourceId,
                 'note' => $mergeReasonText === '' ? null : $mergeReasonText,
                 'reason' => $mergeReason,
                 'created_by' => $result['c_modified_by'],
@@ -684,10 +685,10 @@ class MergePreviewController extends Controller
                     $noteSuffix
                 );
             case 'MERGED_PERSON_DATA':
-                $fromId = $get('c_personid');
-                $toId = $get('c_merged_to_personid');
-                $fromLabel = $this->getPersonLabel($fromId);
+                $toId = $get('c_personid');
+                $fromId = $get('c_merged_from_personid');
                 $toLabel = $this->getPersonLabel($toId);
+                $fromLabel = $this->getPersonLabel($fromId);
                 $reason = trim((string)$get('c_notes'));
                 $reasonSuffix = $reason !== '' ? ' | Reason: '.$reason : '';
                 return sprintf(
@@ -943,7 +944,7 @@ class MergePreviewController extends Controller
             'POSTED_TO_ADDR_DATA' => ['columns' => ['c_personid']],
             'POSTING_DATA' => ['columns' => ['c_personid']],
             'POSTED_TO_OFFICE_DATA' => ['columns' => ['c_personid']],
-            'MERGED_PERSON_DATA' => ['columns' => ['c_personid', 'c_merged_to_personid']],
+            'MERGED_PERSON_DATA' => ['columns' => ['c_personid', 'c_merged_from_personid']],
         ];
         $otherDetails = [];
         foreach ($otherConfigs as $table => $info) {
@@ -1022,7 +1023,7 @@ class MergePreviewController extends Controller
             'posted_to_addr' => ['table' => 'POSTED_TO_ADDR_DATA', 'columns' => ['c_personid']],
             'posting' => ['table' => 'POSTING_DATA', 'columns' => ['c_personid']],
             'posted_to_office' => ['table' => 'POSTED_TO_OFFICE_DATA', 'columns' => ['c_personid']],
-            'merged_person' => ['table' => 'MERGED_PERSON_DATA', 'columns' => ['c_personid', 'c_merged_to_personid']],
+            'merged_person' => ['table' => 'MERGED_PERSON_DATA', 'columns' => ['c_personid', 'c_merged_from_personid']],
         ];
 
         $counts = [

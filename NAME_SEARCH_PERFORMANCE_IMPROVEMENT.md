@@ -77,10 +77,12 @@ WHERE search_term LIKE '石%'  -- 預計 3ms
 
 ## 三、表結構設計
 
-### CBDB_NAME_SEARCH_FTS 表
+### CBDB__NAME_FTS 表
+
+> 命名約定：`CBDB__`（雙底線）前綴代表內部支援/輔助表，不直接對終端使用者曝光，方便 DBA 在 catalog 中一眼辨識。
 
 ```sql
-CREATE TABLE CBDB_NAME_SEARCH_FTS (
+CREATE TABLE CBDB__NAME_FTS (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     c_personid INT NOT NULL,
     name_type_code SMALLINT UNSIGNED NULL,
@@ -94,9 +96,9 @@ CREATE TABLE CBDB_NAME_SEARCH_FTS (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX idx_cbdb_name_search_term ON CBDB_NAME_SEARCH_FTS(search_term, c_personid);
-CREATE INDEX idx_cbdb_name_person ON CBDB_NAME_SEARCH_FTS(c_personid);
-CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS(name_type_code);
+CREATE INDEX idx_cbdb_name_search_term ON CBDB__NAME_FTS(search_term, c_personid);
+CREATE INDEX idx_cbdb_name_person ON CBDB__NAME_FTS(c_personid);
+CREATE INDEX idx_cbdb_name_type ON CBDB__NAME_FTS(name_type_code);
 ```
 
 ### name_type_code 欄位說明與對應描述
@@ -116,29 +118,28 @@ CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS(name_type_code);
 
 > `ALTNAME_DATA` 無自增鍵，建議統一使用 `altname:{c_personid}-{c_alt_name_type_code}-{c_alt_name_chn}` 形式存入 `source_key`，能唯一對應原始別名紀錄；本名則可用 `biog_main:{c_personid}`。
 
-### 繁簡轉換：CBDB_TRAD_SIMP_MAP
+### 繁簡轉換：CBDB__TRAD_SIMP_MAP
 
-為了支援 `is_simplified=1` 的倒排記錄，建議新增一張通用對照表儲存 OpenCC 釋出的繁簡映射：
+（同樣沿用 `CBDB__` 內部前綴，表達此對照表僅供倒排服務使用。）
+
+為了支援 `is_simplified=1` 的倒排記錄，建議新增一張通用對照表儲存 OpenCC 釋出的繁簡映射。需求很單純，實際上只需要兩個欄位即可：
 
 ```sql
-CREATE TABLE CBDB_TRAD_SIMP_MAP (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    trad_char CHAR(1) NOT NULL,
-    simp_char CHAR(1) NOT NULL,
-    variant_set VARCHAR(64) NOT NULL DEFAULT 'OpenCC',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_trad_variant (trad_char, variant_set),
-    KEY idx_simp_char (simp_char)
+CREATE TABLE CBDB__TRAD_SIMP_MAP (
+    trad_char CHAR(1) NOT NULL PRIMARY KEY,
+    simp_char CHAR(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
+> `trad_char` 直接做主鍵即可，表示每個繁體字僅維護一組對應的簡體字；如果之後需要支援多筆對應，可以改成複合主鍵（例如加上 variant_set）或另立一張 mapping table。
+
 匯入流程：
 1. 下載對應的 OpenCC `TSCharacters.txt`/`STCharacters.txt`。
-2. 將每組字拆成 `trad_char → simp_char` 對（多對多則拆成多列）。
-3. 透過簡單的 seed/command 將資料批量寫入 CBDB_TRAD_SIMP_MAP。
+2. 將每組字拆成 `trad_char → simp_char` 對（若一個繁體字對應多個簡體字，就挑選主要字或拆成多列再行決策）。
+3. 透過簡單的 seed/command 將資料批量寫入 `CBDB__TRAD_SIMP_MAP`。
 
 使用方式：
-- 在產生倒排 suffix 時，先寫入繁體字版本（`is_simplified=0`），再以 CBDB_TRAD_SIMP_MAP 查詢對應簡體字重新組合字串、設定 `is_simplified=1` 後寫入同一筆搜尋詞。
+- 在產生倒排 suffix 時，先寫入繁體字版本（`is_simplified=0`），再以 CBDB__TRAD_SIMP_MAP 查詢對應簡體字重新組合字串、設定 `is_simplified=1` 後寫入同一筆搜尋詞。
 - 查詢時若輸入為簡體，可直接 `WHERE search_term LIKE :input% AND is_simplified=1`；若輸入繁體則比對 `is_simplified=0`。也可在應用層將輸入轉為繁簡各一版並合併結果，以兼容混合輸入。
 
 ### 示例資料
@@ -147,7 +148,7 @@ CREATE TABLE CBDB_TRAD_SIMP_MAP (
 -- 王安石（1021-1086，北宋政治家）
 -- 本名：王安石，字：介甫，號：半山
 
-INSERT INTO CBDB_NAME_SEARCH_FTS (
+INSERT INTO CBDB__NAME_FTS (
     c_personid, name_type_code, name_type_desc, name_type_desc_chn,
     search_term, full_name, source, source_key, is_simplified
 ) VALUES
@@ -166,7 +167,7 @@ INSERT INTO CBDB_NAME_SEARCH_FTS (
 
 -- 查詢「石」
 SELECT DISTINCT c_personid, full_name, name_type_code
-FROM CBDB_NAME_SEARCH_FTS
+FROM CBDB__NAME_FTS
 WHERE search_term LIKE '石%'
 ORDER BY LENGTH(search_term) DESC, c_personid;
 
@@ -272,13 +273,13 @@ c_name_rm: "Sū Shì" → ["Sū Shì"]
 
 ```sql
 -- 主查詢索引（複合索引）
-CREATE INDEX idx_cbdb_name_search_term ON CBDB_NAME_SEARCH_FTS (search_term, c_personid);
+CREATE INDEX idx_cbdb_name_search_term ON CBDB__NAME_FTS (search_term, c_personid);
 ```
 
 **查詢最佳化：**
 ```sql
 -- ✅ 使用索引
-EXPLAIN SELECT * FROM CBDB_NAME_SEARCH_FTS
+EXPLAIN SELECT * FROM CBDB__NAME_FTS
 WHERE search_term LIKE '石%';
 -- key: idx_cbdb_name_search_term (using index)
 
@@ -291,10 +292,10 @@ WHERE search_term LIKE '%石%';
 
 ```sql
 -- 按人物 ID 查詢（維護時使用）
-CREATE INDEX idx_cbdb_name_person ON CBDB_NAME_SEARCH_FTS (c_personid);
+CREATE INDEX idx_cbdb_name_person ON CBDB__NAME_FTS (c_personid);
 
 -- 按名字類型過濾
-CREATE INDEX idx_cbdb_name_type ON CBDB_NAME_SEARCH_FTS (name_type_code);
+CREATE INDEX idx_cbdb_name_type ON CBDB__NAME_FTS (name_type_code);
 ```
 
 ### 5.3 索引大小估算
@@ -334,7 +335,7 @@ public static function namesByQuery(Request $request, $num=20)
     }
 
     // 新增：使用倒排表搜尋
-    $personIds = DB::table('CBDB_NAME_SEARCH_FTS')
+    $personIds = DB::table('CBDB__NAME_FTS')
         ->where('search_term', 'LIKE', $request->q . '%')
         ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
         ->limit(500)  // 限制最多 500 個候選人
@@ -412,7 +413,7 @@ class RebuildNameSearchIndex extends Command
     {
         if ($this->option('force')) {
             $this->warn('清空現有索引資料...');
-            DB::table('CBDB_NAME_SEARCH_FTS')->truncate();
+            DB::table('CBDB__NAME_FTS')->truncate();
         }
 
         $chunk = (int) $this->option('chunk');
@@ -493,7 +494,7 @@ class RebuildNameSearchIndex extends Command
         }
 
         if (!empty($records)) {
-            DB::table('CBDB_NAME_SEARCH_FTS')->insert($records);
+            DB::table('CBDB__NAME_FTS')->insert($records);
         }
     }
 
@@ -520,7 +521,7 @@ class RebuildNameSearchIndex extends Command
 
     protected function displayStatistics()
     {
-        $stats = DB::table('CBDB_NAME_SEARCH_FTS')
+        $stats = DB::table('CBDB__NAME_FTS')
             ->selectRaw('COALESCE(name_type_desc_chn, "本名") AS label, COUNT(*) as count')
             ->groupBy('label')
             ->get();
@@ -533,7 +534,7 @@ class RebuildNameSearchIndex extends Command
             ])
         );
 
-        $total = DB::table('CBDB_NAME_SEARCH_FTS')->count();
+        $total = DB::table('CBDB__NAME_FTS')->count();
         $this->info("總計：" . number_format($total) . " 條倒排記錄");
     }
 }
@@ -621,7 +622,7 @@ class NameSearchIndexService
     {
         DB::transaction(function() use ($person) {
             // 刪除舊索引
-            DB::table('CBDB_NAME_SEARCH_FTS')
+            DB::table('CBDB__NAME_FTS')
                 ->where('c_personid', $person->c_personid)
                 ->whereNull('name_type_code')  // 只刪除本名
                 ->delete();
@@ -633,7 +634,7 @@ class NameSearchIndexService
 
     public function removePerson(int $personId)
     {
-        DB::table('CBDB_NAME_SEARCH_FTS')
+        DB::table('CBDB__NAME_FTS')
             ->where('c_personid', $personId)
             ->delete();
     }
@@ -660,7 +661,7 @@ class NameSearchIndexService
             ];
         }
 
-        DB::table('CBDB_NAME_SEARCH_FTS')->insert($records);
+        DB::table('CBDB__NAME_FTS')->insert($records);
     }
 
     protected function splitAltname(string $altname): array
@@ -761,11 +762,11 @@ class NameSearchIndexController extends Controller
     protected function getStatistics()
     {
         $totalPersons = DB::table('BIOG_MAIN')->count();
-        $totalIndexed = DB::table('CBDB_NAME_SEARCH_FTS')
+        $totalIndexed = DB::table('CBDB__NAME_FTS')
             ->distinct('c_personid')
             ->count('c_personid');
 
-        $byType = DB::table('CBDB_NAME_SEARCH_FTS')
+        $byType = DB::table('CBDB__NAME_FTS')
             ->selectRaw('COALESCE(name_type_desc, "main_name") AS type_key, COALESCE(name_type_desc_chn, "本名") AS type_label, COUNT(*) as count')
             ->groupBy('type_key', 'type_label')
             ->get();
@@ -775,7 +776,7 @@ class NameSearchIndexController extends Controller
                 ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
             FROM information_schema.TABLES
             WHERE table_schema = DATABASE()
-            AND table_name = 'CBDB_NAME_SEARCH_FTS'
+            AND table_name = 'CBDB__NAME_FTS'
         ")[0]->size_mb ?? 0;
 
         return [
@@ -792,7 +793,7 @@ class NameSearchIndexController extends Controller
                 ],
             ])->toArray(),
             'table_size_mb' => $tableSize,
-            'last_updated' => DB::table('CBDB_NAME_SEARCH_FTS')
+            'last_updated' => DB::table('CBDB__NAME_FTS')
                 ->max('created_at'),
         ];
     }

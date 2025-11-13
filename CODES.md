@@ -9,6 +9,8 @@
   - 在新增／編輯時計入 `c_created_*`、`c_modified_*` 與 `operations` 日誌。
 - **只讀表**：部分表格設為只讀模式，僅供查詢，禁止新增、修改或刪除：
   - `CBDB_NAME_LIST`：姓名列表（無主鍵定義，為確保數據完整性設為只讀）
+  - `CBDB__NAME_FTS`：姓名搜尋倒排索引（內部輔助表，由系統自動維護）
+  - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射表（內部輔助表，透過 `cbdb:import-trad-simp-map` 指令匯入）
   - `DYNASTIES`：朝代代碼
   - `GANZHI_CODES`：干支代碼
 

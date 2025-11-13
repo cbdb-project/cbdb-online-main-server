@@ -8,6 +8,9 @@
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
   - **兼容性目標**：代碼應能在標準 SQL 和通用的 MySQL/MariaDB/PostgreSQL 功能上運行
+- **內部輔助表**（`CBDB__` 前綴表示內部使用，不直接對終端用戶曝光）：
+  - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
+  - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
 - **日期/時間處理**：使用 Carbon 1.x；若需使用 Carbon 2 API 請額外留意相容性或自行引入拓展。
 - **主要資料夾**：
   - `app/Http/Controllers`：Laravel 控制器（如 `OperationsController`）。
@@ -24,7 +27,7 @@
 - 官名設定在寫入操作紀錄時會將地址清單（POSTED_TO_ADDR_DATA）以 JSON rows 輸出，方便稽核與還原。 目前這類操作在 Operations 頁面暫停提供一鍵復原。
 
 
-- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單目前已納入 `ADDRESSES`，可直接於 `/codes/ADDRESSES` 檢視原始地址主表資料。
+- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單目前已納入 `ADDRESSES`、`CBDB__NAME_FTS`（姓名倒排索引）、`CBDB__TRAD_SIMP_MAP`（繁簡映射表），可直接檢視原始資料。內部表（`CBDB__` 前綴）為只讀模式，僅供查詢不可編輯。
 - `/view/{key}` 檢視表頁面：`ViewTableController` 會依 `config/view_tables.php` 設定執行查詢並套用分頁／搜尋；實際 SQL 可透過頁面右上角「顯示 SQL」按鈕檢視，判斷是否符合預期。只有登入使用者能瀏覽該模組。
 - `/view` 提供檢視表總覽，列表資料源自 `config/view_tables.php` 並會依 `View_*` 名稱排序；如需檢視完整清單與說明可參考 `VIEWS.md`。
 - 管理工具 `/admin/explainsql`：僅限活躍管理員，可輸入 SELECT / WITH 語句並查看 MySQL `EXPLAIN` 計畫，輸出表格供調校索引或查詢效能。
@@ -45,8 +48,13 @@
 | 編譯前端資源 | `npm run dev`（或 `npm run prod`）|
 | 執行完整測試 | `./vendor/bin/phpunit` |
 | 執行單一測試 | `./vendor/bin/phpunit --filter TestName` |
+| 匯入繁簡映射 | `php artisan cbdb:import-trad-simp-map --truncate` |
 
 > 若修改 Vue/JS，記得在本機跑 `npm run dev` 產出 `public/js/app.js`；專案不會自動編譯。
+
+### 內部表維護
+- **繁簡映射表**：使用 `php artisan cbdb:import-trad-simp-map --truncate` 從 OpenCC 匯入最新繁簡對照。支援 `--batch=N` 參數調整批次大小（預設 1000）。
+- **檢視內部表**：可透過 `/codes/CBDB__NAME_FTS` 和 `/codes/CBDB__TRAD_SIMP_MAP` 檢視表內容（只讀）。
 
 ### 檢視表 ViewTable 模組補充
 - 新增或調整檢視請更新 `config/view_tables.php`（欄位標題、描述、每頁筆數、對應 builder）。

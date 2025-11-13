@@ -15,6 +15,8 @@ return [
         'BIOG_ADDR_CODES',
         'BIOG_INST_CODES',
         'CBDB_NAME_LIST',
+        'CBDB__NAME_FTS',
+        'CBDB__TRAD_SIMP_MAP',
         'CHORONYM_CODES',
         'COUNTRY_CODES',
         'DYNASTIES',

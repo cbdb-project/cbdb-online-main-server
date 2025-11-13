@@ -34,6 +34,8 @@ class CodesController extends Controller
      */
     protected $readOnlyTables = [
         'CBDB_NAME_LIST',
+        'CBDB__NAME_FTS',
+        'CBDB__TRAD_SIMP_MAP',
         'DYNASTIES',
         'GANZHI_CODES',
     ];
@@ -46,6 +48,18 @@ class CodesController extends Controller
         'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
         'ADDR_CODES' => ['c_addr_id', 'c_name_chn', 'c_name', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
         'CBDB_NAME_LIST' => ['c_personid', 'name', 'source'],
+        'CBDB__NAME_FTS' => [
+            'id',
+            'c_personid',
+            'name_type_code',
+            'name_type_desc',
+            'name_type_desc_chn',
+            'search_term',
+            'full_name',
+            'source',
+            'is_simplified',
+        ],
+        'CBDB__TRAD_SIMP_MAP' => ['trad_char', 'simp_char'],
         'ADDRESSES' => [
             'c_addr_id',
             'c_addr_cbd',
@@ -103,6 +117,8 @@ class CodesController extends Controller
      */
     protected $tablePrimaryKeyOverrides = [
         'CBDB_NAME_LIST' => ['c_personid', 'name', 'source'],
+        'CBDB__NAME_FTS' => ['id'],
+        'CBDB__TRAD_SIMP_MAP' => ['trad_char'],
         'TEXT_CODES' => ['c_textid'],
     ];
     /**

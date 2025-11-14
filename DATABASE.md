@@ -245,8 +245,6 @@ if (mb_strlen($query) >= 2) {
 }
 ```
 
-**性能分析**：參見 [PERFORMANCE_ANALYSIS_namesByQuery.md](./PERFORMANCE_ANALYSIS_namesByQuery.md)
-
 ### 場景 2：複雜查詢優化
 
 **❌ 錯誤方案**：使用數據庫特定的查詢優化器提示
@@ -499,7 +497,6 @@ public function test_works_on_mariadb()
 
 ### 相關項目文檔
 - [AGENTS.md](./AGENTS.md) - AI 代理開發指南
-- [PERFORMANCE_ANALYSIS_namesByQuery.md](./PERFORMANCE_ANALYSIS_namesByQuery.md) - 姓名搜索性能分析
 - [README.md](./README.md) - 項目總覽
 
 ---

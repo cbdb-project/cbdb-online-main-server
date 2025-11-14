@@ -141,8 +141,12 @@ class CodesController extends Controller
         $this->codesrepostory = $codesRepository;
         $this->operationRepository = $operationRepository;
         $this->allowedTables = $this->codesrepostory->allowedTables();
-        $map = $this->codesrepostory->allowedTableMap();
-        $this->allowedTablesMap = $map;
+
+        // 直接从配置构建大小写映射，避免 SHOW TABLES 查询
+        $this->allowedTablesMap = [];
+        foreach ($this->allowedTables as $table) {
+            $this->allowedTablesMap[strtoupper($table)] = $table;
+        }
     }
 
     protected function guardTable(string $table): string

@@ -1,0 +1,412 @@
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+
+class RebuildNameSearchIndex extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'cbdb:rebuild-name-search
+                            {--truncate : Truncate CBDB__NAME_FTS before rebuilding}
+                            {--batch=500 : Number of records to insert per batch}';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = '重建姓名搜尋倒排索引表';
+
+    /**
+     * 繁簡映射緩存
+     *
+     * @var array
+     */
+    protected $tradSimpMap = [];
+
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     */
+    public function handle()
+    {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
+            $this->error('資料表 CBDB__NAME_FTS 不存在，請先執行 migrations。');
+            return 1;
+        }
+
+        $batchSize = max(1, (int) $this->option('batch'));
+
+        $this->info('開始重建姓名搜尋倒排索引...');
+
+        // 載入繁簡映射表
+        $this->loadTradSimpMap();
+
+        if ($this->option('truncate')) {
+            $this->info('清空現有索引資料...');
+            DB::table('CBDB__NAME_FTS')->truncate();
+        }
+
+        // 流式處理：邊收集邊生成邊插入
+        $this->info('流式處理姓名資料...');
+        $this->streamProcessNames($batchSize);
+
+        $this->info('索引重建完成！');
+        $this->displayStatistics();
+
+        return 0;
+    }
+
+    /**
+     * 流式處理姓名（邊收集邊生成邊插入，降低記憶體佔用）
+     *
+     * @param int $batchSize
+     */
+    protected function streamProcessNames(int $batchSize)
+    {
+        $recordBuffer = [];
+        $totalInserted = 0;
+
+        // 使用事務包裹整個導入過程，大幅提升性能
+        DB::transaction(function () use ($batchSize, &$recordBuffer, &$totalInserted) {
+            $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted);
+        });
+
+        $this->info(sprintf('成功插入 %s 條倒排記錄', number_format($totalInserted)));
+    }
+
+    /**
+     * 在事務中流式處理姓名
+     *
+     * @param int $batchSize
+     * @param array $recordBuffer
+     * @param int $totalInserted
+     */
+    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted)
+    {
+        // 統計總數用於進度條
+        $totalMainNames = DB::table('BIOG_MAIN')
+            ->where('c_personid', '>', 0)
+            ->whereNotNull('c_name_chn')
+            ->where('c_name_chn', '!=', '')
+            ->count();
+        $totalAltNames = DB::table('ALTNAME_DATA')
+            ->where('c_personid', '>', 0)
+            ->whereNotNull('c_alt_name_chn')
+            ->where('c_alt_name_chn', '!=', '')
+            ->count();
+        $totalNames = $totalMainNames + $totalAltNames;
+
+        $bar = $this->output->createProgressBar($totalNames);
+        $bar->start();
+
+        // 1. 處理本名（流式）
+        DB::table('BIOG_MAIN')
+            ->select('c_personid', 'c_name_chn')
+            ->where('c_personid', '>', 0)
+            ->whereNotNull('c_name_chn')
+            ->where('c_name_chn', '!=', '')
+            ->orderBy('c_personid')
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+                foreach ($rows as $row) {
+                    $fullName = $this->normalizeName($row->c_name_chn);
+                    if (!$fullName) {
+                        $bar->advance();
+                        continue;
+                    }
+
+                    // 生成倒排記錄
+                    $records = $this->generateRecordsForName([
+                        'c_personid' => $row->c_personid,
+                        'name_type_code' => null,
+                        'name_type_desc' => 'main_name',
+                        'name_type_desc_chn' => '本名',
+                        'full_name' => $fullName,
+                        'source' => 'BIOG_MAIN',
+                        'source_key' => 'biog_main:' . $row->c_personid,
+                    ]);
+
+                    $recordBuffer = array_merge($recordBuffer, $records);
+
+                    // 當緩衝區達到批次大小時，插入資料庫
+                    if (count($recordBuffer) >= $batchSize) {
+                        DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
+                        $totalInserted += count($recordBuffer);
+                        $recordBuffer = [];
+                    }
+
+                    $bar->advance();
+                }
+            });
+
+        // 2. 處理別名（流式）
+        DB::table('ALTNAME_DATA as ad')
+            ->join('ALTNAME_CODES as codes', 'codes.c_name_type_code', '=', 'ad.c_alt_name_type_code')
+            ->select(
+                'ad.c_personid',
+                'ad.c_alt_name_type_code',
+                'codes.c_name_type_desc',
+                'codes.c_name_type_desc_chn',
+                'ad.c_alt_name_chn'
+            )
+            ->where('ad.c_personid', '>', 0)
+            ->whereNotNull('ad.c_alt_name_chn')
+            ->where('ad.c_alt_name_chn', '!=', '')
+            ->orderBy('ad.c_personid')
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+                foreach ($rows as $row) {
+                    $fullName = $this->normalizeName($row->c_alt_name_chn);
+                    if (!$fullName) {
+                        $bar->advance();
+                        continue;
+                    }
+
+                    // 生成倒排記錄
+                    $records = $this->generateRecordsForName([
+                        'c_personid' => $row->c_personid,
+                        'name_type_code' => $row->c_alt_name_type_code,
+                        'name_type_desc' => $row->c_name_type_desc ?: 'altname',
+                        'name_type_desc_chn' => $row->c_name_type_desc_chn ?: '別名',
+                        'full_name' => $fullName,
+                        'source' => 'ALTNAME_DATA',
+                        'source_key' => sprintf('altname:%d-%d-%s',
+                            $row->c_personid,
+                            $row->c_alt_name_type_code,
+                            $row->c_alt_name_chn
+                        ),
+                    ]);
+
+                    $recordBuffer = array_merge($recordBuffer, $records);
+
+                    // 當緩衝區達到批次大小時，插入資料庫
+                    if (count($recordBuffer) >= $batchSize) {
+                        DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
+                        $totalInserted += count($recordBuffer);
+                        $recordBuffer = [];
+                    }
+
+                    $bar->advance();
+                }
+            });
+
+        // 插入剩餘的記錄
+        if (!empty($recordBuffer)) {
+            DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
+            $totalInserted += count($recordBuffer);
+        }
+
+        $bar->finish();
+        $this->line('');
+    }
+
+    /**
+     * 為單個姓名生成倒排記錄（包含繁簡體）
+     *
+     * @param array $nameInfo
+     * @return array
+     */
+    protected function generateRecordsForName(array $nameInfo): array
+    {
+        $records = [];
+        $insertedTerms = []; // 記錄已插入的 search_term，避免重複
+
+        // 生成繁體版本的後綴
+        $tradSuffixes = $this->generateSuffixes($nameInfo['full_name']);
+        foreach ($tradSuffixes as $suffix) {
+            if ($this->isValidSearchTerm($suffix)) {
+                $records[] = array_merge($nameInfo, [
+                    'search_term' => $suffix,
+                    'is_simplified' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $insertedTerms[$suffix] = true; // 標記已插入
+            }
+        }
+
+        // 生成簡體版本的後綴（只插入與繁體不同的）
+        $simplifiedName = $this->convertToSimplified($nameInfo['full_name']);
+        if ($simplifiedName && $simplifiedName !== $nameInfo['full_name']) {
+            $simpSuffixes = $this->generateSuffixes($simplifiedName);
+            foreach ($simpSuffixes as $suffix) {
+                // 只有當這個後綴尚未插入過（繁簡不同）時才插入
+                if (!isset($insertedTerms[$suffix]) && $this->isValidSearchTerm($suffix)) {
+                    $records[] = array_merge($nameInfo, [
+                        'search_term' => $suffix,
+                        'is_simplified' => 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * 載入繁簡映射表
+     */
+    protected function loadTradSimpMap()
+    {
+        if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
+            $this->warn('CBDB__TRAD_SIMP_MAP 表不存在，將跳過繁簡轉換');
+            return;
+        }
+
+        $this->info('載入繁簡映射表...');
+        $rows = DB::table('CBDB__TRAD_SIMP_MAP')->get();
+
+        foreach ($rows as $row) {
+            $this->tradSimpMap[$row->trad_char] = $row->simp_char;
+        }
+
+        $this->info(sprintf('載入 %d 個繁簡映射', count($this->tradSimpMap)));
+    }
+
+    /**
+     * 規範化姓名（去除括號註釋）
+     *
+     * @param string $name
+     * @return string|null
+     */
+    protected function normalizeName(string $name): ?string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+
+        // 移除末尾的半角括號註釋 (English)
+        if (preg_match('/^(.+?)\([^)]*\)$/', $name, $matches)) {
+            $withoutParen = trim($matches[1]);
+            if ($withoutParen !== '') {
+                $name = $withoutParen;
+            }
+        }
+
+        // 移除末尾的全角括號註釋 （English）
+        if (preg_match('/^(.+?)（[^）]*）$/u', $name, $matches)) {
+            $withoutParen = trim($matches[1]);
+            if ($withoutParen !== '') {
+                $name = $withoutParen;
+            }
+        }
+
+        return $name ?: null;
+    }
+
+    /**
+     * 將繁體字轉換為簡體字
+     *
+     * @param string $text
+     * @return string
+     */
+    protected function convertToSimplified(string $text): string
+    {
+        if (empty($this->tradSimpMap)) {
+            return $text;
+        }
+
+        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $result = '';
+
+        foreach ($chars as $char) {
+            $result .= $this->tradSimpMap[$char] ?? $char;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 生成字串的所有後綴
+     *
+     * @param string $text
+     * @return array
+     */
+    protected function generateSuffixes(string $text): array
+    {
+        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $suffixes = [];
+
+        // 完整名稱
+        $suffixes[] = $text;
+
+        // 生成所有後綴（從第2個字開始）
+        for ($i = 1; $i < count($chars); $i++) {
+            $suffixes[] = implode('', array_slice($chars, $i));
+        }
+
+        return $suffixes;
+    }
+
+    /**
+     * 檢查搜尋詞是否有效
+     *
+     * @param string $term
+     * @return bool
+     */
+    protected function isValidSearchTerm(string $term): bool
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return false;
+        }
+
+        // 排除以括號開頭的詞
+        $firstChar = mb_substr($term, 0, 1, 'UTF-8');
+        if (in_array($firstChar, ['(', ')', '（', '）'])) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 顯示統計資訊
+     */
+    protected function displayStatistics()
+    {
+        $stats = DB::table('CBDB__NAME_FTS')
+            ->selectRaw('
+                COALESCE(name_type_desc_chn, "本名") as label,
+                is_simplified,
+                COUNT(*) as count
+            ')
+            ->groupBy('label', 'is_simplified')
+            ->get();
+
+        $this->info('');
+        $this->info('=== 索引統計 ===');
+
+        $rows = [];
+        foreach ($stats as $stat) {
+            $variant = $stat->is_simplified ? '簡體' : '繁體';
+            $rows[] = [
+                $stat->label,
+                $variant,
+                number_format($stat->count)
+            ];
+        }
+
+        $this->table(['類型', '字體', '記錄數'], $rows);
+
+        $total = DB::table('CBDB__NAME_FTS')->count();
+        $uniquePersons = DB::table('CBDB__NAME_FTS')
+            ->distinct('c_personid')
+            ->count('c_personid');
+
+        $this->info(sprintf('總計：%s 條倒排記錄', number_format($total)));
+        $this->info(sprintf('涵蓋：%s 個人物', number_format($uniquePersons)));
+    }
+}

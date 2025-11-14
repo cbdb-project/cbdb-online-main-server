@@ -13,51 +13,60 @@
 
 ## 目前白名單
 
-| # | 資料表名稱 |
-|---|------------|
-| 1 | ADDR_BELONGS_DATA |
-| 2 | ADDR_CODES |
-| 3 | ADDRESSES |
-| 4 | ALTNAME_CODES |
-| 5 | APPOINTMENT_CODES |
-| 6 | ASSOC_CODES |
-| 7 | ASSUME_OFFICE_CODES |
-| 8 | BIOG_ADDR_CODES |
-| 9 | BIOG_INST_CODES |
-|10 | CBDB_NAME_LIST |
-|11 | CHORONYM_CODES |
-|12 | COUNTRY_CODES |
-|13 | DYNASTIES |
-|14 | ENTRY_CODES |
-|15 | ETHNICITY_TRIBE_CODES |
-|16 | EVENT_CODES |
-|17 | EXTANT_CODES |
-|18 | GANZHI_CODES |
-|19 | HOUSEHOLD_STATUS_CODES |
-|20 | INDEXYEAR_TYPE_CODES |
-|21 | KINSHIP_CODES |
-|22 | LITERARYGENRE_CODES |
-|23 | MEASURE_CODES |
-|24 | MERGED_PERSON_DATA |
-|25 | OCCASION_CODES |
-|26 | OFFICE_CODES |
-|27 | PARENTAL_STATUS_CODES |
-|28 | PLACE_CODES |
-|29 | POSSESSION_ACT_CODES |
-|30 | SCHOLARLYTOPIC_CODES |
-|31 | SOCIAL_INSTITUTION_ALTNAME_CODES |
-|32 | SOCIAL_INSTITUTION_CODES |
-|33 | SOCIAL_INSTITUTION_NAME_CODES |
-|34 | STATUS_CODES |
-|35 | TEXT_BIBLCAT_CODES |
-|36 | TEXT_CODES |
-|37 | TEXT_INSTANCE_DATA |
-|38 | TEXT_ROLE_CODES |
-|39 | YEAR_RANGE_CODES |
+| # | 資料表名稱 | 說明 |
+|---|------------|------|
+| 1 | ADDR_BELONGS_DATA | 地址隸屬關係資料 |
+| 2 | ADDR_CODES | 地址代碼 |
+| 3 | ADDRESSES | 地址主表 |
+| 4 | ALTNAME_CODES | 別名類型代碼 |
+| 5 | APPOINTMENT_CODES | 任命類型代碼 |
+| 6 | ASSOC_CODES | 關聯類型代碼 |
+| 7 | ASSUME_OFFICE_CODES | 就任類型代碼 |
+| 8 | BIOG_ADDR_CODES | 人物地址類型代碼 |
+| 9 | BIOG_INST_CODES | 人物機構類型代碼 |
+|10 | CBDB_NAME_LIST | 姓名列表 |
+|11 | CBDB__NAME_FTS | 姓名搜尋倒排索引（內部表）|
+|12 | CBDB__TRAD_SIMP_MAP | 繁簡字符映射表（內部表）|
+|13 | CHORONYM_CODES | 地名類型代碼 |
+|14 | COUNTRY_CODES | 國家代碼 |
+|15 | DYNASTIES | 朝代代碼 |
+|16 | ENTRY_CODES | 入仕類型代碼 |
+|17 | ETHNICITY_TRIBE_CODES | 民族/部落代碼 |
+|18 | EVENT_CODES | 事件類型代碼 |
+|19 | EXTANT_CODES | 存世狀態代碼 |
+|20 | GANZHI_CODES | 干支代碼 |
+|21 | HOUSEHOLD_STATUS_CODES | 戶籍狀態代碼 |
+|22 | INDEXYEAR_TYPE_CODES | 年份索引類型代碼 |
+|23 | KINSHIP_CODES | 親屬關係代碼 |
+|24 | LITERARYGENRE_CODES | 文學體裁代碼 |
+|25 | MEASURE_CODES | 度量衡代碼 |
+|26 | MERGED_PERSON_DATA | 人物合併資料 |
+|27 | OCCASION_CODES | 場合類型代碼 |
+|28 | OFFICE_CODES | 官職代碼 |
+|29 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
+|30 | PLACE_CODES | 地點類型代碼 |
+|31 | POSSESSION_ACT_CODES | 財產行為代碼 |
+|32 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
+|33 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |
+|34 | SOCIAL_INSTITUTION_CODES | 社會機構代碼 |
+|35 | SOCIAL_INSTITUTION_NAME_CODES | 社會機構名稱類型代碼 |
+|36 | STATUS_CODES | 狀態代碼 |
+|37 | TEXT_BIBLCAT_CODES | 文獻分類代碼 |
+|38 | TEXT_CODES | 文獻代碼 |
+|39 | TEXT_INSTANCE_DATA | 文獻版本資料 |
+|40 | TEXT_ROLE_CODES | 文獻角色代碼 |
+|41 | YEAR_RANGE_CODES | 年份範圍代碼 |
 
 > 建議：若新增或移除代碼表，請同步更新本文件與 `config/codes.php`，並在部署環境重新執行 `php artisan config:cache` 以確保新設定生效。
 
 > 備註：以下表格在泛用 `/codes` 介面中為只讀表，僅允許瀏覽與搜尋：
 > - `CBDB_NAME_LIST`：姓名列表（無主鍵定義）
+> - `CBDB__NAME_FTS`：姓名搜尋倒排索引（內部輔助表，由系統自動維護）
+> - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射表（內部輔助表，透過 `php artisan cbdb:import-trad-simp-map` 指令匯入）
 > - `DYNASTIES`：朝代代碼
 > - `GANZHI_CODES`：干支代碼
+>
+> **內部表說明**：
+> - 表名前綴 `CBDB__`（雙底線）代表內部輔助/支援表，不直接對終端用戶曝光
+> - 這些表用於支援核心功能（如姓名搜尋）或提供輔助數據（如繁簡映射）
+> - 內部表統一設為只讀模式，由專用指令或系統程序維護

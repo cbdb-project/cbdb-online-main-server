@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         Commands\WikiTaskManager::class,
         \App\Console\Commands\ImportTradSimpMap::class,
+        \App\Console\Commands\RebuildNameSearchIndex::class,
     ];
 
     /**

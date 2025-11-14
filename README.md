@@ -24,6 +24,7 @@
 * [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
 * [MERGE 工具說明](./MERGE.md)
 * [檢視表總覽](./VIEWS.md)
+* [姓名搜索索引管理](./NAME_SEARCH_COMMANDS.md)
 
 ## 技術環境
 

@@ -125,6 +125,8 @@ php artisan cbdb:rebuild-name-search
 | `--truncate` | 選填 | false | 重建前清空現有索引 |
 | `--batch` | 選填 | 500 | 每批插入記錄數 |
 | `--commit-interval` | 選填 | 5000 | 每個事務提交的記錄數 |
+| `--id-from` | 選填 | null | 起始 c_personid（包含） |
+| `--id-to` | 選填 | null | 結束 c_personid（包含） |
 
 ### 使用範例
 
@@ -151,6 +153,30 @@ php artisan cbdb:rebuild-name-search --truncate --commit-interval=20000
 **自訂批次大小**
 ```bash
 php artisan cbdb:rebuild-name-search --truncate --batch=1000
+```
+
+**分批處理**（避免記憶體累積，可並行處理）
+```bash
+# 處理 ID 1-100000
+php artisan cbdb:rebuild-name-search --id-from=1 --id-to=100000
+
+# 處理 ID 100001-200000
+php artisan cbdb:rebuild-name-search --id-from=100001 --id-to=200000
+
+# 處理 ID 200001 以後
+php artisan cbdb:rebuild-name-search --id-from=200001
+```
+
+**並行處理**（多終端機同時執行，加速重建）
+```bash
+# 終端機 1
+php artisan cbdb:rebuild-name-search --id-from=1 --id-to=100000 &
+
+# 終端機 2
+php artisan cbdb:rebuild-name-search --id-from=100001 --id-to=200000 &
+
+# 終端機 3
+php artisan cbdb:rebuild-name-search --id-from=200001 &
 ```
 
 ### 執行輸出

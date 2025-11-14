@@ -21,6 +21,11 @@
         </div>
         <!-- /.box-header -->
         <div class="box-body">
+            @if(!empty($copyrightNote))
+                <div class="alert alert-info">
+                    <i class="fa fa-info-circle"></i> {!! $copyrightNote !!}
+                </div>
+            @endif
             <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="margin-bottom: 15px;">
                 <div class="input-group input-group-sm" style="width: 100%; max-width: 420px;">
                     <input type="text"

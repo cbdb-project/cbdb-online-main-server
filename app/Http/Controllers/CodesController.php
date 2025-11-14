@@ -40,6 +40,14 @@ class CodesController extends Controller
         'GANZHI_CODES',
     ];
     /**
+     * Copyright notices for specific tables.
+     *
+     * @var array<string, string>
+     */
+    protected $tableCopyrightNotes = [
+        'CBDB__TRAD_SIMP_MAP' => '此表格數據來自 <a href="https://github.com/BYVoid/OpenCC" target="_blank">OpenCC 項目</a>的字典文件，該文件以 <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache 2.0 License</a> 授權，因此這個表格的授權也是 Apache 2.0，而非 CC BY-NC-SA 4.0 International 授權。',
+    ];
+    /**
      * Custom column configurations for specific tables.
      *
      * @var array<string, array<int, string>>
@@ -184,6 +192,7 @@ class CodesController extends Controller
 
             $isReadOnly = $this->isReadOnlyTable($table);
             $keyColumns = $this->getKeyColumns($table);
+            $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
             return view('codes.show', [
                 'page_title' => 'Codes',
@@ -197,6 +206,7 @@ class CodesController extends Controller
                 'dynastyMap' => $dynastyMap,
                 'isReadOnly' => $isReadOnly,
                 'keyColumns' => $keyColumns,
+                'copyrightNote' => $copyrightNote,
             ]);
         }catch (\PDOException $e){
             flash('找不到该数据表', 'warning');

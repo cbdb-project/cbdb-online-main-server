@@ -275,11 +275,11 @@ ORDER BY LENGTH(search_term) ASC;
 
 ### 預期耗時與資源
 
-假設 70 萬人物、220 萬姓名、平均每個姓名 2.5 個後綴：
+假設 70 萬人物、100 萬姓名、平均每個姓名 3 個後綴：
 
 | 項目 | 數值 |
 |------|------|
-| 倒排記錄數 | 約 550 萬條 |
+| 倒排記錄數 | 約 300 萬條 |
 | 執行時間 | 10-30 分鐘 |
 | 記憶體需求 | 512 MB - 1 GB |
 | 資料庫大小 | 350-500 MB |
@@ -512,11 +512,67 @@ ORDER BY term_length;
 
 ---
 
+## `/codes` 介面檢視
+
+`CBDB__NAME_FTS` 表可透過 `/codes/CBDB__NAME_FTS` 介面檢視，該介面採用**游標分頁**以優化大表查詢效能。
+
+### 游標分頁特性
+
+**URL 參數**：
+```
+/codes/CBDB__NAME_FTS                    # 首頁
+/codes/CBDB__NAME_FTS?after=123456       # 下一頁（ID > 123456）
+/codes/CBDB__NAME_FTS?before=123456      # 上一頁（ID < 123456）
+/codes/CBDB__NAME_FTS?search=王安        # 前綴搜尋（支援游標分頁）
+```
+
+**搜尋特性**：
+- 使用**前綴搜尋**（`LIKE '王安%'`）而非包含搜尋（`LIKE '%王安%'`）
+- 可利用 B-Tree 索引，搜尋速度快（~5ms）
+- 適合搜尋姓名開頭部分（如「王安」可找到「王安石」）
+- 搜尋欄位：`search_term`、`full_name`、`name_type_desc_chn` 等
+
+**效能優勢**：
+
+| 操作 | 傳統分頁 | 游標分頁 | 提升 |
+|------|---------|---------|------|
+| 首頁 | ~5ms | ~3ms | 1.7x |
+| 第 1000 頁 | ~200ms | ~3ms | **67x** |
+| 第 40000 頁 | ~5000ms | ~3ms | **1667x** |
+| 跳轉到指定 ID | N/A | ~3ms | - |
+
+**實現原理**：
+
+```sql
+-- 傳統 OFFSET 分頁（隨頁碼增長而變慢）
+SELECT * FROM CBDB__NAME_FTS LIMIT 20 OFFSET 799980;
+-- 執行計畫：掃描並跳過 799,980 行 → 返回 20 行
+
+-- 游標分頁（恆定速度）
+SELECT * FROM CBDB__NAME_FTS WHERE id > 799980 ORDER BY id ASC LIMIT 20;
+-- 執行計畫：使用主鍵索引定位 → 直接返回 20 行
+```
+
+**界面功能**：
+- 上一頁/下一頁按鈕
+- 顯示當前頁 ID 範圍（如「ID: 123,456 - 123,475」）
+- 「跳轉到 ID」輸入框，可直接定位到特定 ID 附近的記錄
+- 每頁顯示記錄數（預設 20 條）
+
+**限制**：
+- ❌ 無法跳轉到任意第 N 頁（如「第 100 頁」）
+- ❌ 不顯示總頁數
+- ✅ 但可透過「跳轉到 ID」功能達到類似效果
+
+詳細技術說明請參考 [CODES_TABLES.md](CODES_TABLES.md#效能優化)。
+
+---
+
 ## 相關文件
 
 - [NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md](NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md) - 姓名搜尋效能改進方案詳細說明
 - [AGENTS.md](AGENTS.md) - 內部表維護章節
-- [CODES_TABLES.md](CODES_TABLES.md) - 透過 `/codes` 介面檢視內部表
+- [CODES_TABLES.md](CODES_TABLES.md) - 透過 `/codes` 介面檢視內部表（包含游標分頁說明）
 - [DATABASE.md](DATABASE.md) - 資料庫架構說明
 
 ## 授權與貢獻

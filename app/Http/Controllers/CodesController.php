@@ -175,12 +175,25 @@ class CodesController extends Controller
             $thead = $this->buildTableHead($table, $sampleRow);
             $searchableColumns = $this->determineSearchableColumns($table, $thead);
 
+            // 使用游标分页的大表列表
+            $cursorPaginationTables = ['CBDB__NAME_FTS'];
+            $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true);
+
             if ($search !== '' && !empty($searchableColumns)) {
-                $query->where(function ($subQuery) use ($searchableColumns, $search) {
+                $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination) {
                     foreach ($searchableColumns as $column) {
-                        $subQuery->orWhere($column, 'like', '%' . $search . '%');
+                        // 对于游标分页的大表，使用前缀搜索以利用索引
+                        if ($useCursorPagination) {
+                            $subQuery->orWhere($column, 'like', $search . '%');
+                        } else {
+                            $subQuery->orWhere($column, 'like', '%' . $search . '%');
+                        }
                     }
                 });
+            }
+
+            if ($useCursorPagination) {
+                return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead);
             }
 
             $data = $query->paginate($perPage)->appends(['search' => $search]);
@@ -1204,5 +1217,99 @@ class CodesController extends Controller
 
         $message = $exception->getMessage();
         return strpos($message, 'Duplicate entry') !== false;
+    }
+
+    /**
+     * Show table with cursor-based pagination (for large tables).
+     *
+     * @param Request $request
+     * @param string $table
+     * @param \Illuminate\Database\Query\Builder $query
+     * @param string $search
+     * @param int $perPage
+     * @param array $thead
+     * @return \Illuminate\View\View
+     */
+    protected function showWithCursorPagination(Request $request, string $table, $query, string $search, int $perPage, array $thead)
+    {
+        $after = $request->query('after');   // 下一页游标 (id)
+        $before = $request->query('before'); // 上一页游标 (id)
+
+        // 游标查询逻辑
+        if ($before) {
+            // 上一页：取 id < before 的最后 N+1 条（倒序），然后反转
+            $results = (clone $query)
+                ->where('id', '<', $before)
+                ->orderBy('id', 'desc')
+                ->limit($perPage + 1)
+                ->get();
+
+            $hasMore = $results->count() > $perPage;
+            if ($hasMore) {
+                $results = $results->slice(0, $perPage);
+            }
+            $results = $results->reverse()->values();
+            $hasPrev = $hasMore;
+            $hasNext = true; // 既然有 before，说明肯定有下一页
+        } else {
+            // 下一页或首页：取 id > after 的前 N+1 条
+            if ($after) {
+                $query->where('id', '>', $after);
+            }
+            $results = $query
+                ->orderBy('id', 'asc')
+                ->limit($perPage + 1)
+                ->get();
+
+            $hasMore = $results->count() > $perPage;
+            if ($hasMore) {
+                $results = $results->slice(0, $perPage)->values();
+            }
+            $hasNext = $hasMore;
+            $hasPrev = (bool)$after; // 有 after 说明不是首页，肯定有上一页
+        }
+
+        // 构建游标元数据
+        $firstId = $results->first()->id ?? null;
+        $lastId = $results->last()->id ?? null;
+
+        $cursorMeta = [
+            'type' => 'cursor',
+            'data' => $results,
+            'per_page' => $perPage,
+            'first_id' => $firstId,
+            'last_id' => $lastId,
+            'has_more_pages' => $hasNext,
+            'has_prev_pages' => $hasPrev,
+            'next_cursor' => $hasNext ? $lastId : null,
+            'prev_cursor' => $hasPrev ? $firstId : null,
+            'search' => $search,
+        ];
+
+        // 其他元数据
+        $dynastyMap = [];
+        if (in_array('c_dy', $thead, true)) {
+            $dynastyMap = $this->getDynastyNameMap();
+        }
+
+        $isReadOnly = $this->isReadOnlyTable($table);
+        $keyColumns = $this->getKeyColumns($table);
+        $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
+
+        return view('codes.show', [
+            'page_title' => 'Codes',
+            'page_description' => $table,
+            'page_url' => '/codes',
+            'archer' => "<li class='active'>".e($table)."</li>",
+            'q' => $table,
+            'thead' => $thead,
+            'data' => $cursorMeta,  // 传递游标元数据而非标准分页对象
+            'search' => $search,
+            'dynastyMap' => $dynastyMap,
+            'isReadOnly' => $isReadOnly,
+            'keyColumns' => $keyColumns,
+            'copyrightNote' => $copyrightNote,
+            'useCursorPagination' => true,  // 标记使用游标分页
+        ]);
     }
 }

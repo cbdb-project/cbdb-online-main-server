@@ -2,6 +2,8 @@
 
 [中國歷代人物傳在線記录入系统](https://input.cbdb.fas.harvard.edu/)原始碼。
 
+**授權 / License:** [CC BY-NC-SA 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/) (主要授權，詳見 [LICENSE.md](./LICENSE.md))
+
 ## 開發指南(2025 更新)
 
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀

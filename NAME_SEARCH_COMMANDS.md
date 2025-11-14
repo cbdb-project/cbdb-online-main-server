@@ -124,6 +124,7 @@ php artisan cbdb:rebuild-name-search
 |------|------|--------|------|
 | `--truncate` | 選填 | false | 重建前清空現有索引 |
 | `--batch` | 選填 | 500 | 每批插入記錄數 |
+| `--commit-interval` | 選填 | 5000 | 每個事務提交的記錄數 |
 
 ### 使用範例
 
@@ -135,6 +136,16 @@ php artisan cbdb:rebuild-name-search --truncate
 **增量重建**（保留現有資料）
 ```bash
 php artisan cbdb:rebuild-name-search
+```
+
+**調整事務大小**（伺服器記憶體較小時）
+```bash
+php artisan cbdb:rebuild-name-search --truncate --commit-interval=2000
+```
+
+**大記憶體伺服器優化**
+```bash
+php artisan cbdb:rebuild-name-search --truncate --commit-interval=20000
 ```
 
 **自訂批次大小**

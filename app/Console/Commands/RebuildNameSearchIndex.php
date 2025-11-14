@@ -16,7 +16,8 @@ class RebuildNameSearchIndex extends Command
      */
     protected $signature = 'cbdb:rebuild-name-search
                             {--truncate : Truncate CBDB__NAME_FTS before rebuilding}
-                            {--batch=500 : Number of records to insert per batch}';
+                            {--batch=500 : Number of records to insert per batch}
+                            {--commit-interval=5000 : Number of records to commit per transaction}';
 
     /**
      * The console command description.
@@ -45,8 +46,11 @@ class RebuildNameSearchIndex extends Command
         }
 
         $batchSize = max(1, (int) $this->option('batch'));
+        $commitInterval = max(100, (int) $this->option('commit-interval'));
 
         $this->info('開始重建姓名搜尋倒排索引...');
+        $this->info(sprintf('批次大小：%d，事務提交間隔：%d 條記錄',
+            $batchSize, $commitInterval));
 
         // 載入繁簡映射表
         $this->loadTradSimpMap();
@@ -58,7 +62,7 @@ class RebuildNameSearchIndex extends Command
 
         // 流式處理：邊收集邊生成邊插入
         $this->info('流式處理姓名資料...');
-        $this->streamProcessNames($batchSize);
+        $this->streamProcessNames($batchSize, $commitInterval);
 
         $this->info('索引重建完成！');
         $this->displayStatistics();
@@ -70,28 +74,27 @@ class RebuildNameSearchIndex extends Command
      * 流式處理姓名（邊收集邊生成邊插入，降低記憶體佔用）
      *
      * @param int $batchSize
+     * @param int $commitInterval
      */
-    protected function streamProcessNames(int $batchSize)
+    protected function streamProcessNames(int $batchSize, int $commitInterval)
     {
         $recordBuffer = [];
         $totalInserted = 0;
 
-        // 使用事務包裹整個導入過程，大幅提升性能
-        DB::transaction(function () use ($batchSize, &$recordBuffer, &$totalInserted) {
-            $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted);
-        });
+        $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted, $commitInterval);
 
         $this->info(sprintf('成功插入 %s 條倒排記錄', number_format($totalInserted)));
     }
 
     /**
-     * 在事務中流式處理姓名
+     * 流式處理姓名（分段事務）
      *
      * @param int $batchSize
      * @param array $recordBuffer
      * @param int $totalInserted
+     * @param int $commitInterval
      */
-    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted)
+    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval)
     {
         // 統計總數用於進度條
         $totalMainNames = DB::table('BIOG_MAIN')
@@ -109,6 +112,11 @@ class RebuildNameSearchIndex extends Command
         $bar = $this->output->createProgressBar($totalNames);
         $bar->start();
 
+        $lastCommitCount = 0; // 上次提交時的記錄數
+
+        // 開始第一個事務
+        DB::beginTransaction();
+
         // 1. 處理本名（流式）
         DB::table('BIOG_MAIN')
             ->select('c_personid', 'c_name_chn')
@@ -116,7 +124,7 @@ class RebuildNameSearchIndex extends Command
             ->whereNotNull('c_name_chn')
             ->where('c_name_chn', '!=', '')
             ->orderBy('c_personid')
-            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_name_chn);
                     if (!$fullName) {
@@ -142,6 +150,22 @@ class RebuildNameSearchIndex extends Command
                         DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
                         $totalInserted += count($recordBuffer);
                         $recordBuffer = [];
+
+                        // 分段提交：每插入 commitInterval 條記錄就提交並開啟新事務
+                        if ($totalInserted - $lastCommitCount >= $commitInterval) {
+                            DB::commit();
+                            $bar->finish();
+                            $this->line('');
+                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                                number_format($totalInserted),
+                                number_format(memory_get_usage(true) / 1024 / 1024, 2)
+                            ));
+                            DB::beginTransaction();
+                            $lastCommitCount = $totalInserted;
+                            gc_collect_cycles(); // 清理內存
+                            $bar = $this->output->createProgressBar($totalNames);
+                            $bar->start();
+                        }
                     }
 
                     $bar->advance();
@@ -162,7 +186,7 @@ class RebuildNameSearchIndex extends Command
             ->whereNotNull('ad.c_alt_name_chn')
             ->where('ad.c_alt_name_chn', '!=', '')
             ->orderBy('ad.c_personid')
-            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_alt_name_chn);
                     if (!$fullName) {
@@ -192,6 +216,22 @@ class RebuildNameSearchIndex extends Command
                         DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
                         $totalInserted += count($recordBuffer);
                         $recordBuffer = [];
+
+                        // 分段提交：每插入 commitInterval 條記錄就提交並開啟新事務
+                        if ($totalInserted - $lastCommitCount >= $commitInterval) {
+                            DB::commit();
+                            $bar->finish();
+                            $this->line('');
+                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                                number_format($totalInserted),
+                                number_format(memory_get_usage(true) / 1024 / 1024, 2)
+                            ));
+                            DB::beginTransaction();
+                            $lastCommitCount = $totalInserted;
+                            gc_collect_cycles(); // 清理內存
+                            $bar = $this->output->createProgressBar($totalNames);
+                            $bar->start();
+                        }
                     }
 
                     $bar->advance();
@@ -203,6 +243,9 @@ class RebuildNameSearchIndex extends Command
             DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
             $totalInserted += count($recordBuffer);
         }
+
+        // 最後提交剩餘的事務
+        DB::commit();
 
         $bar->finish();
         $this->line('');

@@ -14,6 +14,9 @@ class MichaelRestructurePlanSchemaUpdates extends Migration
      */
     public function up()
     {
+        // Disable foreign key checks to allow modifying columns used in foreign keys
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
         // Add NOT NULL constraints to GANZHI_CODES
         if (Schema::hasTable('GANZHI_CODES')) {
             // First update any NULL values to avoid NOT NULL constraint issues
@@ -212,6 +215,9 @@ class MichaelRestructurePlanSchemaUpdates extends Migration
                 $table->datetime('c_modified_date')->nullable();
             });
         }
+
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     /**
@@ -221,6 +227,9 @@ class MichaelRestructurePlanSchemaUpdates extends Migration
      */
     public function down()
     {
+        // Disable foreign key checks to allow modifying columns used in foreign keys
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
         // Reverse NOT NULL constraints for GANZHI_CODES
         if (Schema::hasTable('GANZHI_CODES')) {
             Schema::table('GANZHI_CODES', function (Blueprint $table) {
@@ -349,5 +358,8 @@ class MichaelRestructurePlanSchemaUpdates extends Migration
                 $table->dropColumn(['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']);
             });
         }
+
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 }

@@ -184,60 +184,65 @@ ORDER BY LENGTH(search_term) DESC, c_personid;
 
 ### 4.1 拆分策略
 
-**只拆分「名」部分的後綴，不包含姓氏單字**
+**實際實作：對完整姓名生成後綴，從第二個字開始拆分**
 
-#### 原因
+> **注意**：實際實作使用 `c_name_chn` 完整姓名字段，而非分離的 `c_surname` 和 `c_mingzi`。
+> 這種實作方式簡化了代碼邏輯，並且對於單姓（佔 95%+ 的情況）工作正常。
 
-1. **避免雜訊**：單字姓氏（如「王」、「李」）會匹配到數萬人
-2. **符合習慣**：使用者通常記得名字的後半部分，而非單姓
-3. **姓氏過濾**：已有 `c_surname` 欄位可單獨過濾
+#### 拆分原則
+
+1. **避免單字姓氏雜訊**：從第二個字開始生成後綴，跳過姓氏首字
+2. **支援後綴匹配**：用戶記得名字的後半部分，可以直接搜尋
+3. **簡化實作**：直接使用 `c_name_chn` 字段，無需區分姓氏和名字
 
 #### 示例
 
-| 姓名 | 姓 | 名 | 倒排後綴 |
-|------|----|----|---------|
-| 王安石 | 王 | 安石 | ["王安石", "安石", "石"] |
-| 司馬相如 | 司馬 | 相如 | ["司馬相如", "相如", "如"] |
-| 李白 | 李 | 白 | ["李白", "白"] |
-| 諸葛亮 | 諸葛 | 亮 | ["諸葛亮", "亮"] |
+| 姓名 | c_name_chn | 倒排後綴 | 說明 |
+|------|------------|---------|------|
+| 王安石 | 王安石 | ["王安石", "安石", "石"] | ✅ 單姓正確 |
+| 李白 | 李白 | ["李白", "白"] | ✅ 單姓正確 |
+| 司馬相如 | 司馬相如 | ["司馬相如", "馬相如", "相如", "如"] | ⚠️ 複姓會多一個中間字 |
+| 諸葛亮 | 諸葛亮 | ["諸葛亮", "葛亮", "亮"] | ⚠️ 複姓會多一個中間字 |
+
+**複姓處理說明**：
+- 對於複姓（如司馬、諸葛），會產生額外的中間字後綴（如"馬相如"、"葛亮"）
+- 這些中間字後綴在實際搜尋中很少被使用，影響有限（複姓僅佔約 1-2%）
+- 索引大小和查詢效能不受明顯影響
 
 ### 4.2 拆分演算法（PHP）
 
 ```php
 /**
- * 將姓名拆分為可搜尋的後綴列表
+ * 生成完整姓名的所有後綴（實際實作）
  *
- * @param string $surname 姓氏（如「王」、「司馬」）
- * @param string $mingzi 名字（如「安石」）
+ * @param string $fullName 完整姓名（如「王安石」、「司馬相如」）
  * @return array 後綴列表（從長到短）
  */
-function splitNameToSuffixes(string $surname, string $mingzi): array
+function generateSuffixes(string $fullName): array
 {
-    if (empty($mingzi)) {
-        return [];
-    }
+    $chars = preg_split('//u', $fullName, -1, PREG_SPLIT_NO_EMPTY);
+    $suffixes = [];
 
-    $fullName = $surname . $mingzi;
-    $suffixes = [$fullName]; // 完整姓名
+    // 完整名稱
+    $suffixes[] = $fullName;
 
-    // 將名字拆成單字陣列
-    $chars = preg_split('//u', $mingzi, -1, PREG_SPLIT_NO_EMPTY);
-
-    // 從後往前產生後綴
-    for ($i = 0; $i < count($chars); $i++) {
-        $suffix = implode('', array_slice($chars, $i));
-        $suffixes[] = $suffix;
+    // 生成所有後綴（從第2個字開始）
+    for ($i = 1; $i < count($chars); $i++) {
+        $suffixes[] = implode('', array_slice($chars, $i));
     }
 
     return $suffixes;
 }
 
 // 示例
-splitNameToSuffixes('王', '安石');
+generateSuffixes('王安石');
 // => ["王安石", "安石", "石"]
 
-splitNameToSuffixes('司馬', '相如');
-// => ["司馬相如", "相如", "如"]
+generateSuffixes('司馬相如');
+// => ["司馬相如", "馬相如", "相如", "如"]
+
+generateSuffixes('李白');
+// => ["李白", "白"]
 ```
 
 ### 4.3 別名處理

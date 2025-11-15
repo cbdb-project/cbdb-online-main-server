@@ -175,7 +175,12 @@ class CodesController extends Controller
         try {
             $perPage = config('codes.per_page', 20);
             $query = DB::table($table);
-            $sampleRow = (clone $query)->first();
+
+            // 只在没有列配置时才查询样本行，避免不必要的数据库查询
+            $upperTable = strtoupper($table);
+            $hasColumnConfig = isset($this->tableColumnOverrides[$upperTable]);
+            $sampleRow = $hasColumnConfig ? null : (clone $query)->first();
+
             $thead = $this->buildTableHead($table, $sampleRow);
             $searchableColumns = $this->determineSearchableColumns($table, $thead);
 

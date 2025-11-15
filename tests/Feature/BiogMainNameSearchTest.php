@@ -143,15 +143,49 @@ class BiogMainNameSearchTest extends TestCase
                 'c_surname_rm' => null,
                 'c_mingzi_rm' => null,
             ],
+            [
+                'c_personid' => 3001,
+                'c_name_chn' => '宗氏（李白妻）',
+                'c_name' => 'Zong Shi',
+                'c_surname' => '宗',
+                'c_mingzi' => '氏',
+                'c_index_year' => 730,
+                'c_dy' => 14,
+                'c_index_addr_id' => 102,
+                'c_name_proper' => null,
+                'c_name_rm' => null,
+                'c_surname_proper' => null,
+                'c_mingzi_proper' => null,
+                'c_surname_rm' => null,
+                'c_mingzi_rm' => null,
+            ],
+            [
+                'c_personid' => 3002,
+                'c_name_chn' => '楊貴妃(楊玉環)',
+                'c_name' => 'Yang Guifei',
+                'c_surname' => '楊',
+                'c_mingzi' => '玉環',
+                'c_index_year' => 720,
+                'c_dy' => 14,
+                'c_index_addr_id' => 102,
+                'c_name_proper' => null,
+                'c_name_rm' => null,
+                'c_surname_proper' => null,
+                'c_mingzi_proper' => null,
+                'c_surname_rm' => null,
+                'c_mingzi_rm' => null,
+            ],
         ]);
 
         DB::table('DYNASTIES')->insert([
+            ['c_dy' => 14, 'c_dynasty_chn' => '唐'],
             ['c_dy' => 15, 'c_dynasty_chn' => '宋'],
         ]);
 
         DB::table('ADDR_CODES')->insert([
             ['c_addr_id' => 100, 'c_name_chn' => '眉州'],
             ['c_addr_id' => 101, 'c_name_chn' => '臨川'],
+            ['c_addr_id' => 102, 'c_name_chn' => '長安'],
         ]);
 
         DB::table('ALTNAME_DATA')->insert([
@@ -177,6 +211,21 @@ class BiogMainNameSearchTest extends TestCase
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '王安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+
+            // 宗氏（李白妻）的倒排記錄 - 括號已移除，內容保留為"宗氏李白妻"
+            ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '宗氏李白妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '氏李白妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '李白妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '白妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+
+            // 楊貴妃(楊玉環)的倒排記錄 - 半角括號已移除，內容保留為"楊貴妃楊玉環"
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '楊貴妃楊玉環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '貴妃楊玉環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '妃楊玉環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '楊玉環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '玉環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 3002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '環', 'full_name' => '楊貴妃楊玉環', 'source' => 'biog_main', 'source_key' => 'biog_main:3002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 
@@ -210,11 +259,19 @@ class BiogMainNameSearchTest extends TestCase
 
     public function test_text_query_uses_complex_search(): void
     {
-        // 注意：此測試在 SQLite 中會因為 FIELD() 函數不存在而失敗
-        // 在實際的 MySQL/MariaDB 環境中可以正常運行
-        // 因此我們只測試基本的查詢行為，不深入測試 FIELD() 排序
+        // 測試文字查詢使用倒排索引搜尋
+        // 現在已經實作 CASE WHEN 模擬 FIELD() 函數，SQLite 也可以正常運行
+        $request = new Request(['q' => '蘇']);
 
-        $this->markTestSkipped('SQLite 不支持 MySQL FIELD() 函數，此測試需要在 MySQL/MariaDB 環境中執行');
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(2, $result->total());
+
+        // 確認結果包含蘇軾和蘇轍
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(1001, $personIds, '搜尋「蘇」應該包含蘇軾');
+        $this->assertContains(1002, $personIds, '搜尋「蘇」應該包含蘇轍');
     }
 
     public function test_mixed_alphanumeric_query_uses_complex_search(): void
@@ -440,5 +497,65 @@ class BiogMainNameSearchTest extends TestCase
 
         // 第一個結果應該是蘇軾或蘇轍（因為都是「蘇」開頭）
         $this->assertContains($firstItem->c_personid, [1001, 1002]);
+    }
+
+    public function test_parentheses_content_is_searchable_fullwidth(): void
+    {
+        // 測試全角括號：搜索「李白」應該能找到「宗氏（李白妻）」
+        $request = new Request(['q' => '李白']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 檢查結果中包含 personid 3001（宗氏（李白妻））
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(3001, $personIds, '搜索「李白」應該能找到「宗氏（李白妻）」');
+    }
+
+    public function test_parentheses_content_is_searchable_halfwidth(): void
+    {
+        // 測試半角括號：搜索「楊玉環」應該能找到「楊貴妃(楊玉環)」
+        $request = new Request(['q' => '楊玉環']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 檢查結果中包含 personid 3002（楊貴妃(楊玉環)）
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(3002, $personIds, '搜索「楊玉環」應該能找到「楊貴妃(楊玉環)」');
+    }
+
+    public function test_parentheses_content_partial_search(): void
+    {
+        // 測試部分匹配：搜索「李白妻」應該能找到「宗氏（李白妻）」
+        $request = new Request(['q' => '李白妻']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 檢查結果中包含 personid 3001
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(3001, $personIds, '搜索「李白妻」應該能找到「宗氏（李白妻）」');
+    }
+
+    public function test_name_before_parentheses_still_searchable(): void
+    {
+        // 測試括號前的內容仍然可搜索：搜索「宗氏」應該能找到「宗氏（李白妻）」
+        $request = new Request(['q' => '宗氏']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 檢查結果中包含 personid 3001
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(3001, $personIds, '搜索「宗氏」應該能找到「宗氏（李白妻）」');
     }
 }

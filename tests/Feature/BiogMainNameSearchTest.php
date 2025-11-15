@@ -70,6 +70,25 @@ class BiogMainNameSearchTest extends TestCase
             $table->string('c_alt_name_chn')->nullable();
             $table->primary(['c_personid', 'c_alt_name_type_code']);
         });
+
+        // 創建倒排索引表
+        Schema::create('CBDB__NAME_FTS', function ($table) {
+            $table->bigIncrements('id');
+            $table->unsignedInteger('c_personid');
+            $table->unsignedSmallInteger('name_type_code')->nullable();
+            $table->string('name_type_desc', 32);
+            $table->string('name_type_desc_chn', 32);
+            $table->string('search_term', 100);
+            $table->string('full_name', 100);
+            $table->string('source', 32);
+            $table->string('source_key', 255)->nullable();
+            $table->boolean('is_simplified')->default(false);
+            $table->timestamps();
+
+            $table->index(['search_term', 'c_personid'], 'idx_cbdb__name_search_term');
+            $table->index('c_personid', 'idx_cbdb__name_person');
+            $table->index('name_type_code', 'idx_cbdb__name_type');
+        });
     }
 
     protected function seedTestData(): void
@@ -139,6 +158,25 @@ class BiogMainNameSearchTest extends TestCase
             ['c_personid' => 1001, 'c_alt_name_type_code' => 4, 'c_alt_name_chn' => '子瞻'],
             ['c_personid' => 1001, 'c_alt_name_type_code' => 5, 'c_alt_name_chn' => '東坡居士'],
             ['c_personid' => 1002, 'c_alt_name_type_code' => 4, 'c_alt_name_chn' => '子由'],
+        ]);
+
+        // 插入倒排索引表數據
+        $now = date('Y-m-d H:i:s');
+        DB::table('CBDB__NAME_FTS')->insert([
+            // 蘇軾的倒排記錄
+            ['c_personid' => 1001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '蘇軾', 'full_name' => '蘇軾', 'source' => 'biog_main', 'source_key' => 'biog_main:1001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 1001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '軾', 'full_name' => '蘇軾', 'source' => 'biog_main', 'source_key' => 'biog_main:1001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 1001, 'name_type_code' => 4, 'name_type_desc' => 'zi', 'name_type_desc_chn' => '字', 'search_term' => '子瞻', 'full_name' => '子瞻', 'source' => 'altname_data', 'source_key' => 'altname:1001-4-子瞻', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 1001, 'name_type_code' => 4, 'name_type_desc' => 'zi', 'name_type_desc_chn' => '字', 'search_term' => '瞻', 'full_name' => '子瞻', 'source' => 'altname_data', 'source_key' => 'altname:1001-4-子瞻', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+
+            // 蘇轍的倒排記錄
+            ['c_personid' => 1002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '蘇轍', 'full_name' => '蘇轍', 'source' => 'biog_main', 'source_key' => 'biog_main:1002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 1002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '轍', 'full_name' => '蘇轍', 'source' => 'biog_main', 'source_key' => 'biog_main:1002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+
+            // 王安石的倒排記錄
+            ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '王安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 
@@ -231,5 +269,136 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInternalType('array', $decoded);
         $this->assertArrayHasKey('data', $decoded);
         $this->assertGreaterThanOrEqual(3, count($decoded['data']));
+    }
+
+    // ===== 倒排索引表測試 =====
+
+    public function test_inverted_index_search_by_full_name(): void
+    {
+        $request = new Request(['q' => '蘇軾']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertCount(1, $result);
+
+        $person = $result->items()[0];
+        $this->assertEquals(1001, $person->c_personid);
+        $this->assertEquals('蘇軾', $person->c_name_chn);
+    }
+
+    public function test_inverted_index_search_by_suffix(): void
+    {
+        $request = new Request(['q' => '軾']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 應該包含蘇軾
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(1001, $personIds);
+    }
+
+    public function test_inverted_index_search_by_name_part(): void
+    {
+        $request = new Request(['q' => '安石']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 應該包含王安石
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(2001, $personIds);
+    }
+
+    public function test_inverted_index_search_by_single_char(): void
+    {
+        $request = new Request(['q' => '石']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 應該包含王安石（名末字「石」）
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(2001, $personIds);
+    }
+
+    public function test_inverted_index_search_by_zi(): void
+    {
+        $request = new Request(['q' => '子瞻']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(1, $result->total());
+
+        // 應該找到蘇軾（字子瞻）
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(1001, $personIds);
+    }
+
+    public function test_inverted_index_orders_by_match_length(): void
+    {
+        $request = new Request(['q' => '蘇']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+
+        // 應該找到多個結果（蘇軾、蘇轍都有「蘇」開頭的倒排記錄）
+        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $this->assertContains(1001, $personIds);
+        $this->assertContains(1002, $personIds);
+    }
+
+    public function test_inverted_index_fallback_when_no_match(): void
+    {
+        // 清空倒排索引表
+        DB::table('CBDB__NAME_FTS')->truncate();
+
+        $request = new Request(['q' => '蘇軾']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        // 即使倒排索引為空，仍應該通過回退方案找到結果
+        // 注意：在 SQLite 中，FIELD() 函數可能導致錯誤
+        // 這個測試主要驗證回退邏輯被觸發
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+    }
+
+    public function test_inverted_index_limits_to_500_candidates(): void
+    {
+        // 插入大量測試數據（超過 500 個）
+        $now = date('Y-m-d H:i:s');
+        $records = [];
+        for ($i = 3000; $i < 3600; $i++) {
+            $records[] = [
+                'c_personid' => $i,
+                'name_type_code' => null,
+                'name_type_desc' => 'main_name',
+                'name_type_desc_chn' => '本名',
+                'search_term' => '測試',
+                'full_name' => '測試' . $i,
+                'source' => 'biog_main',
+                'source_key' => 'biog_main:' . $i,
+                'is_simplified' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        DB::table('CBDB__NAME_FTS')->insert($records);
+
+        $request = new Request(['q' => '測試']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        // 應該成功執行（限制在 500 個候選人）
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
 }

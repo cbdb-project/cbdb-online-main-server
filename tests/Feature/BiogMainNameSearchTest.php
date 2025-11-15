@@ -375,10 +375,13 @@ class BiogMainNameSearchTest extends TestCase
     public function test_inverted_index_limits_to_500_candidates(): void
     {
         // 插入大量測試數據（超過 500 個）
+        // 分批插入以避免 SQLite 的 SQLITE_MAX_COMPOUND_SELECT 限制（默認 500）
         $now = date('Y-m-d H:i:s');
-        $records = [];
-        for ($i = 3000; $i < 3600; $i++) {
-            $records[] = [
+
+        // 第一批：300 條記錄
+        $batch1 = [];
+        for ($i = 3000; $i < 3300; $i++) {
+            $batch1[] = [
                 'c_personid' => $i,
                 'name_type_code' => null,
                 'name_type_desc' => 'main_name',
@@ -392,7 +395,26 @@ class BiogMainNameSearchTest extends TestCase
                 'updated_at' => $now,
             ];
         }
-        DB::table('CBDB__NAME_FTS')->insert($records);
+        DB::table('CBDB__NAME_FTS')->insert($batch1);
+
+        // 第二批：300 條記錄
+        $batch2 = [];
+        for ($i = 3300; $i < 3600; $i++) {
+            $batch2[] = [
+                'c_personid' => $i,
+                'name_type_code' => null,
+                'name_type_desc' => 'main_name',
+                'name_type_desc_chn' => '本名',
+                'search_term' => '測試',
+                'full_name' => '測試' . $i,
+                'source' => 'biog_main',
+                'source_key' => 'biog_main:' . $i,
+                'is_simplified' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        DB::table('CBDB__NAME_FTS')->insert($batch2);
 
         $request = new Request(['q' => '測試']);
 

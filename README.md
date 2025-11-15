@@ -30,8 +30,8 @@
 ## 技術環境
 
 ### 生產環境
-- **PHP**: 7.x
-- **Laravel**: 5.5
+- **PHP**: 7.4+
+- **Laravel**: 5.6
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
 - **Node.js**: 12.x

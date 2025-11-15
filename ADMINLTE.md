@@ -275,7 +275,7 @@ AdminLTE 在 CBDB Online 項目中的作用：
 - **AdminLTE v2.3.8** (~2016-2017年發布)
 - **距今 7-8年**，屬於極度過時版本
 - 基於 **Bootstrap 3**，已被主流淘汰
-- 項目技術棧：Laravel 5.5.x + PHP 7.4.33 + Vue 3.0.0
+- 項目技術棧：Laravel 5.6.x + PHP 7.4.33 + Vue 3.0.0
 
 ### 最新版本對比
 

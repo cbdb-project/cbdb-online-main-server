@@ -13,6 +13,7 @@
 * [CHANGELOG](./CHANGELOG.md)
 * [代碼表格前端實作比較](./CODES.md)
 * [代碼表界面白名單維護](./CODES_TABLES.md)
+* [代碼表界面效能優化](./CODES_PERFORMANCE.md)
 * [Posting/Office 流程備忘](./POSTING_OFFICE.md)
 * [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
 * [使用者權限說明](./USER_PRIVILEGES.md)

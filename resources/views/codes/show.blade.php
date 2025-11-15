@@ -54,7 +54,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @forelse ($data as $item)
+                    @forelse (($useCursorPagination ?? false) ? $data['data'] : $data as $item)
                         @php
                             $row = (array) $item;
                             $idParts = [];
@@ -129,7 +129,57 @@
                     </tfoot>
                 </table>
             </div>
-            <div class="pull-right">{{ $data->links() }}</div>
+            <div class="pull-right">
+                @if($useCursorPagination ?? false)
+                    {{-- 游标分页导航 --}}
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="btn-group" role="group">
+                            @if($data['has_prev_pages'])
+                                <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['before' => $data['prev_cursor']])) }}"
+                                   class="btn btn-default btn-sm">
+                                    <i class="fa fa-chevron-left"></i> 上一頁
+                                </a>
+                            @else
+                                <button class="btn btn-default btn-sm" disabled>
+                                    <i class="fa fa-chevron-left"></i> 上一頁
+                                </button>
+                            @endif
+
+                            <span class="btn btn-default btn-sm" disabled style="cursor: default;">
+                                ID: {{ number_format($data['first_id']) }} - {{ number_format($data['last_id']) }}
+                            </span>
+
+                            @if($data['has_more_pages'])
+                                <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['after' => $data['next_cursor']])) }}"
+                                   class="btn btn-default btn-sm">
+                                    下一頁 <i class="fa fa-chevron-right"></i>
+                                </a>
+                            @else
+                                <button class="btn btn-default btn-sm" disabled>
+                                    下一頁 <i class="fa fa-chevron-right"></i>
+                                </button>
+                            @endif
+                        </div>
+
+                        {{-- 跳转到 ID --}}
+                        <form method="GET" style="margin: 0;">
+                            @if($search)
+                                <input type="hidden" name="search" value="{{ $search }}">
+                            @endif
+                            <div class="input-group input-group-sm" style="width: 200px;">
+                                <input type="number" name="after" placeholder="跳轉到 ID"
+                                       class="form-control" min="0">
+                                <span class="input-group-btn">
+                                    <button type="submit" class="btn btn-primary">跳轉</button>
+                                </span>
+                            </div>
+                        </form>
+                    </div>
+                @else
+                    {{-- 标准 offset 分页 --}}
+                    {{ $data->links() }}
+                @endif
+            </div>
         </div>
         <!-- /.box-body -->
     </div>

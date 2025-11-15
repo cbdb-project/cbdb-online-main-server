@@ -753,16 +753,17 @@ class CodesController extends Controller
             return $cache[$table];
         }
 
-        $columns = Schema::getColumnListing($table);
-        $keys = [];
         $upperTable = strtoupper($table);
 
+        // 先检查配置，有配置则直接返回，不需要查询数据库
         if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
             $overrideKeys = array_values(array_unique(array_filter($this->tablePrimaryKeyOverrides[$upperTable])));
             if (!empty($overrideKeys)) {
                 return $cache[$table] = $overrideKeys;
             }
         }
+
+        $keys = [];
 
         try {
             $connection = DB::connection();
@@ -774,7 +775,9 @@ class CodesController extends Controller
             $keys = [];
         }
 
+        // 只有在需要时才查询列（作为 fallback）
         if (empty($keys)) {
+            $columns = Schema::getColumnListing($table);
             $keys[] = $columns[0] ?? 'id';
             if (isset($columns[1])) {
                 $keys[] = $columns[1];

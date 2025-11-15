@@ -81,7 +81,7 @@ $sampleRow = $hasColumnConfig ? null : (clone $query)->first();
 $thead = $this->buildTableHead($table, $sampleRow);
 ```
 
-**影響的表**：
+**影響的表（有 `tableColumnOverrides` 配置）**：
 - `CBDB__NAME_FTS` ✅
 - `CBDB__TRAD_SIMP_MAP` ✅
 - `CBDB_NAME_LIST` ✅
@@ -99,9 +99,51 @@ $thead = $this->buildTableHead($table, $sampleRow);
 
 **效能提升**：
 - 對於有配置的表，消除 `LIMIT 1` 查詢（~2-5ms）
-- 減少約 40 個白名單表的不必要查詢
+- 減少約 14 個已配置表的不必要查詢
 
-### 3. CBDB__NAME_FTS 游標分頁優化
+### 3. 優化 getKeyColumns() 方法中的列查詢
+
+**問題**：
+- `getKeyColumns()` 方法在開頭就查詢所有列（`Schema::getColumnListing()`）
+- 但對於有 `tablePrimaryKeyOverrides` 配置的表，會直接返回配置
+- 查詢結果根本沒用到，造成不必要的 `information_schema` 查詢
+
+**解決方案**：
+- 先檢查 `tablePrimaryKeyOverrides` 配置，有配置則直接返回
+- 只有在真正需要時（作為 fallback）才查詢列
+
+**代碼變更**：
+
+```php
+// 優化前（總是查詢列）
+$columns = Schema::getColumnListing($table);
+if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
+    return $overrideKeys;  // $columns 根本沒用到！
+}
+// ... 後面才用到 $columns
+
+// 優化後（只在需要時查詢）
+if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
+    return $overrideKeys;  // 直接返回，不查詢
+}
+// ... 其他邏輯
+if (empty($keys)) {
+    $columns = Schema::getColumnListing($table);  // 只在這裡才查詢
+    // ...
+}
+```
+
+**影響的表（有 `tablePrimaryKeyOverrides` 配置）**：
+- `CBDB__NAME_FTS` ✅
+- `CBDB__TRAD_SIMP_MAP` ✅
+- `CBDB_NAME_LIST` ✅
+- `TEXT_CODES` ✅
+
+**效能提升**：
+- 對於有主鍵配置的表，消除 `information_schema.columns` 查詢（~3-5ms）
+- 從兩次 `Schema::getColumnListing()` 減少到一次（對於 `CBDB__NAME_FTS`）
+
+### 4. CBDB__NAME_FTS 游標分頁優化
 
 詳見 [CODES_TABLES.md](./CODES_TABLES.md#效能優化)。
 
@@ -115,22 +157,26 @@ $thead = $this->buildTableHead($table, $sampleRow);
 
 **優化前**（訪問 `/codes/CBDB__NAME_FTS`）：
 ```sql
-SHOW TABLES;                                          -- ~10ms
-SELECT * FROM CBDB__NAME_FTS LIMIT 1;                 -- ~3ms
-SELECT * FROM CBDB__NAME_FTS LIMIT 20 OFFSET 0;      -- ~5ms
--- 總計：~18ms
+SHOW TABLES;                                                                  -- ~10ms
+SELECT column_name FROM information_schema.columns WHERE table_name = ?;     -- ~3ms (第1次)
+SELECT * FROM CBDB__NAME_FTS LIMIT 1;                                        -- ~3ms
+SELECT column_name FROM information_schema.columns WHERE table_name = ?;     -- ~3ms (第2次)
+SELECT * FROM CBDB__NAME_FTS LIMIT 20 OFFSET 0;                              -- ~5ms
+-- 總計：~24ms
 ```
 
 **優化後**：
 ```sql
-SELECT * FROM CBDB__NAME_FTS WHERE id > 0 LIMIT 20;  -- ~3ms
--- 總計：~3ms（減少 83%）
+SELECT column_name FROM information_schema.columns WHERE table_name = ?;     -- ~3ms (僅1次)
+SELECT * FROM CBDB__NAME_FTS WHERE id > 0 LIMIT 20;                          -- ~3ms
+-- 總計：~6ms（減少 75%）
 ```
 
 **優化措施**：
 1. ✅ 移除 `SHOW TABLES` 查詢（-10ms）
 2. ✅ 移除樣本行 `LIMIT 1` 查詢（-3ms）
-3. ✅ 使用游標分頁替代 OFFSET（-2ms）
+3. ✅ 優化 `getKeyColumns()` 減少一次 `information_schema` 查詢（-3ms）
+4. ✅ 使用游標分頁替代 OFFSET（-2ms）
 
 ### 建議的監控指標
 

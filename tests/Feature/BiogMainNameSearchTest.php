@@ -401,4 +401,22 @@ class BiogMainNameSearchTest extends TestCase
         // 應該成功執行（限制在 500 個候選人）
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
+
+    public function test_inverted_index_maintains_match_quality_order(): void
+    {
+        // 驗證排序：完整匹配應該排在前面
+        $request = new Request(['q' => '蘇']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(2, $result->total());
+
+        // 檢查返回的結果
+        $items = $result->items();
+        $firstItem = $items[0];
+
+        // 第一個結果應該是蘇軾或蘇轍（因為都是「蘇」開頭）
+        $this->assertContains($firstItem->c_personid, [1001, 1002]);
+    }
 }

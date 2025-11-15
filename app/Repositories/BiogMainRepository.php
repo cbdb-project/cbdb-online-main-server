@@ -311,14 +311,19 @@ class BiogMainRepository
                 ->whereIn('BIOG_MAIN.c_personid', $personIds)
                 ->groupBy('BIOG_MAIN.c_personid');
 
-            // 使用 FIELD() 排序（僅 MySQL/MariaDB 支援）
-            // SQLite 不支援 FIELD() 函數，在測試環境中使用簡單排序
+            // 使用 FIELD() 排序保持匹配質量順序（完整匹配 → 長後綴 → 短後綴）
             $driver = DB::connection()->getDriverName();
             if ($driver === 'mysql') {
+                // MySQL/MariaDB：使用 FIELD() 函數
                 $query->orderByRaw('FIELD(BIOG_MAIN.c_personid, ' . implode(',', $personIds) . ')');
             } else {
-                // SQLite 或其他資料庫：按 c_personid 升序排列
-                $query->orderBy('BIOG_MAIN.c_personid', 'ASC');
+                // SQLite：使用 CASE WHEN 模擬 FIELD() 行為
+                $caseClauses = [];
+                foreach ($personIds as $index => $personId) {
+                    $caseClauses[] = "WHEN BIOG_MAIN.c_personid = {$personId} THEN {$index}";
+                }
+                $caseStatement = 'CASE ' . implode(' ', $caseClauses) . ' ELSE 999999 END';
+                $query->orderByRaw($caseStatement);
             }
 
             $names = $query->paginate($num);
@@ -358,10 +363,14 @@ class BiogMainRepository
             ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $request->q)
             ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
 
-        // 使用 FIELD() 排序（僅 MySQL/MariaDB 支援）
+        // 使用 FIELD() 排序讓姓氏完全匹配的排在前面
         $driver = DB::connection()->getDriverName();
         if ($driver === 'mysql') {
+            // MySQL/MariaDB：使用 FIELD() 函數
             $names = $names->orderByRaw("FIELD(BIOG_MAIN.c_surname, '$request->q') DESC");
+        } else {
+            // SQLite：使用 CASE WHEN 模擬姓氏優先排序
+            $names = $names->orderByRaw("CASE WHEN BIOG_MAIN.c_surname = '$request->q' THEN 0 ELSE 1 END ASC");
         }
 
         $names = $names->orderBy('BIOG_MAIN.c_personid', 'ASC')

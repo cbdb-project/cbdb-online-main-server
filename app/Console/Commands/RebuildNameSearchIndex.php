@@ -16,7 +16,10 @@ class RebuildNameSearchIndex extends Command
      */
     protected $signature = 'cbdb:rebuild-name-search
                             {--truncate : Truncate CBDB__NAME_FTS before rebuilding}
-                            {--batch=500 : Number of records to insert per batch}';
+                            {--batch=500 : Number of records to insert per batch}
+                            {--commit-interval=5000 : Number of records to commit per transaction}
+                            {--id-from= : Start from this c_personid (inclusive)}
+                            {--id-to= : End at this c_personid (inclusive)}';
 
     /**
      * The console command description.
@@ -45,8 +48,20 @@ class RebuildNameSearchIndex extends Command
         }
 
         $batchSize = max(1, (int) $this->option('batch'));
+        $commitInterval = max(100, (int) $this->option('commit-interval'));
+        $idFrom = $this->option('id-from') ? (int) $this->option('id-from') : null;
+        $idTo = $this->option('id-to') ? (int) $this->option('id-to') : null;
 
         $this->info('開始重建姓名搜尋倒排索引...');
+        $this->info(sprintf('批次大小：%d，事務提交間隔：%d 條記錄',
+            $batchSize, $commitInterval));
+
+        if ($idFrom !== null || $idTo !== null) {
+            $this->info(sprintf('ID 範圍：%s 到 %s',
+                $idFrom ?? '開始',
+                $idTo ?? '結束'
+            ));
+        }
 
         // 載入繁簡映射表
         $this->loadTradSimpMap();
@@ -58,7 +73,7 @@ class RebuildNameSearchIndex extends Command
 
         // 流式處理：邊收集邊生成邊插入
         $this->info('流式處理姓名資料...');
-        $this->streamProcessNames($batchSize);
+        $this->streamProcessNames($batchSize, $commitInterval, $idFrom, $idTo);
 
         $this->info('索引重建完成！');
         $this->displayStatistics();
@@ -70,53 +85,85 @@ class RebuildNameSearchIndex extends Command
      * 流式處理姓名（邊收集邊生成邊插入，降低記憶體佔用）
      *
      * @param int $batchSize
+     * @param int $commitInterval
+     * @param int|null $idFrom
+     * @param int|null $idTo
      */
-    protected function streamProcessNames(int $batchSize)
+    protected function streamProcessNames(int $batchSize, int $commitInterval, ?int $idFrom = null, ?int $idTo = null)
     {
         $recordBuffer = [];
         $totalInserted = 0;
 
-        // 使用事務包裹整個導入過程，大幅提升性能
-        DB::transaction(function () use ($batchSize, &$recordBuffer, &$totalInserted) {
-            $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted);
-        });
+        $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted, $commitInterval, $idFrom, $idTo);
 
         $this->info(sprintf('成功插入 %s 條倒排記錄', number_format($totalInserted)));
     }
 
     /**
-     * 在事務中流式處理姓名
+     * 流式處理姓名（分段事務）
      *
      * @param int $batchSize
      * @param array $recordBuffer
      * @param int $totalInserted
+     * @param int $commitInterval
+     * @param int|null $idFrom
+     * @param int|null $idTo
      */
-    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted)
+    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval, ?int $idFrom = null, ?int $idTo = null)
     {
+        // 禁用查詢日誌以避免記憶體累積
+        DB::connection()->disableQueryLog();
+
         // 統計總數用於進度條
-        $totalMainNames = DB::table('BIOG_MAIN')
+        $mainQuery = DB::table('BIOG_MAIN')
             ->where('c_personid', '>', 0)
             ->whereNotNull('c_name_chn')
-            ->where('c_name_chn', '!=', '')
-            ->count();
-        $totalAltNames = DB::table('ALTNAME_DATA')
+            ->where('c_name_chn', '!=', '');
+        if ($idFrom !== null) {
+            $mainQuery->where('c_personid', '>=', $idFrom);
+        }
+        if ($idTo !== null) {
+            $mainQuery->where('c_personid', '<=', $idTo);
+        }
+        $totalMainNames = $mainQuery->count();
+
+        $altQuery = DB::table('ALTNAME_DATA')
             ->where('c_personid', '>', 0)
             ->whereNotNull('c_alt_name_chn')
-            ->where('c_alt_name_chn', '!=', '')
-            ->count();
+            ->where('c_alt_name_chn', '!=', '');
+        if ($idFrom !== null) {
+            $altQuery->where('c_personid', '>=', $idFrom);
+        }
+        if ($idTo !== null) {
+            $altQuery->where('c_personid', '<=', $idTo);
+        }
+        $totalAltNames = $altQuery->count();
         $totalNames = $totalMainNames + $totalAltNames;
 
         $bar = $this->output->createProgressBar($totalNames);
         $bar->start();
 
-        // 1. 處理本名（流式）
-        DB::table('BIOG_MAIN')
+        $lastCommitCount = 0; // 上次提交時的記錄數
+        $timestamp = now(); // 快取時間戳，避免每次都創建新物件
+
+        // 開始第一個事務
+        DB::beginTransaction();
+
+        // 1. 處理本名（流式，使用 chunkById 避免 OFFSET 造成的記憶體累積）
+        $mainProcessQuery = DB::table('BIOG_MAIN')
             ->select('c_personid', 'c_name_chn')
             ->where('c_personid', '>', 0)
             ->whereNotNull('c_name_chn')
-            ->where('c_name_chn', '!=', '')
+            ->where('c_name_chn', '!=', '');
+        if ($idFrom !== null) {
+            $mainProcessQuery->where('c_personid', '>=', $idFrom);
+        }
+        if ($idTo !== null) {
+            $mainProcessQuery->where('c_personid', '<=', $idTo);
+        }
+        $mainProcessQuery
             ->orderBy('c_personid')
-            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+            ->chunkById(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_name_chn);
                     if (!$fullName) {
@@ -133,23 +180,37 @@ class RebuildNameSearchIndex extends Command
                         'full_name' => $fullName,
                         'source' => 'BIOG_MAIN',
                         'source_key' => 'biog_main:' . $row->c_personid,
-                    ]);
+                    ], $timestamp);
 
-                    $recordBuffer = array_merge($recordBuffer, $records);
+                    // 使用 array_push 展開，避免 array_merge 的記憶體複製
+                    array_push($recordBuffer, ...$records);
 
                     // 當緩衝區達到批次大小時，插入資料庫
                     if (count($recordBuffer) >= $batchSize) {
                         DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
                         $totalInserted += count($recordBuffer);
                         $recordBuffer = [];
+
+                        // 分段提交：每插入 commitInterval 條記錄就提交並開啟新事務
+                        if ($totalInserted - $lastCommitCount >= $commitInterval) {
+                            DB::commit();
+                            $this->line('');
+                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                                number_format($totalInserted),
+                                number_format(memory_get_usage(true) / 1024 / 1024, 2)
+                            ));
+                            DB::beginTransaction();
+                            $lastCommitCount = $totalInserted;
+                            gc_collect_cycles(); // 清理內存
+                        }
                     }
 
                     $bar->advance();
                 }
-            });
+            }, 'c_personid');
 
         // 2. 處理別名（流式）
-        DB::table('ALTNAME_DATA as ad')
+        $altProcessQuery = DB::table('ALTNAME_DATA as ad')
             ->join('ALTNAME_CODES as codes', 'codes.c_name_type_code', '=', 'ad.c_alt_name_type_code')
             ->select(
                 'ad.c_personid',
@@ -160,9 +221,16 @@ class RebuildNameSearchIndex extends Command
             )
             ->where('ad.c_personid', '>', 0)
             ->whereNotNull('ad.c_alt_name_chn')
-            ->where('ad.c_alt_name_chn', '!=', '')
+            ->where('ad.c_alt_name_chn', '!=', '');
+        if ($idFrom !== null) {
+            $altProcessQuery->where('ad.c_personid', '>=', $idFrom);
+        }
+        if ($idTo !== null) {
+            $altProcessQuery->where('ad.c_personid', '<=', $idTo);
+        }
+        $altProcessQuery
             ->orderBy('ad.c_personid')
-            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, $batchSize, $bar) {
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_alt_name_chn);
                     if (!$fullName) {
@@ -183,15 +251,29 @@ class RebuildNameSearchIndex extends Command
                             $row->c_alt_name_type_code,
                             $row->c_alt_name_chn
                         ),
-                    ]);
+                    ], $timestamp);
 
-                    $recordBuffer = array_merge($recordBuffer, $records);
+                    // 使用 array_push 展開，避免 array_merge 的記憶體複製
+                    array_push($recordBuffer, ...$records);
 
                     // 當緩衝區達到批次大小時，插入資料庫
                     if (count($recordBuffer) >= $batchSize) {
                         DB::table('CBDB__NAME_FTS')->insert($recordBuffer);
                         $totalInserted += count($recordBuffer);
                         $recordBuffer = [];
+
+                        // 分段提交：每插入 commitInterval 條記錄就提交並開啟新事務
+                        if ($totalInserted - $lastCommitCount >= $commitInterval) {
+                            DB::commit();
+                            $this->line('');
+                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                                number_format($totalInserted),
+                                number_format(memory_get_usage(true) / 1024 / 1024, 2)
+                            ));
+                            DB::beginTransaction();
+                            $lastCommitCount = $totalInserted;
+                            gc_collect_cycles(); // 清理內存
+                        }
                     }
 
                     $bar->advance();
@@ -204,6 +286,9 @@ class RebuildNameSearchIndex extends Command
             $totalInserted += count($recordBuffer);
         }
 
+        // 最後提交剩餘的事務
+        DB::commit();
+
         $bar->finish();
         $this->line('');
     }
@@ -212,12 +297,18 @@ class RebuildNameSearchIndex extends Command
      * 為單個姓名生成倒排記錄（包含繁簡體）
      *
      * @param array $nameInfo
+     * @param \Illuminate\Support\Carbon|null $timestamp
      * @return array
      */
-    protected function generateRecordsForName(array $nameInfo): array
+    protected function generateRecordsForName(array $nameInfo, $timestamp = null): array
     {
         $records = [];
         $insertedTerms = []; // 記錄已插入的 search_term，避免重複
+
+        // 使用傳入的時間戳或創建新的（避免在循環中重複創建）
+        if ($timestamp === null) {
+            $timestamp = now();
+        }
 
         // 生成繁體版本的後綴
         $tradSuffixes = $this->generateSuffixes($nameInfo['full_name']);
@@ -226,8 +317,8 @@ class RebuildNameSearchIndex extends Command
                 $records[] = array_merge($nameInfo, [
                     'search_term' => $suffix,
                     'is_simplified' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
                 ]);
                 $insertedTerms[$suffix] = true; // 標記已插入
             }
@@ -243,8 +334,8 @@ class RebuildNameSearchIndex extends Command
                     $records[] = array_merge($nameInfo, [
                         'search_term' => $suffix,
                         'is_simplified' => 1,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
                     ]);
                 }
             }

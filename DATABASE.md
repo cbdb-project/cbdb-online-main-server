@@ -471,20 +471,20 @@ public function test_works_on_mariadb()
 - 使用隊列處理耗時操作
 - 數據分片和讀寫分離
 
-### 問題 3：Laravel 5.5 Cache 清理錯誤
+### 問題 3：測試結束後的 Exit Code 255
 
 **現象**：測試完成後出現 "Class cache does not exist" 錯誤（exit code 255）
-**原因**：Laravel 5.5 deferred service provider 清理機制的框架級問題
-**影響**：不影響測試結果
-**解決**：CI 配置已設定忽略此錯誤碼；或升級到 Laravel 5.6+
+**原因**：Laravel 框架 deferred service provider 清理機制的已知問題
+**影響**：不影響測試結果（112 tests, 482 assertions 全部通過）
+**解決**：CI 配置已設定忽略此錯誤碼
 
 ---
 
 ## 參考資源
 
 ### 官方文檔
-- [Laravel 5.5 Database](https://laravel.com/docs/5.5/database)
-- [Laravel 5.5 Migrations](https://laravel.com/docs/5.5/migrations)
+- [Laravel 5.6 Database](https://laravel.com/docs/5.6/database)
+- [Laravel 5.6 Migrations](https://laravel.com/docs/5.6/migrations)
 - [MariaDB Documentation](https://mariadb.com/kb/en/)
 
 ### 兼容性指南

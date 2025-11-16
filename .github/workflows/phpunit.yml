@@ -1,4 +1,4 @@
-name: Codes Controller Tests
+name: PHPUnit Tests
 
 on:
   push:

@@ -30,8 +30,8 @@
 ## 技術環境
 
 ### 生產環境
-- **PHP**: 7.x
-- **Laravel**: 5.5
+- **PHP**: 7.4+
+- **Laravel**: 5.6
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
 - **Node.js**: 12.x
@@ -44,6 +44,19 @@
 - 索引策略應基於通用的 B-Tree 或其他跨數據庫支持的類型
 
 ## 原始说明
+
+Laravel 框架已更新至 [5.6](https://laravel.com/docs/5.6)。
+
+## 開發说明檔案 (2025)
+
+* [代碼表格前端實作比較](./CODES.md)
+* [代碼表界面白名單維護](./CODES_TABLES.md)
+* [MERGE 工具說明](./MERGE.md)
+* [AGENTS 指南](./AGENTS.md)
+
+（感謝 [Frank Lin](https://github.com/frankslin) 先生貢獻）
+
+## 開發手記 (歷史檔案)
 
 ### Database migrations
 
@@ -144,7 +157,7 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 
 ### 构建API资源服务
 
-参考文档[controllers](http://d.laravel-china.org/docs/5.5/eloquent-resources)
+参考文档[controllers](http://d.laravel-china.org/docs/5.6/eloquent-resources)
 
 创建API资源控制器，如人物主要信息
 

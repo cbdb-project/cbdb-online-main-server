@@ -118,11 +118,11 @@ return [
     |
     | Available Settings: "single", "daily", "syslog", "errorlog"
     |
+    | Note: In Laravel 5.6+, all logging configuration has been moved to
+    | config/logging.php. The 'log' and 'log_level' options are no longer
+    | needed here.
+    |
     */
-
-    'log' => env('APP_LOG', 'single'),
-
-    'log_level' => env('APP_LOG_LEVEL', 'debug'),
 
     /*
     |--------------------------------------------------------------------------

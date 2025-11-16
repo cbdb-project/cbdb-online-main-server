@@ -377,21 +377,11 @@ class RebuildNameSearchIndex extends Command
             return null;
         }
 
-        // 移除末尾的半角括號註釋 (English)
-        if (preg_match('/^(.+?)\([^)]*\)$/', $name, $matches)) {
-            $withoutParen = trim($matches[1]);
-            if ($withoutParen !== '') {
-                $name = $withoutParen;
-            }
-        }
-
-        // 移除末尾的全角括號註釋 （English）
-        if (preg_match('/^(.+?)（[^）]*）$/u', $name, $matches)) {
-            $withoutParen = trim($matches[1]);
-            if ($withoutParen !== '') {
-                $name = $withoutParen;
-            }
-        }
+        // 移除括號符號本身，但保留內容以便搜尋
+        // 例如："宗氏（李白妻）" → "宗氏李白妻"
+        // 這樣搜尋 "李白" 可以找到這條記錄
+        $name = preg_replace('/[()（）]/u', '', $name);
+        $name = trim($name);
 
         return $name ?: null;
     }

@@ -57,7 +57,11 @@
 
                         <hr>
 
-                        <form class="rebuild-form" method="POST" action="{{ route('admin.cbdb-table-maintenance.rebuild') }}" data-table-name="{{ $tableInfo['name_chn'] }}">
+                        <form class="rebuild-form" method="POST" action="{{ route('admin.cbdb-table-maintenance.rebuild') }}" data-table-name="{{ $tableInfo['name_chn'] }}"
+                              @if($tableName == 'CBDB__NAME_FTS')
+                                  data-progress-url-template="{{ route('admin.cbdb-table-maintenance.progress', ['taskId' => '__TASK_ID__'], false) }}"
+                              @endif
+                        >
                             {{ csrf_field() }}
                             <input type="hidden" name="table_name" value="{{ $tableName }}">
 
@@ -97,6 +101,16 @@
                                     </div>
                                     <span class="help-block small">留空則處理全部人物記錄</span>
                                 </div>
+
+                                <div class="progress-container name-fts-progress" style="display:none; margin-top:15px;">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="0"
+                                             aria-valuemin="0" aria-valuemax="100" style="width:0%;">
+                                            0%
+                                        </div>
+                                    </div>
+                                    <p class="progress-message text-muted small" style="margin-top:5px;">進度資訊會顯示於此。</p>
+                                </div>
                             @endif
 
                             <button type="submit" class="btn btn-{{ $tableInfo['color'] }} rebuild-btn">
@@ -124,7 +138,7 @@
                     <li>從 OpenCC 專案下載最新的繁簡對照資料</li>
                     <li>用於支援繁簡體混合搜尋功能</li>
                     <li>重建時會清空並重新導入所有映射關係</li>
-                    <li>執行時間：約 1-2 分鐘</li>
+                    <li>執行時間僅需數秒，並會直接在頁面顯示結果</li>
                 </ul>
 
                 <h4>姓名搜尋倒排索引 (CBDB__NAME_FTS)</h4>
@@ -135,7 +149,7 @@
                     <li><strong>Truncate 模式：</strong>清空並重新生成所有索引記錄（預設勾選）</li>
                     <li><strong>增量模式：</strong>不勾選 truncate，僅更新指定 ID 範圍的記錄</li>
                     <li><strong>ID 範圍：</strong>可指定 c_personid 的起始和結束範圍，留空則處理全部</li>
-                    <li>執行時間：全量重建約 5-10 分鐘，增量更新視範圍而定</li>
+                    <li>執行時間：全量重建約 5-10 分鐘，系統會顯示進度條並自動刷新狀態；增量更新視範圍而定</li>
                 </ul>
 
                 <p class="text-danger">
@@ -178,7 +192,9 @@
 @section('js')
 <script>
 $(document).ready(function() {
-    // 為每個重建表單添加處理邏輯
+    var progressPollers = {};
+    var PROGRESS_POLL_INTERVAL = 5000;
+
     $('.rebuild-form').on('submit', function(e) {
         e.preventDefault();
 
@@ -188,30 +204,28 @@ $(document).ready(function() {
         var tableName = $form.data('table-name');
         var originalBtnHtml = $btn.html();
 
-        // 確認重建
         if (!confirm('確定要重建「' + tableName + '」嗎？\n\n此操作將清空資料表並重新生成所有資料，可能需要數分鐘時間。')) {
             return false;
         }
 
-        // 禁用按鈕並顯示 loading
         $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 處理中...');
         $loadingMsg.show();
 
-        // 提交表單
         $.ajax({
             url: $form.attr('action'),
             method: 'POST',
             data: $form.serialize(),
             dataType: 'json',
-            timeout: 600000, // 10 分鐘超時
+            timeout: 600000,
             success: function(response) {
-                if (response.success) {
+                if (response.success && response.task_id) {
+                    startNameFtsProgress($form, response.task_id, response.message, originalBtnHtml, $btn, $loadingMsg);
+                } else if (response.success) {
                     alert('重建成功！\n\n' + response.message);
                     location.reload();
                 } else {
                     alert('重建失敗：\n\n' + response.message);
-                    $btn.prop('disabled', false).html(originalBtnHtml);
-                    $loadingMsg.hide();
+                    resetButton($btn, $loadingMsg, originalBtnHtml);
                 }
             },
             error: function(xhr, status, error) {
@@ -227,11 +241,95 @@ $(document).ready(function() {
                 }
 
                 alert('錯誤：' + errorMsg);
-                $btn.prop('disabled', false).html(originalBtnHtml);
-                $loadingMsg.hide();
+                resetButton($btn, $loadingMsg, originalBtnHtml);
             }
         });
     });
+
+    function resetButton($btn, $loadingMsg, originalBtnHtml) {
+        $btn.prop('disabled', false).html(originalBtnHtml);
+        $loadingMsg.hide();
+    }
+
+    function startNameFtsProgress($form, taskId, initialMessage, originalBtnHtml, $btn, $loadingMsg) {
+        var template = $form.data('progress-url-template');
+        if (!template) {
+            alert('未配置進度查詢 URL。');
+            resetButton($btn, $loadingMsg, originalBtnHtml);
+            return;
+        }
+
+        var url = template.replace('__TASK_ID__', taskId);
+        var $container = $form.find('.name-fts-progress');
+        var $bar = $container.find('.progress-bar');
+        var $message = $container.find('.progress-message');
+
+        $container.show();
+        updateProgressBar($bar, 5);
+        $message.text(initialMessage || '已排程等待執行…');
+
+        var poll = function() {
+            $.ajax({
+                url: url,
+                method: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function(resp) {
+                    if (!resp.success) {
+                        handleProgressError(resp.message || '未知錯誤');
+                        return;
+                    }
+
+                    var progress = resp.progress || {};
+                    updateProgressBar($bar, progress.progress || 0);
+                    if (progress.message) {
+                        $message.text(progress.message);
+                    }
+
+                    if (progress.status === 'completed') {
+                        if (progressPollers[taskId]) {
+                            clearInterval(progressPollers[taskId]);
+                            delete progressPollers[taskId];
+                        }
+                        $message.text(progress.message || '重建完成！');
+                        setTimeout(function() {
+                            alert('重建成功！\n\n' + (progress.message || '索引已完成重建。'));
+                            location.reload();
+                        }, 500);
+                    } else if (progress.status === 'error') {
+                        if (progressPollers[taskId]) {
+                            clearInterval(progressPollers[taskId]);
+                            delete progressPollers[taskId];
+                        }
+                        alert('重建失敗：\n\n' + (progress.message || '請查看日誌'));
+                        resetButton($btn, $loadingMsg, originalBtnHtml);
+                    }
+                },
+                error: function() {
+                    handleProgressError('無法取得重建進度，請稍後再試。');
+                }
+            });
+        };
+
+        var handleProgressError = function(message) {
+            if (progressPollers[taskId]) {
+                clearInterval(progressPollers[taskId]);
+                delete progressPollers[taskId];
+            }
+            alert('進度查詢失敗：\n\n' + message);
+            resetButton($btn, $loadingMsg, originalBtnHtml);
+        };
+
+        progressPollers[taskId] = setInterval(poll, PROGRESS_POLL_INTERVAL);
+        poll();
+    }
+
+    function updateProgressBar($bar, value) {
+        var percent = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+        $bar.css('width', percent + '%')
+            .attr('aria-valuenow', percent)
+            .text(percent + '%');
+    }
 });
 </script>
 @endsection

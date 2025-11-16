@@ -200,6 +200,9 @@ Route::middleware('auth')->group(function () {
     });
     Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')->name('admin.cbdb-table-maintenance');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');
+    Route::get('admin/cbdb-table-maintenance/progress/{taskId}', 'CbdbTableMaintenanceController@getNameFtsProgress')
+        ->where('taskId', '[a-zA-Z0-9_]+')
+        ->name('admin.cbdb-table-maintenance.progress');
 });
 
 Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use ReflectionClass;
@@ -98,22 +99,26 @@ class CbdbTableMaintenanceController extends Controller
         set_time_limit(0);
         ini_set('memory_limit', '1024M');
 
+        // 構建 Artisan::call() 參數（關聯數組格式）
+        $params = [];
+
+        if ($truncate) {
+            $params['--truncate'] = true;
+        }
+
+        if ($idFrom && is_numeric($idFrom)) {
+            $params['--id-from'] = (int) $idFrom;
+        }
+
+        if ($idTo && is_numeric($idTo)) {
+            $params['--id-to'] = (int) $idTo;
+        }
+
+        if ($tableName === 'CBDB__NAME_FTS') {
+            return $this->startNameFtsRebuildTask($command, $tableName, $params, (bool) $truncate, $idFrom, $idTo);
+        }
+
         try {
-            // 構建 Artisan::call() 參數（關聯數組格式）
-            $params = [];
-
-            if ($truncate) {
-                $params['--truncate'] = true;
-            }
-
-            if ($idFrom && is_numeric($idFrom)) {
-                $params['--id-from'] = (int)$idFrom;
-            }
-
-            if ($idTo && is_numeric($idTo)) {
-                $params['--id-to'] = (int)$idTo;
-            }
-
             $paramsLog = json_encode($params);
             Log::info("開始執行命令：{$command}，參數：{$paramsLog}");
 
@@ -145,10 +150,9 @@ class CbdbTableMaintenanceController extends Controller
                     'success' => true,
                     'message' => "重建完成！資料表現有 " . number_format($count) . " 筆記錄"
                 ]);
-            } else {
-                throw new \Exception('Artisan 命令執行失敗，退出代碼：' . $exitCode);
             }
 
+            throw new \Exception('Artisan 命令執行失敗，退出代碼：' . $exitCode);
         } catch (\Exception $e) {
             Log::error('CBDB table maintenance rebuild error', [
                 'table' => $tableName,
@@ -163,6 +167,23 @@ class CbdbTableMaintenanceController extends Controller
                 'message' => '重建失敗：' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getNameFtsProgress($taskId)
+    {
+        $data = Cache::get($this->progressCacheKey($taskId));
+
+        if (!$data) {
+            return response()->json([
+                'success' => false,
+                'message' => '找不到對應的重建任務'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'progress' => $data
+        ]);
     }
 
     protected function logOperation($operation, $tableName, $count = null, $additionalData = [])
@@ -236,5 +257,116 @@ class CbdbTableMaintenanceController extends Controller
         }
 
         throw new \RuntimeException('Unable to resolve Artisan console application instance.');
+    }
+
+    protected function startNameFtsRebuildTask(string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
+    {
+        $taskId = 'cbdb_name_fts_' . time() . '_' . Auth::id();
+        $meta = [
+            'command' => $command,
+            'params' => $params,
+            'truncate' => $truncate,
+            'id_from' => $idFrom,
+            'id_to' => $idTo,
+            'table_name' => $tableName,
+        ];
+
+        $this->initializeProgress($taskId, $meta);
+
+        $this->logOperation('rebuild_start', $tableName, 0, array_merge($meta, [
+            'task_id' => $taskId,
+        ]));
+
+        register_shutdown_function(function () use ($taskId, $command, $tableName, $params, $truncate, $idFrom, $idTo) {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            $this->executeNameFtsRebuildTask($taskId, $command, $tableName, $params, $truncate, $idFrom, $idTo);
+        });
+
+        return response()->json([
+            'success' => true,
+            'task_id' => $taskId,
+            'message' => '已啟動姓名索引重建，請透過進度條查看最新狀態。'
+        ]);
+    }
+
+    protected function executeNameFtsRebuildTask(string $taskId, string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
+    {
+        try {
+            $this->updateProgress($taskId, 10, '正在準備執行 Artisan 指令…', 'running');
+            [$exitCode, $outputStr] = $this->runConsoleCommand($command, $params);
+
+            if ($exitCode !== 0) {
+                throw new \Exception('Artisan 命令執行失敗，退出代碼：' . $exitCode);
+            }
+
+            $this->updateProgress($taskId, 85, '指令已完成，正在統計結果…', 'running');
+
+            $count = 0;
+            if (Schema::hasTable($tableName)) {
+                $count = DB::table($tableName)->count();
+            }
+
+            $this->logOperation('rebuild_success', $tableName, $count, [
+                'command' => $command,
+                'params' => $params,
+                'truncate' => $truncate,
+                'id_from' => $idFrom,
+                'id_to' => $idTo,
+                'exit_code' => 0,
+                'output' => $outputStr,
+                'task_id' => $taskId,
+            ]);
+
+            $this->updateProgress($taskId, 100, "完成！目前共有 " . number_format($count) . " 筆索引記錄。", 'completed');
+        } catch (\Exception $e) {
+            $this->updateProgress($taskId, 0, '重建失敗：' . $e->getMessage(), 'error');
+
+            Log::error('CBDB name index rebuild error', [
+                'table' => $tableName,
+                'command' => $command,
+                'params' => $params,
+                'task_id' => $taskId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    protected function initializeProgress(string $taskId, array $meta = []): void
+    {
+        $data = array_merge($meta, [
+            'task_id' => $taskId,
+            'progress' => 5,
+            'message' => '已排程等待執行…',
+            'status' => 'queued',
+            'started_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->toDateTimeString(),
+        ]);
+
+        Cache::put($this->progressCacheKey($taskId), $data, now()->addHour());
+    }
+
+    protected function updateProgress(string $taskId, int $progress, string $message, string $status = 'running'): void
+    {
+        $key = $this->progressCacheKey($taskId);
+        $data = Cache::get($key, []);
+
+        $data['progress'] = $progress;
+        $data['message'] = $message;
+        $data['status'] = $status;
+        $data['updated_at'] = Carbon::now()->toDateTimeString();
+
+        if (in_array($status, ['completed', 'error'], true)) {
+            $data['completed_at'] = Carbon::now()->toDateTimeString();
+        }
+
+        Cache::put($key, $data, now()->addHour());
+    }
+
+    protected function progressCacheKey(string $taskId): string
+    {
+        return 'cbdb_name_fts_progress_' . $taskId;
     }
 }

@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Services\NameFtsProgressService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class RebuildNameSearchIndex extends Command
@@ -19,7 +19,8 @@ class RebuildNameSearchIndex extends Command
                             {--batch=500 : Number of records to insert per batch}
                             {--commit-interval=5000 : Number of records to commit per transaction}
                             {--id-from= : Start from this c_personid (inclusive)}
-                            {--id-to= : End at this c_personid (inclusive)}';
+                            {--id-to= : End at this c_personid (inclusive)}
+                            {--task-id= : 內部使用：前端輪詢的進度任務編號}';
 
     /**
      * The console command description.
@@ -36,6 +37,27 @@ class RebuildNameSearchIndex extends Command
     protected $tradSimpMap = [];
 
     /**
+     * 目前進行中的進度任務
+     *
+     * @var string|null
+     */
+    protected $taskId;
+
+    /**
+     * 上一次回報進度時已處理的姓名數
+     *
+     * @var int
+     */
+    protected $lastProgressCount = 0;
+
+    /**
+     * 回報進度的最小間隔
+     *
+     * @var int
+     */
+    protected $progressReportInterval = 1000;
+
+    /**
      * Execute the console command.
      *
      * @return int
@@ -45,6 +67,12 @@ class RebuildNameSearchIndex extends Command
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             $this->error('資料表 CBDB__NAME_FTS 不存在，請先執行 migrations。');
             return 1;
+        }
+
+        $this->taskId = $this->option('task-id') ? (string) $this->option('task-id') : null;
+        $this->lastProgressCount = 0;
+        if ($this->taskId) {
+            NameFtsProgressService::update($this->taskId, 12, '正在初始化索引重建作業…', 'running');
         }
 
         $batchSize = max(1, (int) $this->option('batch'));
@@ -73,7 +101,7 @@ class RebuildNameSearchIndex extends Command
 
         // 流式處理：邊收集邊生成邊插入
         $this->info('流式處理姓名資料...');
-        $this->streamProcessNames($batchSize, $commitInterval, $idFrom, $idTo);
+        $this->streamProcessNames($batchSize, $commitInterval, $idFrom, $idTo, $this->taskId);
 
         $this->info('索引重建完成！');
         $this->displayStatistics();
@@ -89,12 +117,12 @@ class RebuildNameSearchIndex extends Command
      * @param int|null $idFrom
      * @param int|null $idTo
      */
-    protected function streamProcessNames(int $batchSize, int $commitInterval, ?int $idFrom = null, ?int $idTo = null)
+    protected function streamProcessNames(int $batchSize, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null)
     {
         $recordBuffer = [];
         $totalInserted = 0;
 
-        $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted, $commitInterval, $idFrom, $idTo);
+        $this->streamProcessNamesInTransaction($batchSize, $recordBuffer, $totalInserted, $commitInterval, $idFrom, $idTo, $taskId);
 
         $this->info(sprintf('成功插入 %s 條倒排記錄', number_format($totalInserted)));
     }
@@ -109,7 +137,7 @@ class RebuildNameSearchIndex extends Command
      * @param int|null $idFrom
      * @param int|null $idTo
      */
-    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval, ?int $idFrom = null, ?int $idTo = null)
+    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null)
     {
         // 禁用查詢日誌以避免記憶體累積
         DB::connection()->disableQueryLog();
@@ -140,11 +168,12 @@ class RebuildNameSearchIndex extends Command
         $totalAltNames = $altQuery->count();
         $totalNames = $totalMainNames + $totalAltNames;
 
-        $bar = $this->output->createProgressBar($totalNames);
+        $bar = $this->output->createProgressBar($totalNames ?: 1);
         $bar->start();
 
         $lastCommitCount = 0; // 上次提交時的記錄數
         $timestamp = now(); // 快取時間戳，避免每次都創建新物件
+        $processedNames = 0;
 
         // 開始第一個事務
         DB::beginTransaction();
@@ -163,11 +192,13 @@ class RebuildNameSearchIndex extends Command
         }
         $mainProcessQuery
             ->orderBy('c_personid')
-            ->chunkById(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp) {
+            ->chunkById(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp, &$processedNames, $taskId) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_name_chn);
+                    $processedNames++;
                     if (!$fullName) {
                         $bar->advance();
+                        $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理本名資料…');
                         continue;
                     }
 
@@ -206,6 +237,7 @@ class RebuildNameSearchIndex extends Command
                     }
 
                     $bar->advance();
+                    $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理本名資料…');
                 }
             }, 'c_personid');
 
@@ -230,11 +262,13 @@ class RebuildNameSearchIndex extends Command
         }
         $altProcessQuery
             ->orderBy('ad.c_personid')
-            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp) {
+            ->chunk(1000, function ($rows) use (&$recordBuffer, &$totalInserted, &$lastCommitCount, $batchSize, $commitInterval, &$bar, $totalNames, $timestamp, &$processedNames, $taskId) {
                 foreach ($rows as $row) {
                     $fullName = $this->normalizeName($row->c_alt_name_chn);
+                    $processedNames++;
                     if (!$fullName) {
                         $bar->advance();
+                        $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理別名資料…');
                         continue;
                     }
 
@@ -277,6 +311,7 @@ class RebuildNameSearchIndex extends Command
                     }
 
                     $bar->advance();
+                    $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理別名資料…');
                 }
             });
 
@@ -291,6 +326,30 @@ class RebuildNameSearchIndex extends Command
 
         $bar->finish();
         $this->line('');
+
+        $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '姓名資料已全部處理，正在整理索引結果…');
+    }
+
+    protected function reportProgressIfNeeded(?string $taskId, int $processed, int $total, string $message = null): void
+    {
+        if (!$taskId || $total <= 0) {
+            return;
+        }
+
+        $shouldReport = $processed === $total || ($processed - $this->lastProgressCount) >= $this->progressReportInterval;
+        if (!$shouldReport) {
+            return;
+        }
+
+        $percent = (int) floor(($processed / $total) * 75) + 15;
+        $percent = max(12, min(90, $percent));
+        $message = $message ?? sprintf('已處理 %s / %s 筆姓名…',
+                number_format($processed),
+                number_format($total)
+            );
+
+        NameFtsProgressService::update($taskId, $percent, $message, 'running');
+        $this->lastProgressCount = $processed;
     }
 
     /**

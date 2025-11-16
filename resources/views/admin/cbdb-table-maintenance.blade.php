@@ -80,7 +80,7 @@
                                 <div class="form-group">
                                     <div class="checkbox">
                                         <label>
-                                            <input type="checkbox" name="truncate" value="1" checked>
+                                            <input type="checkbox" name="truncate" value="1">
                                             清空後重建（truncate）
                                         </label>
                                         <span class="help-block small">不勾選則為增量更新（僅更新指定範圍的記錄）</span>

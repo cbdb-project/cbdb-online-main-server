@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\NameFtsProgressService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use ReflectionClass;
@@ -171,7 +171,7 @@ class CbdbTableMaintenanceController extends Controller
 
     public function getNameFtsProgress($taskId)
     {
-        $data = Cache::get($this->progressCacheKey($taskId));
+        $data = NameFtsProgressService::get($taskId);
 
         if (!$data) {
             return response()->json([
@@ -262,6 +262,7 @@ class CbdbTableMaintenanceController extends Controller
     protected function startNameFtsRebuildTask(string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
     {
         $taskId = 'cbdb_name_fts_' . time() . '_' . Auth::id();
+        $params['--task-id'] = $taskId;
         $meta = [
             'command' => $command,
             'params' => $params,
@@ -271,7 +272,7 @@ class CbdbTableMaintenanceController extends Controller
             'table_name' => $tableName,
         ];
 
-        $this->initializeProgress($taskId, $meta);
+        NameFtsProgressService::initialize($taskId, $meta);
 
         $this->logOperation('rebuild_start', $tableName, 0, array_merge($meta, [
             'task_id' => $taskId,
@@ -294,14 +295,14 @@ class CbdbTableMaintenanceController extends Controller
     protected function executeNameFtsRebuildTask(string $taskId, string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
     {
         try {
-            $this->updateProgress($taskId, 10, '正在準備執行 Artisan 指令…', 'running');
+            NameFtsProgressService::update($taskId, 10, '正在準備執行 Artisan 指令…', 'running');
             [$exitCode, $outputStr] = $this->runConsoleCommand($command, $params);
 
             if ($exitCode !== 0) {
                 throw new \Exception('Artisan 命令執行失敗，退出代碼：' . $exitCode);
             }
 
-            $this->updateProgress($taskId, 85, '指令已完成，正在統計結果…', 'running');
+            NameFtsProgressService::update($taskId, 95, '指令已完成，正在統計結果…', 'running');
 
             $count = 0;
             if (Schema::hasTable($tableName)) {
@@ -319,9 +320,9 @@ class CbdbTableMaintenanceController extends Controller
                 'task_id' => $taskId,
             ]);
 
-            $this->updateProgress($taskId, 100, "完成！目前共有 " . number_format($count) . " 筆索引記錄。", 'completed');
+            NameFtsProgressService::update($taskId, 100, "完成！目前共有 " . number_format($count) . " 筆索引記錄。", 'completed');
         } catch (\Exception $e) {
-            $this->updateProgress($taskId, 0, '重建失敗：' . $e->getMessage(), 'error');
+            NameFtsProgressService::update($taskId, 0, '重建失敗：' . $e->getMessage(), 'error');
 
             Log::error('CBDB name index rebuild error', [
                 'table' => $tableName,
@@ -334,39 +335,4 @@ class CbdbTableMaintenanceController extends Controller
         }
     }
 
-    protected function initializeProgress(string $taskId, array $meta = []): void
-    {
-        $data = array_merge($meta, [
-            'task_id' => $taskId,
-            'progress' => 5,
-            'message' => '已排程等待執行…',
-            'status' => 'queued',
-            'started_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString(),
-        ]);
-
-        Cache::put($this->progressCacheKey($taskId), $data, now()->addHour());
-    }
-
-    protected function updateProgress(string $taskId, int $progress, string $message, string $status = 'running'): void
-    {
-        $key = $this->progressCacheKey($taskId);
-        $data = Cache::get($key, []);
-
-        $data['progress'] = $progress;
-        $data['message'] = $message;
-        $data['status'] = $status;
-        $data['updated_at'] = Carbon::now()->toDateTimeString();
-
-        if (in_array($status, ['completed', 'error'], true)) {
-            $data['completed_at'] = Carbon::now()->toDateTimeString();
-        }
-
-        Cache::put($key, $data, now()->addHour());
-    }
-
-    protected function progressCacheKey(string $taskId): string
-    {
-        return 'cbdb_name_fts_progress_' . $taskId;
-    }
 }

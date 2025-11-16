@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use ReflectionClass;
 use Carbon\Carbon;
 
 class CbdbTableMaintenanceController extends Controller
@@ -114,9 +117,8 @@ class CbdbTableMaintenanceController extends Controller
             $paramsLog = json_encode($params);
             Log::info("開始執行命令：{$command}，參數：{$paramsLog}");
 
-            // 使用 Artisan::call 執行命令
-            $exitCode = Artisan::call($command, $params);
-            $outputStr = Artisan::output();
+            // 使用自定義執行方法呼叫 Artisan 指令，避免 ArrayInput 數字索引觸發錯誤
+            [$exitCode, $outputStr] = $this->runConsoleCommand($command, $params);
 
             Log::info("命令執行完成，退出代碼：{$exitCode}");
             Log::info("命令輸出：{$outputStr}");
@@ -183,5 +185,56 @@ class CbdbTableMaintenanceController extends Controller
         }
 
         Log::info('CBDB Table Maintenance Operation', $logData);
+    }
+
+    /**
+     * 直接透過 Symfony Command 執行 Artisan 指令，確保輸入參數包含 command 名稱
+     * 以避免 ArrayInput 在 PHP 8 上處理數字索引時的錯誤。
+     *
+     * @param  string  $command
+     * @param  array   $params
+     * @return array{int,string}
+     */
+    protected function runConsoleCommand(string $command, array $params = []): array
+    {
+        $artisanApplication = $this->resolveArtisanApplication();
+        $symfonyCommand = $artisanApplication->find($command);
+
+        $input = new ArrayInput($this->formatConsoleParameters($command, $params));
+        $output = new BufferedOutput();
+
+        $exitCode = $symfonyCommand->run($input, $output);
+
+        return [$exitCode, $output->fetch()];
+    }
+
+    /**
+     * 將表單輸入參數轉換成 Symfony ArrayInput 所需格式，強制指定 command 索引鍵。
+     */
+    protected function formatConsoleParameters(string $command, array $params = []): array
+    {
+        $formatted = ['command' => $command];
+
+        foreach ($params as $key => $value) {
+            $formatted[$key] = $value;
+        }
+
+        return $formatted;
+    }
+
+    protected function resolveArtisanApplication()
+    {
+        $kernel = Artisan::getFacadeRoot();
+
+        if (method_exists($kernel, 'getArtisan')) {
+            // Laravel 5.5: getArtisan() is protected; use reflection to call it
+            $reflection = new ReflectionClass($kernel);
+            $method = $reflection->getMethod('getArtisan');
+            $method->setAccessible(true);
+
+            return $method->invoke($kernel);
+        }
+
+        throw new \RuntimeException('Unable to resolve Artisan console application instance.');
     }
 }

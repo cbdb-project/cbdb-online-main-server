@@ -66,8 +66,10 @@ class BiogMainRepository
         if(!empty($c_index_year_type_code)) {
             $simplify_type_code =  substr($c_index_year_type_code, 0, 2);
             $row = DB::table('INDEXYEAR_TYPE_CODES')->where([['c_index_year_type_code' , '=', $simplify_type_code]])->first();
-            $ans_type_code = $c_index_year_type_code." ".$row->c_index_year_type_hz;
-            $basicinformation->c_index_year_type_code = $ans_type_code;
+            if ($row) {
+                $ans_type_code = $c_index_year_type_code." ".$row->c_index_year_type_hz;
+                $basicinformation->c_index_year_type_code = $ans_type_code;
+            }
         }
         else { }
 
@@ -392,6 +394,11 @@ class BiogMainRepository
             ['c_textid', '=', $temp_l[1]],
             ['c_role_id', '=', $temp_l[2]],
         ])->first();
+
+        if (!$row) {
+            return ['row' => null, 'text' => null, 'text_str' => null];
+        }
+
         $text = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
@@ -423,7 +430,9 @@ class BiogMainRepository
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         return ['row' => $row, 'text' => $text, 'text_str' => $text_str];
     }
@@ -445,17 +454,26 @@ class BiogMainRepository
             ['c_office_id', '=', $temp_l[0]],
             ['c_posting_id', '=', $temp_l[1]],
         ])->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'office_str' => null, 'posting_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $office_str = null;
         if($row->c_office_id || $row->c_office_id === 0) {
             $text_ = OfficeCode::find($row->c_office_id);
-            $dy = Dynasty::where('c_dy', $text_->c_dy)->first()->c_dynasty_chn;
-            $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn." ".$dy;
+            if ($text_) {
+                $dynasty = Dynasty::where('c_dy', $text_->c_dy)->first();
+                $dy = $dynasty ? $dynasty->c_dynasty_chn : '';
+                $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn." ".$dy;
+            }
         }
         $posting_str = null;
 //        dd($row->c_inst_name_code);
@@ -467,26 +485,32 @@ class BiogMainRepository
                 ['c_inst_code', '=', $row->c_inst_code],
                 ['c_inst_name_code', '=', $row->c_inst_name_code],
             ])->first();
-            $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
-            $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
-            $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count((array)$res) == 0 ) $addr = "未詳";
-            else {
-                $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
+            if (!$text_) {
+                $posting_str = null;
+            } else {
+                $social_inst = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first();
+                $name_hz = $social_inst ? $social_inst->c_inst_name_hz : '';
+                $name_py = $social_inst ? $social_inst->c_inst_name_py : '';
+                $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
+                if(count((array)$res) == 0 ) $addr = "未詳";
+                else {
+                    $addr_code = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first();
+                    $addr = $addr_code ? $addr_code->c_name_chn : '未詳';
+                }
+                $dy = $text_->c_inst_begin_year;
+                $dy2 = $text_->c_inst_floruit_dy;
+                $dy3 = $text_->c_inst_end_year;
+                $dy4 = $text_->c_inst_last_known_year;
+                if($name_hz == null) $name_hz = "未詳";
+                if($name_py == null) $name_py = "未詳";
+                if($addr == null) $addr = "未詳";
+                if($dy == null) $dy = "未詳";
+                if($dy2 == null) $dy2 = "未詳";
+                if($dy3 == null) $dy3 = "未詳";
+                if($dy4 == null) $dy4 = "未詳";
+                $posting_str = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
+                //修改結束
             }
-            $dy = $text_->c_inst_begin_year;
-            $dy2 = $text_->c_inst_floruit_dy;
-            $dy3 = $text_->c_inst_end_year;
-            $dy4 = $text_->c_inst_last_known_year;
-            if($name_hz == null) $name_hz = "未詳";
-            if($name_py == null) $name_py = "未詳";
-            if($addr == null) $addr = "未詳";
-            if($dy == null) $dy = "未詳";
-            if($dy2 == null) $dy2 = "未詳";
-            if($dy3 == null) $dy3 = "未詳";
-            if($dy4 == null) $dy4 = "未詳";
-            $posting_str = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
-            //修改結束
         }
 //        dd($posting_str);
         $addr_ = DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->get();
@@ -722,42 +746,60 @@ class BiogMainRepository
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->first();
 
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'entry_str' => null, 'entry_str2' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $entry_str = null;
         if($row->c_entry_code || $row->c_entry_code === 0) {
             $text_ = EntryCode::find($row->c_entry_code);
-            $entry_str = $text_->c_entry_code." ".$text_->c_entry_desc_chn." ".$text_->c_entry_desc;
+            if ($text_) {
+                $entry_str = $text_->c_entry_code." ".$text_->c_entry_desc_chn." ".$text_->c_entry_desc;
+            }
         }
         $addr_str = null;
         if($row->c_entry_addr_id || $row->c_entry_addr_id === 0) {
             $text_ = AddressCode::find($row->c_entry_addr_id);
-            $addr_str = $text_->c_addr_id." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $addr_str = $text_->c_addr_id." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $kin_str = null;
         if($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
-            $kin_str = $text_->c_kin_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            if ($text_) {
+                $kin_str = $text_->c_kin_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         //20181112建安修改
         $biog_str = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
-            $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $biog_str2 = null;
         if($row->c_assoc_id || $row->c_assoc_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_id);
-            $biog_str2 = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $biog_str2 = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         //修改結束
         $assoc_str = null;
         if($row->c_assoc_code || $row->c_assoc_code === 0) {
             $text_ = AssocCode::find($row->c_assoc_code);
-            $assoc_str = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
+            if ($text_) {
+                $assoc_str = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
+            }
         }
         //20210804建安新增社交機構輸出文字的程式碼
         $inst_code = null;
@@ -851,15 +893,24 @@ class BiogMainRepository
             ['c_status_code', '=', $temp_l[2]],
         ])->first();
         //$row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'statuse_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $statuse_str = null;
         if($row->c_status_code || $row->c_status_code === 0) {
             $text_ = StatusCode::find($row->c_status_code);
-            $statuse_str = $text_->c_status_code." ".$text_->c_status_desc_chn." ".$text_->c_status_desc;
+            if ($text_) {
+                $statuse_str = $text_->c_status_code." ".$text_->c_status_desc_chn." ".$text_->c_status_desc;
+            }
         }
         return ['row' => $row, 'text_str' => $text_str, 'statuse_str' => $statuse_str];
     }
@@ -941,29 +992,45 @@ class BiogMainRepository
             ['c_kin_code', '=', $temp_l[2]],
         ])->first();
         //$row = DB::table('KIN_DATA')->where('tts_sysno', $id)->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'kin_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $kin_str = null;
         if($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
-            //20201026修改，提供給前端c_kincode可以更新親屬關係。
-            //$kin_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
-            $kin_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            if ($text_) {
+                //20201026修改，提供給前端c_kincode可以更新親屬關係。
+                //$kin_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+                $kin_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         $biog_str = null;
         $kinpair_str = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
-            $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
-            $k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
+            if ($text_) {
+                $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
+            $kin_data = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first();
+            $k_p_code = $kin_data ? $kin_data->c_kin_code : null;
             //$k_p_code = $row->c_kin_code;
-            $text_ = KinshipCode::find($k_p_code);
-            //20201026修改，提供給前端c_kincode可以更新親屬關係。
-            //$kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
-            $kinpair_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            if ($k_p_code || $k_p_code === 0) {
+                $text_ = KinshipCode::find($k_p_code);
+                if ($text_) {
+                    //20201026修改，提供給前端c_kincode可以更新親屬關係。
+                    //$kinpair_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+                    $kinpair_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+                }
+            }
         }
 
 //        dd($biog_str);
@@ -1131,11 +1198,17 @@ class BiogMainRepository
     public function possessionById($id)
     {
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
 
         $addr_ = DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $id)->get();
@@ -1198,11 +1271,17 @@ class BiogMainRepository
         if($addr_l[1] == '') {$addr_l[1] = NULL; }
         if($addr_l[2] == '') {$addr_l[2] = NULL; }
         $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_inst_code', $addr_l[1])->where('c_inst_name_code', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'entry_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
 
         //20210804建安新增社交機構輸出文字的程式碼
@@ -1275,11 +1354,17 @@ class BiogMainRepository
         #20240328移除tts_sysno
         $id_arr = explode("-", $id);
         $row = DB::table('EVENTS_DATA')->where('c_personid', $id_arr[0])->where('c_sequence', $id_arr[1])->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'addr_' => [], 'kin_code' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $addr_ = DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->get();
         $addr_str = [];
@@ -1368,64 +1453,95 @@ class BiogMainRepository
             ['c_text_title', '=', $temp_l[7]],
         ])->first();
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null, 'kin_code' => null, 'assoc_kin_code' => null, 'biog_str' => null];
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         $kin_code = null;
         if($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
-            $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            if ($text_) {
+                $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         //20210705新增，20210708[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係修改
         $kinship_pair = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
-            $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_kin_code;
-            $text_ = KinshipCode::find($k_p_code);
-            $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $assoc_data = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first();
+            if ($assoc_data && ($assoc_data->c_kin_code || $assoc_data->c_kin_code === 0)) {
+                $text_ = KinshipCode::find($assoc_data->c_kin_code);
+                if ($text_) {
+                    $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+                }
+            }
         }
         $assoc_kinship_pair = null;
         if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
-            $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_assoc_kin_code;
-            $text_ = KinshipCode::find($a_k_p_code);
-            $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $assoc_data2 = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first();
+            if ($assoc_data2 && ($assoc_data2->c_assoc_kin_code || $assoc_data2->c_assoc_kin_code === 0)) {
+                $text_ = KinshipCode::find($assoc_data2->c_assoc_kin_code);
+                if ($text_) {
+                    $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+                }
+            }
         }
         //新增結束
         $kin_id = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
-            $kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $assoc_code = null;
         if($row->c_assoc_code || $row->c_assoc_code === 0) {
             $text_ = AssocCode::find($row->c_assoc_code);
-            $assoc_code = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
+            if ($text_) {
+                $assoc_code = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
+            }
         }
         $assoc_id = null;
         if($row->c_assoc_id || $row->c_assoc_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_id);
-            $assoc_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $assoc_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $assoc_kin_code = null;
         if($row->c_assoc_kin_code || $row->c_assoc_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_assoc_kin_code);
-            $assoc_kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            if ($text_) {
+                $assoc_kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         $assoc_kin_id = null;
         if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_kin_id);
-            $assoc_kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $assoc_kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $tertiary_personid = null;
         if($row->c_tertiary_personid || $row->c_tertiary_personid === 0) {
             $text_ = BiogMain::find($row->c_tertiary_personid);
-            $tertiary_personid = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $tertiary_personid = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $assoc_claimer_id = null;
         if($row->c_assoc_claimer_id || $row->c_assoc_claimer_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_claimer_id);
-            $assoc_claimer_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            if ($text_) {
+                $assoc_claimer_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
+            }
         }
         $addr_id = null;
         if($row->c_addr_id || $row->c_addr_id === 0) {
@@ -1679,10 +1795,17 @@ class BiogMainRepository
             ['c_pages', '=', $temp_l[2]],
         ])->first();
         //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
+
+        if (!$row) {
+            return ['row' => null, 'text_str' => null];
+        }
+
         $text_str = null;
         if($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
         return ['row' => $row, 'text_str' => $text_str];
     }

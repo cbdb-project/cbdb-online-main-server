@@ -171,7 +171,6 @@ return [
         Laracasts\Flash\FlashServiceProvider::class,
         Laravel\Passport\PassportServiceProvider::class,
         Naux\Mail\SendCloudServiceProvider::class,
-//        Dingo\Api\Provider\LaravelServiceProvider::class,
 
         /*
          * Application Service Providers...

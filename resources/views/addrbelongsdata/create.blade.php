@@ -11,7 +11,7 @@
                     <div class="form-group">
                         <label for="c_addr_id" class="col-sm-2 control-label">c_addr_id</label>
                         <div class="col-sm-10">
-                            <input type="text" name="c_addr_id" class="form-control" value="{{ $temp_id or '' }}" placeholder="請先從ADDR_CODES表中複製c_addr_id填入" required>
+                            <input type="text" name="c_addr_id" class="form-control" value="{{ $temp_id ?? '' }}" placeholder="請先從ADDR_CODES表中複製c_addr_id填入" required>
                         </div>
                     </div>
                     <div class="form-group">

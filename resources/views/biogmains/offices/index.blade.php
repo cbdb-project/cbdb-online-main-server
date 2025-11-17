@@ -37,7 +37,7 @@
                         <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->pivot->c_posting_id }}</td>
                         <td>{!! $value->c_office_pinyin. '<br>'. $value->c_office_chn !!}</td>
-                        <td>{{ $post2addr[$value->pivot->c_posting_id] or '' }}</td>
+                        <td>{{ $post2addr[$value->pivot->c_posting_id] ?? '' }}</td>
                         <td>{{ $value->pivot->c_firstyear }}</td>
                         <td>{{ $value->pivot->c_lastyear }}</td>
                         @auth

@@ -17,7 +17,9 @@ class ExportMysqlToSqlite extends Command
                             {--schema-only : 只导出结构，不导出数据}
                             {--tables= : 只导出指定的表（逗号分隔）}
                             {--batch=1000 : 批量插入的行数}
-                            {--source=mysql : 源数据库连接名称}';
+                            {--source=mysql : 源数据库连接名称}
+                            {--with-indexes : 包含索引定义（默认跳过）}
+                            {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}';
 
     /**
      * The console command description.
@@ -232,6 +234,13 @@ class ExportMysqlToSqlite extends Command
             return $filtered;
         }
 
+        // 过滤掉 CBDB__ 开头的内部表（除非用户明确指定 --with-internal）
+        if (!$this->option('with-internal')) {
+            $result = array_filter($result, function ($table) {
+                return strpos($table['name'], 'CBDB__') !== 0;
+            });
+        }
+
         return array_values($result);
     }
 
@@ -424,9 +433,12 @@ class ExportMysqlToSqlite extends Command
 
         $tableSql = sprintf("CREATE TABLE \"%s\" (\n    %s\n);", $tableName, implode(",\n    ", $body));
 
+        // 根据 --with-indexes 选项决定是否包含索引
+        $exportIndexes = $this->option('with-indexes') ? $indexes : [];
+
         return [
             'table' => $tableSql,
-            'indexes' => $indexes,
+            'indexes' => $exportIndexes,
             'meta' => [
                 'chunk_column' => $chunkColumn,
             ],

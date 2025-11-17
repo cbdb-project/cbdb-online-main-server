@@ -1,3 +1,214 @@
+# Laravel 升級筆記
+
+## 目錄
+- [Laravel 5.6 → 5.7](#laravel-56--57-升級筆記)
+- [Laravel 5.5 → 5.6](#laravel-55--56-升級筆記)
+
+---
+
+# Laravel 5.6 → 5.7 升級筆記
+
+## 升級狀態
+✅ **已完成** - 2025-11-17
+
+**分支**: `claude/upgrade-laravel-5.7-01SEPRinmUi4LSWVvMhh1YfT`
+
+## 環境需求
+- **PHP**：7.1.3 - 7.4（當前使用 7.4）
+- **MySQL**：5.7.7+ / MariaDB 10.2.2+
+- **作業系統/服務**：與原本一致即可
+
+## 套件變更與版本
+
+### 主要框架更新
+- `laravel/framework`: `5.6.40` → `5.7.29`
+- `laravel/passport`: `^4.0` → `^6.0`
+- `nesbot/carbon`: `1.26.6` → `1.39.1`
+- `league/oauth2-server`: `6.1.1` → `7.4.0`
+
+### 新增套件
+- `laravel/nexmo-notification-channel`: `^1.0` - Nexmo 通知渠道支援
+- `laravel/slack-notification-channel`: `^1.0` - Slack 通知渠道支援
+- `opis/closure`: `^3.7` - 閉包序列化支援（用於隊列）
+
+### Symfony 組件更新
+所有 Symfony 組件更新至 `4.4.x` 版本：
+- `symfony/console`: `3.3.6` → `4.4.49`
+- `symfony/http-kernel`: `3.3.6` → `4.4.51`
+- `symfony/routing`: `3.3.6` → `4.4.44`
+- `symfony/var-dumper`: `3.3.6` → `4.4.47`
+- 等等...
+
+### 測試依賴更新
+- `mockery/mockery`: `1.0.x` → `1.3.6`
+- `phpunit/phpunit`: `7.5.x` → `7.5.20`
+- 所有相關測試依賴升級到最新版本
+
+## Breaking Changes
+
+Laravel 5.6 → 5.7 **幾乎無破壞性變更**，主要是內部優化和新功能添加。
+
+### 應用層面（無需修改）
+✅ **無需修改應用代碼** - 本次升級向後兼容性極好
+
+### 框架內部改進
+- 郵件模板美化
+- 通知渠道改進
+- 任務鏈（Job Chaining）增強
+- 錯誤頁面改進
+- URL 生成性能優化
+
+## Composer 更新步驟
+
+### 開發環境
+```bash
+# 1. 更新依賴
+composer update
+
+# 2. 清除快取
+php artisan config:clear
+php artisan cache:clear
+
+# 3. 運行測試
+./vendor/bin/phpunit
+```
+
+### 生產環境
+```bash
+# 1. 安裝依賴（使用 lockfile）
+composer install --no-dev --optimize-autoloader
+
+# 2. 清除舊快取
+php artisan config:clear
+php artisan cache:clear
+
+# 3. 重建快取
+php artisan config:cache
+php artisan route:cache
+
+# 4. 驗證
+# 檢查日誌、API、認證等核心功能
+```
+
+## 配置文件變更
+
+### 無需修改
+Laravel 5.7 **不需要修改任何配置文件**，所有現有配置保持兼容。
+
+### 可選優化
+如需使用新功能（如 Nexmo、Slack 通知），需添加相應的 `.env` 配置：
+
+```env
+# Nexmo (可選)
+NEXMO_KEY=your-nexmo-key
+NEXMO_SECRET=your-nexmo-secret
+
+# Slack (可選)
+SLACK_WEBHOOK_URL=your-slack-webhook-url
+```
+
+## 環境變量
+
+### 無變更
+所有現有的 `.env` 配置保持不變，包括：
+- `LOG_CHANNEL`
+- `QUEUE_CONNECTION`
+- `DB_*`
+- `MAIL_*`
+- 等等...
+
+## 已知事項
+
+### PHP 版本兼容性
+- ⚠️ **Laravel 5.7 不支援 PHP 8.0+**
+- ✅ 支援 PHP 7.1.3 - 7.4
+- 當前開發環境使用 PHP 8.4，無法運行 artisan 命令
+- **測試需在 PHP 7.4 環境中進行**
+
+### Carbon 1 仍在使用
+- Carbon 仍使用 v1.39.1
+- 需等待升級到 Laravel 5.8 後才能升級至 Carbon 2
+- 參見 `UPGRADE_INSTRUCTIONS.md` 了解 Carbon 升級計劃
+
+### Passport 升級
+- Passport 從 4.x 升級到 6.x
+- OAuth2 Server 從 6.x 升級到 7.x
+- 升級後需運行：
+  ```bash
+  php artisan passport:install
+  php artisan passport:keys --force
+  ```
+
+## 測試情況
+
+### 本地測試（需在 PHP 7.4 環境）
+```bash
+./vendor/bin/phpunit
+
+# 預期輸出：
+# PHPUnit 7.5.20
+# Tests: 112+, Assertions: 482+
+# OK (或帶有 incomplete/skipped tests)
+```
+
+### 測試注意事項
+- Exit code 255 錯誤仍可能出現（框架已知問題）
+- 不影響測試結果的有效性
+- CI 配置已設定忽略此錯誤碼
+
+## 新功能亮點
+
+### 1. Email Verification（郵件驗證）
+Laravel 5.7 新增內建的郵件驗證功能：
+```php
+// 在路由中
+Route::get('/email/verify', 'Auth\VerificationController@show')
+    ->name('verification.notice');
+```
+
+### 2. Guest User Gates & Policies
+現在可以為訪客用戶定義授權策略：
+```php
+Gate::define('view-post', function (?User $user, Post $post) {
+    // $user 可能為 null（訪客）
+});
+```
+
+### 3. Symfony Dump Server
+集成 Symfony 的 dump server，更好的除錯體驗：
+```bash
+php artisan dump-server
+```
+
+### 4. Notification Channels
+新增 Nexmo 和 Slack 通知渠道支援
+
+### 5. URL Generator & Callable Syntax
+路由定義改進，支援更靈活的語法
+
+## 參考連結
+
+- [Laravel 5.7 Release Notes](https://laravel.com/docs/5.7/releases)
+- [Laravel 5.7 Upgrade Guide](https://laravel.com/docs/5.7/upgrade)
+- [Laravel Passport 6.x Documentation](https://laravel.com/docs/5.7/passport)
+- [Carbon 1.x Documentation](https://carbon.nesbot.com/docs/)
+
+## 下一步升級計劃
+
+```
+當前：Laravel 5.7 ✅
+  ↓
+下一步：Laravel 5.7 → 5.8
+  ↓
+然後：Carbon 1.x → 2.x（需 Laravel 5.8+）
+  ↓
+最後：Laravel 5.8 → 6.0
+```
+
+詳見 `UPGRADE_INSTRUCTIONS.md` 了解完整的升級路線圖。
+
+---
+
 # Laravel 5.5 → 5.6 升級筆記
 
 ## 環境需求

@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ExportMysqlToSqlite extends Command
 {
@@ -53,6 +52,13 @@ class ExportMysqlToSqlite extends Command
     ];
 
     /**
+     * 表結構附加資訊（如主鍵欄位）
+     *
+     * @var array
+     */
+    protected $tableMetadata = [];
+
+    /**
      * Execute the console command.
      *
      * @return int
@@ -81,7 +87,7 @@ class ExportMysqlToSqlite extends Command
         }
 
         $this->info(sprintf('准备导出 %d 个表...', count($tables)));
-        $this->newLine();
+        $this->output->newLine();
 
         // 导出表结构和数据
         $bar = $this->output->createProgressBar(count($tables));
@@ -93,14 +99,14 @@ class ExportMysqlToSqlite extends Command
                 $bar->advance();
             } catch (\Exception $e) {
                 $this->stats['errors']++;
-                $this->newLine();
-                $this->error(sprintf('导出表 %s 失败: %s', $table, $e->getMessage()));
+                $this->output->newLine();
+                $this->error(sprintf('导出表 %s 失败: %s', $table['name'], $e->getMessage()));
                 $bar->advance();
             }
         }
 
         $bar->finish();
-        $this->newLine(2);
+        $this->output->newLine(2);
 
         // 显示统计信息
         $this->displayStats();
@@ -195,20 +201,38 @@ class ExportMysqlToSqlite extends Command
     {
         $specifiedTables = $this->option('tables');
 
-        if ($specifiedTables) {
-            return array_map('trim', explode(',', $specifiedTables));
-        }
-
-        // 获取所有表
         $tables = DB::connection($this->sourceConnection)
-            ->select('SHOW TABLES');
+            ->select('SHOW FULL TABLES');
 
         $databaseName = DB::connection($this->sourceConnection)->getDatabaseName();
         $tableKey = 'Tables_in_' . $databaseName;
 
-        return array_map(function ($table) use ($tableKey) {
-            return $table->$tableKey;
-        }, $tables);
+        $result = [];
+
+        foreach ($tables as $table) {
+            $name = $table->$tableKey;
+            $result[$name] = [
+                'name' => $name,
+                'type' => isset($table->Table_type) ? strtoupper($table->Table_type) : 'BASE TABLE',
+            ];
+        }
+
+        if ($specifiedTables) {
+            $names = array_map('trim', explode(',', $specifiedTables));
+            $filtered = [];
+
+            foreach ($names as $name) {
+                if (isset($result[$name])) {
+                    $filtered[] = $result[$name];
+                } else {
+                    $this->warn(sprintf('⚠ 未找到表: %s', $name));
+                }
+            }
+
+            return $filtered;
+        }
+
+        return array_values($result);
     }
 
     /**
@@ -217,14 +241,18 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTable($tableName)
+    protected function exportTable(array $table)
     {
-        // 1. 导出表结构
-        $this->exportTableSchema($tableName);
+        $tableName = $table['name'];
+        $isView = strtoupper($table['type']) === 'VIEW';
 
-        // 2. 导出数据（如果不是 schema-only 模式）
-        if (!$this->option('schema-only')) {
-            $this->exportTableData($tableName);
+        // 1. 导出表结构
+        $this->exportTableSchema($tableName, $isView);
+
+        // 2. 导出数据（如果不是 schema-only 模式且不是视图）
+        if (!$isView && !$this->option('schema-only')) {
+            $rowCount = $this->getTableRowCount($tableName);
+            $this->exportTableData($tableName, $rowCount);
         }
 
         $this->stats['tables']++;
@@ -236,19 +264,49 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTableSchema($tableName)
+    protected function exportTableSchema($tableName, $isView = false)
     {
-        // 获取 MySQL 的 CREATE TABLE 语句
+        $statement = $isView
+            ? "SHOW CREATE VIEW `{$tableName}`"
+            : "SHOW CREATE TABLE `{$tableName}`";
+
         $createTableResult = DB::connection($this->sourceConnection)
-            ->select("SHOW CREATE TABLE `{$tableName}`");
+            ->select($statement);
 
-        $createTableSql = $createTableResult[0]->{'Create Table'};
+        if (empty($createTableResult)) {
+            throw new \RuntimeException(sprintf('无法获取 %s 的结构信息', $tableName));
+        }
 
-        // 转换为 SQLite 兼容的 SQL
-        $sqliteCreateSql = $this->convertCreateTableToSqlite($createTableSql, $tableName);
+        $definition = (array) $createTableResult[0];
+        $sqliteCreateSql = null;
 
-        // 在 SQLite 中执行
-        DB::connection('sqlite_export')->statement($sqliteCreateSql);
+        if ($isView) {
+            $key = 'Create View';
+            if (!isset($definition[$key])) {
+                throw new \RuntimeException(sprintf('未找到视图 %s 的定义', $tableName));
+            }
+
+            $sqliteCreateSql = $this->convertCreateViewToSqlite($definition[$key], $tableName);
+        } else {
+            $key = 'Create Table';
+            if (!isset($definition[$key])) {
+                throw new \RuntimeException(sprintf('未找到数据表 %s 的定义', $tableName));
+            }
+
+            $sqliteCreateSql = $this->convertCreateTableToSqlite($definition[$key], $tableName);
+        }
+
+        if ($isView) {
+            DB::connection('sqlite_export')->statement($sqliteCreateSql);
+            return;
+        }
+
+        DB::connection('sqlite_export')->statement($sqliteCreateSql['table']);
+        $this->tableMetadata[$tableName] = $sqliteCreateSql['meta'] ?? [];
+
+        foreach ($sqliteCreateSql['indexes'] as $indexSql) {
+            DB::connection('sqlite_export')->statement($indexSql);
+        }
     }
 
     /**
@@ -260,55 +318,320 @@ class ExportMysqlToSqlite extends Command
      */
     protected function convertCreateTableToSqlite($mysqlSql, $tableName)
     {
-        // 移除 MySQL 特定的选项
-        $sql = preg_replace('/ENGINE=\w+/i', '', $mysqlSql);
-        $sql = preg_replace('/DEFAULT CHARSET=\w+/i', '', $sql);
-        $sql = preg_replace('/COLLATE=\w+/i', '', $sql);
-        $sql = preg_replace('/ROW_FORMAT=\w+/i', '', $sql);
-        $sql = preg_replace('/AUTO_INCREMENT=\d+/i', '', $sql);
-        $sql = preg_replace('/COMMENT\s*=\s*\'[^\']*\'/i', '', $sql);
+        $cleanSql = preg_replace('/`' . preg_quote($tableName, '/') . '`/i', '"' . $tableName . '"', $mysqlSql);
+        $cleanSql = preg_replace('/ENGINE=.*$/is', '', $cleanSql);
+        $cleanSql = preg_replace('/ROW_FORMAT=\w+/i', '', $cleanSql);
+        $cleanSql = preg_replace('/AUTO_INCREMENT=\d+/i', '', $cleanSql);
+        $cleanSql = preg_replace('/DEFAULT CHARSET=\w+/i', '', $cleanSql);
+        $cleanSql = preg_replace('/COLLATE=\w+/i', '', $cleanSql);
+        $cleanSql = trim($cleanSql);
 
-        // 转换数据类型
-        $sql = preg_replace('/\s+unsigned/i', '', $sql);
-        $sql = preg_replace('/VARBINARY\(\d+\)/i', 'BLOB', $sql);
-        $sql = preg_replace('/TINYINT\(\d+\)/i', 'INTEGER', $sql);
-        $sql = preg_replace('/SMALLINT\(\d+\)/i', 'INTEGER', $sql);
-        $sql = preg_replace('/MEDIUMINT\(\d+\)/i', 'INTEGER', $sql);
-        $sql = preg_replace('/BIGINT\(\d+\)/i', 'INTEGER', $sql);
-        $sql = preg_replace('/INT\(\d+\)/i', 'INTEGER', $sql);
-        $sql = preg_replace('/DOUBLE/i', 'REAL', $sql);
-        $sql = preg_replace('/DATETIME/i', 'TEXT', $sql);
-        $sql = preg_replace('/TIMESTAMP/i', 'TEXT', $sql);
-        $sql = preg_replace('/ENUM\([^)]+\)/i', 'TEXT', $sql);
+        if (!preg_match('/^CREATE TABLE\s+"?([^"\s]+)"?\s*\((.*)\)/is', $cleanSql, $matches)) {
+            throw new \RuntimeException(sprintf('无法解析数据表 %s 的结构', $tableName));
+        }
 
-        // 转换 VARCHAR/CHAR 为 TEXT（SQLite 没有长度限制）
-        $sql = preg_replace('/VARCHAR\(\d+\)/i', 'TEXT', $sql);
-        $sql = preg_replace('/CHAR\(\d+\)/i', 'TEXT', $sql);
+        $definitions = $matches[2];
+        $items = $this->splitDefinitionItems($definitions);
 
-        // 移除 CHARACTER SET 和 COLLATE 子句
-        $sql = preg_replace('/CHARACTER SET \w+/i', '', $sql);
-        $sql = preg_replace('/COLLATE \w+/i', '', $sql);
+        $columns = [];
+        $primaryKeys = [];
+        $indexes = [];
+        $autoIncrementColumns = [];
+        $primaryKeyColumnsList = [];
+        $chunkColumn = null;
+        $firstColumn = null;
 
-        // 移除列级 COMMENT
-        $sql = preg_replace('/COMMENT \'[^\']*\'/i', '', $sql);
+        foreach ($items as $item) {
+            $trimmed = trim($item);
 
-        // 处理 AUTO_INCREMENT（转换为 AUTOINCREMENT）
-        $sql = preg_replace('/AUTO_INCREMENT/i', 'AUTOINCREMENT', $sql);
+            if ($trimmed === '') {
+                continue;
+            }
 
-        // 移除 USING BTREE/HASH
-        $sql = preg_replace('/USING (BTREE|HASH)/i', '', $sql);
+            if (stripos($trimmed, 'PRIMARY KEY') === 0) {
+                $columnsString = $this->extractColumnsFromDefinition($trimmed);
+                $columnNames = $this->extractColumnNames($columnsString);
+                $primaryKeyColumnsList[] = $columnNames;
 
-        // 移除外键约束（稍后单独处理）
-        $sql = preg_replace('/,\s*CONSTRAINT[^,]+FOREIGN KEY[^,]+REFERENCES[^,)]+/is', '', $sql);
-        $sql = preg_replace('/,\s*FOREIGN KEY[^,]+REFERENCES[^,)]+/is', '', $sql);
+                if (count($columnNames) === 1 && in_array($columnNames[0], $autoIncrementColumns, true)) {
+                    continue;
+                }
 
-        // 清理多余的逗号和空格
-        $sql = preg_replace('/,\s*,/', ',', $sql);
-        $sql = preg_replace('/,\s*\)/', ')', $sql);
-        $sql = preg_replace('/\s+/', ' ', $sql);
-        $sql = trim($sql);
+                $primaryKeys[] = sprintf('PRIMARY KEY (%s)', $this->normalizeIndexColumns($columnsString));
+                continue;
+            }
 
-        return $sql;
+            if (preg_match('/^(UNIQUE\s+)?KEY\s+`?([^`(]+)`?\s*\((.+)\)/i', $trimmed, $match)
+                || preg_match('/^(FULLTEXT\s+)?KEY\s+`?([^`(]+)`?\s*\((.+)\)/i', $trimmed, $match)) {
+                $columnsString = $match[3];
+                $normalizedColumns = $this->normalizeIndexColumns($columnsString);
+                $isUnique = stripos($match[1], 'UNIQUE') !== false;
+                $indexName = $this->sanitizeIdentifier($tableName . '_' . $match[2]);
+
+                $indexes[] = sprintf(
+                    'CREATE %sINDEX "%s" ON "%s" (%s);',
+                    $isUnique ? 'UNIQUE ' : '',
+                    $indexName,
+                    $tableName,
+                    $normalizedColumns
+                );
+
+                continue;
+            }
+
+            if (stripos($trimmed, 'CONSTRAINT') === 0 || stripos($trimmed, 'FOREIGN KEY') === 0) {
+                continue;
+            }
+
+            $column = $this->convertColumnDefinition($trimmed);
+
+            if ($column === null) {
+                continue;
+            }
+
+            $columns[] = $column['definition'];
+
+            if ($column['auto_increment']) {
+                $autoIncrementColumns[] = $column['name'];
+                if ($chunkColumn === null) {
+                    $chunkColumn = $column['name'];
+                }
+            }
+
+            if ($firstColumn === null) {
+                $firstColumn = $column['name'];
+            }
+        }
+
+        if ($chunkColumn === null) {
+            foreach ($primaryKeyColumnsList as $pkColumns) {
+                if (count($pkColumns) === 1) {
+                    $chunkColumn = $pkColumns[0];
+                    break;
+                }
+            }
+        }
+
+        if ($chunkColumn === null) {
+            $chunkColumn = $firstColumn;
+        }
+
+        $body = array_merge($columns, $primaryKeys);
+
+        if (empty($body)) {
+            throw new \RuntimeException(sprintf('无法生成 %s 的字段定义', $tableName));
+        }
+
+        $tableSql = sprintf("CREATE TABLE \"%s\" (\n    %s\n);", $tableName, implode(",\n    ", $body));
+
+        return [
+            'table' => $tableSql,
+            'indexes' => $indexes,
+            'meta' => [
+                'chunk_column' => $chunkColumn,
+            ],
+        ];
+    }
+
+    /**
+     * 将 MySQL CREATE VIEW 语句转换为 SQLite 兼容格式
+     *
+     * @param string $mysqlSql
+     * @param string $viewName
+     * @return string
+     */
+    protected function convertCreateViewToSqlite($mysqlSql, $viewName)
+    {
+        $sql = trim($mysqlSql);
+
+        if (!preg_match('/\sAS\s/i', $sql, $match, PREG_OFFSET_CAPTURE)) {
+            throw new \RuntimeException(sprintf('无法解析视图 %s 的定义', $viewName));
+        }
+
+        $start = $match[0][1] + strlen($match[0][0]);
+        $definition = substr($sql, $start);
+
+        if ($definition === false) {
+            throw new \RuntimeException(sprintf('无法解析视图 %s 的 SELECT 语句', $viewName));
+        }
+
+        $definition = trim(rtrim($definition, ';'));
+        $viewIdentifier = str_replace('"', '""', $viewName);
+
+        return sprintf('CREATE VIEW "%s" AS %s', $viewIdentifier, $definition);
+    }
+
+    /**
+     * 将列定义拆分成单独项目
+     */
+    protected function splitDefinitionItems($definitions)
+    {
+        $items = [];
+        $current = '';
+        $depth = 0;
+
+        $length = strlen($definitions);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $definitions[$i];
+
+            if ($char === '(') {
+                $depth++;
+            } elseif ($char === ')') {
+                if ($depth > 0) {
+                    $depth--;
+                }
+            } elseif ($char === ',' && $depth === 0) {
+                $items[] = trim($current);
+                $current = '';
+                continue;
+            }
+
+            $current .= $char;
+        }
+
+        if (trim($current) !== '') {
+            $items[] = trim($current);
+        }
+
+        return $items;
+    }
+
+    /**
+     * 将 MySQL 列定义转换为 SQLite
+     */
+    protected function convertColumnDefinition($definition)
+    {
+        if (!preg_match('/^`?([^`\s]+)`?\s+(.+)$/s', $definition, $matches)) {
+            return null;
+        }
+
+        $columnName = $matches[1];
+        $rest = $matches[2];
+
+        $autoIncrement = stripos($rest, 'auto_increment') !== false;
+
+        $rest = $this->convertColumnType($rest);
+        $rest = preg_replace('/\bUNSIGNED\b/i', '', $rest);
+        $rest = preg_replace('/\bZEROFILL\b/i', '', $rest);
+        $rest = preg_replace('/\bCHARACTER SET\s+\w+/i', '', $rest);
+        $rest = preg_replace('/\bCOLLATE\s+\w+/i', '', $rest);
+        $rest = preg_replace('/\bCOMMENT\s+\'.*?\'/i', '', $rest);
+        $rest = preg_replace('/\bON UPDATE\b[^,]+/i', '', $rest);
+        $rest = preg_replace('/\s+DEFAULT\s+NULL/i', ' DEFAULT NULL', $rest);
+        $rest = preg_replace('/\s+DEFAULT\s+\'0000-00-00 00:00:00\'/i', ' DEFAULT NULL', $rest);
+        $rest = preg_replace('/,\s*$/', '', $rest);
+        $rest = preg_replace('/\s+/', ' ', trim($rest));
+
+        if ($autoIncrement) {
+            $rest = preg_replace('/\bAUTO_INCREMENT\b/i', '', $rest);
+            $rest = preg_replace('/\bNOT NULL\b/i', '', $rest);
+            $rest = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+        }
+
+        return [
+            'definition' => sprintf('"%s" %s', $columnName, trim($rest)),
+            'auto_increment' => $autoIncrement,
+            'name' => $columnName,
+        ];
+    }
+
+    /**
+     * 转换 MySQL 数据类型到 SQLite
+     */
+    protected function convertColumnType($definition)
+    {
+        $map = [
+            '/\bTINYINT\(\d+\)\b/i' => 'INTEGER',
+            '/\bSMALLINT\(\d+\)\b/i' => 'INTEGER',
+            '/\bMEDIUMINT\(\d+\)\b/i' => 'INTEGER',
+            '/\bBIGINT\(\d+\)\b/i' => 'INTEGER',
+            '/\bINT\(\d+\)\b/i' => 'INTEGER',
+            '/\bBIGINT\b/i' => 'INTEGER',
+            '/\bINT\b/i' => 'INTEGER',
+            '/\bDOUBLE\b/i' => 'REAL',
+            '/\bFLOAT\b/i' => 'REAL',
+            '/\bDECIMAL\([^)]*\)/i' => 'NUMERIC',
+            '/\bNUMERIC\([^)]*\)/i' => 'NUMERIC',
+            '/\bVARBINARY\(\d+\)\b/i' => 'BLOB',
+            '/\bBINARY\(\d+\)\b/i' => 'BLOB',
+            '/\bLONGTEXT\b/i' => 'TEXT',
+            '/\bMEDIUMTEXT\b/i' => 'TEXT',
+            '/\bTINYTEXT\b/i' => 'TEXT',
+            '/\bTEXT\b/i' => 'TEXT',
+            '/\bVARCHAR\(\d+\)\b/i' => 'TEXT',
+            '/\bCHAR\(\d+\)\b/i' => 'TEXT',
+            '/\bDATETIME\b/i' => 'TEXT',
+            '/\bTIMESTAMP\b/i' => 'TEXT',
+            '/\bDATE\b/i' => 'TEXT',
+            '/\bTIME\b/i' => 'TEXT',
+            '/\bENUM\([^)]+\)/i' => 'TEXT',
+            '/\bSET\([^)]+\)/i' => 'TEXT',
+        ];
+
+        foreach ($map as $pattern => $replacement) {
+            $definition = preg_replace($pattern, $replacement, $definition);
+        }
+
+        return $definition;
+    }
+
+    /**
+     * 获取索引列定义
+     */
+    protected function extractColumnsFromDefinition($definition)
+    {
+        if (preg_match('/\((.+)\)/s', $definition, $matches)) {
+            return $matches[1];
+        }
+
+        return '';
+    }
+
+    /**
+     * 转换索引列为 SQLite 兼容格式
+     */
+    protected function normalizeIndexColumns($columnsString)
+    {
+        $columns = $this->extractColumnNames($columnsString);
+
+        $quoted = array_map(function ($column) {
+            return sprintf('"%s"', $column);
+        }, $columns);
+
+        return implode(', ', $quoted);
+    }
+
+    /**
+     * 解析索引列名称
+     */
+    protected function extractColumnNames($columnsString)
+    {
+        $parts = preg_split('/\s*,\s*/', $columnsString);
+        $columns = [];
+
+        foreach ($parts as $part) {
+            $column = trim($part);
+            $column = preg_replace('/`([^`]+)`/', '$1', $column);
+            $column = preg_replace('/"([^"]+)"/', '$1', $column);
+            $column = preg_replace('/\(\d+\)/', '', $column);
+            $column = preg_replace('/\s+(ASC|DESC)$/i', '', $column);
+
+            if ($column !== '') {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
+     * 清理索引名称
+     */
+    protected function sanitizeIdentifier($identifier)
+    {
+        $clean = preg_replace('/[^A-Za-z0-9_]+/', '_', $identifier);
+        return trim($clean, '_');
     }
 
     /**
@@ -317,39 +640,97 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTableData($tableName)
+    protected function exportTableData($tableName, $rowCount = 0)
     {
-        $batchSize = (int) $this->option('batch');
+        $metadata = $this->tableMetadata[$tableName] ?? [];
+        $chunkColumn = $metadata['chunk_column'] ?? null;
+        $insertBatchSize = $this->getSqliteInsertBatchSize();
+        $buffer = [];
 
-        // 获取总行数
-        $totalRows = DB::connection($this->sourceConnection)
-            ->table($tableName)
-            ->count();
+        $query = DB::connection($this->sourceConnection)
+            ->table($tableName);
 
-        if ($totalRows === 0) {
-            return;
+        if ($chunkColumn) {
+            $query->orderBy($chunkColumn);
         }
 
         // 禁用外键约束
         DB::connection('sqlite_export')->statement('PRAGMA foreign_keys = OFF');
 
-        // 分批导出数据
-        DB::connection($this->sourceConnection)
-            ->table($tableName)
-            ->orderBy(DB::raw('1')) // 使用常量排序避免表没有主键的情况
-            ->chunk($batchSize, function ($rows) use ($tableName) {
-                $data = json_decode(json_encode($rows), true);
+        $dataBar = null;
+        if ($rowCount > 0) {
+            $this->output->newLine();
+            $dataBar = $this->output->createProgressBar($rowCount);
+            $dataBar->setBarCharacter('▓');
+            $dataBar->setEmptyBarCharacter('░');
+            $dataBar->setFormat('  %current%/%max% 行 (%percent:3s%%)');
+            $dataBar->start();
+        }
 
-                // 批量插入到 SQLite
-                DB::connection('sqlite_export')
-                    ->table($tableName)
-                    ->insert($data);
+        foreach ($query->cursor() as $row) {
+            $buffer[] = (array) $row;
 
-                $this->stats['rows'] += count($data);
-            });
+            if (count($buffer) >= $insertBatchSize) {
+                $count = count($buffer);
+                $this->insertRowsIntoSqlite($tableName, $buffer);
+                $this->stats['rows'] += $count;
+                if ($dataBar) {
+                    $dataBar->advance($count);
+                }
+                $buffer = [];
+            }
+        }
+
+        if (!empty($buffer)) {
+            $count = count($buffer);
+            $this->insertRowsIntoSqlite($tableName, $buffer);
+            $this->stats['rows'] += $count;
+            if ($dataBar) {
+                $dataBar->advance($count);
+            }
+        }
+
+        if ($dataBar) {
+            $dataBar->finish();
+            $this->output->newLine(2);
+        }
 
         // 重新启用外键约束
         DB::connection('sqlite_export')->statement('PRAGMA foreign_keys = ON');
+    }
+
+    /**
+     * 批量寫入資料到 SQLite
+     */
+    protected function insertRowsIntoSqlite($tableName, array $rows)
+    {
+        DB::connection('sqlite_export')
+            ->table($tableName)
+            ->insert($rows);
+    }
+
+    /**
+     * 计算数据表的总行数
+     */
+    protected function getTableRowCount($tableName)
+    {
+        try {
+            return (int) DB::connection($this->sourceConnection)
+                ->table($tableName)
+                ->count();
+        } catch (\Exception $e) {
+            $this->warn(sprintf('⚠ 无法统计表 %s 行数: %s', $tableName, $e->getMessage()));
+            return 0;
+        }
+    }
+
+    /**
+     * 取得 SQLite 插入批次大小。SQLite 允許的 compound SELECT 條件數為 500，
+     * 但保守使用 400 以避免觸發 "too many terms" 錯誤。
+     */
+    protected function getSqliteInsertBatchSize()
+    {
+        return 400;
     }
 
     /**
@@ -370,14 +751,14 @@ class ExportMysqlToSqlite extends Command
             $this->warn(sprintf('⚠ 遇到 %d 个错误', $this->stats['errors']));
         }
 
-        $this->newLine();
+        $this->output->newLine();
         $this->info(sprintf('SQLite 数据库路径: %s', base_path($this->outputPath)));
 
         // 显示文件大小
         $fileSize = filesize(base_path($this->outputPath));
         $this->info(sprintf('文件大小: %s', $this->formatBytes($fileSize)));
 
-        $this->newLine();
+        $this->output->newLine();
         $this->info('下一步:');
         $this->line('  1. 更新 .env 文件:');
         $this->line('     DB_CONNECTION=sqlite');

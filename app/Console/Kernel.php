@@ -16,6 +16,7 @@ class Kernel extends ConsoleKernel
         Commands\WikiTaskManager::class,
         \App\Console\Commands\ImportTradSimpMap::class,
         \App\Console\Commands\RebuildNameSearchIndex::class,
+        \App\Console\Commands\ExportMysqlToSqlite::class,
     ];
 
     /**

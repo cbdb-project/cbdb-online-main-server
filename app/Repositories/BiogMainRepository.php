@@ -456,7 +456,7 @@ class BiogMainRepository
         ])->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'office_str' => null, 'posting_str' => null];
+            return ['row' => null, 'text_str' => null, 'office_str' => null, 'posting_str' => null, 'addr_str' => []];
         }
 
         $text_str = null;
@@ -747,7 +747,7 @@ class BiogMainRepository
         ])->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'entry_str' => null, 'entry_str2' => null];
+            return ['row' => null, 'text_str' => null, 'entry_str' => null, 'addr_str' => null, 'kin_str' => null, 'assoc_str' => null, 'biog_str' => null, 'biog_str2' => null, 'inst_code' => null];
         }
 
         $text_str = null;
@@ -994,7 +994,7 @@ class BiogMainRepository
         //$row = DB::table('KIN_DATA')->where('tts_sysno', $id)->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'kin_str' => null];
+            return ['row' => null, 'text_str' => null, 'kin_str' => null, 'biog_str' => null, 'kinpair_str' => null, 'k_p_code' => null];
         }
 
         $text_str = null;
@@ -1015,6 +1015,7 @@ class BiogMainRepository
         }
         $biog_str = null;
         $kinpair_str = null;
+        $k_p_code = null;
         if($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             if ($text_) {
@@ -1200,7 +1201,7 @@ class BiogMainRepository
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null];
+            return ['row' => null, 'text_str' => null, 'addr_str' => []];
         }
 
         $text_str = null;
@@ -1273,7 +1274,7 @@ class BiogMainRepository
         $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_inst_code', $addr_l[1])->where('c_inst_name_code', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'entry_str' => null];
+            return ['row' => null, 'text_str' => null, 'inst_code' => null];
         }
 
         $text_str = null;
@@ -1356,7 +1357,7 @@ class BiogMainRepository
         $row = DB::table('EVENTS_DATA')->where('c_personid', $id_arr[0])->where('c_sequence', $id_arr[1])->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'addr_' => [], 'kin_code' => null];
+            return ['row' => null, 'text_str' => null, 'addr_str' => [], 'event_str' => null];
         }
 
         $text_str = null;
@@ -1455,7 +1456,9 @@ class BiogMainRepository
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
 
         if (!$row) {
-            return ['row' => null, 'text_str' => null, 'kin_code' => null, 'assoc_kin_code' => null, 'biog_str' => null];
+            return ['row' => null, 'text_str' => null, 'kin_code' => null, 'kin_id' => null,
+                'assoc_code' => null, 'assoc_id' => null, 'assoc_kin_code' => null, 'assoc_kin_id' => null,
+                'tertiary_personid' => null, 'assoc_claimer_id' => null, 'addr_id' => null, 'inst_code' => null, 'kinship_pair' => null, 'assoc_kinship_pair' => null];
         }
 
         $text_str = null;

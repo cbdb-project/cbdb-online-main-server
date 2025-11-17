@@ -11,7 +11,7 @@
                     <div class="form-group">
                         <label for="c_textid" class="col-sm-2 control-label">c_textid</label>
                         <div class="col-sm-8">
-                            <input type="text" name="c_textid" class="form-control" value="{{ $temp_id or '' }}" {{ $temp_id or '' }} placeholder="請先從TEXT_CODES表中複製這本書的c_textid填入" required>
+                            <input type="text" name="c_textid" class="form-control" value="{{ $temp_id ?? '' }}" {{ $temp_id ?? '' }} placeholder="請先從TEXT_CODES表中複製這本書的c_textid填入" required>
                         </div>
                         <div class="col-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">Load Data</button>

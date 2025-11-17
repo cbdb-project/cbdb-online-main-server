@@ -64,13 +64,13 @@ desired effect
         <!-- Content Header (Page header) -->
         <section class="content-header">
             <h1>
-                {{ $page_title or 'Page Title' }}
-                <small>{{ $page_description or null }}</small>
+                {{ $page_title ?? 'Page Title' }}
+                <small>{{ $page_description ?? null }}</small>
             </h1>
             <ol class="breadcrumb">
                 <li><a href="/basicinformation"><i class="fa fa-dashboard"></i> Home</a></li>
-                <li class="active"><a href="{{ $page_url or '#'}}">{{ $page_title }}</a></li>
-                {!! $archer or '' !!}
+                <li class="active"><a href="{{ $page_url ?? '#'}}">{{ $page_title }}</a></li>
+                {!! $archer ?? '' !!}
             </ol>
         </section>
 

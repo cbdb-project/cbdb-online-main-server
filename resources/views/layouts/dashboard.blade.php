@@ -70,7 +70,7 @@ desired effect
             <ol class="breadcrumb">
                 <li><a href="/basicinformation"><i class="fa fa-dashboard"></i> Home</a></li>
                 <li class="active"><a href="{{ $page_url or '#'}}">{{ $page_title }}</a></li>
-                {!! $archer or '' !!}
+                {!! $archer ?? '' !!}
             </ol>
         </section>
 

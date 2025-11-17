@@ -44,7 +44,6 @@
 |27 | OCCASION_CODES | 場合類型代碼 |
 |28 | OFFICE_CODES | 官職代碼 |
 |29 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
-|30 | PLACE_CODES | 地點類型代碼 |
 |31 | POSSESSION_ACT_CODES | 財產行為代碼 |
 |32 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
 |33 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |

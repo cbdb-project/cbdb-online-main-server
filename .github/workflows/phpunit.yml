@@ -6,6 +6,8 @@ on:
       - main
       - develop
       - feature/**
+      - claude/**
+      - fix/**
   pull_request:
     branches:
       - main

@@ -14,7 +14,8 @@ echo "版本号: $(cat version.txt)"
 
 # 2. 安装/更新依赖
 echo "更新 Composer 依赖..."
-composer install --no-dev --optimize-autoloader
+# 同时安装 dev 依赖以便运行 PHPUnit 测试
+composer install --optimize-autoloader
 
 # 3. 清除缓存
 echo "清除应用缓存..."
@@ -24,9 +25,9 @@ php artisan route:clear
 php artisan view:clear
 
 # 4. 优化缓存（可选，生产环境建议开启）
-# echo "优化缓存..."
-# php artisan config:cache
-# php artisan route:cache
-# php artisan view:cache
+echo "优化缓存..."
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
 
 echo "部署完成！"

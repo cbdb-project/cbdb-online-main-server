@@ -57,19 +57,23 @@ Laravel 5.7 → 5.8 的破壞性變更較少，主要影響：
 ### 1. Cache TTL 格式變更（重要）
 **影響**：Cache 方法的 TTL（過期時間）從「分鐘」改為「秒」
 
-**本專案影響**：✅ **無需修改**
-- 本專案使用 `Carbon` 物件作為過期時間
-- Laravel 會自動處理 Carbon 物件，無需調整
+**本專案影響**：⚠️ **需要修改 1 處**
+- 本專案大部分使用 `Carbon` 物件作為過期時間，無需修改
+- 發現 `app/helpers.php:37` 使用整數 `10`，已修復為 `now()->addMinutes(10)`
 
 ```php
-// ✅ 本專案的寫法（無需修改）
-Cache::put('key', $value, now()->addMinutes(60));
-Cache::put('key', $value, Carbon::now()->addHour());
+// ❌ 舊版（Laravel 5.7）：10 = 10 分鐘
+Cache::put($cacheKey, $version, 10);
 
-// ⚠️ 如果使用整數（需要修改，但本專案未使用）
-// 舊版：Cache::put('key', $value, 60);  // 60 分鐘
-// 新版：Cache::put('key', $value, 3600); // 3600 秒
+// ✅ 新版（Laravel 5.8）：使用 Carbon 物件
+Cache::put($cacheKey, $version, now()->addMinutes(10));
+
+// 或者使用秒數：
+// Cache::put($cacheKey, $version, 600); // 600 秒 = 10 分鐘
 ```
+
+**已修復的文件：**
+- `app/helpers.php:37` - `get_app_version()` 函數的版本號快取
 
 ### 2. Email 驗證增強
 **變更**：Email 驗證規則從 RFC822 升級到 RFC6530

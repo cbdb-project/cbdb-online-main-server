@@ -14,9 +14,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', 'WelcomeController@index');
 
 Auth::routes();
 
@@ -158,11 +156,7 @@ Route::resource('modified', 'ModifiedController', ['name' => [
     'update' => 'modified.update'
 ]]);
 
-Route::get('test', function (Request $request){
-    $data = \App\TextCode::find(2031);
-    $data->type;
-    return $data;
-});
+Route::get('test', 'TestController@index');
 
 Route::resource('textinstancedata', 'TextInstanceDataController', ['name' => [
     'show' => 'textinstancedata.show',
@@ -195,9 +189,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/wiki-maintenance/import-url', 'WikiMaintenanceController@importFromUrl')->name('admin.wiki-maintenance.import-url');
     Route::get('admin/wiki-maintenance/progress/{taskId}', 'WikiMaintenanceController@getImportProgress')->where('taskId', '[a-zA-Z0-9_]+')->name('admin.wiki-maintenance.progress');
     Route::post('admin/wiki-maintenance/cancel/{taskId}', 'WikiMaintenanceController@cancelImport')->where('taskId', '[a-zA-Z0-9_]+')->name('admin.wiki-maintenance.cancel');
-    Route::get('admin/wiki-maintenance/test-progress', function() {
-        return response()->json(['success' => true, 'message' => 'Test route works']);
-    });
+    Route::get('admin/wiki-maintenance/test-progress', 'TestController@testProgress');
     Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')->name('admin.cbdb-table-maintenance');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');
     Route::get('admin/cbdb-table-maintenance/progress/{taskId}', 'CbdbTableMaintenanceController@getNameFtsProgress')

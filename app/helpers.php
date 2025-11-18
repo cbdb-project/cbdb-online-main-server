@@ -34,7 +34,7 @@ if (!function_exists('get_app_version')) {
             }
 
             // 缓存版本号10分钟
-            \Cache::put($cacheKey, $version, 10);
+            \Cache::put($cacheKey, $version, now()->addMinutes(10));
 
             return $version;
         } catch (\Exception $e) {

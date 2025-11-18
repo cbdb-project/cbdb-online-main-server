@@ -13,28 +13,14 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::middleware('auth:api')->get(/**
- * @param Request $request
- * @return mixed
- */
-    '/user', function (Request $request) {
-    return $request->user();
-});
+Route::middleware('auth:api')->get('/user', 'Api\UserController@show');
 
 Route::group([], function () {
-    Route::match(['get', 'post'], 'name', function (Request $request) {
-        return \App\Repositories\BiogMainRepository::namesByQuery($request);
-    });
+    Route::match(['get', 'post'], 'name', 'Api\NameController@index');
 
     //20201111建安新增
-    Route::post('textinstancedata', function (Request $request) {
-        $textinstancedatarepository = new \App\Repositories\TextInstanceDataRepository();
-        return $textinstancedatarepository->textByQuery($request);
-    });
-    Route::post('addrbelongsdata', function (Request $request) {
-        $addrbelongsdatarepository = new \App\Repositories\AddrBelongsDataRepository();
-        return $addrbelongsdatarepository->AddrByQuery($request);
-    });
+    Route::post('textinstancedata', 'Api\TextInstanceDataController@query');
+    Route::post('addrbelongsdata', 'Api\AddrBelongsDataController@query');
 });
 
 Route::group(['prefix' => 'select'], function (){

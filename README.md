@@ -8,6 +8,7 @@
 
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
 * [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
+* [升級指南](./UPGRADE.md) - Laravel 框架升級記錄
 * [AdminLTE 在 CBDB Online 項目中的使用分析](./ADMINLTE.md)
 * [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
 * [CHANGELOG](./CHANGELOG.md)
@@ -30,8 +31,8 @@
 ## 技術環境
 
 ### 生產環境
-- **PHP**: 7.4+
-- **Laravel**: 5.6
+- **PHP**: 7.4+ (最低 7.1.3)
+- **Laravel**: 5.7 (已從 5.6 升級，參見 [UPGRADE.md](./UPGRADE.md))
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
 - **Node.js**: 12.x
@@ -45,7 +46,7 @@
 
 ## 原始说明
 
-Laravel 框架已更新至 [5.6](https://laravel.com/docs/5.6)。
+Laravel 框架已更新至 [5.7](https://laravel.com/docs/5.7)（2025-11-17 從 5.6 升級，詳見 [UPGRADE.md](./UPGRADE.md)）。
 
 ## 開發说明檔案 (2025)
 

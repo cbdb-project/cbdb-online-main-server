@@ -1,5 +1,17 @@
 # Changelog
 
+## 技術升級 (2025-11)
+
+### Laravel 5.6 → 5.7 (2025-11-17)
+- 升級 Laravel Framework 從 5.6.40 至 5.7.29
+- 升級 Laravel Passport 從 4.0.3 至 6.0.7
+- 升級 Carbon 從 1.26.6 至 1.39.1
+- 升級 Symfony 組件至 4.4.x 版本
+- 新增 Nexmo 和 Slack 通知渠道支援
+- 新增 `opis/closure` 支援閉包序列化
+- PHP 最低版本要求從 7.0.0 提升至 7.1.3
+- 詳見 `UPGRADE.md` 了解完整升級說明
+
 ## UI 調整 (2025)
 
 - `/codes/*` 模組新增「提交提案」按鈕，可在新增／編輯時先送出提案而不直接寫入資料庫，系統會以 `op_type = 8/9` 於操作紀錄留下待審核紀錄，並於 `/operations`、`/modified` 提供管理員核准／退回按鈕。

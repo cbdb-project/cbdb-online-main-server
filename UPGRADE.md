@@ -88,6 +88,50 @@ Cache::put($cacheKey, $version, now()->addMinutes(10));
 **變更**：Container 的 `rebinding()` 和 `refresh()` 行為改進
 **本專案影響**：✅ 內部優化，應用層無感知
 
+### 5. 路由閉包序列化（重要）
+**影響**：使用閉包定義的路由無法序列化，執行 `route:cache` 會失敗
+
+**本專案影響**：⚠️ **需要修改 7 處**
+- `routes/api.php` 有 4 處閉包路由
+- `routes/web.php` 有 3 處閉包路由
+
+**已修復的路由：**
+
+**API 路由 (routes/api.php)：**
+1. `/api/user` → `Api\UserController@show`
+2. `/api/name` → `Api\NameController@index`
+3. `/api/textinstancedata` → `Api\TextInstanceDataController@query`
+4. `/api/addrbelongsdata` → `Api\AddrBelongsDataController@query`
+
+**Web 路由 (routes/web.php)：**
+1. `/` → `WelcomeController@index`
+2. `/test` → `TestController@index`
+3. `/admin/wiki-maintenance/test-progress` → `TestController@testProgress`
+
+**修復方式：**
+```php
+// ❌ 舊版：使用閉包
+Route::get('/user', function (Request $request) {
+    return $request->user();
+});
+
+// ✅ 新版：使用控制器方法
+Route::get('/user', 'Api\UserController@show');
+```
+
+**創建的新控制器：**
+- `app/Http/Controllers/Api/UserController.php`
+- `app/Http/Controllers/Api/NameController.php`
+- `app/Http/Controllers/Api/TextInstanceDataController.php`
+- `app/Http/Controllers/Api/AddrBelongsDataController.php`
+- `app/Http/Controllers/WelcomeController.php`
+- `app/Http/Controllers/TestController.php`
+
+**向後兼容性：**
+- ✅ 所有控制器執行相同的邏輯
+- ✅ API 行為保持完全一致
+- ✅ 無需修改前端代碼
+
 ## Composer 更新步驟
 
 ### 開發環境

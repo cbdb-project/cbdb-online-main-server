@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Docker
+docker-compose.yml
+docker/
+.dockerignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Laravel
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+
+# 文档
+*.md
+!README.md
+
+# 测试
+tests/
+phpunit.xml
+.phpunit.cache

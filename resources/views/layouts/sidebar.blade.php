@@ -44,9 +44,9 @@
             <li class="{{ $page_title == 'OperationsProposals' ? 'active' : '' }}"><a href="{{ route('operations.index', ['proposals_only' => 1]) }}"><i class="ion ion-ios-people-outline"></i> <span>最近提案列表{{ $hasPendingProposals ? '（待審核）' : '' }}</span></a></li>
             <li class="{{ $page_title == 'Crowdsourcing' ? 'active' : '' }}"><a href="{{ route('crowdsourcing.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近眾包錄入記錄</span></a></li>
             <li class="{{ $page_title == 'Modified' ? 'active' : '' }}"><a href="{{ route('modified.index') }}"><i class="ion ion-ios-people-outline"></i> <span>最近修改記錄</span></a></li>
+            <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>全部表格</span></a></li>
 
             <li class="header">編碼表 CODES</li>
-            <li class="{{ $page_title == 'Codes' ? 'active' : '' }}"><a href="/codes"><i class="fa fa-database"></i> <span>全部表格 (CODES)</span></a></li>
             {{--<li class="{{ $page_title == 'ADDR_CODES' ? 'active' : '' }}"><a href="/codes/ADDR_CODES"><i class="fa fa-database"></i> <span>ADDR_CODES</span></a></li>--}}
             {{--<li class="{{ $page_title == 'ALTNAME_CODES' ? 'active' : '' }}"><a href="/codes/ALTNAME_CODES"><i class="fa fa-database"></i> <span>ALTNAME_CODES</span></a></li>--}}
             {{--<li class="{{ $page_title == 'Address Codes' ? 'active' : '' }}"><a href="{{ route('addresscodes.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址編碼表 (ADDRESSES)</span></a></li>--}}

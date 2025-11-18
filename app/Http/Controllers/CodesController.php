@@ -479,7 +479,7 @@ class CodesController extends Controller
             unset($meta['comment']);
         }
         unset($meta['cancelled_at'], $meta['cancelled_by'], $meta['cancelled_by_id'], $meta['cancel_reason']);
-        $meta['updated_at'] = Carbon::now()->toDateTimeString();
+        $meta['updated_at'] = Carbon::now()->format('Y-m-d H:i:s');
 
         $newPayload = $data;
         $newPayload['__proposal_meta'] = $meta;
@@ -488,7 +488,7 @@ class CodesController extends Controller
 
         $updates = [
             'resource_data' => json_encode($newPayload, JSON_UNESCAPED_UNICODE),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ];
 
         if ($isCreate) {
@@ -522,14 +522,14 @@ class CodesController extends Controller
             $payload['__proposal_meta']['cancel_reason'] = $reason;
         }
 
-        $payload['__proposal_meta']['cancelled_at'] = Carbon::now()->toDateTimeString();
+        $payload['__proposal_meta']['cancelled_at'] = Carbon::now()->format('Y-m-d H:i:s');
         $payload['__proposal_meta']['cancelled_by'] = Auth::user()->name ?? Auth::id();
         $payload['__proposal_meta']['cancelled_by_id'] = Auth::id();
         $this->markProposalCancelled($payload);
 
         DB::table('operations')->where('id', $operation['id'])->update([
             'resource_data' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         flash('提案已撤回 @ '.Carbon::now(), 'info');
@@ -1139,7 +1139,7 @@ class CodesController extends Controller
             'table' => $table,
             'submitted_by' => $user ? ($user->name ?: $user->email ?: $user->id) : null,
             'submitted_by_id' => $user ? $user->id : null,
-            'submitted_at' => Carbon::now()->toDateTimeString(),
+            'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ];
 
         $comment = trim((string) $request->input('__proposal_comment', ''));

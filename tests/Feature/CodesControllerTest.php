@@ -418,8 +418,8 @@ class CodesControllerTest extends TestCase
             'op_type' => $call['op_type'],
             'resource_data' => json_encode($call['resource_data']),
             'resource_original' => json_encode($call['ori']),
-            'created_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'created_at' => Carbon::now()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         $this->operationSpy->calls = [];
@@ -453,7 +453,7 @@ class CodesControllerTest extends TestCase
             '__proposal_meta' => [
                 'submitted_by' => $user->name,
                 'submitted_by_id' => $user->id,
-                'submitted_at' => Carbon::now()->toDateTimeString(),
+                'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ],
         ];
         DB::table('operations')->insert([
@@ -464,8 +464,8 @@ class CodesControllerTest extends TestCase
             'op_type' => Operation::TYPE_PROPOSAL_CREATE,
             'resource_data' => json_encode($resourceData),
             'resource_original' => json_encode([]),
-            'created_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'created_at' => Carbon::now()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         $controller = new class(app(CodesRepository::class), $this->operationSpy, $resourceData, $user) extends CodesController {
@@ -556,7 +556,7 @@ class CodesControllerTest extends TestCase
             '__proposal_meta' => [
                 'submitted_by' => $user->name,
                 'submitted_by_id' => $user->id,
-                'submitted_at' => Carbon::now()->toDateTimeString(),
+                'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ],
         ];
         DB::table('operations')->insert([
@@ -567,8 +567,8 @@ class CodesControllerTest extends TestCase
             'op_type' => Operation::TYPE_PROPOSAL_CREATE,
             'resource_data' => json_encode($resourceData),
             'resource_original' => json_encode([]),
-            'created_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'created_at' => Carbon::now()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         $response = $this->from(route('operations.index', ['proposals_only' => 1]))
@@ -606,7 +606,7 @@ class CodesControllerTest extends TestCase
             '__proposal_meta' => [
                 'submitted_by' => $user->name,
                 'submitted_by_id' => $user->id,
-                'submitted_at' => Carbon::now()->subDay()->toDateTimeString(),
+                'submitted_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
             ],
         ];
         DB::table('operations')->insert([
@@ -617,8 +617,8 @@ class CodesControllerTest extends TestCase
             'op_type' => Operation::TYPE_PROPOSAL_CREATE,
             'resource_data' => json_encode($resourceData),
             'resource_original' => json_encode([]),
-            'created_at' => Carbon::now()->subDay()->toDateTimeString(),
-            'updated_at' => Carbon::now()->subDay()->toDateTimeString(),
+            'created_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
         ]);
 
         $response = $this->from(route('codes.proposals.edit', ['table_name' => 'TEST_CODES', 'operation' => 3]))

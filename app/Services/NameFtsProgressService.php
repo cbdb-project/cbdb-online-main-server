@@ -14,8 +14,8 @@ class NameFtsProgressService
             'progress' => 5,
             'message' => '已排程等待執行…',
             'status' => 'queued',
-            'started_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString(),
+            'started_at' => Carbon::now()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         Cache::put(self::cacheKey($taskId), $data, now()->addHour());
@@ -30,10 +30,10 @@ class NameFtsProgressService
         $data['progress'] = max(0, min(100, $progress));
         $data['message'] = $message;
         $data['status'] = $status;
-        $data['updated_at'] = Carbon::now()->toDateTimeString();
+        $data['updated_at'] = Carbon::now()->format('Y-m-d H:i:s');
 
         if (in_array($status, ['completed', 'error'], true)) {
-            $data['completed_at'] = Carbon::now()->toDateTimeString();
+            $data['completed_at'] = Carbon::now()->format('Y-m-d H:i:s');
         }
 
         Cache::put($key, $data, now()->addHour());

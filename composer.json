@@ -13,7 +13,7 @@
         "laravel/passport": "^7.0",
         "laravel/tinker": "^1.0",
         "naux/sendcloud": "^1.1",
-        "nesbot/carbon": "^1.22"
+        "nesbot/carbon": "^2.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",

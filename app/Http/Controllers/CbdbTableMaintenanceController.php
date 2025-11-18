@@ -193,7 +193,7 @@ class CbdbTableMaintenanceController extends Controller
             'table_name' => $tableName,
             'user_id' => Auth::id(),
             'user_name' => Auth::user()->name,
-            'timestamp' => Carbon::now()->toDateTimeString(),
+            'timestamp' => Carbon::now()->format('Y-m-d H:i:s'),
         ];
 
         if ($count !== null) {

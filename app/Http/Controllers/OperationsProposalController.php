@@ -232,7 +232,7 @@ class OperationsProposalController extends Controller
         $payload['__review_status'] = $status;
         $payload['__reviewed_by'] = Auth::user()->name ?? Auth::id();
         $payload['__reviewed_by_id'] = Auth::id();
-        $payload['__reviewed_at'] = Carbon::now()->toDateTimeString();
+        $payload['__reviewed_at'] = Carbon::now()->format('Y-m-d H:i:s');
         if ($comment !== null && $comment !== '') {
             $payload['__review_comment'] = $comment;
         }

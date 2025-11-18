@@ -19,42 +19,80 @@
 | 2 | ADDR_CODES | 地址代碼 |
 | 3 | ADDRESSES | 地址主表 |
 | 4 | ALTNAME_CODES | 別名類型代碼 |
-| 5 | APPOINTMENT_CODES | 任命類型代碼 |
-| 6 | ASSOC_CODES | 關聯類型代碼 |
-| 7 | ASSUME_OFFICE_CODES | 就任類型代碼 |
-| 8 | BIOG_ADDR_CODES | 人物地址類型代碼 |
-| 9 | BIOG_INST_CODES | 人物機構類型代碼 |
-|10 | CBDB_NAME_LIST | 姓名列表 |
-|11 | CBDB__NAME_FTS | 姓名搜尋倒排索引（內部表）|
-|12 | CBDB__TRAD_SIMP_MAP | 繁簡字符映射表（內部表，⚠️ Apache 2.0 授權）|
-|13 | CHORONYM_CODES | 地名類型代碼 |
-|14 | COUNTRY_CODES | 國家代碼 |
-|15 | DYNASTIES | 朝代代碼 |
-|16 | ENTRY_CODES | 入仕類型代碼 |
-|17 | ETHNICITY_TRIBE_CODES | 民族/部落代碼 |
-|18 | EVENT_CODES | 事件類型代碼 |
-|19 | EXTANT_CODES | 存世狀態代碼 |
-|20 | GANZHI_CODES | 干支代碼 |
-|21 | HOUSEHOLD_STATUS_CODES | 戶籍狀態代碼 |
-|22 | INDEXYEAR_TYPE_CODES | 年份索引類型代碼 |
-|23 | KINSHIP_CODES | 親屬關係代碼 |
-|24 | LITERARYGENRE_CODES | 文學體裁代碼 |
-|25 | MEASURE_CODES | 度量衡代碼 |
-|26 | MERGED_PERSON_DATA | 人物合併資料 |
-|27 | OCCASION_CODES | 場合類型代碼 |
-|28 | OFFICE_CODES | 官職代碼 |
-|29 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
-|31 | POSSESSION_ACT_CODES | 財產行為代碼 |
-|32 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
-|33 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |
-|34 | SOCIAL_INSTITUTION_CODES | 社會機構代碼 |
-|35 | SOCIAL_INSTITUTION_NAME_CODES | 社會機構名稱類型代碼 |
-|36 | STATUS_CODES | 狀態代碼 |
-|37 | TEXT_BIBLCAT_CODES | 文獻分類代碼 |
-|38 | TEXT_CODES | 文獻代碼 |
-|39 | TEXT_INSTANCE_DATA | 文獻版本資料 |
-|40 | TEXT_ROLE_CODES | 文獻角色代碼 |
-|41 | YEAR_RANGE_CODES | 年份範圍代碼 |
+| 5 | ALTNAME_DATA | 別名資料 |
+| 6 | APPOINTMENT_CODES | 任命類型代碼 |
+| 7 | APPOINTMENT_CODE_TYPE_REL | 任命代碼類型關聯 |
+| 8 | APPOINTMENT_TYPES | 任命類型 |
+| 9 | ASSOC_CODES | 關聯類型代碼 |
+|10 | ASSOC_CODE_TYPE_REL | 關聯代碼類型關聯 |
+|11 | ASSOC_DATA | 關聯資料 |
+|12 | ASSOC_TYPES | 關聯類型 |
+|13 | ASSUME_OFFICE_CODES | 就任類型代碼 |
+|14 | BIOG_ADDR_CODES | 人物地址類型代碼 |
+|15 | BIOG_ADDR_DATA | 人物地址資料 |
+|16 | BIOG_INST_CODES | 人物機構類型代碼 |
+|17 | BIOG_INST_DATA | 人物機構資料 |
+|18 | BIOG_MAIN | 人物主表 |
+|19 | BIOG_SOURCE_DATA | 人物來源資料 |
+|20 | BIOG_TEXT_DATA | 人物文獻資料 |
+|21 | CBDB_NAME_LIST | 姓名列表 |
+|22 | CBDB__NAME_FTS | 姓名搜尋倒排索引（內部表）|
+|23 | CBDB__TRAD_SIMP_MAP | 繁簡字符映射表（內部表，⚠️ Apache 2.0 授權）|
+|24 | CHORONYM_CODES | 地名類型代碼 |
+|25 | COUNTRY_CODES | 國家代碼 |
+|26 | DYNASTIES | 朝代代碼 |
+|27 | ENTRY_CODES | 入仕類型代碼 |
+|28 | ENTRY_CODE_TYPE_REL | 入仕代碼類型關聯 |
+|29 | ENTRY_DATA | 入仕資料 |
+|30 | ENTRY_TYPES | 入仕類型 |
+|31 | ETHNICITY_TRIBE_CODES | 民族/部落代碼 |
+|32 | EVENTS_ADDR | 事件地址 |
+|33 | EVENTS_DATA | 事件資料 |
+|34 | EVENT_CODES | 事件類型代碼 |
+|35 | EXTANT_CODES | 存世狀態代碼 |
+|36 | FORMLABELS | 表單標籤 |
+|37 | GANZHI_CODES | 干支代碼 |
+|38 | HOUSEHOLD_STATUS_CODES | 戶籍狀態代碼 |
+|39 | INDEXYEAR_TYPE_CODES | 年份索引類型代碼 |
+|40 | KINSHIP_CODES | 親屬關係代碼 |
+|41 | KIN_DATA | 親屬資料 |
+|42 | KIN_MOURNING | 親屬喪服 |
+|43 | KIN_MOURNING_STEPS | 親屬喪服等級 |
+|44 | LITERARYGENRE_CODES | 文學體裁代碼 |
+|45 | MEASURE_CODES | 度量衡代碼 |
+|46 | MERGED_PERSON_DATA | 人物合併資料 |
+|47 | NIAN_HAO | 年號 |
+|48 | OCCASION_CODES | 場合類型代碼 |
+|49 | OFFICE_CATEGORIES | 官職分類 |
+|50 | OFFICE_CODES | 官職代碼 |
+|51 | OFFICE_CODE_TYPE_REL | 官職代碼類型關聯 |
+|52 | OFFICE_TYPE_TREE | 官職類型樹 |
+|53 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
+|54 | POSSESSION_ACT_CODES | 財產行為代碼 |
+|55 | POSSESSION_ADDR | 財產地址 |
+|56 | POSTED_TO_ADDR_DATA | 任官地址資料 |
+|57 | POSTED_TO_OFFICE_DATA | 任官資料 |
+|58 | POSTING_DATA | 任官主表 |
+|59 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
+|60 | SOCIAL_INSTITUTION_ADDR | 社會機構地址 |
+|61 | SOCIAL_INSTITUTION_ADDR_TYPES | 社會機構地址類型 |
+|62 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |
+|63 | SOCIAL_INSTITUTION_ALTNAME_DATA | 社會機構別名資料 |
+|64 | SOCIAL_INSTITUTION_CODES | 社會機構代碼 |
+|65 | SOCIAL_INSTITUTION_NAME_CODES | 社會機構名稱類型代碼 |
+|66 | SOCIAL_INSTITUTION_TYPES | 社會機構類型 |
+|67 | STATUS_CODES | 狀態代碼 |
+|68 | STATUS_CODE_TYPE_REL | 狀態代碼類型關聯 |
+|69 | STATUS_DATA | 狀態資料 |
+|70 | STATUS_TYPES | 狀態類型 |
+|71 | TEXT_BIBLCAT_CODES | 文獻分類代碼 |
+|72 | TEXT_BIBLCAT_CODE_TYPE_REL | 文獻分類代碼類型關聯 |
+|73 | TEXT_BIBLCAT_TYPES | 文獻分類類型 |
+|74 | TEXT_CODES | 文獻代碼 |
+|75 | TEXT_INSTANCE_DATA | 文獻版本資料 |
+|76 | TEXT_ROLE_CODES | 文獻角色代碼 |
+|77 | TEXT_TYPE | 文獻類型 |
+|78 | YEAR_RANGE_CODES | 年份範圍代碼 |
 
 > 建議：若新增或移除代碼表，請同步更新本文件與 `config/codes.php`，並在部署環境重新執行 `php artisan config:cache` 以確保新設定生效。
 

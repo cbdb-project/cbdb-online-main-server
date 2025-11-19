@@ -270,9 +270,14 @@ class BasicInformationOfficesController extends Controller
     protected function serialAddr(Array $array){
         $res = [];
 //        dd($array);
-        foreach ($array as $item)
-            if (array_has($res, $item['pivot']['c_posting_id'])) $res[$item['pivot']['c_posting_id']] = $res[$item['pivot']['c_posting_id']].';'.$item['c_name_chn'];
-            else $res[$item['pivot']['c_posting_id']] = $item['c_name_chn'];
+        foreach ($array as $item) {
+            $postingId = $item['pivot']['c_posting_id'];
+            if (Arr::has($res, $postingId)) {
+                $res[$postingId] = $res[$postingId].';'.$item['c_name_chn'];
+            } else {
+                $res[$postingId] = $item['c_name_chn'];
+            }
+        }
         return $res;
     }
 }

@@ -159,13 +159,15 @@ class WikiMaintenanceController extends Controller
             'task_id' => $taskId
         ]);
 
-        // 註冊關閉時執行的函數
-        register_shutdown_function(function() use ($taskId, $url, $targetSourceId, $sourceName) {
-            if (function_exists('fastcgi_finish_request')) {
-                fastcgi_finish_request();
-            }
-            $this->executeImportTask($taskId, $url, $targetSourceId, $sourceName);
-        });
+        if (!app()->runningUnitTests() && !app()->runningInConsole()) {
+            // 註冊關閉時執行的函數（僅在 HTTP 請求流程使用）
+            register_shutdown_function(function () use ($taskId, $url, $targetSourceId, $sourceName) {
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                }
+                $this->executeImportTask($taskId, $url, $targetSourceId, $sourceName);
+            });
+        }
 
         return $response;
     }

@@ -174,8 +174,8 @@ class WikiTaskManager extends Command
         $progress['status'] = 'cancelled';
         $progress['message'] = '管理員從命令行取消了導入任務';
         $progress['progress'] = 0;
-        $progress['completed_at'] = Carbon::now()->toDateTimeString();
-        $progress['updated_at'] = Carbon::now()->toDateTimeString();
+        $progress['completed_at'] = Carbon::now()->format('Y-m-d H:i:s');
+        $progress['updated_at'] = Carbon::now()->format('Y-m-d H:i:s');
 
         Cache::put($cacheKey, $progress, now()->addHour());
 

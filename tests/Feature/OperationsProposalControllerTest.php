@@ -107,7 +107,7 @@ class OperationsProposalControllerTest extends TestCase
             'description' => 'Approved create',
             '__key_columns' => ['code_id', 'code_sub'],
             '__review_status' => 'pending',
-            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->toDateTimeString()],
+            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s')],
         ];
 
         $operation = $this->proposalOperation([

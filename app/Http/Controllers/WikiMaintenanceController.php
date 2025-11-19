@@ -473,8 +473,8 @@ class WikiMaintenanceController extends Controller
             'progress' => 0,
             'message' => '準備開始導入...',
             'status' => 'running',
-            'started_at' => Carbon::now()->toDateTimeString(),
-            'updated_at' => Carbon::now()->toDateTimeString()
+            'started_at' => Carbon::now()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s')
         ];
 
         cache([$cacheKey => $progressData], now()->addHour()); // 缓存1小时
@@ -488,10 +488,10 @@ class WikiMaintenanceController extends Controller
         $progressData['progress'] = $progress;
         $progressData['message'] = $message;
         $progressData['status'] = $status;
-        $progressData['updated_at'] = Carbon::now()->toDateTimeString();
+        $progressData['updated_at'] = Carbon::now()->format('Y-m-d H:i:s');
 
         if ($status === 'completed' || $status === 'error' || $status === 'cancelled') {
-            $progressData['completed_at'] = Carbon::now()->toDateTimeString();
+            $progressData['completed_at'] = Carbon::now()->format('Y-m-d H:i:s');
         }
 
         cache([$cacheKey => $progressData], now()->addHour());
@@ -735,7 +735,7 @@ class WikiMaintenanceController extends Controller
             'source_id' => $sourceId,
             'user_id' => Auth::id(),
             'user_name' => Auth::user()->name,
-            'timestamp' => Carbon::now()->toDateTimeString(),
+            'timestamp' => Carbon::now()->format('Y-m-d H:i:s'),
         ];
 
         if ($count !== null) {

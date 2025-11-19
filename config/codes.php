@@ -40,7 +40,6 @@ return [
         'EVENTS_DATA',
         'EVENT_CODES',
         'EXTANT_CODES',
-        'FORMLABELS',
         'GANZHI_CODES',
         'HOUSEHOLD_STATUS_CODES',
         'INDEXYEAR_TYPE_CODES',

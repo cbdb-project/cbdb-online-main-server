@@ -65,9 +65,9 @@ class MergePreviewControllerTest extends TestCase
         $this->assertSame('Active', $values['c_status']);
         $this->assertSame('MergeAdmin', $values['c_modified_by']);
         $this->assertSame('20250102', $values['c_modified_date']);
-        $this->assertContains('Primary note', $values['c_notes']);
-        $this->assertContains('Secondary note', $values['c_notes']);
-        $this->assertContains('[merged #123 and #456 on 20250102 with reason] duplicate record', $values['c_notes']);
+        $this->assertStringContainsString('Primary note', $values['c_notes']);
+        $this->assertStringContainsString('Secondary note', $values['c_notes']);
+        $this->assertStringContainsString('[merged #123 and #456 on 20250102 with reason] duplicate record', $values['c_notes']);
 
         $this->assertArrayHasKey('c_notes', $updates);
         $this->assertArrayHasKey('c_modified_by', $updates);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Auth;
 
 class EmailController extends Controller
@@ -17,7 +18,7 @@ class EmailController extends Controller
             return route('/');
         }
 //        $user->is_active = 2;
-        $user->confirmation_token = str_random(40);
+        $user->confirmation_token = Str::random(40);
         $user->save();
         Auth::login($user);
         flash('用户激活成功 '.Carbon::now(), 'success');

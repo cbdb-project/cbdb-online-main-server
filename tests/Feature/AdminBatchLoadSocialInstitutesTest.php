@@ -6,7 +6,6 @@ use App\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AdminBatchLoadSocialInstitutesTest extends TestCase
@@ -114,7 +113,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
             'email' => uniqid('admin', true).'@example.com',
             'password' => bcrypt('secret'),
             'avatar' => 'avatar5.png',
-            'confirmation_token' => Str::random(10),
+            'confirmation_token' => str_random(10),
         ]);
 
         foreach ($attributes as $key => $value) {

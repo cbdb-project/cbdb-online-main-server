@@ -14,7 +14,6 @@ use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 
 use App\Pinyin;
@@ -237,7 +236,7 @@ class BasicInformationController extends Controller
         foreach ($addr as $addr_data) {
             $addr_data = (array)$addr_data;
             $addr_data['c_personid'] = $new_id;
-            $addr_data = Arr::except($addr_data, ['_token']);
+            $addr_data = array_except($addr_data, ['_token']);
             $addr_data = $this->toolRepository->timestamp($addr_data, True); //建檔資訊
             DB::table('BIOG_ADDR_DATA')->insert($addr_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', $addr_data['c_personid']."-".$addr_data['c_addr_id']."-".$addr_data['c_addr_type']."-".$addr_data['c_sequence'], $addr_data);
@@ -250,7 +249,7 @@ class BasicInformationController extends Controller
         foreach ($source as $source_data) {
             $source_data = (array)$source_data;
             $source_data['c_personid'] = $new_id;
-            $source_data = Arr::except($source_data, ['_token']);
+            $source_data = array_except($source_data, ['_token']);
             DB::table('BIOG_SOURCE_DATA')->insert($source_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', $source_data['c_personid']."-".$source_data['c_textid']."-".$source_data['c_pages'], $source_data);
         }
@@ -322,7 +321,7 @@ class BasicInformationController extends Controller
         foreach ($inst as $inst_data) {
             $inst_data = (array)$inst_data;
             $inst_data['c_personid'] = $new_id;
-            $inst_data = Arr::except($inst_data, ['_token']);
+            $inst_data = array_except($inst_data, ['_token']);
             $inst_data = $this->toolRepository->timestamp($inst_data, True); //建檔資訊
             DB::table('BIOG_INST_DATA')->insert($inst_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', $inst_data['c_personid']."-".$inst_data['c_inst_code']."-".$inst_data['c_inst_name_code']."-".$inst_data['c_bi_role_code'], $inst_data);
@@ -335,7 +334,7 @@ class BasicInformationController extends Controller
         foreach ($status as $status_data) {
             $status_data = (array)$status_data;
             $status_data['c_personid'] = $new_id;
-            $status_data = Arr::except($status_data, ['_token']);
+            $status_data = array_except($status_data, ['_token']);
             $status_data = $this->toolRepository->timestamp($status_data, True); //建檔資訊
             DB::table('STATUS_DATA')->insert($status_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', $status_data['c_personid'].'-'.$status_data['c_sequence'].'-'.$status_data['c_status_code'], $status_data);

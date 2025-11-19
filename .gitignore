@@ -11,4 +11,3 @@ npm-debug.log
 yarn-error.log
 .env
 version.txt
-.phpunit.result.cache

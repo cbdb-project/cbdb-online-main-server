@@ -170,7 +170,7 @@ return [
         Laravel\Tinker\TinkerServiceProvider::class,
         Laracasts\Flash\FlashServiceProvider::class,
         Laravel\Passport\PassportServiceProvider::class,
-        // Naux\Mail\SendCloudServiceProvider::class, // Removed: incompatible with Laravel 6
+        Naux\Mail\SendCloudServiceProvider::class,
 
         /*
          * Application Service Providers...

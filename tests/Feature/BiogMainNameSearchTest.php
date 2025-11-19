@@ -320,10 +320,10 @@ class BiogMainNameSearchTest extends TestCase
         $result = BiogMainRepository::namesByQuery($request, 20);
 
         // 空查詢應該返回 JSON 字串（原有邏輯）
-        $this->assertIsString($result);
+        $this->assertInternalType('string', $result);
 
         $decoded = json_decode($result, true);
-        $this->assertIsArray($decoded);
+        $this->assertInternalType('array', $decoded);
         $this->assertArrayHasKey('data', $decoded);
         $this->assertGreaterThanOrEqual(3, count($decoded['data']));
     }

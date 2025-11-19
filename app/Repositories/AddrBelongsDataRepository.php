@@ -13,7 +13,6 @@ use App\AddrCode;
 use App\AddressCode;
 use App\AddrBelongsData;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -68,7 +67,7 @@ class AddrBelongsDataRepository
     {
         $id_l = explode("-", $id);
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = array_except($data, ['_method', '_token']);
         $table_name = "ADDR_BELONGS_DATA";
         $row = DB::table($table_name)->where([
             ['c_addr_id', '=', $id_l[0]],

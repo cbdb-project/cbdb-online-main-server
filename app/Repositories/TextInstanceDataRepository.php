@@ -11,6 +11,7 @@ namespace App\Repositories;
 
 use App\TextInstanceData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class TextInstanceDataRepository{
     public function textByQuery(Request $request, $num=20)
@@ -41,7 +42,7 @@ class TextInstanceDataRepository{
     public function updateById($request, $id)
     {
         $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token']);
         //20211117增加用戶名和保存時間自動填寫
         $data = (new ToolsRepository)->timestamp($data); //更新
         //$altcode = TextInstanceData::find($id);

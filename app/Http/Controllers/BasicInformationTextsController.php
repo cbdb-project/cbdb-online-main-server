@@ -8,6 +8,7 @@ use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -73,7 +74,7 @@ class BasicInformationTextsController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        $data = array_except($data, ['_token']);
+        $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, True);
         $temp = DB::table($this->table_name)->where([
@@ -136,7 +137,7 @@ class BasicInformationTextsController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         $temp_l = explode("-", $id_);
 

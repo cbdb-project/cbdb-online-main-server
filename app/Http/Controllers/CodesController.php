@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use phpDocumentor\Reflection\Types\Null_;
 
 class CodesController extends Controller
@@ -302,7 +303,7 @@ class CodesController extends Controller
         foreach ($conditions as $column => $value) {
             $query->where($column, $value);
         }
-        $data = array_except($request->all(), ['_method', '_token', '__proposal_comment']);
+        $data = Arr::except($request->all(), ['_method', '_token', '__proposal_comment']);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
 
         try {
@@ -552,7 +553,7 @@ class CodesController extends Controller
             flash('該代碼表為只讀，禁止新增。', 'warning');
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
-        $data = array_except($request->all(), ['_token', '__proposal_comment']);
+        $data = Arr::except($request->all(), ['_token', '__proposal_comment']);
         $keyColumns = $this->getKeyColumns($table);
         if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
             flash('新增失敗：請確認主鍵欄位已填寫完整。', 'error');
@@ -709,13 +710,13 @@ class CodesController extends Controller
                 }
 
                 if (
-                    str_contains($key, 'name') ||
-                    str_contains($key, 'desc') ||
-                    str_contains($key, 'code') ||
-                    str_contains($key, 'id') ||
-                    str_contains($key, 'sequence') ||
-                    str_contains($key, 'chn') ||
-                    str_contains($key, 'dy')
+                    Str::contains($key, 'name') ||
+                    Str::contains($key, 'desc') ||
+                    Str::contains($key, 'code') ||
+                    Str::contains($key, 'id') ||
+                    Str::contains($key, 'sequence') ||
+                    Str::contains($key, 'chn') ||
+                    Str::contains($key, 'dy')
                 ) {
                     $thead[] = $key;
                     $count++;

@@ -8,7 +8,6 @@ use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -78,7 +77,7 @@ class BasicInformationEntriesController extends Controller
         return redirect()->route('basicinformation.entries.edit', ['id' => $id, '_id' => $_id]);
         */
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, True);
         //20181217新增片段，api回傳值有-999需要轉為0
@@ -184,7 +183,7 @@ class BasicInformationEntriesController extends Controller
         return redirect()->route('basicinformation.entries.edit', ['id'=>$id, 'id_'=>$id_]);
         */
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         //20181217新增片段，api回傳值有-999需要轉為0
         $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];

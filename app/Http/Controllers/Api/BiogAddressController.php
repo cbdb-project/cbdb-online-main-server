@@ -9,7 +9,6 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class BiogAddressController extends Controller
@@ -65,7 +64,7 @@ class BiogAddressController extends Controller
         }
         $data['c_addr'] = 0;
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = array_except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
@@ -124,7 +123,7 @@ class BiogAddressController extends Controller
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
 
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = array_except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$addr_id)->update($data);
 //        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());

@@ -3,7 +3,6 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\Resource;
-use Illuminate\Support\Arr;
 
 class BiogMain extends Resource
 {
@@ -16,7 +15,7 @@ class BiogMain extends Resource
     public function toArray($request)
     {
 //        return parent::toArray($request);
-        $json = Arr::except(parent::toArray($request), ['tts_sysno', 'c_personid']);
+        $json = array_except(parent::toArray($request), ['tts_sysno', 'c_personid']);
         return $json;
     }
 

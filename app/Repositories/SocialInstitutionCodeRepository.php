@@ -11,7 +11,6 @@ namespace App\Repositories;
 
 use App\SocialInstitutionCode;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 
 class SocialInstitutionCodeRepository {
 
@@ -54,7 +53,7 @@ class SocialInstitutionCodeRepository {
     public function updateByUnionId($request, $id)
     {
         $data = $request->all();
-        $data = Arr::except($data, ['_token', '_method']);
+        $data = array_except($data, ['_token', '_method']);
         $temp_l = explode("-", $id);
         $row = SocialInstitutionCode::where([
             ['c_inst_name_code', '=', $temp_l[0]],

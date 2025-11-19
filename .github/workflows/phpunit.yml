@@ -29,7 +29,7 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress
+        run: composer install --prefer-dist --no-progress --no-suggest
 
       - name: Prepare environment
         run: |
@@ -37,4 +37,4 @@ jobs:
           php artisan key:generate
 
       - name: Run PHPUnit suite
-        run: ./vendor/bin/phpunit
+        run: composer test

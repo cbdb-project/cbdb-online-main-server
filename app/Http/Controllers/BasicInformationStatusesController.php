@@ -65,7 +65,10 @@ class BasicInformationStatusesController extends Controller
         $data = $this->biogMainRepository->statuseStoreById($request, $id);
         $_id = $data['c_personid']."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.statuses.edit', [
+            'basicinformation' => $id,
+            'status' => $_id,
+        ]);
     }
 
     /**
@@ -115,7 +118,10 @@ class BasicInformationStatusesController extends Controller
         $data = $this->biogMainRepository->statuseUpdateById($request, $id_ ,$id);
         $id_ = $id."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.statuses.edit', [
+            'basicinformation' => $id,
+            'status' => $id_,
+        ]);
     }
 
     /**
@@ -136,6 +142,6 @@ class BasicInformationStatusesController extends Controller
         }
         $this->biogMainRepository->statuseDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.statuses.index', ['id' => $id]);
+        return redirect()->route('basicinformation.statuses.index', ['basicinformation' => $id]);
     }
 }

@@ -91,7 +91,10 @@ class BasicInformationSocialInstController extends Controller
         //修改結束
         $_id = $this->biogMainRepository->socialInstStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.socialinst.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.socialinst.edit', [
+            'basicinformation' => $id,
+            'socialinst' => $_id,
+        ]);
     }
 
     /**
@@ -142,7 +145,10 @@ class BasicInformationSocialInstController extends Controller
         //原本的寫法，保留做為參考。
         $this->biogMainRepository->socialInstUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.socialinst.edit', [
+            'basicinformation' => $id,
+            'socialinst' => $id_,
+        ]);
         */
         
         $data = $request->all();
@@ -177,7 +183,10 @@ class BasicInformationSocialInstController extends Controller
         $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.socialinst.edit', ['id'=>$id, 'id_'=>$newid]);
+        return redirect()->route('basicinformation.socialinst.edit', [
+            'basicinformation' => $id,
+            'socialinst' => $newid,
+        ]);
     }
 
     /**
@@ -214,6 +223,6 @@ class BasicInformationSocialInstController extends Controller
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.socialinst.index', ['id' => $id]);
+        return redirect()->route('basicinformation.socialinst.index', ['basicinformation' => $id]);
     }
 }

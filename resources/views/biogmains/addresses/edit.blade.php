@@ -5,7 +5,7 @@
         <div class="panel-heading">地址 Address</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.addresses.update', ['id' => $id, 'addr'=> $id."-".$row->c_addr_id."-".$row->c_addr_type."-".$row->c_sequence]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.addresses.update', ['basicinformation' => $id, 'address'=> $id.'-'.$row->c_addr_id.'-'.$row->c_addr_type.'-'.$row->c_sequence]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

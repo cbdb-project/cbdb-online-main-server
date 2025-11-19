@@ -66,7 +66,10 @@ class BasicInformationKinshipController extends Controller
         $data = $this->biogMainRepository->kinshipStoreById($request, $id);
         $_id = $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'];
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.kinship.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.kinship.edit', [
+            'basicinformation' => $id,
+            'kinship' => $_id,
+        ]);
     }
 
     /**
@@ -123,7 +126,10 @@ class BasicInformationKinshipController extends Controller
         }
         else {}
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.kinship.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.kinship.edit', [
+            'basicinformation' => $id,
+            'kinship' => $id_,
+        ]);
     }
 
     /**
@@ -144,6 +150,6 @@ class BasicInformationKinshipController extends Controller
         }
         $this->biogMainRepository->kinshipDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.kinship.index', ['id' => $id]);
+        return redirect()->route('basicinformation.kinship.index', ['basicinformation' => $id]);
     }
 }

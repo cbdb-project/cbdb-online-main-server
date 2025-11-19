@@ -100,7 +100,10 @@ class BasicInformationOfficesController extends Controller
         //修改結束
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
+        return redirect()->route('basicinformation.offices.edit', [
+            'basicinformation' => $id,
+            'office' => $_id,
+        ]);
     }
 
     /**
@@ -177,7 +180,10 @@ class BasicInformationOfficesController extends Controller
             flash('Update success @ '.Carbon::now(), 'success');
         }
 
-        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $officeKey]);
+        return redirect()->route('basicinformation.offices.edit', [
+            'basicinformation' => $id,
+            'office' => $officeKey,
+        ]);
     }
 
     //20190225新增另存功能
@@ -215,7 +221,10 @@ class BasicInformationOfficesController extends Controller
         (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_posting_id'], $data);
         $_id = $data['c_office_id']."-".$data['c_posting_id'];
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.offices.edit', ['id' => $id, 'office' => $_id]);
+        return redirect()->route('basicinformation.offices.edit', [
+            'basicinformation' => $id,
+            'office' => $_id,
+        ]);
     }
 
     public function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)
@@ -251,7 +260,7 @@ class BasicInformationOfficesController extends Controller
         }
         $this->biogMainRepository->officeDeleteById($office, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.offices.index', ['id' => $id]);
+        return redirect()->route('basicinformation.offices.index', ['basicinformation' => $id]);
     }
 
     /**

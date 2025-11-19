@@ -64,7 +64,10 @@ class BasicInformationEventsController extends Controller
         }
         $_id = $this->biogMainRepository->eventStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.events.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.events.edit', [
+            'basicinformation' => $id,
+            'event' => $_id,
+        ]);
     }
 
     /**
@@ -113,7 +116,10 @@ class BasicInformationEventsController extends Controller
         }
         $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.events.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.events.edit', [
+            'basicinformation' => $id,
+            'event' => $_id,
+        ]);
     }
 
     /**
@@ -134,6 +140,6 @@ class BasicInformationEventsController extends Controller
         }
         $this->biogMainRepository->eventDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.events.index', ['id' => $id]);
+        return redirect()->route('basicinformation.events.index', ['basicinformation' => $id]);
     }
 }

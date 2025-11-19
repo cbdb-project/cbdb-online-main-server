@@ -25,7 +25,7 @@ $isWikiSource = in_array($row->c_textid, $wikiSourceIds);
                 </div>
             @endif
 
-            <form action="{{ route('basicinformation.sources.update', [$id, $row->c_personid."-".$row->c_textid."-".$row->c_pages]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.sources.update', ['basicinformation' => $id, 'source' => $row->c_personid.'-'.$row->c_textid.'-'.$row->c_pages]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

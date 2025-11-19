@@ -5,7 +5,7 @@
         <div class="panel-heading">出處 Source</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.sources.store', $id) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.sources.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>

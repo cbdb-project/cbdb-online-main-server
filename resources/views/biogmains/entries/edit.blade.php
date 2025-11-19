@@ -5,7 +5,7 @@
         <div class="panel-heading">入仕 Entry</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.entries.update', ['id' =>$id, '_id' => $row->c_personid.'-'.$row->c_entry_code.'-'.$row->c_sequence.'-'.$row->c_kin_code.'-'.$row->c_assoc_code.'-'.$row->c_kin_id.'-'.$row->c_year.'-'.$row->c_assoc_id.'-'.$row->c_inst_code.'-'.$row->c_inst_name_code]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.entries.update', ['basicinformation' => $id, 'entry' => $row->c_personid.'-'.$row->c_entry_code.'-'.$row->c_sequence.'-'.$row->c_kin_code.'-'.$row->c_assoc_code.'-'.$row->c_kin_id.'-'.$row->c_year.'-'.$row->c_assoc_id.'-'.$row->c_inst_code.'-'.$row->c_inst_name_code]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

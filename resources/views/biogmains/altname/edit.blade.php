@@ -12,7 +12,7 @@ $row->c_alt_name_chn = unionPKDef($row->c_alt_name_chn);
 $row->c_alt_name = unionPKDef($row->c_alt_name);
 $row->c_notes = unionPKDef($row->c_notes);
 @endphp
-            <form action="{{ route('basicinformation.altnames.update', ['id'=>$id, 'alt'=>$alt]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

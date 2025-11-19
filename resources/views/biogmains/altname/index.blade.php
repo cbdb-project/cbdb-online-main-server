@@ -9,7 +9,7 @@
         <div class="panel-body">
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <a href="{{ route('basicinformation.altnames.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.altnames.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
@@ -67,7 +67,7 @@ if($value->pivot->c_sequence === 0) {
                             @if(Auth::user()->is_active == 1)
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['basicinformation' => $basicinformation->c_personid, 'altname' => $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -81,7 +81,7 @@ if($value->pivot->c_sequence === 0) {
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code }}" action="{{ route('basicinformation.altnames.destroy', ['id' => $basicinformation->c_personid, 'alt' => $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code }}" action="{{ route('basicinformation.altnames.destroy', ['basicinformation' => $basicinformation->c_personid, 'altname' => $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

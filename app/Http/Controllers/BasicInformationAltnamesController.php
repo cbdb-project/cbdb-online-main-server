@@ -8,6 +8,7 @@ use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -71,7 +72,7 @@ class BasicInformationAltnamesController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        $data = array_except($data, ['_token']);
+        $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, True);
         $temp = DB::table('ALTNAME_DATA')->where([
@@ -157,7 +158,7 @@ class BasicInformationAltnamesController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         $alt = str_replace("--","-minus",$alt);
         //20200709聯合主鍵保留字弱點防禦函式，解析保留字。

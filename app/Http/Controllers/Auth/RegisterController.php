@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Foundation\Auth\RegistersUsers;
+use Illuminate\Support\Str;
 use Naux\Mail\SendCloudTemplate;
 
 class RegisterController extends Controller
@@ -83,7 +84,7 @@ class RegisterController extends Controller
             'email' => $data['email'],
             'institution' => $data['institution'],
             'avatar' => 'avatar5.png',
-            'confirmation_token' => str_random(40),
+            'confirmation_token' => Str::random(40),
             'settings' => [
                 'registration_ip' => $ip,
                 'last_login_ip' => $ip,

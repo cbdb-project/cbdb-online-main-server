@@ -11,6 +11,7 @@ use App\Repositories\ToolsRepository;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -74,7 +75,7 @@ class BasicInformationAddressesController extends Controller
             return redirect()->back();
         }
         $data = $request->all();
-        $data = array_except($data, ['_token']);
+        $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
@@ -216,7 +217,7 @@ class BasicInformationAddressesController extends Controller
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
 
-        $data = array_except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         $addr = str_replace("--","-minus",$addr);
         $addr_l = explode("-", $addr);

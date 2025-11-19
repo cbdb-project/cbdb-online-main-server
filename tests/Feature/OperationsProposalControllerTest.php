@@ -126,7 +126,7 @@ class OperationsProposalControllerTest extends TestCase
 
         $flash = session('flash_notification', collect())->toArray();
         $this->assertNotEmpty($flash);
-        $this->assertContains('已核准', $flash[0]['message'] ?? '');
+        $this->assertStringContainsString('已核准', $flash[0]['message'] ?? '');
 
         $operation->refresh();
         $payload = json_decode($operation->resource_data, true);

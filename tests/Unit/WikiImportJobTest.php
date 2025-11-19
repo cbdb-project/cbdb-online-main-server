@@ -93,8 +93,8 @@ class WikiImportJobTest extends TestCase
         $this->assertEquals(12345, $result['c_personid']);
         $this->assertEquals(60795, $result['c_textid']);
         $this->assertEquals('司马光', $result['c_pages']);
-        $this->assertContains('批次導入於', $result['c_notes']);
-        $this->assertContains('test_task_123', $result['c_notes']);
+        $this->assertStringContainsString('批次導入於', $result['c_notes']);
+        $this->assertStringContainsString('test_task_123', $result['c_notes']);
     }
 
     /**

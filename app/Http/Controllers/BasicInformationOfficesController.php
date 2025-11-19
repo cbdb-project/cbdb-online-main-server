@@ -9,6 +9,7 @@ use App\Repositories\ToolsRepository;
 use App\SocialInst;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -202,7 +203,7 @@ class BasicInformationOfficesController extends Controller
         }
         $data = $res2;
         $c_addr = $data2;
-        $data = array_except($data, ['_token', 'c_addr']);
+        $data = Arr::except($data, ['_token', 'c_addr']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['c_posting_id'] = DB::table('POSTED_TO_OFFICE_DATA')->max('c_posting_id') + 1;

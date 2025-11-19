@@ -170,7 +170,6 @@ return [
         Laravel\Tinker\TinkerServiceProvider::class,
         Laracasts\Flash\FlashServiceProvider::class,
         Laravel\Passport\PassportServiceProvider::class,
-        Naux\Mail\SendCloudServiceProvider::class,
 
         /*
          * Application Service Providers...

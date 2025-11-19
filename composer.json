@@ -12,7 +12,6 @@
         "laravel/framework": "5.8.*",
         "laravel/passport": "^7.0",
         "laravel/tinker": "^1.0",
-        "naux/sendcloud": "^1.1",
         "nesbot/carbon": "^2.0"
     },
     "require-dev": {

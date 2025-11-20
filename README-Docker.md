@@ -81,7 +81,7 @@ docker compose run --rm php php artisan key:generate
 docker compose up --build
 ```
 
-首次启动会构建镜像，大约需要 3-5 分钟。后续启动只需几秒钟。
+首次启动会构建镜像，大约需要 3-5 分钟。构建阶段会自动执行 `deploy.sh`（包含 `composer install`、快取清理与 config cache），因此任何对 `deploy.sh` 的修改都需要重新 `docker compose up --build` 才能生效。后续启动只需几秒钟。
 
 ### 5. 访问应用
 

@@ -44,8 +44,8 @@ RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader
 # 复制代码
 COPY . /var/www/html
 
-# 完成 Composer 安装
-RUN composer dump-autoload --optimize
+# 完成 Composer 安装（執行 deploy.sh 以保持與伺服器相同流程）
+RUN chmod +x deploy.sh && ./deploy.sh
 
 # 给 storage 和 bootstrap/cache 权限
 RUN chown -R www-data:www-data storage bootstrap/cache \

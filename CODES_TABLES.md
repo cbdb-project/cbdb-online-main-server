@@ -18,80 +18,83 @@
 | 1 | ADDR_BELONGS_DATA | 地址隸屬關係資料 |
 | 2 | ADDR_CODES | 地址代碼 |
 | 3 | ADDRESSES | 地址主表（更新已停止） |
-| 4 | ALTNAME_CODES | 別名類型代碼 |
-| 5 | ALTNAME_DATA | 別名資料 |
-| 6 | APPOINTMENT_CODES | 任命類型代碼 |
-| 7 | APPOINTMENT_CODE_TYPE_REL | 任命代碼類型關聯 |
-| 8 | APPOINTMENT_TYPES | 任命類型 |
-| 9 | ASSOC_CODES | 關聯類型代碼 |
-|10 | ASSOC_CODE_TYPE_REL | 關聯代碼類型關聯 |
-|11 | ASSOC_DATA | 關聯資料 |
-|12 | ASSOC_TYPES | 關聯類型 |
-|13 | ASSUME_OFFICE_CODES | 就任類型代碼 |
-|14 | BIOG_ADDR_CODES | 人物地址類型代碼 |
-|15 | BIOG_ADDR_DATA | 人物地址資料 |
-|16 | BIOG_INST_CODES | 人物機構類型代碼 |
-|17 | BIOG_INST_DATA | 人物機構資料 |
-|18 | BIOG_MAIN | 人物主表 |
-|19 | BIOG_SOURCE_DATA | 人物來源資料 |
-|20 | BIOG_TEXT_DATA | 人物文獻資料 |
-|21 | CBDB_NAME_LIST | 姓名列表 |
-|22 | CBDB__NAME_FTS | 姓名搜尋倒排索引（內部表）|
-|23 | CBDB__TRAD_SIMP_MAP | 繁簡字符映射表（內部表，⚠️ Apache 2.0 授權）|
-|24 | CHORONYM_CODES | 地名類型代碼 |
-|25 | COUNTRY_CODES | 國家代碼 |
-|26 | DYNASTIES | 朝代代碼 |
-|27 | ENTRY_CODES | 入仕類型代碼 |
-|28 | ENTRY_CODE_TYPE_REL | 入仕代碼類型關聯 |
-|29 | ENTRY_DATA | 入仕資料 |
-|30 | ENTRY_TYPES | 入仕類型 |
-|31 | ETHNICITY_TRIBE_CODES | 民族/部落代碼 |
-|32 | EVENTS_ADDR | 事件地址 |
-|33 | EVENTS_DATA | 事件資料 |
-|34 | EVENT_CODES | 事件類型代碼 |
-|35 | EXTANT_CODES | 存世狀態代碼 |
-|36 | GANZHI_CODES | 干支代碼 |
-|37 | HOUSEHOLD_STATUS_CODES | 戶籍狀態代碼 |
-|38 | INDEXYEAR_TYPE_CODES | 年份索引類型代碼 |
-|39 | KINSHIP_CODES | 親屬關係代碼 |
-|40 | KIN_DATA | 親屬資料 |
-|41 | KIN_MOURNING | 親屬喪服 |
-|42 | KIN_MOURNING_STEPS | 親屬喪服等級 |
-|43 | LITERARYGENRE_CODES | 文學體裁代碼 |
-|44 | MEASURE_CODES | 度量衡代碼 |
-|45 | MERGED_PERSON_DATA | 人物合併資料 |
-|46 | NIAN_HAO | 年號 |
-|47 | OCCASION_CODES | 場合類型代碼 |
-|48 | OFFICE_CATEGORIES | 官職分類 |
-|49 | OFFICE_CODES | 官職代碼 |
-|50 | OFFICE_CODE_TYPE_REL | 官職代碼類型關聯 |
-|51 | OFFICE_TYPE_TREE | 官職類型樹 |
-|52 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
-|53 | POSSESSION_ACT_CODES | 財產行為代碼 |
-|54 | POSSESSION_ADDR | 財產地址 |
-|55 | POSTED_TO_ADDR_DATA | 任官地址資料 |
-|56 | POSTED_TO_OFFICE_DATA | 任官資料 |
-|57 | POSTING_DATA | 任官主表 |
-|58 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
-|59 | SOCIAL_INSTITUTION_ADDR | 社會機構地址 |
-|60 | SOCIAL_INSTITUTION_ADDR_TYPES | 社會機構地址類型 |
-|61 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |
-|62 | SOCIAL_INSTITUTION_ALTNAME_DATA | 社會機構別名資料 |
-|63 | SOCIAL_INSTITUTION_CODES | 社會機構代碼 |
-|64 | SOCIAL_INSTITUTION_NAME_CODES | 社會機構名稱類型代碼 |
-|65 | SOCIAL_INSTITUTION_TYPES | 社會機構類型 |
-|66 | STATUS_CODES | 狀態代碼 |
-|67 | STATUS_CODE_TYPE_REL | 狀態代碼類型關聯 |
-|68 | STATUS_DATA | 狀態資料 |
-|69 | STATUS_TYPES | 狀態類型 |
-|70 | TEXT_BIBLCAT_CODES | 文獻分類代碼 |
-|71 | TEXT_BIBLCAT_CODE_TYPE_REL | 文獻分類代碼類型關聯 |
-|72 | TEXT_BIBLCAT_TYPES | 文獻分類類型 |
-|73 | TEXT_CODES | 文獻代碼 |
-|74 | TEXT_INSTANCE_DATA | 文獻版本資料 |
-|75 | TEXT_ROLE_CODES | 文獻角色代碼 |
-|76 | TEXT_TYPE | 文獻類型 |
-|77 | YEAR_RANGE_CODES | 年份範圍代碼 |
+| 4 | ADMIN_CAT_CODES | 行政區劃代碼 |
+| 5 | ADMIN_CAT_CODE_TYPE_REL | 行政區劃代碼類型關聯 |
+| 6 | ADMIN_CAT_TYPES | 行政區劃類型 |
+| 7 | ALTNAME_CODES | 別名類型代碼 |
+| 8 | ALTNAME_DATA | 別名資料 |
+| 9 | APPOINTMENT_CODES | 任命類型代碼 |
+|10 | APPOINTMENT_CODE_TYPE_REL | 任命代碼類型關聯 |
+|11 | APPOINTMENT_TYPES | 任命類型 |
+|12 | ASSOC_CODES | 關聯類型代碼 |
+|13 | ASSOC_CODE_TYPE_REL | 關聯代碼類型關聯 |
+|14 | ASSOC_DATA | 關聯資料 |
+|15 | ASSOC_TYPES | 關聯類型 |
+|16 | ASSUME_OFFICE_CODES | 就任類型代碼 |
+|17 | BIOG_ADDR_CODES | 人物地址類型代碼 |
+|18 | BIOG_ADDR_DATA | 人物地址資料 |
+|19 | BIOG_INST_CODES | 人物機構類型代碼 |
+|20 | BIOG_INST_DATA | 人物機構資料 |
+|21 | BIOG_MAIN | 人物主表 |
+|22 | BIOG_SOURCE_DATA | 人物來源資料 |
+|23 | BIOG_TEXT_DATA | 人物文獻資料 |
+|24 | CBDB_NAME_LIST | 姓名列表 |
+|25 | CBDB__NAME_FTS | 姓名搜尋倒排索引（內部表）|
+|26 | CBDB__TRAD_SIMP_MAP | 繁簡字符映射表（內部表，⚠️ Apache 2.0 授權）|
+|27 | CHORONYM_CODES | 地名類型代碼 |
+|28 | COUNTRY_CODES | 國家代碼 |
+|29 | DYNASTIES | 朝代代碼 |
+|30 | ENTRY_CODES | 入仕類型代碼 |
+|31 | ENTRY_CODE_TYPE_REL | 入仕代碼類型關聯 |
+|32 | ENTRY_DATA | 入仕資料 |
+|33 | ENTRY_TYPES | 入仕類型 |
+|34 | ETHNICITY_TRIBE_CODES | 民族/部落代碼 |
+|35 | EVENTS_ADDR | 事件地址 |
+|36 | EVENTS_DATA | 事件資料 |
+|37 | EVENT_CODES | 事件類型代碼 |
+|38 | EXTANT_CODES | 存世狀態代碼 |
+|39 | GANZHI_CODES | 干支代碼 |
+|40 | HOUSEHOLD_STATUS_CODES | 戶籍狀態代碼 |
+|41 | INDEXYEAR_TYPE_CODES | 年份索引類型代碼 |
+|42 | KINSHIP_CODES | 親屬關係代碼 |
+|43 | KIN_DATA | 親屬資料 |
+|44 | KIN_MOURNING | 親屬喪服 |
+|45 | KIN_MOURNING_STEPS | 親屬喪服等級 |
+|46 | LITERARYGENRE_CODES | 文學體裁代碼 |
+|47 | MEASURE_CODES | 度量衡代碼 |
+|48 | MERGED_PERSON_DATA | 人物合併資料 |
+|49 | NIAN_HAO | 年號 |
+|50 | OCCASION_CODES | 場合類型代碼 |
+|51 | OFFICE_CATEGORIES | 官職分類 |
+|52 | OFFICE_CODES | 官職代碼 |
+|53 | OFFICE_CODE_TYPE_REL | 官職代碼類型關聯 |
+|54 | OFFICE_TYPE_TREE | 官職類型樹 |
+|55 | PARENTAL_STATUS_CODES | 父母狀態代碼 |
+|56 | POSSESSION_ACT_CODES | 財產行為代碼 |
+|57 | POSSESSION_ADDR | 財產地址 |
+|58 | POSTED_TO_ADDR_DATA | 任官地址資料 |
+|59 | POSTED_TO_OFFICE_DATA | 任官資料 |
+|60 | POSTING_DATA | 任官主表 |
+|61 | SCHOLARLYTOPIC_CODES | 學術主題代碼 |
+|62 | SOCIAL_INSTITUTION_ADDR | 社會機構地址 |
+|63 | SOCIAL_INSTITUTION_ADDR_TYPES | 社會機構地址類型 |
+|64 | SOCIAL_INSTITUTION_ALTNAME_CODES | 社會機構別名類型代碼 |
+|65 | SOCIAL_INSTITUTION_ALTNAME_DATA | 社會機構別名資料 |
+|66 | SOCIAL_INSTITUTION_CODES | 社會機構代碼 |
+|67 | SOCIAL_INSTITUTION_NAME_CODES | 社會機構名稱類型代碼 |
+|68 | SOCIAL_INSTITUTION_TYPES | 社會機構類型 |
+|69 | STATUS_CODES | 狀態代碼 |
+|70 | STATUS_CODE_TYPE_REL | 狀態代碼類型關聯 |
+|71 | STATUS_DATA | 狀態資料 |
+|72 | STATUS_TYPES | 狀態類型 |
+|73 | TEXT_BIBLCAT_CODES | 文獻分類代碼 |
+|74 | TEXT_BIBLCAT_CODE_TYPE_REL | 文獻分類代碼類型關聯 |
+|75 | TEXT_BIBLCAT_TYPES | 文獻分類類型 |
+|76 | TEXT_CODES | 文獻代碼 |
+|77 | TEXT_INSTANCE_DATA | 文獻版本資料 |
+|78 | TEXT_ROLE_CODES | 文獻角色代碼 |
+|79 | TEXT_TYPE | 文獻類型 |
+|80 | YEAR_RANGE_CODES | 年份範圍代碼 |
 
 > 建議：若新增或移除代碼表，請同步更新本文件與 `config/codes.php`，並在部署環境重新執行 `php artisan config:cache` 以確保新設定生效。
 

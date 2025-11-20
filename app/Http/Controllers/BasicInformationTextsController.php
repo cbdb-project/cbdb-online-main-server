@@ -88,7 +88,10 @@ class BasicInformationTextsController extends Controller
         DB::table($this->table_name)->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id']]);
+        return redirect()->route('basicinformation.texts.edit', [
+            'basicinformation' => $id,
+            'text' => $data['c_personid'].'-'.$data['c_textid'].'-'.$data['c_role_id'],
+        ]);
     }
 
     /**
@@ -156,7 +159,10 @@ class BasicInformationTextsController extends Controller
         $new_id_ = $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'];
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.texts.edit', ['id' => $id, 'id_' => $new_id_]);
+        return redirect()->route('basicinformation.texts.edit', [
+            'basicinformation' => $id,
+            'text' => $new_id_,
+        ]);
     }
 
     /**
@@ -188,6 +194,6 @@ class BasicInformationTextsController extends Controller
         ])->delete();
         $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.texts.index', ['id' => $id]);
+        return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
     }
 }

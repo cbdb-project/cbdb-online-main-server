@@ -5,7 +5,7 @@
         <div class="panel-heading">親屬 Kinship</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.kinship.store', $id) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.kinship.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="person_id" class="col-sm-2 control-label">person id</label>

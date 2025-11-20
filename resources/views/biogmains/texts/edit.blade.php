@@ -5,7 +5,7 @@
         <div class="panel-heading">著述 Writings</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.texts.update', ['id' => $id, 'id_'=> $id."-".$row->c_textid."-".$row->c_role_id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.texts.update', ['basicinformation' => $id, 'text'=> $id.'-'.$row->c_textid.'-'.$row->c_role_id]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

@@ -64,7 +64,10 @@ class BasicInformationPossessionController extends Controller
         }
         $_id = $this->biogMainRepository->possessionStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.possession.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.possession.edit', [
+            'basicinformation' => $id,
+            'possession' => $_id,
+        ]);
 
     }
 
@@ -115,7 +118,10 @@ class BasicInformationPossessionController extends Controller
         }
         $this->biogMainRepository->possessionUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.possession.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.possession.edit', [
+            'basicinformation' => $id,
+            'possession' => $id_,
+        ]);
     }
 
     /**
@@ -136,6 +142,6 @@ class BasicInformationPossessionController extends Controller
         }
         $this->biogMainRepository->possessionDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.possession.index', ['id' => $id]);
+        return redirect()->route('basicinformation.possession.index', ['basicinformation' => $id]);
     }
 }

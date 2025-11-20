@@ -75,7 +75,10 @@ class BasicInformationSourcesController extends Controller
         flash('Store success @ '.Carbon::now(), 'success');
         //20200715引用聯合主鍵保留字弱點防禦函式
         $_id = $this->biogMainRepository->unionPKDef($_id);
-        return redirect()->route('basicinformation.sources.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.sources.edit', [
+            'basicinformation' => $id,
+            'source' => $_id,
+        ]);
     }
 
     /**
@@ -128,7 +131,10 @@ class BasicInformationSourcesController extends Controller
         flash('Update success @ '.Carbon::now(), 'success');
         //20200715引用聯合主鍵保留字弱點防禦函式
         $id_ = $this->biogMainRepository->unionPKDef($id_);
-        return redirect()->route('basicinformation.sources.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.sources.edit', [
+            'basicinformation' => $id,
+            'source' => $id_,
+        ]);
     }
 
     /**
@@ -149,6 +155,6 @@ class BasicInformationSourcesController extends Controller
         }
         $this->biogMainRepository->sourceDeleteById($id, $id_);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.sources.index', ['id' => $id]);
+        return redirect()->route('basicinformation.sources.index', ['basicinformation' => $id]);
     }
 }

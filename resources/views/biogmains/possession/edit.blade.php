@@ -5,7 +5,7 @@
         <div class="panel-heading">財產 Possession</div>
         <div class="panel-body">
             <div class="panel-body">
-            <form action="{{ route('basicinformation.possession.update', [$id, $row->c_possession_record_id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.possession.update', ['basicinformation' => $id, 'possession' => $row->c_possession_record_id]) }}" class="form-horizontal" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <div class="form-group">

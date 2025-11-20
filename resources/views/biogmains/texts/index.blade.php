@@ -8,7 +8,7 @@
         <div class="panel-body">
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <a href="{{ route('basicinformation.texts.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.texts.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
@@ -36,7 +36,7 @@
                             @if(Auth::user()->is_active == 1)
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.texts.edit', ['id' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid."-".$basicinformation->texts[$i]->pivot->c_textid."-".$basicinformation->texts[$i]->pivot->c_role_id]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.texts.edit', ['basicinformation' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -50,7 +50,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $basicinformation->c_personid."-".$basicinformation->texts[$i]->pivot->c_textid."-".$basicinformation->texts[$i]->pivot->c_role_id }}" action="{{ route('basicinformation.texts.destroy', ['id' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid."-".$basicinformation->texts[$i]->pivot->c_textid."-".$basicinformation->texts[$i]->pivot->c_role_id]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id }}" action="{{ route('basicinformation.texts.destroy', ['basicinformation' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

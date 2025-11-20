@@ -115,7 +115,10 @@ class BasicInformationAssocController extends Controller
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $_id = $this->biogMainRepository->unionPKDef($_id);
-        return redirect()->route('basicinformation.assoc.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.assoc.edit', [
+            'basicinformation' => $id,
+            'assoc' => $_id,
+        ]);
     }
 
     /**
@@ -187,7 +190,10 @@ class BasicInformationAssocController extends Controller
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $id_ = $this->biogMainRepository->unionPKDef($id_);
-        return redirect()->route('basicinformation.assoc.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.assoc.edit', [
+            'basicinformation' => $id,
+            'assoc' => $id_,
+        ]);
     }
 
     /**
@@ -208,6 +214,6 @@ class BasicInformationAssocController extends Controller
         }
         $this->biogMainRepository->assocDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.assoc.index', ['id' => $id]);
+        return redirect()->route('basicinformation.assoc.index', ['basicinformation' => $id]);
     }
 }

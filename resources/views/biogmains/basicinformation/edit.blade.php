@@ -425,7 +425,7 @@
             @endauth
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <form id="delete-form" action="{{ route('basicinformation.destroy', ['id' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
+                    <form id="delete-form" action="{{ route('basicinformation.destroy', ['basicinformation' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
                         {{ method_field('DELETE') }}
                         {{ csrf_field() }}
                     </form>

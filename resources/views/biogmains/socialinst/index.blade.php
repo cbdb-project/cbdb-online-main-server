@@ -8,7 +8,7 @@
         <div class="panel-body">
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <a href="{{ route('basicinformation.socialinst.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.socialinst.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
@@ -41,7 +41,7 @@
                                 <td>
                                     <div class="btn-group">
                                         @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code."-".$value->pivot->c_bi_role_code)
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['basicinformation' => $basicinformation->c_personid, 'socialinst' => $id_]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -55,7 +55,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $id_ }}" action="{{ route('basicinformation.socialinst.destroy', ['id' => $basicinformation->c_personid, 'id_' => $id_]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $id_ }}" action="{{ route('basicinformation.socialinst.destroy', ['basicinformation' => $basicinformation->c_personid, 'socialinst' => $id_]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

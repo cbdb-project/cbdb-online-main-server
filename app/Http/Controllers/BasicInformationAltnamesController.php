@@ -89,7 +89,10 @@ class BasicInformationAltnamesController extends Controller
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
-        return redirect()->route('basicinformation.altnames.edit', ['id' => $id, 'alt' => $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code']]);
+        return redirect()->route('basicinformation.altnames.edit', [
+            'basicinformation' => $id,
+            'altname' => $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'],
+        ]);
     }
 
     /**
@@ -191,7 +194,10 @@ class BasicInformationAltnamesController extends Controller
         //20210715新增錯別字過濾
         $errWord = array('?', '', '�');
         $new_alt = str_replace($errWord, '', $new_alt);
-        return redirect()->route('basicinformation.altnames.edit', ['id'=>$id, 'addr'=>$new_alt]);
+        return redirect()->route('basicinformation.altnames.edit', [
+            'basicinformation' => $id,
+            'altname' => $new_alt,
+        ]);
     }
 
     /**
@@ -233,6 +239,6 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.altnames.index', ['id' => $id]);
+        return redirect()->route('basicinformation.altnames.index', ['basicinformation' => $id]);
     }
 }

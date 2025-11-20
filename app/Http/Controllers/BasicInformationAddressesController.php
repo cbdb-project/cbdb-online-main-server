@@ -93,7 +93,10 @@ class BasicInformationAddressesController extends Controller
         DB::table('BIOG_ADDR_DATA')->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence']]);
+        return redirect()->route('basicinformation.addresses.edit', [
+            'basicinformation' => $id,
+            'address' => $data['c_personid'].'-'.$data['c_addr_id'].'-'.$data['c_addr_type'].'-'.$data['c_sequence'],
+        ]);
     }
 
     /**
@@ -242,7 +245,10 @@ class BasicInformationAddressesController extends Controller
         $new_addr = $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.edit', ['id' => $id, 'addr' => $new_addr]);
+        return redirect()->route('basicinformation.addresses.edit', [
+            'basicinformation' => $id,
+            'address' => $new_addr,
+        ]);
     }
 
     /**
@@ -282,6 +288,6 @@ class BasicInformationAddressesController extends Controller
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.addresses.index', ['id' => $id]);
+        return redirect()->route('basicinformation.addresses.index', ['basicinformation' => $id]);
     }
 }

@@ -9,7 +9,7 @@
         <div class="panel-body">
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <a href="{{ route('basicinformation.assoc.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.assoc.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
@@ -51,7 +51,7 @@
                                     @php
                                     $value->pivot->c_text_title = unionPKDef($value->pivot->c_text_title);
                                     @endphp
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['basicinformation' => $basicinformation->c_personid, 'assoc' => $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -65,7 +65,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title }}" action="{{ route('basicinformation.assoc.destroy', ['id' => $basicinformation->c_personid, 'id_' => $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title }}" action="{{ route('basicinformation.assoc.destroy', ['basicinformation' => $basicinformation->c_personid, 'assoc' => $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

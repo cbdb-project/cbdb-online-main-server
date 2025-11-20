@@ -74,7 +74,10 @@ class BasicInformationEntriesController extends Controller
         /*
         $_id = $this->biogMainRepository->entryStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.entries.edit', ['id' => $id, '_id' => $_id]);
+        return redirect()->route('basicinformation.entries.edit', [
+            'basicinformation' => $id,
+            'entry' => $_id,
+        ]);
         */
         $data = $request->all();
         $data = array_except($data, ['_token']);
@@ -125,7 +128,10 @@ class BasicInformationEntriesController extends Controller
         $newKey = $data['c_personid'].'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
         $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', $newKey, $data);
         flash('Store success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.entries.edit', ['id' => $id, 'alt' => $newKey]);
+        return redirect()->route('basicinformation.entries.edit', [
+            'basicinformation' => $id,
+            'entry' => $newKey,
+        ]);
     }
 
     /**
@@ -180,7 +186,10 @@ class BasicInformationEntriesController extends Controller
         //原本的寫法，保留做為參考。
         $this->biogMainRepository->entryUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.entries.edit', ['id'=>$id, 'id_'=>$id_]);
+        return redirect()->route('basicinformation.entries.edit', [
+            'basicinformation' => $id,
+            'entry' => $id_,
+        ]);
         */
         $data = $request->all();
         $data = array_except($data, ['_method', '_token']);
@@ -230,7 +239,10 @@ class BasicInformationEntriesController extends Controller
         $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data);
         flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.entries.edit', ['id'=>$id, 'id_'=>$newid]);
+        return redirect()->route('basicinformation.entries.edit', [
+            'basicinformation' => $id,
+            'entry' => $newid,
+        ]);
     }
 
     /**
@@ -283,6 +295,6 @@ class BasicInformationEntriesController extends Controller
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->delete(); 
         flash('Delete success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.entries.index', ['id' => $id]);
+        return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);
     }
 }

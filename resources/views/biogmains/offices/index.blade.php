@@ -8,7 +8,7 @@
         <div class="panel-body">
             @auth
                 @if(Auth::user()->is_active == 1)
-                    <a href="{{ route('basicinformation.offices.create', $basicinformation->c_personid) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.offices.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
@@ -44,7 +44,7 @@
                             @if(Auth::user()->is_active == 1)
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id."-".$value->pivot->c_posting_id]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['basicinformation' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -57,7 +57,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_office_id."-".$value->pivot->c_posting_id }}" action="{{ route('basicinformation.offices.destroy', ['id' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id."-".$value->pivot->c_posting_id]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id }}" action="{{ route('basicinformation.offices.destroy', ['basicinformation' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

@@ -14,14 +14,31 @@ class AlterAdminCatTablesCollation extends Migration
      */
     public function up()
     {
-        // Alter ADMIN_CAT_CODES table collation
+        // Step 1: Drop foreign key constraints from ADMIN_CAT_CODE_TYPE_REL
+        Schema::table('ADMIN_CAT_CODE_TYPE_REL', function (Blueprint $table) {
+            $table->dropForeign('fk_admin_cat_code');
+            $table->dropForeign('fk_admin_cat_type_code');
+        });
+
+        // Step 2: Alter collation for all three tables
         DB::statement('ALTER TABLE ADMIN_CAT_CODES CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');
-        
-        // Alter ADMIN_CAT_TYPES table collation
         DB::statement('ALTER TABLE ADMIN_CAT_TYPES CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');
-        
-        // Alter ADMIN_CAT_CODE_TYPE_REL table collation
         DB::statement('ALTER TABLE ADMIN_CAT_CODE_TYPE_REL CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');
+
+        // Step 3: Recreate foreign key constraints
+        Schema::table('ADMIN_CAT_CODE_TYPE_REL', function (Blueprint $table) {
+            $table->foreign('c_admin_cat_code', 'fk_admin_cat_code')
+                ->references('c_admin_cat_code')
+                ->on('ADMIN_CAT_CODES')
+                ->onUpdate('cascade')
+                ->onDelete('cascade');
+
+            $table->foreign('c_admin_cat_type_code', 'fk_admin_cat_type_code')
+                ->references('c_admin_cat_type_code')
+                ->on('ADMIN_CAT_TYPES')
+                ->onUpdate('cascade')
+                ->onDelete('cascade');
+        });
     }
 
     /**

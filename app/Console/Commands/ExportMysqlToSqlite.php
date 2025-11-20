@@ -19,7 +19,8 @@ class ExportMysqlToSqlite extends Command
                             {--batch=1000 : 批量插入的行数}
                             {--source=mysql : 源数据库连接名称}
                             {--with-indexes : 包含索引定义（默认跳过）}
-                            {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}';
+                            {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}
+                            {--limit-records= : 限制每张表导出的最大记录数}';
 
     /**
      * The console command description.
@@ -261,7 +262,11 @@ class ExportMysqlToSqlite extends Command
         // 2. 导出数据（如果不是 schema-only 模式且不是视图）
         if (!$isView && !$this->option('schema-only')) {
             $rowCount = $this->getTableRowCount($tableName);
-            $this->exportTableData($tableName, $rowCount);
+            $limit = $this->getRecordLimit();
+            if ($limit !== null) {
+                $rowCount = min($rowCount, $limit);
+            }
+            $this->exportTableData($tableName, $rowCount, $limit);
         }
 
         $this->stats['tables']++;
@@ -652,7 +657,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTableData($tableName, $rowCount = 0)
+    protected function exportTableData($tableName, $rowCount = 0, $limit = null)
     {
         $metadata = $this->tableMetadata[$tableName] ?? [];
         $chunkColumn = $metadata['chunk_column'] ?? null;
@@ -664,6 +669,14 @@ class ExportMysqlToSqlite extends Command
 
         if ($chunkColumn) {
             $query->orderBy($chunkColumn);
+        }
+
+        if ($limit === null) {
+            $limit = $this->getRecordLimit();
+        }
+
+        if ($limit !== null) {
+            $query->limit($limit);
         }
 
         // 禁用外键约束
@@ -743,6 +756,22 @@ class ExportMysqlToSqlite extends Command
     protected function getSqliteInsertBatchSize()
     {
         return 400;
+    }
+
+    /**
+     * 取得每張表的最大導出筆數
+     */
+    protected function getRecordLimit(): ?int
+    {
+        $limit = $this->option('limit-records');
+
+        if ($limit === null || $limit === '') {
+            return null;
+        }
+
+        $limit = (int) $limit;
+
+        return $limit > 0 ? $limit : null;
     }
 
     /**

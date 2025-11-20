@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AddAdminCatCodeToAddrCodesTable extends Migration
 {
@@ -13,19 +14,27 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
      */
     public function up()
     {
-        Schema::table('ADDR_CODES', function (Blueprint $table) {
-            // Add the c_admin_cat_code column
-            $table->integer('c_admin_cat_code')
-                ->default(0)
-                ->after('c_admin_type'); // Adjust the position as needed
-            
-            // Add foreign key constraint
-            $table->foreign('c_admin_cat_code', 'fk_addr_codes_admin_cat_code')
-                ->references('c_admin_cat_code')
-                ->on('ADMIN_CAT_CODES')
-                ->onUpdate('cascade')
-                ->onDelete('cascade');
-        });
+        $this->ensureDefaultAdminCategoryRow();
+
+        if (!Schema::hasColumn('ADDR_CODES', 'c_admin_cat_code')) {
+            Schema::table('ADDR_CODES', function (Blueprint $table) {
+                $table->integer('c_admin_cat_code')
+                    ->default(0)
+                    ->after('c_admin_type');
+            });
+        }
+
+        $this->ensureValidAdminCategoryCodes();
+
+        if (!$this->foreignKeyExists('ADDR_CODES', 'fk_addr_codes_admin_cat_code')) {
+            Schema::table('ADDR_CODES', function (Blueprint $table) {
+                $table->foreign('c_admin_cat_code', 'fk_addr_codes_admin_cat_code')
+                    ->references('c_admin_cat_code')
+                    ->on('ADMIN_CAT_CODES')
+                    ->onUpdate('cascade')
+                    ->onDelete('cascade');
+            });
+        }
     }
 
     /**
@@ -35,12 +44,86 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
      */
     public function down()
     {
-        Schema::table('ADDR_CODES', function (Blueprint $table) {
-            // Drop foreign key constraint first
-            $table->dropForeign('fk_addr_codes_admin_cat_code');
-            
-            // Drop the column
-            $table->dropColumn('c_admin_cat_code');
-        });
+        if ($this->foreignKeyExists('ADDR_CODES', 'fk_addr_codes_admin_cat_code')) {
+            Schema::table('ADDR_CODES', function (Blueprint $table) {
+                $table->dropForeign('fk_addr_codes_admin_cat_code');
+            });
+        }
+
+        if (Schema::hasColumn('ADDR_CODES', 'c_admin_cat_code')) {
+            Schema::table('ADDR_CODES', function (Blueprint $table) {
+                $table->dropColumn('c_admin_cat_code');
+            });
+        }
+    }
+
+    /**
+     * Determine if a foreign key already exists on the table.
+     */
+    protected function foreignKeyExists(string $table, string $keyName): bool
+    {
+        $database = Schema::getConnection()->getDatabaseName();
+
+        return DB::table('information_schema.TABLE_CONSTRAINTS')
+            ->where('TABLE_SCHEMA', $database)
+            ->where('TABLE_NAME', $table)
+            ->where('CONSTRAINT_NAME', $keyName)
+            ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
+            ->exists();
+    }
+
+    /**
+     * Normalize existing ADDR_CODES rows so they reference valid categories.
+     */
+    protected function ensureValidAdminCategoryCodes(): void
+    {
+        if (!Schema::hasColumn('ADDR_CODES', 'c_admin_cat_code')) {
+            return;
+        }
+
+        $defaultCode = DB::table('ADMIN_CAT_CODES')
+            ->orderBy('c_admin_cat_code')
+            ->value('c_admin_cat_code');
+
+        if ($defaultCode === null) {
+            throw new \RuntimeException('ADMIN_CAT_CODES is empty; seed it before adding the foreign key constraint.');
+        }
+
+        // Normalize NULL or zero entries first.
+        DB::table('ADDR_CODES')
+            ->where(function ($query) {
+                $query->whereNull('c_admin_cat_code')
+                    ->orWhere('c_admin_cat_code', 0);
+            })
+            ->update(['c_admin_cat_code' => $defaultCode]);
+
+        // Ensure every remaining value exists in ADMIN_CAT_CODES.
+        DB::table('ADDR_CODES')
+            ->whereNotExists(function ($subQuery) {
+                $subQuery->select(DB::raw(1))
+                    ->from('ADMIN_CAT_CODES')
+                    ->whereColumn('ADMIN_CAT_CODES.c_admin_cat_code', 'ADDR_CODES.c_admin_cat_code');
+            })
+            ->update(['c_admin_cat_code' => $defaultCode]);
+    }
+
+    /**
+     * Make sure ADMIN_CAT_CODES has at least the fallback record.
+     */
+    protected function ensureDefaultAdminCategoryRow(): void
+    {
+        if (!Schema::hasTable('ADMIN_CAT_CODES')) {
+            return;
+        }
+
+        DB::table('ADMIN_CAT_CODES')->updateOrInsert(
+            ['c_admin_cat_code' => 0],
+            [
+                'c_admin_cat_py' => 'unknown',
+                'c_admin_cat_hz' => '未分類',
+                'c_admin_cat_trans' => 'Unknown category',
+                'c_notes' => 'Auto-generated fallback to satisfy ADDR_CODES foreign key.'
+            ]
+        );
     }
 }

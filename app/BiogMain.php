@@ -99,7 +99,7 @@ class BiogMain extends Model
 
     public function altnames()
     {
-        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'c_alt_name_type_code', 'c_sequence')->orderBy(DB::raw('ISNULL(c_sequence), c_sequence'), 'ASC');
+        return $this->belongsToMany('App\AltnameCode', 'ALTNAME_DATA', 'c_personid', 'c_alt_name_type_code')->withPivot('c_alt_name', 'c_alt_name_chn', 'c_alt_name_type_code', 'c_sequence')->orderBy(DB::raw('CASE WHEN c_sequence IS NULL THEN 1 ELSE 0 END, c_sequence'), 'ASC');
     }
 
     public function texts()

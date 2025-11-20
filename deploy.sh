@@ -9,8 +9,13 @@ echo "开始部署..."
 
 # 1. 生成版本号文件
 echo "生成版本号文件..."
-git rev-parse --short=7 HEAD > version.txt
-echo "版本号: $(cat version.txt)"
+if [ -d .git ]; then
+  git rev-parse --short=7 HEAD > version.txt
+  echo "版本号: $(cat version.txt)"
+else
+  echo "unknown" > version.txt
+  echo "警告: 未找到 .git 目录，version.txt 标记为 unknown"
+fi
 
 # 2. 安装/更新依赖
 echo "更新 Composer 依赖..."

@@ -17,6 +17,7 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\ImportTradSimpMap::class,
         \App\Console\Commands\RebuildNameSearchIndex::class,
         \App\Console\Commands\ExportMysqlToSqlite::class,
+        \App\Console\Commands\RegenerateAddresses::class,
     ];
 
     /**

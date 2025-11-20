@@ -11,3 +11,5 @@ npm-debug.log
 yarn-error.log
 .env
 version.txt
+database/database.sqlite3
+.phpunit.result.cache

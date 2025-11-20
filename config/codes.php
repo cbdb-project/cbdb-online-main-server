@@ -8,6 +8,7 @@ return [
         'ADDR_BELONGS_DATA',
         'ADDR_CODES',
         'ADDRESSES',
+        'ADMIN_CAT_CODES',
         'ALTNAME_CODES',
         'ALTNAME_DATA',
         'APPOINTMENT_CODES',

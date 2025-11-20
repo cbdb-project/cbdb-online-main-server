@@ -49,9 +49,9 @@ touch database/database.sqlite3
 
 **方式二：从 MySQL 导出（如果已有 MySQL 数据）**
 ```bash
-php artisan db:export-to-sqlite --output=database/database.sqlite3
+php artisan db:export-to-sqlite --output=database/database.sqlite3 --limit-records=5000
 ```
-`db:export-to-sqlite` 默认为 `mysql` 连接，如需从其他连接导出可加上 `--source=connection_name`，也可以依需求附加 `--schema-only`、`--tables` 等参数。
+`db:export-to-sqlite` 默认为 `mysql` 连接，如需从其他连接导出可加上 `--source=connection_name`，也可以依需求附加 `--schema-only`、`--tables`、`--limit-records=5000`（限制每表导出笔数）等参数。
 
 ### 2. 配置环境变量
 

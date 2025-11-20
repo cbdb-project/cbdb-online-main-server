@@ -69,16 +69,16 @@
 **使用方式：**
 ```bash
 # 从当前 MySQL 数据库导出到 SQLite
-php artisan db:export-to-sqlite
+php artisan db:export-to-sqlite --limit-records=5000
 
 # 指定输出文件
-php artisan db:export-to-sqlite --output=database/production.sqlite
+php artisan db:export-to-sqlite --output=database/production.sqlite --limit-records=5000
 
 # 只导出结构，不导出数据
 php artisan db:export-to-sqlite --schema-only
 
 # 导出特定表
-php artisan db:export-to-sqlite --tables=BIOG_MAIN,ALTNAME_DATA
+php artisan db:export-to-sqlite --tables=BIOG_MAIN,ALTNAME_DATA --limit-records=5000
 ```
 
 ---
@@ -330,7 +330,7 @@ echo ""
 echo "✅ 已切换到 SQLite！"
 echo ""
 echo "📋 下一步："
-echo "   1. 从 MySQL 导出数据: php artisan db:export-to-sqlite"
+echo "   1. 从 MySQL 导出数据: php artisan db:export-to-sqlite --limit-records=5000"
 echo "   2. 或者运行全新迁移: php artisan migrate:fresh"
 echo "   3. 启动服务: php artisan serve"
 ```
@@ -376,7 +376,7 @@ chmod +x scripts/use-sqlite.sh scripts/use-mysql.sh
 ./scripts/use-sqlite.sh
 
 # 2. 从生产 MySQL 导出数据（如果有）
-php artisan db:export-to-sqlite
+php artisan db:export-to-sqlite --limit-records=5000
 
 # 3. 或运行全新迁移
 php artisan migrate:fresh --seed
@@ -532,7 +532,7 @@ php artisan key:generate
 
 # 4. 创建并导入数据
 touch database/database.sqlite
-php artisan db:export-to-sqlite  # 从生产环境导出
+php artisan db:export-to-sqlite --limit-records=5000  # 从生产环境导出
 # 或
 php artisan migrate:fresh --seed  # 使用测试数据
 

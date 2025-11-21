@@ -89,6 +89,13 @@ class CodesController extends Controller
             'belongs5_ID',
             'belongs5_Name',
         ],
+        'ADMIN_CAT_CODES' => [
+            'c_admin_cat_code',
+            'c_admin_cat_py',
+            'c_admin_cat_hz',
+            'c_admin_cat_trans',
+            'c_notes',
+        ],
         'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end'],
         'TEXT_INSTANCE_DATA' => [
             'c_textid',

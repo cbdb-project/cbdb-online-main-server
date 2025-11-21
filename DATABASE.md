@@ -471,13 +471,6 @@ public function test_works_on_mariadb()
 - 使用隊列處理耗時操作
 - 數據分片和讀寫分離
 
-### 問題 3：測試結束後的 Exit Code 255
-
-**現象**：測試完成後出現 "Class cache does not exist" 錯誤（exit code 255）
-**原因**：Laravel 框架 deferred service provider 清理機制的已知問題
-**影響**：不影響測試結果（112 tests, 482 assertions 全部通過）
-**解決**：CI 配置已設定忽略此錯誤碼
-
 ---
 
 ## 參考資源

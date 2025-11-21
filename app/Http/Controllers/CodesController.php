@@ -309,7 +309,7 @@ class CodesController extends Controller
         foreach ($conditions as $column => $value) {
             $query->where($column, $value);
         }
-        $data = array_except($request->all(), ['_method', '_token', '__proposal_comment']);
+        $data = Arr::except($request->all(), ['_method', '_token', '__proposal_comment']);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
 
         try {
@@ -559,7 +559,7 @@ class CodesController extends Controller
             flash('該代碼表為只讀，禁止新增。', 'warning');
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
-        $data = array_except($request->all(), ['_token', '__proposal_comment']);
+        $data = Arr::except($request->all(), ['_token', '__proposal_comment']);
         $keyColumns = $this->getKeyColumns($table);
         if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
             flash('新增失敗：請確認主鍵欄位已填寫完整。', 'error');

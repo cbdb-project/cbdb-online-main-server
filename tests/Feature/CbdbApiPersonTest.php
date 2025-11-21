@@ -142,47 +142,8 @@ class CbdbApiPersonTest extends TestCase
             $table->string('belongs5_Name')->nullable();
             $table->integer('belongs5_Id')->nullable();
             $table->integer('c_firstyear')->nullable();
+            $table->integer('c_lastyear')->nullable();
         });
-
-        \DB::statement(<<<'SQL'
-CREATE VIEW View_Address AS
-SELECT
-    c_addr_id,
-    NULL AS c_name,
-    c_name_chn,
-    NULL AS c_admin_type,
-    NULL AS x_coord,
-    NULL AS y_coord,
-    c_firstyear,
-    NULL AS c_lastyear,
-    belongs1_Id,
-    belongs1_Name,
-    NULL AS belongs1_Type,
-    NULL AS belongs1_FirstYear,
-    NULL AS belongs1_LastYear,
-    belongs2_Id,
-    belongs2_Name,
-    NULL AS belongs2_Type,
-    NULL AS belongs2_FirstYear,
-    NULL AS belongs2_LastYear,
-    belongs3_Id,
-    belongs3_Name,
-    NULL AS belongs3_Type,
-    NULL AS belongs3_FirstYear,
-    NULL AS belongs3_LastYear,
-    belongs4_Id,
-    belongs4_Name,
-    NULL AS belongs4_Type,
-    NULL AS belongs4_FirstYear,
-    NULL AS belongs4_LastYear,
-    belongs5_Id,
-    belongs5_Name,
-    NULL AS belongs5_Type,
-    NULL AS belongs5_FirstYear,
-    NULL AS belongs5_LastYear
-FROM ADDRESSES
-SQL
-        );
 
         Schema::create('ENTRY_TYPES', function (Blueprint $table) {
             $table->integer('c_entry_type')->primary();
@@ -330,7 +291,6 @@ SQL
         Schema::dropIfExists('ENTRY_CODE_TYPE_REL');
         Schema::dropIfExists('ENTRY_CODES');
         Schema::dropIfExists('ENTRY_TYPES');
-        \DB::statement('DROP VIEW IF EXISTS View_Address');
         Schema::dropIfExists('ADDRESSES');
         Schema::dropIfExists('BIOG_ADDR_DATA');
         Schema::dropIfExists('BIOG_ADDR_CODES');

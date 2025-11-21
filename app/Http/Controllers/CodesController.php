@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use phpDocumentor\Reflection\Types\Null_;
 
 class CodesController extends Controller
@@ -716,13 +717,13 @@ class CodesController extends Controller
                 }
 
                 if (
-                    str_contains($key, 'name') ||
-                    str_contains($key, 'desc') ||
-                    str_contains($key, 'code') ||
-                    str_contains($key, 'id') ||
-                    str_contains($key, 'sequence') ||
-                    str_contains($key, 'chn') ||
-                    str_contains($key, 'dy')
+                    Str::contains($key, 'name') ||
+                    Str::contains($key, 'desc') ||
+                    Str::contains($key, 'code') ||
+                    Str::contains($key, 'id') ||
+                    Str::contains($key, 'sequence') ||
+                    Str::contains($key, 'chn') ||
+                    Str::contains($key, 'dy')
                 ) {
                     $thead[] = $key;
                     $count++;

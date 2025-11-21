@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Arr;
 
 class BasicInformationSocialInstController extends Controller
 {
@@ -152,7 +153,7 @@ class BasicInformationSocialInstController extends Controller
         */
         
         $data = $request->all();
-        $data = array_except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
         //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
         $temp = explode("-", $data['c_inst_code']);

@@ -541,7 +541,7 @@ SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        BIOG_ADDR_DATA.c_pages AS Pages,
        BIOG_ADDR_DATA.c_notes AS Notes
 FROM BIOG_ADDR_DATA
-LEFT JOIN View_Address AS ADDR
+LEFT JOIN ADDRESSES AS ADDR
      ON ADDR.c_addr_id = BIOG_ADDR_DATA.c_addr_id
      AND (
          BIOG_ADDR_DATA.c_firstyear IS NULL
@@ -554,21 +554,21 @@ LEFT JOIN View_Address AS ADDR
          OR BIOG_ADDR_DATA.c_lastyear >= ADDR.c_firstyear
      )
      AND NOT EXISTS (
-         SELECT 1 FROM View_Address VA2
-         WHERE VA2.c_addr_id = ADDR.c_addr_id
+         SELECT 1 FROM ADDRESSES ADDR2
+         WHERE ADDR2.c_addr_id = ADDR.c_addr_id
          AND (
              BIOG_ADDR_DATA.c_firstyear IS NULL
-             OR VA2.c_lastyear IS NULL
-             OR BIOG_ADDR_DATA.c_firstyear <= VA2.c_lastyear
+             OR ADDR2.c_lastyear IS NULL
+             OR BIOG_ADDR_DATA.c_firstyear <= ADDR2.c_lastyear
          )
          AND (
              BIOG_ADDR_DATA.c_lastyear IS NULL
-             OR VA2.c_firstyear IS NULL
-             OR BIOG_ADDR_DATA.c_lastyear >= VA2.c_firstyear
+             OR ADDR2.c_firstyear IS NULL
+             OR BIOG_ADDR_DATA.c_lastyear >= ADDR2.c_firstyear
          )
          AND (
-             VA2.c_firstyear < ADDR.c_firstyear
-             OR (VA2.c_firstyear = ADDR.c_firstyear AND VA2.c_lastyear < ADDR.c_lastyear)
+             ADDR2.c_firstyear < ADDR.c_firstyear
+             OR (ADDR2.c_firstyear = ADDR.c_firstyear AND ADDR2.c_lastyear < ADDR.c_lastyear)
          )
      )
 WHERE BIOG_ADDR_DATA.c_personid = ?

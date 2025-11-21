@@ -17,10 +17,6 @@ class WikiMaintenanceControllerTest extends TestCase
     {
         parent::setUp();
 
-        // Note: Laravel 5.5 deferred service provider cleanup issue
-        // 'Class cache does not exist' error may appear after tests complete
-        // This is a framework-level issue, not a test failure
-
         // 使用 in-memory SQLite 数据库
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [

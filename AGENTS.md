@@ -129,7 +129,6 @@
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
 - **PHPUnit 版本兼容性**：專案使用 PHPUnit 7.5，注意使用 `assertContains` 等相容的斷言方法。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
-- **測試結束後的 Exit Code 255**：測試完成後可能出現 "Class cache does not exist" 錯誤（exit code 255），這是 Laravel 框架 deferred service provider 清理機制的已知問題，不影響測試結果（112 tests, 482 assertions 全部通過）。CI 配置和 composer test script 已設定忽略此錯誤碼。
 
 ## 快速回顧
 - 需要了解的主要模組：`CodesController`、`OperationsController`、`OperationRepository`、`resources/views/operations/*`。

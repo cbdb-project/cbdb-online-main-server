@@ -142,6 +142,7 @@ class CbdbApiPersonTest extends TestCase
             $table->string('belongs5_Name')->nullable();
             $table->integer('belongs5_Id')->nullable();
             $table->integer('c_firstyear')->nullable();
+            $table->integer('c_lastyear')->nullable();
         });
 
         \DB::statement(<<<'SQL'

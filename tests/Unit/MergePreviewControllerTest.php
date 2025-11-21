@@ -118,7 +118,8 @@ class MergePreviewControllerTest extends TestCase
         }
         $this->assertTrue($hasMainUpdate, '應該要更新保留人物的 BIOG_MAIN 欄位。');
 
-        $this->assertContains('-- 調整至較小 ID 100', $statements, 'Auto arrange block should suggest moving to min ID');
+        $sql = implode("\n", $statements);
+        $this->assertStringContainsString('-- 調整至較小 ID 100', $sql, 'Auto arrange block should suggest moving to min ID');
 
         $hasMinUpdate = false;
         foreach ($statements as $statement) {

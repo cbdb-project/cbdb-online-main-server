@@ -13,3 +13,4 @@ yarn-error.log
 version.txt
 database/database.sqlite3
 .phpunit.result.cache
+.php-cs-fixer.cache

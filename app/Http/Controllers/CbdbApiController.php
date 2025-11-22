@@ -59,7 +59,7 @@ class CbdbApiController extends Controller
         if ($idParam) {
             $resolvedId = (int) $idParam;
         } elseif ($nameParam) {
-            $searchResults = $this->searchPersonCandidates($nameParam, 20);
+            $searchResults = $this->searchPersonCandidates($nameParam, 50);
             $resolvedId = $searchResults[0]['id'] ?? null;
         }
 

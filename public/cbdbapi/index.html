@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>CBDB API 使用說明 - API Documentation</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        body {
+            background-color: #fafafa;
+            padding: 0;
+            margin: 0;
+        }
+
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+        }
+
+        .header-section {
+            background-color: #fff;
+            border-bottom: 2px solid #333;
+            padding: 25px 40px;
+        }
+
+        .site-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        .site-subtitle {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .content-section {
+            padding: 30px 40px;
+        }
+
+        .section-block {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+        }
+
+        .section-header {
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #999;
+            padding: 10px 18px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .section-content {
+            padding: 18px;
+        }
+
+        .info-box {
+            background-color: #f8f8f8;
+            border: 1px solid #ccc;
+            padding: 14px;
+            margin-bottom: 15px;
+        }
+
+        .alert-box {
+            padding: 14px;
+            margin: 20px 0;
+            border: 1px solid;
+        }
+
+        .alert-info {
+            background-color: #f5f5f5;
+            border-color: #ccc;
+            color: #555;
+        }
+
+        .alert-warning {
+            background-color: #fff8e1;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        code {
+            background-color: #eee;
+            padding: 2px 6px;
+            color: #555;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            margin: 10px 0;
+        }
+
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .param-table th,
+        .param-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .param-table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .param-table tr:hover {
+            background-color: #fafafa;
+        }
+
+        .badge {
+            font-weight: normal;
+            font-size: 0.8rem;
+            background-color: #999 !important;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .badge-required {
+            background-color: #ef5350 !important;
+        }
+
+        .badge-optional {
+            background-color: #42a5f5 !important;
+        }
+
+        strong {
+            font-weight: 600;
+            color: #222;
+        }
+
+        .footer-section {
+            background-color: #f5f5f5;
+            border-top: 1px solid #ddd;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .footer-section a {
+            color: #555;
+            text-decoration: underline;
+        }
+
+        .footer-section a:hover {
+            color: #333;
+        }
+
+        .example-link {
+            display: inline-block;
+            padding: 6px 14px;
+            margin: 4px 6px 4px 0;
+            background-color: #fff;
+            color: #555;
+            border: 1px solid #999;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .example-link:hover {
+            background-color: #666;
+            color: white;
+            border-color: #666;
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #222;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+
+        li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .header-section, .content-section {
+                padding: 20px 20px;
+            }
+
+            .site-title {
+                font-size: 1.4rem;
+            }
+
+            .param-table {
+                font-size: 0.85rem;
+            }
+
+            .param-table th,
+            .param-table td {
+                padding: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- Header Section -->
+    <div class="header-section">
+        <h1 class="site-title">CBDB API 使用說明</h1>
+        <p class="site-subtitle">China Biographical Database API Documentation</p>
+    </div>
+
+    <!-- Content Section -->
+    <div class="content-section">
+
+        <!-- Introduction -->
+        <div class="section-block">
+            <div class="section-header">簡介 Introduction</div>
+            <div class="section-content">
+                <p>
+                    中國歷代人物傳記資料庫（CBDB）提供開放的 RESTful API，
+                    允許開發者和研究者透過程式化方式查詢人物資料。
+                    API 以 JSON 格式輸出，並提供豐富的人物傳記資訊，
+                    包括基本資料、別名、地址、任官、親屬關係、社會關係、著述等。
+                </p>
+
+                <p>
+                    The China Biographical Database (CBDB) provides an open RESTful API
+                    that allows developers and researchers to programmatically query biographical data.
+                    The API returns data in JSON format and provides comprehensive
+                    biographical information including basic details, aliases, addresses, postings,
+                    kinship relations, social associations, and texts.
+                </p>
+            </div>
+        </div>
+
+        <!-- API Endpoint -->
+        <div class="section-block">
+            <div class="section-header">API 端點 Endpoint</div>
+            <div class="section-content">
+                <div class="info-box">
+                    <strong>基礎 URL Base URL:</strong><br>
+                    <code>https://cbdb.fas.harvard.edu/cbdbapi/person</code>
+                </div>
+
+                <p><strong>支援的 HTTP 方法 HTTP Methods:</strong> GET</p>
+                <p><strong>編碼 Encoding:</strong> UTF-8</p>
+            </div>
+        </div>
+
+        <!-- Parameters -->
+        <div class="section-block">
+            <div class="section-header">請求參數 Request Parameters</div>
+            <div class="section-content">
+                <table class="param-table">
+                    <thead>
+                        <tr>
+                            <th>參數 Parameter</th>
+                            <th>類型 Type</th>
+                            <th>必填 Required</th>
+                            <th>說明 Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>id</code></td>
+                            <td>integer</td>
+                            <td><span class="badge badge-optional">擇一 Either</span></td>
+                            <td>
+                                人物 ID（<code>c_personid</code>）<br>
+                                <em>Person ID (c_personid)</em>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>string</td>
+                            <td><span class="badge badge-optional">擇一 Either</span></td>
+                            <td>
+                                人物姓名（支援中文名、英文名、別名，最多返回 50 個候選人）<br>
+                                <em>Person name (supports Chinese name, English name, aliases; returns up to 50 candidates)</em>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>o</code> 或 <code>mode</code></td>
+                            <td>string</td>
+                            <td><span class="badge badge-optional">選填 Optional</span></td>
+                            <td>
+                                輸出格式：<code>json</code> 或不填（預設為可供閱覽的網頁）<br>
+                                <em>Output format: <code>json</code> or omit (defaults to HTML page for viewing)</em>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert-box alert-info">
+                    <strong>注意 Note:</strong> <code>id</code> 和 <code>name</code> 參數必須提供其中一個。
+                    如果同時提供，將優先使用 <code>id</code>。<br>
+                    <em>Either <code>id</code> or <code>name</code> parameter must be provided.
+                    If both are provided, <code>id</code> takes precedence.</em>
+                </div>
+            </div>
+        </div>
+
+        <!-- Examples -->
+        <div class="section-block">
+            <div class="section-header">使用範例 Usage Examples</div>
+            <div class="section-content">
+
+                <h3>1. 透過 ID 查詢 Query by ID</h3>
+                <p><strong>網頁版 HTML version:</strong></p>
+                <pre><code>GET https://cbdb.fas.harvard.edu/cbdbapi/person?id=21246</code></pre>
+
+                <p><strong>JSON 版 JSON version:</strong></p>
+                <pre><code>GET https://cbdb.fas.harvard.edu/cbdbapi/person?id=21246&mode=json</code></pre>
+                <p>
+                    <a href="person?id=21246" class="example-link" target="_blank">HTML</a>
+                    <a href="person?id=21246&mode=json" class="example-link" target="_blank">JSON</a>
+                </p>
+
+                <h3>2. 透過姓名查詢 Query by Name</h3>
+                <p><strong>網頁版 HTML version:</strong></p>
+                <pre><code>GET https://cbdb.fas.harvard.edu/cbdbapi/person?name=蘇軾</code></pre>
+
+                <p><strong>JSON 版 JSON version:</strong></p>
+                <pre><code>GET https://cbdb.fas.harvard.edu/cbdbapi/person?name=蘇軾&mode=json</code></pre>
+                <p>
+                    <a href="person?name=蘇軾" class="example-link" target="_blank">HTML</a>
+                    <a href="person?name=蘇軾&mode=json" class="example-link" target="_blank">JSON</a>
+                </p>
+                <div class="alert-box alert-info">
+                    <strong>注意 Note:</strong><br>
+                    • 網頁版輸出：找到多個匹配結果時，會顯示最多 50 個候選人列表供您選擇<br>
+                    • JSON 版輸出：使用 <code>?name=</code> 查詢時僅返回第一個匹配結果<br>
+                    <em>• HTML output: When multiple matches are found, displays up to 50 candidates for selection</em><br>
+                    <em>• JSON output: When using <code>?name=</code> query, only returns the first matching result</em>
+                </div>
+
+                <h3>3. cURL 範例 cURL Example</h3>
+                <pre><code>curl -X GET "https://cbdb.fas.harvard.edu/cbdbapi/person?id=21246&mode=json" \
+     -H "Accept: application/json"</code></pre>
+
+                <h3>4. Python 範例 Python Example</h3>
+                <pre><code>import requests
+
+# 查詢蘇軾的資料
+response = requests.get(
+    'https://cbdb.fas.harvard.edu/cbdbapi/person',
+    params={'id': 21246, 'mode': 'json'}
+)
+
+if response.status_code == 200:
+    data = response.json()
+    person = data['Package']['PersonAuthority']['PersonInfo']['Person']
+    print(f"姓名: {person['BasicInfo']['ChName']}")
+    print(f"ID: {person['BasicInfo']['PersonId']}")
+else:
+    print(f"錯誤: {response.status_code}")</code></pre>
+
+                <h3>5. JavaScript 範例 JavaScript Example</h3>
+                <pre><code>// 使用 Fetch API 查詢
+fetch('https://cbdb.fas.harvard.edu/cbdbapi/person?id=21246&mode=json')
+    .then(response => response.json())
+    .then(data => {
+        const person = data.Package.PersonAuthority.PersonInfo.Person;
+        console.log('姓名:', person.BasicInfo.ChName);
+        console.log('ID:', person.BasicInfo.PersonId);
+    })
+    .catch(error => console.error('錯誤:', error));</code></pre>
+            </div>
+        </div>
+
+        <!-- Response Format -->
+        <div class="section-block">
+            <div class="section-header">回應格式 Response Format</div>
+            <div class="section-content">
+
+                <h3>JSON 回應結構 JSON Response Structure</h3>
+                <pre><code>{
+  "Package": {
+    "PersonAuthority": {
+      "PersonInfo": {
+        "Person": {
+          "BasicInfo": {
+            "PersonId": "21246",
+            "ChName": "蘇軾",
+            "EngName": "Su Shi",
+            "IndexYear": "1037",
+            ...
+          },
+          "PersonSources": {
+            "Source": [...]
+          },
+          "PersonAliases": {
+            "Alias": [...]
+          },
+          "PersonAddresses": {
+            "Address": [...]
+          },
+          "PersonEntryInfo": {
+            "Entry": [...]
+          },
+          "PersonPostings": {
+            "Posting": [...]
+          },
+          "PersonSocialStatus": {
+            "SocialStatus": [...]
+          },
+          "PersonKinshipInfo": {
+            "Kinship": [...]
+          },
+          "PersonSocialAssociation": {
+            "Association": [...]
+          },
+          "PersonTexts": {
+            "Text": [...]
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+
+                <h3>資料區塊說明 Data Sections</h3>
+                <ul>
+                    <li><strong>BasicInfo</strong>: 基本資訊（姓名、生卒年、朝代、性別等）<br>
+                        <em>Basic information (name, birth/death years, dynasty, gender, etc.)</em></li>
+                    <li><strong>PersonSources</strong>: 出處資料<br>
+                        <em>Source references</em></li>
+                    <li><strong>PersonSourcesAs</strong>: 人名權威資料鏈接<br>
+                        <em>Name authority data links</em></li>
+                    <li><strong>PersonAliases</strong>: 別名（字、號等）<br>
+                        <em>Aliases (courtesy names, art names, etc.)</em></li>
+                    <li><strong>PersonAddresses</strong>: 地址資訊（籍貫、活動地等）<br>
+                        <em>Address information (native place, activity locations, etc.)</em></li>
+                    <li><strong>PersonEntryInfo</strong>: 入仕資料（科舉等）<br>
+                        <em>Entry information (examinations, etc.)</em></li>
+                    <li><strong>PersonPostings</strong>: 任官記錄<br>
+                        <em>Official posting records</em></li>
+                    <li><strong>PersonSocialStatus</strong>: 社會區分（士人、宗室等）<br>
+                        <em>Social status (scholar, royal clan, etc.)</em></li>
+                    <li><strong>PersonKinshipInfo</strong>: 親屬關係<br>
+                        <em>Kinship relations</em></li>
+                    <li><strong>PersonSocialAssociation</strong>: 社會關係（師生、友人等）<br>
+                        <em>Social associations (teacher-student, friends, etc.)</em></li>
+                    <li><strong>PersonTexts</strong>: 著述資料<br>
+                        <em>Text/authorship information</em></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Error Handling -->
+        <div class="section-block">
+            <div class="section-header">錯誤處理 Error Handling</div>
+            <div class="section-content">
+
+                <h3>HTTP 狀態碼 HTTP Status Codes</h3>
+                <table class="param-table">
+                    <thead>
+                        <tr>
+                            <th>狀態碼 Code</th>
+                            <th>說明 Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>200</code></td>
+                            <td>成功 Success</td>
+                        </tr>
+                        <tr>
+                            <td><code>404</code></td>
+                            <td>找不到指定的人物 Person not found</td>
+                        </tr>
+                        <tr>
+                            <td><code>422</code></td>
+                            <td>參數驗證失敗 Validation failed</td>
+                        </tr>
+                        <tr>
+                            <td><code>500</code></td>
+                            <td>伺服器內部錯誤 Internal server error</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>錯誤回應範例 Error Response Example</h3>
+                <pre><code>{
+  "error": {
+    "code": 404,
+    "message": "找不到 ID 為 999999 的人物。",
+    "details": []
+  }
+}</code></pre>
+
+                <h3>人物合併提示 Person Merge Hint</h3>
+                <p>當查詢的人物 ID 已被合併到另一個 ID 時，錯誤回應會包含 <code>merge_hint</code>：<br>
+                   <em>When querying a person ID that has been merged to another ID, the error response will include a <code>merge_hint</code>:</em></p>
+                <pre><code>{
+  "error": {
+    "code": 404,
+    "message": "找不到 ID 為 12345 的人物。",
+    "merge_hint": {
+      "merged_to_person_id": 67890,
+      "reason": "重複人物合併"
+    }
+  }
+}</code></pre>
+            </div>
+        </div>
+
+        <!-- Rate Limiting -->
+        <div class="section-block">
+            <div class="section-header">使用限制 Rate Limiting</div>
+            <div class="section-content">
+                <ul>
+                    <li>單次姓名查詢最多返回 <strong>50 個候選人</strong><br>
+                        <em>Name queries return up to <strong>50 candidates</strong> per request</em></li>
+                    <li>建議在應用程式中實作適當的快取機制以減少重複查詢<br>
+                        <em>Recommended to implement appropriate caching in your application to reduce duplicate queries</em></li>
+                    <li>對於大量資料查詢需求，請考慮下載完整資料庫<br>
+                        <em>For bulk data queries, please consider downloading the complete database</em></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Best Practices -->
+        <div class="section-block">
+            <div class="section-header">最佳實踐 Best Practices</div>
+            <div class="section-content">
+                <ol>
+                    <li><strong>優先使用 ID 查詢</strong>：如果已知人物 ID，直接使用 ID 查詢效能最佳<br>
+                        <em><strong>Prefer ID queries</strong>: If the person ID is known, direct ID queries have the best performance</em></li>
+
+                    <li><strong>處理姓名查詢的多個結果</strong>：使用姓名查詢時，可能返回多個同名人物，需要額外邏輯選擇正確的人物<br>
+                        <em><strong>Handle multiple name query results</strong>: Name queries may return multiple people with the same name, requiring additional logic to select the correct person</em></li>
+
+                    <li><strong>實作錯誤處理</strong>：妥善處理 404 和其他錯誤狀態<br>
+                        <em><strong>Implement error handling</strong>: Properly handle 404 and other error statuses</em></li>
+
+                    <li><strong>快取結果</strong>：CBDB 資料更新頻率較低，建議快取查詢結果以提升應用效能<br>
+                        <em><strong>Cache results</strong>: CBDB data updates infrequently; caching query results is recommended to improve application performance</em></li>
+
+                    <li><strong>尊重授權條款</strong>：使用 API 資料時請遵守 CC BY-NC-SA 4.0 授權<br>
+                        <em><strong>Respect the license</strong>: When using API data, please comply with the CC BY-NC-SA 4.0 license</em></li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- License -->
+        <div class="section-block">
+            <div class="section-header">授權與使用條款 License and Terms</div>
+            <div class="section-content">
+                <p>
+                    CBDB API 提供的資料採用
+                    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">
+                        Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+                    </a>
+                    授權。這表示您可以：
+                </p>
+                <ul>
+                    <li><strong>分享</strong>：以任何媒介或格式複製及散布本素材</li>
+                    <li><strong>修改</strong>：重混、轉換本素材、及依本素材建立新素材</li>
+                </ul>
+                <p>但必須遵守以下條件：</p>
+                <ul>
+                    <li><strong>姓名標示</strong>：您必須給予適當表彰、提供指向本授權條款的連結</li>
+                    <li><strong>非商業性</strong>：您不得將本素材進行商業目的之使用</li>
+                    <li><strong>相同方式分享</strong>：若您重混、轉換或依本素材建立新素材，您必須依本素材的授權條款來散布您的貢獻物</li>
+                </ul>
+
+                <hr>
+
+                <p>
+                    Data provided by the CBDB API is licensed under
+                    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">
+                        Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+                    </a>.
+                    This means you are free to:
+                </p>
+                <ul>
+                    <li><strong>Share</strong>: Copy and redistribute the material in any medium or format</li>
+                    <li><strong>Adapt</strong>: Remix, transform, and build upon the material</li>
+                </ul>
+                <p>Under the following terms:</p>
+                <ul>
+                    <li><strong>Attribution</strong>: You must give appropriate credit and provide a link to the license</li>
+                    <li><strong>NonCommercial</strong>: You may not use the material for commercial purposes</li>
+                    <li><strong>ShareAlike</strong>: If you remix, transform, or build upon the material, you must distribute your contributions under the same license</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="section-block">
+            <div class="section-header">聯絡與支援 Contact and Support</div>
+            <div class="section-content">
+                <p>
+                    <strong>專案網站 Project Website:</strong><br>
+                    <a href="https://cbdb.hsites.harvard.edu/" target="_blank">https://cbdb.hsites.harvard.edu/</a>
+                </p>
+
+                <p>
+                    <strong>資料庫入口 Database Portal:</strong><br>
+                    <a href="https://input.cbdb.fas.harvard.edu/" target="_blank">https://input.cbdb.fas.harvard.edu/</a>
+                </p>
+
+                <p>
+                    <strong>技術問題 Technical Issues:</strong><br>
+                    如遇到 API 技術問題，請透過專案網站聯繫我們。<br>
+                    <em>For API technical issues, please contact us through the project website.</em>
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer Section -->
+    <div class="footer-section">
+        © China Biographical Database. Except where otherwise noted, content on this site is licensed under a
+        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">
+            Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license
+        </a>.
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

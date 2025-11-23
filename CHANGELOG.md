@@ -2,6 +2,21 @@
 
 ## 技術升級 (2025-11)
 
+### Laravel 6.0 LTS → 7.0 (2025-11-23)
+- 升級 Laravel Framework 從 6.20.44 至 7.x
+- 升級 Laravel Passport 從 7.5.x 至 8.x
+- 升級 Laravel Tinker 從 1.x 至 2.x
+- 新增 Laravel UI 套件 ^2.0
+- 新增 Facade Ignition ^2.0（改進的錯誤頁面）
+- 升級 Nunomaduro Collision 至 ^4.1（美化的測試錯誤輸出）
+- PHP 最低版本要求從 7.2.0 提升至 7.2.5
+- PHPUnit 維持在 ^8.5（因兼容性問題暫不升級至 9.x）
+- 郵件配置更新：`MAIL_DRIVER` → `MAIL_MAILER`
+- 異常處理器類型提示：`Exception` → `Throwable`
+- 新增 Email 驗證路由和通知
+- 改進的授權回應
+- 詳見 `UPGRADE.md` 了解完整升級說明
+
 ### Laravel 5.8 → 6.0 LTS (2025-11-22)
 - 升級 Laravel Framework 從 5.8.38 至 6.20.44（LTS 長期支援版本）
 - 升級 Carbon 從 1.39.1 至 2.72.5（重大版本升級）

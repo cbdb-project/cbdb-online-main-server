@@ -476,8 +476,9 @@ public function test_works_on_mariadb()
 ## 參考資源
 
 ### 官方文檔
-- [Laravel 5.6 Database](https://laravel.com/docs/5.6/database)
-- [Laravel 5.6 Migrations](https://laravel.com/docs/5.6/migrations)
+- [Laravel 6.x Database](https://laravel.com/docs/6.x/database)
+- [Laravel 6.x Migrations](https://laravel.com/docs/6.x/migrations)
+- [Laravel 6.x Eloquent](https://laravel.com/docs/6.x/eloquent)
 - [MariaDB Documentation](https://mariadb.com/kb/en/)
 
 ### 兼容性指南

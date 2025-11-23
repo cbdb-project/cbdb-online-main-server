@@ -2,6 +2,30 @@
 
 ## 技術升級 (2025-11)
 
+### Laravel 5.8 → 6.0 LTS (2025-11-22)
+- 升級 Laravel Framework 從 5.8.38 至 6.20.44（LTS 長期支援版本）
+- 升級 Carbon 從 1.39.1 至 2.72.5（重大版本升級）
+- 升級 PHPUnit 從 7.5.20 至 8.5.40
+- 升級 Mockery 至 1.6.12
+- PHP 最低版本要求從 7.1.3 提升至 7.2.0
+- 新增 LazyCollection 支援，處理大數據集更高效
+- 改進 Eloquent 子查詢功能
+- 新增 Job 中介軟體支援
+- 新增密碼確認功能
+- 新增 friendsofphp/php-cs-fixer 代碼風格檢查工具
+- 新增 GitHub Actions 自動格式化工作流程
+- 詳見 `UPGRADE.md` 了解完整升級說明
+
+### Laravel 5.7 → 5.8 (2025-11-18)
+- 升級 Laravel Framework 從 5.7.29 至 5.8.38
+- 升級 Laravel Passport 從 6.0.7 至 7.5.1
+- Cache TTL 格式從「分鐘」改為「秒」
+- 路由閉包序列化支援改進
+- 移除 Nexmo 和 Slack 通知渠道獨立套件（已內建到框架）
+- 新增 PSR-16 Cache 相容性
+- Email 驗證從 RFC822 升級到 RFC6530
+- 詳見 `UPGRADE.md` 了解完整升級說明
+
 ### Laravel 5.6 → 5.7 (2025-11-17)
 - 升級 Laravel Framework 從 5.6.40 至 5.7.29
 - 升級 Laravel Passport 從 4.0.3 至 6.0.7

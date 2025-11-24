@@ -269,7 +269,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $result->total());
 
         // 確認結果包含蘇軾和蘇轍
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds, '搜尋「蘇」應該包含蘇軾');
         $this->assertContains(1002, $personIds, '搜尋「蘇」應該包含蘇轍');
     }
@@ -354,7 +354,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含蘇軾
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
     }
 
@@ -368,7 +368,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含王安石
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(2001, $personIds);
     }
 
@@ -382,7 +382,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含王安石（名末字「石」）
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(2001, $personIds);
     }
 
@@ -396,7 +396,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該找到蘇軾（字子瞻）
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
     }
 
@@ -409,7 +409,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
 
         // 應該找到多個結果（蘇軾、蘇轍都有「蘇」開頭的倒排記錄）
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
         $this->assertContains(1002, $personIds);
     }
@@ -496,7 +496,7 @@ class BiogMainNameSearchTest extends TestCase
         $firstItem = $items[0];
 
         // 第一個結果應該是蘇軾或蘇轍（因為都是「蘇」開頭）
-        $this->assertContains($firstItem->c_personid, [1001, 1002]);
+        $this->assertContains((int)$firstItem->c_personid, [1001, 1002]);
     }
 
     public function test_parentheses_content_is_searchable_fullwidth(): void
@@ -510,7 +510,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001（宗氏（李白妻））
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「李白」應該能找到「宗氏（李白妻）」');
     }
 
@@ -525,7 +525,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3002（楊貴妃(楊玉環)）
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(3002, $personIds, '搜索「楊玉環」應該能找到「楊貴妃(楊玉環)」');
     }
 
@@ -540,7 +540,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「李白妻」應該能找到「宗氏（李白妻）」');
     }
 
@@ -555,7 +555,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001
-        $personIds = collect($result->items())->pluck('c_personid')->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「宗氏」應該能找到「宗氏（李白妻）」');
     }
 }

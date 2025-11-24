@@ -146,7 +146,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $this->assertSame('Batch Admin', $record->c_created_by);
         $this->assertSame('88', $record->c_text_dy);
         $this->assertSame('54321', $record->c_source);
-        $this->assertRegExp('/^\[[0-9]{14}\]$/', $record->c_notes);
+        $this->assertMatchesRegularExpression('/^\[[0-9]{14}\]$/', $record->c_notes);
         $this->assertNull($record->c_modified_by);
         $this->assertNull($record->c_modified_date);
 

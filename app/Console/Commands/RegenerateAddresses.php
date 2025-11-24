@@ -729,12 +729,4 @@ class RegenerateAddresses extends Command
 
         return !empty($validValues) ? max($validValues) : null;
     }
-
-    /**
-     * Laravel 6 尚未提供 Command::newLine()，自行代理到輸出層
-     */
-    protected function newLine($count = 1)
-    {
-        $this->output->newLine($count);
-    }
 }

@@ -88,8 +88,8 @@
 
 1. **数据库事务**: 测试使用 `DatabaseTransactions` trait 确保测试之间的数据隔离
 2. **缓存清理**: 功能测试在 tearDown 中清理缓存
-3. **Laravel 版本**: 测试适配 Laravel 7.0，使用旧的工厂语法 `factory(User::class)->create()`
-4. **PHPUnit 版本**: 使用 PHPUnit 8.5，注意使用相容的断言方法
+3. **Laravel 版本**: 测试适配 Laravel 8.0，使用 `laravel/legacy-factories` 保持工厂语法 `factory(User::class)->create()` 的向后兼容
+4. **PHPUnit 版本**: 使用 PHPUnit 9.x，注意使用相容的断言方法
 
 ## 模拟数据示例
 

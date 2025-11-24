@@ -2,6 +2,22 @@
 
 ## 技術升級 (2025-11)
 
+### Laravel 7.0 → 8.0 (LTS) (2025-11-25)
+- 升級 Laravel Framework 從 7.30.7 至 8.83.29（LTS 長期支援版本）
+- 升級 Laravel Passport 從 8.x 至 10.x
+- 升級 Laravel UI 從 2.x 至 3.x
+- 升級 Guzzle 從 6.x 至 7.0（PSR-18 支援）
+- 升級 Nunomaduro Collision 至 ^5.0
+- 新增 Laravel Legacy Factories ^1.0（保持工廠模式向後兼容）
+- 新增 Laravel Serializable Closure ^1.0（取代 opis/closure）
+- PHP 最低版本要求從 7.2.5 提升至 7.3.0
+- PHPUnit 維持在 ^9.0（已於先前升級）
+- 更新 public/index.php 添加維護模式檢查和現代化結構
+- 遷移 Seeders 到 database/seeders/ 並添加命名空間
+- 修復 Console Command 方法訪問級別衝突（RegenerateAddresses::newLine）
+- 支援 Job Batching、Rate Limiting 改進、Time Testing Helpers
+- 詳見 `UPGRADE.md` 了解完整升級說明
+
 ### Laravel 6.0 LTS → 7.0 (2025-11-23)
 - 升級 Laravel Framework 從 6.20.44 至 7.x
 - 升級 Laravel Passport 從 7.5.x 至 8.x

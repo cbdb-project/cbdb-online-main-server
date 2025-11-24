@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 7.0（PHP 7.2.5-7.4）、MariaDB 10.3.39、Blade、Vue 3（透過 `laravel-mix` 編譯）、Bootstrap/AdminLTE。
+- **技術棧**：Laravel 8.0 LTS（PHP 7.3.0-8.0）、MariaDB 10.3.39、Blade、Vue 3（透過 `laravel-mix` 編譯）、Bootstrap/AdminLTE。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
@@ -11,7 +11,7 @@
 - **內部輔助表**（`CBDB__` 前綴表示內部使用，不直接對終端用戶曝光）：
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
   - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
-- **日期/時間處理**：使用 Carbon 2.x（Laravel 7.0 要求）；API 與 Carbon 1.x 基本兼容。
+- **日期/時間處理**：使用 Carbon 2.x（Laravel 8.0 要求）；API 與 Carbon 1.x 基本兼容。
 - **主要資料夾**：
   - `app/Http/Controllers`：Laravel 控制器（如 `OperationsController`）。
   - `app/Repositories`：資料存取與封裝邏輯（例如 `OperationRepository`）。

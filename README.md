@@ -31,8 +31,8 @@
 ## 技術環境
 
 ### 生產環境
-- **PHP**: 7.4+ (最低 7.2.0)
-- **Laravel**: 6.0 LTS (已從 5.8 升級，參見 [UPGRADE.md](./UPGRADE.md))
+- **PHP**: 7.4+ (最低 7.2.5)
+- **Laravel**: 7.0 (已從 6.0 LTS 升級，參見 [UPGRADE.md](./UPGRADE.md))
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
 - **Node.js**: 12.x

@@ -29,7 +29,7 @@
                         <td>{{ $user->is_active == 1 ? 'Yes' : 'No' }}</td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '1']) }}">改变审核状态</a>
+                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '1']) }}">改变审核状态</a>
                             </div>
                         </td>
                         <td>
@@ -37,12 +37,12 @@
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['id' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
+                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
                             </div>
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a type="button" 
+                                <a type="button"
                                     onclick="
                                     let msg = '您真的确定要删除吗？\n\n请确认！';
                                     if (confirm(msg)===true){
@@ -50,8 +50,8 @@
                                     }else{
                                         return false;
                                     }"
-                                    class="btn btn-xs btn-danger" 
-                                    href="{{ route('manage.edit', ['id' => $user->id , 'type' => '3']) }}">
+                                    class="btn btn-xs btn-danger"
+                                    href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '3']) }}">
                                 del</a>
                             </div>
                         </td>

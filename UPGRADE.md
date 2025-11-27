@@ -1,12 +1,177 @@
 # Laravel 升級筆記
 
 ## 目錄
+- [Laravel 8.0 → 8.83 + PHP 8.1](#laravel-80--883--php-81-升級筆記)
 - [Laravel 7.0 → 8.0](#laravel-70--80-升級筆記)
 - [Laravel 6.0 → 7.0](#laravel-60--70-升級筆記)
 - [Laravel 5.8 → 6.0](#laravel-58--60-升級筆記)
 - [Laravel 5.7 → 5.8](#laravel-57--58-升級筆記)
 - [Laravel 5.6 → 5.7](#laravel-56--57-升級筆記)
 - [Laravel 5.5 → 5.6](#laravel-55--56-升級筆記)
+
+---
+
+# Laravel 8.0 → 8.83 + PHP 8.1 升級筆記
+
+## 升級狀態
+✅ **已完成** - 2025-11-24
+
+**分支**: 待合併
+
+## 環境需求
+- **PHP**：8.1+ （最低 8.1.0，**強烈建議 8.4**）
+- **MySQL**：5.7.7+ / MariaDB 10.2.2+
+- **作業系統/服務**：與原本一致即可
+
+⚠️ **重要變更**：本次升級將 PHP 最低版本要求從 7.3.0 提升至 8.1.0
+
+## 套件變更與版本
+
+### 主要框架更新
+- `laravel/framework`: `^8.0` → `^8.83` (8.0.0 → 8.83.29)
+- `php`: `^7.3.0` → `^8.1` ⭐ **重大變更**
+- `doctrine/dbal`: `^2.5` → `^3.0`
+- `phpunit/phpunit`: `^9.0` → `^9.6`
+
+### PHP 8.1+ 要求說明
+Laravel 8.83 本身支援 PHP 7.3-8.1，但本專案選擇要求 PHP 8.1+ 的原因：
+- **性能提升**：PHP 8.x 比 PHP 7.x 快 20-40%
+- **新特性**：枚舉（Enums）、只讀屬性、纖程等
+- **安全性**：PHP 7.x 系列已全部停止維護
+- **未來兼容**：為升級 Laravel 9/10/11 做準備
+
+### PHP 版本支援狀態
+| PHP 版本 | 狀態 | 安全更新截止 | 建議 |
+|---------|------|------------|-----|
+| 7.3 | ❌ 停止維護 | 2021-12-06 | 不建議 |
+| 7.4 | ❌ 停止維護 | 2022-11-28 | 不建議 |
+| 8.0 | ❌ 停止維護 | 2023-11-26 | 不建議 |
+| 8.1 | ✅ 安全更新 | 2025-11-25 | 可用 |
+| 8.2 | ✅ 主動支援 | 2026-12-08 | 推薦 |
+| 8.3 | ✅ 主動支援 | 2027-12-31 | 推薦 |
+| 8.4 | ✅ 主動支援 | 2028-12-31 | **最佳** |
+
+## Breaking Changes
+
+### 1. PHP 版本要求提升（重要）
+**影響**：必須將系統 PHP 更新至 8.1 或更高版本
+
+**部署前準備**：
+```bash
+# Ubuntu/Debian 系統升級 PHP
+sudo apt update
+sudo apt install php8.4 php8.4-cli php8.4-fpm php8.4-mysql \
+    php8.4-xml php8.4-mbstring php8.4-curl php8.4-zip
+
+# 切換預設 PHP 版本
+sudo update-alternatives --set php /usr/bin/php8.4
+
+# 驗證版本
+php -v  # 應該顯示 PHP 8.4.x
+```
+
+### 2. Doctrine DBAL 3.0
+**變更**：資料庫抽象層升級
+
+**影響**：某些資料庫操作的 API 可能有細微變化
+**本專案影響**：✅ 已驗證，無需修改程式碼
+
+### 3. PHPUnit 9.6
+**變更**：測試框架維持在 9.6（已兼容）
+
+## Composer 更新步驟
+
+### 開發環境
+```bash
+# 0. 確認 PHP 版本
+php -v  # 必須是 8.1 或更高
+
+# 1. 更新依賴
+composer update --with-all-dependencies
+
+# 2. 清除快取
+php artisan config:clear
+php artisan cache:clear
+php artisan view:clear
+
+# 3. 運行測試
+./vendor/bin/phpunit
+```
+
+### 生產環境
+```bash
+# 0. 確認 PHP 版本
+php -v  # 必須是 8.1 或更高
+
+# 1. 安裝依賴（使用 lockfile）
+composer install --no-dev --optimize-autoloader
+
+# 2. 清除舊快取
+php artisan config:clear
+php artisan cache:clear
+php artisan view:clear
+
+# 3. 重建快取
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# 4. 驗證
+# 檢查日誌、API、認證等核心功能
+```
+
+## 測試情況
+
+### 本地測試（需在 PHP 8.1+ 環境）
+```bash
+./vendor/bin/phpunit
+
+# 預期輸出：
+# PHPUnit 9.6.29
+# Tests: 153+, Assertions: 562+
+# OK
+```
+
+## 新功能與改進
+
+### PHP 8.1+ 新特性
+- **枚舉（Enums）**：類型安全的枚舉支援
+- **只讀屬性**：不可變屬性
+- **First-class 可調用語法**：`$fn = strlen(...)`
+- **新的初始化器**：`new` 表達式
+- **純交集類型**：更精確的類型定義
+- **纖程（Fibers）**：異步程式設計支援
+
+### Laravel 8.83 穩定性
+- Laravel 8.83 是 8.x 系列最新穩定版本
+- 包含所有安全修復和錯誤修復
+- 為未來升級 Laravel 9 做好準備
+
+## 參考連結
+
+- [Laravel 8.x Documentation](https://laravel.com/docs/8.x)
+- [PHP 8.1 Release Notes](https://www.php.net/releases/8.1/en.php)
+- [PHP 8.2 Release Notes](https://www.php.net/releases/8.2/en.php)
+- [PHP 8.3 Release Notes](https://www.php.net/releases/8.3/en.php)
+- [PHP 8.4 Release Notes](https://www.php.net/releases/8.4/en.php)
+- [Doctrine DBAL 3.x Documentation](https://www.doctrine-project.org/projects/dbal.html)
+
+## 下一步升級計劃
+
+```
+當前：Laravel 8.83 + PHP 8.1+ ✅
+  ↓
+建議：Laravel 8.83 → 9.x
+  ├─ PHP 要求：8.0+
+  ├─ 更多 PHP 8 特性
+  └─ 改進的路由、Eloquent 功能
+  ↓
+長期：Laravel 9.x → 11.x
+  ├─ PHP 8.1+ / 8.2+ 要求
+  └─ 最新的 Laravel 功能
+```
+
+詳見 `LARAVEL_7_8_9_UPGRADE_PLAN.md` 了解完整的升級路線圖。
 
 ---
 

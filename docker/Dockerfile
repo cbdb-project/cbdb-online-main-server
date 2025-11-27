@@ -1,4 +1,4 @@
-FROM php:7.4-fpm
+FROM php:8.4-fpm
 
 # 安装编译工具和依赖
 RUN apt-get update && apt-get install -y \

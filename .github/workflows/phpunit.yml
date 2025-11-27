@@ -24,12 +24,11 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.4'
+          php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, curl, pdo_sqlite
           coverage: none
-        # 注：Laravel 7.0 支持 PHP 7.2.5-7.4
-        # Laravel 7.12+ 开始支持 PHP 8.0
-        # 需要 PHP 8.1+ 支持请升级到 Laravel 8.x+
+        # 注：Laravel 8.83 LTS 要求 PHP 8.1+
+        # 建議使用 PHP 8.4 以獲得最佳性能和安全性
 
       - name: Get Composer cache directory
         id: composer-cache

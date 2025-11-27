@@ -5,11 +5,11 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": "^7.3.0",
-        "doctrine/dbal": "^2.5",
+        "php": "^8.1",
+        "doctrine/dbal": "^3.0",
         "guzzlehttp/guzzle": "^7.0",
         "laracasts/flash": "^3.0",
-        "laravel/framework": "^8.0",
+        "laravel/framework": "^8.83",
         "laravel/legacy-factories": "^1.0",
         "laravel/passport": "^10.0",
         "laravel/tinker": "^2.0",
@@ -22,7 +22,7 @@
         "friendsofphp/php-cs-fixer": "^3.0",
         "mockery/mockery": "^1.0",
         "nunomaduro/collision": "^5.0",
-        "phpunit/phpunit": "^9.0"
+        "phpunit/phpunit": "^9.6"
     },
     "autoload": {
         "classmap": [
@@ -65,9 +65,6 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "optimize-autoloader": true,
-        "platform": {
-            "php": "7.4.0"
-        },
         "allow-plugins": {
             "kylekatarnls/update-helper": true
         }

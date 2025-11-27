@@ -60,9 +60,21 @@ class BasicInformationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('biogmains.basicinformation.index', ['page_title' => 'Basicinformation', 'page_description' => '編輯人物基本信息']);
+        // 获取查询参数
+        $q = $request->input('q', '');
+        $num = $request->input('num', 20);
+
+        // 使用 Repository 查询数据
+        $names = $this->biogMainRepository->namesByQuery($request, $num);
+
+        return view('biogmains.basicinformation.index', [
+            'page_title' => 'Basicinformation',
+            'page_description' => '編輯人物基本信息',
+            'names' => $names,
+            'q' => $q
+        ]);
     }
 
     /**

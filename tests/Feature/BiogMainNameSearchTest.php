@@ -319,13 +319,10 @@ class BiogMainNameSearchTest extends TestCase
 
         $result = BiogMainRepository::namesByQuery($request, 20);
 
-        // 空查詢應該返回 JSON 字串（原有邏輯）
-        $this->assertIsString($result);
-
-        $decoded = json_decode($result, true);
-        $this->assertIsArray($decoded);
-        $this->assertArrayHasKey('data', $decoded);
-        $this->assertGreaterThanOrEqual(3, count($decoded['data']));
+        // 20251127 修改：空查詢現在也返回 LengthAwarePaginator 對象，與其他查詢保持一致
+        $this->assertInstanceOf(LengthAwarePaginator::class, $result);
+        $this->assertGreaterThanOrEqual(3, $result->total());
+        $this->assertGreaterThanOrEqual(3, count($result->items()));
     }
 
     // ===== 倒排索引表測試 =====

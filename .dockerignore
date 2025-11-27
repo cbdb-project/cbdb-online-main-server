@@ -6,8 +6,8 @@
 
 # Docker
 docker-compose.yml
-docker/
 .dockerignore
+# 保留 docker/ 目錄中的配置文件（Dockerfile, entrypoint.sh, php.ini, nginx.conf 等需要被 COPY）
 
 # IDE
 .idea

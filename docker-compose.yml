@@ -8,6 +8,8 @@ services:
     container_name: cbdb-php
     volumes:
       - .:/var/www/html                                    # 映射代码，git pull 即可生效
+      - vendor:/var/www/html/vendor                        # 獨立的 vendor 目錄（容器專用）
+      - node_modules:/var/www/html/node_modules            # 獨立的 node_modules 目錄（容器專用）
       - ./database:/var/www/html/database                  # SQLite 数据库目录
       - ./docker/php.ini:/usr/local/etc/php/conf.d/custom.ini  # PHP 配置
     environment:
@@ -17,8 +19,6 @@ services:
       DB_DATABASE: /var/www/html/database/database.sqlite3
     networks:
       - laravel-net
-    depends_on:
-      - web
 
   web:
     image: nginx:alpine
@@ -30,7 +30,15 @@ services:
       - "8000:80"                                 # 本地 8000 端口映射到容器 80
     networks:
       - laravel-net
+    depends_on:
+      - php
 
 networks:
   laravel-net:
     driver: bridge
+
+volumes:
+  vendor:
+    driver: local
+  node_modules:
+    driver: local

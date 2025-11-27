@@ -37,15 +37,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# 安装 Laravel 依赖（开发环境）
-COPY composer.json composer.lock ./
-RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader
+# 复制启动脚本
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# 复制代码
+# 复制代码（開發環境會被卷映射覆蓋，這裡主要用於生產構建）
 COPY . /var/www/html
-
-# 完成 Composer 安装（執行 deploy.sh 以保持與伺服器相同流程）
-RUN chmod +x deploy.sh && ./deploy.sh
 
 # 给 storage 和 bootstrap/cache 权限
 RUN chown -R www-data:www-data storage bootstrap/cache \
@@ -56,4 +53,5 @@ RUN mkdir -p database && chown -R www-data:www-data database
 
 EXPOSE 9000
 
-CMD ["php-fpm"]
+# 使用啟動腳本（會在容器啟動時安裝依賴並清除緩存）
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

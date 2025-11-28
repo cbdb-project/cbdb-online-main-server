@@ -219,9 +219,21 @@ class BiogMainRepository
         $data['c_female'] = (int)($data['c_female']);
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
-        $data = (new ToolsRepository)->timestamp($data);
+        
         $biogbasicinformation = BiogMain::find($id);
-        $ori = $this->byPersonId($id);
+        $ori = $biogbasicinformation->toArray();
+        
+        // 檢查是否有實質變更
+        $hasChanges = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
+        
+        if (!$hasChanges) {
+            return [
+                'no_changes' => true,
+            ];
+        }
+        
+        $data = (new ToolsRepository)->timestamp($data);
+        
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
@@ -231,6 +243,10 @@ class BiogMainRepository
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
         }
         //20190531修改結束
+        
+        return [
+            'no_changes' => false,
+        ];
     }
 
     /**

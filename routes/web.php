@@ -175,6 +175,9 @@ Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
 ]]);
 
 Route::middleware('auth')->group(function () {
+    Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
+    Route::patch('profile', 'UserProfileController@update')->name('profile.update');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

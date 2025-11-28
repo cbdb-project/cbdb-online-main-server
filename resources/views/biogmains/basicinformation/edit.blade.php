@@ -9,7 +9,7 @@
         <div id='pinyin_info' style='display:none;' class="alert alert-success alert-dismissible">訊息提示：「生成拼音」已經完成。</div>
 
         <div class="panel-body">
-            <form action="/basicinformation/{{ $basicinformation->c_personid }}" class="form-horizontal"
+            <form id="basic-info-form" action="/basicinformation/{{ $basicinformation->c_personid }}" class="form-horizontal"
                   method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
@@ -388,7 +388,7 @@
                     @if(Auth::user()->is_active == 1)
                         <div class="form-group">
                             <div class="col-sm-offset-2 col-sm-10">
-                                <button type="submit" class="btn btn-default">Submit</button>
+                                <button type="submit" class="btn btn-default" id="basic-info-submit">Submit</button>
                             </div>
                         </div>
                     @endif
@@ -436,6 +436,26 @@
 @endsection
 @section('js')
     <script>
+        var $basicInfoForm = $('#basic-info-form');
+        var $submitButton = $('#basic-info-submit');
+        var pristineSnapshot = $basicInfoForm.serialize();
+
+        function evaluateFormDirty() {
+            var isDirty = $basicInfoForm.serialize() !== pristineSnapshot;
+            $submitButton.prop('disabled', !isDirty);
+        }
+
+        evaluateFormDirty();
+
+        $basicInfoForm.on('change input', 'input, select, textarea', function () {
+            evaluateFormDirty();
+        });
+
+        $basicInfoForm.on('submit', function () {
+            pristineSnapshot = $basicInfoForm.serialize();
+            $submitButton.prop('disabled', true);
+        });
+
         $(".select2").select2();
         function indexYear() {
             let birth = $('input[name=c_birthyear]').val();

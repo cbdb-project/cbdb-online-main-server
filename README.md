@@ -59,10 +59,6 @@ php artisan make:migration creat_tasks_table --create=tasks
 ```
 参考文档[migrations](http://d.laravel-china.org/docs/5.4/migrations)
 
-### 验证邮箱
-
-laravel自带的邮箱服务对国内支持不太好，本项目倾向使用[sendcloud](https://github.com/NauxLiu/Laravel-SendCloud)服务
-
 ### 用户验证
 
 执行如下命令，使用laravel自带的用户验证功能

@@ -16,13 +16,16 @@
 ---
 
 ## 二、帳號角色（`users.is_admin`）
-| 值 | 名稱 / 定位 | 主要行為 |
-|----|-------------|-----------|
-| `0` | 一般用戶 | 只要 `is_active = 1` 即可直接對 `/basicinformation/*`、`/codes/*` 等模組進行新增 / 修改，Controller 會直接呼叫對應的 Repository → Model，寫入資料表並留下操作紀錄。 |
-| `1` | 專家用戶（管理員） | 擁有一般用戶權限；另外可：<br>• 進入 `/manage` 調整帳號啟用 / 角色。<br>• 在 `/operations`、`/modified` 審核提案（核准 / 退修）、執行操作復原。<br>• 存取 `/merge-preview` 等管理工具。 |
-| `2` | 眾包用戶 | 前台頁面可編輯，但 Controller 會偵測 `is_admin == 2`，把提交內容轉成 `operations`（`crowdsourcing_status = 2`），等待專家審核後套用，並不直接寫主資料表。 |
+| 值 | 名稱 / 定位 | 常量定義 | 主要行為 |
+|----|-------------|---------|-----------|
+| `0` | 一般用戶 | `User::ROLE_REGULAR` | 只要 `is_active = 1` 即可直接對 `/basicinformation/*`、`/codes/*` 等模組進行新增 / 修改，Controller 會直接呼叫對應的 Repository → Model，寫入資料表並留下操作紀錄。 |
+| `1` | 專家用戶 | `User::ROLE_EXPERT` | 擁有一般用戶權限；另外可：<br>• 進入 `/manage` 調整帳號啟用 / 角色。<br>• 在 `/operations`、`/modified` 審核提案（核准 / 退修）、執行操作復原。<br>• 存取 `/merge-preview` 等管理工具。 |
+| `2` | 眾包用戶 | `User::ROLE_CROWDSOURCING` | 前台頁面可編輯，但 Controller 會偵測 `is_admin == 2`，把提交內容轉成 `operations`（`crowdsourcing_status = 2`），等待專家審核後套用，並不直接寫主資料表。 |
+| `3` | 系統管理員（預留） | `User::ROLE_SUPER_ADMIN` | 預留角色，擁有比專家更高階的權限，需配合程式實作後啟用。 |
 
-> 角色切換邏輯在 `ManagementController@edit(type=2)`：`1 → 2 → 0 → 1` 循環。若未來新增層級，需同步調整此處與各 Controller 的 `is_admin` 判斷。
+> **角色切換邏輯**：在 `ManagementController@edit(type=2)` 中實現循環切換：`1 → 2 → 0 → 1`。若要包含系統管理員，需調整為 `1 → 2 → 0 → 3 → 1`。
+>
+> **常量使用**：`User` 模型已定義角色和狀態常量（參見 `app/User.php`），建議在新代碼中使用常量而非魔術數字。
 
 ---
 
@@ -40,15 +43,92 @@
 
 ---
 
-## 四、新增「系統管理員」的建議
+## 四、User 模型輔助方法
 
-若未來需要比「專家」更高階的權限，可新增一個新的 `is_admin` 層級（例如值 3），但需注意：
+`User` 模型（`app/User.php`）提供以下輔助方法簡化權限檢查：
 
-1. **資料庫 / 角色輪換**：更新 migration / seeder，並調整 `ManagementController@edit` 的角色切換邏輯，避免新層級被排除或輪轉錯亂。
-2. **授權判斷**：所有以 `is_admin == 1` 判斷管理權限的程式需要改為 `in_array(Auth::user()->is_admin, [...])` 或抽象成常數，以便新層級具備管理權限。
-3. **UI 與操作流程**：像 `/manage` 的角色顯示、按鈕、以及新層級專屬的操作或頁面都要同步更新。
+### 角色檢查方法
+- `isActive(): bool` - 檢查用戶是否為活跃狀態（`is_active == 1`）
+- `isAdmin(): bool` - 檢查用戶是否為專家或系統管理員（`is_admin` 為 1 或 3）
+- `isExpert(): bool` - 檢查用戶是否為專家用戶（`is_admin == 1`）
+- `isSuperAdmin(): bool` - 檢查用戶是否為系統管理員（`is_admin == 3`）
+- `isCrowdsourcingUser(): bool` - 檢查用戶是否為眾包用戶（`is_admin == 2`）
+- `isRegularUser(): bool` - 檢查用戶是否為一般用戶（`is_admin == 0`）
 
-目前專家 (`is_admin = 1`) 已能涵蓋帳號管理與資料審核職責；如需擴充，請先完整規劃授權矩陣再實作。
+### 權限檢查方法
+- `canManageUsers(): bool` - 檢查是否可管理用戶（活躍的專家或系統管理員）
+- `canRestoreOperations(): bool` - 檢查是否可執行操作復原（活躍的專家或系統管理員）
+- `canWriteDirectly(): bool` - 檢查是否可直接寫入數據（活躍且非眾包用戶）
+
+### 其他輔助方法
+- `getRoleName(): string` - 獲取用戶角色中文名稱（「一般」、「專家」、「眾包」、「系統管理員」）
+
+### 使用示例
+
+```php
+// 舊寫法（魔術數字）
+if (Auth::user()->is_active == 1 && Auth::user()->is_admin == 1) {
+    // ...
+}
+
+// 新寫法（使用常量）
+if (Auth::user()->is_active == User::STATUS_ACTIVE && Auth::user()->is_admin == User::ROLE_EXPERT) {
+    // ...
+}
+
+// 推薦寫法（使用輔助方法）
+if (Auth::user()->canManageUsers()) {
+    // ...
+}
+```
+
+---
+
+## 五、新增「系統管理員」的實施指南
+
+系統已預留系統管理員角色（`User::ROLE_SUPER_ADMIN = 3`），若要啟用需完成以下步驟：
+
+### 1. 調整角色切換邏輯
+修改 `ManagementController@edit(type=2)` 的角色切換邏輯：
+
+```php
+// 當前：1 → 2 → 0 → 1
+// 修改為：1 → 2 → 0 → 3 → 1
+if($user->is_admin == 1) { $user->is_admin = 2; }
+elseif($user->is_admin == 2) { $user->is_admin = 0; }
+elseif($user->is_admin == 0) { $user->is_admin = 3; }
+elseif($user->is_admin == 3) { $user->is_admin = 1; }
+```
+
+### 2. 更新 UI 顯示
+修改 `resources/views/manage/index.blade.php` 的角色顯示：
+
+```php
+{{
+    $user->is_admin == 3 ? '系統管理員' :
+    ($user->is_admin == 2 ? '眾包' :
+    ($user->is_admin == 1 ? '專家' : '一般'))
+}}
+
+// 或使用輔助方法（推薦）
+{{ $user->getRoleName() }}
+```
+
+### 3. 定義系統管理員專屬權限（可選）
+若系統管理員需要比專家更高的權限，需在相關 Controller 中添加判斷：
+
+```php
+// 僅限系統管理員
+if (!Auth::user()->isSuperAdmin()) {
+    flash('該功能僅限系統管理員使用。', 'error');
+    return redirect()->back();
+}
+```
+
+### 4. 測試覆蓋
+為新角色補充測試用例，確保權限檢查正確。
+
+**注意**：目前多數功能使用 `is_admin == 1` 檢查，若要讓系統管理員也擁有相同權限，應改用 `isAdmin()` 方法（已包含專家和系統管理員）。
 
 ---
 

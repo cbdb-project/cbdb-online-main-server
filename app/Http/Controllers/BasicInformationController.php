@@ -171,7 +171,15 @@ class BasicInformationController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $this->biogMainRepository->updateById($request, $id);
+        
+        $result = $this->biogMainRepository->updateById($request, $id);
+        
+        // 檢查是否有實質變更
+        if (isset($result['no_changes']) && $result['no_changes']) {
+            flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
+            return redirect()->route('basicinformation.edit', $id);
+        }
+        
         //20190531判別是否為眾包用戶
         if (Auth::user()->is_admin == 2) {
             flash('眾包紀錄 Update success @ '.Carbon::now(), 'success');

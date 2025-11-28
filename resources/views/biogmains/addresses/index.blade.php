@@ -6,7 +6,7 @@
         <div class="panel-heading">地址清單</div>
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.addresses.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -21,7 +21,7 @@
                     <th>始年</th>
                     <th>終年</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -36,7 +36,7 @@
                         <td>{{ $basicinformation->biog_addresses[$i]->c_firstyear }}</td>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_lastyear }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.addresses.edit', ['basicinformation' => $basicinformation->c_personid, 'address' => $basicinformation->c_personid.'-'.$basicinformation->biog_addresses[$i]->c_addr_id.'-'.$basicinformation->biog_addresses[$i]->c_addr_type.'-'.$basicinformation->biog_addresses[$i]->c_sequence]) }}">edit</a>

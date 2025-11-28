@@ -6,7 +6,7 @@
         <div class="panel-heading">人名查詢</div>
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
                 @endif
             @endauth

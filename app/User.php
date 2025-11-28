@@ -142,6 +142,16 @@ class User extends Authenticatable
     }
 
     /**
+     * 检查用户是否可以运行批量导入操作（活跃的专家或系统管理员）
+     *
+     * @return bool
+     */
+    public function canRunBatchImport(): bool
+    {
+        return $this->isActive() && $this->isAdmin();
+    }
+
+    /**
      * 获取用户角色名称（中文）
      *
      * @return string

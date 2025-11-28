@@ -8,7 +8,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.sources.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -21,7 +21,7 @@
                     <th>出處</th>
                     <th>頁碼</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -51,7 +51,7 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
                             @endif
                         </td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['basicinformation' => $basicinformation->c_personid, 'source' => $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.$value->pivot->c_pages]) }}">edit</a>

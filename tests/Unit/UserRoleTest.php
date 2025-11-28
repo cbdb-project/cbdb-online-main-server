@@ -209,6 +209,39 @@ class UserRoleTest extends TestCase
     }
 
     /**
+     * 测试 canRunBatchImport() 方法
+     */
+    public function testCanRunBatchImport()
+    {
+        $user = new User();
+
+        // 未启用的专家用户
+        $user->is_active = User::STATUS_INACTIVE;
+        $user->is_admin = User::ROLE_EXPERT;
+        $this->assertFalse($user->canRunBatchImport());
+
+        // 已启用的一般用户
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_REGULAR;
+        $this->assertFalse($user->canRunBatchImport());
+
+        // 已启用的专家用户
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_EXPERT;
+        $this->assertTrue($user->canRunBatchImport());
+
+        // 已启用的系统管理员
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_SUPER_ADMIN;
+        $this->assertTrue($user->canRunBatchImport());
+
+        // 已启用的众包用户
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_CROWDSOURCING;
+        $this->assertFalse($user->canRunBatchImport());
+    }
+
+    /**
      * 测试 getRoleName() 方法
      */
     public function testGetRoleName()

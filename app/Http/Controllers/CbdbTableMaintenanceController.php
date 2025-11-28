@@ -39,7 +39,7 @@ class CbdbTableMaintenanceController extends Controller
     {
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
-            if (!Auth::user() || Auth::user()->is_admin != 1 || Auth::user()->is_active != 1) {
+            if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
                 abort(403, '此功能僅限活躍管理員使用');
             }
             return $next($request);

@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.events.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -20,7 +20,7 @@
                     <th>SEQUENCE</th>
                     <th>事件名稱</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth

@@ -26,14 +26,14 @@
                         <td>{{ $user->name }}</td>
                         <td>{{ $user->email }}</td>
                         <td>{{ $user->institution }}</td>
-                        <td>{{ $user->is_active == 1 ? 'Yes' : 'No' }}</td>
+                        <td>{{ $user->isActive() ? 'Yes' : 'No' }}</td>
                         <td>
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '1']) }}">改变审核状态</a>
                             </div>
                         </td>
                         <td>
-                            {{ $user->is_admin == 2 ? '眾包' : ( $user->is_admin == 1 ? '專家' : '一般' ) }}
+                            {{ $user->getRoleName() }}
                         </td>
                         <td>
                             <div class="btn-group">

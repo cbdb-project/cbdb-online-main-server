@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.texts.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -20,7 +20,7 @@
                     <th>書名</th>
                     <th>著述角色</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -33,7 +33,7 @@
                         <td>{{ $basicinformation->texts[$i]->c_title_chn }}</td>
                         <td>{{ $basicinformation->texts_role[$i]->c_role_desc_chn }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.texts.edit', ['basicinformation' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id]) }}">edit</a>

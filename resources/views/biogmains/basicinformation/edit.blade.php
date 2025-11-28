@@ -385,7 +385,7 @@
                     </div>
                 </div>
                 @auth
-                    @if(Auth::user()->is_active == 1)
+                    @if(Auth::user()->isActive())
                         <div class="form-group">
                             <div class="col-sm-offset-2 col-sm-10">
                                 <button type="submit" class="btn btn-default">Submit</button>
@@ -396,7 +396,7 @@
 
             </form>
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <div class="btn-group pull-right">
                         <a href=""
                            onclick="
@@ -414,7 +414,7 @@
                 @endif
             @endauth
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <div class="btn-group pull-right">
                         <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
                     </div>
@@ -424,7 +424,7 @@
                 @endif
             @endauth
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <form id="delete-form" action="{{ route('basicinformation.destroy', ['basicinformation' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
                         {{ method_field('DELETE') }}
                         {{ csrf_field() }}

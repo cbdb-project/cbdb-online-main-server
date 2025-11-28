@@ -32,7 +32,7 @@
                             <input type="text" name="c_lastyear" class="form-control" placeholder="c_lastyear" required>
                         </div>
                     </div>
-                    @if(Auth::check() && Auth::user()->is_active == 1)
+                    @if(Auth::check() && Auth::user()->isActive())
                     <div class="form-group">
                         <div class="col-sm-offset-2 col-sm-10">
                             <button type="submit" class="btn btn-default">Submit</button>

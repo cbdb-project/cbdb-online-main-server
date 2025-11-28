@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.offices.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -24,7 +24,7 @@
                     <th>始年</th>
                     <th>終年</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -41,7 +41,7 @@
                         <td>{{ $value->pivot->c_firstyear }}</td>
                         <td>{{ $value->pivot->c_lastyear }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['basicinformation' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id]) }}">edit</a>

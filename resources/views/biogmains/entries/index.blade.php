@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.entries.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -20,7 +20,7 @@
                     <th>sequence</th>
                     <th>入仕法</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -33,7 +33,7 @@
                         <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->c_entry_desc_chn }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_entry_code."-".$value->pivot->c_sequence."-".$value->pivot->c_kin_code."-".$value->pivot->c_assoc_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_year."-".$value->pivot->c_assoc_id."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code)

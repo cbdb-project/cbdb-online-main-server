@@ -70,7 +70,7 @@ class OperationsProposalController extends Controller
 
     protected function ensureCanReview(Operation $operation): void
     {
-        if (!Auth::check() || Auth::user()->is_active != 1 || Auth::user()->is_admin != 1) {
+        if (!Auth::check() || !Auth::user()->canRestoreOperations()) {
             abort(403, '無權審核提案。');
         }
 

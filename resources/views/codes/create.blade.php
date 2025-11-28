@@ -20,7 +20,7 @@
                         </div>
                     @php($i++)
                     @endforeach
-                    @if(Auth::check() && Auth::user()->is_active == 1)
+                    @if(Auth::check() && Auth::user()->isActive())
                     <div class="form-group">
                         <label for="__proposal_comment" class="col-sm-2 control-label">提案說明</label>
                         <div class="col-sm-10">

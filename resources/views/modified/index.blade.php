@@ -241,7 +241,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     </div>
                                   </div>
                                 </div>
-                                @if(Auth::check() && Auth::user()->is_admin == 1 && in_array((int)$item->op_type, [3,4]) && $item->resource !== 'POSTED_TO_ADDR_DATA' && $canCompare)
+                                @if(Auth::check() && Auth::user()->isAdmin() && in_array((int)$item->op_type, [3,4]) && $item->resource !== 'POSTED_TO_ADDR_DATA' && $canCompare)
                                     <form method="post" action="{{ route('operations.restore', $item->id) }}" style="display:inline;">
                                         {{ csrf_field() }}
                                         <button type="submit" class="btn btn-warning"
@@ -250,7 +250,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         </button>
                                     </form>
                                 @endif
-                                @if($isProposal && Auth::check() && Auth::user()->is_admin == 1 && Auth::user()->is_active == 1 && $reviewStatus === 'pending')
+                                @if($isProposal && Auth::check() && Auth::user()->canManageUsers() && $reviewStatus === 'pending')
                                     <div class="proposal-actions" style="margin-top:8px;">
                                         <form method="post" action="{{ route('operations.proposals.approve', $item->id) }}" style="display:inline;">
                                             {{ csrf_field() }}

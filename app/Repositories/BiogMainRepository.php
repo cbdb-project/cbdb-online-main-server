@@ -223,7 +223,7 @@ class BiogMainRepository
         $biogbasicinformation = BiogMain::find($id);
         $ori = $this->byPersonId($id);
         //20190531判別是否為眾包用戶
-        if (Auth::user()->is_admin == 2) {
+        if (Auth::user()->isCrowdsourcingUser()) {
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
         }
         else {

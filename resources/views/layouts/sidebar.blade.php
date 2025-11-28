@@ -19,7 +19,7 @@
         <!-- Sidebar Menu -->
         @php
             $hasPendingProposals = false;
-            if (Auth::check() && Auth::user()->is_admin == 1 && Auth::user()->is_active == 1) {
+            if (Auth::check() && Auth::user()->canManageUsers()) {
                 try {
                     if (\Illuminate\Support\Facades\Schema::hasTable('operations')) {
                         $hasPendingProposals = \App\Operation::where('crowdsourcing_status', 0)
@@ -81,7 +81,7 @@
             <li class="{{ $page_title == '任官職務資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'posting-office-data') }}"><i class="fa fa-table"></i> <span>任官職務資料檢視<br>(View_PostingOfficeData)</span></a></li>
             <li class="{{ $page_title == '人物身份資料檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'status-data') }}"><i class="fa fa-table"></i> <span>人物身份資料檢視<br>(View_StatusData)</span></a></li>
 
-            @if(Auth::check() and Auth::user()->is_admin == 1)
+            @if(Auth::check() and Auth::user()->isAdmin())
                 <li class="header">Management</li>
                 <li class="{{ $page_title == 'SQL 執行計畫' ? 'active' : '' }}"><a href="{{ route('admin.explainsql') }}"><i class="fa fa-search"></i> <span>SQL EXPLAIN</span></a></li>
                 <li class="{{ $page_title == '批次匯入書稿資料' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-book-titles') }}"><i class="fa fa-upload"></i> <span>批次匯入書稿</span></a></li>

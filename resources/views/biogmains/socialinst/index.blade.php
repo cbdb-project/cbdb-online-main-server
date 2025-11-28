@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.socialinst.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -22,7 +22,7 @@
                     <th>始年</th>
                     <th>終年</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -37,7 +37,7 @@
                         <td>{{ $value->pivot->c_bi_begin_year }}</td>
                         <td>{{ $value->pivot->c_bi_end_year }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code."-".$value->pivot->c_bi_role_code)

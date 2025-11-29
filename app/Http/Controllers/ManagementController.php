@@ -65,41 +65,25 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $type = $request['type'];
         if (!Auth::user()->canManageUsers()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        if($type == 1) {
-            $user = User::find($id);
-            $user->is_active = ($user->is_active == User::STATUS_ACTIVE) ? User::STATUS_INACTIVE : User::STATUS_ACTIVE;
-            $user->save();
-            flash('修改成功 @ '.Carbon::now(), 'success');
+
+        $user = User::find($id);
+
+        if (!$user) {
+            flash('用户不存在 @ '.Carbon::now(), 'error');
             return redirect()->route('manage.index');
         }
-        if($type == 2) {
-            $user = User::find($id);
-            if($user->is_admin == User::ROLE_EXPERT) { $user->is_admin = User::ROLE_CROWDSOURCING; }
-            elseif($user->is_admin == User::ROLE_CROWDSOURCING) { $user->is_admin = User::ROLE_REGULAR; }
-            elseif($user->is_admin == User::ROLE_REGULAR) { $user->is_admin = User::ROLE_EXPERT; }
-            $user->save();
-            flash('修改成功 @ '.Carbon::now(), 'success');
-            return redirect()->route('manage.index');
-        }
-        if($type == 3) {
-            $user = User::find($id);
-            $email = $user->email;
-            $user->email = $email.'-'.Carbon::now();
-            $user->password = '-';
-            $user->confirmation_token = '-';
-            $user->remember_token = '-';
-            $user->updated_at = Carbon::now();
-            $user->save();
-            flash('刪除成功 @ '.Carbon::now(), 'danger');
-            return redirect()->route('manage.index');
-        }
+
+        return view('manage.edit', [
+            'user' => $user,
+            'page_title' => '编辑用户',
+            'page_description' => '编辑用户 ' . $user->name . ' 的设置'
+        ]);
     }
 
     /**
@@ -111,8 +95,44 @@ class ManagementController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        if (!Auth::user()->canManageUsers()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
 
+        $user = User::find($id);
+
+        if (!$user) {
+            flash('用户不存在 @ '.Carbon::now(), 'error');
+            return redirect()->route('manage.index');
+        }
+
+        // 检查是否要删除用户
+        if ($request->has('delete_user') && $request->delete_user == 1) {
+            $email = $user->email;
+            $user->email = $email . '-' . Carbon::now();
+            $user->password = '-';
+            $user->confirmation_token = '-';
+            $user->remember_token = '-';
+            $user->updated_at = Carbon::now();
+            $user->save();
+            flash('用户已删除 @ '.Carbon::now(), 'danger');
+            return redirect()->route('manage.index');
+        }
+
+        // 验证输入
+        $validated = $request->validate([
+            'is_active' => 'required|integer|in:0,1',
+            'is_admin' => 'required|integer|in:0,1,2,3',
+        ]);
+
+        // 更新用户设置
+        $user->is_active = $validated['is_active'];
+        $user->is_admin = $validated['is_admin'];
+        $user->save();
+
+        flash('用户设置已更新 @ '.Carbon::now(), 'success');
+        return redirect()->route('manage.index');
     }
 
     /**

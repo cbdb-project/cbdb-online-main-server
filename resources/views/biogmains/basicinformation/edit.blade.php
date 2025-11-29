@@ -159,8 +159,12 @@
                 <div class="form-group">
                     <label for="c_name_rm" class="col-sm-2 control-label">外文羅馬字轉寫姓名</label>
                     <div class="col-sm-10">
-                        <input type="text" name="c_name_rm" class="form-control"
-                               value="{{ $basicinformation->c_name_rm }}" disabled>
+                        <input type="text" name="c_name_rm" class="form-control" readonly
+                               value="{{ $basicinformation->c_name_rm }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由「外文羅馬字轉寫姓」和「外文羅馬字轉寫名」自動合併生成，不可直接編輯</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -267,8 +271,12 @@
                 <div class="form-group{{ $errors->has('c_index_year') ? ' has-error' : '' }}">
                     <label for="c_index_year" class="col-sm-2 control-label">指數年(index year)</label>
                     <div class="col-sm-10">
-                        <input type="number" name="c_index_year" class="form-control"
-                               value="{{ $basicinformation->c_index_year }}" disabled>
+                        <input type="number" name="c_index_year" class="form-control" readonly
+                               value="{{ $basicinformation->c_index_year }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
+                        </span>
                         @if ($errors->has('c_index_year'))
                             <span class="help-block">
                             <strong>{{ $errors->first('c_index_year') }}</strong>
@@ -280,28 +288,44 @@
                     <label for="c_index_year_type_code"
                            class="col-sm-2 control-label">指數年推算方法(c_index_year_type_code)</label>
                     <div class="col-sm-4">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_index_year_type_code }}" disabled>
+                        <input type="text" name="" class="form-control" readonly
+                               value="{{ $basicinformation->c_index_year_type_code }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
+                        </span>
                     </div>
                     <label for="c_index_year_source_id"
                            class="col-sm-2 control-label">指數年推算來源(c_index_year_source_id)</label>
                     <div class="col-sm-4">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_index_year_source_id }}" disabled>
+                        <input type="text" name="" class="form-control" readonly
+                               value="{{ $basicinformation->c_index_year_source_id }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_index_addr_id"
                            class="col-sm-2 control-label">指數地址(index_addr)</label>
                     <div class="col-sm-4">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_index_addr_id }}" disabled>
+                        <input type="text" name="" class="form-control" readonly
+                               value="{{ $basicinformation->c_index_addr_id }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
+                        </span>
                     </div>
                     <label for="c_index_addr_type_code"
                            class="col-sm-2 control-label">指數地址類型(index_addr_type)</label>
                     <div class="col-sm-4">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_index_addr_type_code }}" disabled>
+                        <input type="text" name="" class="form-control" readonly
+                               value="{{ $basicinformation->c_index_addr_type_code }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group{{ $errors->has('c_death_age') ? ' has-error' : '' }}">

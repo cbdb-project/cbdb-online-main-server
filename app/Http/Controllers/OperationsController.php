@@ -208,7 +208,7 @@ class OperationsController extends Controller
             flash('請登入後再試。', 'error');
             return redirect()->back();
         }
-        if (Auth::user()->is_active != 1 || Auth::user()->is_admin != 1) {
+        if (!Auth::user()->canRestoreOperations()) {
             flash('該用戶沒有權限，請聯絡管理員。', 'error');
             return redirect()->back();
         }

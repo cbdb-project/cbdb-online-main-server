@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.kinship.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -20,7 +20,7 @@
                     <th>親屬關係類別</th>
                     <th>親戚姓名</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -33,7 +33,7 @@
                         <td>{{ $value->c_kinrel_chn. ' '. $value->c_kinrel_alt }}</td>
                         <td><a href="{{ route('basicinformation.edit', $basicinformation->kinship_name[$key]->c_kin_id) }}" target="_blank">{{ $basicinformation->kinship_name[$key]->c_name_chn.' '.$basicinformation->kinship_name[$key]->c_name }}</a></td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.kinship.edit', ['basicinformation' => $basicinformation->c_personid, 'kinship' => $value->pivot->c_personid.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_kin_code]) }}">edit</a>

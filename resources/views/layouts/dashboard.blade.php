@@ -81,7 +81,7 @@ desired effect
             @yield('content')
 
             @php
-                $canViewQueryDetails = Auth::check() && Auth::user()->is_admin == 1;
+                $canViewQueryDetails = Auth::check() && Auth::user()->isAdmin();
             @endphp
 
             @if(!empty($queryProfileSummary['count']))

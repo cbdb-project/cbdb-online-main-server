@@ -7,7 +7,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.possession.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -21,7 +21,7 @@
                     <th>行為</th>
                     <th>財產</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -35,7 +35,7 @@
                         <td>{{ $value->c_possession_act_desc_chn }}</td>
                         <td>{{ $value->pivot->c_possession_desc_chn }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.possession.edit', ['basicinformation' => $basicinformation->c_personid, 'possession' => $value->pivot->c_possession_record_id]) }}">edit</a>

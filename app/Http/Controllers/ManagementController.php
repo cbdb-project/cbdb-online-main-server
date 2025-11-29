@@ -20,7 +20,7 @@ class ManagementController extends Controller
      */
     public function index()
     {
-        if (Auth::user()->is_admin != 1){
+        if (!Auth::user()->isAdmin()) {
             return redirect('/home');
         }
         $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
@@ -68,22 +68,22 @@ class ManagementController extends Controller
     public function edit(Request $request, $id)
     {
         $type = $request['type'];
-        if (Auth::user()->is_admin != 1){
+        if (!Auth::user()->canManageUsers()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
         if($type == 1) {
             $user = User::find($id);
-            $user->is_active = 1 - $user->is_active;
+            $user->is_active = ($user->is_active == User::STATUS_ACTIVE) ? User::STATUS_INACTIVE : User::STATUS_ACTIVE;
             $user->save();
             flash('修改成功 @ '.Carbon::now(), 'success');
             return redirect()->route('manage.index');
         }
         if($type == 2) {
             $user = User::find($id);
-            if($user->is_admin == 1) { $user->is_admin = 2; }
-            elseif($user->is_admin == 2) { $user->is_admin = 0; }
-            elseif($user->is_admin == 0) { $user->is_admin = 1; }
+            if($user->is_admin == User::ROLE_EXPERT) { $user->is_admin = User::ROLE_CROWDSOURCING; }
+            elseif($user->is_admin == User::ROLE_CROWDSOURCING) { $user->is_admin = User::ROLE_REGULAR; }
+            elseif($user->is_admin == User::ROLE_REGULAR) { $user->is_admin = User::ROLE_EXPERT; }
             $user->save();
             flash('修改成功 @ '.Carbon::now(), 'success');
             return redirect()->route('manage.index');

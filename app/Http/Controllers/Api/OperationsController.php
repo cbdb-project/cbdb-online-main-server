@@ -199,12 +199,11 @@ class OperationsController extends Controller
         $user_password = $request->p;
         //呼叫這行就可以進行帳號與密碼的認證了
         if (Auth::attempt(['email' => $user_id, 'password' => $user_password])) {
-            $data = DB::table('users')->where('email','=',$user_id)->get();
-            foreach($data as $item){
-                if($item->is_admin != 2) { return "帳號須為眾包身分，才可以取得token。"; }
-                $data = $item->confirmation_token;
+            $user = \App\User::where('email', $user_id)->first();
+            if ($user && !$user->isCrowdsourcingUser()) {
+                return "帳號須為眾包身分，才可以取得token。";
             }
-            return $data;
+            return $user ? $user->confirmation_token : "無法取得token";
         }
         else { return "您的帳號與密碼輸入錯誤"; }
     }

@@ -59,7 +59,7 @@ class BasicInformationKinshipController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+        elseif (!Auth::user()->canWriteDirectly()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -112,7 +112,7 @@ class BasicInformationKinshipController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+        elseif (!Auth::user()->canWriteDirectly()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -144,7 +144,7 @@ class BasicInformationKinshipController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+        elseif (!Auth::user()->canWriteDirectly()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }

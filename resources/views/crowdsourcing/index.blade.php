@@ -115,8 +115,8 @@
                             </td>
                             <td>{{ $item->crowdsourcing_status }}</td>
                             <td>
-                                @if($item->crowdsourcing_status == 2 and Auth::check() and Auth::user()->is_admin != 2)
-                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>　
+                                @if($item->crowdsourcing_status == 2 and Auth::check() and !Auth::user()->isCrowdsourcingUser())
+                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>
                                 <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
                                 @endif
                             </td>

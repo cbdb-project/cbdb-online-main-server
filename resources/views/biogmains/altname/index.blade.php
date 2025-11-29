@@ -8,7 +8,7 @@
 
         <div class="panel-body">
             @auth
-                @if(Auth::user()->is_active == 1)
+                @if(Auth::user()->isActive())
                     <a href="{{ route('basicinformation.altnames.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
                 @endif
             @endauth
@@ -22,7 +22,7 @@
                     <th>別名漢字</th>
                     <th>別名類型</th>
                     @auth
-                        @if(Auth::user()->is_active == 1)
+                        @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
                         @endif
                     @endauth
@@ -64,7 +64,7 @@ if($value->pivot->c_sequence === 0) {
                         <td>{{ $c_alt_name_chn_view }}</td>
                         <td>{{ $altTypeLabel }}</td>
                         @auth
-                            @if(Auth::user()->is_active == 1)
+                            @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.altnames.edit', ['basicinformation' => $basicinformation->c_personid, 'altname' => $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code]) }}">edit</a>

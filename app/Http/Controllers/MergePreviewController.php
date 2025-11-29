@@ -29,7 +29,7 @@ class MergePreviewController extends Controller
 
     public function index(Request $request)
     {
-        if (Auth::user()->is_admin != 1) {
+        if (!Auth::user()->isAdmin()) {
             flash('該用戶沒有權限，請聯絡管理員。', 'error');
             return redirect('/home');
         }

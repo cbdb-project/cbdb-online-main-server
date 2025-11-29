@@ -88,7 +88,7 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1){
+        elseif (!Auth::user()->isActive()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -106,7 +106,7 @@ class BasicInformationController extends Controller
         #$data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         $data = $this->toolRepository->timestamp($data, True);
         //20190531判別是否為眾包用戶
-        if (Auth::user()->is_admin == 2) {
+        if (Auth::user()->isCrowdsourcingUser()) {
             $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data, '', 2);
             flash('眾包紀錄 Create success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.index');
@@ -167,13 +167,13 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1){
+        elseif (!Auth::user()->isActive()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
         $this->biogMainRepository->updateById($request, $id);
         //20190531判別是否為眾包用戶
-        if (Auth::user()->is_admin == 2) {
+        if (Auth::user()->isCrowdsourcingUser()) {
             flash('眾包紀錄 Update success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.index');
         }
@@ -191,7 +191,7 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+        elseif (!Auth::user()->canWriteDirectly()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -218,7 +218,7 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+        elseif (!Auth::user()->canWriteDirectly()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -358,7 +358,7 @@ class BasicInformationController extends Controller
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (Auth::user()->is_active != 1){
+        elseif (!Auth::user()->isActive()){
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
@@ -366,7 +366,7 @@ class BasicInformationController extends Controller
         $biog = BiogMain::find($id);
         $biog->c_name_chn = '<待删除>';
         //20190605判別是否為眾包用戶
-        if (Auth::user()->is_admin == 2) {
+        if (Auth::user()->isCrowdsourcingUser()) {
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori, 2);
             flash('眾包紀錄 Delete success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.index');

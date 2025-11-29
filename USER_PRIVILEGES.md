@@ -23,8 +23,6 @@
 | `2` | 眾包用戶 | `User::ROLE_CROWDSOURCING` | 前台頁面可編輯，但 Controller 會偵測 `is_admin == 2`，把提交內容轉成 `operations`（`crowdsourcing_status = 2`），等待專家審核後套用，並不直接寫主資料表。 |
 | `3` | 系統管理員（預留） | `User::ROLE_SUPER_ADMIN` | 預留角色，擁有比專家更高階的權限，需配合程式實作後啟用。 |
 
-> **角色切換邏輯**：在 `ManagementController@edit(type=2)` 中實現循環切換：`1 → 2 → 0 → 1`。若要包含系統管理員，需調整為 `1 → 2 → 0 → 3 → 1`。
->
 > **常量使用**：`User` 模型已定義角色和狀態常量（參見 `app/User.php`），建議在新代碼中使用常量而非魔術數字。
 
 ---
@@ -88,19 +86,7 @@ if (Auth::user()->canManageUsers()) {
 
 系統已預留系統管理員角色（`User::ROLE_SUPER_ADMIN = 3`），若要啟用需完成以下步驟：
 
-### 1. 調整角色切換邏輯
-修改 `ManagementController@edit(type=2)` 的角色切換邏輯：
-
-```php
-// 當前：1 → 2 → 0 → 1
-// 修改為：1 → 2 → 0 → 3 → 1
-if($user->is_admin == 1) { $user->is_admin = 2; }
-elseif($user->is_admin == 2) { $user->is_admin = 0; }
-elseif($user->is_admin == 0) { $user->is_admin = 3; }
-elseif($user->is_admin == 3) { $user->is_admin = 1; }
-```
-
-### 2. 更新 UI 顯示
+### 1. 更新 UI 顯示
 修改 `resources/views/manage/index.blade.php` 的角色顯示：
 
 ```php
@@ -114,7 +100,7 @@ elseif($user->is_admin == 3) { $user->is_admin = 1; }
 {{ $user->getRoleName() }}
 ```
 
-### 3. 定義系統管理員專屬權限（可選）
+### 2. 定義系統管理員專屬權限
 若系統管理員需要比專家更高的權限，需在相關 Controller 中添加判斷：
 
 ```php
@@ -125,7 +111,7 @@ if (!Auth::user()->isSuperAdmin()) {
 }
 ```
 
-### 4. 測試覆蓋
+### 3. 測試覆蓋
 為新角色補充測試用例，確保權限檢查正確。
 
 **注意**：目前多數功能使用 `is_admin == 1` 檢查，若要讓系統管理員也擁有相同權限，應改用 `isAdmin()` 方法（已包含專家和系統管理員）。

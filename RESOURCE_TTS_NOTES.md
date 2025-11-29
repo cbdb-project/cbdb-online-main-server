@@ -11,7 +11,7 @@
 - 表單允許 `c_sequence` 留空，資料庫會存 `NULL`；在 TTS 上會顯示成 "NULL"。
 
 ## 排序唯一性
-- 資料庫沒有針對 `c_sequence` 設唯一鍵（僅 PK 限制），重新排序需由程式端控制，避免同一類別出現相同序號。
+- 資料庫沒有針對 `c_sequence` 設唯一鍵（僅有主鍵限制），重新排序需由程式端控制，避免同一類別出現相同序號。
 
 ## BIOG_MAIN 特例
 - `/modified` 顯示 BIOG_MAIN 現況時，直接透過 `BiogMain::find()` 取得，不依賴 `resource_id` 解析，因此不受上述別名問題影響。

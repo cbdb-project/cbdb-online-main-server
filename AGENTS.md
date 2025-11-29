@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 8.83 LTS（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3（透過 `laravel-mix` 編譯）、Bootstrap/AdminLTE。
+- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3（透過 `laravel-mix` 編譯）、Bootstrap 3/AdminLTE 2。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
@@ -11,12 +11,12 @@
 - **內部輔助表**（`CBDB__` 前綴表示內部使用，不直接對終端用戶曝光）：
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
   - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
-- **日期/時間處理**：使用 Carbon 2.x（Laravel 8.0 要求）；API 與 Carbon 1.x 基本兼容。
+- **日期/時間處理**：使用 Carbon 2.x。
 - **主要資料夾**：
   - `app/Http/Controllers`：Laravel 控制器（如 `OperationsController`）。
-  - `app/Repositories`：資料存取與封裝邏輯（例如 `OperationRepository`）。
+  - `app/Repositories`：資料存取與封裝邏輯（如 `OperationRepository`）。
   - `resources/views`：Blade 模板與各模組頁面。
-  - `resources/assets/js`：Vue 元件與前端入口（需跑 `npm run dev` 重新編譯）。
+  - `resources/assets/js`：Vue 元件與前端入口（代碼提交前需跑 `npm run prod` 重新編譯）。
   - `tests/Feature`、`tests/Unit`：PHPUnit 測試。
 - **重要設定**：
   - `config/codes.php`：`/codes/*` 白名單。
@@ -25,7 +25,6 @@
 
 ## 核心功能備忘
 - 官名設定在寫入操作紀錄時會將地址清單（POSTED_TO_ADDR_DATA）以 JSON rows 輸出，方便稽核與還原。 目前這類操作在 Operations 頁面暫停提供一鍵復原。
-
 
 - `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單目前已納入 `ADDRESSES`、`CBDB__NAME_FTS`（姓名倒排索引）、`CBDB__TRAD_SIMP_MAP`（繁簡映射表），可直接檢視原始資料。內部表（`CBDB__` 前綴）為只讀模式，僅供查詢不可編輯。
 - `/view/{key}` 檢視表頁面：`ViewTableController` 會依 `config/view_tables.php` 設定執行查詢並套用分頁／搜尋；實際 SQL 可透過頁面右上角「顯示 SQL」按鈕檢視，判斷是否符合預期。只有登入使用者能瀏覽該模組。
@@ -45,16 +44,17 @@
 |------|------|
 | 安裝 PHP 依賴 | `composer install` |
 | 安裝前端依賴 | `npm install` |
-| 編譯前端資源 | `npm run dev`（或 `npm run prod`）|
+| 編譯前端資源 | `npm run prod`（或 `npm run dev` 用於調試）|
 | 執行完整測試 | `./vendor/bin/phpunit` |
 | 執行單一測試 | `./vendor/bin/phpunit --filter TestName` |
 | 匯入繁簡映射 | `php artisan cbdb:import-trad-simp-map --truncate` |
 
-> 若修改 Vue/JS，記得在本機跑 `npm run dev` 產出 `public/js/app.js`；專案不會自動編譯。
+> 若修改 Vue/JS，記得在本機跑 `npm run prod` 產出 `public/js/app.js`；專案不會自動編譯。
 
 ### 內部表維護
 - **繁簡映射表**：使用 `php artisan cbdb:import-trad-simp-map --truncate` 從 OpenCC 匯入最新繁簡對照。支援 `--batch=N` 參數調整批次大小（預設 1000）。
 - **檢視內部表**：可透過 `/codes/CBDB__NAME_FTS` 和 `/codes/CBDB__TRAD_SIMP_MAP` 檢視表內容（只讀）。
+- **项目未用表格**：`ADDRESSES` 表僅供 CBDB Public API 使用。`CBDB_NAME_SEARCH` 表格僅供舊版 CBDB API 姓名搜索功能使用，其功能現已被 `CBDB__NAME_FTS` 替代。
 
 ### 檢視表 ViewTable 模組補充
 - 新增或調整檢視請更新 `config/view_tables.php`（欄位標題、描述、每頁筆數、對應 builder）。
@@ -120,7 +120,7 @@
    - 有任何 UI／流程重大調整時，請同步更新 `README.md` 與 `CHANGELOG.md`。
    - 若整理出新的知識或踩坑，務必補充至 `AGENTS.md`，讓後續代理能快速掌握背景。
    - 重要設定或部署注意事項建議集中在專用文件（如 `MERGE.md`、`API.md`）維護。
-6. **提交規範補充**：所有 Git commit message 必須使用繁體中文敘述。
+6. **提交規範補充**：所有 Git commit message、必須使用繁體中文敘述。使用者介面使用繁體中文。
 
 ## 常見坑位
 - `resource_id` 可能是複合主鍵並經過特殊編碼（`(slash)`、`minus` 等），還原/比對前需解析。

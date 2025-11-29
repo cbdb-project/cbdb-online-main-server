@@ -150,46 +150,66 @@ class ManagePagesLoadTest extends TestCase
     }
 
     /**
-     * 测试编辑页面（改变审核状态）：/manage/{id}/edit?type=1
+     * 测试编辑页面加载：/manage/{id}/edit
      */
-    public function test_manage_edit_change_active_status()
+    public function test_manage_edit_page_loads()
     {
-        $originalStatus = $this->regularUser->is_active;
-
         $response = $this->actingAs($this->adminUser)
-            ->get("/manage/{$this->regularUser->id}/edit?type=1");
+            ->get("/manage/{$this->regularUser->id}/edit");
+
+        $response->assertStatus(200);
+        $response->assertSee('编辑用户设置');
+        $response->assertSee($this->regularUser->name);
+        $response->assertSee($this->regularUser->email);
+    }
+
+    /**
+     * 测试更新用户激活状态：PUT /manage/{id}
+     */
+    public function test_manage_update_active_status()
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->put("/manage/{$this->regularUser->id}", [
+                'is_active' => 0,
+                'is_admin' => $this->regularUser->is_admin,
+            ]);
 
         $response->assertRedirect(route('manage.index'));
 
         // 验证状态已改变
         $this->regularUser->refresh();
-        $this->assertEquals(1 - $originalStatus, $this->regularUser->is_active);
+        $this->assertEquals(0, $this->regularUser->is_active);
     }
 
     /**
-     * 测试编辑页面（改变用户状态）：/manage/{id}/edit?type=2
+     * 测试更新用户角色：PUT /manage/{id}
      */
-    public function test_manage_edit_change_user_type()
+    public function test_manage_update_user_role()
     {
-        $originalType = $this->regularUser->is_admin;
-
         $response = $this->actingAs($this->adminUser)
-            ->get("/manage/{$this->regularUser->id}/edit?type=2");
+            ->put("/manage/{$this->regularUser->id}", [
+                'is_active' => $this->regularUser->is_active,
+                'is_admin' => 1, // 改为专家
+            ]);
 
         $response->assertRedirect(route('manage.index'));
 
-        // 验证用户类型已改变（0 -> 1）
+        // 验证用户类型已改变
         $this->regularUser->refresh();
-        $this->assertNotEquals($originalType, $this->regularUser->is_admin);
+        $this->assertEquals(1, $this->regularUser->is_admin);
     }
 
     /**
-     * 测试编辑页面（删除用户）：/manage/{id}/edit?type=3
+     * 测试删除用户：PUT /manage/{id} with delete_user
      */
-    public function test_manage_edit_delete_user()
+    public function test_manage_delete_user()
     {
         $response = $this->actingAs($this->adminUser)
-            ->get("/manage/{$this->regularUser->id}/edit?type=3");
+            ->put("/manage/{$this->regularUser->id}", [
+                'is_active' => $this->regularUser->is_active,
+                'is_admin' => $this->regularUser->is_admin,
+                'delete_user' => 1,
+            ]);
 
         $response->assertRedirect(route('manage.index'));
 
@@ -201,25 +221,76 @@ class ManagePagesLoadTest extends TestCase
     }
 
     /**
-     * 测试非管理员无法执行编辑操作
+     * 测试非管理员无法访问编辑页面
      */
     public function test_manage_edit_requires_admin()
     {
         $response = $this->actingAs($this->regularUser)
-            ->get("/manage/{$this->adminUser->id}/edit?type=1");
+            ->get("/manage/{$this->adminUser->id}/edit");
 
         $response->assertRedirect();
     }
 
     /**
-     * 测试路由参数正确性（验证修复后的路由参数）
+     * 测试非管理员无法执行更新操作
+     */
+    public function test_manage_update_requires_admin()
+    {
+        $response = $this->actingAs($this->regularUser)
+            ->put("/manage/{$this->adminUser->id}", [
+                'is_active' => 0,
+                'is_admin' => 0,
+            ]);
+
+        $response->assertRedirect();
+    }
+
+    /**
+     * 测试路由参数正确性
      */
     public function test_manage_edit_route_with_correct_parameters()
     {
         // 测试路由能正确生成 URL
-        $url = route('manage.edit', ['manage' => $this->regularUser->id, 'type' => '1']);
+        $url = route('manage.edit', $this->regularUser->id);
         $this->assertStringContainsString("/manage/{$this->regularUser->id}/edit", $url);
-        $this->assertStringContainsString("type=1", $url);
+    }
+
+    /**
+     * 测试更新不存在的用户
+     */
+    public function test_manage_update_nonexistent_user()
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->put("/manage/99999", [
+                'is_active' => 1,
+                'is_admin' => 0,
+            ]);
+
+        $response->assertRedirect(route('manage.index'));
+    }
+
+    /**
+     * 测试验证规则
+     */
+    public function test_manage_update_validation()
+    {
+        // 测试无效的 is_active 值
+        $response = $this->actingAs($this->adminUser)
+            ->put("/manage/{$this->regularUser->id}", [
+                'is_active' => 'invalid',
+                'is_admin' => 0,
+            ]);
+
+        $response->assertSessionHasErrors('is_active');
+
+        // 测试无效的 is_admin 值
+        $response = $this->actingAs($this->adminUser)
+            ->put("/manage/{$this->regularUser->id}", [
+                'is_active' => 1,
+                'is_admin' => 99,
+            ]);
+
+        $response->assertSessionHasErrors('is_admin');
     }
 
     protected function tearDown(): void

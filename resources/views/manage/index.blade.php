@@ -13,10 +13,8 @@
                     <th>Email</th>
                     <th>Institution</th>
                     <th>是否通过审核</th>
+                    <th>用户角色</th>
                     <th style="width: 120px">操作</th>
-                    <th>一般/專家/眾包用戶</th>
-                    <th style="width: 120px">操作</th>
-                    <th>刪除</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -26,33 +24,21 @@
                         <td>{{ $user->name }}</td>
                         <td>{{ $user->email }}</td>
                         <td>{{ $user->institution }}</td>
-                        <td>{{ $user->isActive() ? 'Yes' : 'No' }}</td>
                         <td>
-                            <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '1']) }}">改变审核状态</a>
-                            </div>
+                            @if($user->isActive())
+                                <span class="label label-success">已激活</span>
+                            @else
+                                <span class="label label-warning">未激活</span>
+                            @endif
                         </td>
                         <td>
-                            {{ $user->getRoleName() }}
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-default" href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '2']) }}">改变用戶状态</a>
-                            </div>
+                            <span class="label label-primary">{{ $user->getRoleName() }}</span>
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a type="button"
-                                    onclick="
-                                    let msg = '您真的确定要删除吗？\n\n请确认！';
-                                    if (confirm(msg)===true){
-                                        return true;
-                                    }else{
-                                        return false;
-                                    }"
-                                    class="btn btn-xs btn-danger"
-                                    href="{{ route('manage.edit', ['manage' => $user->id , 'type' => '3']) }}">
-                                del</a>
+                                <a type="button" class="btn btn-sm btn-primary" href="{{ route('manage.edit', $user->id) }}">
+                                    <i class="fa fa-edit"></i> 编辑
+                                </a>
                             </div>
                         </td>
                     </tr>

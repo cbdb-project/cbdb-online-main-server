@@ -126,15 +126,23 @@
                 <div class="form-group">
                     <label for="c_name_chn" class="col-sm-2 control-label">姓名(中)</label>
                     <div class="col-sm-10">
-                        <input type="text" name="c_name_chn" class="form-control"
-                               value="{{ $basicinformation->c_name_chn }}">
+                        <input type="text" name="c_name_chn" class="form-control" readonly
+                               value="{{ $basicinformation->c_name_chn }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由「姓」和「名」自動合併生成，不可直接編輯</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="c_name" class="col-sm-2 control-label">姓名(拼音)</label>
                     <div class="col-sm-10">
-                        <input type="text" name="c_name" class="form-control"
-                               value="{{ $basicinformation->c_name }}">
+                        <input type="text" name="c_name" class="form-control" readonly
+                               value="{{ $basicinformation->c_name }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由「Xing」和「Ming」自動合併生成，不可直接編輯</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group">

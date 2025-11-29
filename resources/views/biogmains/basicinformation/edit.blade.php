@@ -148,8 +148,12 @@
                 <div class="form-group">
                     <label for="c_name_proper" class="col-sm-2 control-label">外文全名</label>
                     <div class="col-sm-10">
-                        <input type="text" name="c_name_proper" class="form-control"
-                               value="{{ $basicinformation->c_name_proper }}">
+                        <input type="text" name="c_name_proper" class="form-control" readonly
+                               value="{{ $basicinformation->c_name_proper }}"
+                               style="background-color: #f5f5f5; cursor: not-allowed;">
+                        <span class="help-block">
+                            <small class="text-muted">此欄位由「外文名」和「外文姓」自動合併生成（名+姓順序），不可直接編輯</small>
+                        </span>
                     </div>
                 </div>
                 <div class="form-group">

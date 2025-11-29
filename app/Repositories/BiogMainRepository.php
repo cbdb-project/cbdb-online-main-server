@@ -211,12 +211,12 @@ class BiogMainRepository
         #20230626修改外文全名呈現順序
         #$c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
         #$c_name_rm = $request->c_surname_rm.' '.$request->c_mingzi_rm;
-        $c_name_proper = $request->c_mingzi_proper.' '.$request->c_surname_proper;
-        $c_name_rm = $request->c_mingzi_rm.' '.$request->c_surname_rm;
+        $c_name_proper = trim($request->c_mingzi_proper.' '.$request->c_surname_proper);
+        $c_name_rm = trim($request->c_mingzi_rm.' '.$request->c_surname_rm);
         $data['c_name_chn'] = $c_name_chn;
         $data['c_name'] = $c_name;
-        $data['c_name_proper'] = $data['c_name_proper'] ?? $c_name_proper; //如果欄位是空白,系統自動添加,如果有填入資料,以填入資料為優先.
-        $data['c_name_rm'] = $data['c_name_rm'] ?? $c_name_rm; //如果欄位是空白,系統自動添加,這一欄在前端頁面不開放編輯,自動生成先名後姓.
+        $data['c_name_proper'] = $c_name_proper; // 自動由外文姓名組合生成
+        $data['c_name_rm'] = $c_name_rm; // 自動由外文羅馬字轉寫姓名組合生成
         $data['c_female'] = (int)($data['c_female']);
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);

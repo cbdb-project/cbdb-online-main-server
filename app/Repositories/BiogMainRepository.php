@@ -205,6 +205,7 @@ class BiogMainRepository
     public function updateById($request, $id)
     {
         $data = $request->all();
+        
         $c_name_chn = $request->c_surname_chn.$request->c_mingzi_chn;
         $c_name = $request->c_surname.' '.$request->c_mingzi;
         #20230626修改外文全名呈現順序
@@ -223,8 +224,11 @@ class BiogMainRepository
         $biogbasicinformation = BiogMain::find($id);
         $ori = $biogbasicinformation->toArray();
         
+        // 移除 Laravel 框架欄位，避免誤判為有變更
+        $dataForComparison = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode']));
+        
         // 檢查是否有實質變更
-        $hasChanges = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
+        $hasChanges = $this->hasMeaningfulChanges($dataForComparison, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
         
         if (!$hasChanges) {
             return [

@@ -963,7 +963,7 @@ class FakeQueryBuilder
     public function insert(array $data)
     {
         if ($this->manager->shouldFail('insert')) {
-            throw new QueryException('insert into '.$this->table, [], new \Exception($this->manager->failureMessage('insert')));
+            throw new QueryException('testing', 'insert into '.$this->table, [], new \Exception($this->manager->failureMessage('insert')));
         }
 
         if (isset($data[0]) && is_array($data[0])) {
@@ -979,7 +979,7 @@ class FakeQueryBuilder
     public function update(array $data)
     {
         if ($this->manager->shouldFail('update')) {
-            throw new QueryException('update '.$this->table, [], new \Exception($this->manager->failureMessage('update')));
+            throw new QueryException('testing', 'update '.$this->table, [], new \Exception($this->manager->failureMessage('update')));
         }
 
         foreach ($this->rows as &$row) {
@@ -996,7 +996,7 @@ class FakeQueryBuilder
     public function delete()
     {
         if ($this->manager->shouldFail('delete')) {
-            throw new QueryException('delete from '.$this->table, [], new \Exception($this->manager->failureMessage('delete')));
+            throw new QueryException('testing', 'delete from '.$this->table, [], new \Exception($this->manager->failureMessage('delete')));
         }
 
         $this->rows = array_values(array_filter($this->rows, function ($row) {

@@ -26,6 +26,7 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        Passport::routes();
+        // Passport routes are now automatically registered in Passport 11.x
+        // If you need to customize routes, publish the config and enable them there
     }
 }

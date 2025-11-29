@@ -130,7 +130,7 @@
                                value="{{ $basicinformation->c_name_chn }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
                         <span class="help-block">
-                            <small class="text-muted">此欄位由「姓」和「名」自動合併生成，不可直接編輯</small>
+                            <small class="text-muted">此欄位由「姓」和「名」自動合併生成，無需手動填寫</small>
                         </span>
                     </div>
                 </div>
@@ -141,7 +141,7 @@
                                value="{{ $basicinformation->c_name }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
                         <span class="help-block">
-                            <small class="text-muted">此欄位由「Xing」和「Ming」自動合併生成，不可直接編輯</small>
+                            <small class="text-muted">此欄位由「Xing」和「Ming」自動合併生成，無需手動填寫</small>
                         </span>
                     </div>
                 </div>
@@ -152,7 +152,7 @@
                                value="{{ $basicinformation->c_name_proper }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
                         <span class="help-block">
-                            <small class="text-muted">此欄位由「外文名」和「外文姓」自動合併生成（名+姓順序），不可直接編輯</small>
+                            <small class="text-muted">此欄位由「外文名」和「外文姓」自動合併生成（名+姓順序），無需手動填寫</small>
                         </span>
                     </div>
                 </div>
@@ -163,7 +163,7 @@
                                value="{{ $basicinformation->c_name_rm }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
                         <span class="help-block">
-                            <small class="text-muted">此欄位由「外文羅馬字轉寫姓」和「外文羅馬字轉寫名」自動合併生成，不可直接編輯</small>
+                            <small class="text-muted">此欄位由「外文羅馬字轉寫姓」和「外文羅馬字轉寫名」自動合併生成，無需手動填寫</small>
                         </span>
                     </div>
                 </div>

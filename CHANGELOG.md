@@ -84,6 +84,18 @@
 - Basicinformation → 任官（office）操作全面交易化：`BiogMainRepository::officeStoreById`／`officeUpdateById`／`officeDeleteById` 會鎖定職官、同步維護地址清單並一併寫入 Operations；`officeUpdateById` 僅在主表欄位有異動時才更新 timestamp，純地址調整會重建 `POSTED_TO_ADDR_DATA` 並留下前後 JSON。
 - Basicinformation 編輯頁面新增後端變更檢測：`BiogMainRepository::updateById()` 使用 `DetectsModelChanges` trait 的 `hasMeaningfulChanges()` 方法檢查資料是否有實質變更，若無變更則返回 `['no_changes' => true]` 並顯示「無實質更新，資料未變更」訊息；前端已有按鈕狀態管理（commit 18bc6d8f），後端檢測可防止繞過前端驗證的提交。新增 `BiogMainRepositoryUpdateTest` 單元測試驗證變更檢測邏輯，包括數值型字串與整數的等價比較、忽略指定欄位等情境。
 
+## [2025-11-29] - 修復基本資料編輯的變更檢測問題
+
+### Fixed
+- 修復基本資料編輯頁面在無修改時仍會寫入資料庫和操作記錄的問題
+- 原因：Laravel 表單框架欄位（`_method`、`_token`、`_wysihtml5_mode`）被錯誤地包含在變更檢測中
+- 解決方案：在 `BiogMainRepository::updateById()` 中，於變更檢測前過濾掉框架欄位，只比對實際業務資料
+- 影響範圍：`BiogMainRepository::updateById()` 方法
+- 新增 `BasicInformationUpdateTest` 測試驗證修復效果，包含三個測試場景：
+  - 測試無修改時不寫入資料庫
+  - 測試有修改時正常寫入
+  - 測試 Laravel 框架欄位被正確過濾
+
 
 - Basicinformation 子頁面（addresses、altnames、assoc、entries、events、kinship、offices、possession、socialinst、sources、statuses、texts）之列表新增 `.table-responsive`，改善窄螢幕上的橫向捲動體驗。
 - Operations / Modified 頁面套用 `.table-responsive`，按鈕文字調整為「內容快照」與「比較」，相關 Bootstrap Modal 皆設 `tabindex="-1"` 以支援 `ESC` 關閉；Crowdsourcing 頁面則加入 `.table-responsive` 與 `tabindex="-1"`。

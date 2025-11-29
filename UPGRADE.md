@@ -17,8 +17,6 @@
 ## 升級狀態
 ✅ **已完成** - 2025-11-29
 
-**分支**: `claude/upgrade-laravel-10-012PmiyG3npZM6Kq9rQMmuNc`
-
 ## 升級路徑
 此次升級採用漸進式策略，分兩個階段完成：
 1. Laravel 8.83 → 9.52.21
@@ -228,8 +226,6 @@ extension=pdo_sqlite
 ## 升級狀態
 ✅ **已完成** - 2025-11-24
 
-**分支**: 待合併
-
 ## 環境需求
 - **PHP**：8.1+ （最低 8.1.0，**強烈建議 8.4**）
 - **MySQL**：5.7.7+ / MariaDB 10.2.2+
@@ -392,8 +388,6 @@ php artisan view:cache
 
 ## 升級狀態
 ✅ **已完成** - 2025-11-25
-
-**分支**: `claude/setup-phpunit-local-01L2X8EgW1Za6KGRfqaVfQoV`
 
 ## 環境需求
 - **PHP**：7.3.0 - 8.0（Laravel 8.0 最低要求 PHP 7.3.0）
@@ -618,8 +612,6 @@ protected function newLine($count = 1)
 
 ## 升級狀態
 ✅ **已完成** - 2025-11-23
-
-**分支**: `claude/upgrade-laravel-to-7-01QTwazAAWbSsGzVXDTXEKqK`
 
 ## 環境需求
 - **PHP**：7.2.5 - 7.4（Laravel 7.0 最低要求 PHP 7.2.5）
@@ -939,8 +931,6 @@ $users = User::select([
 ## 升級狀態
 ✅ **已完成** - 2025-11-22
 
-**分支**: `claude/upgrade-laravel-to-6-01QTwazAAWbSsGzVXDTXEKqK`
-
 ## 環境需求
 - **PHP**：7.2.0 - 7.4（Laravel 6.0 最低要求 PHP 7.2）
 - **MySQL**：5.7.7+ / MariaDB 10.2.2+
@@ -1217,8 +1207,6 @@ Eloquent 查詢建構器的子查詢功能大幅增強
 
 ## 升級狀態
 ✅ **已完成** - 2025-11-18
-
-**分支**: `claude/upgrade-laravel-5.8-012jN85zt1B7LaDDXwnbg118`
 
 ## 環境需求
 - **PHP**：7.1.3 - 7.4（當前使用 7.4）
@@ -1504,8 +1492,6 @@ Notification::route('slack', config('slack.webhook'))
 
 ## 升級狀態
 ✅ **已完成** - 2025-11-17
-
-**分支**: `claude/upgrade-laravel-5.7-01SEPRinmUi4LSWVvMhh1YfT`
 
 ## 環境需求
 - **PHP**：7.1.3 - 7.4（當前使用 7.4）

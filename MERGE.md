@@ -1,4 +1,4 @@
-# MERGE 工具說明
+# 人物合併預覽工具說明
 
 本專案提供 `/merge-preview` 介面，協助管理員在刪除或合併人物記錄前進行全面檢視與驗證。本頁面由 `MergePreviewController` 與 `resources/views/manage/merge-preview.blade.php` 驅動，僅對 `is_admin == 1` 的使用者開放。
 

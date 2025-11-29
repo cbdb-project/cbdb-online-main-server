@@ -267,23 +267,53 @@ class BiogMainRepository
         }
         if (!$request->q){
             //20211112註記，運用每次僅呈現20筆的特性，先快速提供人名資料，再查詢相關的朝代與字、號。
-            $names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name', 'c_index_year', 'c_dy', 'c_index_addr_id'])->paginate($num);
-            $json = json_encode($names);
-            $arr = json_decode($json, true);
-            foreach($arr['data'] as $key => $v) {
-                $c_dy = $addr = $zi = $hao = '';
-                $c_dy = Dynasty::select('c_dynasty_chn')->where('c_dy', '=', $v['c_dy'])->first();
-                $addr = AddrCode::select('c_name_chn')->where('c_addr_id', '=', $v['c_index_addr_id'])->first(); 
-                $zi = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 4)->where('c_personid', '=', $v['c_personid'])->first();
-                $hao = DB::table('ALTNAME_DATA')->select('c_alt_name_chn')->where('c_alt_name_type_code', '=', 5)->where('c_personid', '=', $v['c_personid'])->first();
-               
-                $arr['data'][$key]['c_dynasty_chn'] = empty($c_dy['c_dynasty_chn']) ? '' : $c_dy['c_dynasty_chn'];
-                $arr['data'][$key]['ADDR_c_name_chn'] = empty($addr['c_name_chn']) ? '' : $addr['c_name_chn'];
-                $arr['data'][$key]['c_alt_name_chn_zi'] = empty($zi->c_alt_name_chn) ? '' : $zi->c_alt_name_chn;
-                $arr['data'][$key]['c_alt_name_chn_hao'] = empty($hao->c_alt_name_chn) ? '' : $hao->c_alt_name_chn;
+            //20251127修改：改為與其他查詢一致的 LeftJoin 方式，統一返回 Paginator 對象以支持 Blade 模板渲染
+            //20251127性能優化：先分頁獲取 personid 列表（COUNT 快速），再 JOIN 查詢詳細信息
+
+            // 第一步：獲取分頁的 personid 列表（COUNT 只統計 BIOG_MAIN，非常快）
+            $personIdsPaginator = BiogMain::select('c_personid')
+                ->paginate($num);
+
+            // 如果沒有結果，直接返回空的 Paginator
+            if ($personIdsPaginator->isEmpty()) {
+                return $personIdsPaginator;
             }
-            $names_json = json_encode($arr);
-            return $names_json;
+
+            // 第二步：用這些 personid 去 JOIN 查詢完整資訊
+            $personIds = $personIdsPaginator->pluck('c_personid')->toArray();
+
+            $detailedItems = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
+                ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+                ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
+                ->leftJoin('ALTNAME_DATA as A1', function($join) {
+                    $join->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
+                         ->where('A1.c_alt_name_type_code', '=', 4);
+                })
+                ->leftJoin('ALTNAME_DATA as A2', function($join) {
+                    $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
+                         ->where('A2.c_alt_name_type_code', '=', 5);
+                })
+                ->whereIn('BIOG_MAIN.c_personid', $personIds)
+                ->groupBy('BIOG_MAIN.c_personid')
+                ->get()
+                ->keyBy('c_personid');
+
+            // 第三步：將詳細資訊按原順序填充到 Paginator 的 items 中
+            $orderedItems = collect($personIds)->map(function($personId) use ($detailedItems) {
+                return $detailedItems->get($personId);
+            })->filter()->values();
+
+            // 創建新的 Paginator 對象，保持原有的分頁信息
+            $names = new \Illuminate\Pagination\LengthAwarePaginator(
+                $orderedItems,
+                $personIdsPaginator->total(),
+                $personIdsPaginator->perPage(),
+                $personIdsPaginator->currentPage(),
+                ['path' => $personIdsPaginator->path()]
+            );
+
+            $names->appends(['q' => $request->q])->links();
+            return $names;
         }
 
         // 20251109優化：當輸入為純數字時，直接按 c_personid 精確查詢，避免複雜的多條件搜尋

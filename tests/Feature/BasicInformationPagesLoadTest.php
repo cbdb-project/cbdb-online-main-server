@@ -76,8 +76,11 @@ class BasicInformationPagesLoadTest extends TestCase
         Schema::create('BIOG_MAIN', function (Blueprint $table) {
             $table->integer('c_personid')->primary();
             $table->string('c_name_chn', 50)->nullable();
+            $table->string('c_name', 50)->nullable();  // 拼音姓名
             $table->string('c_name_eng', 50)->nullable();
+            $table->integer('c_dy')->nullable();  // 朝代
             $table->integer('c_index_year')->nullable();
+            $table->integer('c_index_addr_id')->nullable();  // 指数地址ID
             $table->string('c_created_by', 50)->nullable();
             $table->string('c_created_date', 50)->nullable();
             $table->string('c_modified_by', 50)->nullable();
@@ -350,6 +353,13 @@ class BasicInformationPagesLoadTest extends TestCase
             $table->string('c_inst_name', 255)->nullable();
             $table->timestamps();
         });
+
+        // 创建 CBDB__NAME_FTS 表（倒排索引表，用于高效姓名搜索）
+        Schema::create('CBDB__NAME_FTS', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->string('search_term', 200);
+            $table->index('search_term');
+        });
     }
 
     /**
@@ -437,16 +447,22 @@ class BasicInformationPagesLoadTest extends TestCase
         \DB::table('BIOG_MAIN')->insert([
             'c_personid' => $this->testPersonId,
             'c_name_chn' => '测试人物',
+            'c_name' => 'Ceshi Renwu',
             'c_name_eng' => 'Test Person',
+            'c_dy' => 1,
             'c_index_year' => 1000,
+            'c_index_addr_id' => 1,
         ]);
 
         // 添加亲属人物记录（用于 kinship 关系）
         \DB::table('BIOG_MAIN')->insert([
             'c_personid' => 77777,
             'c_name_chn' => '亲属人物',
+            'c_name' => 'Qinshu Renwu',
             'c_name_eng' => 'Relative Person',
+            'c_dy' => 1,
             'c_index_year' => 1000,
+            'c_index_addr_id' => 1,
         ]);
 
         // 1. 地址数据 (addresses)

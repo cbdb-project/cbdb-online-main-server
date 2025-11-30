@@ -271,7 +271,9 @@ class BiogMainRepository
             //20251127性能優化：先分頁獲取 personid 列表（COUNT 快速），再 JOIN 查詢詳細信息
 
             // 第一步：獲取分頁的 personid 列表（COUNT 只統計 BIOG_MAIN，非常快）
+            // 按 c_personid 排序（主鍵排序速度快）
             $personIdsPaginator = BiogMain::select('c_personid')
+                ->orderBy('c_personid')
                 ->paginate($num);
 
             // 如果沒有結果，直接返回空的 Paginator
@@ -299,6 +301,7 @@ class BiogMainRepository
                 ->keyBy('c_personid');
 
             // 第三步：將詳細資訊按原順序填充到 Paginator 的 items 中
+            // 由於第一步已按 c_personid 排序，這裡保持相同順序
             $orderedItems = collect($personIds)->map(function($personId) use ($detailedItems) {
                 return $detailedItems->get($personId);
             })->filter()->values();

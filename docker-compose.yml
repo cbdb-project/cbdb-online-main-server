@@ -1,37 +1,51 @@
 version: "3.9"
 
 services:
-  php:
+  # FrankenPHP 服务（替代原来的 php + web 两个容器）
+  app:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    container_name: cbdb-php
+    container_name: cbdb-frankenphp
     volumes:
-      - .:/var/www/html                                    # 映射代码，git pull 即可生效
-      - vendor:/var/www/html/vendor                        # 獨立的 vendor 目錄（容器專用）
-      - node_modules:/var/www/html/node_modules            # 獨立的 node_modules 目錄（容器專用）
-      - ./database:/var/www/html/database                  # SQLite 数据库目录
-      - ./docker/php.ini:/usr/local/etc/php/conf.d/custom.ini  # PHP 配置
+      # 映射代码，git pull 即可生效
+      - .:/app
+      # 独立的 vendor 目录（容器专用，避免本地和容器冲突）
+      - vendor:/app/vendor
+      # 独立的 node_modules 目录（容器专用）
+      - node_modules:/app/node_modules
+      # SQLite 数据库目录
+      - ./database:/app/database
     environment:
+      # Laravel 环境变量
       APP_ENV: local
       APP_DEBUG: "true"
+      # SQLite 配置
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/database/database.sqlite3
-    networks:
-      - laravel-net
-
-  web:
-    image: nginx:alpine
-    container_name: cbdb-nginx
-    volumes:
-      - .:/var/www/html                           # 映射代码
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf # Nginx 配置
+      DB_DATABASE: /app/database/database.sqlite3
+      # FrankenPHP 配置
+      SERVER_NAME: :80
+      FRANKENPHP_CONFIG: |
+        {
+          frankenphp {
+            num_threads 4
+          }
+        }
     ports:
-      - "8000:80"                                 # 本地 8000 端口映射到容器 80
+      # 本地 8000 端口映射到容器 80
+      - "8000:80"
+      # HTTPS 端口（可选）
+      # - "8443:443"
+      # - "8443:443/udp"
     networks:
       - laravel-net
-    depends_on:
-      - php
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   laravel-net:

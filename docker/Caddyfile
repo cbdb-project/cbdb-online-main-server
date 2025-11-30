@@ -1,0 +1,52 @@
+# Caddyfile for FrankenPHP + Laravel
+# 替代 nginx.conf
+
+{
+    # 全局选项
+    auto_https off
+    admin off
+
+    # FrankenPHP 选项
+    frankenphp {
+        # 工作线程数（根据 CPU 核心数调整）
+        num_threads 4
+    }
+}
+
+# 主服务器配置
+:80 {
+    # 设置根目录为 Laravel public 目录
+    root * /app/public
+
+    # 启用 gzip 压缩
+    encode gzip
+
+    # PHP 处理配置
+    php_server {
+        # 解析 .php 文件
+        resolve_root_symlink
+    }
+
+    # 文件服务器配置
+    file_server {
+        # 隐藏 .ht* 文件
+        hide .htaccess .htpasswd
+    }
+
+    # 日志配置
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}
+
+# HTTPS 配置（可选，用于生产环境）
+# 开发环境可以注释掉
+# :443 {
+#     tls internal
+#     root * /app/public
+#     encode gzip
+#     php_server
+#     file_server
+# }

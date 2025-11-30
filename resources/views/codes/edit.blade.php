@@ -41,10 +41,35 @@
                         @endphp
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
+                            @if($table === 'TEXT_INSTANCE_DATA' && $key === 'c_textid')
+                            <div class="col-sm-8">
+                                <input type="text" name="{{ $key }}" class="form-control"
+                                       value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
+                            </div>
+                            <div class="col-sm-2">
+                                <button type="button" id="button_ajax_load_instance" class="btn btn-info">Load Data</button>
+                            </div>
+                            <div class="col-sm-offset-2 col-sm-10">
+                                <p class="help-block text-muted">請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入</p>
+                            </div>
+                            @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_addr_id')
+                            <div class="col-sm-10">
+                                <input type="text" name="{{ $key }}" class="form-control"
+                                       value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
+                                <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                            </div>
+                            @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_belongs_to')
+                            <div class="col-sm-10">
+                                <input type="text" name="{{ $key }}" class="form-control"
+                                       value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
+                                <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                            </div>
+                            @else
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
                             </div>
+                            @endif
                         </div>
                     @endforeach
                     @if(Auth::check() && Auth::user()->isActive())
@@ -98,6 +123,61 @@
         let new_window = window.open('_blank');
         new_window.location = url ;
     });
+</script>
+@endif
+@if($table === 'TEXT_INSTANCE_DATA')
+<script type="text/javascript">
+$(document).ready(function (){
+
+    var DoAjax = function(requestUrl, sentData, sHandler, eHandler, pageNotFoundHandler){
+        $.ajax({
+            type: 'GET',
+            url: requestUrl,
+            cache: false,
+            data: sentData,
+            success: sHandler,
+            error: eHandler,
+            statusCode: {
+              404: pageNotFoundHandler
+            }
+        });
+    };
+
+    /* Load Data from TEXT_CODES */
+    $("#button_ajax_load_instance").click(function(){
+
+        var c_textid = $("input[name='c_textid']").val();
+        var url = "/api/select/search/text?q=" + c_textid + "";
+        /* disable trigger button, preventing multiple requests */
+        $(this).attr("disabled", true);
+
+        /* wait for ajax */
+        setTimeout(function(){
+
+            DoAjax(url, {todo : "exSucceed"},
+                function(data, textStatus, jqXHR){
+                    if(data.data == '') {
+                        alert('Load Data 沒有查詢到資料');
+                    }
+                    else if(data.data != '') {
+                        /* 在這裡添加錄入表單更新的欄位與資料 */
+                        $("input[name='c_instance_title_chn']").val(data.data[0].c_title_chn);
+                        $("input[name='c_instance_title_chn']").css("background","#FFFFBB");
+                        $("input[name='c_instance_title']").val(data.data[0].c_title);
+                        $("input[name='c_instance_title']").css("background","#FFFFBB");
+                        alert('Load Data 更新[c_instance_title_chn]與[c_instance_title]成功');
+                    }
+                    else {
+                        alert('Load Data 查詢失敗');
+                    }
+                });
+
+            /* enable trigger button */
+            $("#button_ajax_load_instance").attr("disabled", false);
+        }, 10);
+    });
+
+});
 </script>
 @endif
 @endsection

@@ -1,13 +1,16 @@
-FROM php:8.4-fpm
+# FrankenPHP Dockerfile for CBDB Online
+# 使用 FrankenPHP 替代传统的 PHP-FPM + Nginx 架构
 
-# 安装编译工具和依赖
+FROM dunglas/frankenphp:1-php8.4.15
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装编译工具和依赖（用于编译 SQLite）
 RUN apt-get update && apt-get install -y \
-    zip unzip git \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
+    git \
+    zip \
+    unzip \
     wget \
     build-essential \
     && apt-get clean \
@@ -29,29 +32,43 @@ RUN cd /tmp \
     && rm -rf sqlite-autoconf-${SQLITE_VERSION}*
 
 # 安装 PHP 扩展
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_sqlite pdo_mysql mbstring exif pcntl bcmath gd
+# FrankenPHP 使用 install-php-extensions 工具
+RUN install-php-extensions \
+    pdo_sqlite \
+    pdo_mysql \
+    gd \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    opcache
 
-# 安装 Composer
+# 复制 Composer（FrankenPHP 镜像已包含 Composer，但我们确保使用最新版本）
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
+# 复制应用代码
+COPY . /app
 
-# 复制启动脚本
+# 确保必要的目录存在并设置权限
+RUN mkdir -p storage/framework/{sessions,views,cache} \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    && mkdir -p database \
+    && chown -R www-data:www-data storage bootstrap/cache database \
+    && chmod -R 775 storage bootstrap/cache database
+
+# 复制 FrankenPHP 配置文件（Caddyfile）
+COPY docker/Caddyfile /etc/caddy/Caddyfile
+
+# 复制并设置启动脚本
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# 复制代码（開發環境會被卷映射覆蓋，這裡主要用於生產構建）
-COPY . /var/www/html
+# 暴露端口
+# FrankenPHP 默认使用 80 (HTTP) 和 443 (HTTPS)
+EXPOSE 80
+EXPOSE 443
+EXPOSE 443/udp
 
-# 给 storage 和 bootstrap/cache 权限
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
-
-# 确保 database 目录存在
-RUN mkdir -p database && chown -R www-data:www-data database
-
-EXPOSE 9000
-
-# 使用啟動腳本（會在容器啟動時安裝依賴並清除緩存）
+# 使用自定义启动脚本
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

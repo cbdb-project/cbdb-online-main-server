@@ -2,22 +2,37 @@
 
 使用 Docker Compose 快速搭建 CBDB Online 开发环境，无需安装 PHP、Composer、MySQL 等依赖。
 
+## 🆕 Docker 架构
+
+本项目使用 **FrankenPHP** 作为 Docker 架构，提供现代化的 PHP 应用服务器体验。
+
+### ⚡ 架构特点
+- 架构：单容器集成 Web 服务器（替代传统 PHP-FPM + Nginx）
+- 性能：Classic 模式适合开发，Worker 模式性能可提升 10 倍以上
+- 特性：支持 HTTP/2、HTTP/3，配置简单
+- 容器名：`cbdb-frankenphp`
+
 ## 目录结构
 
 ```
 /
 ├── docker/
-│   ├── Dockerfile      # PHP 7.4 + SQLite + Composer 镜像
-│   ├── nginx.conf      # Nginx 配置
+│   ├── Dockerfile      # FrankenPHP Dockerfile
+│   ├── Caddyfile       # Caddy Web 服务器配置
+│   ├── entrypoint.sh   # 容器启动脚本
 │   └── php.ini         # PHP 配置
-├── docker-compose.yml  # Docker Compose 配置文件
+├── docker-compose.yml  # Docker Compose 配置
 ├── database/
 │   └── database.sqlite3  # SQLite 数据库文件
 ├── .env                # 环境配置文件
 └── .env.docker.example # Docker 环境配置示例
 ```
 
-默认的 SQLite 文件位于 `database/database.sqlite3`，Docker Compose 会将 PHP 应用运行在名为 `cbdb-php` 的容器中（对应 `php` 服务）。
+**默认配置**：
+- 架构：FrankenPHP（1 个容器）
+- 数据库：SQLite (`database/database.sqlite3`)
+- 端口：8000
+- 工作目录：`/app`
 
 ## 技术特点
 
@@ -35,6 +50,27 @@
 ENV SQLITE_VERSION=3450000  # 对应 3.45.0
 ENV SQLITE_YEAR=2024
 ```
+
+### FrankenPHP 架构特点
+
+FrankenPHP 是新一代 PHP 应用服务器，将 PHP 与现代 Web 服务器（Caddy）集成：
+
+**优势**：
+- ✅ 架构简化：单容器替代 PHP-FPM + Nginx 双容器
+- ✅ 性能提升：Worker 模式下性能可提升 10 倍以上
+- ✅ 现代协议：原生支持 HTTP/2、HTTP/3
+- ✅ 配置简单：使用 Caddyfile 替代复杂的 Nginx 配置
+- ✅ 自动 HTTPS：内置自动证书管理
+
+**两种运行模式**：
+1. **Classic 模式**（默认）：兼容传统 PHP 应用，性能与 PHP-FPM 相当
+2. **Worker 模式**（Octane）：应用常驻内存，性能大幅提升（需要 Laravel Octane）
+
+**适用场景**：
+- ✅ 单服务器部署（搭配 SQLite 完美组合）
+- ✅ 中小型应用（大部分 Laravel 应用）
+- ✅ 开发环境（配置更简单）
+- ⚠️ 不适合多服务器横向扩展（建议使用 MySQL/PostgreSQL）
 
 ## 快速开始
 
@@ -63,16 +99,16 @@ cp .env.docker.example .env
 编辑 `.env` 文件，确保数据库配置正确：
 ```env
 DB_CONNECTION=sqlite
-DB_DATABASE=/var/www/html/database/database.sqlite3
+DB_DATABASE=/app/database/database.sqlite3
 ```
 
-**重要**：路径必须是容器内的路径 `/var/www/html/database/database.sqlite3`，不是本地路径。
+**重要**：路径必须是容器内的路径 `/app/database/database.sqlite3`，不是本地路径。
 
 ### 3. 生成应用密钥（首次运行）
 
 ```bash
 # 如果 .env 中 APP_KEY 为空，需要生成
-docker compose run --rm php php artisan key:generate
+docker compose run --rm app php artisan key:generate
 ```
 
 ### 4. 启动服务
@@ -81,7 +117,7 @@ docker compose run --rm php php artisan key:generate
 docker compose up --build
 ```
 
-首次启动会构建镜像，大约需要 3-5 分钟。构建阶段会自动执行 `deploy.sh`（包含 `composer install`、快取清理与 config cache），因此任何对 `deploy.sh` 的修改都需要重新 `docker compose up --build` 才能生效。后续启动只需几秒钟。
+首次启动会构建镜像，大约需要 3-5 分钟。容器启动时会自动执行 `composer install` 和缓存清理，无需手动操作。后续启动只需几秒钟。
 
 ### 5. 访问应用
 
@@ -114,31 +150,33 @@ docker compose build --no-cache  # 完全重新构建（不使用缓存）
 
 ```bash
 # 运行迁移
-docker compose exec php php artisan migrate
+docker compose exec app php artisan migrate
 
 # 清除缓存
-docker compose exec php php artisan cache:clear
-docker compose exec php php artisan config:clear
-docker compose exec php php artisan route:clear
-docker compose exec php php artisan view:clear
+docker compose exec app php artisan cache:clear
+docker compose exec app php artisan config:clear
+docker compose exec app php artisan route:clear
+docker compose exec app php artisan view:clear
 
 # 生成应用密钥
-docker compose exec php php artisan key:generate
+docker compose exec app php artisan key:generate
 
-# 进入 PHP 容器
-docker compose exec php bash
+# 进入容器
+docker compose exec app bash
 
 # 运行 Composer
-docker compose exec php composer install
-docker compose exec php composer update
-docker compose exec php composer dump-autoload
+docker compose exec app composer install
+docker compose exec app composer update
+docker compose exec app composer dump-autoload
+
+# 查看 FrankenPHP 状态
+docker compose exec app frankenphp version
 ```
 
 ### 查看日志
 ```bash
 docker compose logs        # 查看所有服务日志
-docker compose logs php    # 查看 PHP 服务日志
-docker compose logs web    # 查看 Nginx 服务日志
+docker compose logs app    # 查看应用日志
 docker compose logs -f     # 实时查看日志
 ```
 
@@ -147,7 +185,7 @@ docker compose logs -f     # 实时查看日志
 ### 1. 修改代码
 直接在本地编辑器修改代码，容器会自动映射最新的代码：
 ```bash
-# 代码映射： . -> /var/www/html
+# 代码映射： . -> /app
 ```
 
 刷新浏览器即可看到变化（无需重启容器）。
@@ -161,7 +199,7 @@ git pull
 ### 3. 更新依赖
 ```bash
 # 如果 composer.json 有变化
-docker compose exec php composer install
+docker compose exec app composer install
 
 # 如果需要重新构建镜像
 docker compose up --build
@@ -169,7 +207,7 @@ docker compose up --build
 
 ### 4. 运行数据库迁移
 ```bash
-docker compose exec php php artisan migrate
+docker compose exec app php artisan migrate
 ```
 
 ## 文件权限问题
@@ -177,8 +215,8 @@ docker compose exec php php artisan migrate
 如果遇到 `storage/` 或 `bootstrap/cache/` 权限错误：
 
 ```bash
-docker compose exec php chown -R www-data:www-data storage bootstrap/cache
-docker compose exec php chmod -R 775 storage bootstrap/cache
+docker compose exec app chown -R www-data:www-data storage bootstrap/cache
+docker compose exec app chmod -R 775 storage bootstrap/cache
 ```
 
 ## 数据库管理
@@ -206,7 +244,7 @@ SELECT * FROM users; # 执行查询
 
 **方式二：在容器内查看**
 ```bash
-docker compose exec php sqlite3 /var/www/html/database/database.sqlite3
+docker compose exec app sqlite3 /app/database/database.sqlite3
 ```
 
 ### 备份数据库
@@ -223,17 +261,48 @@ php artisan db:export-to-sqlite --output=database/database.sqlite3
 docker compose restart
 ```
 
+## 启用 Worker 模式（高性能）
+
+如果需要更高性能，可以启用 Laravel Octane Worker 模式：
+
+```bash
+# 1. 安装 Laravel Octane
+docker compose exec app composer require laravel/octane
+
+# 2. 安装 FrankenPHP 驱动
+docker compose exec app php artisan octane:install --server=frankenphp
+
+# 3. 修改 docker/entrypoint.sh 最后一行
+# 从: exec frankenphp run --config /etc/caddy/Caddyfile
+# 改为: exec php artisan octane:start --server=frankenphp --host=0.0.0.0 --port=80
+
+# 4. 重新构建并启动
+docker compose down
+docker compose up --build
+```
+
+**Worker 模式注意事项**：
+- ⚠️ 代码修改后需要重启容器才能生效
+- ⚠️ 需要注意内存泄漏和全局状态管理
+- ⚠️ 适合生产环境，不适合频繁修改代码的开发环境
+- ✅ 性能可提升 10 倍以上
+
 ## 升级 PHP 版本
 
-要升级到更高版本的 PHP（如 PHP 8.1），只需修改 `docker/Dockerfile` 第一行：
+要升级到更高版本的 PHP，只需修改 `docker/Dockerfile` 第一行的镜像标签：
 
 ```dockerfile
-# 从
-FROM php:7.4-fpm
+# 当前版本
+FROM dunglas/frankenphp:1-php8.4.15
 
-# 改为
-FROM php:8.1-fpm
+# 升级示例
+FROM dunglas/frankenphp:1-php8.5
 ```
+
+**镜像标签格式说明**：
+- `1`：FrankenPHP 主版本
+- `php8.4.15`：具体的 PHP 版本（可选）
+- 使用 `1-php8.4` 会自动使用该系列的最新补丁版本
 
 然后重新构建：
 ```bash
@@ -260,25 +329,53 @@ docker compose up --build
 ### 页面显示 500 错误
 ```bash
 # 检查 Laravel 日志
-docker compose exec php tail -f storage/logs/laravel.log
+docker compose exec app tail -f storage/logs/laravel.log
 
 # 检查权限
-docker compose exec php ls -la storage/
-docker compose exec php chown -R www-data:www-data storage bootstrap/cache
+docker compose exec app ls -la storage/
+docker compose exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
 ### Composer 依赖安装失败
 ```bash
 # 进入容器手动安装
-docker compose exec php bash
+docker compose exec app bash
 composer install --verbose
 ```
 
 ### 数据库连接失败
 检查 `.env` 文件：
 - `DB_CONNECTION=sqlite`
-- `DB_DATABASE=/var/www/html/database/database.sqlite3` （容器内路径，不是本地路径）
+- `DB_DATABASE=/app/database/database.sqlite3`（容器内路径）
 - 确保 `database/database.sqlite3` 文件存在且有读写权限
+
+### 容器无响应
+
+**问题：容器启动后访问 localhost:8000 无响应**
+```bash
+# 检查容器是否真的在运行
+docker compose ps
+
+# 检查日志
+docker compose logs app
+
+# 检查端口是否正确监听
+docker compose exec app netstat -tlnp
+```
+
+**问题：Worker 模式下代码修改不生效**
+```bash
+# Worker 模式需要重启容器
+docker compose restart app
+
+# 或者修改 entrypoint.sh 切换回 Classic 模式进行开发
+```
+
+**问题：Caddyfile 语法错误**
+```bash
+# 测试 Caddyfile 配置
+docker compose exec app frankenphp validate --config /etc/caddy/Caddyfile
+```
 
 ## 生产部署注意事项
 

@@ -207,7 +207,7 @@ class BiogMainRepository
         $data = $request->all();
         
         $c_name_chn = $request->c_surname_chn.$request->c_mingzi_chn;
-        $c_name = $request->c_surname.' '.$request->c_mingzi;
+        $c_name = trim($request->c_surname.' '.$request->c_mingzi);
         #20230626修改外文全名呈現順序
         #$c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
         #$c_name_rm = $request->c_surname_rm.' '.$request->c_mingzi_rm;

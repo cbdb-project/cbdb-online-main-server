@@ -261,7 +261,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
         
         // 只有名時，姓名欄位應該等於名
         $this->assertSame('孔子', $person->c_name_chn);
-        $this->assertSame(' Confucius', $person->c_name); // 注意前面有空格
+        $this->assertSame('Confucius', $person->c_name); // trim 後移除前導空格
         $this->assertSame('Aristotle', $person->c_name_proper); // trim 後沒有空格
     }
 

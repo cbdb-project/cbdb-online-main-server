@@ -48,6 +48,17 @@ require('./../../bower_components/AdminLTE/plugins/select2/select2.min');
 require('./../../bower_components/AdminLTE/dist/js/app.min');
 ```
 
+### 以 CDN 載入 AdminLTE（暫時免除 npm 構建）的可行性說明
+
+- **現況限制**：上述 CSS/JS 透過 Laravel Mix 在 `resources/assets` 中打包，路徑依賴本地 `bower_components`。直接改為 CDN 需要調整 Blade 佈局以改從遠端載入，並避開 Mix 對這些檔案的 require/import。 【F:ADMINLTE.md†L16-L49】
+- **可行作法**：在升級探索階段，可於 `resources/views/layouts/dashboard.blade.php` 等主佈局中改用 CDN `<link>` / `<script>` 載入 AdminLTE 3 及其依賴（Bootstrap 4、jQuery、FontAwesome 5、OverlayScrollbars 等），並暫時停用對應的 Mix import，讓現有 PHP 功能先跑通。此方案不需要 npm 打包。 【F:ADMINLTE.md†L53-L84】
+- **風險/代價**：
+  - 需逐頁確認外掛版本相容性（如 DataTables、Select2、iCheck）並替換新版相容的 CDN；舊版插件路徑寫死在混編 JS 中，可能失效。
+  - 缺乏版本鎖定與離線能力，部署時需確保環境允許外網存取 CDN，且考量 CSP 設定。
+  - 若後續仍需整合自訂樣式/JS，仍建議補上 npm 流程以避免日後二次切換成本。
+
+> 結論：以 CDN 方式短期驗證 AdminLTE 3 可行，但需同步調整佈局引用與插件版本，並接受外部依賴與相容性驗證的額外成本。
+
 ## 界面結構 - 完全採用 AdminLTE 架構
 
 ### 主佈局文件 (`resources/views/layouts/dashboard.blade.php`)
@@ -197,6 +208,42 @@ require('./../../bower_components/AdminLTE/dist/js/app.min');
 - **FontAwesome 4.5.0**: 通過 CDN 載入
 - **Ionicons 2.0.1**: 通過 CDN 載入
 - **Bootstrap Glyphicons**: 包含在 AdminLTE 中
+
+## 升級到 AdminLTE 3 準備清單
+
+### 現況重點（AdminLTE 2.3.8 深度整合）
+- 样式來源依賴 `resources/bower_components/AdminLTE`，`resources/assets/sass/app.scss` 直接匯入 Bootstrap 3、AdminLTE 主題與外掛（DataTables、Select2、iCheck 等）。【F:resources/assets/sass/app.scss†L10-L18】
+- `resources/assets/js/bootstrap.js` 透過 Bower 路徑載入 AdminLTE 2 的 Bootstrap 3 版 JS 與多個插件，當前構建鏈仍基於 Bootstrap 3。【F:resources/assets/js/bootstrap.js†L13-L20】
+- 佈局使用舊版 `skin-blue sidebar-mini` 等皮膚類別，頂部仍透過 CDN 載入 FontAwesome 4.5.0 / Ionicons 2.0.1。【F:resources/views/layouts/dashboard.blade.php†L15-L22】【F:resources/views/layouts/dashboard.blade.php†L36-L51】
+- 側邊欄依舊採用 AdminLTE 2 的 `.sidebar-menu` 清單結構，無 data-widget 屬性，未使用 v3 的 nav 結構。【F:resources/views/layouts/sidebar.blade.php†L38-L95】
+- 前端依賴仍包含 `bootstrap-sass@3.4` 等 Bootstrap 3 工具包，尚未導入 AdminLTE 3 所需的 Bootstrap 4/FontAwesome 5 依賴。【F:package.json†L12-L24】
+
+### 主要差異與升級風險
+- AdminLTE 3 基於 **Bootstrap 4** 並改用 **FontAwesome 5**，`skin-*` 與部分布局類別已移除；現有頁面皮膚、按鈕 (`btn-default`) 與表單樣式需全面換膚。
+- 官方取消 Bower 發佈，需改以 npm 套件載入，並引入 Popper.js、overlayScrollbars、icheck-bootstrap 等新的插件組合；舊版 SlimScroll、iCheck 2.3.8、DataTables Bootstrap 3 皮膚皆需替換。
+- AdminLTE 3 的側邊欄/控制面板採用新的 `.nav-sidebar` 標記與 `data-widget="treeview"` 初始化方式，現有 Blade 模板需要結構性調整。
+- 多數頁面使用 `.panel` 組件（Bootstrap 3），在 Bootstrap 4 中需改為 `.card`，同時表單間距、栅格欄位類別（`col-xs-*` → `col-*`）都要對應更新。【F:resources/views/addrbelongsdata/index.blade.php†L4-L14】
+
+### 建議的升級步驟
+1. **資源與構建鏈調整**
+   - 將 AdminLTE 改為 npm 安裝（`admin-lte@^3`），同步升級 `bootstrap` 至 4.x、`@fortawesome/fontawesome-free`、`popper.js` / `@popperjs/core`，並引入 `overlayScrollbars`、`icheck-bootstrap` 等 v3 依賴；移除 Bower 目錄與 `bootstrap-sass`。
+   - 重寫 `resources/assets/sass/app.scss` 與 `resources/assets/js/bootstrap.js` 的引用路徑，改用 `node_modules` 版本的 AdminLTE 3 打包入口（CSS/JS、DataTables Bootstrap4 皮膚、Select2 Bootstrap4 皮膚等），確保 Laravel Mix 能編譯。
+
+2. **佈局與導覽結構**
+   - 更新 `resources/views/layouts/dashboard.blade.php` 的 `<body>` 類別與 wrapper 結構，採用 AdminLTE 3 標準類別（如 `layout-navbar-fixed sidebar-mini layout-fixed`），並替換頂部資源為 FontAwesome 5。
+   - 重構 `resources/views/layouts/sidebar.blade.php`，改用 `.nav nav-pills nav-sidebar flex-column`、`data-widget="treeview"` 及 `.nav-icon` 標記；同時調整 breadcrumbs 與控制側欄標記以符合 v3。
+
+3. **頁面組件替換**
+   - 將所有 `.panel`/`.panel-*` 容器替換為 Bootstrap 4 `.card` 結構，並調整按鈕顏色（`btn-default` → `btn-secondary` 等）、表單間距與網格欄位類別以符合 Bootstrap 4。
+   - 檢查 DataTables、Select2、iCheck 等插件的初始化腳本與樣式類別，改用對應的 Bootstrap 4 皮膚與 AdminLTE 3 初始化方式（例如 `overlayScrollbars` 取代 SlimScroll）。
+
+4. **圖標與樣式一致性**
+   - 將 FontAwesome 4 圖標名稱替換成 FontAwesome 5，逐頁確認 Ionicons 2 依賴是否仍需保留或替換。
+   - 檢查自訂樣式（`resources/assets/css/styles` 等）是否覆寫了 AdminLTE 2 的類別，必要時同步調整到 AdminLTE 3 的新 class 命名。
+
+5. **驗證與回歸**
+   - 針對主要頁面（基本信息、任官管理、檢視表、管理工具等）建立手動驗證清單，確認側邊欄折疊、麵包屑、模態窗、表格操作、頁面提醒等行為在 AdminLTE 3 下正常。
+   - 若前端 JS 有初始化 AdminLTE 2 版特性（如 `$('.sidebar-menu').tree()`），需改用 AdminLTE 3 的 API 並撰寫 smoke tests 或瀏覽器驗證腳本。
 
 ## 插件生態系統
 

@@ -266,9 +266,9 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     }
 
     /**
-     * 測試姓名欄位更新時的變更檢測
+     * 測試提交相同值時不產生變更（無操作記錄）
      */
-    public function testNameMergeDetectsChanges()
+    public function testNameMergeWithNoChanges()
     {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -287,6 +287,9 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
             'c_created_by' => 'test',
             'c_created_date' => '20250101',
         ]);
+
+        // 記錄提交前的操作記錄數量
+        $operationCountBefore = DB::table('operations')->count();
 
         // 提交相同的值，應該檢測到無變更
         $response = $this->patch('/basicinformation/2348', [
@@ -310,6 +313,10 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2348)->first();
         $this->assertSame('歐陽修', $person->c_name_chn);
         $this->assertSame('Ouyang Xiu', $person->c_name);
+        
+        // 驗證沒有產生新的操作記錄（因為資料未變更）
+        $operationCountAfter = DB::table('operations')->count();
+        $this->assertSame($operationCountBefore, $operationCountAfter, '提交相同值時不應產生操作記錄');
     }
 
     /**
@@ -322,12 +329,12 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         \App\BiogMain::create([
             'c_personid' => 2349,
-            'c_surname_chn' => '張',
-            'c_mingzi_chn' => '三',
-            'c_name_chn' => '張三',
-            'c_surname' => 'Zhang',
-            'c_mingzi' => 'San',
-            'c_name' => 'Zhang San',
+            'c_surname_chn' => '王',
+            'c_mingzi_chn' => '五',
+            'c_name_chn' => '王五',
+            'c_surname' => 'Wang',
+            'c_mingzi' => 'Wu',
+            'c_name' => 'Wang Wu',
             'c_female' => 0,
             'c_by_intercalary' => 0,
             'c_dy_intercalary' => 0,
@@ -335,6 +342,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
             'c_created_date' => '20250101',
         ]);
 
+        // 更新為不同的值以驗證合併邏輯
         $response = $this->patch('/basicinformation/2349', [
             'c_surname_chn' => '張',
             'c_mingzi_chn' => '三',  // 必填

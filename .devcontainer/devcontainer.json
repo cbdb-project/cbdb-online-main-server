@@ -1,0 +1,8 @@
+{
+  "name": "CBDB Dev Env",
+  "image": "mcr.microsoft.com/devcontainers/php:8.4-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  }
+}

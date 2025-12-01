@@ -3,7 +3,9 @@
 ## 現況
 - `/codes/{table}` 為唯一介面：`CodesController` 依網址動態查詢資料表，提供列表、CRUD、提案／審核等完整流程。
 - 2025-11 起移除 6 個既有的 Vue 單頁（`/altnamecodes`、`/addrcodes`、`/appointcodes`、`/officecodes`、`/socialinstitutioncodes`、`/textcodes` 與其對應 API），原功能已整合回 `/codes/*`。
-- 目前仍保留 2 個 Vue 頁面：`/addrbelongsdata` 和 `/textinstancedata`，提供數據表格的互動式管理功能。
+- 2025-11 起將 `/addrbelongsdata` 和 `/textinstancedata` 整合至 `/codes/ADDR_BELONGS_DATA` 和 `/codes/TEXT_INSTANCE_DATA`。
+  - 新增頁面提供欄位說明和連結，方便用戶查看相關代碼表。
+  - `TEXT_INSTANCE_DATA` 提供 Load Data 功能，可從 `TEXT_CODES` 自動載入書籍資訊。
 - 常用 *_CODES 表的欄位順序與 Vue 版本一致，並會：
   - 自動排序主鍵欄位並預估下一個編號（含複合鍵組合）。
   - 在新增／編輯時計入 `c_created_*`、`c_modified_*` 與 `operations` 日誌。

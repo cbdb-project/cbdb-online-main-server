@@ -57,8 +57,8 @@
             <li class="{{ $page_title == 'Office Codes' ? 'active' : '' }}"><a href="/codes/OFFICE_CODES"><i class="ion ion-ios-people-outline"></i> <span>任官編碼表 (OFFICE_CODES)</span></a></li>
             <li class="{{ $page_title == 'Social Institution Codes' ? 'active' : '' }}"><a href="/codes/SOCIAL_INSTITUTION_CODES"><i class="ion ion-ios-people-outline"></i> <span>社會機構編碼表<br>(SOCIAL_INSTITUTION_CODES)</span></a></li>
             <li class="header">資料表 DATA</li>
-            <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="{{ route('addrbelongsdata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表</span></a></li>
-            <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="{{ route('textinstancedata.index') }}"><i class="ion ion-ios-people-outline"></i> <span>著作版本表</span></a></li>
+            <li class="{{ $page_title == 'Addrbelongsdata Type Codes' ? 'active' : '' }}"><a href="/codes/ADDR_BELONGS_DATA"><i class="ion ion-ios-people-outline"></i> <span>地址從屬表<br>(ADDR_BELONGS_DATA)</span></a></li>
+            <li class="{{ $page_title == 'Text Instance Data' ? 'active' : '' }}"><a href="/codes/TEXT_INSTANCE_DATA"><i class="ion ion-ios-people-outline"></i> <span>著作版本表<br>(TEXT_INSTANCE_DATA)</span></a></li>
             <li class="header">檢視表 VIEW</li>
             <li class="{{ $page_title == '檢視表總覽' ? 'active' : '' }}"><a href="{{ route('view.index') }}"><i class="fa fa-th-list"></i> <span>檢視表總覽</span></a></li>
             <li class="{{ $page_title == '地址層級檢視' ? 'active' : '' }}"><a href="{{ route('view.show', 'addresses') }}"><i class="fa fa-table"></i> <span>地址層級檢視</span></a></li>

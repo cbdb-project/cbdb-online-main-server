@@ -169,11 +169,12 @@ class CodesController extends Controller
     public function index()
     {
         $data = $this->codesrepostory->codes();
-        return view('codes.index',[
-            'page_title' => 'Tables',
-            'page_description' => '',
+        return view('codes.index', [
+            'page_title' => 'Codes',
+            'page_description' => '全部表格',
             'page_url' => '/codes',
-            'data' => $data]);
+            'data' => $data,
+        ]);
     }
 
     public function show(Request $request, $table_name)

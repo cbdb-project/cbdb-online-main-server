@@ -4,6 +4,8 @@
 
 AdminLTE 在本項目中扮演著**核心 UI 框架**的角色，絕非僅僅是資源文件的引用，而是作為整個後台管理界面的基礎架構被深度整合使用。
 
+- `/codes` 頁面已率先切換為 AdminLTE 3 佈局（`layouts/dashboard-v3`，使用 CDN），舊版 `/codes-v3-test` 測試路由已移除；此佈局不載入 Mix 編譯的 v2 JS 以避免 Bootstrap/AdminLTE 版本衝突。
+
 ## 版本信息
 
 - **AdminLTE 版本**: v2.3.8

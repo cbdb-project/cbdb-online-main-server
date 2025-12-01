@@ -17,10 +17,6 @@ Route::middleware('auth:api')->get('/user', 'Api\UserController@show');
 
 Route::group([], function () {
     Route::match(['get', 'post'], 'name', 'Api\NameController@index');
-
-    //20201111建安新增
-    Route::post('textinstancedata', 'Api\TextInstanceDataController@query');
-    Route::post('addrbelongsdata', 'Api\AddrBelongsDataController@query');
 });
 
 Route::group(['prefix' => 'select'], function (){

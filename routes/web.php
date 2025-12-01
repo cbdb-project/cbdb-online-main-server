@@ -158,22 +158,6 @@ Route::resource('modified', 'ModifiedController', ['name' => [
 
 Route::get('test', 'TestController@index');
 
-Route::resource('textinstancedata', 'TextInstanceDataController', ['name' => [
-    'show' => 'textinstancedata.show',
-    'create' => 'textinstancedata.create',
-    'edit' => 'textinstancedata.edit',
-    'update' => 'textinstancedata.update'
-]]);
-
-Route::get('textinstancedata/{id}/delete', 'TextInstanceDataController@destroy');
-
-Route::resource('addrbelongsdata', 'AddrBelongsDataController', ['name' => [
-    'show' => 'addrbelongsdata.show',
-    'create' => 'addrbelongsdata.create',
-    'edit' => 'addrbelongsdata.edit',
-    'update' => 'addrbelongsdata.update'
-]]);
-
 Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
     Route::patch('profile', 'UserProfileController@update')->name('profile.update');
@@ -199,5 +183,3 @@ Route::middleware('auth')->group(function () {
         ->where('taskId', '[a-zA-Z0-9_]+')
         ->name('admin.cbdb-table-maintenance.progress');
 });
-
-Route::get('addrbelongsdata/{id}/delete', 'AddrBelongsDataController@destroy');

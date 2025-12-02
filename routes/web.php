@@ -28,10 +28,6 @@ Route::get('cbdbapi/person', 'CbdbApiController@person');
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 
-Route::resource('informations', 'InformationsController', ['names' => [
-    'create' => 'information.create'
-]]);
-
 Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'show' => 'basicinformation.show',
     'create' => 'basicinformation.create',
@@ -84,41 +80,6 @@ Route::resource('sources', 'SourcesController', ['name' => [
     'create' => 'source.create',
     'edit' => 'source.edit',
     'update' => 'source.update'
-]]);
-
-Route::resource('entries', 'EntriesController', ['name' => [
-    'show' => 'entry.show',
-    'create' => 'entry.create',
-    'edit' => 'entry.edit',
-    'update' => 'entry.update'
-]]);
-
-Route::resource('statuses', 'StatusesController', ['name' => [
-    'show' => 'status.show',
-    'create' => 'status.create',
-    'edit' => 'status.edit',
-    'update' => 'status.update'
-]]);
-
-Route::resource('events', 'EventsController', ['name' => [
-    'show' => 'event.show',
-    'create' => 'event.create',
-    'edit' => 'event.edit',
-    'update' => 'event.update'
-]]);
-
-Route::resource('kinship', 'KinshipController', ['name' => [
-    'show' => 'kinship.show',
-    'create' => 'kinship.create',
-    'edit' => 'kinship.edit',
-    'update' => 'kinship.update'
-]]);
-
-Route::resource('assoc', 'AssocController', ['name' => [
-    'show' => 'assoc.show',
-    'create' => 'assoc.create',
-    'edit' => 'assoc.edit',
-    'update' => 'assoc.update'
 ]]);
 
 Route::resource('manage', 'ManagementController', ['name' => [

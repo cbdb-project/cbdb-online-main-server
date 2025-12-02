@@ -6,10 +6,10 @@
 參考 `AGENTS.md` 和 `APPROVAL_FLOWS.md`，為 BiogMain 及其 12 個子頁面（共 13 類項目）實現完整的審批流程，仿照現有 CodesController 的提案審批模式。
 
 ### 1.2 技術環境
-- **Laravel**：8.83 LTS
+- **Laravel**：10.0
 - **PHP**：8.1+（建議 8.4）
-- **Carbon**：2.x
-- **PHPUnit**：9.6
+- **Carbon**：2.67+
+- **PHPUnit**：10.1
 - **數據庫**：MariaDB 10.3.39
 
 ### 1.3 涉及範圍
@@ -520,7 +520,7 @@ class BasicInformationProposalTest extends TestCase
 
     public function test_can_submit_create_proposal_for_altname()
     {
-        $user = factory(User::class)->create(['is_active' => 1]);
+        $user = User::factory()->create(['is_active' => 1]);
 
         $response = $this->actingAs($user)->post(route('basicinformation.altnames.proposal.store', ['personid' => 1]), [
             'c_personid' => 1,
@@ -547,7 +547,7 @@ class BasicInformationProposalTest extends TestCase
             'c_alt_name_type_code' => 1,
         ]);
 
-        $user = factory(User::class)->create(['is_active' => 1]);
+        $user = User::factory()->create(['is_active' => 1]);
 
         $response = $this->actingAs($user)->post(
             route('basicinformation.altnames.proposal.update', ['personid' => 1, 'id' => '1-1-原別名-1']),
@@ -743,8 +743,9 @@ protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType
 | 風險 | 影響 | 緩解措施 |
 |-----|------|---------|
 | 複合主鍵解析錯誤 | 高 | 使用現有的 `unionPKDef()` 函數，充分測試 |
-| Carbon 2.x 兼容性問題 | 中 | 使用 `format()` 替代 `toDateTimeString()` |
-| Laravel 8 新特性 | 低 | 參考官方文檔，使用穩定 API |
+| Carbon 2.x 兼容性問題 | 低 | 使用 `format()` 方法，Laravel 10 完全兼容 |
+| Laravel 10 新特性 | 低 | 參考官方文檔，使用穩定 API |
+| PHPUnit 10 斷言變更 | 中 | 使用新的斷言方法（如 `assertStringContainsString`）|
 | 數據庫交易衝突 | 中 | 官職操作使用現有 Repository 方法 |
 | JSON 數據過大 | 低 | 監控 `resource_data` 大小 |
 
@@ -800,8 +801,13 @@ protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType
 
 ---
 
-**文檔版本**：2.0（基於 Laravel 8.83 / PHP 8.1+）
+**文檔版本**：3.0（基於 Laravel 10.0 / PHP 8.1+）
 **創建日期**：2025-11-27
-**最後更新**：2025-11-27
+**最後更新**：2025-12-02
 **作者**：Claude AI
 **審核狀態**：待審核
+
+### 版本歷史
+- v3.0 (2025-12-02): 同步 Laravel 10.0 + PHPUnit 10.1 升級
+- v2.0 (2025-11-27): 基於 Laravel 8.83 初始版本
+- v1.0 (2025-11-17): 初始草案

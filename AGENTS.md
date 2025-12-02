@@ -127,7 +127,7 @@
 - Feature 測試手動建立資料表時，記得設置必要的 primary key 與時間戳；否則模型邏輯可能出錯。
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
-- **PHPUnit 版本兼容性**：專案使用 PHPUnit 7.5，注意使用 `assertContains` 等相容的斷言方法。
+- **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
 
 ## 快速回顧

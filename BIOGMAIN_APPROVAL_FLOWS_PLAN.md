@@ -26,7 +26,7 @@
   9. 身份（STATUS_DATA）
   10. 所有物（POSSESSION_DATA）
   11. 社交機構（BIOG_INST_DATA）
-  12. 來源（待確認具體表名）
+  12. 來源（SOURCES）
 
 ## 二、現有審批流程分析
 
@@ -170,6 +170,7 @@ Route::prefix('basicinformation')->middleware('auth')->group(function () {
 | statuses | STATUS_DATA | c_personid, c_status_code, c_sequence | `{c_personid}-{c_status_code}-{c_sequence}` |
 | possessions | POSSESSION_DATA | c_personid, c_poss_code, c_sequence | `{c_personid}-{c_poss_code}-{c_sequence}` |
 | socialinst | BIOG_INST_DATA | c_personid, c_inst_code, c_inst_role_code | `{c_personid}-{c_inst_code}-{c_inst_role_code}` |
+| sources | SOURCES | c_personid, c_textid, c_pages | `{c_personid}-{c_textid}-{c_pages}` |
 
 ### 3.4 資源配置數組
 
@@ -282,9 +283,9 @@ protected function applyOfficeProposal(Operation $proposal, array $data, array $
 
         <!-- 按鈕區 -->
         <div class="box-footer">
-            @if(Auth::check() && Auth::user()->is_active == 1 && Auth::user()->is_admin != 2)
-                <!-- 直接儲存按鈕（管理員可見） -->
-                @if(Auth::user()->is_admin == 1)
+            @if(Auth::check() && Auth::user()->isActive())
+                <!-- 直接儲存按鈕（非眾包用戶可見） -->
+                @if(Auth::user()->canWriteDirectly())
                     <button type="submit" name="action" value="save" class="btn btn-primary">
                         <i class="fa fa-save"></i> 直接儲存
                     </button>
@@ -315,7 +316,8 @@ public function store(Request $request, $id)
         flash('请登入后编辑 @ '.Carbon::now(), 'error');
         return redirect()->back();
     }
-    elseif (Auth::user()->is_active != 1 || Auth::user()->is_admin == 2){
+
+    if (!Auth::user()->isActive()) {
         flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
         return redirect()->back();
     }
@@ -326,6 +328,12 @@ public function store(Request $request, $id)
     if ($action === 'proposal') {
         // 轉發到提案控制器
         return app(BasicInformationProposalController::class)->proposalStore($request, $id, 'altnames');
+    }
+
+    // 直接儲存需要額外權限檢查
+    if (!Auth::user()->canWriteDirectly()) {
+        flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+        return redirect()->back();
     }
 
     // 原有的直接儲存邏輯
@@ -677,24 +685,35 @@ protected function ensureCanPropose()
         abort(403, '請登入後提交提案');
     }
 
-    if (Auth::user()->is_active != 1) {
+    if (!Auth::user()->isActive()) {
         abort(403, '該用戶沒有權限，請聯繫管理員');
-    }
-
-    if (Auth::user()->is_admin == 2) {
-        abort(403, '該用戶類型不允許提交提案');
     }
 }
 
 protected function ensureCanDirectSave()
 {
-    $this->ensureCanPropose();
+    if (!Auth::check()) {
+        abort(403, '請登入後編輯');
+    }
 
-    if (Auth::user()->is_admin != 1) {
-        abort(403, '僅管理員可直接儲存');
+    if (!Auth::user()->canWriteDirectly()) {
+        abort(403, '該用戶沒有權限，請聯繫管理員');
+    }
+}
+
+protected function ensureCanReview()
+{
+    if (!Auth::check() || !Auth::user()->canRestoreOperations()) {
+        abort(403, '無權審核提案');
     }
 }
 ```
+
+**權限方法說明**（定義於 `app/User.php`）：
+- `isActive()`: 檢查用戶是否活躍 (`is_active == 1`)
+- `canWriteDirectly()`: 活躍且非眾包用戶可直接寫入
+- `canRestoreOperations()`: 活躍的專家或系統管理員可審核提案
+- `isCrowdsourcingUser()`: 檢查是否為眾包用戶 (`is_admin == 2`)
 
 ### 5.5 數據驗證
 
@@ -757,28 +776,33 @@ protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType
 | 提案積壓 | 中 | 提供提案統計和提醒功能 |
 | 誤審核 | 高 | 提供審核預覽 |
 
-## 七、待確認問題
+## 七、已確認決策
 
-### 問題 1：是否保留直接儲存功能？
-- **選項 A**：普通用戶僅能提案，管理員可直接儲存
-- **選項 B**：所有用戶（包括管理員）都走提案流程
-- **建議**：選項 A
+### 決策 1：保留直接儲存功能 ✅
+- **實施方案**：與現有 CodesController 一致
+- **權限模型**：
+  - **眾包用戶** (`is_admin == 2`): 僅能提案
+  - **一般用戶** (`is_admin == 0`, `is_active == 1`): 可直接儲存或提案
+  - **專家/管理員** (`is_admin == 1`, `is_active == 1`): 可直接儲存、提案、審核
+- **判斷方法**：使用 `Auth::user()->canWriteDirectly()`
 
-### 問題 2：是否支持刪除提案？
-- 當前 CodesController 不支持刪除提案
-- **建議**：暫不支持，未來可擴展
+### 決策 2：不支持刪除提案 ✅
+- 與 CodesController 保持一致
+- 未來可根據需求擴展
 
-### 問題 3：第 12 個子頁面（來源）的具體表是？
-- 需要確認是 SOURCES 還是其他表
-- **待確認**
+### 決策 3：第 12 個子頁面確認為 SOURCES 表 ✅
+- **表名**：SOURCES
+- **主鍵**：`c_personid, c_textid, c_pages`
+- **Resource ID 格式**：`{c_personid}-{c_textid}-{c_pages}`
 
-### 問題 4：官職的地址列表如何處理？
-- POSTED_TO_ADDR_DATA 與 POSTED_TO_OFFICE_DATA 關聯
-- **建議**：將地址列表作為 JSON 存儲在提案的 resource_data 中
+### 決策 4：官職地址列表按現有機制處理 ✅
+- 使用現有的 `BiogMainRepository::officeStoreById()` / `officeUpdateById()` 方法
+- POSTED_TO_ADDR_DATA 在交易中一併處理
+- 操作記錄保留完整的 before/after JSON
 
-### 問題 5：是否需要批量操作支持？
-- 如批量審核、批量撤回
-- **建議**：後續優化
+### 決策 5：暫不支持批量操作 ✅
+- 後續優化時再考慮
+- 優先完成基本提案審批流程
 
 ## 八、總結
 

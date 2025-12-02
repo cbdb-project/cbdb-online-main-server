@@ -12,6 +12,7 @@ use App\Repositories\NianHaoRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
+use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Pinyin;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Arr;
 /**
  * Class BiogBasicInformationController
@@ -37,13 +39,14 @@ class BasicInformationController extends Controller
     protected $yearRangeRepository;
     protected $operationRepository;
     protected $toolRepository;
+    protected $nameSearchIndexService;
 
     /**
      * Create a new controller instance.
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService)
     {
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
@@ -53,6 +56,7 @@ class BasicInformationController extends Controller
         $this->yearRangeRepository = $yearRangeRepository;
         $this->operationRepository = $operationRepository;
         $this->toolRepository  = $toolsRepository;
+        $this->nameSearchIndexService = $nameSearchIndexService;
     }
 
     /**
@@ -129,6 +133,11 @@ class BasicInformationController extends Controller
             //增加完成
             $flight = BiogMain::create($data);
             $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
+
+            if (Schema::hasTable('CBDB__NAME_FTS')) {
+                $this->nameSearchIndexService->reindexPerson($flight);
+            }
+
             flash('Create success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.edit', $data['c_personid']);
         }
@@ -198,6 +207,13 @@ class BasicInformationController extends Controller
             return redirect()->route('basicinformation.index');
         }
         else {
+            if (Schema::hasTable('CBDB__NAME_FTS')) {
+                $person = BiogMain::find($id);
+                if ($person) {
+                    $this->nameSearchIndexService->reindexPerson($person);
+                }
+            }
+
             flash('Update success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.edit', $id);
         }
@@ -227,6 +243,11 @@ class BasicInformationController extends Controller
         $data['c_modified_by'] = $data['c_modified_date'] = '';
         $flight = BiogMain::create($data);
         $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+
+        if (Schema::hasTable('CBDB__NAME_FTS')) {
+            $this->nameSearchIndexService->reindexPerson($flight);
+        }
+
         flash('Create success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.edit', $new_id); 
     }
@@ -249,6 +270,11 @@ class BasicInformationController extends Controller
         $data['c_modified_by'] = $data['c_modified_date'] = '';
         $flight = BiogMain::create($data);
         $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+
+        if (Schema::hasTable('CBDB__NAME_FTS')) {
+            $this->nameSearchIndexService->reindexPerson($flight);
+        }
+
         //擴充複製訊息：地址，出處，親屬，社會關係，社會機構，社會區分
         //地址
         $addr = DB::table('BIOG_ADDR_DATA')->where([
@@ -394,6 +420,11 @@ class BasicInformationController extends Controller
         else {
             $biog->save();
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori);
+
+            if (Schema::hasTable('CBDB__NAME_FTS')) {
+                $this->nameSearchIndexService->reindexPerson($biog);
+            }
+
             flash('Delete success @ '.Carbon::now(), 'success');
             return redirect()->route('basicinformation.index');
         }

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\AltnameData;
+use App\BiogMain;
+use App\Observers\AltnameDataObserver;
+use App\Observers\BiogMainObserver;
 use App\Services\QueryProfile;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Pagination\Paginator;
@@ -32,6 +36,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // 使用 Bootstrap 分页样式（Laravel 8 默认为 Tailwind）
         Paginator::useBootstrap();
+
+        // 註冊姓名索引 Observers
+        BiogMain::observe(BiogMainObserver::class);
+        AltnameData::observe(AltnameDataObserver::class);
 
         $profiler = $this->app->make(QueryProfile::class);
 

@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\NameSearchIndexService;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Arr;
 
 class BasicInformationAltnamesController extends Controller
@@ -20,16 +22,18 @@ class BasicInformationAltnamesController extends Controller
     protected $biogMainRepository;
     protected $operationRepository;
     protected $toolsRepository;
+    protected $nameSearchIndexService;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository)
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, NameSearchIndexService $nameSearchIndexService)
     {
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
+        $this->nameSearchIndexService = $nameSearchIndexService;
     }
     /**
      * Display a listing of the resource.
@@ -87,6 +91,15 @@ class BasicInformationAltnamesController extends Controller
         }
         DB::table('ALTNAME_DATA')->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
+
+        if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
+            $this->nameSearchIndexService->indexAltname(
+                $data['c_personid'],
+                $data['c_alt_name_type_code'],
+                $data['c_alt_name_chn']
+            );
+        }
+
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
@@ -189,6 +202,30 @@ class BasicInformationAltnamesController extends Controller
         if($data['c_sequence'] == NULL) { $data['c_sequence'] = 'NULL'; }
         $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data, $ori);
+
+        if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
+            $nameChanged = $ori->c_alt_name_chn !== $data['c_alt_name_chn'];
+            $typeChanged = $ori->c_alt_name_type_code !== $data['c_alt_name_type_code'];
+
+            if ($nameChanged || $typeChanged) {
+                if ($ori->c_alt_name_chn) {
+                    $this->nameSearchIndexService->removeAltname(
+                        $ori->c_personid,
+                        $ori->c_alt_name_type_code,
+                        $ori->c_alt_name_chn
+                    );
+                }
+
+                if (!empty($data['c_alt_name_chn'])) {
+                    $this->nameSearchIndexService->indexAltname(
+                        $addr_l[0],
+                        $data['c_alt_name_type_code'],
+                        $data['c_alt_name_chn']
+                    );
+                }
+            }
+        }
+
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $new_alt = $this->biogMainRepository->unionPKDef($new_alt);
@@ -239,6 +276,15 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->delete();
+
+        if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {
+            $this->nameSearchIndexService->removeAltname(
+                $row->c_personid,
+                $row->c_alt_name_type_code,
+                $row->c_alt_name_chn
+            );
+        }
+
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['basicinformation' => $id]);
     }

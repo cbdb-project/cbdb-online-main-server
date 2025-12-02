@@ -48,8 +48,45 @@
 | 執行完整測試 | `./vendor/bin/phpunit` |
 | 執行單一測試 | `./vendor/bin/phpunit --filter TestName` |
 | 匯入繁簡映射 | `php artisan cbdb:import-trad-simp-map --truncate` |
+| 管理用戶 | `php artisan cbdb:manage-user` （交互式）或帶選項創建/更新 |
 
 > 若修改 Vue/JS，記得在本機跑 `npm run prod` 產出 `public/js/app.js`；專案不會自動編譯。
+
+### 用戶管理
+- **管理用戶命令**：使用 `php artisan cbdb:manage-user` 創建或更新用戶。適用於環境初始設置和日常用戶管理。
+  - **交互式模式**：直接運行 `php artisan cbdb:manage-user`，系統會逐步詢問所需信息。
+  - **命令行模式**：使用選項直接指定參數，適合腳本自動化：
+    ```bash
+    # 創建系統管理員
+    php artisan cbdb:manage-user \
+      --email=admin@example.com \
+      --name="系統管理員" \
+      --password=secret123 \
+      --active=1 \
+      --role=super-admin
+
+    # 更新現有用戶角色
+    php artisan cbdb:manage-user --email=user@example.com --role=expert
+
+    # 列出所有用戶
+    php artisan cbdb:manage-user --list
+    ```
+  - **支持的角色**：`regular`（一般）、`expert`（專家）、`crowdsourcing`（眾包）、`super-admin`（系統管理員）
+  - **激活狀態**：`0`（未激活）、`1`（激活）、`2`（預留）
+- **User Factory**：測試和內部工具可使用 `User::factory()` 創建測試用戶：
+  ```php
+  // 創建普通用戶
+  $user = User::factory()->create();
+
+  // 創建活躍的系統管理員
+  $admin = User::factory()->active()->superAdmin()->create();
+
+  // 批量創建用戶
+  $users = User::factory()->count(5)->create();
+
+  // 舊語法仍然支持（向後兼容）
+  $user = factory(User::class)->create();
+  ```
 
 ### 內部表維護
 - **繁簡映射表**：使用 `php artisan cbdb:import-trad-simp-map --truncate` 從 OpenCC 匯入最新繁簡對照。支援 `--batch=N` 參數調整批次大小（預設 1000）。

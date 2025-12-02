@@ -1,18 +1,18 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <!-- SELECT2 EXAMPLE -->
-    <div class="box box-default">
-        <div class="box-header with-border">
-            <h3 class="box-title">全部表格</h3>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">全部表格</h3>
 
-            <div class="box-tools pull-right">
-                <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+            <div class="card-tools">
+                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                    <i class="fas fa-minus"></i>
+                </button>
             </div>
         </div>
-        <!-- /.box-header -->
-        <div class="box-body table-responsive no-padding">
-            <table class="table table-hover table-condensed">
+        <div class="card-body table-responsive p-0">
+            <table class="table table-hover table-sm">
                 <thead>
                 <tr>
                     <th>表名</th>
@@ -25,10 +25,8 @@
                 </tbody>
             </table>
         </div>
-        <!-- /.box-body -->
     </div>
-    <!-- /.box -->
 @endsection
-@section('js')
 
+@section('js')
 @endsection

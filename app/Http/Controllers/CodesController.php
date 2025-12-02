@@ -97,7 +97,7 @@ class CodesController extends Controller
             'c_admin_cat_trans',
             'c_notes',
         ],
-        'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end'],
+        'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end', 'c_sort'],
         'TEXT_INSTANCE_DATA' => [
             'c_textid',
             'c_text_edition_id',

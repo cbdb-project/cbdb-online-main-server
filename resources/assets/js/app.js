@@ -5,9 +5,6 @@ import './bootstrap';
 // 確保所有組件都已經正確導入和註冊，在Vue 3中，使用 import 而不是 require。
 
 import { createApp } from 'vue';
-import AddrCodeList from './components/AddrCodeList.vue';
-import TextInstanceDataList from './components/TextInstanceDataList.vue';
-import AddrBelongsDataList from './components/AddrBelongsDataList.vue';
 import Codebox from './components/codebox.vue';
 import SelectVue from './components/Select.vue';
 import Select2 from './components/Select2.vue';
@@ -18,9 +15,6 @@ import PassportPersonalAccessTokens from './components/passport/PersonalAccessTo
 
 const app = createApp({
     components: {
-        'address-code-list': AddrCodeList,
-        'text-instance-data-list': TextInstanceDataList,
-        'addr-belongs-data-list': AddrBelongsDataList,
         'codebox': Codebox,
         'select-vue': SelectVue,
         'select2': Select2,

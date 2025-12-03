@@ -27,6 +27,7 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use Illuminate\Support\Facades\DB;
 use App\Repositories\Concerns\DetectsModelChanges;
+use Carbon\Carbon;
 
 //20181112建安修改
 use App\SocialInstCode;
@@ -556,7 +557,7 @@ class BiogMainRepository
 
     public function officeUpdateById(Request $request, $id, $c_personid)
     {
-        $data = $request->all();
+	$data = $request->all();
         $_id = $data['_id'];
         $_postingid = $data['_postingid'];
         $_officeid = $data['_officeid']; //目前与officeid无关
@@ -630,7 +631,7 @@ class BiogMainRepository
                             'c_addr_id' => (int) $row->c_addr_id,
                         ];
                     })
-                    ->all();
+		    ->all();
 
                 if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
                     DB::table('POSTED_TO_ADDR_DATA')
@@ -640,8 +641,10 @@ class BiogMainRepository
                         ->delete();
                 }
 
+		$c_created_by = Auth::user()->name;
+		$c_created_date = Carbon::now();
                 $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
-                $this->insertAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId);
+                $this->insertAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId, $c_created_by, $c_created_date);
 
                 $afterRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $_id)
@@ -691,14 +694,22 @@ class BiogMainRepository
                 ->orderByDesc('c_posting_id')
                 ->value('c_posting_id');
             $data['c_posting_id'] = ((int) $lastPostingId) + 1;
-            $data['c_personid'] = $id;
+	    $data['c_personid'] = $id;
+
+	    //將操作新增的使用者與當下時間紀錄為c_created_by與c_created_date。
+            $c_created_by = Auth::user()->name;
+            $c_created_date = Carbon::now();
+            $data['c_created_by'] = $c_created_by;
+            $data['c_created_date'] = $c_created_date;
 
             DB::table('POSTING_DATA')->insert([
                 'c_personid' => $data['c_personid'],
-                'c_posting_id' => $data['c_posting_id'],
+		'c_posting_id' => $data['c_posting_id'],
+		'c_created_by' => $data['c_created_by'],
+                'c_created_date' => $data['c_created_date'],
             ]);
 
-            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id']);
+            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);
 
             $data = (new ToolsRepository)->timestamp($data, true);
             DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
@@ -1843,7 +1854,7 @@ class BiogMainRepository
         return $originalText." ".$add;
     }
 
-    protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid)
+    protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid, $c_created_by='', $c_created_date='')
     {
         DB::table('POSTED_TO_ADDR_DATA')
             ->where('c_personid', $_id)
@@ -1856,7 +1867,9 @@ class BiogMainRepository
                     'c_personid' => $_id,
                     'c_posting_id' => $_postingid,
                     'c_office_id' => $_officeid,
-                    'c_addr_id' => $item == -999 ? 0 : $item
+		    'c_addr_id' => $item == -999 ? 0 : $item,
+		    'c_created_by' => $c_created_by,
+		    'c_created_date' => $c_created_date,
                 ]
             );
         }

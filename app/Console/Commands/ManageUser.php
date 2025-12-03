@@ -130,8 +130,8 @@ class ManageUser extends Command
 
         $role = $this->roleMap[$roleInput] ?? User::ROLE_REGULAR;
 
-        // 使用 Factory 創建用戶
-        $user = User::factory()->create([
+        // 創建用戶（直接使用模型，避免依賴 dev-only 的 Faker）
+        $user = User::create([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($password),

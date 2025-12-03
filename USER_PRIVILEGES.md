@@ -89,7 +89,7 @@ if (Auth::user()->canManageUsers()) {
 
 ### 5.1 命令行用戶管理（cbdb:manage-user）
 
-項目提供 `cbdb:manage-user` artisan 命令，用於環境初始設置和日常用戶管理。此命令使用 `User::factory()` 創建新用戶，確保數據一致性。
+項目提供 `cbdb:manage-user` artisan 命令，用於環境初始設置和日常用戶管理。此命令直接使用 `User` 模型創建新用戶，無需依賴開發環境的 Factory 組件，確保在生產環境中也能正常運行。
 
 #### 交互式模式
 

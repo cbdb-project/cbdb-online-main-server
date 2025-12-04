@@ -108,14 +108,36 @@ class OperationsController extends Controller
 		    case "ALTNAME_DATA":
                         //20251201先遮除原本存取方式，改使用聯合主鍵解析
                         //$arr3 = $this->fetchAltnameCurrentRow($listsArr['data'][$x]);
-                        $alt = str_replace("--","-minus",$resource_id);
-                        //聯合主鍵保留字弱點防禦函式，解析保留字。
-                        $alt = $this->unionPKDef_decode($alt);
-                        $addr_l = explode("-", $alt);
-                        foreach($addr_l as $key => $value) {
-                            $addr_l[$key] = str_replace("minus","-",$value);
+
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $addr_l = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $addr_l = explode("-", $alt);
+                            foreach($addr_l as $key => $value) {
+                                $addr_l[$key] = str_replace("minus","-",$value);
+                            }
                         }
-                        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+
+                        // 檢查陣列長度是否足夠（ALTNAME_DATA 需要 4 個欄位）
+                        if (count($addr_l) < 4) {
+                            // 記錄錯誤並跳過此筆資料
+                            \Log::warning("ALTNAME_DATA resource_id 格式不正確: {$resource_id}", [
+                                'parsed' => $addr_l,
+                                'expected_count' => 4,
+                                'actual_count' => count($addr_l),
+                                'operation_id' => $listsArr['data'][$x]['id'] ?? null
+                            ]);
+                            $arr3 = null;
+                            break;
+                        }
+
+                        if(isset($addr_l[1]) && $addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
                         $arr3 = DB::table('ALTNAME_DATA')->where([
                             ['c_personid', '=', $addr_l[0]],
                             ['c_sequence', '=', $addr_l[1]],

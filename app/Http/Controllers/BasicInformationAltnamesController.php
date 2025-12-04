@@ -128,14 +128,8 @@ class BasicInformationAltnamesController extends Controller
      */
     public function edit($id, $alt)
     {
-        $alt = str_replace("--","-minus",$alt);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
-        $addr_l = explode("-", $alt);
-        foreach($addr_l as $key => $value) {
-            $addr_l[$key] = str_replace("minus","-",$value);
-        }
-        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+        $addr_l = $this->parseAltnameId($alt);
+
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_sequence', '=', $addr_l[1]],
@@ -176,14 +170,7 @@ class BasicInformationAltnamesController extends Controller
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
-        $alt = str_replace("--","-minus",$alt);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
-        $addr_l = explode("-", $alt);
-        foreach($addr_l as $key => $value) {
-            $addr_l[$key] = str_replace("minus","-",$value);
-        }
-        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+        $addr_l = $this->parseAltnameId($alt);
 
         //20251213新增差異比對紀錄
         $ori = DB::table('ALTNAME_DATA')->where([
@@ -254,14 +241,8 @@ class BasicInformationAltnamesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $alt = str_replace("--","-minus",$alt);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $alt = $this->biogMainRepository->unionPKDef_decode($alt);
-        $addr_l = explode("-", $alt);
-        foreach($addr_l as $key => $value) {
-            $addr_l[$key] = str_replace("minus","-",$value);
-        }
-        if($addr_l[1] == 'NULL') {$addr_l[1] = NULL; }
+        $addr_l = $this->parseAltnameId($alt);
+
         $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_sequence', '=', $addr_l[1]],
@@ -287,5 +268,47 @@ class BasicInformationAltnamesController extends Controller
 
         flash('Delete success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.altnames.index', ['basicinformation' => $id]);
+    }
+
+    /**
+     * 解析別名複合主鍵 ID
+     * 支持兩種分隔符格式：'_._' (新格式) 和 '-' (舊格式)
+     *
+     * @param string $alt 複合主鍵 ID
+     * @return array 包含 4 個元素的陣列 [c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
+     */
+    protected function parseAltnameId($alt)
+    {
+        // 檢測分隔符類型：支持兩種格式 '_._' 或 '-'
+        if (strpos($alt, '_._') !== false) {
+            // 使用 _._格式
+            $addr_l = explode('_._', $alt);
+        } else {
+            // 使用 - 格式
+            $alt = str_replace("--","-minus",$alt);
+            //聯合主鍵保留字弱點防禦函式，解析保留字。
+            $alt = $this->biogMainRepository->unionPKDef_decode($alt);
+            $addr_l = explode("-", $alt);
+            foreach($addr_l as $key => $value) {
+                $addr_l[$key] = str_replace("minus","-",$value);
+            }
+        }
+
+        // 檢查陣列長度是否足夠（ALTNAME_DATA 需要 4 個欄位）
+        if (count($addr_l) < 4) {
+            \Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
+                'parsed' => $addr_l,
+                'expected_count' => 4,
+                'actual_count' => count($addr_l),
+            ]);
+            abort(400, 'ALTNAME_DATA ID 格式不正確');
+        }
+
+        // 處理 NULL 值
+        if(isset($addr_l[1]) && $addr_l[1] == 'NULL') {
+            $addr_l[1] = NULL;
+        }
+
+        return $addr_l;
     }
 }

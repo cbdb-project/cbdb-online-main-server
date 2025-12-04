@@ -1299,8 +1299,7 @@ Cache::put($cacheKey, $version, now()->addMinutes(10));
 
 **Web 路由 (routes/web.php)：**
 1. `/` → `WelcomeController@index`
-2. `/test` → `TestController@index`
-3. `/admin/wiki-maintenance/test-progress` → `TestController@testProgress`
+2. `/admin/wiki-maintenance/test-progress` → `TestController@testProgress`
 
 **修復方式：**
 ```php

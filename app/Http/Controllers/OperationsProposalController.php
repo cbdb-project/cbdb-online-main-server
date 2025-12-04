@@ -214,9 +214,12 @@ class OperationsProposalController extends Controller
             ? Operation::TYPE_CREATE
             : Operation::TYPE_UPDATE;
 
+        // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
+        $personId = $proposal->c_personid ?? 0;
+
         $this->operationRepository->store(
             Auth::id(),
-            0,
+            $personId,
             $type,
             $proposal->resource,
             $resourceId,

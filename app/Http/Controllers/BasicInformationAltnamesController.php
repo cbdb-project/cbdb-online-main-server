@@ -160,6 +160,13 @@ class BasicInformationAltnamesController extends Controller
             abort(404, 'ALTNAME_DATA record not found');
         }
 
+        // 填補在測試或精簡 schema 中可能缺少的欄位，避免 Blade 存取未定義屬性
+        foreach (['c_alt_name', 'c_notes', 'c_pages', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'] as $column) {
+            if (!property_exists($row, $column)) {
+                $row->{$column} = null;
+            }
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);

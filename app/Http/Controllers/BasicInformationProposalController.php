@@ -347,16 +347,25 @@ class BasicInformationProposalController extends Controller
 
     /**
      * 檢查是否有待審核的提案衝突
+     *
+     * 注意：不使用 JSON_EXTRACT 直接在 SQL 中比較，因為 MySQL/MariaDB 的 JSON_EXTRACT
+     * 返回帶引號的 JSON 字符串（如 "pending"），需要 JSON_UNQUOTE 才能正確比較。
+     * 為了跨資料庫兼容性（SQLite/MySQL），採用在 PHP 端解析 JSON 的方式。
      */
     protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType)
     {
         $resourceId = $this->buildCompositeId($keyColumns, $data);
 
-        return Operation::where('resource', $table)
+        $operations = Operation::where('resource', $table)
             ->where('resource_id', $resourceId)
             ->where('op_type', $opType)
-            ->whereRaw("JSON_EXTRACT(resource_data, '$.__review_status') = 'pending'")
-            ->exists();
+            ->get();
+
+        return $operations->contains(function (Operation $operation) {
+            $payload = json_decode($operation->resource_data, true);
+            $status = is_array($payload) ? ($payload['__review_status'] ?? null) : null;
+            return $status === 'pending';
+        });
     }
 
     /**

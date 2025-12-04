@@ -155,11 +155,17 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
+
+        if (!$row) {
+            abort(404, 'ALTNAME_DATA record not found');
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
 
         return view('biogmains.altname.edit', ['id' => $id, 'row' => $row, 'alt' => $alt, 'text_str' => $text_str,

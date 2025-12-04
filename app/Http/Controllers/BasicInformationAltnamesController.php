@@ -67,16 +67,35 @@ class BasicInformationAltnamesController extends Controller
      */
     public function store(Request $request, $id)
     {
+        // 權限檢查
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (!Auth::user()->canWriteDirectly()){
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalStore($request, $id, 'altnames');
+        }
+
+        // 直接儲存需要額外權限檢查
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+
+        // 原有的直接儲存邏輯
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, True);
         $temp = DB::table('ALTNAME_DATA')->where([
@@ -159,16 +178,35 @@ class BasicInformationAltnamesController extends Controller
      */
     public function update(Request $request, $id, $alt)
     {
+        // 權限檢查
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        elseif (!Auth::user()->canWriteDirectly()){
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdate($request, $id, 'altnames', $alt);
+        }
+
+        // 直接儲存需要額外權限檢查
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            return redirect()->back();
+        }
+
+        // 原有的直接儲存邏輯
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         $addr_l = $this->parseAltnameId($alt);
 

@@ -549,4 +549,291 @@ class BasicInformationProposalTest extends TestCase
             'c_alt_name_chn' => '退回別名',
         ]);
     }
+
+    public function testApproveRequiresReviewerPermission()
+    {
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-無權-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '無權',
+            'c_alt_name_type_code' => 1,
+            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__review_status' => 'pending',
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertStatus(403);
+    }
+
+    public function testApproveRejectsNonProposalOperation()
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-非提案-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '非提案',
+            'c_alt_name_type_code' => 1,
+            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertStatus(404);
+    }
+
+    public function testApproveFailsWhenKeyColumnsMissing()
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-缺主鍵-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '缺主鍵',
+            'c_alt_name_type_code' => 1,
+            '__review_status' => 'pending',
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('提案缺少主鍵資訊', $flash[0]['message'] ?? '');
+    }
+
+    public function testApproveCreateFailsWhenRowAlreadyExists()
+    {
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '已存在',
+            'c_alt_name_type_code' => 1,
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-已存在-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '已存在',
+            'c_alt_name_type_code' => 1,
+            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__review_status' => 'pending',
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('資料已存在', $flash[0]['message'] ?? '');
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+        $this->assertSame(1, Operation::count());
+    }
+
+    public function testApproveUpdateFailsWithoutOriginalData()
+    {
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '缺少原始',
+            'c_alt_name_type_code' => 1,
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_UPDATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-缺少原始-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '缺少原始',
+            'c_alt_name_type_code' => 1,
+            'c_notes' => '新的備註',
+            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__review_status' => 'pending',
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode([]);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('缺少原始資料', $flash[0]['message'] ?? '');
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '缺少原始',
+            'c_notes' => null,
+        ]);
+    }
+
+    public function testApproveUpdateRejectsPrimaryKeyChange()
+    {
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '不可改主鍵',
+            'c_alt_name_type_code' => 1,
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_UPDATE;
+        $operation->resource = 'ALTNAME_DATA';
+        $operation->resource_id = '1-1-不可改主鍵-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '新主鍵值',
+            'c_alt_name_type_code' => 1,
+            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__review_status' => 'pending',
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '不可改主鍵',
+            'c_alt_name_type_code' => 1,
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('提案不可修改主鍵欄位', $flash[0]['message'] ?? '');
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '不可改主鍵',
+        ]);
+    }
+
+    public function testProposalStoreFailsWhenPrimaryKeyMissing()
+    {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'altnames',
+        ]), [
+            'c_alt_name_chn' => '缺少主鍵欄位',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '主鍵缺失',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('主鍵欄位已填寫完整', $flash[0]['message'] ?? '');
+        $this->assertSame(0, Operation::count());
+    }
+
+    public function testProposalUpdateFailsWhenRowMissing()
+    {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.update', [
+            'personid' => 1,
+            'resource' => 'altnames',
+            'id' => '1-1-不存在-1',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '不存在',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '不存在的資料列',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('找不到對應的資料列', $flash[0]['message'] ?? '');
+        $this->assertSame(0, Operation::count());
+    }
+
+    public function testUnknownResourceTypeReturnsNotFound()
+    {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'unknown',
+        ]), [
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '未知',
+            'c_alt_name_type_code' => 1,
+        ]);
+
+        $response->assertStatus(404);
+    }
+
+    public function testCompositeIdEncodesHyphenInResourceId()
+    {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'altnames',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '名-字',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '連字號測試',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::first();
+        $this->assertNotNull($operation);
+        $this->assertSame('1-1-名minus字-1', $operation->resource_id);
+    }
 }

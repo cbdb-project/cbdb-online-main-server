@@ -52,6 +52,12 @@ Route::resource('basicinformation.possession', 'BasicInformationPossessionContro
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
 Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
+// BiogMain 提案路由
+Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')
+    ->name('basicinformation.proposal.store');
+Route::post('basicinformation/{personid}/{resource}/{id}/proposal', 'BasicInformationProposalController@proposalUpdate')
+    ->name('basicinformation.proposal.update');
+
 Route::get('codes', 'CodesController@index')->name('codes.index');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
 Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');

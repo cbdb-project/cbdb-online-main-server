@@ -84,8 +84,31 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="__proposal_comment" class="col-sm-2 control-label">提案說明</label>
+                    <div class="col-sm-10">
+                        <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="提交提案時請簡述修改原因或補充說明"></textarea>
+                        <small class="text-muted">僅在提交提案時需要填寫，直接儲存時可略過</small>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                        @if(Auth::check() && Auth::user()->isActive())
+                            <!-- 直接儲存按鈕（非眾包用戶可見） -->
+                            @if(Auth::user()->canWriteDirectly())
+                                <button type="submit" name="action" value="save" class="btn btn-primary">
+                                    <i class="fa fa-save"></i> 直接儲存
+                                </button>
+                            @endif
+
+                            <!-- 提交提案按鈕（所有活躍用戶可見） -->
+                            <button type="submit" name="action" value="proposal" class="btn btn-info">
+                                <i class="fa fa-paper-plane"></i> 提交提案
+                            </button>
+                        @endif
+
+                        <a href="{{ route('basicinformation.altnames.index', ['basicinformation' => $id]) }}" class="btn btn-default">
+                            <i class="fa fa-times"></i> 取消
+                        </a>
                     </div>
                 </div>
             </form>

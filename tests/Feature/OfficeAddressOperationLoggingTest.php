@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Repositories\BiogMainRepository;
+use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class OfficeAddressOperationLoggingTest extends TestCase
@@ -47,6 +49,19 @@ class OfficeAddressOperationLoggingTest extends TestCase
             $table->integer('c_posting_id');
             $table->integer('c_office_id');
             $table->integer('c_addr_id');
+            $table->string('c_created_by')->nullable();
+            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
+        });
+
+        Schema::create('POSTING_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_posting_id')->primary();
+            $table->string('c_created_by')->nullable();
+            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {
@@ -62,6 +77,8 @@ class OfficeAddressOperationLoggingTest extends TestCase
             $table->tinyInteger('crowdsourcing_status')->default(0);
             $table->tinyInteger('rate')->default(0);
         });
+
+        Auth::guard()->setUser(new GenericUser(['id' => 1, 'name' => 'Testing Admin']));
     }
 
     public function testAddressChangeCreatesStructuredOperationRecord(): void

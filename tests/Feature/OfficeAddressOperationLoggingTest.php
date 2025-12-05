@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Repositories\BiogMainRepository;
+use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class OfficeAddressOperationLoggingTest extends TestCase
@@ -47,6 +49,19 @@ class OfficeAddressOperationLoggingTest extends TestCase
             $table->integer('c_posting_id');
             $table->integer('c_office_id');
             $table->integer('c_addr_id');
+            $table->string('c_created_by')->nullable();
+            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
+        });
+
+        Schema::create('POSTING_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_posting_id')->primary();
+            $table->string('c_created_by')->nullable();
+            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {
@@ -62,6 +77,8 @@ class OfficeAddressOperationLoggingTest extends TestCase
             $table->tinyInteger('crowdsourcing_status')->default(0);
             $table->tinyInteger('rate')->default(0);
         });
+
+        Auth::guard()->setUser(new GenericUser(['id' => 1, 'name' => 'Testing Admin']));
     }
 
     public function testAddressChangeCreatesStructuredOperationRecord(): void
@@ -100,6 +117,7 @@ class OfficeAddressOperationLoggingTest extends TestCase
         $this->assertNotNull($operation);
         $this->assertEquals('POSTED_TO_ADDR_DATA', $operation->resource);
         $this->assertEquals('71313-312754', $operation->resource_id);
+        $this->assertNotNull($operation->resource_original);
 
         $after = json_decode($operation->resource_data, true);
         $before = json_decode($operation->resource_original, true);
@@ -125,6 +143,137 @@ class OfficeAddressOperationLoggingTest extends TestCase
                 ],
             ],
         ], $before);
+    }
+
+    public function testAddressChangeUpdatesAuditFields(): void
+    {
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 900001,
+            'c_posting_id' => 880001,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 900001,
+            'c_office_id' => 77771,
+            'c_posting_id' => 880001,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 900001,
+            'c_posting_id' => 880001,
+            'c_office_id' => 77771,
+            'c_addr_id' => 45,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-02 00:00:00',
+        ]);
+
+        Auth::guard()->setUser(new GenericUser(['id' => 2, 'name' => 'Updater A']));
+
+        $request = new Request([
+            '_id' => 900001,
+            '_postingid' => 880001,
+            '_officeid' => 77771,
+            'c_office_id' => 77771,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [46],
+        ]);
+
+        $repository = new BiogMainRepository();
+        $repository->officeUpdateById($request, 880001, 900001);
+
+        $posting = DB::table('POSTING_DATA')->where('c_posting_id', 880001)->first();
+        $this->assertSame('Updater A', $posting->c_modified_by);
+        $this->assertNotNull($posting->c_modified_date);
+
+        $address = DB::table('POSTED_TO_ADDR_DATA')->where([
+            'c_personid' => 900001,
+            'c_posting_id' => 880001,
+            'c_office_id' => 77771,
+            'c_addr_id' => 46,
+        ])->first();
+
+        $this->assertSame('Updater A', $address->c_created_by);
+        $this->assertSame('Updater A', $address->c_modified_by);
+        $this->assertNotNull($address->c_created_date);
+        $this->assertNotNull($address->c_modified_date);
+
+        $operation = DB::table('operations')->orderByDesc('id')->first();
+        $this->assertSame('POSTED_TO_ADDR_DATA', $operation->resource);
+        $this->assertNotNull($operation->resource_original);
+        $payload = json_decode($operation->resource_data, true);
+        $original = json_decode($operation->resource_original, true);
+
+        $this->assertSame(46, $payload['rows'][0]['c_addr_id']);
+        $this->assertSame(45, $original['rows'][0]['c_addr_id']);
+    }
+
+    public function testOfficeUpdateDoesNotResetAddressTimestampsWhenUnchanged(): void
+    {
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 910002,
+            'c_posting_id' => 880002,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-05-01 00:00:00',
+            'c_modified_by' => 'Seeder',
+            'c_modified_date' => '2023-05-02 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 910002,
+            'c_office_id' => 77772,
+            'c_posting_id' => 880002,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 910002,
+            'c_posting_id' => 880002,
+            'c_office_id' => 77772,
+            'c_addr_id' => 25,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-05-01 00:00:00',
+            'c_modified_by' => 'Seeder',
+            'c_modified_date' => '2023-05-02 00:00:00',
+        ]);
+
+        Auth::guard()->setUser(new GenericUser(['id' => 3, 'name' => 'Updater B']));
+
+        $request = new Request([
+            '_id' => 910002,
+            '_postingid' => 880002,
+            '_officeid' => 77772,
+            'c_office_id' => 77772,
+            'c_fy_intercalary' => 1,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [25],
+        ]);
+
+        $repository = new BiogMainRepository();
+        $repository->officeUpdateById($request, 880002, 910002);
+
+        $address = DB::table('POSTED_TO_ADDR_DATA')->where([
+            'c_personid' => 910002,
+            'c_posting_id' => 880002,
+            'c_office_id' => 77772,
+            'c_addr_id' => 25,
+        ])->first();
+
+        $this->assertSame('2023-05-02 00:00:00', $address->c_modified_date);
+        $this->assertSame('Seeder', $address->c_modified_by);
+
+        $operations = DB::table('operations')->pluck('resource');
+        $this->assertContains('POSTED_TO_OFFICE_DATA', $operations);
+        $this->assertNotContains('POSTED_TO_ADDR_DATA', $operations);
     }
 
     public function testAddressChangeOnlyTouchesTargetOffice(): void

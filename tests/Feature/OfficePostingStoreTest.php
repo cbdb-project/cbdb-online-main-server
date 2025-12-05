@@ -24,6 +24,10 @@ class OfficePostingStoreTest extends TestCase
         Schema::create('POSTING_DATA', function (Blueprint $table) {
             $table->integer('c_posting_id')->primary();
             $table->integer('c_personid');
+            $table->string('c_created_by')->nullable();
+            $table->string('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->string('c_modified_date')->nullable();
         });
 
         Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
@@ -44,6 +48,10 @@ class OfficePostingStoreTest extends TestCase
             $table->integer('c_posting_id');
             $table->integer('c_office_id');
             $table->integer('c_addr_id');
+            $table->string('c_created_by')->nullable();
+            $table->string('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->string('c_modified_date')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {

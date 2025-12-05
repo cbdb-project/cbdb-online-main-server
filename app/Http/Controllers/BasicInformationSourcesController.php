@@ -126,7 +126,7 @@ class BasicInformationSourcesController extends Controller
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
-        $data = $this->biogMainRepository->SourceUpdateById($request, $id, $id_);
+        $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
         $id_ = $id."-".$data['c_textid']."-".$data['c_pages'];
         flash('Update success @ '.Carbon::now(), 'success');
         //20200715引用聯合主鍵保留字弱點防禦函式

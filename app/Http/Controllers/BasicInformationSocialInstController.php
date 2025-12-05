@@ -38,7 +38,7 @@ class BasicInformationSocialInstController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithSocialInst($id);
 
         return view('biogmains.socialinst.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構']);
+            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -49,7 +49,7 @@ class BasicInformationSocialInstController extends Controller {
     public function create($id) {
         return view('biogmains.socialinst.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構', 'page_url' => '/basicinformation/'.$id.'/socialinst']);
+            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構', 'page_url' => '/basicinformation/'.$id.'/socialinst', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -115,9 +115,10 @@ class BasicInformationSocialInstController extends Controller {
         $res = $this->biogMainRepository->socialInstById($id_);
 
         return view('biogmains.socialinst.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社交機構',
+            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構',
             'page_url' => '/basicinformation/'.$id.'/socialinst',
-            'archer' => "<li><a href='#'>SocialInst</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

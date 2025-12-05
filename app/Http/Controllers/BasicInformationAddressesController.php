@@ -42,7 +42,7 @@ class BasicInformationAddressesController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAddr($id);
 
         return view('biogmains.addresses.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址']);
+            'page_title' => '地址', 'page_description' => '基本信息表 地址', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -53,7 +53,7 @@ class BasicInformationAddressesController extends Controller {
     public function create($id) {
         return view('biogmains.addresses.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址', 'page_url' => '/basicinformation/'.$id.'/addresses']);
+            'page_title' => '地址', 'page_description' => '基本信息表 地址', 'page_url' => '/basicinformation/'.$id.'/addresses', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -188,9 +188,10 @@ class BasicInformationAddressesController extends Controller {
         }
 
         return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 地址',
+            'page_title' => '地址', 'page_description' => '基本信息表 地址',
             'page_url' => '/basicinformation/'.$id.'/addresses',
-            'archer' => "<li><a href='#'>Address</a></li>", 'other_belongs_str' => $other_belongs_str,
+            'archer' => "<li>編輯</li>", 'other_belongs_str' => $other_belongs_str,
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

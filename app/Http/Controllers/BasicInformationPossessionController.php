@@ -30,7 +30,7 @@ class BasicInformationPossessionController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithPossession($id);
 
         return view('biogmains.possession.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產']);
+            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -41,7 +41,7 @@ class BasicInformationPossessionController extends Controller {
     public function create($id) {
         return view('biogmains.possession.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession']);
+            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -91,9 +91,10 @@ class BasicInformationPossessionController extends Controller {
 
         //        dd($res);
         return view('biogmains.possession.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產',
+            'page_title' => '財產', 'page_description' => '基本信息表 財產',
             'page_url' => '/basicinformation/'.$id.'/possession',
-            'archer' => "<li><a href='#'>Possession</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

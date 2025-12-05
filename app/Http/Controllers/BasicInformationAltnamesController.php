@@ -43,7 +43,7 @@ class BasicInformationAltnamesController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAlt($id);
 
         return view('biogmains.altname.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名']);
+            'page_title' => '别名', 'page_description' => '基本信息表 别名', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -54,7 +54,7 @@ class BasicInformationAltnamesController extends Controller {
     public function create($id) {
         return view('biogmains.altname.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名', 'page_url' => '/basicinformation/'.$id.'/altnames']);
+            'page_title' => '别名', 'page_description' => '基本信息表 别名', 'page_url' => '/basicinformation/'.$id.'/altnames', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -181,9 +181,10 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         return view('biogmains.altname.edit', ['id' => $id, 'row' => $row, 'alt' => $alt, 'text_str' => $text_str,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名',
+            'page_title' => '别名', 'page_description' => '基本信息表 别名',
             'page_url' => '/basicinformation/'.$id.'/altnames',
-            'archer' => "<li><a href='#'>Altname</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

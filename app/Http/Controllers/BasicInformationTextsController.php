@@ -40,7 +40,7 @@ class BasicInformationTextsController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithText($id);
 
         return view('biogmains.texts.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述']);
+            'page_title' => '著述', 'page_description' => '基本信息表 著述', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -51,7 +51,7 @@ class BasicInformationTextsController extends Controller {
     public function create($id) {
         return view('biogmains.texts.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述', 'page_url' => '/basicinformation/'.$id.'/texts']);
+            'page_title' => '著述', 'page_description' => '基本信息表 著述', 'page_url' => '/basicinformation/'.$id.'/texts', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -114,9 +114,10 @@ class BasicInformationTextsController extends Controller {
         $res = $this->biogMainRepository->textById($id_);
 
         return view('biogmains.texts.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述',
+            'page_title' => '著述', 'page_description' => '基本信息表 著述',
             'page_url' => '/basicinformation/'.$id.'/texts',
-            'archer' => "<li><a href='#'>Texts</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

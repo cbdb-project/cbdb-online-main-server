@@ -30,7 +30,7 @@ class BasicInformationKinshipController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->byIdWithKinship($id);
 
         return view('biogmains.kinship.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬']);
+            'page_title' => '親屬', 'page_description' => '基本信息表 親屬', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -41,7 +41,7 @@ class BasicInformationKinshipController extends Controller {
     public function create($id) {
         return view('biogmains.kinship.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬', 'page_url' => '/basicinformation/'.$id.'/kinship']);
+            'page_title' => '親屬', 'page_description' => '基本信息表 親屬', 'page_url' => '/basicinformation/'.$id.'/kinship', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -90,9 +90,10 @@ class BasicInformationKinshipController extends Controller {
         $res = $this->biogMainRepository->kinshipById($id_);
 
         return view('biogmains.kinship.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 親屬',
+            'page_title' => '親屬', 'page_description' => '基本信息表 親屬',
             'page_url' => '/basicinformation/'.$id.'/kinship',
-            'archer' => "<li><a href='#'>Kinship</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

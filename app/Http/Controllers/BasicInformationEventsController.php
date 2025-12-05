@@ -30,7 +30,7 @@ class BasicInformationEventsController extends Controller {
         $biogbasicinformation = $this->biogMainRepository->simpleByPersonId($id);
 
         return view('biogmains.events.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件']);
+            'page_title' => '事件', 'page_description' => '基本信息表 事件', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -41,7 +41,7 @@ class BasicInformationEventsController extends Controller {
     public function create($id) {
         return view('biogmains.events.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件', 'page_url' => '/basicinformation/'.$id.'/events']);
+            'page_title' => '事件', 'page_description' => '基本信息表 事件', 'page_url' => '/basicinformation/'.$id.'/events', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -89,9 +89,10 @@ class BasicInformationEventsController extends Controller {
         $res = $this->biogMainRepository->eventById($id.'-'.$id_);
 
         return view('biogmains.events.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 事件',
+            'page_title' => '事件', 'page_description' => '基本信息表 事件',
             'page_url' => '/basicinformation/'.$id.'/events',
-            'archer' => "<li><a href='#'>Events</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

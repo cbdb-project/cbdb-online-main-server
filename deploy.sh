@@ -22,21 +22,17 @@ fi
 echo "更新 Composer 依赖..."
 composer install --optimize-autoloader
 
-# 3. 重新生成 autoload
-echo "重新生成 Composer autoload..."
-composer dump-autoload -o
-
-# 4. 强制触发 package discovery
+# 3. 强制触发 package discovery
 php artisan package:discover --ansi
 
-# 5. 清除缓存
+# 4. 清除缓存
 echo "清除应用缓存..."
 php artisan cache:clear
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 
-# 6. 重建缓存
+# 5. 重建缓存
 echo "重建缓存..."
 php artisan config:cache
 php artisan route:cache

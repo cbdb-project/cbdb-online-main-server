@@ -155,11 +155,24 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
+
+        if (!$row) {
+            abort(404, 'ALTNAME_DATA record not found');
+        }
+
+        // 填補在測試或精簡 schema 中可能缺少的欄位，避免 Blade 存取未定義屬性
+        foreach (['c_alt_name', 'c_notes', 'c_pages', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'] as $column) {
+            if (!property_exists($row, $column)) {
+                $row->{$column} = null;
+            }
+        }
+
         $text_str = null;
         if($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
-            $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
-
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
         }
 
         return view('biogmains.altname.edit', ['id' => $id, 'row' => $row, 'alt' => $alt, 'text_str' => $text_str,

@@ -20,6 +20,11 @@ class CodesRepository
     {
         $configTables = config('codes.tables', []);
         if (!empty($configTables)) {
+            // 如果配置是關聯數組（表名 => 說明），返回鍵（表名）
+            if (array_keys($configTables) !== range(0, count($configTables) - 1)) {
+                return array_keys($configTables);
+            }
+            // 如果是索引數組（舊格式），直接返回
             return array_values(array_unique($configTables));
         }
 
@@ -87,6 +92,30 @@ class CodesRepository
 
     public function codes()
     {
-        return $this->allowedTables();
+        $configTables = config('codes.tables', []);
+
+        // 如果配置是關聯數組（表名 => 說明）
+        if (!empty($configTables) && array_keys($configTables) !== range(0, count($configTables) - 1)) {
+            $result = [];
+            foreach ($configTables as $name => $description) {
+                $result[] = [
+                    'name' => $name,
+                    'description' => $description,
+                ];
+            }
+            return $result;
+        }
+
+        // 向後兼容：如果是索引數組（舊格式）
+        $tables = $this->allowedTables();
+        $result = [];
+        foreach ($tables as $table) {
+            $result[] = [
+                'name' => $table,
+                'description' => '',
+            ];
+        }
+
+        return $result;
     }
 }

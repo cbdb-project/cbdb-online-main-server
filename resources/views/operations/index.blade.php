@@ -64,58 +64,58 @@ $item->resource_data = unionPKDef($item->resource_data);
                             @php
                                 $originalResourceId = $rawResourceId;
                                 $personLink = null;
+                                $resourceSpecificLink = null;
                                 $a = $item->resource;
                                 $id = $item->c_personid;
                                 $res_id = $item->resource_id;
                                 if ((int) $id !== 0) {
-                                    if ($item->op_type == 4) {
-                                        $personLink = "/basicinformation/{$id}";
-                                    } else {
+                                    // 人物链接统一指向编辑页面
+                                    $personLink = "/basicinformation/{$id}/edit";
+
+                                    // 根据资源类型生成特定的资源链接
+                                    if ($item->op_type != 4) {
                                         switch ($a) {
-                                            case "BIOG_MAIN":
-                                                $personLink = "/basicinformation/{$id}";
-                                                break;
                                             case "BIOG_ADDR_DATA":
-                                                $personLink = "/basicinformation/{$id}/addresses/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/addresses/{$res_id}/edit";
                                                 break;
                                             case "ALTNAME_DATA":
-                                                $personLink = "/basicinformation/{$id}/altnames/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/altnames/{$res_id}/edit";
                                                 break;
                                             case "TEXT_DATA":
                                             case "BIOG_TEXT_DATA":
-                                                $personLink = "/basicinformation/{$id}/texts/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/texts/{$res_id}/edit";
                                                 break;
                                             case "POSTED_TO_OFFICE_DATA":
                                             case "POSTED_TO_ADDR_DATA":
-                                                $personLink = "/basicinformation/{$id}/offices/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/offices/{$res_id}/edit";
                                                 break;
                                             case "ENTRY_DATA":
-                                                $personLink = "/basicinformation/{$id}/entries/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/entries/{$res_id}/edit";
                                                 break;
                                             case "EVENTS_DATA":
-                                                $personLink = "/basicinformation/{$id}/events/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/events/{$res_id}/edit";
                                                 break;
                                             case "STATUS_DATA":
-                                                $personLink = "/basicinformation/{$id}/statuses/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/statuses/{$res_id}/edit";
                                                 break;
                                             case "KIN_DATA":
-                                                $personLink = "/basicinformation/{$id}/kinship/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/kinship/{$res_id}/edit";
                                                 break;
                                             case "ASSOC_DATA":
                                                 $res_id = str_replace("/", "(slash)", $res_id);
-                                                $personLink = "/basicinformation/{$id}/assoc/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/assoc/{$res_id}/edit";
                                                 break;
                                             case "POSSESSION_DATA":
-                                                $personLink = "/basicinformation/{$id}/possession/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/possession/{$res_id}/edit";
                                                 break;
                                             case "BIOG_INST_DATA":
-                                                $personLink = "/basicinformation/{$id}/socialinst/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/socialinst/{$res_id}/edit";
                                                 break;
                                             case "BIOG_SOURCE_DATA":
-                                                $personLink = "/basicinformation/{$id}/sources/{$res_id}";
+                                                $resourceSpecificLink = "/basicinformation/{$id}/sources/{$res_id}/edit";
                                                 break;
                                             default:
-                                                $personLink = "/basicinformation/{$id}";
+                                                $resourceSpecificLink = null;
                                         }
                                     }
                                 }
@@ -126,12 +126,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $resourceLink = null;
                                 if (!$hasPersonLink && $isCodeResource) {
                                     $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
+                                } elseif ($hasPersonLink && $resourceSpecificLink) {
+                                    $resourceLink = $resourceSpecificLink;
                                 }
                             @endphp
                             @if(!$hasPersonLink)
                                 <span class="text-muted">(本修改不涉及人物)</span>
                             @else
-                                <a href="{{ $personLink }}/edit">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
+                                <a href="{{ $personLink }}">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
                             @endif
                             </td>
                             <td>{{ $item->resource }}</td>

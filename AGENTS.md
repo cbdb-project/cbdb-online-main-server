@@ -166,6 +166,11 @@
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
 - **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
+- **Eloquent 與複合主鍵的限制**：Laravel Eloquent ORM 對複合主鍵（composite primary key）支援不佳。對於擁有複合主鍵的表（如 `ALTNAME_DATA` 使用 `c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`），建議直接使用 Query Builder（`DB::table()`）而非建立 Eloquent 模型。若需要類似 Observer 的副作用（如自動索引），應在控制器中手動調用對應服務（如 `NameSearchIndexService`）。嘗試為複合主鍵表建立 Eloquent 模型會遇到以下問題：
+  - `delete()` 方法無法正常運作（要求單一主鍵）
+  - `update()` 可能無法正確檢測變更（`getDirty()` 判斷失效）
+  - 即使覆寫 `delete()`/`update()` 方法仍會增加維護成本與複雜度
+  - Observer 無法被 Query Builder 觸發，但手動調用服務更加明確且易於測試
 
 ## 快速回顧
 - 需要了解的主要模組：`CodesController`、`OperationsController`、`OperationRepository`、`resources/views/operations/*`。

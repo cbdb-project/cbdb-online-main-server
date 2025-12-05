@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\BiogMain;
-use App\Services\NameSearchIndexService;
+use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -11,10 +11,10 @@ use Tests\TestCase;
 /**
  * 姓名搜尋索引自動同步測試
  *
- * 測試 BiogMain 使用 Observer 和 ALTNAME_DATA 使用手動調用服務是否能正確維護 CBDB__NAME_FTS 索引表。
+ * 測試 BiogMain 使用 Observer，以及 ALTNAME_DATA 透過實際 Controller + 服務的流程，是否能正確維護 CBDB__NAME_FTS 索引表。
  *
  * - BiogMain：使用 Eloquent + Observer 自動觸發
- * - ALTNAME_DATA：使用 Query Builder + 手動調用 NameSearchIndexService（因復合主鍵無法使用 Eloquent）
+ * - ALTNAME_DATA：使用 BasicInformationAltnamesController + NameSearchIndexService（因復合主鍵改用 Query Builder）
  */
 class NameSearchIndexAutoSyncTest extends TestCase
 {
@@ -40,6 +40,36 @@ class NameSearchIndexAutoSyncTest extends TestCase
 
     protected function createTestTables(): void
     {
+        // users 表（供 actingAs 與權限判斷）
+        Schema::create('users', function ($table) {
+            $table->increments('id');
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->string('institution')->nullable();
+            $table->json('settings')->nullable();
+            $table->string('avatar')->nullable();
+            $table->string('confirmation_token')->nullable();
+            $table->smallInteger('is_active')->default(0);
+            $table->smallInteger('is_admin')->default(0);
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        // operations 表（BasicInformationAltnamesController 會寫入）
+        Schema::create('operations', function ($table) {
+            $table->increments('id');
+            $table->integer('user_id');
+            $table->integer('c_personid');
+            $table->integer('op_type');
+            $table->string('resource');
+            $table->string('resource_id');
+            $table->text('resource_data')->nullable();
+            $table->text('resource_original')->nullable();
+            $table->integer('crowdsourcing_status')->default(0);
+            $table->timestamps();
+        });
+
         // BIOG_MAIN 表
         Schema::create('BIOG_MAIN', function ($table) {
             $table->integer('c_personid')->primary();
@@ -56,6 +86,11 @@ class NameSearchIndexAutoSyncTest extends TestCase
             $table->integer('c_sequence')->nullable();
             $table->integer('c_alt_name_type_code');
             $table->string('c_alt_name_chn')->nullable();
+            $table->integer('c_source')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->string('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->string('c_modified_date')->nullable();
 
             // 實際資料庫使用復合主鍵，但 SQLite 測試環境簡化處理
             $table->index(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], 'idx_altname_pk');
@@ -98,6 +133,21 @@ class NameSearchIndexAutoSyncTest extends TestCase
             ['c_name_type_code' => 4, 'c_name_type_desc' => 'zi', 'c_name_type_desc_chn' => '字'],
             ['c_name_type_code' => 5, 'c_name_type_desc' => 'hao', 'c_name_type_desc_chn' => '號'],
         ]);
+    }
+
+    protected function createActiveExpert(): User
+    {
+        $user = User::create([
+            'name' => 'Admin Tester',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('secret'),
+        ]);
+
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_EXPERT;
+        $user->save();
+
+        return $user;
     }
 
     // ===== BiogMain 測試 =====
@@ -210,28 +260,22 @@ class NameSearchIndexAutoSyncTest extends TestCase
 
     public function test_creating_altname_automatically_creates_index(): void
     {
+        $user = $this->createActiveExpert();
+
         // 先創建人物
         BiogMain::create([
             'c_personid' => 2001,
             'c_name_chn' => '蘇軾',
         ]);
 
-        // 新增別名（使用 Query Builder，模擬控制器行為）
-        $altnameData = [
-            'c_personid' => 2001,
-            'c_sequence' => 1,
-            'c_alt_name_type_code' => 4,
-            'c_alt_name_chn' => '子瞻',
-        ];
-        DB::table('ALTNAME_DATA')->insert($altnameData);
-
-        // 手動調用索引服務（模擬控制器中的手動調用）
-        $indexService = app(NameSearchIndexService::class);
-        $indexService->indexAltname(
-            $altnameData['c_personid'],
-            $altnameData['c_alt_name_type_code'],
-            $altnameData['c_alt_name_chn']
-        );
+        // 透過實際 Controller 路由新增別名，確保使用生產流程與索引服務
+        $this->actingAs($user)
+            ->post('/basicinformation/2001/altnames', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 4,
+                'c_alt_name_chn' => '子瞻',
+            ])
+            ->assertStatus(302);
 
         // 檢查別名索引是否創建
         $indexExists = DB::table('CBDB__NAME_FTS')
@@ -245,47 +289,30 @@ class NameSearchIndexAutoSyncTest extends TestCase
 
     public function test_updating_altname_reindexes(): void
     {
+        $user = $this->createActiveExpert();
+
         BiogMain::create([
             'c_personid' => 2002,
             'c_name_chn' => '蘇軾',
         ]);
 
-        // 新增別名
-        $originalData = [
-            'c_personid' => 2002,
-            'c_sequence' => 1,
-            'c_alt_name_type_code' => 5,
-            'c_alt_name_chn' => '東坡居士',
-        ];
-        DB::table('ALTNAME_DATA')->insert($originalData);
+        // 透過生產路由新增別名
+        $this->actingAs($user)
+            ->post('/basicinformation/2002/altnames', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 5,
+                'c_alt_name_chn' => '東坡居士',
+            ])
+            ->assertStatus(302);
 
-        // 創建舊索引
-        $indexService = app(NameSearchIndexService::class);
-        $indexService->indexAltname(
-            $originalData['c_personid'],
-            $originalData['c_alt_name_type_code'],
-            $originalData['c_alt_name_chn']
-        );
-
-        // 修改別名（模擬控制器的更新邏輯）
-        $updatedData = ['c_alt_name_chn' => '東坡先生'];
-        DB::table('ALTNAME_DATA')
-            ->where('c_personid', 2002)
-            ->where('c_sequence', 1)
-            ->where('c_alt_name_type_code', 5)
-            ->update($updatedData);
-
-        // 手動處理索引更新：刪除舊索引，創建新索引
-        $indexService->removeAltname(
-            $originalData['c_personid'],
-            $originalData['c_alt_name_type_code'],
-            $originalData['c_alt_name_chn']
-        );
-        $indexService->indexAltname(
-            $originalData['c_personid'],
-            $originalData['c_alt_name_type_code'],
-            $updatedData['c_alt_name_chn']
-        );
+        // 使用生產路由更新別名，觸發控制器內的索引更新流程
+        $this->actingAs($user)
+            ->put('/basicinformation/2002/altnames/2002-1-東坡居士-5', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 5,
+                'c_alt_name_chn' => '東坡先生',
+            ])
+            ->assertStatus(302);
 
         // 檢查舊索引已刪除
         $oldExists = DB::table('CBDB__NAME_FTS')
@@ -306,27 +333,21 @@ class NameSearchIndexAutoSyncTest extends TestCase
 
     public function test_deleting_altname_removes_index(): void
     {
+        $user = $this->createActiveExpert();
+
         BiogMain::create([
             'c_personid' => 2003,
             'c_name_chn' => '李白',
         ]);
 
-        // 新增別名
-        $altnameData = [
-            'c_personid' => 2003,
-            'c_sequence' => 1,
-            'c_alt_name_type_code' => 4,
-            'c_alt_name_chn' => '太白',
-        ];
-        DB::table('ALTNAME_DATA')->insert($altnameData);
-
-        // 創建索引
-        $indexService = app(NameSearchIndexService::class);
-        $indexService->indexAltname(
-            $altnameData['c_personid'],
-            $altnameData['c_alt_name_type_code'],
-            $altnameData['c_alt_name_chn']
-        );
+        // 新增別名（生產路由）
+        $this->actingAs($user)
+            ->post('/basicinformation/2003/altnames', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 4,
+                'c_alt_name_chn' => '太白',
+            ])
+            ->assertStatus(302);
 
         // 確認索引已創建
         $this->assertTrue(
@@ -338,19 +359,10 @@ class NameSearchIndexAutoSyncTest extends TestCase
             '別名索引應該已創建'
         );
 
-        // 刪除別名（模擬控制器邏輯）
-        DB::table('ALTNAME_DATA')
-            ->where('c_personid', 2003)
-            ->where('c_sequence', 1)
-            ->where('c_alt_name_type_code', 4)
-            ->delete();
-
-        // 手動刪除索引
-        $indexService->removeAltname(
-            $altnameData['c_personid'],
-            $altnameData['c_alt_name_type_code'],
-            $altnameData['c_alt_name_chn']
-        );
+        // 刪除別名（生產路由），並讓控制器負責清理索引
+        $this->actingAs($user)
+            ->delete('/basicinformation/2003/altnames/2003-1-太白-4')
+            ->assertStatus(302);
 
         // 檢查別名索引已刪除
         $indexExists = DB::table('CBDB__NAME_FTS')

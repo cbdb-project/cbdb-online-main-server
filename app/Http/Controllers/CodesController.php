@@ -167,7 +167,7 @@ class CodesController extends Controller {
         $data = $this->codesrepostory->codes();
 
         return view('codes.index', [
-            'page_title' => 'Codes',
+            'page_title' => '全部表格',
             'page_description' => '全部表格',
             'page_url' => '/codes',
             'data' => $data,

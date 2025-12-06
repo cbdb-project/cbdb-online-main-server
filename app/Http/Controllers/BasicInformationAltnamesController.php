@@ -98,6 +98,8 @@ class BasicInformationAltnamesController extends Controller
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, True);
+
+        // 檢查重複資料
         $temp = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
             ['c_sequence', '=', $data['c_sequence']],
@@ -108,9 +110,12 @@ class BasicInformationAltnamesController extends Controller
             flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
             return redirect()->back();
         }
+
+        // 使用 Query Builder 插入資料
         DB::table('ALTNAME_DATA')->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
 
+        // 手動調用索引服務
         if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
             $this->nameSearchIndexService->indexAltname(
                 $data['c_personid'],
@@ -231,21 +236,25 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
 
+        // 使用 Query Builder 更新資料
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_sequence', '=', $addr_l[1]],
             ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->update($data);
+
         if($data['c_sequence'] == NULL) { $data['c_sequence'] = 'NULL'; }
         $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data, $ori);
 
+        // 手動調用索引服務
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
             $nameChanged = $ori->c_alt_name_chn !== $data['c_alt_name_chn'];
             $typeChanged = $ori->c_alt_name_type_code !== $data['c_alt_name_type_code'];
 
             if ($nameChanged || $typeChanged) {
+                // 刪除舊索引
                 if ($ori->c_alt_name_chn) {
                     $this->nameSearchIndexService->removeAltname(
                         $ori->c_personid,
@@ -254,6 +263,7 @@ class BasicInformationAltnamesController extends Controller
                     );
                 }
 
+                // 創建新索引
                 if (!empty($data['c_alt_name_chn'])) {
                     $this->nameSearchIndexService->indexAltname(
                         $addr_l[0],
@@ -302,6 +312,8 @@ class BasicInformationAltnamesController extends Controller
         ])->first();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
+
+        // 使用 Query Builder 刪除資料
         DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_sequence', '=', $addr_l[1]],
@@ -309,6 +321,7 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->delete();
 
+        // 手動調用索引服務清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {
             $this->nameSearchIndexService->removeAltname(
                 $row->c_personid,

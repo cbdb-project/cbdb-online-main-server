@@ -9,7 +9,7 @@
 namespace App\Repositories;
 
 
-use App\TextTypeCode;
+use App\TextCode;
 use Illuminate\Http\Request;
 
 class TextCodeRepository{
@@ -19,16 +19,16 @@ class TextCodeRepository{
             $num = $temp;
         }
         if (!$request->q){
-            return TextTypeCode::paginate($num);
+            return TextCode::paginate($num);
         }
-        $names = TextTypeCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate($num);
+        $names = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
         return $names;
     }
 
     public function byId($id)
     {
-        return TextTypeCode::find($id);
+        return TextCode::find($id);
     }
 
     public function updateById($request, $id)
@@ -36,7 +36,7 @@ class TextCodeRepository{
         $data = $request->all();
         //20210624增加用戶名和保存時間自動填寫
         $data = (new ToolsRepository)->timestamp($data); //更新
-        $altcode = TextTypeCode::find($id);
+        $altcode = TextCode::find($id);
         $altcode->update($data);
     }
 }

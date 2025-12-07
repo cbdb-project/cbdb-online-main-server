@@ -105,12 +105,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
+                'c_kin_code' => 2,
             ],
             [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
+                'c_kin_code' => 2,
             ],
         ]);
 
@@ -118,8 +118,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
-                'new_c_kin_code' => 2,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
             ]);
 
         $response->assertStatus(400);
@@ -138,26 +138,26 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $person1 = BiogMain::factory()->create();
         $person2 = BiogMain::factory()->create();
 
-        // 創建原始關係：person1 是 person2 的親屬（關係代碼 1）
+        // 創建原始關係：person1 是 person2 的親屬（關係代碼 2）
         DB::table('KIN_DATA')->insert([
             'c_personid' => $person1->c_personid,
             'c_kin_id' => $person2->c_personid,
-            'c_kin_code' => 1,
+            'c_kin_code' => 2,
         ]);
 
-        // 創建反向關係：person2 是 person1 的親屬（關係代碼 2）
+        // 創建反向關係：person2 是 person1 的親屬（關係代碼 303）
         DB::table('KIN_DATA')->insert([
             'c_personid' => $person2->c_personid,
             'c_kin_id' => $person1->c_personid,
-            'c_kin_code' => 2,
+            'c_kin_code' => 303,
         ]);
 
         $response = $this->actingAs($this->adminUser)
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
-                'new_c_kin_code' => 2,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
             ]);
 
         $response->assertStatus(400);
@@ -174,11 +174,11 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $person1 = BiogMain::factory()->create();
         $person2 = BiogMain::factory()->create();
 
-        // 創建原始關係：person1 是 person2 的親屬（關係代碼 1）
+        // 創建原始關係：person1 是 person2 的親屬（關係代碼 2）
         DB::table('KIN_DATA')->insert([
             'c_personid' => $person1->c_personid,
             'c_kin_id' => $person2->c_personid,
-            'c_kin_code' => 1,
+            'c_kin_code' => 2,
             'c_source' => 100,
             'c_pages' => '10-15',
             'c_notes' => '原始備註',
@@ -188,8 +188,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
-                'new_c_kin_code' => 2,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
             ]);
 
         $response->assertStatus(200);
@@ -199,12 +199,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             'original' => [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
+                'c_kin_code' => 2,
             ],
             'created' => [
                 'c_personid' => $person2->c_personid,
                 'c_kin_id' => $person1->c_personid,
-                'c_kin_code' => 2,
+                'c_kin_code' => 303,
             ],
         ]);
 
@@ -212,7 +212,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $this->assertDatabaseHas('KIN_DATA', [
             'c_personid' => $person2->c_personid,
             'c_kin_id' => $person1->c_personid,
-            'c_kin_code' => 2,
+            'c_kin_code' => 303,
             'c_source' => 100,
             'c_pages' => '10-15',
             'c_notes' => '原始備註',
@@ -222,7 +222,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $reverseRecord = DB::table('KIN_DATA')
             ->where('c_personid', $person2->c_personid)
             ->where('c_kin_id', $person1->c_personid)
-            ->where('c_kin_code', 2)
+            ->where('c_kin_code', 303)
             ->first();
 
         $this->assertStringContainsString('由單向關係修復工具自動創建', $reverseRecord->c_autogen_notes);
@@ -273,7 +273,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         DB::table('ASSOC_DATA')->insert([
             'c_personid' => $person1->c_personid,
             'c_assoc_id' => $person2->c_personid,
-            'c_assoc_code' => 10,
+            'c_assoc_code' => 4,
             'c_kin_code' => 0,
             'c_kin_id' => 0,
             'c_assoc_kin_code' => 0,
@@ -291,8 +291,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
                 'c_personid' => $person1->c_personid,
                 'c_assoc_id' => $person2->c_personid,
-                'c_assoc_code' => 10,
-                'new_c_assoc_code' => 11,
+                'c_assoc_code' => 4,
+                'new_c_assoc_code' => 5,
             ]);
 
         $response->assertStatus(200);
@@ -302,12 +302,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             'original' => [
                 'c_personid' => $person1->c_personid,
                 'c_assoc_id' => $person2->c_personid,
-                'c_assoc_code' => 10,
+                'c_assoc_code' => 4,
             ],
             'created' => [
                 'c_personid' => $person2->c_personid,
                 'c_assoc_id' => $person1->c_personid,
-                'c_assoc_code' => 11,
+                'c_assoc_code' => 5,
             ],
         ]);
 
@@ -315,7 +315,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $this->assertDatabaseHas('ASSOC_DATA', [
             'c_personid' => $person2->c_personid,
             'c_assoc_id' => $person1->c_personid,
-            'c_assoc_code' => 11,
+            'c_assoc_code' => 5,
             'c_text_title' => '測試文獻',
             'c_assoc_first_year' => 1000,
             'c_source' => 200,
@@ -327,7 +327,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $reverseRecord = DB::table('ASSOC_DATA')
             ->where('c_personid', $person2->c_personid)
             ->where('c_assoc_id', $person1->c_personid)
-            ->where('c_assoc_code', 11)
+            ->where('c_assoc_code', 5)
             ->first();
 
         $this->assertNotEmpty($reverseRecord->c_created_by);
@@ -345,7 +345,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         DB::table('KIN_DATA')->insert([
             'c_personid' => $person1->c_personid,
             'c_kin_id' => $person2->c_personid,
-            'c_kin_code' => 1,
+            'c_kin_code' => 3,
         ]);
 
         // 模擬資料庫錯誤（使用不存在的關係代碼，會導致外鍵約束失敗）
@@ -354,7 +354,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 1,
+                'c_kin_code' => 3,
                 'new_c_kin_code' => 99999, // 不存在的關係代碼
             ]);
 

@@ -2,9 +2,7 @@
 
 namespace App\Providers;
 
-use App\AltnameData;
 use App\BiogMain;
-use App\Observers\AltnameDataObserver;
 use App\Observers\BiogMainObserver;
 use App\Services\QueryProfile;
 use Illuminate\Database\Events\QueryExecuted;
@@ -39,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
 
         // 註冊姓名索引 Observers
         BiogMain::observe(BiogMainObserver::class);
-        AltnameData::observe(AltnameDataObserver::class);
+        // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為在控制器中手動調用索引服務
 
         $profiler = $this->app->make(QueryProfile::class);
 

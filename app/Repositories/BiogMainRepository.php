@@ -557,7 +557,7 @@ class BiogMainRepository
 
     public function officeUpdateById(Request $request, $id, $c_personid)
     {
-	$data = $request->all();
+        $data = $request->all();
         $_id = $data['_id'];
         $_postingid = $data['_postingid'];
         $_officeid = $data['_officeid']; //目前与officeid无关
@@ -615,7 +615,19 @@ class BiogMainRepository
                 );
             }
 
-            $shouldUpdateAddress = $hasAddressChange || $previousOfficeId !== $currentOfficeId;
+	    $shouldUpdateAddress = $hasAddressChange || $previousOfficeId !== $currentOfficeId;
+
+	    //20251204 issues-487，用戶在「修改」頁面保存時，若地名資訊（POSTED_TO_ADDR_DATA.c_addr_id）並沒有改變，用戶在保存的時候，則不會修改 POSTED_TO_ADDR_DATA 的 c_modified_by, c_modified_date 欄位。
+	    //有修改地名資訊時$shouldUpdateAddress = true
+	    //dd($shouldUpdateAddress);
+
+	    $c_created_by = Auth::user()->name;
+	    $c_created_date = Carbon::now();
+
+	    DB::table('POSTING_DATA')->where([
+                ['c_personid', '=', $_id],
+                ['c_posting_id', '=', $_postingid],
+            ])->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
 
             if ($shouldUpdateAddress) {
                 $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
@@ -633,18 +645,59 @@ class BiogMainRepository
                     })
 		    ->all();
 
+                //dd($previousOfficeId, $currentOfficeId, $beforeRows);
+
                 if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
                     DB::table('POSTED_TO_ADDR_DATA')
                         ->where('c_personid', $_id)
                         ->where('c_posting_id', $_postingid)
                         ->where('c_office_id', $previousOfficeId)
-                        ->delete();
-                }
+			->delete();
+		    //如果$previousOfficeId與$currentOfficeId不相等，而且$beforeRows有資料，就先將舊的POSTED_TO_ADDR_DATA刪除乾淨。
+		}
 
-		$c_created_by = Auth::user()->name;
-		$c_created_date = Carbon::now();
-                $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
-                $this->insertAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId, $c_created_by, $c_created_date);
+		$addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+
+		//比對修改前後的Addr陣列，刪除更新時被移除的addr。
+		$beforeAddressesForUpdate = [];
+		foreach($beforeRows as $addr_v) {
+			$beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
+		}
+		//dd($beforeRows, $addressesForInsert);
+		//dd($beforeAddressesForUpdate, $addressesForInsert);
+		$oldHave_diff = array_diff($beforeAddressesForUpdate, $addressesForInsert);
+		$newHave_diff = array_diff($addressesForInsert, $beforeAddressesForUpdate);
+		//dd($oldHave_diff);
+		//dd($newHave_diff);
+
+		//比對結束，刪除更新時被移除的addr。
+		foreach($oldHave_diff as $addr_v) {
+			DB::table('POSTED_TO_ADDR_DATA')
+                        ->where('c_personid', $_id)
+                        ->where('c_posting_id', $_postingid)
+			->where('c_office_id', $previousOfficeId)
+			->where('c_addr_id', $addr_v)
+                        ->delete();
+		}
+
+		//比對結束，新增後來新加的addr。
+		foreach($newHave_diff as $addr_v) {
+			DB::table('POSTED_TO_ADDR_DATA')->insert(
+				[
+                                    'c_personid' => $_id,
+                                    'c_posting_id' => $_postingid,
+                                    'c_office_id' => $_officeid,
+                                    'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
+                                    'c_created_by' => $c_created_by,
+                                    'c_created_date' => $c_created_date,
+                                    'c_modified_by' => $c_created_by,
+                                    'c_modified_date' => $c_created_date,
+				]
+			);
+		}
+
+
+                $this->updateAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId, $c_created_by, $c_created_date);
 
                 $afterRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $_id)
@@ -697,16 +750,16 @@ class BiogMainRepository
 	    $data['c_personid'] = $id;
 
 	    //將操作新增的使用者與當下時間紀錄為c_created_by與c_created_date。
-            $c_created_by = Auth::user()->name;
-            $c_created_date = Carbon::now();
-            $data['c_created_by'] = $c_created_by;
-            $data['c_created_date'] = $c_created_date;
+	    $c_created_by = Auth::user()->name;
+	    $c_created_date = Carbon::now();
+	    $data['c_created_by'] = $c_created_by;
+	    $data['c_created_date'] = $c_created_date;
 
             DB::table('POSTING_DATA')->insert([
                 'c_personid' => $data['c_personid'],
 		'c_posting_id' => $data['c_posting_id'],
 		'c_created_by' => $data['c_created_by'],
-                'c_created_date' => $data['c_created_date'],
+		'c_created_date' => $data['c_created_date'],
             ]);
 
             $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);
@@ -1778,6 +1831,10 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
+	$c_modified_by = Auth::user()->name;
+	$c_modified_date = Carbon::now();
+	$data['c_modified_by'] = $c_modified_by;
+	$data['c_modified_date'] = $c_modified_date;
         DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -1793,7 +1850,11 @@ class BiogMainRepository
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
-        $data['c_self_bio'] = (int)$data['c_self_bio'];
+	$data['c_self_bio'] = (int)$data['c_self_bio'];
+	$c_created_by = Auth::user()->name;
+	$c_created_date = Carbon::now();
+	$data['c_created_by'] = $c_created_by;
+	$data['c_created_date'] = $c_created_date;
         DB::table('BIOG_SOURCE_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
         return $data;
@@ -1873,6 +1934,31 @@ class BiogMainRepository
                 ]
             );
         }
+    }
+
+    protected function updateAddr(Array $c_addr, $_id, $_postingid, $_officeid, $c_created_by='', $c_created_date='')
+    {
+	    foreach ($c_addr as $item) {
+
+		    $addr = '';
+		    $addr = DB::table('POSTED_TO_ADDR_DATA')->where([
+			    ['c_personid', '=', $_id],
+			    ['c_posting_id', '=', $_postingid],
+			    ['c_office_id', '=', $_officeid],
+			    ['c_addr_id', '=', $item],
+		    ])->get();
+
+		    if(!empty($addr)) {
+			    //有資料就更新
+			    DB::table('POSTED_TO_ADDR_DATA')->where([
+                            ['c_personid', '=', $_id],
+                            ['c_posting_id', '=', $_postingid],
+                            ['c_office_id', '=', $_officeid],
+                            ['c_addr_id', '=', $item],
+                            ])
+			    ->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
+		    }
+            }
     }
 
     protected function insertAddrPo(Array $c_addr_id, $c_possession_record_id, $c_personid)

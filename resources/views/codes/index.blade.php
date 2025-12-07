@@ -16,11 +16,15 @@
                 <thead>
                 <tr>
                     <th>表名</th>
+                    <th>說明</th>
                 </tr>
                 </thead>
                 <tbody>
                 @foreach($data as $item)
-                    <tr><td><a href="/codes/{{ $item }}">{{ $item }}</a></td></tr>
+                    <tr>
+                        <td><a href="/codes/{{ $item['name'] }}">{{ $item['name'] }}</a></td>
+                        <td>{{ $item['description'] }}</td>
+                    </tr>
                 @endforeach
                 </tbody>
             </table>

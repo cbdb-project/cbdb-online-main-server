@@ -4,19 +4,35 @@ namespace App\Http\Controllers;
 
 use App\Operation;
 use App\Repositories\OperationRepository;
+use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class OperationsProposalController extends Controller
 {
     protected $operationRepository;
+    protected $nameSearchIndexService;
 
-    public function __construct(OperationRepository $operationRepository)
+    /**
+     * 表名到模型類的映射
+     * 用於將審批應用到資料表時使用 Eloquent 模型，以觸發觀察者
+     *
+     * @var array
+     */
+    protected $tableModelMap = [
+        'BIOG_MAIN' => \App\BiogMain::class,
+        // 未來可以添加更多表的映射
+        // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為手動調用索引服務
+    ];
+
+    public function __construct(OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService)
     {
         $this->operationRepository = $operationRepository;
+        $this->nameSearchIndexService = $nameSearchIndexService;
     }
 
     public function approve(Request $request, Operation $operation)
@@ -115,11 +131,24 @@ class OperationsProposalController extends Controller
             throw new \RuntimeException('資料已存在，無法再次新增。');
         }
 
+        // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
+        if (isset($this->tableModelMap[$table])) {
+            $modelClass = $this->tableModelMap[$table];
+            $model = $modelClass::create($data);
+            return $this->convertRowToArray($model);
+        }
+
+        // 如果沒有對應的模型，則使用原有的 DB::table() 方法
         DB::table($table)->insert($data);
 
         $row = DB::table($table)->where($this->buildKeyConditions($keyColumns, $data))->first();
         if (!$row) {
             throw new \RuntimeException('新增後讀取資料失敗。');
+        }
+
+        // 特殊處理：ALTNAME_DATA 需要手動調用索引服務
+        if ($table === 'ALTNAME_DATA') {
+            $this->indexAltnameAfterCreate($data);
         }
 
         return $this->convertRowToArray($row);
@@ -132,6 +161,36 @@ class OperationsProposalController extends Controller
         }
 
         $conditions = $this->buildKeyConditions($keyColumns, $original);
+
+        // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
+        if (isset($this->tableModelMap[$table])) {
+            $modelClass = $this->tableModelMap[$table];
+            $model = $modelClass::where($conditions)->first();
+            if (!$model) {
+                throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
+            }
+
+            foreach ($keyColumns as $column) {
+                if (!array_key_exists($column, $original)) {
+                    continue;
+                }
+                if (array_key_exists($column, $data) && !$this->keyValuesMatch($data[$column], $original[$column])) {
+                    throw new \RuntimeException('提案不可修改主鍵欄位。');
+                }
+            }
+
+            $updatePayload = array_diff_key($data, array_flip($keyColumns));
+            if (!empty($updatePayload)) {
+                // 使用 update() 方法，這會觸發 Observer 並強制更新
+                $model->update($updatePayload);
+                // 重新讀取以確保獲取最新數據
+                $model->refresh();
+            }
+
+            return $this->convertRowToArray($model);
+        }
+
+        // 如果沒有對應的模型，則使用原有的 DB::table() 方法
         $current = DB::table($table)->where($conditions)->first();
         if (!$current) {
             throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
@@ -154,6 +213,11 @@ class OperationsProposalController extends Controller
         $row = DB::table($table)->where($conditions)->first();
         if (!$row) {
             throw new \RuntimeException('更新後讀取資料失敗。');
+        }
+
+        // 特殊處理：ALTNAME_DATA 需要手動調用索引服務
+        if ($table === 'ALTNAME_DATA') {
+            $this->indexAltnameAfterUpdate($original, $data);
         }
 
         return $this->convertRowToArray($row);
@@ -214,9 +278,12 @@ class OperationsProposalController extends Controller
             ? Operation::TYPE_CREATE
             : Operation::TYPE_UPDATE;
 
+        // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
+        $personId = $proposal->c_personid ?? 0;
+
         $this->operationRepository->store(
             Auth::id(),
-            0,
+            $personId,
             $type,
             $proposal->resource,
             $resourceId,
@@ -253,5 +320,65 @@ class OperationsProposalController extends Controller
         }
 
         return implode('_._', $parts);
+    }
+
+    /**
+     * ALTNAME_DATA 新增後手動調用索引服務
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function indexAltnameAfterCreate(array $data): void
+    {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
+            return;
+        }
+
+        if (empty($data['c_alt_name_chn']) || !isset($data['c_personid'])) {
+            return;
+        }
+
+        $this->nameSearchIndexService->indexAltname(
+            $data['c_personid'],
+            $data['c_alt_name_type_code'],
+            $data['c_alt_name_chn']
+        );
+    }
+
+    /**
+     * ALTNAME_DATA 更新後手動調用索引服務
+     *
+     * @param array $original
+     * @param array $updated
+     * @return void
+     */
+    protected function indexAltnameAfterUpdate(array $original, array $updated): void
+    {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
+            return;
+        }
+
+        $nameChanged = ($original['c_alt_name_chn'] ?? '') !== ($updated['c_alt_name_chn'] ?? '');
+        $typeChanged = ($original['c_alt_name_type_code'] ?? null) !== ($updated['c_alt_name_type_code'] ?? null);
+
+        if ($nameChanged || $typeChanged) {
+            // 刪除舊索引
+            if (!empty($original['c_alt_name_chn'])) {
+                $this->nameSearchIndexService->removeAltname(
+                    $original['c_personid'],
+                    $original['c_alt_name_type_code'],
+                    $original['c_alt_name_chn']
+                );
+            }
+
+            // 創建新索引
+            if (!empty($updated['c_alt_name_chn'])) {
+                $this->nameSearchIndexService->indexAltname(
+                    $updated['c_personid'] ?? $original['c_personid'],
+                    $updated['c_alt_name_type_code'],
+                    $updated['c_alt_name_chn']
+                );
+            }
+        }
     }
 }

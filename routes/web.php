@@ -52,6 +52,12 @@ Route::resource('basicinformation.possession', 'BasicInformationPossessionContro
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
 Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
+// BiogMain 提案路由
+Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')
+    ->name('basicinformation.proposal.store');
+Route::post('basicinformation/{personid}/{resource}/{id}/proposal', 'BasicInformationProposalController@proposalUpdate')
+    ->name('basicinformation.proposal.update');
+
 Route::get('codes', 'CodesController@index')->name('codes.index');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
 Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
@@ -67,20 +73,6 @@ Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes
 
 Route::post('operations/{operation}/approve', 'OperationsProposalController@approve')->name('operations.proposals.approve');
 Route::post('operations/{operation}/reject', 'OperationsProposalController@reject')->name('operations.proposals.reject');
-
-Route::resource('addresscodes', 'AddressCodesController', ['name' => [
-    'show' => 'addresscode.show',
-    'create' => 'addresscode.create',
-    'edit' => 'addresscode.edit',
-    'update' => 'addresscode.update'
-]]);
-
-Route::resource('sources', 'SourcesController', ['name' => [
-    'show' => 'source.show',
-    'create' => 'source.create',
-    'edit' => 'source.edit',
-    'update' => 'source.update'
-]]);
 
 Route::resource('manage', 'ManagementController', ['name' => [
     'show' => 'manage.show',
@@ -116,8 +108,6 @@ Route::resource('modified', 'ModifiedController', ['name' => [
     'edit' => 'modified.edit',
     'update' => 'modified.update'
 ]]);
-
-Route::get('test', 'TestController@index');
 
 Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');

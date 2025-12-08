@@ -47,130 +47,22 @@ class UnidirectionalRelationshipRepairController extends Controller
      */
     public function repairKinship(Request $request)
     {
-        $request->validate([
-            'c_personid' => 'required|integer',
-            'c_kin_id' => 'required|integer',
-            'c_kin_code' => 'required|integer',
-            'new_c_kin_code' => 'required|integer',
-        ]);
-
-        $c_personid = $request->input('c_personid');
-        $c_kin_id = $request->input('c_kin_id');
-        $c_kin_code = $request->input('c_kin_code');
-        $new_c_kin_code = $request->input('new_c_kin_code');
+        $params = $this->validateAndExtractParams($request, 'kinship');
 
         try {
-            // 確認人物與關係代碼存在，避免觸發外鍵例外
-            $this->assertKinshipDependenciesExist($c_personid, $c_kin_id, $c_kin_code, $new_c_kin_code);
+            $this->assertKinshipDependenciesExist(
+                $params['person_id'],
+                $params['related_id'],
+                $params['relation_code'],
+                $params['new_relation_code']
+            );
 
-            return DB::transaction(function () use ($c_personid, $c_kin_id, $c_kin_code, $new_c_kin_code) {
-                // 檢索當前單向關係
-                $existingRelations = DB::table('KIN_DATA')
-                    ->where('c_personid', $c_personid)
-                    ->where('c_kin_id', $c_kin_id)
-                    ->where('c_kin_code', $c_kin_code)
-                    ->lockForUpdate()
-                    ->get();
-
-                // 如果找到多條記錄，提示用戶並暫停操作
-                if ($existingRelations->count() > 1) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '檢索到多條記錄（' . $existingRelations->count() . ' 條），請檢查輸入參數是否正確。',
-                        'records' => $existingRelations->map(fn($r) => [
-                            'c_personid' => $r->c_personid,
-                            'c_kin_id' => $r->c_kin_id,
-                            'c_kin_code' => $r->c_kin_code,
-                            'c_source' => $r->c_source,
-                            'c_created_by' => $r->c_created_by ?? null,
-                            'c_created_date' => $r->c_created_date ?? null,
-                        ])->toArray()
-                    ], 400);
-                }
-
-                // 如果找不到記錄
-                if ($existingRelations->count() === 0) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '未找到符合條件的親屬關係記錄。',
-                    ], 404);
-                }
-
-                $relation = $existingRelations->first();
-
-                // 檢查反向關係是否已存在
-                $reverseExists = DB::table('KIN_DATA')
-                    ->where('c_personid', $c_kin_id)
-                    ->where('c_kin_id', $c_personid)
-                    ->where('c_kin_code', $new_c_kin_code)
-                    ->exists();
-
-                if ($reverseExists) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '反向關係已存在，無需創建。',
-                    ], 400);
-                }
-
-                // 創建反向關係記錄
-                // 重要：c_autogen_notes 必須與原始記錄保持一致，這樣刪除時才能找到反向關係
-                $newRelation = [
-                    'c_personid' => $c_kin_id,
-                    'c_kin_id' => $c_personid,
-                    'c_kin_code' => $new_c_kin_code,
-                    'c_source' => $relation->c_source ?? null,
-                    'c_pages' => $relation->c_pages ?? null,
-                    'c_notes' => $relation->c_notes ?? null,
-                    'c_autogen_notes' => $relation->c_autogen_notes ?? null,
-                ];
-                $newRelation = $this->toolsRepository->timestamp($newRelation, true);
-
-                DB::table('KIN_DATA')->insert($newRelation);
-
-                $this->operationRepository->store(
-                    Auth::id(),
-                    $newRelation['c_personid'],
-                    1,
-                    'KIN_DATA',
-                    $newRelation['c_personid'] . '-' . $newRelation['c_kin_id'] . '-' . $newRelation['c_kin_code'],
-                    $newRelation,
-                    $relation
-                );
-
-                return response()->json([
-                    'success' => true,
-                    'message' => '親屬關係修復成功！已創建反向關係記錄。',
-                    'original' => [
-                        'c_personid' => $c_personid,
-                        'c_kin_id' => $c_kin_id,
-                        'c_kin_code' => $c_kin_code,
-                    ],
-                    'created' => [
-                        'c_personid' => $c_kin_id,
-                        'c_kin_id' => $c_personid,
-                        'c_kin_code' => $new_c_kin_code,
-                    ]
-                ]);
-            });
+            return $this->executeRepair('kinship', $params);
 
         } catch (ValidationException $e) {
             throw $e;
         } catch (Exception $e) {
-            Log::error('Kinship repair error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'input' => [
-                    'c_personid' => $c_personid,
-                    'c_kin_id' => $c_kin_id,
-                    'c_kin_code' => $c_kin_code,
-                    'new_c_kin_code' => $new_c_kin_code,
-                ],
-                'user_id' => Auth::id(),
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => '修復過程中發生錯誤：' . $e->getMessage(),
-            ], 500);
+            return $this->handleRepairError('Kinship', $e, $params);
         }
     }
 
@@ -179,172 +71,346 @@ class UnidirectionalRelationshipRepairController extends Controller
      */
     public function repairAssoc(Request $request)
     {
-        $request->validate([
-            'c_personid' => 'required|integer',
-            'c_assoc_id' => 'required|integer',
-            'c_assoc_code' => 'required|integer',
-            'new_c_assoc_code' => 'required|integer',
-        ]);
-
-        $c_personid = $request->input('c_personid');
-        $c_assoc_id = $request->input('c_assoc_id');
-        $c_assoc_code = $request->input('c_assoc_code');
-        $new_c_assoc_code = $request->input('new_c_assoc_code');
+        $params = $this->validateAndExtractParams($request, 'assoc');
 
         try {
-            // 確認人物與關係代碼存在，避免觸發外鍵例外
-            $this->assertAssociationDependenciesExist($c_personid, $c_assoc_id, $c_assoc_code, $new_c_assoc_code);
+            $this->assertAssociationDependenciesExist(
+                $params['person_id'],
+                $params['related_id'],
+                $params['relation_code'],
+                $params['new_relation_code']
+            );
 
-            return DB::transaction(function () use ($c_personid, $c_assoc_id, $c_assoc_code, $new_c_assoc_code) {
-                // 檢索當前單向關係
-                $existingRelations = DB::table('ASSOC_DATA')
-                    ->where('c_personid', $c_personid)
-                    ->where('c_assoc_id', $c_assoc_id)
-                    ->where('c_assoc_code', $c_assoc_code)
-                    ->lockForUpdate()
-                    ->get();
-
-                // 如果找到多條記錄，提示用戶並暫停操作
-                if ($existingRelations->count() > 1) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '檢索到多條記錄（' . $existingRelations->count() . ' 條），請檢查輸入參數是否正確。',
-                        'records' => $existingRelations->map(fn($r) => [
-                            'c_personid' => $r->c_personid,
-                            'c_assoc_id' => $r->c_assoc_id,
-                            'c_assoc_code' => $r->c_assoc_code,
-                            'c_text_title' => $r->c_text_title,
-                            'c_source' => $r->c_source,
-                            'c_created_by' => $r->c_created_by ?? null,
-                            'c_created_date' => $r->c_created_date ?? null,
-                        ])->toArray()
-                    ], 400);
-                }
-
-                // 如果找不到記錄
-                if ($existingRelations->count() === 0) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '未找到符合條件的社會關係記錄。',
-                    ], 404);
-                }
-
-                $relation = $existingRelations->first();
-                $relationFirstYear = $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR;
-
-                // 檢查反向關係是否已存在（涵蓋主鍵欄位，避免觸發重複鍵例外）
-                // ASSOC_DATA 的邏輯主鍵包含多個欄位，需要全部檢查以避免創建重複記錄
-                $reverseExists = DB::table('ASSOC_DATA')
-                    ->where('c_personid', $c_assoc_id)
-                    ->where('c_assoc_id', $c_personid)
-                    ->where('c_assoc_code', $new_c_assoc_code)
-                    ->where('c_kin_code', $relation->c_kin_code)
-                    ->where('c_kin_id', $relation->c_kin_id)
-                    ->where('c_assoc_kin_code', $relation->c_assoc_kin_code)
-                    ->where('c_assoc_kin_id', $relation->c_assoc_kin_id)
-                    ->where('c_text_title', $relation->c_text_title)
-                    ->where('c_assoc_first_year', $relationFirstYear)
-                    ->where('c_assoc_count', $relation->c_assoc_count ?? 1)
-                    ->where('c_sequence', $relation->c_sequence ?? 0)
-                    ->exists();
-
-                if ($reverseExists) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => '反向關係已存在，無需創建。',
-                    ], 400);
-                }
-
-                // 創建反向關係記錄
-                $newRelation = [
-                    'c_personid' => $c_assoc_id,
-                    'c_assoc_id' => $c_personid,
-                    'c_assoc_code' => $new_c_assoc_code,
-                    'c_kin_code' => $relation->c_kin_code,
-                    'c_kin_id' => $relation->c_kin_id,
-                    'c_assoc_kin_code' => $relation->c_assoc_kin_code,
-                    'c_assoc_kin_id' => $relation->c_assoc_kin_id,
-                    'c_text_title' => $relation->c_text_title,
-                    'c_tertiary_personid' => $relation->c_tertiary_personid ?? null,
-                    'c_tertiary_type_notes' => $relation->c_tertiary_type_notes ?? null,
-                    'c_assoc_count' => $relation->c_assoc_count ?? 1,
-                    'c_sequence' => $relation->c_sequence ?? 0,
-                    'c_assoc_first_year' => $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR,
-                    'c_assoc_last_year' => $relation->c_assoc_last_year ?? null,
-                    'c_assoc_fy_nh_code' => $relation->c_assoc_fy_nh_code ?? null,
-                    'c_assoc_fy_nh_year' => $relation->c_assoc_fy_nh_year ?? null,
-                    'c_assoc_fy_range' => $relation->c_assoc_fy_range ?? null,
-                    'c_assoc_ly_nh_code' => $relation->c_assoc_ly_nh_code ?? null,
-                    'c_assoc_ly_nh_year' => $relation->c_assoc_ly_nh_year ?? null,
-                    'c_assoc_ly_range' => $relation->c_assoc_ly_range ?? null,
-                    'c_assoc_fy_intercalary' => $relation->c_assoc_fy_intercalary ?? null,
-                    'c_assoc_fy_month' => $relation->c_assoc_fy_month ?? null,
-                    'c_assoc_fy_day' => $relation->c_assoc_fy_day ?? null,
-                    'c_assoc_fy_day_gz' => $relation->c_assoc_fy_day_gz ?? null,
-                    'c_assoc_ly_intercalary' => $relation->c_assoc_ly_intercalary ?? null,
-                    'c_assoc_ly_month' => $relation->c_assoc_ly_month ?? null,
-                    'c_assoc_ly_day' => $relation->c_assoc_ly_day ?? null,
-                    'c_assoc_ly_day_gz' => $relation->c_assoc_ly_day_gz ?? null,
-                    'c_addr_id' => $relation->c_addr_id ?? null,
-                    'c_inst_code' => $relation->c_inst_code ?? 0,
-                    'c_inst_name_code' => $relation->c_inst_name_code ?? 0,
-                    'c_litgenre_code' => $relation->c_litgenre_code ?? null,
-                    'c_occasion_code' => $relation->c_occasion_code ?? null,
-                    'c_topic_code' => $relation->c_topic_code ?? null,
-                    'c_assoc_claimer_id' => $relation->c_assoc_claimer_id ?? null,
-                    'c_source' => $relation->c_source ?? null,
-                    'c_pages' => $relation->c_pages ?? null,
-                    'c_notes' => $relation->c_notes ?? null,
-                ];
-                $newRelation = $this->toolsRepository->timestamp($newRelation, true);
-
-                DB::table('ASSOC_DATA')->insert($newRelation);
-
-                $this->operationRepository->store(
-                    Auth::id(),
-                    $newRelation['c_personid'],
-                    1,
-                    'ASSOC_DATA',
-                    $newRelation['c_personid'] . '-' . $newRelation['c_assoc_code'] . '-' . $newRelation['c_assoc_id'] . '-' . $newRelation['c_kin_code'] . '-' . $newRelation['c_kin_id'] . '-' . $newRelation['c_assoc_kin_code'] . '-' . $newRelation['c_assoc_kin_id'] . '-' . $newRelation['c_text_title'],
-                    $newRelation,
-                    $relation
-                );
-
-                return response()->json([
-                    'success' => true,
-                    'message' => '社會關係修復成功！已創建反向關係記錄。',
-                    'original' => [
-                        'c_personid' => $c_personid,
-                        'c_assoc_id' => $c_assoc_id,
-                        'c_assoc_code' => $c_assoc_code,
-                    ],
-                    'created' => [
-                        'c_personid' => $c_assoc_id,
-                        'c_assoc_id' => $c_personid,
-                        'c_assoc_code' => $new_c_assoc_code,
-                    ]
-                ]);
-            });
+            return $this->executeRepair('assoc', $params);
 
         } catch (ValidationException $e) {
             throw $e;
         } catch (Exception $e) {
-            Log::error('Association repair error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'input' => [
-                    'c_personid' => $c_personid,
-                    'c_assoc_id' => $c_assoc_id,
-                    'c_assoc_code' => $c_assoc_code,
-                    'new_c_assoc_code' => $new_c_assoc_code,
-                ],
-                'user_id' => Auth::id(),
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => '修復過程中發生錯誤：' . $e->getMessage(),
-            ], 500);
+            return $this->handleRepairError('Association', $e, $params);
         }
+    }
+
+    /**
+     * 驗證並提取請求參數
+     *
+     * @param Request $request
+     * @param string $type 'kinship' 或 'assoc'
+     * @return array 標準化的參數數組
+     */
+    protected function validateAndExtractParams(Request $request, string $type): array
+    {
+        if ($type === 'kinship') {
+            $request->validate([
+                'c_personid' => 'required|integer',
+                'c_kin_id' => 'required|integer',
+                'c_kin_code' => 'required|integer',
+                'new_c_kin_code' => 'required|integer',
+            ]);
+
+            return [
+                'person_id' => $request->input('c_personid'),
+                'related_id' => $request->input('c_kin_id'),
+                'relation_code' => $request->input('c_kin_code'),
+                'new_relation_code' => $request->input('new_c_kin_code'),
+            ];
+        } else {
+            $request->validate([
+                'c_personid' => 'required|integer',
+                'c_assoc_id' => 'required|integer',
+                'c_assoc_code' => 'required|integer',
+                'new_c_assoc_code' => 'required|integer',
+            ]);
+
+            return [
+                'person_id' => $request->input('c_personid'),
+                'related_id' => $request->input('c_assoc_id'),
+                'relation_code' => $request->input('c_assoc_code'),
+                'new_relation_code' => $request->input('new_c_assoc_code'),
+            ];
+        }
+    }
+
+    /**
+     * 執行關係修復的核心邏輯
+     *
+     * @param string $type 'kinship' 或 'assoc'
+     * @param array $params 參數數組
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function executeRepair(string $type, array $params)
+    {
+        return DB::transaction(function () use ($type, $params) {
+            $config = $this->getRepairConfig($type);
+
+            // 檢索當前單向關係
+            $existingRelations = DB::table($config['table'])
+                ->where('c_personid', $params['person_id'])
+                ->where($config['related_id_field'], $params['related_id'])
+                ->where($config['relation_code_field'], $params['relation_code'])
+                ->lockForUpdate()
+                ->get();
+
+            // 驗證記錄唯一性
+            if ($count = $existingRelations->count()) {
+                if ($count > 1) {
+                    return $this->multipleRecordsError($type, $existingRelations, $count);
+                }
+            } else {
+                return $this->recordNotFoundError($type);
+            }
+
+            $relation = $existingRelations->first();
+
+            // 檢查反向關係是否已存在
+            if ($this->reverseRelationExists($type, $relation, $params)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => '反向關係已存在，無需創建。',
+                ], 400);
+            }
+
+            // 創建反向關係記錄
+            $newRelation = $this->buildReverseRelation($type, $relation, $params);
+            $newRelation = $this->toolsRepository->timestamp($newRelation, true);
+
+            DB::table($config['table'])->insert($newRelation);
+
+            // 記錄操作日誌
+            $this->operationRepository->store(
+                Auth::id(),
+                $newRelation['c_personid'],
+                1,
+                $config['table'],
+                $this->buildResourceId($type, $newRelation),
+                $newRelation,
+                $relation
+            );
+
+            return $this->successResponse($type, $params);
+        });
+    }
+
+    /**
+     * 獲取關係類型的配置
+     */
+    protected function getRepairConfig(string $type): array
+    {
+        return $type === 'kinship' ? [
+            'table' => 'KIN_DATA',
+            'related_id_field' => 'c_kin_id',
+            'relation_code_field' => 'c_kin_code',
+            'relation_name' => '親屬關係',
+        ] : [
+            'table' => 'ASSOC_DATA',
+            'related_id_field' => 'c_assoc_id',
+            'relation_code_field' => 'c_assoc_code',
+            'relation_name' => '社會關係',
+        ];
+    }
+
+    /**
+     * 處理多條記錄錯誤
+     */
+    protected function multipleRecordsError(string $type, $records, int $count)
+    {
+        $config = $this->getRepairConfig($type);
+        $mapper = $type === 'kinship'
+            ? fn($r) => [
+                'c_personid' => $r->c_personid,
+                'c_kin_id' => $r->c_kin_id,
+                'c_kin_code' => $r->c_kin_code,
+                'c_source' => $r->c_source,
+                'c_created_by' => $r->c_created_by ?? null,
+                'c_created_date' => $r->c_created_date ?? null,
+            ]
+            : fn($r) => [
+                'c_personid' => $r->c_personid,
+                'c_assoc_id' => $r->c_assoc_id,
+                'c_assoc_code' => $r->c_assoc_code,
+                'c_text_title' => $r->c_text_title,
+                'c_source' => $r->c_source,
+                'c_created_by' => $r->c_created_by ?? null,
+                'c_created_date' => $r->c_created_date ?? null,
+            ];
+
+        return response()->json([
+            'success' => false,
+            'message' => "檢索到多條記錄（{$count} 條），請檢查輸入參數是否正確。",
+            'records' => $records->map($mapper)->toArray()
+        ], 400);
+    }
+
+    /**
+     * 處理記錄未找到錯誤
+     */
+    protected function recordNotFoundError(string $type)
+    {
+        $config = $this->getRepairConfig($type);
+        return response()->json([
+            'success' => false,
+            'message' => "未找到符合條件的{$config['relation_name']}記錄。",
+        ], 404);
+    }
+
+    /**
+     * 檢查反向關係是否已存在
+     */
+    protected function reverseRelationExists(string $type, $relation, array $params): bool
+    {
+        $config = $this->getRepairConfig($type);
+
+        if ($type === 'kinship') {
+            return DB::table('KIN_DATA')
+                ->where('c_personid', $params['related_id'])
+                ->where('c_kin_id', $params['person_id'])
+                ->where('c_kin_code', $params['new_relation_code'])
+                ->exists();
+        } else {
+            $relationFirstYear = $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR;
+            return DB::table('ASSOC_DATA')
+                ->where('c_personid', $params['related_id'])
+                ->where('c_assoc_id', $params['person_id'])
+                ->where('c_assoc_code', $params['new_relation_code'])
+                ->where('c_kin_code', $relation->c_kin_code)
+                ->where('c_kin_id', $relation->c_kin_id)
+                ->where('c_assoc_kin_code', $relation->c_assoc_kin_code)
+                ->where('c_assoc_kin_id', $relation->c_assoc_kin_id)
+                ->where('c_text_title', $relation->c_text_title)
+                ->where('c_assoc_first_year', $relationFirstYear)
+                ->where('c_assoc_count', $relation->c_assoc_count ?? 1)
+                ->where('c_sequence', $relation->c_sequence ?? 0)
+                ->exists();
+        }
+    }
+
+    /**
+     * 構建反向關係記錄
+     */
+    protected function buildReverseRelation(string $type, $relation, array $params): array
+    {
+        if ($type === 'kinship') {
+            return [
+                'c_personid' => $params['related_id'],
+                'c_kin_id' => $params['person_id'],
+                'c_kin_code' => $params['new_relation_code'],
+                'c_source' => $relation->c_source ?? null,
+                'c_pages' => $relation->c_pages ?? null,
+                'c_notes' => $relation->c_notes ?? null,
+                'c_autogen_notes' => $relation->c_autogen_notes ?? null,
+            ];
+        } else {
+            return [
+                'c_personid' => $params['related_id'],
+                'c_assoc_id' => $params['person_id'],
+                'c_assoc_code' => $params['new_relation_code'],
+                'c_kin_code' => $relation->c_kin_code,
+                'c_kin_id' => $relation->c_kin_id,
+                'c_assoc_kin_code' => $relation->c_assoc_kin_code,
+                'c_assoc_kin_id' => $relation->c_assoc_kin_id,
+                'c_text_title' => $relation->c_text_title,
+                'c_tertiary_personid' => $relation->c_tertiary_personid ?? null,
+                'c_tertiary_type_notes' => $relation->c_tertiary_type_notes ?? null,
+                'c_assoc_count' => $relation->c_assoc_count ?? 1,
+                'c_sequence' => $relation->c_sequence ?? 0,
+                'c_assoc_first_year' => $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR,
+                'c_assoc_last_year' => $relation->c_assoc_last_year ?? null,
+                'c_assoc_fy_nh_code' => $relation->c_assoc_fy_nh_code ?? null,
+                'c_assoc_fy_nh_year' => $relation->c_assoc_fy_nh_year ?? null,
+                'c_assoc_fy_range' => $relation->c_assoc_fy_range ?? null,
+                'c_assoc_ly_nh_code' => $relation->c_assoc_ly_nh_code ?? null,
+                'c_assoc_ly_nh_year' => $relation->c_assoc_ly_nh_year ?? null,
+                'c_assoc_ly_range' => $relation->c_assoc_ly_range ?? null,
+                'c_assoc_fy_intercalary' => $relation->c_assoc_fy_intercalary ?? null,
+                'c_assoc_fy_month' => $relation->c_assoc_fy_month ?? null,
+                'c_assoc_fy_day' => $relation->c_assoc_fy_day ?? null,
+                'c_assoc_fy_day_gz' => $relation->c_assoc_fy_day_gz ?? null,
+                'c_assoc_ly_intercalary' => $relation->c_assoc_ly_intercalary ?? null,
+                'c_assoc_ly_month' => $relation->c_assoc_ly_month ?? null,
+                'c_assoc_ly_day' => $relation->c_assoc_ly_day ?? null,
+                'c_assoc_ly_day_gz' => $relation->c_assoc_ly_day_gz ?? null,
+                'c_addr_id' => $relation->c_addr_id ?? null,
+                'c_inst_code' => $relation->c_inst_code ?? 0,
+                'c_inst_name_code' => $relation->c_inst_name_code ?? 0,
+                'c_litgenre_code' => $relation->c_litgenre_code ?? null,
+                'c_occasion_code' => $relation->c_occasion_code ?? null,
+                'c_topic_code' => $relation->c_topic_code ?? null,
+                'c_assoc_claimer_id' => $relation->c_assoc_claimer_id ?? null,
+                'c_source' => $relation->c_source ?? null,
+                'c_pages' => $relation->c_pages ?? null,
+                'c_notes' => $relation->c_notes ?? null,
+            ];
+        }
+    }
+
+    /**
+     * 構建資源 ID
+     */
+    protected function buildResourceId(string $type, array $relation): string
+    {
+        if ($type === 'kinship') {
+            return "{$relation['c_personid']}-{$relation['c_kin_id']}-{$relation['c_kin_code']}";
+        } else {
+            return "{$relation['c_personid']}-{$relation['c_assoc_code']}-{$relation['c_assoc_id']}-{$relation['c_kin_code']}-{$relation['c_kin_id']}-{$relation['c_assoc_kin_code']}-{$relation['c_assoc_kin_id']}-{$relation['c_text_title']}";
+        }
+    }
+
+    /**
+     * 返回成功響應
+     */
+    protected function successResponse(string $type, array $params)
+    {
+        $config = $this->getRepairConfig($type);
+        $originalKey = $type === 'kinship' ? 'c_kin_id' : 'c_assoc_id';
+        $codeKey = $config['relation_code_field'];
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$config['relation_name']}修復成功！已創建反向關係記錄。",
+            'original' => [
+                'c_personid' => $params['person_id'],
+                $originalKey => $params['related_id'],
+                $codeKey => $params['relation_code'],
+            ],
+            'created' => [
+                'c_personid' => $params['related_id'],
+                $originalKey => $params['person_id'],
+                $codeKey => $params['new_relation_code'],
+            ]
+        ]);
+    }
+
+    /**
+     * 處理修復錯誤
+     */
+    protected function handleRepairError(string $typeName, Exception $e, array $params)
+    {
+        $inputKeys = $typeName === 'Kinship'
+            ? ['c_personid', 'c_kin_id', 'c_kin_code', 'new_c_kin_code']
+            : ['c_personid', 'c_assoc_id', 'c_assoc_code', 'new_c_assoc_code'];
+
+        $input = [];
+        $fieldMap = [
+            'person_id' => $inputKeys[0],
+            'related_id' => $inputKeys[1],
+            'relation_code' => $inputKeys[2],
+            'new_relation_code' => $inputKeys[3],
+        ];
+
+        foreach ($fieldMap as $key => $originalKey) {
+            $input[$originalKey] = $params[$key];
+        }
+
+        Log::error("{$typeName} repair error", [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'input' => $input,
+            'user_id' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => '修復過程中發生錯誤：' . $e->getMessage(),
+        ], 500);
     }
 
     /**

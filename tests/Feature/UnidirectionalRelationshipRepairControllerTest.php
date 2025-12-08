@@ -111,6 +111,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             $table->integer('c_kincode')->primary();
             $table->string('c_kin_rel_name')->nullable();
             $table->string('c_kin_rel_name_chn')->nullable();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
         });
 
         // 插入测试用的关系代码
@@ -712,6 +714,254 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         $response->assertJson([
             'success' => false,
             'message' => '反向關係已存在，無需創建。',
+        ]);
+    }
+
+    /** @test */
+    public function kinship_repair_enables_bidirectional_delete()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 創建原始單向關係：person1 是 person2 的親屬（關係代碼 2）
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => '測試備註',
+        ]);
+
+        // 使用修復工具創建反向關係
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
+                'c_personid' => $person1->c_personid,
+                'c_kin_id' => $person2->c_personid,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
+            ]);
+
+        $response->assertStatus(200);
+
+        // 驗證兩條記錄都存在
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+        ]);
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+        ]);
+
+        // 需要添加 KINSHIP_CODES 的反向關係配置
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+        DB::table('KINSHIP_CODES')->where('c_kincode', 303)->update([
+            'c_kin_pair1' => 2,
+        ]);
+
+        // 使用 BiogMainRepository 刪除原始關係
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $resourceId = "{$person1->c_personid}-{$person2->c_personid}-2";
+
+        // 模擬認證用戶
+        $this->actingAs($this->adminUser);
+
+        $repository->kinshipDeleteById($resourceId, null);
+
+        // 驗證兩條記錄都被刪除（雙向刪除）
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+        ]);
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+        ]);
+    }
+
+    /** @test */
+    public function kinship_repair_reverse_delete_also_works()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 創建原始單向關係
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => null, // 測試 NULL 的情況
+        ]);
+
+        // 使用修復工具創建反向關係
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
+                'c_personid' => $person1->c_personid,
+                'c_kin_id' => $person2->c_personid,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
+            ]);
+
+        $response->assertStatus(200);
+
+        // 配置反向關係代碼
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+        DB::table('KINSHIP_CODES')->where('c_kincode', 303)->update([
+            'c_kin_pair1' => 2,
+        ]);
+
+        // 從反向關係側刪除
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $resourceId = "{$person2->c_personid}-{$person1->c_personid}-303";
+
+        $this->actingAs($this->adminUser);
+
+        $repository->kinshipDeleteById($resourceId, null);
+
+        // 驗證兩條記錄都被刪除
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+        ]);
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+        ]);
+    }
+
+    /** @test */
+    public function assoc_repair_enables_bidirectional_delete()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 創建原始單向社會關係
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_source' => 200,
+        ]);
+
+        // 使用修復工具創建反向關係
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
+                'c_personid' => $person1->c_personid,
+                'c_assoc_id' => $person2->c_personid,
+                'c_assoc_code' => 4,
+                'new_c_assoc_code' => 5,
+            ]);
+
+        $response->assertStatus(200);
+
+        // 驗證兩條記錄都存在
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+        ]);
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_assoc_id' => $person1->c_personid,
+            'c_assoc_code' => 5,
+        ]);
+
+        // 使用 BiogMainRepository 刪除原始關係
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $resourceId = "{$person1->c_personid}-4-{$person2->c_personid}-0-0-0-0-測試文獻";
+
+        $this->actingAs($this->adminUser);
+
+        $repository->assocDeleteById($resourceId, $person1->c_personid);
+
+        // 驗證兩條記錄都被刪除（雙向刪除）
+        $this->assertDatabaseMissing('ASSOC_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+        ]);
+        $this->assertDatabaseMissing('ASSOC_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_assoc_id' => $person1->c_personid,
+            'c_assoc_code' => 5,
+        ]);
+    }
+
+    /** @test */
+    public function kinship_without_repair_cannot_bidirectional_delete()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 手動創建兩條獨立的關係（不是通過修復工具創建）
+        // 這樣它們的 c_autogen_notes 不一致，無法雙向刪除
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => '原始備註',
+        ]);
+
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+            'c_source' => 100,
+            'c_autogen_notes' => '不同的備註', // 不一致的 autogen_notes
+        ]);
+
+        // 配置反向關係代碼
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+        DB::table('KINSHIP_CODES')->where('c_kincode', 303)->update([
+            'c_kin_pair1' => 2,
+        ]);
+
+        // 刪除第一條記錄
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $resourceId = "{$person1->c_personid}-{$person2->c_personid}-2";
+
+        $this->actingAs($this->adminUser);
+
+        $repository->kinshipDeleteById($resourceId, null);
+
+        // 驗證只有第一條記錄被刪除，第二條仍然存在（因為 c_autogen_notes 不匹配）
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+        ]);
+
+        // 反向關係仍然存在（單向刪除）
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
         ]);
     }
 }

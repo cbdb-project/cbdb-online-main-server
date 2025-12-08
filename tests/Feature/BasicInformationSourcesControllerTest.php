@@ -186,4 +186,36 @@ class BasicInformationSourcesControllerTest extends TestCase
         $this->assertStringContainsString('Creator User/2024-02-01 12:00:00', $html);
         $this->assertStringContainsString('Editor User/2024-02-03 08:30:00', $html);
     }
+
+    public function testSourceDeleteRemovesRowAndStoresOriginal(): void
+    {
+        $repository = new BiogMainRepository();
+        $request = new Request([
+            'c_textid' => 501,
+            'c_pages' => 'p20',
+            'c_notes' => 'to delete',
+            'c_main_source' => 1,
+            'c_self_bio' => 0,
+        ]);
+
+        $repository->sourceStoreById($request, 654);
+
+        Auth::guard()->setUser($this->makeUser(11, 'Remover User'));
+
+        $repository->sourceDeleteById(654, '654-501-p20');
+
+        $this->assertSame(0, DB::table('BIOG_SOURCE_DATA')->count());
+
+        $operation = DB::table('operations')->orderByDesc('id')->first();
+        $this->assertSame('BIOG_SOURCE_DATA', $operation->resource);
+        $this->assertSame(4, $operation->op_type);
+        $this->assertSame('654', $operation->resource_id);
+        $this->assertNull($operation->resource_original);
+
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame(654, $payload['c_personid']);
+        $this->assertSame('to delete', $payload['c_notes']);
+        $this->assertSame('Creator User', $payload['c_created_by']);
+        $this->assertNotNull($payload['c_created_date']);
+    }
 }

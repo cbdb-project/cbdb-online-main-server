@@ -19,6 +19,12 @@ $finder = Finder::create()
 return (new Config())
     ->setRules([
         '@PSR12' => true,
+        // 覆盖 PSR-12 的大括号换行要求
+        'curly_braces_position' => [
+            'control_structures_opening_brace' => 'same_line',
+            'functions_opening_brace' => 'same_line',
+            'classes_opening_brace' => 'same_line',
+        ],
         'array_syntax' => ['syntax' => 'short'],
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'no_unused_imports' => true,

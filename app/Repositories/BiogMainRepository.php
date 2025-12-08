@@ -1211,8 +1211,8 @@ class BiogMainRepository
             ['c_kin_code', '=', $temp_l[2]],
         ])->delete();
 
-        //先檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
-        if(is_null($row2->c_modified_date)) {
+        //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
+        if($row2 !== null && is_null($row2->c_modified_date)) {
             DB::table('KIN_DATA')->where([
                 ['c_kin_id',$row2->c_kin_id], 
                 ['c_personid', $row2->c_personid], 
@@ -1227,7 +1227,7 @@ class BiogMainRepository
                 ['c_kin_code', $kin_code_pair->c_kin_pair2],
             ])->delete();
         }
-        else {
+        else if($row2 !== null) {
             DB::table('KIN_DATA')->where([
                 ['c_kin_id',$row2->c_kin_id],
                 ['c_personid', $row2->c_personid],
@@ -1768,11 +1768,15 @@ class BiogMainRepository
             ['c_text_title', '=', $temp_l[7]],
         ])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
-        DB::table('ASSOC_DATA')->where([
-            ['c_personid',$row2->c_personid],
-            ['c_assoc_id', $row2->c_assoc_id],
-            ['c_source', $row2->c_source],
-        ])->delete();
+
+        // 檢查$row2是否存在後再刪除反向關係
+        if($row2 !== null) {
+            DB::table('ASSOC_DATA')->where([
+                ['c_personid',$row2->c_personid],
+                ['c_assoc_id', $row2->c_assoc_id],
+                ['c_source', $row2->c_source],
+            ])->delete();
+        }
     }
 
     public function sourceById($id, $_id)

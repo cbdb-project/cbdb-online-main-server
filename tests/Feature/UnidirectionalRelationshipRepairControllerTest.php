@@ -69,6 +69,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     protected function tearDown(): void
     {
         // 按照依赖关系顺序删除表（先删除有外键约束的表）
+        Schema::dropIfExists('operations');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('ASSOC_CODES');
@@ -154,6 +155,20 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             $table->foreign('c_kin_code')->references('c_kincode')->on('KINSHIP_CODES');
             $table->foreign('c_personid')->references('c_personid')->on('BIOG_MAIN');
             $table->foreign('c_kin_id')->references('c_personid')->on('BIOG_MAIN');
+        });
+
+        // 创建 operations 表（用於操作紀錄）
+        Schema::create('operations', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('user_id');
+            $table->integer('c_personid');
+            $table->smallInteger('op_type');
+            $table->string('resource');
+            $table->string('resource_id');
+            $table->text('resource_data');
+            $table->text('resource_original')->nullable();
+            $table->smallInteger('crowdsourcing_status')->default(0);
+            $table->timestamps();
         });
 
         // 创建 ASSOC_DATA 表（简化版，包含外键约束）
@@ -248,6 +263,21 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
+    public function kinship_repair_validates_entity_existence()
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
+                'c_personid' => 99999,
+                'c_kin_id' => 1,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 301,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['dependencies']);
+    }
+
+    /** @test */
     public function kinship_repair_returns_error_when_record_not_found()
     {
         // 創建測試人物
@@ -258,8 +288,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => $person1->c_personid,
                 'c_kin_id' => $person2->c_personid,
-                'c_kin_code' => 999,
-                'new_c_kin_code' => 998,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 301,
             ]);
 
         $response->assertStatus(404);
@@ -356,16 +386,29 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             'c_notes' => '原始備註',
         ]);
 
-        // 驗證自動生成備註
+        // 驗證反向記錄的 c_autogen_notes 與原始記錄保持一致
+        // 這很重要，因為刪除邏輯依賴 c_autogen_notes 來匹配反向關係
+        $originalRecord = DB::table('KIN_DATA')
+            ->where('c_personid', $person1->c_personid)
+            ->where('c_kin_id', $person2->c_personid)
+            ->where('c_kin_code', 2)
+            ->first();
+
         $reverseRecord = DB::table('KIN_DATA')
             ->where('c_personid', $person2->c_personid)
             ->where('c_kin_id', $person1->c_personid)
             ->where('c_kin_code', 303)
             ->first();
 
-        $this->assertStringContainsString('由單向關係修復工具自動創建', $reverseRecord->c_autogen_notes);
+        $this->assertEquals($originalRecord->c_autogen_notes, $reverseRecord->c_autogen_notes);
         $this->assertNotEmpty($reverseRecord->c_created_by);
         $this->assertNotEmpty($reverseRecord->c_created_date);
+
+        // 驗證操作紀錄
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'KIN_DATA',
+            'resource_id' => $person2->c_personid . '-' . $person1->c_personid . '-303',
+        ]);
     }
 
     /** @test */
@@ -379,6 +422,21 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
+    public function assoc_repair_validates_entity_existence()
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
+                'c_personid' => 99999,
+                'c_assoc_id' => 1,
+                'c_assoc_code' => 4,
+                'new_c_assoc_code' => 5,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['dependencies']);
+    }
+
+    /** @test */
     public function assoc_repair_returns_error_when_record_not_found()
     {
         // 創建測試人物
@@ -389,8 +447,8 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
                 'c_personid' => $person1->c_personid,
                 'c_assoc_id' => $person2->c_personid,
-                'c_assoc_code' => 999,
-                'new_c_assoc_code' => 998,
+                'c_assoc_code' => 4,
+                'new_c_assoc_code' => 5,
             ]);
 
         $response->assertStatus(404);
@@ -470,6 +528,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
 
         $this->assertNotEmpty($reverseRecord->c_created_by);
         $this->assertNotEmpty($reverseRecord->c_created_date);
+
+        // 驗證操作紀錄
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => $person2->c_personid . '-5-' . $person1->c_personid . '-0-0-0-0-測試文獻',
+        ]);
     }
 
     protected function createTestPerson()
@@ -510,11 +574,9 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
                 'new_c_kin_code' => 99999, // 不存在的關係代碼
             ]);
 
-        // 應該返回錯誤
-        $response->assertStatus(500);
-        $response->assertJson([
-            'success' => false,
-        ]);
+        // 應該返回驗證錯誤而非觸發交易中的外鍵例外
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['dependencies']);
 
         // 驗證沒有創建任何新記錄（事務回滾）
         $this->assertDatabaseMissing('KIN_DATA', [

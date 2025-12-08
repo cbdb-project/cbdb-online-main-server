@@ -329,6 +329,13 @@
                     </li>
 
                     <li class="nav-item">
+                        <a href="{{ route('admin.unidirectional-relationship-repair') }}" class="nav-link {{ $page_title == '單向關係修復' ? 'active' : '' }}">
+                            <i class="nav-icon fa fa-exchange"></i>
+                            <p>單向關係修復</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a href="{{ route('merge-preview.index') }}" class="nav-link {{ $page_title == 'MergePreview' ? 'active' : '' }}">
                             <i class="nav-icon ion ion-shuffle"></i>
                             <p>人物記錄合併</p>

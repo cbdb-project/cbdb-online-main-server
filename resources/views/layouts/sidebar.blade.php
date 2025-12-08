@@ -89,6 +89,7 @@
                 <li class="{{ $page_title == '批次匯入社會機構' ? 'active' : '' }}"><a href="{{ route('admin.batch-load-social-institutes') }}"><i class="fa fa-university"></i> <span>批次匯入社會機構</span></a></li>
                 <li class="{{ $page_title == 'Wiki 對照資料維護' ? 'active' : '' }}"><a href="{{ route('admin.wiki-maintenance') }}"><i class="fa fa-wikipedia-w"></i> <span>Wiki 對照資料維護</span></a></li>
                 <li class="{{ $page_title == 'CBDB 內部表維護' ? 'active' : '' }}"><a href="{{ route('admin.cbdb-table-maintenance') }}"><i class="fa fa-database"></i> <span>CBDB 內部表維護</span></a></li>
+                <li class="{{ $page_title == '單向關係修復' ? 'active' : '' }}"><a href="{{ route('admin.unidirectional-relationship-repair') }}"><i class="fa fa-exchange"></i> <span>單向關係修復</span></a></li>
                 <li class="{{ $page_title == 'MergePreview' ? 'active' : '' }}"><a href="{{ route('merge-preview.index') }}"><i class="ion ion-shuffle"></i> <span>人物記錄合併</span></a></li>
                 <li class="{{ $page_title == 'Management' ? 'active' : '' }}"><a href="{{ route('manage.index') }}"><i class="ion ion-ios-people-outline"></i> <span>管理用戶</span></a></li>
             @endif

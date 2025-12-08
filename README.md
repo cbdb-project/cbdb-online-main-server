@@ -23,6 +23,7 @@
 
 * 若需批次導入資料，請參考 [BATCH_UPLOADERS](./BATCH_UPLOADERS.md)
 * [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
+* [單向關係修復工具](./UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)
 * [MERGE 工具說明](./MERGE.md)
 * [檢視表總覽](./VIEWS.md)
 * [Wiki 导入任务管理](./WIKI_TASK_MANAGEMENT.md)

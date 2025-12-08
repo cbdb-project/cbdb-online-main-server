@@ -143,7 +143,15 @@ class BasicInformationSourcesControllerTest extends TestCase
         $this->assertSame('BIOG_SOURCE_DATA', $operation->resource);
         $this->assertSame('654-501-p20', $operation->resource_id);
         $this->assertEquals(3, $operation->op_type);
-        $this->assertNull($operation->resource_original);
+        $this->assertNotNull($operation->resource_original);
+
+        $originalPayload = json_decode($operation->resource_original, true);
+        $this->assertSame(654, $originalPayload['c_personid']);
+        $this->assertSame('initial note', $originalPayload['c_notes']);
+        $this->assertSame(0, $originalPayload['c_main_source']);
+        $this->assertSame(1, $originalPayload['c_self_bio']);
+        $this->assertSame('Creator User', $originalPayload['c_created_by']);
+        $this->assertNotNull($originalPayload['c_created_date']);
 
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('Editor User', $payload['c_modified_by']);

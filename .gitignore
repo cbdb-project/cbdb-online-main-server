@@ -15,3 +15,4 @@ database/database.sqlite3
 .phpunit.result.cache
 .phpunit.cache/
 .php-cs-fixer.cache
+.claude/settings.local.json

@@ -56,8 +56,8 @@
 4. **創建反向記錄**:
    - 交換 `c_personid` 和 `c_kin_id`
    - 使用 `new_c_kin_code` 作為關係代碼
-   - 繼承原記錄的 `c_source`、`c_pages`、`c_notes`
-   - 標記 `c_autogen_notes` 為「由單向關係修復工具自動創建」
+   - 繼承原記錄的 `c_source`、`c_pages`、`c_notes`、`c_autogen_notes`
+   - **重要**：`c_autogen_notes` 必須與原記錄保持一致，這是雙向刪除邏輯的關鍵依賴
    - 記錄創建者和創建時間
 
 ### 使用範例

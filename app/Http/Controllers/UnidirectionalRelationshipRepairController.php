@@ -13,6 +13,11 @@ use Exception;
 
 class UnidirectionalRelationshipRepairController extends Controller
 {
+    /**
+     * 默認的 c_assoc_first_year 值，用於 ASSOC_DATA 記錄
+     */
+    const DEFAULT_ASSOC_FIRST_YEAR = -9999;
+
     protected OperationRepository $operationRepository;
     protected ToolsRepository $toolsRepository;
 
@@ -72,7 +77,14 @@ class UnidirectionalRelationshipRepairController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => '檢索到多條記錄（' . $existingRelations->count() . ' 條），請檢查輸入參數是否正確。',
-                        'records' => $existingRelations->toArray()
+                        'records' => $existingRelations->map(fn($r) => [
+                            'c_personid' => $r->c_personid,
+                            'c_kin_id' => $r->c_kin_id,
+                            'c_kin_code' => $r->c_kin_code,
+                            'c_source' => $r->c_source,
+                            'c_created_by' => $r->c_created_by ?? null,
+                            'c_created_date' => $r->c_created_date ?? null,
+                        ])->toArray()
                     ], 400);
                 }
 
@@ -144,7 +156,17 @@ class UnidirectionalRelationshipRepairController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (Exception $e) {
-            Log::error('Kinship repair error: ' . $e->getMessage());
+            Log::error('Kinship repair error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'input' => [
+                    'c_personid' => $c_personid,
+                    'c_kin_id' => $c_kin_id,
+                    'c_kin_code' => $c_kin_code,
+                    'new_c_kin_code' => $new_c_kin_code,
+                ],
+                'user_id' => Auth::id(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => '修復過程中發生錯誤：' . $e->getMessage(),
@@ -187,7 +209,15 @@ class UnidirectionalRelationshipRepairController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => '檢索到多條記錄（' . $existingRelations->count() . ' 條），請檢查輸入參數是否正確。',
-                        'records' => $existingRelations->toArray()
+                        'records' => $existingRelations->map(fn($r) => [
+                            'c_personid' => $r->c_personid,
+                            'c_assoc_id' => $r->c_assoc_id,
+                            'c_assoc_code' => $r->c_assoc_code,
+                            'c_text_title' => $r->c_text_title,
+                            'c_source' => $r->c_source,
+                            'c_created_by' => $r->c_created_by ?? null,
+                            'c_created_date' => $r->c_created_date ?? null,
+                        ])->toArray()
                     ], 400);
                 }
 
@@ -200,9 +230,10 @@ class UnidirectionalRelationshipRepairController extends Controller
                 }
 
                 $relation = $existingRelations->first();
-                $relationFirstYear = $relation->c_assoc_first_year ?? -9999;
+                $relationFirstYear = $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR;
 
                 // 檢查反向關係是否已存在（涵蓋主鍵欄位，避免觸發重複鍵例外）
+                // ASSOC_DATA 的邏輯主鍵包含多個欄位，需要全部檢查以避免創建重複記錄
                 $reverseExists = DB::table('ASSOC_DATA')
                     ->where('c_personid', $c_assoc_id)
                     ->where('c_assoc_id', $c_personid)
@@ -213,6 +244,8 @@ class UnidirectionalRelationshipRepairController extends Controller
                     ->where('c_assoc_kin_id', $relation->c_assoc_kin_id)
                     ->where('c_text_title', $relation->c_text_title)
                     ->where('c_assoc_first_year', $relationFirstYear)
+                    ->where('c_assoc_count', $relation->c_assoc_count ?? 1)
+                    ->where('c_sequence', $relation->c_sequence ?? 0)
                     ->exists();
 
                 if ($reverseExists) {
@@ -236,7 +269,7 @@ class UnidirectionalRelationshipRepairController extends Controller
                     'c_tertiary_type_notes' => $relation->c_tertiary_type_notes ?? null,
                     'c_assoc_count' => $relation->c_assoc_count ?? 1,
                     'c_sequence' => $relation->c_sequence ?? 0,
-                    'c_assoc_first_year' => $relationFirstYear,
+                    'c_assoc_first_year' => $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR,
                     'c_assoc_last_year' => $relation->c_assoc_last_year ?? null,
                     'c_assoc_fy_nh_code' => $relation->c_assoc_fy_nh_code ?? null,
                     'c_assoc_fy_nh_year' => $relation->c_assoc_fy_nh_year ?? null,
@@ -296,7 +329,17 @@ class UnidirectionalRelationshipRepairController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (Exception $e) {
-            Log::error('Association repair error: ' . $e->getMessage());
+            Log::error('Association repair error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'input' => [
+                    'c_personid' => $c_personid,
+                    'c_assoc_id' => $c_assoc_id,
+                    'c_assoc_code' => $c_assoc_code,
+                    'new_c_assoc_code' => $new_c_assoc_code,
+                ],
+                'user_id' => Auth::id(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => '修復過程中發生錯誤：' . $e->getMessage(),

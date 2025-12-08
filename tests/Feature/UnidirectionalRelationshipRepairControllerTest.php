@@ -585,4 +585,133 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
             'c_kin_code' => 99999,
         ]);
     }
+
+    /** @test */
+    public function kinship_repair_handles_null_autogen_notes()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 創建原始關係，c_autogen_notes 為 NULL
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_autogen_notes' => null,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
+                'c_personid' => $person1->c_personid,
+                'c_kin_id' => $person2->c_personid,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
+            ]);
+
+        $response->assertStatus(200);
+
+        // 驗證反向關係的 c_autogen_notes 也為 NULL
+        $reverseRecord = DB::table('KIN_DATA')
+            ->where('c_personid', $person2->c_personid)
+            ->where('c_kin_id', $person1->c_personid)
+            ->where('c_kin_code', 303)
+            ->first();
+
+        $this->assertNull($reverseRecord->c_autogen_notes);
+    }
+
+    /** @test */
+    public function kinship_repair_preserves_autogen_notes_value()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        $customNotes = '自定義的 autogen 備註';
+
+        // 創建原始關係，帶有自定義 c_autogen_notes
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_autogen_notes' => $customNotes,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
+                'c_personid' => $person1->c_personid,
+                'c_kin_id' => $person2->c_personid,
+                'c_kin_code' => 2,
+                'new_c_kin_code' => 303,
+            ]);
+
+        $response->assertStatus(200);
+
+        // 驗證反向關係完全複製了原始的 c_autogen_notes
+        $reverseRecord = DB::table('KIN_DATA')
+            ->where('c_personid', $person2->c_personid)
+            ->where('c_kin_id', $person1->c_personid)
+            ->where('c_kin_code', 303)
+            ->first();
+
+        $this->assertEquals($customNotes, $reverseRecord->c_autogen_notes);
+    }
+
+    /** @test */
+    public function assoc_repair_checks_duplicate_with_all_key_fields()
+    {
+        // 創建測試人物
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        // 創建原始社會關係
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_assoc_count' => 2,
+            'c_sequence' => 1,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+        ]);
+
+        // 創建反向關係（包含所有邏輯主鍵欄位）
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_assoc_id' => $person1->c_personid,
+            'c_assoc_code' => 5,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_assoc_count' => 2,
+            'c_sequence' => 1,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+        ]);
+
+        // 嘗試再次修復應該被阻止
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
+                'c_personid' => $person1->c_personid,
+                'c_assoc_id' => $person2->c_personid,
+                'c_assoc_code' => 4,
+                'new_c_assoc_code' => 5,
+            ]);
+
+        $response->assertStatus(400);
+        $response->assertJson([
+            'success' => false,
+            'message' => '反向關係已存在，無需創建。',
+        ]);
+    }
 }

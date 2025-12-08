@@ -174,7 +174,15 @@ class BasicInformationSocialInstController extends Controller
         //修改結束 //20211020修改增加c_bi_begin_year與c_bi_end_year
         $addr_l = explode("-", $id_);
         if($addr_l[1] == '') {$addr_l[1] = NULL; }
-        if($addr_l[2] == '') {$addr_l[2] = NULL; }
+	if($addr_l[2] == '') {$addr_l[2] = NULL; }
+
+	$ori = DB::table('BIOG_INST_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_inst_code', '=', $addr_l[1]],
+            ['c_inst_name_code', '=', $addr_l[2]],
+            ['c_bi_role_code', '=', $addr_l[3]],
+	])->first();
+
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_inst_code', '=', $addr_l[1]],
@@ -182,7 +190,7 @@ class BasicInformationSocialInstController extends Controller
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->update($data);
         $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.socialinst.edit', [
             'basicinformation' => $id,

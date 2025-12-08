@@ -1005,7 +1005,7 @@ class BiogMainRepository
             ['c_status_code', '=', $temp_l[2]],
         ])->update($data);
         $new_id = $c_personid."-".$data['c_sequence']."-".$data['c_status_code'];
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data, $row);
         return $data;
     }
 
@@ -1122,7 +1122,7 @@ class BiogMainRepository
         ])->update($data);
         $ori_data = $data;
         $new_id_ = $id."-".$data['c_kin_id']."-".$data['c_kin_code'];
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $new_id_, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $new_id_, $data, $row);
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $kin_id;
         $data = Arr::except($data, ['c_kin_id']);
@@ -1275,8 +1275,9 @@ class BiogMainRepository
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository)->timestamp($data);
+        $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id',$id_)->first();
         DB::table('POSSESSION_DATA')->where('c_possession_record_id',$id_)->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
     }
 
     public function possessionStoreById(Request $request, $id)
@@ -1421,10 +1422,12 @@ class BiogMainRepository
         $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
-        $data = (new ToolsRepository)->timestamp($data);
+	$data = (new ToolsRepository)->timestamp($data);
+	#20251208新增差異比對紀錄
+        $ori = DB::table('EVENTS_DATA')->where('c_personid',$id)->where('c_sequence',$id_)->first();
         #20240328移除tts_sysno
         DB::table('EVENTS_DATA')->where('c_personid',$id)->where('c_sequence',$id_)->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data, $ori);
         return $data['c_sequence'];
     }
 
@@ -1653,7 +1656,7 @@ class BiogMainRepository
         ])->update($data);
         $ori_data = $data;
         $data['c_personid'] = $c_personid;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data, $row);
         //20210702取得成對資料原本的c_kin_code
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
@@ -1840,7 +1843,7 @@ class BiogMainRepository
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data, $row);
         return $data;
     }
 

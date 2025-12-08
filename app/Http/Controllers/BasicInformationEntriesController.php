@@ -224,7 +224,22 @@ class BasicInformationEntriesController extends Controller
         $addr_a = explode("-", $id_);
         foreach($addr_a as $key => $value) {
             $addr_a[$key] = str_replace("minus","-",$value);
-        }
+	}
+
+	//20251208新增差異比對紀錄
+        $ori = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $addr_a[0]],
+            ['c_entry_code', '=', $addr_a[1]],
+            ['c_sequence', '=', $addr_a[2]],
+            ['c_kin_code', '=', $addr_a[3]],
+            ['c_assoc_code', '=', $addr_a[4]],
+            ['c_kin_id', '=', $addr_a[5]],
+            ['c_year', '=', $addr_a[6]],
+            ['c_assoc_id', '=', $addr_a[7]],
+            ['c_inst_code', '=', $addr_a[8]],
+            ['c_inst_name_code', '=', $addr_a[9]],
+	])->first();
+
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],
@@ -238,7 +253,7 @@ class BasicInformationEntriesController extends Controller
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->update($data);
         $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
         return redirect()->route('basicinformation.entries.edit', [
             'basicinformation' => $id,

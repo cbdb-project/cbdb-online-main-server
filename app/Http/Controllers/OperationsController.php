@@ -197,6 +197,198 @@ class OperationsController extends Controller
                             $arr3 = [];
                         }
                         break;
+		    //20251205新增入仕差異比對紀錄
+		    case "ENTRY_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $entry_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $entry_1 = explode("-", $alt);
+                            foreach($entry_1 as $key => $value) {
+                                $entry_1[$key] = str_replace("minus","-",$value);
+                            }
+			}
+			$arr3 = DB::table('ENTRY_DATA')->where([
+                            ['c_personid', '=', $entry_1[0]],
+                            ['c_entry_code', '=', $entry_1[1]],
+                            ['c_sequence', '=', $entry_1[2]],
+                            ['c_kin_code', '=', $entry_1[3]],
+                            ['c_assoc_code', '=', $entry_1[4]],
+                            ['c_kin_id', '=', $entry_1[5]],
+                            ['c_year', '=', $entry_1[6]],
+                            ['c_assoc_id', '=', $entry_1[7]],
+                            ['c_inst_code', '=', $entry_1[8]],
+                            ['c_inst_name_code', '=', $entry_1[9]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			//dd($arr3);
+                        break;
+		    //20251208新增事件差異比對紀錄
+		    case "EVENTS_DATA":
+                        $arr3 = DB::table('EVENTS_DATA')->where('c_personid',$c_personid)->where('c_sequence',$resource_id)->first();    
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+                        break;
+		    //20251208新增社會區別差異比對紀錄
+		    case "STATUS_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $status_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $status_1 = explode("-", $alt);
+                            foreach($status_1 as $key => $value) {
+                                $status_1[$key] = str_replace("minus","-",$value);
+                            }
+			}
+			$arr3 = DB::table('STATUS_DATA')->where([
+			    ['c_personid', '=', $status_1[0]],
+			    ['c_sequence', '=', $status_1[1]],
+			    ['c_status_code', '=', $status_1[2]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			break;
+		    //20251208新增親屬差異比對紀錄
+		    case "KIN_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $kin_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $kin_1 = explode("-", $alt);
+                            foreach($kin_1 as $key => $value) {
+                                $kin_1[$key] = str_replace("minus","-",$value);
+                            }
+			}
+			$arr3 = DB::table('KIN_DATA')->where([
+			    ['c_personid', '=', $kin_1[0]],
+			    ['c_kin_id', '=', $kin_1[1]],
+			    ['c_kin_code', '=', $kin_1[2]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			break;
+		    //20251208新增社會關係差異比對紀錄
+		    case "ASSOC_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $assoc_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $assoc_1 = explode("-", $alt);
+                            foreach($assoc_1 as $key => $value) {
+                                $assoc_1[$key] = str_replace("minus","-",$value);
+			    }
+			    //防止c_text_title欄位內含負號所做的字串重組
+			    $new_c_text_title = '';
+			    if(!empty($assoc_1[8])) {
+			        for($i=7; $i<count($assoc_1); $i++) {
+				    if(empty($new_c_text_title)) { $new_c_text_title .= $assoc_1[$i]; }
+				    else { $new_c_text_title .= "-".$assoc_1[$i]; }
+				}
+			        $assoc_1[7] = $new_c_text_title;
+			    }
+			    //end
+			}
+			$arr3 = DB::table('ASSOC_DATA')->where([
+			    ['c_personid', '=', $assoc_1[0]],
+			    ['c_assoc_code', '=', $assoc_1[1]],
+			    ['c_assoc_id', '=', $assoc_1[2]],
+			    ['c_kin_code', '=', $assoc_1[3]],
+			    ['c_kin_id', '=', $assoc_1[4]],
+			    ['c_assoc_kin_code', '=', $assoc_1[5]],
+			    ['c_assoc_kin_id', '=', $assoc_1[6]],
+			    ['c_text_title', '=', $assoc_1[7]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			break;
+		    //20251208新增財產差異比對紀錄
+		    case "POSSESSION_DATA":
+			$arr3 = DB::table('POSSESSION_DATA')->where('c_possession_record_id',$resource_id)->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+                        break;
+		    //20251208新增社交機構差異比對紀錄
+		    case "BIOG_INST_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $inst_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $inst_1 = explode("-", $alt);
+                            foreach($inst_1 as $key => $value) {
+                                $inst_1[$key] = str_replace("minus","-",$value);
+			    }
+			    if($inst_1[1] == '') {$inst_1[1] = NULL; }
+			    if($inst_1[2] == '') {$inst_1[2] = NULL; }
+			}
+			$arr3 = DB::table('BIOG_INST_DATA')->where([
+			    ['c_personid', '=', $inst_1[0]],
+			    ['c_inst_code', '=', $inst_1[1]],
+			    ['c_inst_name_code', '=', $inst_1[2]],
+			    ['c_bi_role_code', '=', $inst_1[3]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			break;
+		    //20251208新增出處差異比對紀錄
+		    case "BIOG_SOURCE_DATA":
+                        // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
+                        if (strpos($resource_id, '_._') !== false) {
+                            // 使用 _._格式
+                            $source_1 = explode('_._', $resource_id);
+                        } else {
+                            // 使用 - 格式
+                            $alt = str_replace("--","-minus",$resource_id);
+                            //聯合主鍵保留字弱點防禦函式，解析保留字。
+                            $alt = $this->unionPKDef_decode($alt);
+                            $source_1 = explode("-", $alt);
+                            foreach($source_1 as $key => $value) {
+                                $source_1[$key] = str_replace("minus","-",$value);
+			    }
+			    //防止c_pages欄位內含負號所做的字串重組
+			    $new_c_pages = '';
+			    if(!empty($source_1[3])) {
+			        for($i=2; $i<count($source_1); $i++) {
+			            if(empty($new_c_pages)) { $new_c_pages .= $source_1[$i]; }
+			            else { $new_c_pages .= "-".$source_1[$i]; }
+				}
+				$source_1[2] = $new_c_pages;
+			    }
+
+			}
+			$arr3 = DB::table('BIOG_SOURCE_DATA')->where([
+			    ['c_personid', '=', $source_1[0]],
+			    ['c_textid', '=', $source_1[1]],
+			    ['c_pages', '=', $source_1[2]],
+			])->first();
+                        $arr3 = json_encode($arr3);
+                        $arr3 = json_decode($arr3, true);
+			break;
                     default:
                         $arr3 = array();
                         break;

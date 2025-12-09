@@ -58,7 +58,7 @@ migration 是laravel提供的一个数据库迁移功能，可以方便的在新
 ```bash
 php artisan make:migration creat_tasks_table --create=tasks
 ```
-参考文档[migrations](http://d.laravel-china.org/docs/5.4/migrations)
+参考文档：[Laravel 10.x Migrations](https://laravel.com/docs/10.x/migrations)
 
 ### 用户验证
 
@@ -68,7 +68,7 @@ php artisan make:migration creat_tasks_table --create=tasks
 php artisan make:auth
 ```
 
-参考文档[authentication](http://d.laravel-china.org/docs/5.4/authentication)
+参考文档：[Laravel 10.x Authentication](https://laravel.com/docs/10.x/authentication)
 
 ### 信息提示 flash
 
@@ -78,15 +78,20 @@ php artisan make:auth
 
 表单验证会是本项目的重点之一，保证用户提交的信息准确无误
 
-参考文档[validation](http://d.laravel-china.org/docs/5.4/validation)
+参考文档：[Laravel 10.x Validation](https://laravel.com/docs/10.x/validation)
 
-### Eloquent ORM
+### Eloquent ORM 與 Query Builder
 
 Laravel 的 Eloquent ORM 提供了漂亮、简洁的 ActiveRecord 实现来和数据库进行交互。每个数据库表都有一个对应的「模型」可用来跟数据表进行交互。你可以通过模型查询数据表内的数据，以及将记录添加到数据表中。
 
-本项目的数据库操作都会采取这种方式。
+**重要原則：**
+- **單一主鍵的表**：可以使用 Eloquent 模型進行操作
+- **複合主鍵的表**（如 `ALTNAME_DATA`、`POSTED_TO_ADDR_DATA` 等）：必須使用 Query Builder（`DB::table()`）而非 Eloquent 模型，因為 **Eloquent 官方不支持複合主鍵**。雖然有第三方套件提供支援，但會增加維護上的不確定性，因此本專案決定在複合主鍵表上直接使用 Query Builder
 
-参考文档[eloquent](http://d.laravel-china.org/docs/5.4/eloquent)
+参考文档：
+- [Laravel 10.x Eloquent ORM](https://laravel.com/docs/10.x/eloquent)
+- [Laravel 10.x Query Builder](https://laravel.com/docs/10.x/queries)
+- [複合主鍵限制說明](./AGENTS.md#常見坑位)
 
 ### 控制器
 
@@ -108,7 +113,7 @@ php artisan make:request BiogBasicInformationRequest
 ```
 
 
-参考文档[controllers](http://d.laravel-china.org/docs/5.4/controllers)
+参考文档：[Laravel 10.x Controllers](https://laravel.com/docs/10.x/controllers)
 
 ### webpack打包
 
@@ -126,7 +131,7 @@ DYNASTIES
 CHORONYM_CODES
 
 ### passport API认证
-http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
+参考文档：[Laravel 10.x Passport](https://laravel.com/docs/10.x/passport)
 
 ### 对数据库的修改
 
@@ -142,7 +147,7 @@ http://d.laravel-china.org/docs/5.4/passport#frontend-quickstart
 
 ### 构建API资源服务
 
-参考文档[controllers](http://d.laravel-china.org/docs/5.6/eloquent-resources)
+参考文档：[Laravel 10.x Eloquent Resources](https://laravel.com/docs/10.x/eloquent-resources)
 
 创建API资源控制器，如人物主要信息
 

@@ -426,10 +426,16 @@ php artisan migrate
 大部分情况下，Eloquent 会自动处理数据库差异：
 
 ```php
-// ✅ 好 - 自动兼容
+// ✅ 好 - 单一主键的表使用 Eloquent
 User::where('email', 'test@example.com')->first();
+
+// ✅ 好 - 复合主键的表使用 Query Builder
 DB::table('users')->where('active', 1)->get();
 ```
+
+**重要限制：**
+- **单一主键的表**：可以使用 Eloquent 模型
+- **复合主键的表**（如 `ALTNAME_DATA`、`POSTED_TO_ADDR_DATA`）：必须使用 Query Builder（`DB::table()`），因为 **Eloquent 官方不支持复合主键**。虽然有第三方套件提供支持，但会增加维护上的不确定性，因此本项目决定在复合主键表上直接使用 Query Builder
 
 #### 2. 避免数据库特定函数
 
@@ -617,9 +623,9 @@ if ($driver === 'mysql') {
 
 ### Laravel 文档
 
-- [数据库配置](https://laravel.com/docs/5.6/database)
-- [迁移](https://laravel.com/docs/5.6/migrations)
-- [测试](https://laravel.com/docs/5.6/testing)
+- [数据库配置](https://laravel.com/docs/10.x/database)
+- [迁移](https://laravel.com/docs/10.x/migrations)
+- [测试](https://laravel.com/docs/10.x/testing)
 
 ### 最佳实践
 

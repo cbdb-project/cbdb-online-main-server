@@ -150,7 +150,7 @@
    - 若改了前端資源，記得提交編譯後檔案（除非專案流程另有規範）。
 4. **開發注意事項**：
    - 嚴禁在未授權情況下直接修改資料庫結構或大量資料。
-   - 避免在 Controller 中直接寫 SQL；如需操作資料庫，優先利用 Repository 或 Eloquent。
+   - 避免在 Controller 中直接寫 SQL；如需操作資料庫，優先利用 Repository。對於**單一主鍵**的表可以使用 Eloquent 模型，但對於**複合主鍵**的表（如 `ALTNAME_DATA`、`POSTED_TO_ADDR_DATA` 等）必須使用 Query Builder（`DB::table()`）而非 Eloquent 模型。
    - 所有新路由需通過授權檢查，避免只靠前端限制。
   - 目前前端樣式與互動高度依賴 AdminLTE（`resources/assets/sass/app.scss`、`resources/assets/js/bootstrap.js` 持續匯入相關資產）；`/codes` 已改用 `layouts/dashboard-v3`（AdminLTE 3 CDN、未載入 Mix 產物），其他頁面仍是 AdminLTE 2。若要移除舊資產需先規畫替代的樣式框架、重構 Blade 樣板與 JS 初始化流程，並逐頁驗證後才能刪除舊資產，避免界面崩壞。
 5. **文檔更新建議**：
@@ -166,11 +166,13 @@
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
 - **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
-- **Eloquent 與複合主鍵的限制**：Laravel Eloquent ORM 對複合主鍵（composite primary key）支援不佳。對於擁有複合主鍵的表（如 `ALTNAME_DATA` 使用 `c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`），建議直接使用 Query Builder（`DB::table()`）而非建立 Eloquent 模型。若需要類似 Observer 的副作用（如自動索引），應在控制器中手動調用對應服務（如 `NameSearchIndexService`）。嘗試為複合主鍵表建立 Eloquent 模型會遇到以下問題：
-  - `delete()` 方法無法正常運作（要求單一主鍵）
-  - `update()` 可能無法正確檢測變更（`getDirty()` 判斷失效）
-  - 即使覆寫 `delete()`/`update()` 方法仍會增加維護成本與複雜度
-  - Observer 無法被 Query Builder 觸發，但手動調用服務更加明確且易於測試
+- **Eloquent 與複合主鍵的限制**：Laravel Eloquent ORM **官方不支持**複合主鍵（composite primary key）。雖然社群有第三方套件（如 `laravel-composite-primary-keys`）提供支援，但引入第三方包會增加維護上的不確定性（套件的長期維護狀態難以保證）。因此，本專案決定對於擁有複合主鍵的表（如 `ALTNAME_DATA` 使用 `c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`），直接使用 Query Builder（`DB::table()`）而非建立 Eloquent 模型。若需要類似 Observer 的副作用（如自動索引），應在 Repository 或 Service 層手動調用對應服務（如 `NameSearchIndexService`）。
+
+  使用 Query Builder 的優勢：
+  - 官方完整支援，無需依賴第三方套件
+  - 程式碼更明確，易於理解和維護
+  - 避免 Eloquent 在複合主鍵下的各種問題（`delete()`/`update()` 方法無法正常運作、`getDirty()` 判斷失效等）
+  - 手動調用服務比 Observer 更加明確且易於測試
 
 ## 快速回顧
 - 需要了解的主要模組：`CodesController`、`OperationsController`、`OperationRepository`、`resources/views/operations/*`。

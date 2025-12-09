@@ -205,6 +205,51 @@ $users = DB::table('users')
     ->get();
 ```
 
+### ORM 使用策略
+
+#### Eloquent 與複合主鍵限制
+
+**重要原則**：Laravel Eloquent ORM **官方不支持**複合主鍵（composite primary key）。雖然社群有第三方套件提供支援，但會增加維護上的不確定性（套件的長期維護狀態難以保證）。因此需根據表結構選擇合適的操作方式。
+
+```php
+// ✅ 好：單一主鍵的表使用 Eloquent
+class User extends Model {
+    protected $primaryKey = 'id';  // 單一主鍵
+}
+
+$user = User::find(1);
+$user->update(['name' => 'New Name']);
+$user->delete();
+
+// ✅ 好：複合主鍵的表使用 Query Builder
+// 例如：ALTNAME_DATA 有複合主鍵 (c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code)
+DB::table('ALTNAME_DATA')
+    ->where('c_personid', $personId)
+    ->where('c_sequence', $sequence)
+    ->update(['c_alt_name_chn' => $name]);
+
+DB::table('ALTNAME_DATA')
+    ->where('c_personid', $personId)
+    ->where('c_sequence', $sequence)
+    ->delete();
+
+// ❌ 避免：為複合主鍵表建立 Eloquent 模型
+// Eloquent 官方不支持複合主鍵，會導致以下問題：
+// - delete() 方法無法正常運作（僅支援單一主鍵）
+// - update() 無法正確檢測變更（getDirty() 判斷失效）
+// - find() 等方法無法使用
+// 雖然有第三方套件，但會增加維護負擔和不確定性
+```
+
+**本專案複合主鍵表示例**：
+- `ALTNAME_DATA`：`c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`
+- `POSTED_TO_ADDR_DATA`：`c_personid + c_posting_id + c_office_id`
+
+**處理副作用（如索引更新）**：
+- 不要依賴 Eloquent Observer（Query Builder 不會觸發）
+- 在 Repository 或 Service 層手動調用相關服務（如 `NameSearchIndexService`）
+- 更加明確且易於測試
+
 ---
 
 ## 具體場景指南
@@ -476,9 +521,9 @@ public function test_works_on_mariadb()
 ## 參考資源
 
 ### 官方文檔
-- [Laravel 8.x Database](https://laravel.com/docs/8.x/database)
-- [Laravel 8.x Migrations](https://laravel.com/docs/8.x/migrations)
-- [Laravel 8.x Eloquent](https://laravel.com/docs/8.x/eloquent)
+- [Laravel 10.x Database](https://laravel.com/docs/10.x/database)
+- [Laravel 10.x Migrations](https://laravel.com/docs/10.x/migrations)
+- [Laravel 10.x Eloquent](https://laravel.com/docs/10.x/eloquent)
 - [MariaDB Documentation](https://mariadb.com/kb/en/)
 
 ### 兼容性指南

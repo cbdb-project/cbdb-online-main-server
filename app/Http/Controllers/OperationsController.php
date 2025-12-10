@@ -781,7 +781,7 @@ class OperationsController extends Controller {
         $key = str_replace("(slash)", "/", $key);
         $key = str_replace("(backslash)", "\\", $key);
         $key = str_replace("(brackets)", "{", $key);
-        $key = str_replace("(brackets_r)","}",$key);
+        $key = str_replace("(brackets_r)", "}", $key);
         $result = $key;
 
         return $result;

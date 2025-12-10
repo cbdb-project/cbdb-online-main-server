@@ -11,15 +11,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
-class AppServiceProvider extends ServiceProvider
-{
+class AppServiceProvider extends ServiceProvider {
     /**
      * Register any application services.
      *
      * @return void
      */
-    public function register()
-    {
+    public function register() {
         $this->app->singleton(QueryProfile::class, function () {
             return new QueryProfile();
         });
@@ -30,8 +28,7 @@ class AppServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    public function boot()
-    {
+    public function boot() {
         // 使用 Bootstrap 分页样式（Laravel 8 默认为 Tailwind）
         Paginator::useBootstrap();
 

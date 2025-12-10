@@ -2,57 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\BiogMain;
 use App\OfficeCode;
 use App\OfficeCodeTypeRel;
 use App\OfficeTypeTree;
 use App\Operation;
-use App\Repositories\ToolsRepository;
 use App\Repositories\OperationRepository;
-use Carbon\Carbon;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
+use App\Repositories\ToolsRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
-class ModifiedController extends Controller
-{
+class ModifiedController extends Controller {
     protected $operationRepository;
     protected $toolRepository;
 
-    public function __construct(ToolsRepository $toolsRepository,OperationRepository $operationRepository)
-    {
-        $this->toolRepository  = $toolsRepository;
+    public function __construct(ToolsRepository $toolsRepository, OperationRepository $operationRepository) {
+        $this->toolRepository = $toolsRepository;
         $this->operationRepository = $operationRepository;
     }
 
-    public function store()
-    {
-//        Operation::all();
+    public function store() {
+        //        Operation::all();
     }
 
-    public function index()
-    {
-        $lists = Operation::whereIn('crowdsourcing_status', array(0,1))->orderBy('updated_at', 'desc')->limit(100)->paginate(20);
+    public function index() {
+        $lists = Operation::whereIn('crowdsourcing_status', [0,1])->orderBy('updated_at', 'desc')->limit(100)->paginate(20);
         //將物件轉為陣列進行陣列比對
         $listsArr = $this->operationRepository->objectToArray($lists);
         $dataRows = isset($listsArr['data']) && is_array($listsArr['data']) ? $listsArr['data'] : [];
         $all = count($dataRows);
-        for($x=0;$x<$all;$x++) {
+        for ($x = 0;$x < $all;$x++) {
             $c_personid = '';
-            $arr3 = array();
+            $arr3 = [];
             $resource = $dataRows[$x]['resource'];
             $arr1 = $dataRows[$x]['resource_data'];
             $arr2 = $dataRows[$x]['resource_original'];
             //20191225實時比對的程式判斷
-            if(!empty($c_personid = $dataRows[$x]['c_personid']) && $dataRows[$x]['resource'] == "BIOG_MAIN") { $arr3 = BiogMain::find($c_personid)->toArray(); }
-            elseif(!empty($resource_id = $dataRows[$x]['resource_id']) && !empty($resource = $dataRows[$x]['resource'])) {
+            if (!empty($c_personid = $dataRows[$x]['c_personid']) && $dataRows[$x]['resource'] == "BIOG_MAIN") {
+                $arr3 = BiogMain::find($c_personid)->toArray();
+            } elseif (!empty($resource_id = $dataRows[$x]['resource_id']) && !empty($resource = $dataRows[$x]['resource'])) {
                 switch ($resource) {
                     case "OFFICE_CODES":
                         if ($office = OfficeCode::find($resource_id)) {
                             $arr3 = $office->toArray();
                         }
+
                         break;
                     case "OFFICE_CODE_TYPE_REL":
                         $temp_l = explode("-", $resource_id);
@@ -62,11 +55,13 @@ class ModifiedController extends Controller
                         if ($relation) {
                             $arr3 = $relation->toArray();
                         }
+
                         break;
                     case "OFFICE_TYPE_TREE":
                         if ($tree = OfficeTypeTree::find($resource_id)) {
                             $arr3 = $tree->toArray();
                         }
+
                         break;
                     case "POSTED_TO_ADDR_DATA":
                         $addrParts = explode('-', $resource_id);
@@ -98,13 +93,16 @@ class ModifiedController extends Controller
                         } else {
                             $arr3 = [];
                         }
+
                         break;
                     default:
-                        $arr3 = array();
+                        $arr3 = [];
+
                         break;
                 }
+            } else {
+                $arr3 = [];
             }
-            else { $arr3 = array(); }
 
             $arr1Decoded = json_decode($arr1, true);
             $arr2Decoded = json_decode($arr2, true);
@@ -126,9 +124,10 @@ class ModifiedController extends Controller
                 $lists[$x]->setAttribute('resource_diff', null);
             }
         }
+
         return view('modified.index', ['lists' => $lists,
             'page_title' => 'Modified', 'page_description' => '最近修改紀錄',
-            'page_url' => '/modified'
+            'page_url' => '/modified',
         ]);
     }
 }

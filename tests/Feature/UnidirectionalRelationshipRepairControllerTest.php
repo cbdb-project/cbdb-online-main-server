@@ -2,20 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\BiogMain;
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
-class UnidirectionalRelationshipRepairControllerTest extends TestCase
-{
+class UnidirectionalRelationshipRepairControllerTest extends TestCase {
     protected $adminUser;
     protected $regularUser;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 数据库
@@ -66,8 +63,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         ]);
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         // 按照依赖关系顺序删除表（先删除有外键约束的表）
         Schema::dropIfExists('operations');
         Schema::dropIfExists('ASSOC_DATA');
@@ -79,8 +75,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         parent::tearDown();
     }
 
-    protected function createMinimalTables(): void
-    {
+    protected function createMinimalTables(): void {
         // 创建 users 表
         Schema::create('users', function (Blueprint $table) {
             $table->increments('id');
@@ -226,16 +221,14 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function guest_cannot_access_repair_page()
-    {
+    public function guest_cannot_access_repair_page() {
         $response = $this->get(route('admin.unidirectional-relationship-repair'));
 
         $response->assertRedirect(route('login'));
     }
 
     /** @test */
-    public function regular_user_cannot_access_repair_page()
-    {
+    public function regular_user_cannot_access_repair_page() {
         $response = $this->actingAs($this->regularUser)
             ->get(route('admin.unidirectional-relationship-repair'));
 
@@ -243,8 +236,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function admin_can_access_repair_page()
-    {
+    public function admin_can_access_repair_page() {
         $response = $this->actingAs($this->adminUser)
             ->get(route('admin.unidirectional-relationship-repair'));
 
@@ -255,8 +247,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_validates_required_fields()
-    {
+    public function kinship_repair_validates_required_fields() {
         $response = $this->actingAs($this->adminUser)
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), []);
 
@@ -265,8 +256,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_validates_entity_existence()
-    {
+    public function kinship_repair_validates_entity_existence() {
         $response = $this->actingAs($this->adminUser)
             ->postJson(route('admin.unidirectional-relationship-repair.kinship'), [
                 'c_personid' => 99999,
@@ -280,8 +270,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_returns_error_when_record_not_found()
-    {
+    public function kinship_repair_returns_error_when_record_not_found() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -302,8 +291,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_returns_error_when_reverse_already_exists()
-    {
+    public function kinship_repair_returns_error_when_reverse_already_exists() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -338,8 +326,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_successfully_creates_reverse_relationship()
-    {
+    public function kinship_repair_successfully_creates_reverse_relationship() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -414,8 +401,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_validates_required_fields()
-    {
+    public function assoc_repair_validates_required_fields() {
         $response = $this->actingAs($this->adminUser)
             ->postJson(route('admin.unidirectional-relationship-repair.assoc'), []);
 
@@ -424,8 +410,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_validates_entity_existence()
-    {
+    public function assoc_repair_validates_entity_existence() {
         $response = $this->actingAs($this->adminUser)
             ->postJson(route('admin.unidirectional-relationship-repair.assoc'), [
                 'c_personid' => 99999,
@@ -439,8 +424,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_returns_error_when_record_not_found()
-    {
+    public function assoc_repair_returns_error_when_record_not_found() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -461,8 +445,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_successfully_creates_reverse_relationship()
-    {
+    public function assoc_repair_successfully_creates_reverse_relationship() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -538,8 +521,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
         ]);
     }
 
-    protected function createTestPerson()
-    {
+    protected function createTestPerson() {
         static $personId = 1;
         $id = $personId++;
 
@@ -553,8 +535,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_uses_database_transaction()
-    {
+    public function kinship_repair_uses_database_transaction() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -589,8 +570,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_handles_null_autogen_notes()
-    {
+    public function kinship_repair_handles_null_autogen_notes() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -624,8 +604,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_preserves_autogen_notes_value()
-    {
+    public function kinship_repair_preserves_autogen_notes_value() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -661,8 +640,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_checks_duplicate_with_all_key_fields()
-    {
+    public function assoc_repair_checks_duplicate_with_all_key_fields() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -718,8 +696,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_enables_bidirectional_delete()
-    {
+    public function kinship_repair_enables_bidirectional_delete() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -787,8 +764,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_repair_reverse_delete_also_works()
-    {
+    public function kinship_repair_reverse_delete_also_works() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -843,8 +819,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function assoc_repair_enables_bidirectional_delete()
-    {
+    public function assoc_repair_enables_bidirectional_delete() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
@@ -910,8 +885,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase
     }
 
     /** @test */
-    public function kinship_without_repair_cannot_bidirectional_delete()
-    {
+    public function kinship_without_repair_cannot_bidirectional_delete() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();

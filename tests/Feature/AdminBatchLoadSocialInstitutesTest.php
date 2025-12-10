@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class AdminBatchLoadSocialInstitutesTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class AdminBatchLoadSocialInstitutesTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -92,8 +90,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('ADDR_CODES');
@@ -107,8 +104,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
         parent::tearDown();
     }
 
-    protected function makeUser(array $attributes = []): User
-    {
+    protected function makeUser(array $attributes = []): User {
         $user = new User([
             'name' => 'Batch Admin',
             'email' => uniqid('admin', true).'@example.com',
@@ -134,8 +130,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
         return $user;
     }
 
-    public function test_admin_can_view_form(): void
-    {
+    public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -143,8 +138,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
         $response->assertStatus(200)->assertSee('批次匯入社會機構');
     }
 
-    public function test_admin_can_upload_new_institution(): void
-    {
+    public function test_admin_can_upload_new_institution(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -208,8 +202,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
             ->assertSee('是');
     }
 
-    public function test_existing_name_reuses_code(): void
-    {
+    public function test_existing_name_reuses_code(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -253,8 +246,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase
         $followUp->assertSee('否');
     }
 
-    public function test_invalid_type_results_in_error(): void
-    {
+    public function test_invalid_type_results_in_error(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 

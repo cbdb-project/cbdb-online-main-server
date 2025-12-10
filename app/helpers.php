@@ -6,8 +6,7 @@ if (!function_exists('get_app_version')) {
      *
      * @return string 返回短版本的 commit ID（前7位）或 'unknown'
      */
-    function get_app_version()
-    {
+    function get_app_version() {
         // 尝试从缓存中获取版本号（避免频繁读取文件或执行 git 命令）
         $cacheKey = 'app_version';
         $cachedVersion = \Cache::get($cacheKey);

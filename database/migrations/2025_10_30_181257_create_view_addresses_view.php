@@ -1,17 +1,16 @@
 <?php
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Database\Migrations\Migration;
 
-class CreateViewAddressesView extends Migration
-{
-    public function up()
-    {
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateViewAddressesView extends Migration {
+    public function up() {
         Schema::table('ADDR_BELONGS_DATA', function (Blueprint $table) {
             $table->index('c_belongs_to', 'idx_belongs_to');
             $table->index(['c_addr_id', 'c_firstyear', 'c_lastyear'], 'idx_addr_year');
         });
-        
+
         DB::statement("
           CREATE OR REPLACE VIEW View_Address AS
           SELECT
@@ -141,10 +140,9 @@ class CreateViewAddressesView extends Migration
         ");
     }
 
-    public function down()
-    {
+    public function down() {
         DB::statement("DROP VIEW IF EXISTS View_Address");
-        
+
         Schema::table('ADDR_BELONGS_DATA', function (Blueprint $table) {
             $table->dropIndex('idx_belongs_to');
             $table->dropIndex('idx_addr_year');

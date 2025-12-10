@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,12 +9,10 @@
 
 namespace App\Repositories;
 
-
 use App\Operation;
 use Illuminate\Support\Facades\DB;
 
-class OperationRepository
-{
+class OperationRepository {
     /**
      * @param int $user_id 用户ID
      * @param int $c_personid 人物ID
@@ -22,16 +21,14 @@ class OperationRepository
      * @param int $resource_id 修改数据ID
      * @param array $resource_data 数据
      * @param array $ori 数据
-     * @param int $crowdsourcing_status 0.專業用戶修改紀錄 
-     *                                  1.crowdsourcing記錄並已插入數據庫 
-     *                                  2.crowdsourcing記錄還沒有被處理 
-     *                                  3.crowdsourcing記錄reject 
+     * @param int $crowdsourcing_status 0.專業用戶修改紀錄
+     *                                  1.crowdsourcing記錄並已插入數據庫
+     *                                  2.crowdsourcing記錄還沒有被處理
+     *                                  3.crowdsourcing記錄reject
      *                                  4.crowdsourcing處理失敗
      * @return mixed
      */
-
-    public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori='', $crowdsourcing_status=0)
-    {
+    public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0) {
         $operation = new Operation();
         $operation->user_id = $user_id;
         $operation->c_personid = $c_personid;
@@ -39,15 +36,18 @@ class OperationRepository
         $operation->resource = $resource;
         $operation->resource_id = $resource_id;
         $operation->resource_data = json_encode($resource_data, JSON_UNESCAPED_UNICODE);
-        if(!empty($ori)) $operation->resource_original = json_encode($ori, JSON_UNESCAPED_UNICODE);
-        if($crowdsourcing_status != 0) $operation->crowdsourcing_status = $crowdsourcing_status;
+        if (!empty($ori)) {
+            $operation->resource_original = json_encode($ori, JSON_UNESCAPED_UNICODE);
+        }
+        if ($crowdsourcing_status != 0) {
+            $operation->crowdsourcing_status = $crowdsourcing_status;
+        }
         $operation->save();
 
         return $operation;
     }
 
-    public function hasPendingCreateProposal(string $resource, string $resourceId, ?int $excludeId = null): bool
-    {
+    public function hasPendingCreateProposal(string $resource, string $resourceId, ?int $excludeId = null): bool {
         try {
             $query = Operation::where('resource', $resource)
                 ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
@@ -60,6 +60,7 @@ class OperationRepository
             return $query->get()->contains(function (Operation $operation) {
                 $payload = json_decode($operation->resource_data, true);
                 $status = is_array($payload) ? ($payload['__review_status'] ?? null) : null;
+
                 return in_array($status, ['pending', 'rejected'], true);
             });
         } catch (\Throwable $e) {
@@ -67,14 +68,12 @@ class OperationRepository
         }
     }
 
-    public function objectToArray($object)
-    {
+    public function objectToArray($object) {
         //先編碼成json字串，再解碼成陣列
         return json_decode(json_encode($object), true);
     }
 
-    public function getArrDiff($arr1, $arr2, $arr3)
-    {
+    public function getArrDiff($arr1, $arr2, $arr3) {
         //20251001Compare 功能有時無法顯示修改內容修改
         if (!is_array($arr1)) {
             return null;  // 沒有修改後資料就不產生比對結果
@@ -93,6 +92,7 @@ class OperationRepository
             if (is_bool($value)) {
                 return $value ? 'true' : 'false';
             }
+
             return (string)$value;
         };
 
@@ -106,6 +106,7 @@ class OperationRepository
             if (is_bool($value)) {
                 return $value ? '1' : '0';
             }
+
             return trim((string)$value);
         };
 
@@ -145,6 +146,7 @@ class OperationRepository
         if (empty($rows)) {
             return null;
         }
+
         return ['rows' => $rows];
     }
 
@@ -156,8 +158,7 @@ class OperationRepository
      * @param array $currentRows
      * @return array|null
      */
-    public function buildPostedToAddrDiff(array $afterRows, array $beforeRows, array $currentRows)
-    {
+    public function buildPostedToAddrDiff(array $afterRows, array $beforeRows, array $currentRows) {
         $reference = $this->firstNonEmptyRow($afterRows, $beforeRows, $currentRows);
 
         $keys = [
@@ -186,8 +187,7 @@ class OperationRepository
      */
     protected $addressLabelCache = [];
 
-    protected function firstNonEmptyRow(array ...$rowSets)
-    {
+    protected function firstNonEmptyRow(array ...$rowSets) {
         foreach ($rowSets as $rows) {
             if (!empty($rows)) {
                 $first = reset($rows);
@@ -196,11 +196,11 @@ class OperationRepository
                 }
             }
         }
+
         return null;
     }
 
-    protected function extractPostedToAddrKeys(array $rows, ?array $fallback)
-    {
+    protected function extractPostedToAddrKeys(array $rows, ?array $fallback) {
         $source = !empty($rows) ? reset($rows) : $fallback;
 
         return [
@@ -210,8 +210,7 @@ class OperationRepository
         ];
     }
 
-    protected function buildPostedToAddrAddressMatrix(array $afterRows, array $beforeRows, array $currentRows)
-    {
+    protected function buildPostedToAddrAddressMatrix(array $afterRows, array $beforeRows, array $currentRows) {
         $uniqueIds = $this->collectPostedToAddrIds($afterRows, $beforeRows, $currentRows);
         if (empty($uniqueIds)) {
             return [];
@@ -236,8 +235,7 @@ class OperationRepository
         return $matrix;
     }
 
-    protected function collectPostedToAddrIds(array ...$rowSets)
-    {
+    protected function collectPostedToAddrIds(array ...$rowSets) {
         $ids = [];
         foreach ($rowSets as $rows) {
             foreach ($rows as $row) {
@@ -258,8 +256,7 @@ class OperationRepository
         return $ids;
     }
 
-    protected function warmAddressLabelCache(array $addrIds)
-    {
+    protected function warmAddressLabelCache(array $addrIds) {
         $existing = array_map('intval', array_keys($this->addressLabelCache));
         $missing = array_diff($addrIds, $existing);
         if (empty($missing)) {
@@ -286,8 +283,7 @@ class OperationRepository
         }
     }
 
-    protected function buildPostedToAddrMap(array $rows)
-    {
+    protected function buildPostedToAddrMap(array $rows) {
         $map = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -299,20 +295,21 @@ class OperationRepository
             }
             $map[$addrId] = $this->addressLabelCache[$addrId] ?? $this->formatAddressLabel($addrId, null);
         }
+
         return $map;
     }
 
-    protected function normalizePostedToAddrInteger($value)
-    {
+    protected function normalizePostedToAddrInteger($value) {
         if ($value === null || $value === '') {
             return null;
         }
+
         return (int) $value;
     }
 
-    protected function formatAddressLabel(int $addrId, ?string $name)
-    {
+    protected function formatAddressLabel(int $addrId, ?string $name) {
         $label = $name ? trim($name) : '未詳';
+
         return $addrId.' '.$label;
     }
 }

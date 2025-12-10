@@ -2,16 +2,14 @@
 
 namespace App\Repositories\Concerns;
 
-trait DetectsModelChanges
-{
+trait DetectsModelChanges {
     /**
      * Normalize scalar or structured values so they can be compared consistently.
      *
      * @param mixed $value
      * @return string
      */
-    protected function normalizeComparisonValue($value)
-    {
+    protected function normalizeComparisonValue($value) {
         if (is_array($value) || is_object($value)) {
             return json_encode($value);
         }
@@ -21,6 +19,7 @@ trait DetectsModelChanges
         if (is_bool($value)) {
             return $value ? '1' : '0';
         }
+
         return trim((string)$value);
     }
 
@@ -32,8 +31,7 @@ trait DetectsModelChanges
      * @param array $ignoredKeys
      * @return bool
      */
-    protected function hasMeaningfulChanges(array $newData, array $original, array $ignoredKeys = [])
-    {
+    protected function hasMeaningfulChanges(array $newData, array $original, array $ignoredKeys = []) {
         if (empty($original)) {
             return true;
         }
@@ -63,8 +61,7 @@ trait DetectsModelChanges
      * @param mixed $nullToken Value that should be treated as null before normalization.
      * @return array
      */
-    protected function normalizeSelectionList($values, $nullToken = null)
-    {
+    protected function normalizeSelectionList($values, $nullToken = null) {
         $normalized = [];
 
         foreach ((array)$values as $value) {
@@ -92,8 +89,7 @@ trait DetectsModelChanges
      * @param mixed $nullToken
      * @return bool True when lists differ.
      */
-    protected function selectionListHasChanges($incoming, $existing, $nullToken = null)
-    {
+    protected function selectionListHasChanges($incoming, $existing, $nullToken = null) {
         return $this->normalizeSelectionList($incoming, $nullToken) !== $this->normalizeSelectionList($existing, $nullToken);
     }
 }

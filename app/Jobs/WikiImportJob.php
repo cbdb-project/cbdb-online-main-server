@@ -2,16 +2,18 @@
 
 namespace App\Jobs;
 
+use App\Http\Controllers\WikiMaintenanceController;
 use Illuminate\Bus\Queueable;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Http\Controllers\WikiMaintenanceController;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 
-class WikiImportJob implements ShouldQueue
-{
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+class WikiImportJob implements ShouldQueue {
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     protected $taskId;
     protected $url;
@@ -23,8 +25,7 @@ class WikiImportJob implements ShouldQueue
      *
      * @return void
      */
-    public function __construct($taskId, $url, $targetSourceId, $sourceName)
-    {
+    public function __construct($taskId, $url, $targetSourceId, $sourceName) {
         $this->taskId = $taskId;
         $this->url = $url;
         $this->targetSourceId = $targetSourceId;
@@ -36,8 +37,7 @@ class WikiImportJob implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
-    {
+    public function handle() {
         $controller = new WikiMaintenanceController();
         $controller->executeImportTask($this->taskId, $this->url, $this->targetSourceId, $this->sourceName);
     }

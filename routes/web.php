@@ -11,8 +11,6 @@
 |
 */
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 Route::get('/', 'WelcomeController@index');
 
@@ -78,7 +76,7 @@ Route::resource('manage', 'ManagementController', ['name' => [
     'show' => 'manage.show',
     'create' => 'manage.create',
     'edit' => 'manage.edit',
-    'update' => 'manage.update'
+    'update' => 'manage.update',
 ]]);
 
 Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
@@ -87,7 +85,7 @@ Route::resource('operations', 'OperationsController', ['name' => [
     'show' => 'operations.show',
     'create' => 'operations.create',
     'edit' => 'operations.edit',
-    'update' => 'operations.update'
+    'update' => 'operations.update',
 ]]);
 Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
@@ -95,7 +93,7 @@ Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
     'show' => 'crowdsourcing.show',
     'create' => 'crowdsourcing.create',
     'edit' => 'crowdsourcing.edit',
-    'update' => 'crowdsourcing.update'
+    'update' => 'crowdsourcing.update',
 ]]);
 
 
@@ -106,7 +104,7 @@ Route::resource('modified', 'ModifiedController', ['name' => [
     'show' => 'modified.show',
     'create' => 'modified.create',
     'edit' => 'modified.edit',
-    'update' => 'modified.update'
+    'update' => 'modified.update',
 ]]);
 
 Route::middleware('auth')->group(function () {

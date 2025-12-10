@@ -5,8 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-class ExportMysqlToSqlite extends Command
-{
+class ExportMysqlToSqlite extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -66,8 +65,7 @@ class ExportMysqlToSqlite extends Command
      *
      * @return int
      */
-    public function handle()
-    {
+    public function handle() {
         $this->sourceConnection = $this->option('source');
         $this->outputPath = $this->option('output');
 
@@ -86,6 +84,7 @@ class ExportMysqlToSqlite extends Command
 
         if (empty($tables)) {
             $this->error('没有找到要导出的表');
+
             return 1;
         }
 
@@ -122,13 +121,13 @@ class ExportMysqlToSqlite extends Command
      *
      * @return bool
      */
-    protected function validateSourceConnection()
-    {
+    protected function validateSourceConnection() {
         try {
             $driver = DB::connection($this->sourceConnection)->getDriverName();
 
             if ($driver !== 'mysql') {
                 $this->error(sprintf('源数据库必须是 MySQL，当前是: %s', $driver));
+
                 return false;
             }
 
@@ -140,6 +139,7 @@ class ExportMysqlToSqlite extends Command
             return true;
         } catch (\Exception $e) {
             $this->error(sprintf('无法连接到源数据库: %s', $e->getMessage()));
+
             return false;
         }
     }
@@ -149,8 +149,7 @@ class ExportMysqlToSqlite extends Command
      *
      * @return bool
      */
-    protected function prepareSqliteDatabase()
-    {
+    protected function prepareSqliteDatabase() {
         $absolutePath = base_path($this->outputPath);
         $directory = dirname($absolutePath);
 
@@ -158,6 +157,7 @@ class ExportMysqlToSqlite extends Command
         if (!is_dir($directory)) {
             if (!mkdir($directory, 0755, true)) {
                 $this->error(sprintf('无法创建目录: %s', $directory));
+
                 return false;
             }
         }
@@ -166,6 +166,7 @@ class ExportMysqlToSqlite extends Command
         if (file_exists($absolutePath)) {
             if (!$this->confirm(sprintf('文件 %s 已存在，是否覆盖？', $this->outputPath), false)) {
                 $this->info('操作已取消');
+
                 return false;
             }
 
@@ -182,15 +183,17 @@ class ExportMysqlToSqlite extends Command
                 'database' => $absolutePath,
                 'prefix' => '',
                 'foreign_key_constraints' => false, // 导出时先禁用外键
-            ]
+            ],
         ]);
 
         try {
             DB::connection('sqlite_export')->getPdo();
             $this->info(sprintf('✓ SQLite 数据库已创建: %s', $this->outputPath));
+
             return true;
         } catch (\Exception $e) {
             $this->error(sprintf('无法创建 SQLite 数据库: %s', $e->getMessage()));
+
             return false;
         }
     }
@@ -200,8 +203,7 @@ class ExportMysqlToSqlite extends Command
      *
      * @return array
      */
-    protected function getTablesToExport()
-    {
+    protected function getTablesToExport() {
         $specifiedTables = $this->option('tables');
 
         $tables = DB::connection($this->sourceConnection)
@@ -251,8 +253,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTable(array $table)
-    {
+    protected function exportTable(array $table) {
         $tableName = $table['name'];
         $isView = strtoupper($table['type']) === 'VIEW';
 
@@ -278,8 +279,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTableSchema($tableName, $isView = false)
-    {
+    protected function exportTableSchema($tableName, $isView = false) {
         $statement = $isView
             ? "SHOW CREATE VIEW `{$tableName}`"
             : "SHOW CREATE TABLE `{$tableName}`";
@@ -312,6 +312,7 @@ class ExportMysqlToSqlite extends Command
 
         if ($isView) {
             DB::connection('sqlite_export')->statement($sqliteCreateSql);
+
             return;
         }
 
@@ -330,8 +331,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return string
      */
-    protected function convertCreateTableToSqlite($mysqlSql, $tableName)
-    {
+    protected function convertCreateTableToSqlite($mysqlSql, $tableName) {
         $cleanSql = preg_replace('/`' . preg_quote($tableName, '/') . '`/i', '"' . $tableName . '"', $mysqlSql);
         $cleanSql = preg_replace('/ENGINE=.*$/is', '', $cleanSql);
         $cleanSql = preg_replace('/ROW_FORMAT=\w+/i', '', $cleanSql);
@@ -372,6 +372,7 @@ class ExportMysqlToSqlite extends Command
                 }
 
                 $primaryKeys[] = sprintf('PRIMARY KEY (%s)', $this->normalizeIndexColumns($columnsString));
+
                 continue;
             }
 
@@ -421,6 +422,7 @@ class ExportMysqlToSqlite extends Command
             foreach ($primaryKeyColumnsList as $pkColumns) {
                 if (count($pkColumns) === 1) {
                     $chunkColumn = $pkColumns[0];
+
                     break;
                 }
             }
@@ -457,8 +459,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $viewName
      * @return string
      */
-    protected function convertCreateViewToSqlite($mysqlSql, $viewName)
-    {
+    protected function convertCreateViewToSqlite($mysqlSql, $viewName) {
         $sql = trim($mysqlSql);
 
         if (!preg_match('/\sAS\s/i', $sql, $match, PREG_OFFSET_CAPTURE)) {
@@ -481,8 +482,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 将列定义拆分成单独项目
      */
-    protected function splitDefinitionItems($definitions)
-    {
+    protected function splitDefinitionItems($definitions) {
         $items = [];
         $current = '';
         $depth = 0;
@@ -501,6 +501,7 @@ class ExportMysqlToSqlite extends Command
             } elseif ($char === ',' && $depth === 0) {
                 $items[] = trim($current);
                 $current = '';
+
                 continue;
             }
 
@@ -517,8 +518,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 将 MySQL 列定义转换为 SQLite
      */
-    protected function convertColumnDefinition($definition)
-    {
+    protected function convertColumnDefinition($definition) {
         if (!preg_match('/^`?([^`\s]+)`?\s+(.+)$/s', $definition, $matches)) {
             return null;
         }
@@ -556,8 +556,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 转换 MySQL 数据类型到 SQLite
      */
-    protected function convertColumnType($definition)
-    {
+    protected function convertColumnType($definition) {
         $map = [
             '/\bTINYINT\(\d+\)\b/i' => 'INTEGER',
             '/\bSMALLINT\(\d+\)\b/i' => 'INTEGER',
@@ -596,8 +595,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 获取索引列定义
      */
-    protected function extractColumnsFromDefinition($definition)
-    {
+    protected function extractColumnsFromDefinition($definition) {
         if (preg_match('/\((.+)\)/s', $definition, $matches)) {
             return $matches[1];
         }
@@ -608,8 +606,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 转换索引列为 SQLite 兼容格式
      */
-    protected function normalizeIndexColumns($columnsString)
-    {
+    protected function normalizeIndexColumns($columnsString) {
         $columns = $this->extractColumnNames($columnsString);
 
         $quoted = array_map(function ($column) {
@@ -622,8 +619,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 解析索引列名称
      */
-    protected function extractColumnNames($columnsString)
-    {
+    protected function extractColumnNames($columnsString) {
         $parts = preg_split('/\s*,\s*/', $columnsString);
         $columns = [];
 
@@ -645,9 +641,9 @@ class ExportMysqlToSqlite extends Command
     /**
      * 清理索引名称
      */
-    protected function sanitizeIdentifier($identifier)
-    {
+    protected function sanitizeIdentifier($identifier) {
         $clean = preg_replace('/[^A-Za-z0-9_]+/', '_', $identifier);
+
         return trim($clean, '_');
     }
 
@@ -657,8 +653,7 @@ class ExportMysqlToSqlite extends Command
      * @param string $tableName
      * @return void
      */
-    protected function exportTableData($tableName, $rowCount = 0, $limit = null)
-    {
+    protected function exportTableData($tableName, $rowCount = 0, $limit = null) {
         $metadata = $this->tableMetadata[$tableName] ?? [];
         $chunkColumn = $metadata['chunk_column'] ?? null;
         $insertBatchSize = $this->getSqliteInsertBatchSize();
@@ -727,8 +722,7 @@ class ExportMysqlToSqlite extends Command
     /**
      * 批量寫入資料到 SQLite
      */
-    protected function insertRowsIntoSqlite($tableName, array $rows)
-    {
+    protected function insertRowsIntoSqlite($tableName, array $rows) {
         DB::connection('sqlite_export')
             ->table($tableName)
             ->insert($rows);
@@ -737,14 +731,14 @@ class ExportMysqlToSqlite extends Command
     /**
      * 计算数据表的总行数
      */
-    protected function getTableRowCount($tableName)
-    {
+    protected function getTableRowCount($tableName) {
         try {
             return (int) DB::connection($this->sourceConnection)
                 ->table($tableName)
                 ->count();
         } catch (\Exception $e) {
             $this->warn(sprintf('⚠ 无法统计表 %s 行数: %s', $tableName, $e->getMessage()));
+
             return 0;
         }
     }
@@ -753,16 +747,14 @@ class ExportMysqlToSqlite extends Command
      * 取得 SQLite 插入批次大小。SQLite 允許的 compound SELECT 條件數為 500，
      * 但保守使用 400 以避免觸發 "too many terms" 錯誤。
      */
-    protected function getSqliteInsertBatchSize()
-    {
+    protected function getSqliteInsertBatchSize() {
         return 400;
     }
 
     /**
      * 取得每張表的最大導出筆數
      */
-    protected function getRecordLimit(): ?int
-    {
+    protected function getRecordLimit(): ?int {
         $limit = $this->option('limit-records');
 
         if ($limit === null || $limit === '') {
@@ -779,8 +771,7 @@ class ExportMysqlToSqlite extends Command
      *
      * @return void
      */
-    protected function displayStats()
-    {
+    protected function displayStats() {
         $this->info('=== 导出完成 ===');
         $this->info(sprintf('✓ 成功导出 %d 个表', $this->stats['tables']));
 
@@ -813,8 +804,7 @@ class ExportMysqlToSqlite extends Command
      * @param int $bytes
      * @return string
      */
-    protected function formatBytes($bytes)
-    {
+    protected function formatBytes($bytes) {
         $units = ['B', 'KB', 'MB', 'GB'];
         $unitIndex = 0;
 

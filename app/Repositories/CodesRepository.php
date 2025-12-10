@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,22 +9,20 @@
 
 namespace App\Repositories;
 
-
-class CodesRepository
-{
+class CodesRepository {
     /**
      * Get the list of allowed code tables.
      *
      * @return array
      */
-    public function allowedTables(): array
-    {
+    public function allowedTables(): array {
         $configTables = config('codes.tables', []);
         if (!empty($configTables)) {
             // 如果配置是關聯數組（表名 => 說明），返回鍵（表名）
             if (array_keys($configTables) !== range(0, count($configTables) - 1)) {
                 return array_keys($configTables);
             }
+
             // 如果是索引數組（舊格式），直接返回
             return array_values(array_unique($configTables));
         }
@@ -41,8 +40,7 @@ class CodesRepository
      *
      * @return array<string,string>
      */
-    public function allowedTableMap(): array
-    {
+    public function allowedTableMap(): array {
         $allowed = $this->allowedTables();
         if (empty($allowed)) {
             return [];
@@ -90,8 +88,7 @@ class CodesRepository
         return $map;
     }
 
-    public function codes()
-    {
+    public function codes() {
         $configTables = config('codes.tables', []);
 
         // 如果配置是關聯數組（表名 => 說明）
@@ -103,6 +100,7 @@ class CodesRepository
                     'description' => $description,
                 ];
             }
+
             return $result;
         }
 

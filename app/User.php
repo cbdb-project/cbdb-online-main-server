@@ -3,24 +3,25 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Laravel\Passport\HasApiTokens;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\HasApiTokens;
 
-class User extends Authenticatable
-{
-    use HasApiTokens, HasFactory, Notifiable;
+class User extends Authenticatable {
+    use HasApiTokens;
+    use HasFactory;
+    use Notifiable;
 
     // 帐号启用状态常量
-    const STATUS_INACTIVE = 0;
-    const STATUS_ACTIVE = 1;
-    const STATUS_RESERVED = 2;
+    public const STATUS_INACTIVE = 0;
+    public const STATUS_ACTIVE = 1;
+    public const STATUS_RESERVED = 2;
 
     // 帐号角色常量
-    const ROLE_REGULAR = 0;
-    const ROLE_EXPERT = 1;
-    const ROLE_CROWDSOURCING = 2;
-    const ROLE_SUPER_ADMIN = 3;
+    public const ROLE_REGULAR = 0;
+    public const ROLE_EXPERT = 1;
+    public const ROLE_CROWDSOURCING = 2;
+    public const ROLE_SUPER_ADMIN = 3;
 
     /**
      * The attributes that are mass assignable.
@@ -57,8 +58,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isActive(): bool
-    {
+    public function isActive(): bool {
         return $this->is_active === self::STATUS_ACTIVE;
     }
 
@@ -67,8 +67,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isAdmin(): bool
-    {
+    public function isAdmin(): bool {
         return in_array($this->is_admin, [self::ROLE_EXPERT, self::ROLE_SUPER_ADMIN]);
     }
 
@@ -77,8 +76,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isExpert(): bool
-    {
+    public function isExpert(): bool {
         return $this->is_admin === self::ROLE_EXPERT;
     }
 
@@ -87,8 +85,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isSuperAdmin(): bool
-    {
+    public function isSuperAdmin(): bool {
         return $this->is_admin === self::ROLE_SUPER_ADMIN;
     }
 
@@ -97,8 +94,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isCrowdsourcingUser(): bool
-    {
+    public function isCrowdsourcingUser(): bool {
         return $this->is_admin === self::ROLE_CROWDSOURCING;
     }
 
@@ -107,8 +103,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function isRegularUser(): bool
-    {
+    public function isRegularUser(): bool {
         return $this->is_admin === self::ROLE_REGULAR;
     }
 
@@ -117,8 +112,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function canManageUsers(): bool
-    {
+    public function canManageUsers(): bool {
         return $this->isActive() && $this->isAdmin();
     }
 
@@ -127,8 +121,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function canRestoreOperations(): bool
-    {
+    public function canRestoreOperations(): bool {
         return $this->isActive() && $this->isAdmin();
     }
 
@@ -137,8 +130,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function canWriteDirectly(): bool
-    {
+    public function canWriteDirectly(): bool {
         return $this->isActive() && !$this->isCrowdsourcingUser();
     }
 
@@ -147,8 +139,7 @@ class User extends Authenticatable
      *
      * @return bool
      */
-    public function canRunBatchImport(): bool
-    {
+    public function canRunBatchImport(): bool {
         return $this->isActive() && $this->isAdmin();
     }
 
@@ -157,8 +148,7 @@ class User extends Authenticatable
      *
      * @return string
      */
-    public function getRoleName(): string
-    {
+    public function getRoleName(): string {
         switch ($this->is_admin) {
             case self::ROLE_SUPER_ADMIN:
                 return '系统管理员';
@@ -172,8 +162,7 @@ class User extends Authenticatable
         }
     }
 
-    public function operation()
-    {
+    public function operation() {
         return $this->has('App\Operation');
     }
 }

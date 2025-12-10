@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\BiogMain;
 use App\Repositories\BiogMainRepository;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -10,10 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class BiogMainNameSearchTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BiogMainNameSearchTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 設定使用 SQLite in-memory 資料庫
@@ -35,8 +32,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->seedTestData();
     }
 
-    protected function createTestTables(): void
-    {
+    protected function createTestTables(): void {
         Schema::create('BIOG_MAIN', function ($table) {
             $table->integer('c_personid')->primary();
             $table->string('c_name_chn')->nullable();
@@ -91,8 +87,7 @@ class BiogMainNameSearchTest extends TestCase
         });
     }
 
-    protected function seedTestData(): void
-    {
+    protected function seedTestData(): void {
         // 插入測試數據
         DB::table('BIOG_MAIN')->insert([
             [
@@ -229,8 +224,7 @@ class BiogMainNameSearchTest extends TestCase
         ]);
     }
 
-    public function test_numeric_query_uses_personid_direct_lookup(): void
-    {
+    public function test_numeric_query_uses_personid_direct_lookup(): void {
         $request = new Request(['q' => '1001']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -247,8 +241,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertEquals('東坡居士', $person->c_alt_name_chn_hao);
     }
 
-    public function test_numeric_query_returns_empty_for_nonexistent_id(): void
-    {
+    public function test_numeric_query_returns_empty_for_nonexistent_id(): void {
         $request = new Request(['q' => '9999']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -257,8 +250,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertCount(0, $result);
     }
 
-    public function test_text_query_uses_complex_search(): void
-    {
+    public function test_text_query_uses_complex_search(): void {
         // 測試文字查詢使用倒排索引搜尋
         // 現在已經實作 CASE WHEN 模擬 FIELD() 函數，SQLite 也可以正常運行
         $request = new Request(['q' => '蘇']);
@@ -269,13 +261,12 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $result->total());
 
         // 確認結果包含蘇軾和蘇轍
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds, '搜尋「蘇」應該包含蘇軾');
         $this->assertContains(1002, $personIds, '搜尋「蘇」應該包含蘇轍');
     }
 
-    public function test_mixed_alphanumeric_query_uses_complex_search(): void
-    {
+    public function test_mixed_alphanumeric_query_uses_complex_search(): void {
         $request = new Request(['q' => 'Su1001']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -284,8 +275,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
 
-    public function test_leading_zeros_not_treated_as_numeric(): void
-    {
+    public function test_leading_zeros_not_treated_as_numeric(): void {
         $request = new Request(['q' => '01001']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -295,8 +285,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
 
-    public function test_numeric_query_includes_all_join_data(): void
-    {
+    public function test_numeric_query_includes_all_join_data(): void {
         $request = new Request(['q' => '1002']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -313,8 +302,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertNull($person->c_alt_name_chn_hao);
     }
 
-    public function test_empty_query_returns_paginated_list(): void
-    {
+    public function test_empty_query_returns_paginated_list(): void {
         $request = new Request(['q' => '']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -327,8 +315,7 @@ class BiogMainNameSearchTest extends TestCase
 
     // ===== 倒排索引表測試 =====
 
-    public function test_inverted_index_search_by_full_name(): void
-    {
+    public function test_inverted_index_search_by_full_name(): void {
         $request = new Request(['q' => '蘇軾']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -341,8 +328,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertEquals('蘇軾', $person->c_name_chn);
     }
 
-    public function test_inverted_index_search_by_suffix(): void
-    {
+    public function test_inverted_index_search_by_suffix(): void {
         $request = new Request(['q' => '軾']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -351,12 +337,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含蘇軾
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
     }
 
-    public function test_inverted_index_search_by_name_part(): void
-    {
+    public function test_inverted_index_search_by_name_part(): void {
         $request = new Request(['q' => '安石']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -365,12 +350,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含王安石
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(2001, $personIds);
     }
 
-    public function test_inverted_index_search_by_single_char(): void
-    {
+    public function test_inverted_index_search_by_single_char(): void {
         $request = new Request(['q' => '石']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -379,12 +363,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該包含王安石（名末字「石」）
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(2001, $personIds);
     }
 
-    public function test_inverted_index_search_by_zi(): void
-    {
+    public function test_inverted_index_search_by_zi(): void {
         $request = new Request(['q' => '子瞻']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -393,12 +376,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 應該找到蘇軾（字子瞻）
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
     }
 
-    public function test_inverted_index_orders_by_match_length(): void
-    {
+    public function test_inverted_index_orders_by_match_length(): void {
         $request = new Request(['q' => '蘇']);
 
         $result = BiogMainRepository::namesByQuery($request, 20);
@@ -406,13 +388,12 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
 
         // 應該找到多個結果（蘇軾、蘇轍都有「蘇」開頭的倒排記錄）
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds);
         $this->assertContains(1002, $personIds);
     }
 
-    public function test_inverted_index_fallback_when_no_match(): void
-    {
+    public function test_inverted_index_fallback_when_no_match(): void {
         // 清空倒排索引表
         DB::table('CBDB__NAME_FTS')->truncate();
 
@@ -426,8 +407,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
 
-    public function test_inverted_index_limits_to_500_candidates(): void
-    {
+    public function test_inverted_index_limits_to_500_candidates(): void {
         // 插入大量測試數據（超過 500 個）
         // 分批插入以避免 SQLite 的 SQLITE_MAX_COMPOUND_SELECT 限制（默認 500）
         $now = date('Y-m-d H:i:s');
@@ -478,8 +458,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
     }
 
-    public function test_inverted_index_maintains_match_quality_order(): void
-    {
+    public function test_inverted_index_maintains_match_quality_order(): void {
         // 驗證排序：完整匹配應該排在前面
         $request = new Request(['q' => '蘇']);
 
@@ -496,8 +475,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertContains((int)$firstItem->c_personid, [1001, 1002]);
     }
 
-    public function test_parentheses_content_is_searchable_fullwidth(): void
-    {
+    public function test_parentheses_content_is_searchable_fullwidth(): void {
         // 測試全角括號：搜索「李白」應該能找到「宗氏（李白妻）」
         $request = new Request(['q' => '李白']);
 
@@ -507,12 +485,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001（宗氏（李白妻））
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「李白」應該能找到「宗氏（李白妻）」');
     }
 
-    public function test_parentheses_content_is_searchable_halfwidth(): void
-    {
+    public function test_parentheses_content_is_searchable_halfwidth(): void {
         // 測試半角括號：搜索「楊玉環」應該能找到「楊貴妃(楊玉環)」
         $request = new Request(['q' => '楊玉環']);
 
@@ -522,12 +499,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3002（楊貴妃(楊玉環)）
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(3002, $personIds, '搜索「楊玉環」應該能找到「楊貴妃(楊玉環)」');
     }
 
-    public function test_parentheses_content_partial_search(): void
-    {
+    public function test_parentheses_content_partial_search(): void {
         // 測試部分匹配：搜索「李白妻」應該能找到「宗氏（李白妻）」
         $request = new Request(['q' => '李白妻']);
 
@@ -537,12 +513,11 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「李白妻」應該能找到「宗氏（李白妻）」');
     }
 
-    public function test_name_before_parentheses_still_searchable(): void
-    {
+    public function test_name_before_parentheses_still_searchable(): void {
         // 測試括號前的內容仍然可搜索：搜索「宗氏」應該能找到「宗氏（李白妻）」
         $request = new Request(['q' => '宗氏']);
 
@@ -552,7 +527,7 @@ class BiogMainNameSearchTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $result->total());
 
         // 檢查結果中包含 personid 3001
-        $personIds = collect($result->items())->pluck('c_personid')->map(fn($id) => (int)$id)->toArray();
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「宗氏」應該能找到「宗氏（李白妻）」');
     }
 }

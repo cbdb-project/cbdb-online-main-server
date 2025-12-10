@@ -2,35 +2,33 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
-class WikiMaintenanceController extends Controller
-{
+class WikiMaintenanceController extends Controller {
     protected $targetSourceIds = [60795, 68942, 68943];
     protected $sourceNames = [
         60795 => '中文維基百科 (Wikipedia)',
         68942 => '維基數據 (Wikidata)',
-        68943 => '英文維基百科 (Wikipedia)'
+        68943 => '英文維基百科 (Wikipedia)',
     ];
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
                 abort(403, '此功能僅限活躍管理員使用');
             }
+
             return $next($request);
         });
     }
 
-    public function index(Request $request)
-    {
+    public function index(Request $request) {
         $sourceId = $request->input('source_id', $this->targetSourceIds[0]);
 
         // 验证 source_id 是否在允许的范围内
@@ -75,12 +73,11 @@ class WikiMaintenanceController extends Controller
             'page' => $page,
             'perPage' => $perPage,
             'hasNext' => $total > $page * $perPage,
-            'hasPrev' => $page > 1
+            'hasPrev' => $page > 1,
         ]);
     }
 
-    public function deleteAll(Request $request)
-    {
+    public function deleteAll(Request $request) {
         $sourceId = (int) $request->input('source_id');
 
         if (!in_array($sourceId, $this->targetSourceIds)) {
@@ -100,16 +97,17 @@ class WikiMaintenanceController extends Controller
             DB::commit();
 
             $sourceName = $this->sourceNames[$sourceId] ?? "文本 ID {$sourceId}";
+
             return redirect()->back()->with('success', "成功刪除「{$sourceName}」的 {$deletedCount} 筆記錄");
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return redirect()->back()->with('error', '刪除失敗：' . $e->getMessage());
         }
     }
 
-    public function reimport(Request $request)
-    {
+    public function reimport(Request $request) {
         $sourceId = (int) $request->input('source_id');
 
         if (!in_array($sourceId, $this->targetSourceIds)) {
@@ -118,15 +116,15 @@ class WikiMaintenanceController extends Controller
 
         // Placeholder 功能
         $sourceName = $this->sourceNames[$sourceId] ?? "文本 ID {$sourceId}";
+
         return redirect()->back()->with('info', "「{$sourceName}」的重新導入功能尚未實現");
     }
 
-    public function importFromUrl(Request $request)
-    {
+    public function importFromUrl(Request $request) {
         // 驗證輸入
         $request->validate([
             'import_url' => 'required|string',
-            'target_source' => 'required|integer|in:' . implode(',', $this->targetSourceIds)
+            'target_source' => 'required|integer|in:' . implode(',', $this->targetSourceIds),
         ]);
 
         $url = $request->input('import_url');
@@ -136,8 +134,8 @@ class WikiMaintenanceController extends Controller
             return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => [
-                    'import_url' => ['請輸入有效的HTTPS網址']
-                ]
+                    'import_url' => ['請輸入有效的HTTPS網址'],
+                ],
             ], 422);
         }
         $targetSourceId = (int) $request->input('target_source');
@@ -156,7 +154,7 @@ class WikiMaintenanceController extends Controller
         $response = response()->json([
             'success' => true,
             'message' => '導入任務已開始',
-            'task_id' => $taskId
+            'task_id' => $taskId,
         ]);
 
         if (!app()->runningUnitTests() && !app()->runningInConsole()) {
@@ -172,19 +170,17 @@ class WikiMaintenanceController extends Controller
         return $response;
     }
 
-    public function cancelImport(Request $request, $taskId)
-    {
+    public function cancelImport(Request $request, $taskId) {
         // 设置取消标志
         $this->updateProgress($taskId, 0, '用戶已取消導入任務', 'cancelled');
 
         return response()->json([
             'success' => true,
-            'message' => '導入任務已取消'
+            'message' => '導入任務已取消',
         ]);
     }
 
-    public function executeImportTask($taskId, $url, $targetSourceId, $sourceName)
-    {
+    public function executeImportTask($taskId, $url, $targetSourceId, $sourceName) {
         // 移除執行時間限制
         set_time_limit(0);
         ini_set('memory_limit', '1024M'); // 增加到1GB以處理大型導入
@@ -215,6 +211,7 @@ class WikiMaintenanceController extends Controller
 
             if ($data === null || $jsonError !== JSON_ERROR_NONE) {
                 $errorMessage = $this->getJsonErrorMessage($jsonError);
+
                 throw new \Exception("無法解析 JSON 資料：{$errorMessage}");
             }
 
@@ -240,6 +237,7 @@ class WikiMaintenanceController extends Controller
 
             // 先在單獨事務中刪除舊資料
             DB::beginTransaction();
+
             try {
                 $deletedCount = DB::table('BIOG_SOURCE_DATA')
                     ->where('c_textid', $targetSourceId)
@@ -248,6 +246,7 @@ class WikiMaintenanceController extends Controller
                 $this->updateProgress($taskId, 30, "已清空舊資料 ({$deletedCount} 筆)，開始導入新資料...");
             } catch (\Exception $e) {
                 DB::rollBack();
+
                 throw $e;
             }
 
@@ -323,6 +322,7 @@ class WikiMaintenanceController extends Controller
                     // 每处理 100 条记录检查一次是否取消
                     if ($processedCount % 100 == 0 && $this->isTaskCancelled($taskId)) {
                         DB::rollBack();
+
                         return;
                     }
 
@@ -344,6 +344,7 @@ class WikiMaintenanceController extends Controller
                         // 在插入前再次检查是否取消
                         if ($this->isTaskCancelled($taskId)) {
                             DB::rollBack();
+
                             return;
                         }
 
@@ -400,9 +401,15 @@ class WikiMaintenanceController extends Controller
                 }
 
                 // 清理所有可能的變量引用
-                if (isset($batchData)) unset($batchData);
-                if (isset($allPersonIds)) unset($allPersonIds);
-                if (isset($personIdChunks)) unset($personIdChunks);
+                if (isset($batchData)) {
+                    unset($batchData);
+                }
+                if (isset($allPersonIds)) {
+                    unset($allPersonIds);
+                }
+                if (isset($personIdChunks)) {
+                    unset($personIdChunks);
+                }
 
                 // 最後一次強制垃圾回收
                 gc_collect_cycles();
@@ -416,7 +423,7 @@ class WikiMaintenanceController extends Controller
                     'task_id' => $taskId,
                     'deleted_count' => $deletedCount,
                     'imported_count' => $importedCount,
-                    'skipped_count' => $skippedCount
+                    'skipped_count' => $skippedCount,
                 ]);
 
             } catch (\Exception $e) {
@@ -424,6 +431,7 @@ class WikiMaintenanceController extends Controller
                 if (DB::transactionLevel() > 0) {
                     DB::rollBack();
                 }
+
                 throw $e;
             }
 
@@ -435,7 +443,7 @@ class WikiMaintenanceController extends Controller
             $this->logOperation('import_url_error', $targetSourceId, 0, [
                 'url' => $url,
                 'task_id' => $taskId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             Log::error('Wiki maintenance import error', [
@@ -443,31 +451,29 @@ class WikiMaintenanceController extends Controller
                 'target_source' => $targetSourceId,
                 'task_id' => $taskId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
 
-    public function getImportProgress($taskId)
-    {
+    public function getImportProgress($taskId) {
         $cacheKey = "import_progress_{$taskId}";
         $progress = cache($cacheKey);
 
         if (!$progress) {
             return response()->json([
                 'success' => false,
-                'message' => '找不到指定的任務'
+                'message' => '找不到指定的任務',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'progress' => $progress
+            'progress' => $progress,
         ]);
     }
 
-    private function initializeProgress($taskId, $sourceName)
-    {
+    private function initializeProgress($taskId, $sourceName) {
         $cacheKey = "import_progress_{$taskId}";
         $progressData = [
             'task_id' => $taskId,
@@ -476,14 +482,13 @@ class WikiMaintenanceController extends Controller
             'message' => '準備開始導入...',
             'status' => 'running',
             'started_at' => Carbon::now()->format('Y-m-d H:i:s'),
-            'updated_at' => Carbon::now()->format('Y-m-d H:i:s')
+            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ];
 
         cache([$cacheKey => $progressData], now()->addHour()); // 缓存1小时
     }
 
-    private function updateProgress($taskId, $progress, $message, $status = 'running')
-    {
+    private function updateProgress($taskId, $progress, $message, $status = 'running') {
         $cacheKey = "import_progress_{$taskId}";
         $progressData = cache($cacheKey, []);
 
@@ -499,21 +504,20 @@ class WikiMaintenanceController extends Controller
         cache([$cacheKey => $progressData], now()->addHour());
     }
 
-    private function isTaskCancelled($taskId)
-    {
+    private function isTaskCancelled($taskId) {
         $cacheKey = "import_progress_{$taskId}";
         $progressData = cache($cacheKey, []);
+
         return isset($progressData['status']) && $progressData['status'] === 'cancelled';
     }
 
-    private function downloadAndDecompress($url)
-    {
+    private function downloadAndDecompress($url) {
         $client = new Client([
             'timeout' => 0, // 無超時限制
             'verify' => false, // 在開發環境中可能需要
             'headers' => [
-                'User-Agent' => 'CBDB-Wiki-Maintenance/1.0'
-            ]
+                'User-Agent' => 'CBDB-Wiki-Maintenance/1.0',
+            ],
         ]);
 
         try {
@@ -524,6 +528,7 @@ class WikiMaintenanceController extends Controller
             // 檢查 HTTP 狀態碼並提供友好的錯誤信息
             if ($statusCode !== 200) {
                 $errorMessage = $this->getHttpErrorMessage($statusCode);
+
                 throw new \Exception($errorMessage);
             }
 
@@ -565,10 +570,12 @@ class WikiMaintenanceController extends Controller
             // 4xx 錯誤 (客戶端錯誤)
             $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
             $errorMessage = $this->getHttpErrorMessage($statusCode);
+
             throw new \Exception($errorMessage);
         } catch (\GuzzleHttp\Exception\ServerException $e) {
             // 5xx 錯誤 (服務器錯誤)
             $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : 0;
+
             throw new \Exception("服務器暫時無法處理請求 (HTTP {$statusCode})，請稍後再試或聯絡資料提供者");
         } catch (\GuzzleHttp\Exception\ConnectException $e) {
             throw new \Exception('無法連接到指定的 URL，請檢查：1) URL 是否正確 2) 網路連接是否正常 3) 目標服務器是否可用');
@@ -577,8 +584,7 @@ class WikiMaintenanceController extends Controller
         }
     }
 
-    private function getHttpErrorMessage($statusCode)
-    {
+    private function getHttpErrorMessage($statusCode) {
         switch ($statusCode) {
             case 400:
                 return 'URL 請求格式錯誤 (HTTP 400)，請檢查 URL 是否完整且正確';
@@ -603,8 +609,7 @@ class WikiMaintenanceController extends Controller
         }
     }
 
-    private function looksLikeHtmlErrorPage($content)
-    {
+    private function looksLikeHtmlErrorPage($content) {
         // 檢查內容是否看起來像 HTML 錯誤頁面
         $content = strtolower(trim($content));
 
@@ -621,16 +626,15 @@ class WikiMaintenanceController extends Controller
         return false;
     }
 
-    private function looksLikeValidJson($content)
-    {
+    private function looksLikeValidJson($content) {
         // 簡單檢查內容是否可能是 JSON
         $trimmed = trim($content);
+
         return (strpos($trimmed, '{') === 0 && strrpos($trimmed, '}') === strlen($trimmed) - 1) ||
                (strpos($trimmed, '[') === 0 && strrpos($trimmed, ']') === strlen($trimmed) - 1);
     }
 
-    private function prepareRecordData($record, $targetSourceId, $taskId = null)
-    {
+    private function prepareRecordData($record, $targetSourceId, $taskId = null) {
         // 驗證記錄格式
         if (!isset($record['cbdb_personid']) || !isset($record['wikidata_qid'])) {
             return null;
@@ -659,8 +663,9 @@ class WikiMaintenanceController extends Controller
             \Log::error("Regex error in WikiMaintenance", [
                 'wikidataQid' => $wikidataQid,
                 'cbdb_personid' => $cbdbPersonId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return null;
         }
 
@@ -700,8 +705,7 @@ class WikiMaintenanceController extends Controller
         ];
     }
 
-    private function getJsonErrorMessage($jsonError)
-    {
+    private function getJsonErrorMessage($jsonError) {
         switch ($jsonError) {
             case JSON_ERROR_NONE:
                 return '無錯誤';
@@ -730,8 +734,7 @@ class WikiMaintenanceController extends Controller
         }
     }
 
-    protected function logOperation($operation, $sourceId, $count = null, $additionalData = [])
-    {
+    protected function logOperation($operation, $sourceId, $count = null, $additionalData = []) {
         $logData = [
             'operation' => $operation,
             'source_id' => $sourceId,

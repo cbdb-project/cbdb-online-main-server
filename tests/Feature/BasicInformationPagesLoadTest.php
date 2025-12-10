@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
 /**
  * 测试 BasicInformation 相关页面能正常加载（不出现 500 错误）
@@ -13,13 +13,11 @@ use App\User;
  * 使用 in-memory SQLite 数据库，灌入最小化测试数据
  * 只验证 HTTP 状态码，不检查具体内容
  */
-class BasicInformationPagesLoadTest extends TestCase
-{
+class BasicInformationPagesLoadTest extends TestCase {
     protected $user;
     protected $testPersonId = 99999;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 数据库
@@ -43,7 +41,7 @@ class BasicInformationPagesLoadTest extends TestCase
             'email' => 'test@example.com',
             'is_active' => 1,
             'is_admin' => 0,
-            'confirmation_token' => 'test_token_' . time()
+            'confirmation_token' => 'test_token_' . time(),
         ]);
 
         // 灌入测试数据
@@ -53,8 +51,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 创建最小化表结构
      */
-    protected function createMinimalTables()
-    {
+    protected function createMinimalTables() {
         // 创建 users 表
         Schema::dropIfExists('users');
         Schema::create('users', function (Blueprint $table) {
@@ -365,8 +362,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 灌入测试数据
      */
-    protected function seedTestData()
-    {
+    protected function seedTestData() {
         // 插入代码表基础数据
         \DB::table('DYNASTIES')->insert([
             'c_dy' => 1,
@@ -566,8 +562,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试主页面：/basicinformation
      */
-    public function test_basicinformation_index_page_loads()
-    {
+    public function test_basicinformation_index_page_loads() {
         $response = $this->get('/basicinformation');
         $response->assertStatus(200);
     }
@@ -575,8 +570,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试创建页面：/basicinformation/create
      */
-    public function test_basicinformation_create_page_loads()
-    {
+    public function test_basicinformation_create_page_loads() {
         $response = $this->get('/basicinformation/create');
         $response->assertStatus(200);
     }
@@ -584,8 +578,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试编辑页面：/basicinformation/{id}/edit
      */
-    public function test_basicinformation_edit_page_loads()
-    {
+    public function test_basicinformation_edit_page_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/edit");
         $response->assertStatus(200);
     }
@@ -593,8 +586,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试地址子页面：/basicinformation/{id}/addresses
      */
-    public function test_basicinformation_addresses_index_loads()
-    {
+    public function test_basicinformation_addresses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/addresses");
         $response->assertStatus(200);
     }
@@ -602,8 +594,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试别名子页面：/basicinformation/{id}/altnames
      */
-    public function test_basicinformation_altnames_index_loads()
-    {
+    public function test_basicinformation_altnames_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/altnames");
         $response->assertStatus(200);
     }
@@ -611,8 +602,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试文本子页面：/basicinformation/{id}/texts
      */
-    public function test_basicinformation_texts_index_loads()
-    {
+    public function test_basicinformation_texts_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/texts");
         $response->assertStatus(200);
     }
@@ -620,8 +610,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试官职子页面：/basicinformation/{id}/offices
      */
-    public function test_basicinformation_offices_index_loads()
-    {
+    public function test_basicinformation_offices_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
         $response->assertStatus(200);
     }
@@ -629,8 +618,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试社会关系子页面：/basicinformation/{id}/assoc
      */
-    public function test_basicinformation_assoc_index_loads()
-    {
+    public function test_basicinformation_assoc_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/assoc");
         $response->assertStatus(200);
     }
@@ -638,8 +626,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试入词子页面：/basicinformation/{id}/entries
      */
-    public function test_basicinformation_entries_index_loads()
-    {
+    public function test_basicinformation_entries_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
         $response->assertStatus(200);
     }
@@ -647,8 +634,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试事件子页面：/basicinformation/{id}/events
      */
-    public function test_basicinformation_events_index_loads()
-    {
+    public function test_basicinformation_events_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/events");
         $response->assertStatus(200);
     }
@@ -656,8 +642,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试亲属子页面：/basicinformation/{id}/kinship
      */
-    public function test_basicinformation_kinship_index_loads()
-    {
+    public function test_basicinformation_kinship_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/kinship");
         $response->assertStatus(200);
     }
@@ -665,8 +650,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试社会区分子页面：/basicinformation/{id}/statuses
      */
-    public function test_basicinformation_statuses_index_loads()
-    {
+    public function test_basicinformation_statuses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/statuses");
         $response->assertStatus(200);
     }
@@ -674,8 +658,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试财物子页面：/basicinformation/{id}/possession
      */
-    public function test_basicinformation_possession_index_loads()
-    {
+    public function test_basicinformation_possession_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/possession");
         $response->assertStatus(200);
     }
@@ -683,8 +666,7 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试社会机构子页面：/basicinformation/{id}/socialinst
      */
-    public function test_basicinformation_socialinst_index_loads()
-    {
+    public function test_basicinformation_socialinst_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/socialinst");
         $response->assertStatus(200);
     }
@@ -692,14 +674,12 @@ class BasicInformationPagesLoadTest extends TestCase
     /**
      * 测试出处子页面：/basicinformation/{id}/sources
      */
-    public function test_basicinformation_sources_index_loads()
-    {
+    public function test_basicinformation_sources_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/sources");
         $response->assertStatus(200);
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         parent::tearDown();
     }
 }

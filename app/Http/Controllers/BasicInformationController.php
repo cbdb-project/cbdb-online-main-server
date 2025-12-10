@@ -15,13 +15,12 @@ use App\Repositories\YearRangeRepository;
 use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-
-use App\Pinyin;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Arr;
+
 /**
  * Class BiogBasicInformationController
  * @package App\Http\Controllers
@@ -29,8 +28,7 @@ use Illuminate\Support\Arr;
  * 人物基本信息主要包括如下几个Model的内容
  * BiogMain Dynasty NianHao YearRangeCode ChoronymCode TextCode Text
  */
-class BasicInformationController extends Controller
-{
+class BasicInformationController extends Controller {
     protected $biogMainRepository;
     protected $ethnicityRepository;
     protected $dynastyRepository;
@@ -46,8 +44,7 @@ class BasicInformationController extends Controller
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService) {
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
         $this->dynastyRepository = $dynastyRepository;
@@ -55,7 +52,7 @@ class BasicInformationController extends Controller
         $this->choronymRepository = $choronymRepository;
         $this->yearRangeRepository = $yearRangeRepository;
         $this->operationRepository = $operationRepository;
-        $this->toolRepository  = $toolsRepository;
+        $this->toolRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
     }
 
@@ -64,8 +61,7 @@ class BasicInformationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
-    {
+    public function index(Request $request) {
         // 获取查询参数
         $q = $request->input('q', '');
         $num = $request->input('num', 20);
@@ -77,7 +73,7 @@ class BasicInformationController extends Controller
             'page_title' => 'Basicinformation',
             'page_description' => '編輯人物基本信息',
             'names' => $names,
-            'q' => $q
+            'q' => $q,
         ]);
     }
 
@@ -86,9 +82,9 @@ class BasicInformationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
+    public function create() {
         $temp_id = BiogMain::max('c_personid') + 1;
+
         return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息', 'temp_id' => $temp_id]);
     }
 
@@ -98,36 +94,38 @@ class BasicInformationController extends Controller
      * @param  \Illuminate\Http\Request $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
-    {
+    public function store(Request $request) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $data = $request->all();
-//        dd(!BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty());
-        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()){
+        //        dd(!BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty());
+        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()) {
             flash('person id 未填或已存在 '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }elseif ((int)$data['c_personid']-(BiogMain::max('c_personid')) > 10000) {
+        } elseif ((int)$data['c_personid'] - (BiogMain::max('c_personid')) > 10000) {
             flash('person id 过大 '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
-//        $data['c_personid'] = BiogMain::max('c_personid') + 1;
+        //        $data['c_personid'] = BiogMain::max('c_personid') + 1;
         #20240328移除tts_sysno
         #$data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
-        $data = $this->toolRepository->timestamp($data, True);
+        $data = $this->toolRepository->timestamp($data, true);
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
             $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data, '', 2);
             flash('眾包紀錄 Create success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.index');
-        }
-        else {
+        } else {
             //20230628觸發「自動生成」功能
             $data = $this->biogMainRepository->auto_pinyin($data);
             //增加完成
@@ -139,6 +137,7 @@ class BasicInformationController extends Controller
             }
 
             flash('Create success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.edit', $data['c_personid']);
         }
         //20190531修改結束
@@ -150,13 +149,13 @@ class BasicInformationController extends Controller
      * @param  int $id
      * @return \App\BiogMain|BiogMainRepository|BiogMainRepository[]|\Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|\Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
         $biogbasicinformation->kinship;
         $biogbasicinformation->office;
+
         return $biogbasicinformation;
-//        return view('biogmains.show', $result);
+        //        return view('biogmains.show', $result);
     }
 
     /**
@@ -165,12 +164,12 @@ class BasicInformationController extends Controller
      * @param  int $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
-    {
+    public function edit($id) {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();
         $yearRange = $this->yearRangeRepository->yearRange();
+
         return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 基本资料']);
     }
@@ -182,31 +181,32 @@ class BasicInformationController extends Controller
      * @param  int $id
      * @return \Illuminate\Http\Response
      */
-    public function update(BasicInformationRequest $request, $id)
-    {
+    public function update(BasicInformationRequest $request, $id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
-        
+
         $result = $this->biogMainRepository->updateById($request, $id);
-        
+
         // 檢查是否有實質變更
         if (isset($result['no_changes']) && $result['no_changes']) {
             flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
+
             return redirect()->route('basicinformation.edit', $id);
         }
-        
+
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
             flash('眾包紀錄 Update success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.index');
-        }
-        else {
+        } else {
             if (Schema::hasTable('CBDB__NAME_FTS')) {
                 $person = BiogMain::find($id);
                 if ($person) {
@@ -215,20 +215,21 @@ class BasicInformationController extends Controller
             }
 
             flash('Update success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.edit', $id);
         }
         //20190531修改結束
     }
 
     //20190223新增另存功能
-    public function saveas($id)
-    {
+    public function saveas($id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         //如果沒有使用toArray(), 需搭配save()儲存, 則會儲存物件本身, 就無法另存.
@@ -239,7 +240,7 @@ class BasicInformationController extends Controller
         $data['c_personid'] = $new_id;
         #20240328移除tts_sysno
         #$data['tts_sysno'] = $new_ttsid;
-        $data = $this->toolRepository->timestamp($data, True); //建檔資訊
+        $data = $this->toolRepository->timestamp($data, true); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
         $flight = BiogMain::create($data);
         $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
@@ -249,24 +250,25 @@ class BasicInformationController extends Controller
         }
 
         flash('Create success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.edit', $new_id); 
+
+        return redirect()->route('basicinformation.edit', $new_id);
     }
 
     //20240701新增Duplicate Collateral Info功能
-    public function Duplicate_Collateral_Info($id)
-    {
+    public function Duplicate_Collateral_Info($id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $data = BiogMain::find($id)->toArray();
         $new_id = BiogMain::max('c_personid') + 1;
         $data['c_personid'] = $new_id;
-        $data = $this->toolRepository->timestamp($data, True); //建檔資訊
+        $data = $this->toolRepository->timestamp($data, true); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
         $flight = BiogMain::create($data);
         $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
@@ -284,7 +286,7 @@ class BasicInformationController extends Controller
             $addr_data = (array)$addr_data;
             $addr_data['c_personid'] = $new_id;
             $addr_data = Arr::except($addr_data, ['_token']);
-            $addr_data = $this->toolRepository->timestamp($addr_data, True); //建檔資訊
+            $addr_data = $this->toolRepository->timestamp($addr_data, true); //建檔資訊
             DB::table('BIOG_ADDR_DATA')->insert($addr_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', $addr_data['c_personid']."-".$addr_data['c_addr_id']."-".$addr_data['c_addr_type']."-".$addr_data['c_sequence'], $addr_data);
         }
@@ -308,7 +310,7 @@ class BasicInformationController extends Controller
         foreach ($kin as $kin_data) {
             $kin_data = (array)$kin_data;
             $kin_data['c_personid'] = $new_id;
-            $kin_data = $this->toolRepository->timestamp($kin_data, True); //建檔資訊
+            $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
             DB::table('KIN_DATA')->insert($kin_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', $kin_data['c_personid']."-".$kin_data['c_kin_id']."-".$kin_data['c_kin_code'], $kin_data);
         }
@@ -320,7 +322,7 @@ class BasicInformationController extends Controller
             $kin_data = (array)$kin_data;
             $kin_pair_id = $kin_data['c_personid'];
             $kin_data['c_kin_id'] = $new_id;
-            $kin_data = $this->toolRepository->timestamp($kin_data, True); //建檔資訊
+            $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
             DB::table('KIN_DATA')->insert($kin_data);
             $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', $kin_data['c_personid']."-".$kin_data['c_kin_id']."-".$kin_data['c_kin_code'], $kin_data);
         }
@@ -338,7 +340,7 @@ class BasicInformationController extends Controller
             $assoc_data['c_assoc_kin_code'] = 0;
             $assoc_data['c_tertiary_personid'] = 0;
             $assoc_data['c_tertiary_type_notes'] = null;
-            $assoc_data = $this->toolRepository->timestamp($assoc_data, True); //建檔資訊
+            $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$assoc_data['c_text_title'], $assoc_data);
         }
@@ -356,7 +358,7 @@ class BasicInformationController extends Controller
             $assoc_data['c_assoc_kin_code'] = 0;
             $assoc_data['c_tertiary_personid'] = 0;
             $assoc_data['c_tertiary_type_notes'] = null;
-            $assoc_data = $this->toolRepository->timestamp($assoc_data, True); //建檔資訊
+            $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
             $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$assoc_data['c_text_title'], $assoc_data);
         }
@@ -369,10 +371,10 @@ class BasicInformationController extends Controller
             $inst_data = (array)$inst_data;
             $inst_data['c_personid'] = $new_id;
             $inst_data = Arr::except($inst_data, ['_token']);
-            $inst_data = $this->toolRepository->timestamp($inst_data, True); //建檔資訊
+            $inst_data = $this->toolRepository->timestamp($inst_data, true); //建檔資訊
             DB::table('BIOG_INST_DATA')->insert($inst_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', $inst_data['c_personid']."-".$inst_data['c_inst_code']."-".$inst_data['c_inst_name_code']."-".$inst_data['c_bi_role_code'], $inst_data);
-        } 
+        }
 
         //社會區分
         $status = DB::table('STATUS_DATA')->where([
@@ -382,13 +384,14 @@ class BasicInformationController extends Controller
             $status_data = (array)$status_data;
             $status_data['c_personid'] = $new_id;
             $status_data = Arr::except($status_data, ['_token']);
-            $status_data = $this->toolRepository->timestamp($status_data, True); //建檔資訊
+            $status_data = $this->toolRepository->timestamp($status_data, true); //建檔資訊
             DB::table('STATUS_DATA')->insert($status_data);
             $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', $status_data['c_personid'].'-'.$status_data['c_sequence'].'-'.$status_data['c_status_code'], $status_data);
         }
 
         //擴充結束
         flash('Create success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.edit', $new_id);
     }
 
@@ -398,14 +401,14 @@ class BasicInformationController extends Controller
      * @param  int $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
-    {
+    public function destroy($id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $ori = $this->biogMainRepository->byPersonId($id);
@@ -415,9 +418,9 @@ class BasicInformationController extends Controller
         if (Auth::user()->isCrowdsourcingUser()) {
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori, 2);
             flash('眾包紀錄 Delete success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.index');
-        }
-        else {
+        } else {
             $biog->save();
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori);
 
@@ -426,6 +429,7 @@ class BasicInformationController extends Controller
             }
 
             flash('Delete success @ '.Carbon::now(), 'success');
+
             return redirect()->route('basicinformation.index');
         }
     }

@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\Schema;
  * - If the migration fails during data conversion, columns will exist but some may be empty
  * - This is safe because the original data in c_created_date/c_modified_date is preserved
  */
-class AddTimestampTemporaryColumns extends Migration
-{
+class AddTimestampTemporaryColumns extends Migration {
     /**
      * The tables that need timestamp conversion.
      *
@@ -44,8 +43,7 @@ class AddTimestampTemporaryColumns extends Migration
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         // Step 1: Add all columns first (DDL operations - cannot be rolled back in MySQL)
         foreach ($this->tables as $table) {
             if (!Schema::hasTable($table)) {
@@ -83,8 +81,7 @@ class AddTimestampTemporaryColumns extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         foreach ($this->tables as $table) {
             if (!Schema::hasTable($table)) {
                 continue;
@@ -110,8 +107,7 @@ class AddTimestampTemporaryColumns extends Migration
      * @param string $table
      * @return void
      */
-    protected function convertDates(string $table): void
-    {
+    protected function convertDates(string $table): void {
         // Update c_created_date_timestamp_temporary
         if (Schema::hasColumn($table, 'c_created_date')) {
             DB::statement("

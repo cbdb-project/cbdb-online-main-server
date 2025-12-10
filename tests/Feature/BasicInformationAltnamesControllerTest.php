@@ -2,17 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\User;
 use App\TextCode;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
+use App\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class BasicInformationAltnamesControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BasicInformationAltnamesControllerTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 數據庫
@@ -98,8 +96,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
         ]);
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('BIOG_MAIN');
@@ -112,8 +109,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
     /**
      * 測試當 ALTNAME_DATA 記錄不存在時返回 404
      */
-    public function testEditReturns404WhenAltnameNotFound()
-    {
+    public function testEditReturns404WhenAltnameNotFound() {
         // 創建用戶
         $user = User::create([
             'name' => 'Test User',
@@ -139,8 +135,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
     /**
      * 測試當 c_source 為 null 時不會發生 NPE
      */
-    public function testEditHandlesNullCSource()
-    {
+    public function testEditHandlesNullCSource() {
         // 創建用戶
         $user = User::create([
             'name' => 'Test User',
@@ -176,8 +171,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
     /**
      * 測試當 TextCode 不存在時不會發生 NPE
      */
-    public function testEditHandlesNonExistentTextCode()
-    {
+    public function testEditHandlesNonExistentTextCode() {
         // 創建用戶
         $user = User::create([
             'name' => 'Test User',
@@ -213,8 +207,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
     /**
      * 測試正常情況下能正確載入 TextCode 資訊
      */
-    public function testEditLoadsTextCodeSuccessfully()
-    {
+    public function testEditLoadsTextCodeSuccessfully() {
         // 創建用戶
         $user = User::create([
             'name' => 'Test User',
@@ -257,8 +250,7 @@ class BasicInformationAltnamesControllerTest extends TestCase
     /**
      * 測試 c_source 為 0 時的處理
      */
-    public function testEditHandlesZeroCSource()
-    {
+    public function testEditHandlesZeroCSource() {
         // 創建用戶
         $user = User::create([
             'name' => 'Test User',

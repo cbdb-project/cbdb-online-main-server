@@ -8,20 +8,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class AdminBatchLoadOfficesController extends Controller
-{
+class AdminBatchLoadOfficesController extends Controller {
     /**
      * @var OperationRepository
      */
     protected $operationRepository;
 
-    public function __construct(OperationRepository $operationRepository)
-    {
+    public function __construct(OperationRepository $operationRepository) {
         $this->operationRepository = $operationRepository;
     }
 
-    public function showForm()
-    {
+    public function showForm() {
         $this->ensureAdmin();
 
         return view('admin.batch_load_offices', [
@@ -34,8 +31,7 @@ class AdminBatchLoadOfficesController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
+    public function store(Request $request) {
         $this->ensureAdmin();
 
         $data = $request->validate([
@@ -117,8 +113,7 @@ class AdminBatchLoadOfficesController extends Controller
             ->with('batch_errors', []);
     }
 
-    protected function ensureAdmin(): void
-    {
+    protected function ensureAdmin(): void {
         if (!Auth::check() || !Auth::user()->canRunBatchImport()) {
             abort(403);
         }
@@ -129,8 +124,7 @@ class AdminBatchLoadOfficesController extends Controller
      *
      * @return array{0: array<int,array<string,mixed>>, 1: array<int,string>}
      */
-    protected function parseEntries(string $input): array
-    {
+    protected function parseEntries(string $input): array {
         $lines = preg_split('/\r\n|\n|\r/', $input);
         $rows = [];
         $errors = [];
@@ -146,6 +140,7 @@ class AdminBatchLoadOfficesController extends Controller
             $parts = preg_split("/\t+/", $line);
             if (!$parts || count($parts) < 6) {
                 $errors[] = "第 {$lineNumber} 行需要至少六欄資料（職名、英文、朝代、官職類型 ID、所屬單位、來源 TEXT_ID）";
+
                 continue;
             }
 
@@ -175,6 +170,7 @@ class AdminBatchLoadOfficesController extends Controller
 
             if (!empty($lineErrors)) {
                 $errors = array_merge($errors, $lineErrors);
+
                 continue;
             }
 
@@ -201,8 +197,7 @@ class AdminBatchLoadOfficesController extends Controller
      *
      * @return array<string,int>
      */
-    protected function getDynastyMap(): array
-    {
+    protected function getDynastyMap(): array {
         return DB::table('DYNASTIES')
             ->orderBy('c_dy')
             ->pluck('c_dy', 'c_dynasty_chn')
@@ -219,14 +214,14 @@ class AdminBatchLoadOfficesController extends Controller
      * @param array<string,int> $dynastyMap
      * @return array<int,string>
      */
-    protected function validateDynasties(array $rows, array $dynastyMap): array
-    {
+    protected function validateDynasties(array $rows, array $dynastyMap): array {
         $errors = [];
         foreach ($rows as $row) {
             if (!array_key_exists($row['dynasty_label'], $dynastyMap)) {
                 $errors[] = "第 {$row['line']} 行找不到朝代「{$row['dynasty_label']}」對應的代碼";
             }
         }
+
         return $errors;
     }
 
@@ -236,8 +231,7 @@ class AdminBatchLoadOfficesController extends Controller
      * @param array<int,string> $typeIds
      * @return array<int,string>
      */
-    protected function validateOfficeTypes(array $typeIds): array
-    {
+    protected function validateOfficeTypes(array $typeIds): array {
         $unique = array_unique(array_filter($typeIds, static function ($value) {
             return $value !== '';
         }));
@@ -267,8 +261,7 @@ class AdminBatchLoadOfficesController extends Controller
      * @param array<int,int> $sourceIds
      * @return array<int,string>
      */
-    protected function validateSourceIds(array $sourceIds): array
-    {
+    protected function validateSourceIds(array $sourceIds): array {
         $unique = array_unique($sourceIds);
         if (empty($unique)) {
             return [];
@@ -295,8 +288,7 @@ class AdminBatchLoadOfficesController extends Controller
     /**
      * Convert Chinese string to space-separated pinyin.
      */
-    protected function buildPinyin(string $value): string
-    {
+    protected function buildPinyin(string $value): string {
         $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $syllables = [];
 
@@ -324,8 +316,7 @@ class AdminBatchLoadOfficesController extends Controller
      *
      * @param array<int,string> $errors
      */
-    protected function backWithErrors(array $errors)
-    {
+    protected function backWithErrors(array $errors) {
         return redirect()
             ->route('admin.batch-load-offices')
             ->withInput()

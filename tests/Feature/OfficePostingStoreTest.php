@@ -12,10 +12,8 @@ use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
 
-class OfficePostingStoreTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class OfficePostingStoreTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -71,8 +69,7 @@ class OfficePostingStoreTest extends TestCase
         Auth::guard()->setUser(new GenericUser(['id' => 1, 'name' => 'Testing Admin']));
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
@@ -81,8 +78,7 @@ class OfficePostingStoreTest extends TestCase
         parent::tearDown();
     }
 
-    private function makeRequest(array $overrides = []): Request
-    {
+    private function makeRequest(array $overrides = []): Request {
         $payload = array_merge([
             '_token' => 'token',
             'c_addr' => [0],
@@ -95,8 +91,7 @@ class OfficePostingStoreTest extends TestCase
         return new Request($payload);
     }
 
-    public function testOfficeStoreCreatesPostingRecordsWithinTransaction(): void
-    {
+    public function testOfficeStoreCreatesPostingRecordsWithinTransaction(): void {
         $repository = new BiogMainRepository();
         $request = $this->makeRequest();
 
@@ -135,8 +130,7 @@ class OfficePostingStoreTest extends TestCase
         ]);
     }
 
-    public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void
-    {
+    public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void {
         $repository = Mockery::mock(BiogMainRepository::class)->makePartial();
         $repository->shouldAllowMockingProtectedMethods();
         $repository->shouldReceive('insertAddr')->andThrow(new \RuntimeException('addr failure'));
@@ -162,8 +156,7 @@ class OfficePostingStoreTest extends TestCase
         ]);
     }
 
-    public function testOfficeUpdateCreatesOperationLog(): void
-    {
+    public function testOfficeUpdateCreatesOperationLog(): void {
         $repo = new BiogMainRepository();
         $repo->officeStoreById($this->makeRequest([
             'c_office_id' => 20,
@@ -194,8 +187,7 @@ class OfficePostingStoreTest extends TestCase
         ]);
     }
 
-    public function testOfficeDeleteCreatesOperationLogAndCleansPostingTables(): void
-    {
+    public function testOfficeDeleteCreatesOperationLogAndCleansPostingTables(): void {
         $repo = new BiogMainRepository();
         $repo->officeStoreById($this->makeRequest([
             'c_office_id' => 30,

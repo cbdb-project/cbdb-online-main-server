@@ -3,14 +3,11 @@
 namespace Tests\Unit;
 
 use App\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class UserFactoryTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class UserFactoryTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 配置 SQLite 内存数据库
@@ -29,8 +26,7 @@ class UserFactoryTest extends TestCase
         $this->createTestTables();
     }
 
-    protected function createTestTables()
-    {
+    protected function createTestTables() {
         Schema::dropIfExists('users');
 
         Schema::create('users', function ($table) {
@@ -49,15 +45,13 @@ class UserFactoryTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
     /** @test */
-    public function it_can_create_user_with_new_factory_syntax()
-    {
+    public function it_can_create_user_with_new_factory_syntax() {
         $user = User::factory()->create();
 
         $this->assertInstanceOf(User::class, $user);
@@ -72,8 +66,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_user_with_custom_attributes()
-    {
+    public function it_can_create_user_with_custom_attributes() {
         $user = User::factory()->create([
             'name' => '测试用户',
             'email' => 'test@example.com',
@@ -84,8 +77,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_multiple_users()
-    {
+    public function it_can_create_multiple_users() {
         $users = User::factory()->count(3)->create();
 
         $this->assertCount(3, $users);
@@ -93,8 +85,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_active_user()
-    {
+    public function it_can_create_active_user() {
         $user = User::factory()->active()->create();
 
         $this->assertEquals(User::STATUS_ACTIVE, $user->is_active);
@@ -102,8 +93,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_inactive_user()
-    {
+    public function it_can_create_inactive_user() {
         $user = User::factory()->inactive()->create();
 
         $this->assertEquals(User::STATUS_INACTIVE, $user->is_active);
@@ -111,8 +101,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_super_admin_user()
-    {
+    public function it_can_create_super_admin_user() {
         $user = User::factory()->superAdmin()->create();
 
         $this->assertEquals(User::ROLE_SUPER_ADMIN, $user->is_admin);
@@ -121,8 +110,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_expert_user()
-    {
+    public function it_can_create_expert_user() {
         $user = User::factory()->expert()->create();
 
         $this->assertEquals(User::ROLE_EXPERT, $user->is_admin);
@@ -131,8 +119,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_crowdsourcing_user()
-    {
+    public function it_can_create_crowdsourcing_user() {
         $user = User::factory()->crowdsourcing()->create();
 
         $this->assertEquals(User::ROLE_CROWDSOURCING, $user->is_admin);
@@ -141,8 +128,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_create_regular_user()
-    {
+    public function it_can_create_regular_user() {
         $user = User::factory()->regular()->create();
 
         $this->assertEquals(User::ROLE_REGULAR, $user->is_admin);
@@ -151,8 +137,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_sets_default_confirmation_token()
-    {
+    public function it_sets_default_confirmation_token() {
         $user = User::factory()->create();
 
         $this->assertNotNull($user->confirmation_token);
@@ -160,8 +145,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_make_user_without_persisting()
-    {
+    public function it_can_make_user_without_persisting() {
         $user = User::factory()->make();
 
         $this->assertInstanceOf(User::class, $user);
@@ -170,8 +154,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function it_can_combine_multiple_states()
-    {
+    public function it_can_combine_multiple_states() {
         $user = User::factory()->active()->superAdmin()->create();
 
         $this->assertEquals(User::STATUS_ACTIVE, $user->is_active);
@@ -181,8 +164,7 @@ class UserFactoryTest extends TestCase
     }
 
     /** @test */
-    public function old_factory_syntax_still_works()
-    {
+    public function old_factory_syntax_still_works() {
         // 验证旧的 factory() 语法仍然可用
         $user = factory(User::class)->create();
 

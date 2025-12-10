@@ -1,19 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-class AlterAdminCatTablesCollation extends Migration
-{
+class AlterAdminCatTablesCollation extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         // Step 1: Drop foreign key constraints from ADMIN_CAT_CODE_TYPE_REL
         Schema::table('ADMIN_CAT_CODE_TYPE_REL', function (Blueprint $table) {
             $table->dropForeign('fk_admin_cat_code');
@@ -46,8 +44,7 @@ class AlterAdminCatTablesCollation extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         // Note: Reverting collation changes is not typically necessary
         // as utf8mb4_general_ci is the standard for this project.
         // If needed, you would need to know the previous collation settings.

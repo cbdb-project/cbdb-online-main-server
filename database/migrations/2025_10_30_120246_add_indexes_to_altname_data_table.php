@@ -1,18 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class AddIndexesToAltnameDataTable extends Migration
-{
+class AddIndexesToAltnameDataTable extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         if (Schema::hasTable('ALTNAME_DATA')) {
             Schema::table('ALTNAME_DATA', function (Blueprint $table) {
                 // 加速與 ALTNAME_CODES、TEXT_CODES 的多表關聯。
@@ -85,8 +83,7 @@ class AddIndexesToAltnameDataTable extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         if (Schema::hasTable('ALTNAME_DATA')) {
             Schema::table('ALTNAME_DATA', function (Blueprint $table) {
                 $table->dropIndex('idx_altname_code_source');

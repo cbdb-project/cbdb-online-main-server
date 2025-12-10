@@ -6,15 +6,13 @@ use App\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
-class UserFactory extends Factory
-{
+class UserFactory extends Factory {
     /**
      * Define the model's default state.
      *
      * @return array
      */
-    public function definition()
-    {
+    public function definition() {
         return [
             'name' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
@@ -31,8 +29,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function active()
-    {
+    public function active() {
         return $this->state(function (array $attributes) {
             return [
                 'is_active' => User::STATUS_ACTIVE,
@@ -45,8 +42,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function inactive()
-    {
+    public function inactive() {
         return $this->state(function (array $attributes) {
             return [
                 'is_active' => User::STATUS_INACTIVE,
@@ -59,8 +55,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function superAdmin()
-    {
+    public function superAdmin() {
         return $this->state(function (array $attributes) {
             return [
                 'is_admin' => User::ROLE_SUPER_ADMIN,
@@ -73,8 +68,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function expert()
-    {
+    public function expert() {
         return $this->state(function (array $attributes) {
             return [
                 'is_admin' => User::ROLE_EXPERT,
@@ -87,8 +81,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function crowdsourcing()
-    {
+    public function crowdsourcing() {
         return $this->state(function (array $attributes) {
             return [
                 'is_admin' => User::ROLE_CROWDSOURCING,
@@ -101,8 +94,7 @@ class UserFactory extends Factory
      *
      * @return \Illuminate\Database\Eloquent\Factories\Factory
      */
-    public function regular()
-    {
+    public function regular() {
         return $this->state(function (array $attributes) {
             return [
                 'is_admin' => User::ROLE_REGULAR,

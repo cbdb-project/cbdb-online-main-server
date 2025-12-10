@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,15 +9,11 @@
 
 namespace App\Http\Controllers\Api;
 
-
 use Illuminate\Http\Request;
-use App\User;
 use Validator;
 
-class LoginController extends ApiController
-{
-    public function login(Request $request)
-    {
+class LoginController extends ApiController {
+    public function login(Request $request) {
         $validator = Validator::make($request->all(), [
             'email' => 'required|exists:users',
             'password' => 'required|between:6,32',
@@ -26,6 +23,7 @@ class LoginController extends ApiController
                 'errors' => $validator->errors()->toArray(),
                 'code' => 401,
             ]);
+
             return $this->sendFailedLoginResponse($request);
         }
         $credentials = $this->credentials($request);
@@ -36,6 +34,4 @@ class LoginController extends ApiController
 
         return $this->failed('login failed', 401);
     }
-
-
 }

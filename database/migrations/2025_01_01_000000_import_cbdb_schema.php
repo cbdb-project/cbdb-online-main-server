@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class ImportCbdbSchema extends Migration
-{
+class ImportCbdbSchema extends Migration {
     /**
      * Run the migrations.
      *
@@ -13,8 +12,7 @@ class ImportCbdbSchema extends Migration
      * and creates missing tables so that Laravel's migration history
      * matches the current database structure.
      */
-    public function up(): void
-    {
+    public function up(): void {
         $statements = $this->extractCreateStatements($this->schemaSql());
 
         if (empty($statements)) {
@@ -32,8 +30,7 @@ class ImportCbdbSchema extends Migration
         });
     }
 
-    protected function schemaSql(): string
-    {
+    protected function schemaSql(): string {
         return <<<'SQL'
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -2380,16 +2377,14 @@ SQL;
     /**
      * Reverse the migrations.
      */
-    public function down(): void
-    {
+    public function down(): void {
         // Intentionally left blank. This migration serves as a historical baseline.
     }
 
     /**
      * @return array<int, string>
      */
-    protected function extractCreateStatements(string $sql): array
-    {
+    protected function extractCreateStatements(string $sql): array {
         $statements = [];
         $buffer = '';
         $length = strlen($sql);
@@ -2423,6 +2418,7 @@ SQL;
                 foreach ($skipPrefixes as $prefix) {
                     if (stripos($normalized, $prefix) === 0) {
                         $shouldSkip = true;
+
                         break;
                     }
                 }

@@ -5,15 +5,13 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Arr;
 
-class BasicInformationEntriesController extends Controller
-{
+class BasicInformationEntriesController extends Controller {
     /**
      * @var BiogMainRepository
      */
@@ -25,20 +23,20 @@ class BasicInformationEntriesController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id)
-    {
+    public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithEntries($id);
+
         return view('biogmains.entries.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕']);
     }
@@ -48,8 +46,7 @@ class BasicInformationEntriesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create($id)
-    {
+    public function create($id) {
         return view('biogmains.entries.create', [
             'id' => $id,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 入仕', 'page_url' => '/basicinformation/'.$id.'/entries']);
@@ -61,14 +58,14 @@ class BasicInformationEntriesController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, $id)
-    {
+    public function store(Request $request, $id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         //20181217建安遮除原本儲存方式，改以[别名]方式儲存。
@@ -83,7 +80,7 @@ class BasicInformationEntriesController extends Controller
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, True);
+        $data = $this->toolsRepository->timestamp($data, true);
         //20181217新增片段，api回傳值有-999需要轉為0
         $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
         $data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
@@ -95,15 +92,14 @@ class BasicInformationEntriesController extends Controller
         //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
         $temp = explode("-", $data['c_inst_code']);
         $c_inst_code = $temp[0];
-        if(!empty($temp[1])) {
+        if (!empty($temp[1])) {
             $c_inst_name_code = $temp[1];
-        }
-        else {
+        } else {
             $c_inst_code = '0';
             $c_inst_name_code = '0';
         }
 
-        if($c_inst_name_code != '') {
+        if ($c_inst_name_code != '') {
             $data['c_inst_code'] = $c_inst_code;
             $data['c_inst_name_code'] = $c_inst_name_code;
         }
@@ -123,12 +119,14 @@ class BasicInformationEntriesController extends Controller
         ])->first();
         if (!blank($temp)) {
             flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         DB::table('ENTRY_DATA')->insert($data);
         $newKey = $data['c_personid'].'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
         $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', $newKey, $data);
         flash('Store success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.entries.edit', [
             'basicinformation' => $id,
             'entry' => $newKey,
@@ -141,8 +139,7 @@ class BasicInformationEntriesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         //
     }
 
@@ -152,8 +149,7 @@ class BasicInformationEntriesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $id_)
-    {
+    public function edit($id, $id_) {
         //聯合主鍵的樣式
         //"c_personid":34445,"c_entry_code":39,"c_sequence":1,"c_kin_code":0,"c_kin_id":0,"c_assoc_code":0,"c_assoc_id":0,"c_year":1351,"c_inst_code":0,"c_inst_name_code":0
         $res = $this->biogMainRepository->entryById($id_);
@@ -172,15 +168,15 @@ class BasicInformationEntriesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $id_)
-    {
+    public function update(Request $request, $id, $id_) {
         //建安修改20181109
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         /*
@@ -206,27 +202,26 @@ class BasicInformationEntriesController extends Controller
         //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
         $temp = explode("-", $data['c_inst_code']);
         $c_inst_code = $temp[0];
-        if(!empty($temp[1])) {
+        if (!empty($temp[1])) {
             $c_inst_name_code = $temp[1];
-        }
-        else {
+        } else {
             $c_inst_code = '0';
             $c_inst_name_code = '0';
         }
 
-        if($c_inst_name_code != '') {
+        if ($c_inst_name_code != '') {
             $data['c_inst_code'] = $c_inst_code;
             $data['c_inst_name_code'] = $c_inst_name_code;
         }
         //return $request;
         //修改結束
-        $id_ = str_replace("--","-minus",$id_);
+        $id_ = str_replace("--", "-minus", $id_);
         $addr_a = explode("-", $id_);
-        foreach($addr_a as $key => $value) {
-            $addr_a[$key] = str_replace("minus","-",$value);
-	}
+        foreach ($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus", "-", $value);
+        }
 
-	//20251208新增差異比對紀錄
+        //20251208新增差異比對紀錄
         $ori = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],
@@ -238,7 +233,7 @@ class BasicInformationEntriesController extends Controller
             ['c_assoc_id', '=', $addr_a[7]],
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
-	])->first();
+    ])->first();
 
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
@@ -255,6 +250,7 @@ class BasicInformationEntriesController extends Controller
         $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.entries.edit', [
             'basicinformation' => $id,
             'entry' => $newid,
@@ -267,22 +263,22 @@ class BasicInformationEntriesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_)
-    {
+    public function destroy($id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         //建安修改20191112
         //$this->biogMainRepository->entryDeleteById($id_, $id);
-        $id_ = str_replace("--","-minus",$id_);
+        $id_ = str_replace("--", "-minus", $id_);
         $addr_a = explode("-", $id_);
-        foreach($addr_a as $key => $value) {
-            $addr_a[$key] = str_replace("minus","-",$value);
+        foreach ($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus", "-", $value);
         }
         $row = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
@@ -309,8 +305,9 @@ class BasicInformationEntriesController extends Controller
             ['c_assoc_id', '=', $addr_a[7]],
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
-        ])->delete(); 
+        ])->delete();
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);
     }
 }

@@ -7,10 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
-class CbdbApiController extends Controller
-{
-    public function person(Request $request)
-    {
+class CbdbApiController extends Controller {
+    public function person(Request $request) {
         $mode = strtolower((string) $request->query('mode', $request->query('o', 'html')));
 
         $validator = Validator::make($request->all(), [
@@ -162,24 +160,23 @@ class CbdbApiController extends Controller
         ]);
     }
 
-    protected function fetchAll(string $sql, array $bindings): array
-    {
+    protected function fetchAll(string $sql, array $bindings): array {
         return array_map(function ($row) {
             return $this->normalizeRow((array) $row);
         }, DB::select($sql, $bindings));
     }
 
-    protected function fetchSingle(string $sql, array $bindings): ?array
-    {
+    protected function fetchSingle(string $sql, array $bindings): ?array {
         $rows = $this->fetchAll($sql, $bindings);
+
         return $rows[0] ?? null;
     }
 
-    protected function normalizeRow(array $row): array
-    {
+    protected function normalizeRow(array $row): array {
         foreach ($row as $key => $value) {
             if ($value === null) {
                 $row[$key] = null;
+
                 continue;
             }
 
@@ -187,6 +184,7 @@ class CbdbApiController extends Controller
                 $trimmed = trim($value);
                 if ($trimmed === '') {
                     $row[$key] = null;
+
                     continue;
                 }
                 if (is_numeric($trimmed) && !preg_match('/^0[0-9]+$/', $trimmed)) {
@@ -194,6 +192,7 @@ class CbdbApiController extends Controller
                 } else {
                     $row[$key] = $trimmed;
                 }
+
                 continue;
             }
 
@@ -205,25 +204,26 @@ class CbdbApiController extends Controller
         return $row;
     }
 
-    protected function stringifyRow(array $row): array
-    {
+    protected function stringifyRow(array $row): array {
         $result = [];
         foreach ($row as $key => $value) {
             if ($value === null) {
                 $result[$key] = '';
+
                 continue;
             }
             if (is_scalar($value)) {
                 $result[$key] = (string) $value;
+
                 continue;
             }
             $result[$key] = $value;
         }
+
         return $result;
     }
 
-    protected function stripEmptyCollections(array $personPayload): array
-    {
+    protected function stripEmptyCollections(array $personPayload): array {
         foreach ($personPayload as $section => $wrapper) {
             if (!is_array($wrapper)) {
                 continue;
@@ -241,8 +241,7 @@ class CbdbApiController extends Controller
         return $personPayload;
     }
 
-    protected function arrayKeyFirst(array $array)
-    {
+    protected function arrayKeyFirst(array $array) {
         foreach ($array as $key => $value) {
             return $key;
         }
@@ -250,8 +249,7 @@ class CbdbApiController extends Controller
         return null;
     }
 
-    protected function resolvePersonId(?string $idParam, ?string $nameParam): ?int
-    {
+    protected function resolvePersonId(?string $idParam, ?string $nameParam): ?int {
         if ($idParam !== null && $idParam !== '') {
             return (int) $idParam;
         }
@@ -263,14 +261,13 @@ class CbdbApiController extends Controller
         return $this->findPersonIdByName($nameParam);
     }
 
-protected function findPersonIdByName(string $name): ?int
-{
+    protected function findPersonIdByName(string $name): ?int {
         $candidate = $this->searchPersonCandidates($name, 1);
-        return $candidate[0]['id'] ?? null;
-}
 
-    protected function searchPersonCandidates(string $name, int $limit = 20): array
-    {
+        return $candidate[0]['id'] ?? null;
+    }
+
+    protected function searchPersonCandidates(string $name, int $limit = 20): array {
         $term = trim($name);
 
         if ($term === '') {
@@ -291,11 +288,13 @@ protected function findPersonIdByName(string $name): ?int
             if ($person) {
                 $row = (array) $person;
                 $label = $row['c_name_chn'] ?? $row['c_name'] ?? $row['c_name_rm'] ?? 'ID ' . $personId;
+
                 return [[
                     'id' => $personId,
                     'label' => $label,
                 ]];
             }
+
             return [];
         }
 
@@ -409,8 +408,7 @@ protected function findPersonIdByName(string $name): ?int
         return $results;
     }
 
-    protected function appendPersonIdsFromQuery($builder, array &$collector, int $limit): void
-    {
+    protected function appendPersonIdsFromQuery($builder, array &$collector, int $limit): void {
         if (count($collector) >= $limit) {
             return;
         }
@@ -429,8 +427,7 @@ protected function findPersonIdByName(string $name): ?int
         }
     }
 
-    protected function jsonPersonNotFoundResponse(?int $requestedId = null)
-    {
+    protected function jsonPersonNotFoundResponse(?int $requestedId = null) {
         $error = [
             'code' => 404,
             'message' => 'Person not found.',
@@ -446,8 +443,7 @@ protected function findPersonIdByName(string $name): ?int
         return response()->json(['error' => $error], 404);
     }
 
-    protected function buildMergeHint(int $personId): ?array
-    {
+    protected function buildMergeHint(int $personId): ?array {
         if (!Schema::hasTable('MERGED_PERSON_DATA')) {
             return null;
         }
@@ -474,8 +470,7 @@ protected function findPersonIdByName(string $name): ?int
         ];
     }
 
-    protected function sqlBasicInfo(): string
-    {
+    protected function sqlBasicInfo(): string {
         $yearsLivedApprox = 'NULL AS YearsLivedApprox,';
         if (Schema::hasColumn('BIOG_MAIN', 'c_death_age_approx')) {
             $yearsLivedApprox = "(SELECT c_range_chn FROM YEAR_RANGE_CODES WHERE c_range_code = BIOG_MAIN.c_death_age_approx) AS YearsLivedApprox,";
@@ -521,8 +516,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlSources(): string
-    {
+    protected function sqlSources(): string {
         return <<<SQL
 SELECT (SELECT c_title_chn FROM TEXT_CODES WHERE c_textid = BIOG_SOURCE_DATA.c_textid) AS Source,
        c_textid AS SourceId,
@@ -533,8 +527,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlSourcesAs(): string
-    {
+    protected function sqlSourcesAs(): string {
         return <<<SQL
 SELECT (SELECT c_title_chn FROM TEXT_CODES WHERE c_textid = BIOG_SOURCE_DATA.c_textid) AS Source,
        c_textid AS SourceId,
@@ -545,8 +538,7 @@ WHERE c_textid = 9602 AND c_personid = ?
 SQL;
     }
 
-    protected function sqlAliases(): string
-    {
+    protected function sqlAliases(): string {
         return <<<SQL
 SELECT (SELECT c_name_type_desc_chn FROM ALTNAME_CODES WHERE c_name_type_code = ALTNAME_DATA.c_alt_name_type_code) AS AliasType,
        ALTNAME_DATA.c_alt_name_type_code AS AliasTypeId,
@@ -556,8 +548,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlAddresses(): string
-    {
+    protected function sqlAddresses(): string {
         return <<<SQL
 SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        (SELECT c_addr_desc_chn FROM BIOG_ADDR_CODES WHERE c_addr_type = BIOG_ADDR_DATA.c_addr_type) AS AddrType,
@@ -614,9 +605,8 @@ WHERE BIOG_ADDR_DATA.c_personid = ?
 SQL;
     }
 
-    protected function sqlEntries(): string
-    {
-    return <<<SQL
+    protected function sqlEntries(): string {
+        return <<<SQL
 SELECT
     et.c_entry_type_desc_chn AS EntryType,
     et.c_entry_type AS EntryTypeId,
@@ -636,8 +626,7 @@ WHERE ed.c_personid = ?
 SQL;
     }
 
-    protected function sqlPostings(): string
-    {
+    protected function sqlPostings(): string {
         return <<<SQL
 SELECT POSTED_TO_OFFICE_DATA.c_office_id AS OfficeId,
        OFFICE_CODES.c_office_chn AS OfficeName,
@@ -672,8 +661,7 @@ WHERE POSTED_TO_OFFICE_DATA.c_personid = ?
 SQL;
     }
 
-    protected function sqlStatuses(): string
-    {
+    protected function sqlStatuses(): string {
         return <<<SQL
 SELECT c_status_code AS StatusId,
        (SELECT c_status_desc_chn FROM STATUS_CODES WHERE c_status_code = STATUS_DATA.c_status_code) AS StatusName,
@@ -684,8 +672,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlKinships(): string
-    {
+    protected function sqlKinships(): string {
         return <<<SQL
 SELECT c_kin_id AS KinPersonId,
        (SELECT c_name_chn FROM BIOG_MAIN WHERE c_personid = KIN_DATA.c_kin_id) AS KinPersonName,
@@ -700,8 +687,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlAssociations(): string
-    {
+    protected function sqlAssociations(): string {
         return <<<SQL
 SELECT c_assoc_id AS AssocPersonId,
        (SELECT c_name_chn FROM BIOG_MAIN WHERE c_personid = ASSOC_DATA.c_assoc_id) AS AssocPersonName,
@@ -723,8 +709,7 @@ WHERE c_personid = ?
 SQL;
     }
 
-    protected function sqlTexts(): string
-    {
+    protected function sqlTexts(): string {
         return <<<SQL
 SELECT TEXT_CODES.c_textid AS TextId,
        TEXT_CODES.c_title_chn AS TextName,

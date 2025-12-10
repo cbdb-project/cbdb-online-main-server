@@ -11,10 +11,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class OperationsProposalControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class OperationsProposalControllerTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -58,16 +56,14 @@ class OperationsProposalControllerTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('TEST_CODES');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
-    protected function makeAdmin(): User
-    {
+    protected function makeAdmin(): User {
         $user = new User([
             'name' => 'admin',
             'email' => 'admin@example.com',
@@ -81,8 +77,7 @@ class OperationsProposalControllerTest extends TestCase
         return $user;
     }
 
-    protected function proposalOperation(array $attributes = []): Operation
-    {
+    protected function proposalOperation(array $attributes = []): Operation {
         $operation = new Operation();
         $operation->user_id = $attributes['user_id'] ?? 100;
         $operation->c_personid = 0;
@@ -96,8 +91,7 @@ class OperationsProposalControllerTest extends TestCase
         return $operation;
     }
 
-    public function testApproveCreateProposalInsertsRow()
-    {
+    public function testApproveCreateProposalInsertsRow() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 
@@ -146,8 +140,7 @@ class OperationsProposalControllerTest extends TestCase
         ]);
     }
 
-    public function testApproveUpdateProposalUpdatesRow()
-    {
+    public function testApproveUpdateProposalUpdatesRow() {
         \DB::table('TEST_CODES')->insert([
             'code_id' => 'UP',
             'code_sub' => '02',
@@ -198,8 +191,7 @@ class OperationsProposalControllerTest extends TestCase
         ]);
     }
 
-    public function testRejectProposalUpdatesStatus()
-    {
+    public function testRejectProposalUpdatesStatus() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 

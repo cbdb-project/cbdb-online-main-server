@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class AdminBatchLoadBookTitlesTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class AdminBatchLoadBookTitlesTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -67,8 +65,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('TEXT_CODES');
@@ -77,8 +74,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         parent::tearDown();
     }
 
-    protected function makeUser(array $attributes = []): User
-    {
+    protected function makeUser(array $attributes = []): User {
         $user = new User([
             'name' => 'Batch Admin',
             'email' => uniqid('admin', true).'@example.com',
@@ -104,8 +100,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         return $user;
     }
 
-    public function test_non_admin_cannot_access_page(): void
-    {
+    public function test_non_admin_cannot_access_page(): void {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);
 
@@ -113,8 +108,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_admin_can_view_form(): void
-    {
+    public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -122,8 +116,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $response->assertStatus(200)->assertSee('批次匯入書稿資料');
     }
 
-    public function test_admin_can_upload_batch_entries(): void
-    {
+    public function test_admin_can_upload_batch_entries(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -164,8 +157,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $followUp->assertSee('批次編號');
     }
 
-    public function test_invalid_lines_are_reported(): void
-    {
+    public function test_invalid_lines_are_reported(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -181,8 +173,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase
         $this->assertSame(0, DB::table('TEXT_CODES')->count());
     }
 
-    public function test_blank_source_is_rejected(): void
-    {
+    public function test_blank_source_is_rejected(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 

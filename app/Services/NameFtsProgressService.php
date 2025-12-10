@@ -5,10 +5,8 @@ namespace App\Services;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
-class NameFtsProgressService
-{
-    public static function initialize(string $taskId, array $meta = []): void
-    {
+class NameFtsProgressService {
+    public static function initialize(string $taskId, array $meta = []): void {
         $data = array_merge($meta, [
             'task_id' => $taskId,
             'progress' => 5,
@@ -21,8 +19,7 @@ class NameFtsProgressService
         Cache::put(self::cacheKey($taskId), $data, now()->addHour());
     }
 
-    public static function update(string $taskId, int $progress, string $message, string $status = 'running'): void
-    {
+    public static function update(string $taskId, int $progress, string $message, string $status = 'running'): void {
         $key = self::cacheKey($taskId);
         $data = Cache::get($key, []);
 
@@ -39,13 +36,11 @@ class NameFtsProgressService
         Cache::put($key, $data, now()->addHour());
     }
 
-    public static function get(string $taskId)
-    {
+    public static function get(string $taskId) {
         return Cache::get(self::cacheKey($taskId));
     }
 
-    public static function cacheKey(string $taskId): string
-    {
+    public static function cacheKey(string $taskId): string {
         return 'cbdb_name_fts_progress_' . $taskId;
     }
 }

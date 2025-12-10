@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,32 +9,29 @@
 
 namespace App\Repositories;
 
-
 use App\AppointmentTypeCode;
 use Illuminate\Http\Request;
 
-class AppointCodeRepository{
-    public function appointByQuery(Request $request, $num=20)
-    {
-        if ($temp = $request->num){
+class AppointCodeRepository {
+    public function appointByQuery(Request $request, $num = 20) {
+        if ($temp = $request->num) {
             $num = $temp;
         }
-        if (!$request->q){
+        if (!$request->q) {
             return AppointmentTypeCode::paginate($num);
         }
         //$names = AppointmentTypeCode::where('c_appt_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_appt_type_desc', 'like', '%'.$request->q.'%')->orWhere('c_appt_code', $request->q)->paginate($num);
         $names = AppointmentTypeCode::where('c_appt_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_appt_desc', 'like', '%'.$request->q.'%')->orWhere('c_appt_code', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
+
         return $names;
     }
 
-    public function byId($id)
-    {
+    public function byId($id) {
         return AppointmentTypeCode::find($id);
     }
 
-    public function updateById($request, $id)
-    {
+    public function updateById($request, $id) {
         $data = $request->all();
         $altcode = AppointmentTypeCode::find($id);
         $altcode->update($data);

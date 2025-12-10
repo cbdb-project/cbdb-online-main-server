@@ -7,16 +7,14 @@ use Tests\TestCase;
 
 /**
  * 測試 BiogMainRepository::updateById() 的變更檢測邏輯
- * 
+ *
  * 參考 PR #330 (commit f14925d) 的測試模式
  */
-class BiogMainRepositoryUpdateTest extends TestCase
-{
+class BiogMainRepositoryUpdateTest extends TestCase {
     /** @var TestableBiogMainRepositoryForUpdate */
     private $repository;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
         $this->repository = new TestableBiogMainRepositoryForUpdate();
     }
@@ -24,13 +22,12 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：當基本資料欄位有實質變更時，應該被檢測到
      */
-    public function testDetectsActualChangesInBasicFields()
-    {
+    public function testDetectsActualChangesInBasicFields() {
         $newData = [
             'c_name_chn' => '張三',
             'c_dy' => '19',
         ];
-        
+
         $original = [
             'c_name_chn' => '李四',
             'c_dy' => 19,
@@ -45,13 +42,12 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：當數值型字串與整數相等時，不應視為變更
      */
-    public function testTreatsNumericStringsAsEqualToIntegers()
-    {
+    public function testTreatsNumericStringsAsEqualToIntegers() {
         $newData = [
             'c_dy' => '19',
             'c_fy_nh_code' => '652',
         ];
-        
+
         $original = [
             'c_dy' => 19,
             'c_fy_nh_code' => 652,
@@ -66,8 +62,7 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：當所有欄位都相同時，不應視為有變更
      */
-    public function testNoChangesWhenAllFieldsIdentical()
-    {
+    public function testNoChangesWhenAllFieldsIdentical() {
         $data = [
             'c_name_chn' => '張三',
             'c_dy' => '19',
@@ -83,14 +78,13 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：忽略的欄位（如 c_modified_by, c_modified_date）不應影響變更檢測
      */
-    public function testIgnoresSpecifiedFields()
-    {
+    public function testIgnoresSpecifiedFields() {
         $newData = [
             'c_name_chn' => '張三',
             'c_modified_by' => 'user1',
             'c_modified_date' => '2024-01-01',
         ];
-        
+
         $original = [
             'c_name_chn' => '張三',
             'c_modified_by' => 'user2',
@@ -106,13 +100,12 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：空值與 null 的處理
      */
-    public function testHandlesNullAndEmptyValues()
-    {
+    public function testHandlesNullAndEmptyValues() {
         $newData = [
             'c_name_chn' => '',
             'c_notes' => null,
         ];
-        
+
         $original = [
             'c_name_chn' => null,
             'c_notes' => '',
@@ -121,7 +114,7 @@ class BiogMainRepositoryUpdateTest extends TestCase
         // 空字串與 null 在某些情況下應視為相等
         // 這取決於 normalizeComparisonValue 的實作
         $hasChanges = $this->repository->callHasMeaningfulChanges($newData, $original);
-        
+
         // 此測試驗證系統對空值的一致性處理
         $this->assertIsBool($hasChanges, '空值處理應該返回布林值');
     }
@@ -129,13 +122,12 @@ class BiogMainRepositoryUpdateTest extends TestCase
     /**
      * 測試：當新增欄位（原始資料中不存在）時，應視為變更
      */
-    public function testDetectsNewFields()
-    {
+    public function testDetectsNewFields() {
         $newData = [
             'c_name_chn' => '張三',
             'c_new_field' => 'new_value',
         ];
-        
+
         $original = [
             'c_name_chn' => '張三',
         ];
@@ -151,13 +143,11 @@ class BiogMainRepositoryUpdateTest extends TestCase
  * 測試用的 BiogMainRepository 子類別
  * 使用 Reflection 來測試 protected 方法
  */
-class TestableBiogMainRepositoryForUpdate extends BiogMainRepository
-{
+class TestableBiogMainRepositoryForUpdate extends BiogMainRepository {
     /**
      * 公開 hasMeaningfulChanges 方法供測試使用
      */
-    public function callHasMeaningfulChanges(array $newData, array $original, array $ignored = []): bool
-    {
+    public function callHasMeaningfulChanges(array $newData, array $original, array $ignored = []): bool {
         $ref = new \ReflectionClass(BiogMainRepository::class);
         $method = $ref->getMethod('hasMeaningfulChanges');
         $method->setAccessible(true);

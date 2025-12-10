@@ -2,12 +2,11 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
 
-class WikiTaskManager extends Command
-{
+class WikiTaskManager extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -27,8 +26,7 @@ class WikiTaskManager extends Command
      *
      * @return void
      */
-    public function __construct()
-    {
+    public function __construct() {
         parent::__construct();
     }
 
@@ -37,28 +35,32 @@ class WikiTaskManager extends Command
      *
      * @return mixed
      */
-    public function handle()
-    {
+    public function handle() {
         $action = $this->argument('action');
         $taskId = $this->argument('taskId');
 
         switch ($action) {
             case 'list':
                 $this->listTasks();
+
                 break;
             case 'show':
                 if (!$taskId) {
                     $this->error('Task ID is required for show action');
+
                     return 1;
                 }
                 $this->showTask($taskId);
+
                 break;
             case 'cancel':
                 if (!$taskId) {
                     $this->error('Task ID is required for cancel action');
+
                     return 1;
                 }
                 $this->cancelTask($taskId);
+
                 break;
             default:
                 $this->error('Invalid action. Available actions: list, show, cancel');
@@ -66,14 +68,14 @@ class WikiTaskManager extends Command
                 $this->line('  php artisan wiki:task list');
                 $this->line('  php artisan wiki:task show <taskId>');
                 $this->line('  php artisan wiki:task cancel <taskId>');
+
                 return 1;
         }
 
         return 0;
     }
 
-    private function listTasks()
-    {
+    private function listTasks() {
         $this->info('Scanning for Wiki import tasks...');
 
         // 获取所有导入进度的缓存键
@@ -96,6 +98,7 @@ class WikiTaskManager extends Command
 
         if (empty($cacheKeys)) {
             $this->info('No active or recent Wiki import tasks found.');
+
             return;
         }
 
@@ -112,20 +115,20 @@ class WikiTaskManager extends Command
                 $progress['status'] ?? 'unknown',
                 ($progress['progress'] ?? 0) . '%',
                 substr($progress['message'] ?? '', 0, 50) . (strlen($progress['message'] ?? '') > 50 ? '...' : ''),
-                $progress['started_at'] ?? 'unknown'
+                $progress['started_at'] ?? 'unknown',
             ];
         }
 
         $this->table($headers, $rows);
     }
 
-    private function showTask($taskId)
-    {
+    private function showTask($taskId) {
         $cacheKey = "import_progress_{$taskId}";
         $progress = Cache::get($cacheKey);
 
         if (!$progress) {
             $this->error("Task '{$taskId}' not found.");
+
             return;
         }
 
@@ -150,23 +153,25 @@ class WikiTaskManager extends Command
         }
     }
 
-    private function cancelTask($taskId)
-    {
+    private function cancelTask($taskId) {
         $cacheKey = "import_progress_{$taskId}";
         $progress = Cache::get($cacheKey);
 
         if (!$progress) {
             $this->error("Task '{$taskId}' not found.");
+
             return;
         }
 
         if ($progress['status'] !== 'running') {
             $this->warn("Task '{$taskId}' is not running (status: {$progress['status']}).");
+
             return;
         }
 
         if (!$this->option('force') && !$this->confirm("Are you sure you want to cancel task '{$taskId}'?")) {
             $this->info('Task cancellation aborted.');
+
             return;
         }
 

@@ -5,15 +5,13 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Arr;
 
-class BasicInformationTextsController extends Controller
-{
+class BasicInformationTextsController extends Controller {
     /**
      * @var BiogMainRepository
      */
@@ -26,21 +24,21 @@ class BasicInformationTextsController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository,OperationRepository $operationRepository, ToolsRepository $toolsRepository)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
         $this->biogMainRepository = $biogMainRepository;
         $this->table_name = 'BIOG_TEXT_DATA';
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id)
-    {
+    public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithText($id);
+
         return view('biogmains.texts.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述']);
     }
@@ -50,8 +48,7 @@ class BasicInformationTextsController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create($id)
-    {
+    public function create($id) {
         return view('biogmains.texts.create', [
             'id' => $id,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述', 'page_url' => '/basicinformation/'.$id.'/texts']);
@@ -63,20 +60,20 @@ class BasicInformationTextsController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, $id)
-    {
+    public function store(Request $request, $id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, True);
+        $data = $this->toolsRepository->timestamp($data, true);
         $temp = DB::table($this->table_name)->where([
             ['c_personid', '=', $data['c_personid']],
             ['c_textid', '=', $data['c_textid']],
@@ -84,11 +81,13 @@ class BasicInformationTextsController extends Controller
         ])->first();
         if (!blank($temp)) {
             flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         DB::table($this->table_name)->insert($data);
         $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.texts.edit', [
             'basicinformation' => $id,
             'text' => $data['c_personid'].'-'.$data['c_textid'].'-'.$data['c_role_id'],
@@ -101,8 +100,7 @@ class BasicInformationTextsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         //
     }
 
@@ -112,9 +110,9 @@ class BasicInformationTextsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $id_)
-    {
+    public function edit($id, $id_) {
         $res = $this->biogMainRepository->textById($id_);
+
         return view('biogmains.texts.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 著述',
             'page_url' => '/basicinformation/'.$id.'/texts',
@@ -129,14 +127,14 @@ class BasicInformationTextsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $id_)
-    {
+    public function update(Request $request, $id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $data = $request->all();
@@ -160,6 +158,7 @@ class BasicInformationTextsController extends Controller
         $new_id_ = $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'];
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.texts.edit', [
             'basicinformation' => $id,
             'text' => $new_id_,
@@ -172,29 +171,30 @@ class BasicInformationTextsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_)
-    {
+    public function destroy($id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $temp_l = explode("-", $id_);
         $row = DB::table($this->table_name)->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]]
+            ['c_role_id', '=', $temp_l[2]],
         ])->first();
         DB::table($this->table_name)->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]]
+            ['c_role_id', '=', $temp_l[2]],
         ])->delete();
         $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
     }
 }

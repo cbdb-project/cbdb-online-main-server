@@ -1,4 +1,5 @@
 <?php
+
 /**
  * User: ja
  * Date: 2023/7/25
@@ -7,32 +8,22 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\BiogMain;
-use App\BiogAddr;
-use App\BiogAddrCode;
 use App\AddrCode;
-use App\OfficeCode;
-use App\EntryCode;
-use App\KinshipCode;
 use App\AssocCode;
-use App\Operation;
+use App\BiogMain;
 use App\Dynasty;
+use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
-ini_set('memory_limit','512M');
+ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 300);
 
-class ApiController7 extends Controller
-{
+class ApiController7 extends Controller {
     use AuthenticatesUsers;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest');
     }
 
@@ -42,7 +33,7 @@ class ApiController7 extends Controller
         $arr = json_decode($json, true);
         //dd($arr); //驗證資料傳遞的正確性
         $start = $list = $total = 0;
-        $data = $useXyArr = array();
+        $data = $useXyArr = [];
         $people = $arr['people'];  //陣列
         $user_input_people = $people;//clone the original input people
         $assocCode = $arr['assocCode'];  //陣列
@@ -60,24 +51,29 @@ class ApiController7 extends Controller
         $dynEnd = $arr['dynEnd'] ?? 0;  //數字
         $includeMale = $arr['includeMale'] ?? 1;  //數字默認為1
         $includeFemale = $arr['includeFemale'] ?? 1;  //數字默認為1
-        if($broad == 1) {
+        if ($broad == 1) {
             $XY = '0.03';
-        }
-        else {
+        } else {
             $XY = '0.06';
         }
         //dd($includeMale);
 
-        if(!empty($arr['start'])) { 
-            if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
-            else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        if (!empty($arr['start'])) {
+            if ($arr['start'] <= 0) {
+                $start = 0;
+            } // 避免start為負數
+            else {
+                $start = $arr['start'] - 1;
+            } // return輸出由1開始, 程式需由0開始.
+        } else {
+            $start = 0;
         }
-        else { $start = 0; }
 
-        if(!empty($arr['list'])) {
+        if (!empty($arr['list'])) {
             $list = $arr['list'];
+        } else {
+            $list = 10000;
         }
-        else { $list = 10000; }
 
         //主要資料庫邏輯
 
@@ -85,12 +81,11 @@ class ApiController7 extends Controller
         //20241028增補，確認是否有查詢到資料。
         $c_assoc_type_parent_id_sum = count($first_row);
         #dd($c_assoc_type_parent_id_sum);
-        if(!empty($c_assoc_type_parent_id_sum)) {
+        if (!empty($c_assoc_type_parent_id_sum)) {
             foreach ($first_row as $val) {
                 $assocType_row[] = $val->c_assoc_type_code;
             }
-        }
-        else{
+        } else {
             $first_row = DB::table('ASSOC_TYPES')->whereIn('ASSOC_TYPES.c_assoc_type_code', $assocType)->get();
             foreach ($first_row as $val) {
                 $assocType_row[] = $val->c_assoc_type_code;
@@ -104,15 +99,14 @@ class ApiController7 extends Controller
             $c_assoc_code_row[] = $val->c_assoc_code;
         }
         //dd($c_assoc_code_row);
-       
-        if($maxNodeDist == 0) {
+
+        if ($maxNodeDist == 0) {
             $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $user_input_people);
             $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
             $row->whereIn('ASSOC_DATA.c_assoc_id', $user_input_people);
-           
-        }
-        elseif($maxNodeDist == 1) {
-            foreach($c_assoc_code_row as $v) {
+
+        } elseif ($maxNodeDist == 1) {
+            foreach ($c_assoc_code_row as $v) {
                 $assocCode[] = $v;
             }
             //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id array
@@ -123,50 +117,65 @@ class ApiController7 extends Controller
             //限定 ASSOC_DATA.personid 和 ASSOC_DATA.c_assoc_id 必需是 $sum_people 中的人物，並與 BIOG_MAIN 做 join
             $row = $this->get_related_edges($sum_people, $assocCode);
 
-        }
-        elseif($maxNodeDist == 2) {
-            foreach($c_assoc_code_row as $v) {
+        } elseif ($maxNodeDist == 2) {
+            foreach ($c_assoc_code_row as $v) {
                 $assocCode[] = $v;
             }
-            
+
             //ASSOC_DATA.personid 符合 $user_input_people 的 ASSOC_DATA.c_assoc_id
             $assoc_people = $this->get_assoc_people($user_input_people, $assocCode);
             //將前一輪的 ASSOC_DATA.c_assoc_id 作為 ASSOC_DATA.personid, 再進行一次查詢。
             $assoc_people2 = $this->get_assoc_people($assoc_people, $assocCode);
             //將$user_input_people、第一輪找出的 ASSOC_DATA.c_assoc_id 和 第二輪找出的 ASSOC_DATA.c_assoc_id 合併去重
-            $sum_people = array_merge($user_input_people, $assoc_people , $assoc_people2);
+            $sum_people = array_merge($user_input_people, $assoc_people, $assoc_people2);
             $sum_people = array_unique($sum_people);
             //限定 ASSOC_DATA.personid 和 ASSOC_DATA.c_assoc_id 必需是 $sum_people 中的人物，並與 BIOG_MAIN 做 join
-            $row = $this->get_related_edges($sum_people, $assocCode);         
-        }
-        else {
+            $row = $this->get_related_edges($sum_people, $assocCode);
+        } else {
             return 'API 暫不支援 maxNodeDist 大於 2 之查詢';
         }
 
         $row = $row->get();
         //資料庫邏輯結束 $row 的型態此時是 collect
-        if(!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) { return $row; }
+        if (!empty($arr['DEBUG']) && $arr['DEBUG'] == 1) {
+            return $row;
+        }
 
         //找出關係人在 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
-        $row = $this->get_assoc_necessary_data($row);  
-        
+        $row = $this->get_assoc_necessary_data($row);
+
         //如果useXy == 1 得到擴大的$place清單，注意 $place 是以 by reference 方式傳入
-        $this->get_extended_place($row, $useXy, $XY, $place); 
-        
+        $this->get_extended_place($row, $useXy, $XY, $place);
+
         //過濾地點、時間、性別條件，在 URL 上的人物不受過濾條件限制
-        $row = $this->filter_conditions($row, $user_input_people, $usePeoplePlace, $useXy, $place,
-        $indexYear, $indexStartTime, $indexEndTime, $useDy, $dynStart, $dynEnd,
-        $includeMale, $includeFemale);
+        $row = $this->filter_conditions(
+            $row,
+            $user_input_people,
+            $usePeoplePlace,
+            $useXy,
+            $place,
+            $indexYear,
+            $indexStartTime,
+            $indexEndTime,
+            $useDy,
+            $dynStart,
+            $dynEnd,
+            $includeMale,
+            $includeFemale
+        );
 
         //去除重複的資料清洗，$row 的型態在清洗後之後變成 array
         $new_row = [];
-        foreach($row as $v) {
-            if(empty($new_row)) { $new_row[] = $v; }
-            foreach($new_row as $s) {
-                if($v->c_personid == $s->c_personid && $v->c_assoc_id == $s->c_assoc_id && $v->c_assoc_code == $s->c_assoc_code && $v->c_text_title == $s->c_text_title) {
-                    break; 
+        foreach ($row as $v) {
+            if (empty($new_row)) {
+                $new_row[] = $v;
+            }
+            foreach ($new_row as $s) {
+                if ($v->c_personid == $s->c_personid && $v->c_assoc_id == $s->c_assoc_id && $v->c_assoc_code == $s->c_assoc_code && $v->c_text_title == $s->c_text_title) {
+                    break;
                 } else {
                     $new_row[] = $v;
+
                     break;
                 }
             }
@@ -177,18 +186,20 @@ class ApiController7 extends Controller
         $total = count($row);
 
         //需要客製lise與start的資料處理
-        if($list) {
+        if ($list) {
             //$row = $row->slice($start, $list);
             $new_row = [];
             $i = 0;
             $j = 0;
-            foreach($row as $v) {
+            foreach ($row as $v) {
                 $j++;
-                if($j > $start) {
+                if ($j > $start) {
                     $new_row[] = $v;
                     $i++;
                 }
-                if($i >= $list) { break; }
+                if ($i >= $list) {
+                    break;
+                }
             }
             $row = $new_row;
         }
@@ -203,7 +214,7 @@ class ApiController7 extends Controller
 
             //$record_list++;
             //if($record_list < $start + 1) { continue; }
-            //if($record_list > $list) { break; } 
+            //if($record_list > $list) { break; }
 
             $BiogMain = BiogMain::where('c_personid', '=', $val->c_personid)->first();
             $data_val['pId'] = $val->c_personid;
@@ -218,17 +229,16 @@ class ApiController7 extends Controller
             $data_val['aIndexYear'] = $AssocBiogMain->c_index_year;
             $data_val['aSex'] = $AssocBiogMain->c_female ? 'F' : 'M';
             //用c_index_addr_id查ADDR_CODES的c_addr_id
-            if(!empty($val->c_index_addr_id)) {
+            if (!empty($val->c_index_addr_id)) {
                 $AddrCode = AddrCode::where('c_addr_id', '=', $val->c_index_addr_id)->first();
             }
-            if(!empty($AddrCode)) {
+            if (!empty($AddrCode)) {
                 $data_val['pAddrID'] = $val->c_index_addr_id;
                 $data_val['pAddrName'] = $AddrCode->c_name;
                 $data_val['pAddrNameChn'] = $AddrCode->c_name_chn;
                 $data_val['pX'] = $AddrCode->x_coord;
                 $data_val['pY'] = $AddrCode->y_coord;
-            }
-            else {
+            } else {
                 $data_val['pAddrID'] = '';
                 $data_val['pAddrName'] = '';
                 $data_val['pAddrNameChn'] = '';
@@ -236,17 +246,16 @@ class ApiController7 extends Controller
                 $data_val['pY'] = '';
             }
             //用$AssocBiogMain的c_index_addr_id查ADDR_CODES的c_addr_id
-            if(!empty($AssocBiogMain->c_index_addr_id)) {
+            if (!empty($AssocBiogMain->c_index_addr_id)) {
                 $AddrCode2 = AddrCode::where('c_addr_id', '=', $AssocBiogMain->c_index_addr_id)->first();
             }
-            if(!empty($AddrCode2)) {
+            if (!empty($AddrCode2)) {
                 $data_val['aAddrID'] = $AssocBiogMain->c_index_addr_id;
                 $data_val['aAddrName'] = $AddrCode2->c_name;
                 $data_val['aAddrNameChn'] = $AddrCode2->c_name_chn;
                 $data_val['aX'] = $AddrCode2->x_coord;
                 $data_val['ay'] = $AddrCode2->y_coord;
-            }
-            else {
+            } else {
                 $data_val['aAddrID'] = '';
                 $data_val['aAddrName'] = '';
                 $data_val['aAddrNameChn'] = '';
@@ -255,14 +264,13 @@ class ApiController7 extends Controller
             }
 
             $data_val['pAssocRelationId'] = $val->c_assoc_code;
-            if(!empty($val->c_assoc_code)) {
+            if (!empty($val->c_assoc_code)) {
                 $AssocCode = AssocCode::where('c_assoc_code', '=', $val->c_assoc_code)->first();
             }
-            if(!empty($AssocCode)) {
+            if (!empty($AssocCode)) {
                 $data_val['pAssocRelation'] = $AssocCode->c_assoc_desc;
                 $data_val['pAssocRelationChn'] = $AssocCode->c_assoc_desc_chn;
-            }
-            else {
+            } else {
                 $data_val['pAssocRelation'] = '';
                 $data_val['pAssocRelationChn'] = '';
             }
@@ -279,12 +287,15 @@ class ApiController7 extends Controller
         }
 
         $ans['total'] = $total;
-        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
-        if(isset($list) && $list >= 0) {
+        if (isset($start)) {
+            $ans['start'] = (int)$start + 1;
+        } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if (isset($list) && $list >= 0) {
             $ans['end'] = (int)$list + (int)$start;
-            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
-        }
-        else {
+            if ($ans['end'] > $ans['total']) {
+                $ans['end'] = $ans['total'];
+            }
+        } else {
             $ans['end'] = (int)$total;
         }
         $ans['data'] = $data;
@@ -294,15 +305,15 @@ class ApiController7 extends Controller
     }
 
     // 從 ASSOC_DATA 裡，找到以 $people 為 c_personid 的所有 c_assoc_id
-    protected function get_assoc_people($people, $assocCode){
+    protected function get_assoc_people($people, $assocCode) {
         $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
         $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
-        
+
         $row = $row->get();
         $return_people = [];
 
-        foreach($row as $v) {
-            if(!in_array($v->c_assoc_id, $return_people)){
+        foreach ($row as $v) {
+            if (!in_array($v->c_assoc_id, $return_people)) {
                 $return_people[] = $v->c_assoc_id;
             }
         }
@@ -312,141 +323,169 @@ class ApiController7 extends Controller
     }
 
     // 從 ASSOC_DATA 裡，找到 $people 範圍內的所有關係，並將 ASSOC_DATA.c_personid join 到 BIOG_MAIN.c_personid
-    protected function get_related_edges($people, $assocCode){
+    protected function get_related_edges($people, $assocCode) {
         $row = DB::table('ASSOC_DATA')->whereIn('ASSOC_DATA.c_personid', $people);
         $row->join('BIOG_MAIN', 'ASSOC_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
         $row->whereIn('ASSOC_DATA.c_assoc_id', $people);
         $row->whereIn('ASSOC_DATA.c_assoc_code', $assocCode);
-        
+
         return $row;
     }
 
     // 組成新的row，加入以 c_assoc_id 為 BiogMain.c_personid ，並找出關係人在 BiogMain 的 c_index_addr_id、c_index_year、c_dy、c_female
-    protected function get_assoc_necessary_data($row){
+    protected function get_assoc_necessary_data($row) {
         foreach ($row as $v) {
             $assoc_BiogMain = BiogMain::where('c_personid', '=', $v->c_assoc_id)->first();
 
-            if(!empty($assoc_BiogMain)){
+            if (!empty($assoc_BiogMain)) {
                 $v->assoc_c_index_addr_id = $assoc_BiogMain->c_index_addr_id;
                 $v->assoc_c_index_year = $assoc_BiogMain->c_index_year;
                 $v->assoc_c_dy = $assoc_BiogMain->c_dy;
                 $v->assoc_c_female = $assoc_BiogMain->c_female;
-            }
-            else{
+            } else {
                 $v->assoc_c_index_addr_id = "";
                 $v->assoc_c_index_year = "";
                 $v->assoc_c_dy = "";
                 $v->assoc_c_female = "";
             }
         }
-        
+
         return $row;
     }
 
     //過濾條件
-    protected function filter_conditions($row, $user_input_people, 
-        $usePeoplePlace, $useXy, $place, 
-        $indexYear, $indexStartTime, $indexEndTime, 
-        $useDy, $dynStart, $dynEnd,
-        $includeMale, $includeFemale){
+    protected function filter_conditions(
+        $row,
+        $user_input_people,
+        $usePeoplePlace,
+        $useXy,
+        $place,
+        $indexYear,
+        $indexStartTime,
+        $indexEndTime,
+        $useDy,
+        $dynStart,
+        $dynEnd,
+        $includeMale,
+        $includeFemale
+    ) {
 
-        $tmp_row =collect();
-        if($row->isEmpty()){
+        $tmp_row = collect();
+        if ($row->isEmpty()) {
             return $row;
         }
 
-        foreach($row as $v) {
+        foreach ($row as $v) {
             //人物與關係人都在URL的people中
-            if(in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)){
+            if (in_array($v->c_personid, $user_input_people) && in_array($v->c_assoc_id, $user_input_people)) {
                 $tmp_row->push($v);
             }
             //人物在URL的people中，關係人符合過濾條件
-            else if(in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) && 
-            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
-            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
+            elseif (in_array($v->c_personid, $user_input_people) && (!in_array($v->c_assoc_id, $user_input_people) &&
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) &&
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) &&
             $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy) &&
             $this->filter_includeMale($includeMale, $v->assoc_c_female) &&
-            $this->filter_includeFemale($includeFemale, $v->assoc_c_female))){
+            $this->filter_includeFemale($includeFemale, $v->assoc_c_female))) {
                 $tmp_row->push($v);
             }
             //關係人在URL的people中，人物符合過濾條件
-            else if(in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) && 
-            $this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
-            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
-            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy)&&
+            elseif (in_array($v->c_assoc_id, $user_input_people) && (!in_array($v->c_personid, $user_input_people) &&
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) &&
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) &&
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy) &&
             $this->filter_includeMale($includeMale, $v->c_female) &&
-            $this->filter_includeFemale($includeFemale, $v->c_female))){
+            $this->filter_includeFemale($includeFemale, $v->c_female))) {
                 $tmp_row->push($v);
             }
             //人物與關係人都不在URL的people中，但都符合過濾條件
-            else if($this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) && 
-            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) && 
+            elseif ($this->filter_place($usePeoplePlace, $useXy, $place, $v->c_index_addr_id) &&
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->c_index_year) &&
             $this->filter_dy($useDy, $dynStart, $dynEnd, $v->c_dy) &&
             $this->filter_includeMale($includeMale, $v->c_female) &&
-            $this->filter_includeFemale($includeFemale, $v->c_female)&&
-            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) && 
-            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) && 
-            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy)&&
+            $this->filter_includeFemale($includeFemale, $v->c_female) &&
+            $this->filter_place($usePeoplePlace, $useXy, $place, $v->assoc_c_index_addr_id) &&
+            $this->filter_index_year($indexYear, $indexStartTime, $indexEndTime, $v->assoc_c_index_year) &&
+            $this->filter_dy($useDy, $dynStart, $dynEnd, $v->assoc_c_dy) &&
             $this->filter_includeMale($includeMale, $v->assoc_c_female) &&
-            $this->filter_includeFemale($includeFemale, $v->assoc_c_female)){
+            $this->filter_includeFemale($includeFemale, $v->assoc_c_female)) {
                 $tmp_row->push($v);
             }
         }
+
         return $tmp_row;
     }
 
-    protected function filter_includeMale($includeMale, $c_female){
-        if($includeMale == 0){
-            if($c_female==1) return true;
-            else return false;
+    protected function filter_includeMale($includeMale, $c_female) {
+        if ($includeMale == 0) {
+            if ($c_female == 1) {
+                return true;
+            } else {
+                return false;
+            }
         }
-        return true;      
-    }
 
-    protected function filter_includeFemale($includeFemale, $c_female){
-        if($includeFemale == 0){
-            if($c_female==0) return true;
-            else return false;
-        }
         return true;
     }
 
-    protected function filter_place($usePeoplePlace, $useXy, $place, $index_addr_id){
-        if($usePeoplePlace || $useXy){
+    protected function filter_includeFemale($includeFemale, $c_female) {
+        if ($includeFemale == 0) {
+            if ($c_female == 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function filter_place($usePeoplePlace, $useXy, $place, $index_addr_id) {
+        if ($usePeoplePlace || $useXy) {
             return in_array($index_addr_id, $place);
         }
+
         return true;
     }
 
-
-    protected function filter_index_year($indexYear, $indexStartTime, $indexEndTime, $c_index_year){
-        if($indexYear) { 
-            if($c_index_year >= $indexStartTime && $c_index_year <= $indexEndTime) return true;
-            else return false;
+    protected function filter_index_year($indexYear, $indexStartTime, $indexEndTime, $c_index_year) {
+        if ($indexYear) {
+            if ($c_index_year >= $indexStartTime && $c_index_year <= $indexEndTime) {
+                return true;
+            } else {
+                return false;
+            }
         }
+
         return true;
     }
 
-    protected function filter_dy($useDy, $dynStart, $dynEnd, $c_dy){
-        if($useDy){
+    protected function filter_dy($useDy, $dynStart, $dynEnd, $c_dy) {
+        if ($useDy) {
             $dynasty_sort = Dynasty::where('c_dy', '=', $c_dy)->first()->c_sort ?? null;
             $dynStart_sort = Dynasty::where('c_dy', '=', $dynStart)->first()->c_sort ?? null;
             $dynEnd_sort = Dynasty::where('c_dy', '=', $dynEnd)->first()->c_sort ?? null;
-            if($dynasty_sort >= $dynStart_sort && $dynasty_sort <= $dynEnd_sort) return true;
-            else return false;   
+            if ($dynasty_sort >= $dynStart_sort && $dynasty_sort <= $dynEnd_sort) {
+                return true;
+            } else {
+                return false;
+            }
         }
+
         return true;
     }
 
     // $place 在使用XY之後，會更新成擴展後的地址id，因此要用 by reference 的方式傳入
     protected function get_extended_place($row, $useXy, $XY, &$place) {
-        if($useXy && !empty($place)) {    
+        if ($useXy && !empty($place)) {
             $useXyVar = '';
             foreach ($place as $val) {
-                if($useXyVar)  $useXyVar .= ',';  //string concat
+                if ($useXyVar) {
+                    $useXyVar .= ',';
+                }  //string concat
                 $useXyVar .= $val;
             }
-                
+
             $sqlTmp = sprintf('
 SELECT DISTINCT ADDR_CODES.c_addr_id FROM ADDR_CODES
 INNER JOIN ADDR_CODES AS ADDR_CODES_1
@@ -456,8 +495,8 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
 
             //return $sqlTmp; //驗證$useXy可以查找到資料並進行過濾
             $useXyRes = DB::select($sqlTmp);
-                
-            $useXyResArr = array(); //放擴展地理座標後的結果
+
+            $useXyResArr = []; //放擴展地理座標後的結果
             foreach ($useXyRes as $val) {
                 array_push($useXyResArr, $val->c_addr_id);
             }
@@ -471,7 +510,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
         }
     }
 
-    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit=2, $decimal=2){
+    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit = 2, $decimal = 2) {
         /*
         * 計算兩點地理座標之間的距離
         * @param  Decimal $longitude1 起點經度
@@ -490,17 +529,18 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-'.$XY.') And (ADDR_CODES.x_c
         $radLat2 = $latitude2 * $PI / 180.0;
 
         $radLng1 = $longitude1 * $PI / 180.0;
-        $radLng2 = $longitude2 * $PI /180.0;
+        $radLng2 = $longitude2 * $PI / 180.0;
 
         $a = $radLat1 - $radLat2;
         $b = $radLng1 - $radLng2;
 
-        $distance = 2 * asin(sqrt(pow(sin($a/2),2) + cos($radLat1) * cos($radLat2) * pow(sin($b/2),2)));
+        $distance = 2 * asin(sqrt(pow(sin($a / 2), 2) + cos($radLat1) * cos($radLat2) * pow(sin($b / 2), 2)));
         $distance = $distance * $EARTH_RADIUS * 1000;
 
-        if($unit==2){
+        if ($unit == 2) {
             $distance = $distance / 1000;
         }
+
         return round($distance, $decimal);
     }
 }

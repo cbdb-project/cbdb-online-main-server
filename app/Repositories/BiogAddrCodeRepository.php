@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,13 +9,10 @@
 
 namespace App\Repositories;
 
-
 use App\BiogAddrCode;
 
-class BiogAddrCodeRepository
-{
-    public function biogaddr()
-    {
+class BiogAddrCodeRepository {
+    public function biogaddr() {
         return BiogAddrCode::select(['c_addr_type', 'c_addr_desc', 'c_addr_desc_chn'])->get();
     }
 }

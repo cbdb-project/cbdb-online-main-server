@@ -4,10 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class UpdateAddressesTableForHierarchy extends Migration
-{
-    public function up(): void
-    {
+class UpdateAddressesTableForHierarchy extends Migration {
+    public function up(): void {
         Schema::table('ADDRESSES', function (Blueprint $table) {
             if (!Schema::hasColumn('ADDRESSES', 'c_belongs_firstyear')) {
                 $table->smallInteger('c_belongs_firstyear')
@@ -32,8 +30,7 @@ class UpdateAddressesTableForHierarchy extends Migration
         });
     }
 
-    public function down(): void
-    {
+    public function down(): void {
         Schema::table('ADDRESSES', function (Blueprint $table) {
             if (Schema::hasColumn('ADDRESSES', 'c_belongs_firstyear')) {
                 $table->dropColumn('c_belongs_firstyear');

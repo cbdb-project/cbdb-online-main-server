@@ -7,24 +7,23 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class ManagementController extends Controller
-{
-    public function __construct()
-    {
+class ManagementController extends Controller {
+    public function __construct() {
         $this->middleware('auth');
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
+    public function index() {
         if (!Auth::user()->isAdmin()) {
             return redirect('/home');
         }
         $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
-        return view('manage.index',['data' => $data, 'page_title' => 'Management', 'page_description' => '管理用戶']);
+
+        return view('manage.index', ['data' => $data, 'page_title' => 'Management', 'page_description' => '管理用戶']);
     }
 
     /**
@@ -32,8 +31,7 @@ class ManagementController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
+    public function create() {
         //
     }
 
@@ -43,8 +41,7 @@ class ManagementController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
-    {
+    public function store(Request $request) {
         //
     }
 
@@ -54,8 +51,7 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         //
     }
 
@@ -65,10 +61,10 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
-    {
+    public function edit($id) {
         if (!Auth::user()->canManageUsers()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -76,13 +72,14 @@ class ManagementController extends Controller
 
         if (!$user) {
             flash('用户不存在 @ '.Carbon::now(), 'error');
+
             return redirect()->route('manage.index');
         }
 
         return view('manage.edit', [
             'user' => $user,
             'page_title' => '编辑用户',
-            'page_description' => '编辑用户 ' . $user->name . ' 的设置'
+            'page_description' => '编辑用户 ' . $user->name . ' 的设置',
         ]);
     }
 
@@ -93,10 +90,10 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
-    {
+    public function update(Request $request, $id) {
         if (!Auth::user()->canManageUsers()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -104,6 +101,7 @@ class ManagementController extends Controller
 
         if (!$user) {
             flash('用户不存在 @ '.Carbon::now(), 'error');
+
             return redirect()->route('manage.index');
         }
 
@@ -117,6 +115,7 @@ class ManagementController extends Controller
             $user->updated_at = Carbon::now();
             $user->save();
             flash('用户已删除 @ '.Carbon::now(), 'danger');
+
             return redirect()->route('manage.index');
         }
 
@@ -132,6 +131,7 @@ class ManagementController extends Controller
         $user->save();
 
         flash('用户设置已更新 @ '.Carbon::now(), 'success');
+
         return redirect()->route('manage.index');
     }
 
@@ -141,9 +141,7 @@ class ManagementController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
-    {
+    public function destroy($id) {
         //
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,8 +9,5 @@
 
 namespace App\Repositories;
 
-
-class TextRepository
-{
-
+class TextRepository {
 }

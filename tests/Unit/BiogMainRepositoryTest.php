@@ -5,19 +5,16 @@ namespace Tests\Unit;
 use App\Repositories\BiogMainRepository;
 use Tests\TestCase;
 
-class BiogMainRepositoryTest extends TestCase
-{
+class BiogMainRepositoryTest extends TestCase {
     /** @var TestableBiogMainRepository */
     private $repository;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
         $this->repository = new TestableBiogMainRepository();
     }
 
-    public function testHasMeaningfulChangesTreatsNumericStringsAsEqual()
-    {
+    public function testHasMeaningfulChangesTreatsNumericStringsAsEqual() {
         $newData = ['c_fy_nh_code' => '652', 'c_dy' => '19'];
         $original = ['c_fy_nh_code' => 652, 'c_dy' => 19];
 
@@ -27,8 +24,7 @@ class BiogMainRepositoryTest extends TestCase
         );
     }
 
-    public function testHasMeaningfulChangesDetectsActualDifferences()
-    {
+    public function testHasMeaningfulChangesDetectsActualDifferences() {
         $newData = ['c_dy' => '20'];
         $original = ['c_dy' => 19];
 
@@ -38,32 +34,28 @@ class BiogMainRepositoryTest extends TestCase
         );
     }
 
-    public function testHasMeaningfulChangesTreatsMissingOriginalAsChange()
-    {
+    public function testHasMeaningfulChangesTreatsMissingOriginalAsChange() {
         $newData = ['c_sequence' => '1'];
         $original = [];
 
         $this->assertTrue($this->repository->callHasMeaningfulChanges($newData, $original));
     }
 
-    public function testNormalizeSelectionListHandlesMinus999AndSorts()
-    {
+    public function testNormalizeSelectionListHandlesMinus999AndSorts() {
         $input = ['-999', 123, '456', 123];
         $expected = ['0', '123', '456'];
 
         $this->assertSame($expected, $this->repository->callNormalizeSelectionList($input, -999));
     }
 
-    public function testNormalizeSelectionListIgnoresEmptyValues()
-    {
+    public function testNormalizeSelectionListIgnoresEmptyValues() {
         $input = ['', null, '-999'];
         $expected = ['0'];
 
         $this->assertSame($expected, $this->repository->callNormalizeSelectionList($input, -999));
     }
 
-    public function testSelectionListHasChangesDetectsDifferences()
-    {
+    public function testSelectionListHasChangesDetectsDifferences() {
         $this->assertTrue(
             $this->repository->callSelectionListHasChanges([1, 2], [1], null)
         );
@@ -74,10 +66,8 @@ class BiogMainRepositoryTest extends TestCase
     }
 }
 
-class TestableBiogMainRepository extends BiogMainRepository
-{
-    public function callHasMeaningfulChanges(array $newData, array $original, array $ignored = []): bool
-    {
+class TestableBiogMainRepository extends BiogMainRepository {
+    public function callHasMeaningfulChanges(array $newData, array $original, array $ignored = []): bool {
         $ref = new \ReflectionClass(BiogMainRepository::class);
         $method = $ref->getMethod('hasMeaningfulChanges');
         $method->setAccessible(true);
@@ -85,8 +75,7 @@ class TestableBiogMainRepository extends BiogMainRepository
         return $method->invoke($this, $newData, $original, $ignored);
     }
 
-    public function callNormalizeSelectionList($values, $nullToken): array
-    {
+    public function callNormalizeSelectionList($values, $nullToken): array {
         $ref = new \ReflectionClass(BiogMainRepository::class);
         $method = $ref->getMethod('normalizeSelectionList');
         $method->setAccessible(true);
@@ -94,8 +83,7 @@ class TestableBiogMainRepository extends BiogMainRepository
         return $method->invoke($this, $values, $nullToken);
     }
 
-    public function callSelectionListHasChanges($incoming, $existing, $nullToken): bool
-    {
+    public function callSelectionListHasChanges($incoming, $existing, $nullToken): bool {
         $ref = new \ReflectionClass(BiogMainRepository::class);
         $method = $ref->getMethod('selectionListHasChanges');
         $method->setAccessible(true);

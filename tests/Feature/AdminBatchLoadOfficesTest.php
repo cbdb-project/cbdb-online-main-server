@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class AdminBatchLoadOfficesTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class AdminBatchLoadOfficesTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -76,8 +74,7 @@ class AdminBatchLoadOfficesTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('DYNASTIES');
@@ -89,8 +86,7 @@ class AdminBatchLoadOfficesTest extends TestCase
         parent::tearDown();
     }
 
-    protected function makeUser(array $attributes = []): User
-    {
+    protected function makeUser(array $attributes = []): User {
         $user = new User([
             'name' => 'Batch Admin',
             'email' => uniqid('admin', true).'@example.com',
@@ -116,8 +112,7 @@ class AdminBatchLoadOfficesTest extends TestCase
         return $user;
     }
 
-    public function test_admin_can_view_form(): void
-    {
+    public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -125,8 +120,7 @@ class AdminBatchLoadOfficesTest extends TestCase
         $response->assertStatus(200)->assertSee('批次匯入官職');
     }
 
-    public function test_admin_can_upload_office(): void
-    {
+    public function test_admin_can_upload_office(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -174,8 +168,7 @@ class AdminBatchLoadOfficesTest extends TestCase
             ->assertSee('4763');
     }
 
-    public function test_unknown_type_is_rejected(): void
-    {
+    public function test_unknown_type_is_rejected(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 

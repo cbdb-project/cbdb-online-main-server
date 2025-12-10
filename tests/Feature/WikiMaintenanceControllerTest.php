@@ -2,19 +2,15 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Cache;
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
-class WikiMaintenanceControllerTest extends TestCase
-{
-
+class WikiMaintenanceControllerTest extends TestCase {
     protected $user;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 数据库
@@ -40,12 +36,11 @@ class WikiMaintenanceControllerTest extends TestCase
             'email' => 'test@example.com',
             'is_active' => 1,
             'is_admin' => 1,
-            'confirmation_token' => 'test_token_' . time()
+            'confirmation_token' => 'test_token_' . time(),
         ]);
     }
 
-    protected function createTestTables()
-    {
+    protected function createTestTables() {
         // 创建 users 表
         Schema::dropIfExists('users');
         Schema::create('users', function (Blueprint $table) {
@@ -103,19 +98,19 @@ class WikiMaintenanceControllerTest extends TestCase
                 'c_textid' => 60795,
                 'c_title_chn' => '中文維基百科 (Wikipedia)',
                 'c_url_api' => 'https://zh.wikipedia.org/wiki/',
-                'c_url_api_coda' => ''
+                'c_url_api_coda' => '',
             ],
             [
                 'c_textid' => 68942,
                 'c_title_chn' => '維基數據 (Wikidata)',
                 'c_url_api' => 'https://www.wikidata.org/wiki/',
-                'c_url_api_coda' => ''
+                'c_url_api_coda' => '',
             ],
             [
                 'c_textid' => 68943,
                 'c_title_chn' => '英文維基百科 (Wikipedia)',
                 'c_url_api' => 'https://en.wikipedia.org/wiki/',
-                'c_url_api_coda' => ''
+                'c_url_api_coda' => '',
             ],
         ]);
 
@@ -130,8 +125,7 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试未认证用户不能访问 Wiki 维护页面
      */
-    public function test_unauthenticated_user_cannot_access_wiki_maintenance()
-    {
+    public function test_unauthenticated_user_cannot_access_wiki_maintenance() {
         $response = $this->get('/admin/wiki-maintenance');
         $response->assertRedirect('/login');
     }
@@ -139,8 +133,7 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试认证用户可以访问 Wiki 维护页面
      */
-    public function test_authenticated_user_can_access_wiki_maintenance()
-    {
+    public function test_authenticated_user_can_access_wiki_maintenance() {
         $this->actingAs($this->user);
 
         $response = $this->get('/admin/wiki-maintenance');
@@ -152,8 +145,7 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试页面显示正确的数据源选项
      */
-    public function test_wiki_maintenance_shows_correct_source_options()
-    {
+    public function test_wiki_maintenance_shows_correct_source_options() {
         $this->actingAs($this->user);
 
         $response = $this->get('/admin/wiki-maintenance');
@@ -166,12 +158,11 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试删除全部记录功能需要有效的 source_id
      */
-    public function test_delete_all_records_validation()
-    {
+    public function test_delete_all_records_validation() {
         $this->actingAs($this->user);
 
         $response = $this->post('/admin/wiki-maintenance/delete-all', [
-            'source_id' => 99999  // 无效的 source_id
+            'source_id' => 99999,  // 无效的 source_id
         ]);
 
         $response->assertRedirect();
@@ -181,13 +172,12 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试 URL 导入功能的输入验证
      */
-    public function test_import_url_validation()
-    {
+    public function test_import_url_validation() {
         $this->actingAs($this->user);
 
         // 测试缺少 URL
         $response = $this->postJson('/admin/wiki-maintenance/import-url', [
-            'target_source' => 60795
+            'target_source' => 60795,
         ]);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['import_url']);
@@ -195,7 +185,7 @@ class WikiMaintenanceControllerTest extends TestCase
         // 测试无效 URL
         $response = $this->postJson('/admin/wiki-maintenance/import-url', [
             'import_url' => 'not-a-url',
-            'target_source' => 60795
+            'target_source' => 60795,
         ]);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['import_url']);
@@ -203,7 +193,7 @@ class WikiMaintenanceControllerTest extends TestCase
         // 测试无效数据源
         $response = $this->postJson('/admin/wiki-maintenance/import-url', [
             'import_url' => 'https://example.com/data.json',
-            'target_source' => 99999
+            'target_source' => 99999,
         ]);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['target_source']);
@@ -212,32 +202,30 @@ class WikiMaintenanceControllerTest extends TestCase
     /**
      * 测试有效的 URL 导入请求返回正确响应
      */
-    public function test_import_url_returns_success_response()
-    {
+    public function test_import_url_returns_success_response() {
         $this->actingAs($this->user);
 
         $response = $this->postJson('/admin/wiki-maintenance/import-url', [
             'import_url' => 'https://example.com/data.json',
-            'target_source' => 60795
+            'target_source' => 60795,
         ]);
 
         $response->assertStatus(200);
         $response->assertJson([
             'success' => true,
-            'message' => '導入任務已開始'
+            'message' => '導入任務已開始',
         ]);
         $response->assertJsonStructure([
             'success',
             'message',
-            'task_id'
+            'task_id',
         ]);
     }
 
     /**
      * 测试进度查询功能 - 测试不存在的任务返回404
      */
-    public function test_get_import_progress_not_found()
-    {
+    public function test_get_import_progress_not_found() {
         $this->actingAs($this->user);
 
         $taskId = 'nonexistent_task';
@@ -245,12 +233,11 @@ class WikiMaintenanceControllerTest extends TestCase
         $response->assertStatus(404);
         $response->assertJson([
             'success' => false,
-            'message' => '找不到指定的任務'
+            'message' => '找不到指定的任務',
         ]);
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         parent::tearDown();
     }
 }

@@ -9,10 +9,8 @@ use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
-class AdminBatchLoadBookTitlesController extends Controller
-{
+class AdminBatchLoadBookTitlesController extends Controller {
     /**
      * @var OperationRepository
      */
@@ -23,8 +21,7 @@ class AdminBatchLoadBookTitlesController extends Controller
      */
     protected $toolsRepository;
 
-    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository)
-    {
+    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }
@@ -32,8 +29,7 @@ class AdminBatchLoadBookTitlesController extends Controller
     /**
      * Render the batch upload form.
      */
-    public function showForm()
-    {
+    public function showForm() {
         $this->ensureAdmin();
 
         return view('admin.batch_load_book_titles', [
@@ -50,8 +46,7 @@ class AdminBatchLoadBookTitlesController extends Controller
     /**
      * Handle the batch upload submission.
      */
-    public function store(Request $request)
-    {
+    public function store(Request $request) {
         $this->ensureAdmin();
 
         $data = $request->validate([
@@ -133,8 +128,7 @@ class AdminBatchLoadBookTitlesController extends Controller
     /**
      * Ensure the current user is an active admin.
      */
-    protected function ensureAdmin(): void
-    {
+    protected function ensureAdmin(): void {
         if (!Auth::check() || !Auth::user()->canRunBatchImport()) {
             abort(403);
         }
@@ -146,8 +140,7 @@ class AdminBatchLoadBookTitlesController extends Controller
      * @param string $input
      * @return array{0: array<int,array<string,mixed>>, 1: array<int,string>}
      */
-    protected function parseEntries(string $input): array
-    {
+    protected function parseEntries(string $input): array {
         $lines = preg_split('/\r\n|\n|\r/', $input);
         $rows = [];
         $errors = [];
@@ -164,6 +157,7 @@ class AdminBatchLoadBookTitlesController extends Controller
 
             if (!$parts || count($parts) < 3) {
                 $errors[] = "第 {$lineNumber} 行未找到三欄資料（作者 ID、書名、來源 TEXT_ID）";
+
                 continue;
             }
 
@@ -173,21 +167,25 @@ class AdminBatchLoadBookTitlesController extends Controller
 
             if ($authorId === '') {
                 $errors[] = "第 {$lineNumber} 行作者 ID 為空";
+
                 continue;
             }
 
             if (!ctype_digit($authorId)) {
                 $errors[] = "第 {$lineNumber} 行作者 ID 必須為整數";
+
                 continue;
             }
 
             if ($title === '') {
                 $errors[] = "第 {$lineNumber} 行書名為空";
+
                 continue;
             }
 
             if ($source === '') {
                 $errors[] = "第 {$lineNumber} 行來源 TEXT_ID 為空";
+
                 continue;
             }
 
@@ -209,34 +207,31 @@ class AdminBatchLoadBookTitlesController extends Controller
     /**
      * Generate a batch identifier for audit trail.
      */
-    protected function generateBatchId(): string
-    {
+    protected function generateBatchId(): string {
         return now()->format('YmdHis');
     }
 
     /**
      * Remove redundant punctuation/spaces from the supplied title.
      */
-    protected function normalizeTitle(string $title): string
-    {
+    protected function normalizeTitle(string $title): string {
         $title = preg_replace('/\s+/u', '', $title);
         $title = preg_replace('/[:：]\s*/u', ': ', $title);
+
         return trim($title);
     }
 
     /**
      * Remove volume/annotation info trailing after colon characters.
      */
-    protected function stripVolumeInfo(string $title): string
-    {
+    protected function stripVolumeInfo(string $title): string {
         return trim(preg_replace('/[:：].*$/u', '', $title));
     }
 
     /**
      * Convert Chinese title to a space-separated pinyin string.
      */
-    protected function buildPinyin(string $title): string
-    {
+    protected function buildPinyin(string $title): string {
         $chars = preg_split('//u', $title, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $syllables = [];
 
@@ -262,8 +257,7 @@ class AdminBatchLoadBookTitlesController extends Controller
     /**
      * Look up dynasty (c_dy) for the given person ID.
      */
-    protected function lookupDynasty(int $personId): ?string
-    {
+    protected function lookupDynasty(int $personId): ?string {
         try {
             $value = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
         } catch (\Throwable $e) {

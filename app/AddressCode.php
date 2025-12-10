@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AddressCode extends Model
-{
+class AddressCode extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -34,8 +33,7 @@ class AddressCode extends Model
         $this->hasOne('App\BiogAddrCode');
     }
 
-    public function biog()
-    {
+    public function biog() {
         return $this->belongsToMany('App\BiogMain', 'BIOG_ADDR_DATA', 'c_addr_id', 'c_personid')->withPivot('c_addr_type', 'c_firstyear', 'c_lastyear', 'c_sequence', 'tts_sysno');
     }
 }

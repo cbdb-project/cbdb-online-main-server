@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class TextCode extends Model
-{
+class TextCode extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -27,8 +26,7 @@ class TextCode extends Model
      */
     protected $guarded = [];
 
-    public function type()
-    {
+    public function type() {
         return $this->belongsTo('App\TextType', 'c_text_type_id', 'c_text_type_code');
     }
 }

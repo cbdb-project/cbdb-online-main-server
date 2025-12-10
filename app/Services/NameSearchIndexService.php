@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * 負責維護 CBDB__NAME_FTS 倒排索引表的增量更新。
  * 當人物姓名或別名資料變更時，自動同步索引。
  */
-class NameSearchIndexService
-{
+class NameSearchIndexService {
     /**
      * 繁簡映射緩存
      *
@@ -29,17 +28,17 @@ class NameSearchIndexService
         'main' => [
             'desc' => 'main_name',
             'desc_chn' => '本名',
-            'source' => 'BIOG_MAIN'
+            'source' => 'BIOG_MAIN',
         ],
         4 => [
             'desc' => 'zi',
             'desc_chn' => '字',
-            'source' => 'ALTNAME_DATA'
+            'source' => 'ALTNAME_DATA',
         ],
         5 => [
             'desc' => 'hao',
             'desc_chn' => '號',
-            'source' => 'ALTNAME_DATA'
+            'source' => 'ALTNAME_DATA',
         ],
     ];
 
@@ -51,14 +50,13 @@ class NameSearchIndexService
     protected $defaultAltMeta = [
         'desc' => 'altname',
         'desc_chn' => '別名',
-        'source' => 'ALTNAME_DATA'
+        'source' => 'ALTNAME_DATA',
     ];
 
     /**
      * 建構函式
      */
-    public function __construct()
-    {
+    public function __construct() {
         $this->loadTradSimpMap();
     }
 
@@ -68,8 +66,7 @@ class NameSearchIndexService
      * @param \App\BiogMain $person
      * @return void
      */
-    public function indexPerson($person)
-    {
+    public function indexPerson($person) {
         if (!$person || !$person->c_name_chn) {
             return;
         }
@@ -100,8 +97,7 @@ class NameSearchIndexService
      * @param \App\BiogMain $person
      * @return void
      */
-    public function reindexPerson($person)
-    {
+    public function reindexPerson($person) {
         DB::transaction(function () use ($person) {
             // 刪除舊索引（只刪除本名）
             DB::table('CBDB__NAME_FTS')
@@ -120,8 +116,7 @@ class NameSearchIndexService
      * @param int $personId
      * @return void
      */
-    public function removePerson($personId)
-    {
+    public function removePerson($personId) {
         DB::table('CBDB__NAME_FTS')
             ->where('c_personid', $personId)
             ->delete();
@@ -136,8 +131,7 @@ class NameSearchIndexService
      * @param string|null $sourceKey
      * @return void
      */
-    public function indexAltname($personId, $typeCode, $altname, $sourceKey = null)
-    {
+    public function indexAltname($personId, $typeCode, $altname, $sourceKey = null) {
         $fullName = $this->normalizeName($altname);
         if (!$fullName) {
             return;
@@ -168,8 +162,7 @@ class NameSearchIndexService
      * @param string $altname
      * @return void
      */
-    public function reindexAltname($personId, $typeCode, $altname)
-    {
+    public function reindexAltname($personId, $typeCode, $altname) {
         DB::transaction(function () use ($personId, $typeCode, $altname) {
             // 刪除舊索引
             $this->removeAltname($personId, $typeCode, $altname);
@@ -187,8 +180,7 @@ class NameSearchIndexService
      * @param string|null $altname
      * @return void
      */
-    public function removeAltname($personId, $typeCode, $altname = null)
-    {
+    public function removeAltname($personId, $typeCode, $altname = null) {
         $query = DB::table('CBDB__NAME_FTS')
             ->where('c_personid', $personId)
             ->where('name_type_code', $typeCode);
@@ -209,8 +201,7 @@ class NameSearchIndexService
      * @param \Illuminate\Support\Carbon|null $timestamp
      * @return array
      */
-    protected function generateRecordsForName(array $nameInfo, $timestamp = null)
-    {
+    protected function generateRecordsForName(array $nameInfo, $timestamp = null) {
         $records = [];
         $insertedTerms = [];
 
@@ -256,8 +247,7 @@ class NameSearchIndexService
      *
      * @return void
      */
-    protected function loadTradSimpMap()
-    {
+    protected function loadTradSimpMap() {
         if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
             return;
         }
@@ -275,8 +265,7 @@ class NameSearchIndexService
      * @param string $name
      * @return string|null
      */
-    protected function normalizeName($name)
-    {
+    protected function normalizeName($name) {
         $name = trim($name);
         if ($name === '') {
             return null;
@@ -296,8 +285,7 @@ class NameSearchIndexService
      * @param string $text
      * @return string
      */
-    protected function convertToSimplified($text)
-    {
+    protected function convertToSimplified($text) {
         if (empty($this->tradSimpMap)) {
             return $text;
         }
@@ -318,8 +306,7 @@ class NameSearchIndexService
      * @param string $text
      * @return array
      */
-    protected function generateSuffixes($text)
-    {
+    protected function generateSuffixes($text) {
         $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
         $suffixes = [];
 
@@ -340,8 +327,7 @@ class NameSearchIndexService
      * @param string $term
      * @return bool
      */
-    protected function isValidSearchTerm($term)
-    {
+    protected function isValidSearchTerm($term) {
         $term = trim($term);
 
         if ($term === '') {

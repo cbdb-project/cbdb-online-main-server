@@ -4,15 +4,13 @@ namespace App\Services;
 
 use Illuminate\Database\Events\QueryExecuted;
 
-class QueryProfile
-{
+class QueryProfile {
     /**
      * @var array<int, array<string, mixed>>
      */
     protected $queries = [];
 
-    public function add(QueryExecuted $event): void
-    {
+    public function add(QueryExecuted $event): void {
         $time = is_numeric($event->time) ? (float) $event->time : 0.0;
 
         $this->queries[] = [
@@ -22,18 +20,15 @@ class QueryProfile
         ];
     }
 
-    public function count(): int
-    {
+    public function count(): int {
         return count($this->queries);
     }
 
-    public function totalTime(): float
-    {
+    public function totalTime(): float {
         return array_sum(array_column($this->queries, 'time'));
     }
 
-    public function summary(): array
-    {
+    public function summary(): array {
         $queries = array_map(function ($query) {
             return $query + [
                 'bindings_json' => json_encode(

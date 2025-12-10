@@ -1,4 +1,5 @@
 <?php
+
 /**
  * User: ja
  * Date: 2020/5/6
@@ -7,28 +8,23 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\BiogMain;
+use App\AddrCode;
 use App\BiogAddr;
 use App\BiogAddrCode;
-use App\AddrCode;
+use App\BiogMain;
+use App\Http\Controllers\Controller;
 use App\OfficeCode;
-use App\Operation;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
-ini_set('memory_limit','512M');
+ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 300);
 
-class ApiController2 extends Controller
-{
+class ApiController2 extends Controller {
     use AuthenticatesUsers;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest');
     }
 
@@ -36,34 +32,38 @@ class ApiController2 extends Controller
     protected function query_office_postings(Request $request) {
         $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
-        $office = $officePlace = $peoplePlace = $data = $useXyArr = array();
+        $office = $officePlace = $peoplePlace = $data = $useXyArr = [];
         $useOfficePlace = $usePeoplePlace = $indexYear = $useDate = $indexStartTime = $indexEndTime = $dateType = $dynStart = $dynEnd = $useXy = $start = $list = 0;
-        
+
         $office = $arr['office'];
         $officePlace = $arr['officePlace'];
         $peoplePlace = $arr['peoplePlace'];
         $useOfficePlace = $arr['useOfficePlace'];
-        $usePeoplePlace = $arr['usePeoplePlace']; 
-        //$indexYear = $arr['indexYear']; 
+        $usePeoplePlace = $arr['usePeoplePlace'];
+        //$indexYear = $arr['indexYear'];
         $useDate = $arr['useDate'];
         $dateType = $arr['dateType'];
         $dynStart = $arr['dynStart'];
         $dynEnd = $arr['dynEnd'];
-        $indexStartTime = $arr['indexStartTime']; 
-        $indexEndTime = $arr['indexEndTime']; 
-        $useXy = $arr['useXy']; 
-        if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
-        else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        $indexStartTime = $arr['indexStartTime'];
+        $indexEndTime = $arr['indexEndTime'];
+        $useXy = $arr['useXy'];
+        if ($arr['start'] <= 0) {
+            $start = 0;
+        } // 避免start為負數
+        else {
+            $start = $arr['start'] - 1;
+        } // return輸出由1開始, 程式需由0開始.
         $list = $arr['list'];
-        
+
         $row = DB::table('POSTED_TO_OFFICE_DATA')->whereIn('POSTED_TO_OFFICE_DATA.c_office_id', $office);
         $row->join('POSTED_TO_ADDR_DATA', 'POSTED_TO_OFFICE_DATA.c_posting_id', '=', 'POSTED_TO_ADDR_DATA.c_posting_id');
         $row->join('BIOG_MAIN', 'POSTED_TO_OFFICE_DATA.c_personid', '=', 'BIOG_MAIN.c_personid');
 
-        if($useOfficePlace) {
+        if ($useOfficePlace) {
             $row->whereIn('c_addr_id', $officePlace);
         }
-        if($usePeoplePlace) {
+        if ($usePeoplePlace) {
             //人物地點BIOG_ADDR_DATA，地名資料ADDR_CODES
             $row->join('BIOG_ADDR_DATA', 'POSTED_TO_ADDR_DATA.c_personid', '=', 'BIOG_ADDR_DATA.c_personid');
             $row->whereIn('BIOG_ADDR_DATA.c_addr_id', $peoplePlace);
@@ -74,30 +74,31 @@ class ApiController2 extends Controller
             $row->whereBetween('BIOG_MAIN.c_index_year', array($indexStartTime, $indexEndTime));
         }
         */
-        if($useDate) {
-            if($dateType == 'index') {
+        if ($useDate) {
+            if ($dateType == 'index') {
                 $row->where('BIOG_MAIN.c_index_year', '>=', $indexStartTime);
                 $row->where('BIOG_MAIN.c_index_year', '<=', $indexEndTime);
-            }
-            elseif($dateType == 'dynasty') {
+            } elseif ($dateType == 'dynasty') {
                 $row->join('DYNASTIES', 'BIOG_MAIN.c_dy', '=', 'DYNASTIES.c_dy');
                 $row->where('DYNASTIES.c_dy', '>=', $dynStart);
                 $row->where('DYNASTIES.c_dy', '<=', $dynEnd);
+            } else {
             }
-            else {}
         }
-        if($useXy) {
+        if ($useXy) {
             $rowOut = $row->get();
             foreach ($rowOut as $val) {
-                if($val->c_addr_id != null) {
+                if ($val->c_addr_id != null) {
                     array_push($useXyArr, $val->c_addr_id);
                 }
             }
             //判斷是否為空陣列
-            if(!empty($useXyArr)) {
+            if (!empty($useXyArr)) {
                 $useXyVar = '';
                 foreach ($useXyArr as $val) {
-                    if($useXyVar)  $useXyVar .= ',';
+                    if ($useXyVar) {
+                        $useXyVar .= ',';
+                    }
                     $useXyVar .= $val;
                 }
                 $sqlTmp = sprintf('
@@ -107,7 +108,7 @@ ON ADDR_CODES_1.c_addr_id in ('. $useXyVar .')
 WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coord)<=(ADDR_CODES_1.x_coord+0.03)) AND ((ADDR_CODES.y_coord)>=(ADDR_CODES_1.y_coord-0.03) And (ADDR_CODES.y_coord)<=(ADDR_CODES_1.y_coord+0.03)))
 ');
                 $useXyRes = DB::select($sqlTmp);
-                $useXyResArr = array();
+                $useXyResArr = [];
                 foreach ($useXyRes as $val) {
                     array_push($useXyResArr, $val->c_addr_id);
                 }
@@ -119,7 +120,7 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
         $row = $row->get();
         $total = count($row);
 
-        if($list) {
+        if ($list) {
             $row = $row->slice($start, $list);
         }
         //return $row;
@@ -136,12 +137,12 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
             //這裡是查詢人物的[地址]BIOG_ADDR_DATA
             //20200522修改人物的[地址]查詢依據
             $c_addr_type = $c_addr_id = 0;
-            $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first(); 
-            if(!$BiogAddr) {
+            $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
+            if (!$BiogAddr) {
                 $BiogAddr = BiogAddr::where('c_personid', '=', $val->c_personid)->first();
             }
             //20200522修改結束
-            if($BiogAddr) { 
+            if ($BiogAddr) {
                 $c_addr_type = $BiogAddr->c_addr_type;
                 $c_addr_id = $BiogAddr->c_addr_id;
             }
@@ -168,16 +169,16 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
             $dy = DB::table('DYNASTIES')->where('c_dy', '=', $val->c_dy)->first();
             $data_val['Dynasty'] = $dy->c_dynasty_chn; // 字符串 朝代
             $data_val['OfficeAddrID'] = $val->c_addr_id; // 數字 官職地點ID
-            $data_val['OfficeAddrName']	= $AddrCode_office->c_name; // 字符串 官職地點名，英文
+            $data_val['OfficeAddrName'] = $AddrCode_office->c_name; // 字符串 官職地點名，英文
             $data_val['OfficeAddrChn'] = $AddrCode_office->c_name_chn; // 字符串 官職地點名，中文
             $data_val['OfficeX'] = $AddrCode_office->x_coord; // 數字 官職地點經度座標
             $data_val['OfficeY'] = $AddrCode_office->y_coord; // 數字 官職地點緯度座標
-            if($val->c_addr_id != 0) {
+            if ($val->c_addr_id != 0) {
                 $POSTED_TO_ADDR_DATA = DB::table('POSTED_TO_ADDR_DATA')->where('c_addr_id', '=', $c_addr_id)->count('c_personid');
             }
             $data_val['office_xy_count'] = $POSTED_TO_ADDR_DATA; // 數字 職官地址數
             $data_val['PostingID'] = $val->c_appt_code; // 數字 除授記錄
-            if($val->c_appt_code != null) {
+            if ($val->c_appt_code != null) {
                 #20250321依據Appointment表重構，修改為存取APPOINTMENT_CODES表
                 #$c_appt_type_code = DB::table('APPOINTMENT_TYPE_CODES')->where('c_appt_type_code', '=', $val->c_appt_type_code)->first();
                 #$c_appt_type_desc = $c_appt_type_code->c_appt_type_desc;
@@ -185,16 +186,18 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
                 $c_appt_code = DB::table('APPOINTMENT_CODES')->where('c_appt_code', '=', $val->c_appt_code)->first();
                 $c_appt_type_desc = $c_appt_code->c_appt_desc;
                 $c_appt_type_desc_chn = $c_appt_code->c_appt_desc_chn;
+            } else {
+                $c_appt_type_desc = $c_appt_type_desc_chn = '';
             }
-            else { $c_appt_type_desc = $c_appt_type_desc_chn = ''; }
             $data_val['ApptType'] = $c_appt_type_desc; // 字符串 除授類型，英文
             $data_val['ApptTypeChn'] = $c_appt_type_desc_chn; // 字符串 除授類型，中文
-            if($val->c_assume_office_code != null && $val->c_assume_office_code != 0) {
+            if ($val->c_assume_office_code != null && $val->c_assume_office_code != 0) {
                 $c_assume_office_code = DB::table('ASSUME_OFFICE_CODES')->where('c_assume_office_code', '=', $val->c_assume_office_code)->first();
                 $c_assume_office_desc = $c_assume_office_code->c_assume_office_desc;
                 $c_assume_office_desc_chn = $c_assume_office_code->c_assume_office_desc_chn;
+            } else {
+                $c_assume_office_desc = $c_assume_office_desc_chn = '';
             }
-            else { $c_assume_office_desc = $c_assume_office_desc_chn = ''; }
             $data_val['AssumptionOffice'] = $c_assume_office_desc; // 字符串 赴任情況，英文
             $data_val['AssumptionOfficeChn'] = $c_assume_office_desc_chn; //字符串 赴任情況，中文
             $data_val['Notes'] = $val->c_notes; //字符串 備註
@@ -203,12 +206,15 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
         }
 
         $ans['total'] = $total;
-        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
-        if(isset($list) && $list >= 0) {
+        if (isset($start)) {
+            $ans['start'] = (int)$start + 1;
+        } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if (isset($list) && $list >= 0) {
             $ans['end'] = (int)$list + (int)$start;
-            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
-        }
-        else {
+            if ($ans['end'] > $ans['total']) {
+                $ans['end'] = $ans['total'];
+            }
+        } else {
             $ans['end'] = (int)$total;
         }
         $ans['data'] = $data;

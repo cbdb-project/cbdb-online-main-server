@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\User;
 use App\Repositories\BiogMainRepository;
+use App\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,10 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class BasicInformationSourcesControllerTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BasicInformationSourcesControllerTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         if (!extension_loaded('pdo_sqlite')) {
@@ -62,8 +60,7 @@ class BasicInformationSourcesControllerTest extends TestCase
         Auth::guard()->setUser($this->makeUser(9, 'Creator User'));
     }
 
-    protected function makeUser(int $id, string $name): User
-    {
+    protected function makeUser(int $id, string $name): User {
         $user = new User();
         $user->id = $id;
         $user->name = $name;
@@ -74,8 +71,7 @@ class BasicInformationSourcesControllerTest extends TestCase
         return $user;
     }
 
-    public function testSourceStoreWritesAuditFieldsAndOperations(): void
-    {
+    public function testSourceStoreWritesAuditFieldsAndOperations(): void {
         $repository = new BiogMainRepository();
         $request = new Request([
             'c_textid' => 500,
@@ -107,8 +103,7 @@ class BasicInformationSourcesControllerTest extends TestCase
         $this->assertSame(321, $payload['c_personid']);
     }
 
-    public function testSourceUpdatePreservesCreationAndSetsModification(): void
-    {
+    public function testSourceUpdatePreservesCreationAndSetsModification(): void {
         $repository = new BiogMainRepository();
         $initialRequest = new Request([
             'c_textid' => 501,
@@ -158,8 +153,7 @@ class BasicInformationSourcesControllerTest extends TestCase
         $this->assertSame('updated note', $payload['c_notes']);
     }
 
-    public function testEditViewDisplaysCreationAndModificationInfo(): void
-    {
+    public function testEditViewDisplaysCreationAndModificationInfo(): void {
         $row = (object) [
             'c_personid' => 777,
             'c_textid' => 888,
@@ -187,8 +181,7 @@ class BasicInformationSourcesControllerTest extends TestCase
         $this->assertStringContainsString('Editor User/2024-02-03 08:30:00', $html);
     }
 
-    public function testSourceDeleteRemovesRowAndStoresOriginal(): void
-    {
+    public function testSourceDeleteRemovesRowAndStoresOriginal(): void {
         $repository = new BiogMainRepository();
         $request = new Request([
             'c_textid' => 501,

@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Repositories\CodesRepository;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 
-class LoginController extends Controller
-{
+class LoginController extends Controller {
     /*
     |--------------------------------------------------------------------------
     | Login Controller
@@ -34,13 +32,11 @@ class LoginController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest')->except('logout');
     }
 
-    public function login(Request $request)
-    {
+    public function login(Request $request) {
         $this->validateLogin($request);
 
         // If the class is using the ThrottlesLogins trait, we can automatically throttle
@@ -54,6 +50,7 @@ class LoginController extends Controller
 
         if ($this->attemptLogin($request)) {
             flash('Login success', 'success');
+
             return $this->sendLoginResponse($request);
         }
 
@@ -68,8 +65,7 @@ class LoginController extends Controller
     /**
      * The user has been authenticated.
      */
-    protected function authenticated(Request $request, $user)
-    {
+    protected function authenticated(Request $request, $user) {
         $settings = $user->settings ?? [];
         unset($settings['last_login_at'], $settings['registration_at']);
         $settings['last_login_ip'] = $request->ip();

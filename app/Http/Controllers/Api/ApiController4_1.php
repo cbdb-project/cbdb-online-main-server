@@ -1,4 +1,5 @@
 <?php
+
 /**
  * User: ja
  * Date: 2020/12/14
@@ -7,39 +8,31 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\BiogMain;
+use App\AddrCode;
 use App\BiogAddr;
 use App\BiogAddrCode;
-use App\AddrCode;
-use App\OfficeCode;
-use App\EntryCode;
+use App\BiogMain;
+use App\Http\Controllers\Controller;
 use App\KinshipCode;
-use App\AssocCode;
-use App\Operation;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
-ini_set('memory_limit','512M');
+ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 300);
 
-class ApiController4_1 extends Controller
-{
+class ApiController4_1 extends Controller {
     use AuthenticatesUsers;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest');
     }
 
     //20200609製作query_relatives API 遞迴的function
     protected function relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run) {
         $check = count($firstPeople);
-        $c_kin_id = $data = $firstPeopleArr = array();
-        $checkArr = $checkArr2 = array();
+        $c_kin_id = $data = $firstPeopleArr = [];
+        $checkArr = $checkArr2 = [];
         $run = $run + 1;
         foreach ($rowArr as $checkVal) {
             array_push($checkArr, $checkVal['c_personid']);
@@ -47,58 +40,57 @@ class ApiController4_1 extends Controller
         }
         //資料庫邏輯
         //把迴圈拿掉，限制$firstPeople只能有一人，改用whereIn可以大幅提升速度。
-        if($check > 1) {
-          for($i=0;$i<count($people);$i++) {
-            $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
-            $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
-            //下列三行是避免循環
-            $row->whereNotIn('KIN_DATA.c_kin_id', $checkArr2);
-            $row->whereNotIn('KIN_DATA.c_kin_id',  $checkArr);
-            $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
-            //四個參數如果其中一個有值，才進行SQL條件過濾，都為0則略過SQL條件過濾，直接取得親屬關係人id。
-            if($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0 ) {
-                $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
-                $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
-                $row->where('KINSHIP_CODES.c_marstep', '<=', $MColLink);
-                $row->where('KINSHIP_CODES.c_colstep', '<=', $MMarLink);
-            }
-            $row = $row->get();
-            foreach ($row as $val) {
-                array_push($c_kin_id, $val->c_kin_id);
-
-                array_push($firstPeopleArr, $firstPeople[$i]);
-                $data['firstId'] = $firstPeople[$i];
-
-                $data['run'] = $run;
-                $data['c_personid'] = $val->c_personid;
-                $data['c_kin_id'] = $val->c_kin_id;
-                $data['c_kin_code'] = $val->c_kin_code;
-                $data['c_notes'] = $val->c_notes;
-
-                //$MAncGen-$MDecGen。如果是 >0, 則 $MAncGen = $MAncGen-$MDecGen，且 $MDecGen = 0。
-                //反之則 $MDecGen = $MDecGen-$MAncGen，且 $MAncGen = 0。
-                //這樣做的目的是：如果兩個人的關係是：兒子的兒子的父親（向下兩步-兒子的兒子，向上一步-父親），就能把重複的步數清除掉。
-                //再用得到的每個親屬人物到 $people 的四參數與用戶設定的四參數進行對比，留下符合設定四參數的親屬人物。
-                $NewMAncGen = $val->c_upstep;
-                $NewMDecGen = $val->c_dwnstep;
-                if(($NewMAncGen - $NewMDecGen) > 0) { 
-                    $NewMAncGen = $NewMAncGen - $NewMDecGen;
-                    $NewMDecGen = 0;
+        if ($check > 1) {
+            for ($i = 0;$i < count($people);$i++) {
+                $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
+                $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+                //下列三行是避免循環
+                $row->whereNotIn('KIN_DATA.c_kin_id', $checkArr2);
+                $row->whereNotIn('KIN_DATA.c_kin_id',  $checkArr);
+                $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
+                //四個參數如果其中一個有值，才進行SQL條件過濾，都為0則略過SQL條件過濾，直接取得親屬關係人id。
+                if ($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0) {
+                    $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
+                    $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
+                    $row->where('KINSHIP_CODES.c_marstep', '<=', $MColLink);
+                    $row->where('KINSHIP_CODES.c_colstep', '<=', $MMarLink);
                 }
-                else {
-                    $NewMDecGen = $NewMDecGen - $NewMAncGen;
-                    $NewMAncGen = 0;
-                }
+                $row = $row->get();
+                foreach ($row as $val) {
+                    array_push($c_kin_id, $val->c_kin_id);
 
-                $data['new_c_upstep'] = $NewMAncGen;
-                $data['new_c_dwnstep'] = $NewMDecGen;
-                $data['c_marstep'] = $val->c_marstep;
-                $data['c_colstep'] = $val->c_colstep;
-                $data['c_kinrel'] = $val->c_kinrel;
-                $data['c_kinrel_chn'] = $val->c_kinrel_chn;
-                array_push($rowArr, $data);
+                    array_push($firstPeopleArr, $firstPeople[$i]);
+                    $data['firstId'] = $firstPeople[$i];
+
+                    $data['run'] = $run;
+                    $data['c_personid'] = $val->c_personid;
+                    $data['c_kin_id'] = $val->c_kin_id;
+                    $data['c_kin_code'] = $val->c_kin_code;
+                    $data['c_notes'] = $val->c_notes;
+
+                    //$MAncGen-$MDecGen。如果是 >0, 則 $MAncGen = $MAncGen-$MDecGen，且 $MDecGen = 0。
+                    //反之則 $MDecGen = $MDecGen-$MAncGen，且 $MAncGen = 0。
+                    //這樣做的目的是：如果兩個人的關係是：兒子的兒子的父親（向下兩步-兒子的兒子，向上一步-父親），就能把重複的步數清除掉。
+                    //再用得到的每個親屬人物到 $people 的四參數與用戶設定的四參數進行對比，留下符合設定四參數的親屬人物。
+                    $NewMAncGen = $val->c_upstep;
+                    $NewMDecGen = $val->c_dwnstep;
+                    if (($NewMAncGen - $NewMDecGen) > 0) {
+                        $NewMAncGen = $NewMAncGen - $NewMDecGen;
+                        $NewMDecGen = 0;
+                    } else {
+                        $NewMDecGen = $NewMDecGen - $NewMAncGen;
+                        $NewMAncGen = 0;
+                    }
+
+                    $data['new_c_upstep'] = $NewMAncGen;
+                    $data['new_c_dwnstep'] = $NewMDecGen;
+                    $data['c_marstep'] = $val->c_marstep;
+                    $data['c_colstep'] = $val->c_colstep;
+                    $data['c_kinrel'] = $val->c_kinrel;
+                    $data['c_kinrel_chn'] = $val->c_kinrel_chn;
+                    array_push($rowArr, $data);
+                }
             }
-          }
         } else {
             $row = DB::table('KIN_DATA')->whereIn('KIN_DATA.c_personid', $people);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
@@ -107,7 +99,7 @@ class ApiController4_1 extends Controller
             $row->whereNotIn('KIN_DATA.c_kin_id',  $checkArr);
             $row->whereNotIn('KIN_DATA.c_personid', $checkArr);
             //四個參數如果其中一個有值，才進行SQL條件過濾，都為0則略過SQL條件過濾，直接取得親屬關係人id。
-            if($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0 ) {
+            if ($MAncGen != 0 || $MDecGen != 0 || $MColLink != 0 || $MMarLink != 0) {
                 $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
                 $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
                 $row->where('KINSHIP_CODES.c_marstep', '<=', $MColLink);
@@ -131,11 +123,10 @@ class ApiController4_1 extends Controller
                 //再用得到的每個親屬人物到 $people 的四參數與用戶設定的四參數進行對比，留下符合設定四參數的親屬人物。
                 $NewMAncGen = $val->c_upstep;
                 $NewMDecGen = $val->c_dwnstep;
-                if(($NewMAncGen - $NewMDecGen) > 0) { 
+                if (($NewMAncGen - $NewMDecGen) > 0) {
                     $NewMAncGen = $NewMAncGen - $NewMDecGen;
                     $NewMDecGen = 0;
-                }
-                else {
+                } else {
                     $NewMDecGen = $NewMDecGen - $NewMAncGen;
                     $NewMAncGen = 0;
                 }
@@ -152,19 +143,18 @@ class ApiController4_1 extends Controller
 
         $MLoop = $MLoop - 1;
 
-        if($MLoop >= 1) {
+        if ($MLoop >= 1) {
             //20201214四個參數只應該應用於$people，對於查到的親屬，只要從KIN_DATA裡面把他們的直接到親屬關係人id拿出來就可以了。
             //$MLoop的作用是生成一些史料不見載的親屬關係
             //$rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeopleArr, $run);
-            if($check > 1) {
+            if ($check > 1) {
                 $rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeopleArr, $run);
-            }
-            else {
+            } else {
                 $rowArr = $this->relativesLoop($c_kin_id, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run);
             }
+
             return $rowArr;
-        }
-        else {
+        } else {
             return $rowArr;
         }
     }
@@ -173,33 +163,41 @@ class ApiController4_1 extends Controller
     protected function query_relatives(Request $request) {
         $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
-        $people = $mCircleArr = $data = $dataV = $rowArr = array();
-        $k_addr_id_Arr = array();
+        $people = $mCircleArr = $data = $dataV = $rowArr = [];
+        $k_addr_id_Arr = [];
         $mCircle = $MAncGen = $MDecGen = $MColLink = $MMarLink = $MLoop = $run = $start = $list = 0;
-        
+
         $people = $arr['people'];
-        $mCircle = $arr['mCircle']; 
+        $mCircle = $arr['mCircle'];
         $MAncGen = $arr['MAncGen'];
-        $MDecGen = $arr['MDecGen']; 
+        $MDecGen = $arr['MDecGen'];
         $MColLink = $arr['MColLink'];
-        $MMarLink = $arr['MMarLink']; 
+        $MMarLink = $arr['MMarLink'];
         $MLoop = $arr['MLoop'];
 
         $debugMode = 0;
-        if(!empty($arr['debugMode'])) { $debugMode = $arr['debugMode']; }
-
-        if(!empty($arr['start'])) { 
-            if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
-            else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        if (!empty($arr['debugMode'])) {
+            $debugMode = $arr['debugMode'];
         }
-        else { $start = 0; }
 
-        if(!empty($arr['list'])) {
+        if (!empty($arr['start'])) {
+            if ($arr['start'] <= 0) {
+                $start = 0;
+            } // 避免start為負數
+            else {
+                $start = $arr['start'] - 1;
+            } // return輸出由1開始, 程式需由0開始.
+        } else {
+            $start = 0;
+        }
+
+        if (!empty($arr['list'])) {
             $list = $arr['list'];
+        } else {
+            $list = 10000;
         }
-        else { $list = 10000; }
 
-        if($mCircle) {
+        if ($mCircle) {
             //資料庫邏輯
             $row = DB::table('KIN_DATA')->whereIn('KIN_DATA.c_personid', $people);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
@@ -213,7 +211,7 @@ class ApiController4_1 extends Controller
             $row->whereIn('KIN_DATA.c_kin_code', $mCircleArr);
             $row = $row->get();
             $total = count($row);
-            if($list) {
+            if ($list) {
                 $row = $row->slice($start, $list);
             }
             foreach ($row as $val) {
@@ -225,13 +223,12 @@ class ApiController4_1 extends Controller
                 array_push($rowArr, $dataV);
             }
             $row = $rowArr;
-        }
-        else {
+        } else {
             $row = $this->relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $people, $run);
             //20201214取得完整的人物資料，再對於四參數進行過濾。
-            $rowNew = array();
+            $rowNew = [];
             foreach ($row as $val) {
-                if($val['new_c_upstep'] <= $MAncGen && $val['new_c_dwnstep'] <= $MDecGen && $val['c_marstep'] <= $MColLink && $val['c_colstep'] <= $MMarLink) {
+                if ($val['new_c_upstep'] <= $MAncGen && $val['new_c_dwnstep'] <= $MDecGen && $val['c_marstep'] <= $MColLink && $val['c_colstep'] <= $MMarLink) {
                     array_push($rowNew, $val);
                 }
             }
@@ -239,7 +236,9 @@ class ApiController4_1 extends Controller
             //新增結束
             $total = count($row);
             //20201215增加除錯模式的資料輸出
-            if($debugMode) { return $row; }
+            if ($debugMode) {
+                return $row;
+            }
         }
 
         //預先組合計算用的資料
@@ -247,20 +246,20 @@ class ApiController4_1 extends Controller
             //這裡是查詢親屬關係目標人物人物的[地址]BIOG_ADDR_DATA
             $k_addr_type = $k_addr_id = 0;
             $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$KBiogAddr) {
+            if (!$KBiogAddr) {
                 $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->first();
             }
-            if($KBiogAddr) {
+            if ($KBiogAddr) {
                 $k_addr_type = $KBiogAddr->c_addr_type;
                 $k_addr_id = $KBiogAddr->c_addr_id;
             }
             $KAddrCode = AddrCode::where('c_addr_id', '=', $k_addr_id)->first();
-            
+
             array_push($k_addr_id_Arr, $k_addr_id.'-'.$KAddrCode->c_name_chn);
         }
         $answer = array_count_values($k_addr_id_Arr);
         //return $answer;
-        
+
         //組合輸出資料
         foreach ($row as $val) {
             $FirstBiogMain = BiogMain::where('c_personid', '=', $val['firstId'])->first();
@@ -268,12 +267,11 @@ class ApiController4_1 extends Controller
             $data_val['rName'] = $FirstBiogMain->c_name;
             $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
             $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
-            if($BiogMain) {
+            if ($BiogMain) {
                 $data_val['pId'] = $val['c_personid'];
                 $data_val['pName'] = $BiogMain->c_name;
                 $data_val['pNameChn'] = $BiogMain->c_name_chn;
-            }
-            else {
+            } else {
                 $data_val['pId'] = $val['c_personid'];
                 $data_val['pName'] = '';
                 $data_val['pNameChn'] = '';
@@ -281,14 +279,14 @@ class ApiController4_1 extends Controller
             //這裡是查詢人物的[地址]BIOG_ADDR_DATA
             $c_addr_type = $c_addr_id = 0;
             $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$BiogAddr) {
+            if (!$BiogAddr) {
                 $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->first();
             }
-            if($BiogAddr) {
+            if ($BiogAddr) {
                 $c_addr_type = $BiogAddr->c_addr_type;
                 $c_addr_id = $BiogAddr->c_addr_id;
             }
-            $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first(); 
+            $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first();
             $data_val['pAddrID'] = $c_addr_id;
             $data_val['pAddrType'] = $BiogAddrCode->c_addr_desc;
             $data_val['pAddrTypeChn'] = $BiogAddrCode->c_addr_desc_chn;
@@ -299,14 +297,13 @@ class ApiController4_1 extends Controller
             $data_val['pY'] = $AddrCode->y_coord;
 
             $KinBiogMain = BiogMain::where('c_personid', '=', $val['c_kin_id'])->first();
-            if($KinBiogMain) {
+            if ($KinBiogMain) {
                 $data_val['Id'] = $val['c_kin_id'];
                 $data_val['Name'] = $KinBiogMain->c_name;
                 $data_val['NameChn'] = $KinBiogMain->c_name_chn;
                 $data_val['Sex'] = $KinBiogMain->c_female ? '1-女' : '0-男';
                 $data_val['IndexYear'] = $KinBiogMain->c_index_year;
-            }
-            else {
+            } else {
                 $data_val['Id'] = $val['c_kin_id'];
                 $data_val['Name'] = '';
                 $data_val['NameChn'] = '';
@@ -321,7 +318,7 @@ class ApiController4_1 extends Controller
             //rKinship查找與中心人物的親屬關係
             $rKinshipCodeNum = 0;
             $rKinship = DB::table('KIN_DATA')->where('c_personid', '=', $val['firstId'])->where('c_kin_id', '=', $val['c_kin_id'])->get();
-            if($rKinship) {
+            if ($rKinship) {
                 foreach ($rKinship as $val2) {
                     $rKinshipCodeNum = $val2->c_kin_code;
                 }
@@ -335,10 +332,10 @@ class ApiController4_1 extends Controller
             //這裡是查詢親屬關係目標人物人物的[地址]BIOG_ADDR_DATA
             $k_addr_type = $k_addr_id = 0;
             $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$KBiogAddr) {
+            if (!$KBiogAddr) {
                 $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->first();
             }
-            if($KBiogAddr) {
+            if ($KBiogAddr) {
                 $k_addr_type = $KBiogAddr->c_addr_type;
                 $k_addr_id = $KBiogAddr->c_addr_id;
             }
@@ -355,10 +352,10 @@ class ApiController4_1 extends Controller
             //這裡是查詢中心人物的[地址]BIOG_ADDR_DATA
             $r_addr_type = $r_addr_id = 0;
             $RBiogAddr = BiogAddr::where('c_personid', '=', $val['firstId'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$RBiogAddr) {
+            if (!$RBiogAddr) {
                 $RBiogAddr = BiogAddr::where('c_personid', '=', $val['firstId'])->first();
             }
-            if($RBiogAddr) {
+            if ($RBiogAddr) {
                 $r_addr_type = $RBiogAddr->c_addr_type;
                 $r_addr_id = $RBiogAddr->c_addr_id;
             }
@@ -366,19 +363,22 @@ class ApiController4_1 extends Controller
             $data_val['pDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $AddrCode->x_coord, $AddrCode->y_coord);
             $data_val['rDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $RAddrCode->x_coord, $RAddrCode->y_coord);
 
-            $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn]; 
+            $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn];
             $data_val['Notes'] = $val['c_notes'];
 
             array_push($data, $data_val);
         }
 
         $ans['total'] = $total;
-        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
-        if(isset($list) && $list >= 0) {
+        if (isset($start)) {
+            $ans['start'] = (int)$start + 1;
+        } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if (isset($list) && $list >= 0) {
             $ans['end'] = (int)$list + (int)$start;
-            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
-        }
-        else {
+            if ($ans['end'] > $ans['total']) {
+                $ans['end'] = $ans['total'];
+            }
+        } else {
             $ans['end'] = (int)$total;
         }
         $ans['data'] = $data;
@@ -387,7 +387,7 @@ class ApiController4_1 extends Controller
         //return $row;
     }
 
-    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit=2, $decimal=2){
+    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit = 2, $decimal = 2) {
         /*
         * 計算兩點地理座標之間的距離
         * @param  Decimal $longitude1 起點經度
@@ -406,17 +406,18 @@ class ApiController4_1 extends Controller
         $radLat2 = $latitude2 * $PI / 180.0;
 
         $radLng1 = $longitude1 * $PI / 180.0;
-        $radLng2 = $longitude2 * $PI /180.0;
+        $radLng2 = $longitude2 * $PI / 180.0;
 
         $a = $radLat1 - $radLat2;
         $b = $radLng1 - $radLng2;
 
-        $distance = 2 * asin(sqrt(pow(sin($a/2),2) + cos($radLat1) * cos($radLat2) * pow(sin($b/2),2)));
+        $distance = 2 * asin(sqrt(pow(sin($a / 2), 2) + cos($radLat1) * cos($radLat2) * pow(sin($b / 2), 2)));
         $distance = $distance * $EARTH_RADIUS * 1000;
 
-        if($unit==2){
+        if ($unit == 2) {
             $distance = $distance / 1000;
         }
+
         return round($distance, $decimal);
     }
 }

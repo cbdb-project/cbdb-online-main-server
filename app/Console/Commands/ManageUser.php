@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
-class ManageUser extends Command
-{
+class ManageUser extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -43,8 +42,7 @@ class ManageUser extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
-    {
+    public function handle() {
         // 如果是列出用戶
         if ($this->option('list')) {
             return $this->listUsers();
@@ -55,16 +53,18 @@ class ManageUser extends Command
 
         if (!$email) {
             $this->error('Email 是必填項！');
+
             return 1;
         }
 
         // 驗證 Email 格式
         $validator = Validator::make(['email' => $email], [
-            'email' => 'required|email'
+            'email' => 'required|email',
         ]);
 
         if ($validator->fails()) {
             $this->error('Email 格式無效！');
+
             return 1;
         }
 
@@ -73,9 +73,11 @@ class ManageUser extends Command
 
         if ($user) {
             $this->info("找到現有用戶：{$user->name} ({$user->email})");
+
             return $this->updateUser($user);
         } else {
             $this->info("用戶不存在，將創建新用戶");
+
             return $this->createUser($email);
         }
     }
@@ -83,8 +85,7 @@ class ManageUser extends Command
     /**
      * 創建新用戶
      */
-    protected function createUser($email)
-    {
+    protected function createUser($email) {
         $this->info('=== 創建新用戶 ===');
 
         // 獲取或詢問用戶名稱
@@ -92,6 +93,7 @@ class ManageUser extends Command
 
         if (!$name) {
             $this->error('用戶名稱是必填項！');
+
             return 1;
         }
 
@@ -100,6 +102,7 @@ class ManageUser extends Command
 
         if (!$password || strlen($password) < 6) {
             $this->error('密碼必須至少 6 個字符！');
+
             return 1;
         }
 
@@ -122,7 +125,7 @@ class ManageUser extends Command
                     'regular' => '一般用戶',
                     'expert' => '專家',
                     'crowdsourcing' => '眾包用戶',
-                    'super-admin' => '系統管理員'
+                    'super-admin' => '系統管理員',
                 ],
                 'regular'
             );
@@ -150,8 +153,7 @@ class ManageUser extends Command
     /**
      * 更新現有用戶
      */
-    protected function updateUser(User $user)
-    {
+    protected function updateUser(User $user) {
         $this->info('=== 更新用戶信息 ===');
 
         $updated = false;
@@ -174,6 +176,7 @@ class ManageUser extends Command
         if ($password) {
             if (strlen($password) < 6) {
                 $this->error('密碼必須至少 6 個字符！');
+
                 return 1;
             }
             $user->password = Hash::make($password);
@@ -205,7 +208,7 @@ class ManageUser extends Command
                         'regular' => '一般用戶',
                         'expert' => '專家',
                         'crowdsourcing' => '眾包用戶',
-                        'super-admin' => '系統管理員'
+                        'super-admin' => '系統管理員',
                     ],
                     $currentRoleName
                 );
@@ -221,6 +224,7 @@ class ManageUser extends Command
 
         if (!$updated) {
             $this->info('沒有任何更新。');
+
             return 0;
         }
 
@@ -236,12 +240,12 @@ class ManageUser extends Command
     /**
      * 列出所有用戶
      */
-    protected function listUsers()
-    {
+    protected function listUsers() {
         $users = User::orderBy('id')->get();
 
         if ($users->isEmpty()) {
             $this->info('沒有找到任何用戶。');
+
             return 0;
         }
 
@@ -267,8 +271,7 @@ class ManageUser extends Command
     /**
      * 顯示用戶信息
      */
-    protected function displayUserInfo(User $user)
-    {
+    protected function displayUserInfo(User $user) {
         $this->table(
             ['屬性', '值'],
             [
@@ -285,8 +288,7 @@ class ManageUser extends Command
     /**
      * 獲取狀態文本
      */
-    protected function getStatusText($status)
-    {
+    protected function getStatusText($status) {
         $statusMap = [
             User::STATUS_INACTIVE => '未激活',
             User::STATUS_ACTIVE => '激活',

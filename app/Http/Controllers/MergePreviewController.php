@@ -4,13 +4,12 @@ namespace App\Http\Controllers;
 
 use App\BiogMain;
 use App\Dynasty;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use Carbon\Carbon;
 
-class MergePreviewController extends Controller
-{
+class MergePreviewController extends Controller {
     protected $addressCache = [];
     protected $officeCache = [];
     protected $textCache = [];
@@ -22,15 +21,14 @@ class MergePreviewController extends Controller
     protected $socialInstCache = [];
     protected $personCache = [];
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('auth');
     }
 
-    public function index(Request $request)
-    {
+    public function index(Request $request) {
         if (!Auth::user()->isAdmin()) {
             flash('該用戶沒有權限，請聯絡管理員。', 'error');
+
             return redirect('/home');
         }
 
@@ -68,11 +66,11 @@ class MergePreviewController extends Controller
             $originalPrimary = $primaryInput;
             $originalSecondary = $secondaryInput;
 
-        $primary = $primaryInput;
-        $secondary = $secondaryInput;
-        $primaryNumeric = (int) $primaryInput;
-        $secondaryNumeric = (int) $secondaryInput;
-        $minTargetId = $autoArrange ? min($primaryNumeric, $secondaryNumeric) : null;
+            $primary = $primaryInput;
+            $secondary = $secondaryInput;
+            $primaryNumeric = (int) $primaryInput;
+            $secondaryNumeric = (int) $secondaryInput;
+            $minTargetId = $autoArrange ? min($primaryNumeric, $secondaryNumeric) : null;
 
             $primarySummary = $this->buildPersonSummary($primary, $mergeReason);
             $secondarySummary = $this->buildPersonSummary($secondary, $mergeReason);
@@ -130,8 +128,7 @@ class MergePreviewController extends Controller
         ]);
     }
 
-    protected function buildPersonSummary($personId, $mergeReason = '')
-    {
+    protected function buildPersonSummary($personId, $mergeReason = '') {
         if ($personId === '') {
             return [
                 'exists' => false,
@@ -183,8 +180,7 @@ class MergePreviewController extends Controller
         ];
     }
 
-    protected function compareDynasty(array $primary, array $secondary)
-    {
+    protected function compareDynasty(array $primary, array $secondary) {
         if (!$primary['exists'] || !$secondary['exists']) {
             return 'unknown';
         }
@@ -196,8 +192,7 @@ class MergePreviewController extends Controller
         return 'different';
     }
 
-    protected function compareName(array $primary, array $secondary)
-    {
+    protected function compareName(array $primary, array $secondary) {
         if (!$primary['exists'] || !$secondary['exists']) {
             return 'unknown';
         }
@@ -219,8 +214,7 @@ class MergePreviewController extends Controller
         return $different ? 'different' : 'same';
     }
 
-    protected function compareGender(array $primary, array $secondary)
-    {
+    protected function compareGender(array $primary, array $secondary) {
         if (!$primary['exists'] || !$secondary['exists']) {
             return 'unknown';
         }
@@ -235,8 +229,7 @@ class MergePreviewController extends Controller
         return ((int)$primaryGender === (int)$secondaryGender) ? 'same' : 'different';
     }
 
-    protected function formatGenderLabel($genderCode)
-    {
+    protected function formatGenderLabel($genderCode) {
         if ($genderCode === null) {
             return '未詳';
         }
@@ -252,8 +245,7 @@ class MergePreviewController extends Controller
         return (string)$genderCode;
     }
 
-    protected function buildSqlPreview($primary, $secondary, array $mergedResult, $autoArrange, $minTargetId = null)
-    {
+    protected function buildSqlPreview($primary, $secondary, array $mergedResult, $autoArrange, $minTargetId = null) {
         $statements = [];
         $statements[] = 'START TRANSACTION;';
 
@@ -381,8 +373,7 @@ class MergePreviewController extends Controller
         return $statements;
     }
 
-    protected function buildShareUrl(Request $request, $originalPrimary, $originalSecondary, $autoArrange, $reason)
-    {
+    protected function buildShareUrl(Request $request, $originalPrimary, $originalSecondary, $autoArrange, $reason) {
         $params = [
             'primary_id' => $originalPrimary,
             'secondary_id' => $originalSecondary,
@@ -395,8 +386,7 @@ class MergePreviewController extends Controller
         return $request->url().'?'.http_build_query($params);
     }
 
-    protected function getBiogColumns()
-    {
+    protected function getBiogColumns() {
         static $columns = null;
         if ($columns === null) {
             try {
@@ -405,11 +395,11 @@ class MergePreviewController extends Controller
                 $columns = [];
             }
         }
+
         return $columns;
     }
 
-    protected function calculateMergedPerson(array $primary, array $secondary, $mergeReason)
-    {
+    protected function calculateMergedPerson(array $primary, array $secondary, $mergeReason) {
         if (!$secondary['exists']) {
             return [
                 'values' => [],
@@ -500,8 +490,7 @@ class MergePreviewController extends Controller
         ];
     }
 
-    protected function formatSqlValue($value)
-    {
+    protected function formatSqlValue($value) {
         if (is_null($value)) {
             return 'NULL';
         }
@@ -516,11 +505,11 @@ class MergePreviewController extends Controller
 
         $string = (string)$value;
         $escaped = str_replace("'", "''", $string);
+
         return "'".$escaped."'";
     }
 
-    protected function buildMergeTag($targetId, $sourceId, $date, $reason)
-    {
+    protected function buildMergeTag($targetId, $sourceId, $date, $reason) {
         $segments = [];
         if ($targetId !== null && $targetId !== '') {
             $segments[] = '#'.$targetId;
@@ -542,11 +531,11 @@ class MergePreviewController extends Controller
         if ($reasonText !== '') {
             $note .= ' '.$reasonText;
         }
+
         return $note;
     }
 
-    protected function summarizeOtherRow($table, array $data)
-    {
+    protected function summarizeOtherRow($table, array $data) {
         $get = function ($key) use ($data) {
             return array_key_exists($key, $data) ? $data[$key] : null;
         };
@@ -554,6 +543,7 @@ class MergePreviewController extends Controller
             if ($value === null || $value === '') {
                 return '(null)';
             }
+
             return (string)$value;
         };
         $formatId = function ($id, $label = null) {
@@ -564,6 +554,7 @@ class MergePreviewController extends Controller
             if ($label !== null && $label !== '') {
                 return $idStr.' '.$label;
             }
+
             return $idStr;
         };
         $notes = trim((string)$get('c_notes'));
@@ -573,6 +564,7 @@ class MergePreviewController extends Controller
             case 'BIOG_ADDR_DATA':
                 $addrId = $get('c_addr_id');
                 $addrLabel = $this->getAddressLabel($addrId);
+
                 return sprintf(
                     'Seq %s — Addr %s (type %s)%s',
                     $format($get('c_sequence')),
@@ -584,6 +576,7 @@ class MergePreviewController extends Controller
                 $instCode = $get('c_inst_code');
                 $instNameCode = $get('c_inst_name_code');
                 $instLabel = $this->getSocialInstLabel($instCode, $instNameCode);
+
                 return sprintf(
                     'Inst %s — NameCode %s%s',
                     $formatId($instCode, $instLabel),
@@ -593,6 +586,7 @@ class MergePreviewController extends Controller
             case 'BIOG_SOURCE_DATA':
                 $textId = $get('c_textid');
                 $textLabel = $this->getTextLabel($textId);
+
                 return sprintf(
                     'Source %s — Pages %s%s',
                     $formatId($textId, $textLabel),
@@ -604,6 +598,7 @@ class MergePreviewController extends Controller
                 $textLabel = $this->getTextLabel($textId);
                 $roleId = $get('c_role_id');
                 $roleLabel = $this->getRoleLabel($roleId);
+
                 return sprintf(
                     'Text %s — Role %s — Seq %s%s',
                     $formatId($textId, $textLabel),
@@ -614,6 +609,7 @@ class MergePreviewController extends Controller
             case 'ENTRY_DATA':
                 $entryCode = $get('c_entry_code');
                 $entryLabel = $this->getEntryLabel($entryCode);
+
                 return sprintf(
                     'Entry %s — Seq %s — Year %s%s',
                     $formatId($entryCode, $entryLabel),
@@ -624,6 +620,7 @@ class MergePreviewController extends Controller
             case 'EVENTS_DATA':
                 $eventCode = $get('c_event_code');
                 $eventLabel = $this->getEventLabel($eventCode);
+
                 return sprintf(
                     'Event %s — Seq %s — Year %s%s',
                     $formatId($eventCode, $eventLabel),
@@ -637,6 +634,7 @@ class MergePreviewController extends Controller
                 $actLabel = $this->getPossessionLabel($actCode);
                 $desc = $get('c_possession_desc_chn') ?: $get('c_possession_desc');
                 $main = $desc ? trim((string)$desc) : $formatId($actCode, $actLabel);
+
                 return sprintf(
                     'Possession %s — %s%s',
                     $format($recordId),
@@ -646,6 +644,7 @@ class MergePreviewController extends Controller
             case 'STATUS_DATA':
                 $statusCode = $get('c_status_code');
                 $statusLabel = $this->getStatusLabel($statusCode);
+
                 return sprintf(
                     'Status %s — Seq %s — Year %s%s',
                     $formatId($statusCode, $statusLabel),
@@ -658,6 +657,7 @@ class MergePreviewController extends Controller
                 $officeLabel = $this->getOfficeLabel($officeId);
                 $addrId = $get('c_addr_id');
                 $addrLabel = $this->getAddressLabel($addrId);
+
                 return sprintf(
                     'Posting %s — Office %s — Addr %s%s',
                     $format($get('c_posting_id')),
@@ -668,6 +668,7 @@ class MergePreviewController extends Controller
             case 'POSTING_DATA':
                 $officeId = $get('c_office_id');
                 $officeLabel = $this->getOfficeLabel($officeId);
+
                 return sprintf(
                     'Posting %s — Office %s%s',
                     $format($get('c_posting_id')),
@@ -677,6 +678,7 @@ class MergePreviewController extends Controller
             case 'POSTED_TO_OFFICE_DATA':
                 $officeId = $get('c_office_id');
                 $officeLabel = $this->getOfficeLabel($officeId);
+
                 return sprintf(
                     'Posting %s — Office %s — Person %s%s',
                     $format($get('c_posting_id')),
@@ -691,6 +693,7 @@ class MergePreviewController extends Controller
                 $fromLabel = $this->getPersonLabel($fromId);
                 $reason = trim((string)$get('c_notes'));
                 $reasonSuffix = $reason !== '' ? ' | Reason: '.$reason : '';
+
                 return sprintf(
                     'Merged %s → %s%s',
                     $formatId($fromId, $fromLabel),
@@ -702,12 +705,12 @@ class MergePreviewController extends Controller
                 foreach ($data as $key => $val) {
                     $parts[] = $key.':'.$format($val);
                 }
+
                 return sprintf('%s — %s', $table, implode(', ', $parts));
         }
     }
 
-    protected function getAddressLabel($id)
-    {
+    protected function getAddressLabel($id) {
         if ($id === null || $id === '' || (int)$id === 0) {
             return '未詳';
         }
@@ -719,11 +722,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->addressCache[$id] = $row ? trim($row->c_name_chn ?: $row->c_name ?: '') : null;
         }
+
         return $this->addressCache[$id];
     }
 
-    protected function getOfficeLabel($id)
-    {
+    protected function getOfficeLabel($id) {
         if ($id === null || $id === '' || (int)$id === 0) {
             return null;
         }
@@ -735,11 +738,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->officeCache[$id] = $row ? trim($row->c_office_chn ?: $row->c_office_pinyin ?: '') : null;
         }
+
         return $this->officeCache[$id];
     }
 
-    protected function getTextLabel($id)
-    {
+    protected function getTextLabel($id) {
         if ($id === null || $id === '' || (int)$id === 0) {
             return null;
         }
@@ -751,11 +754,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->textCache[$id] = $row ? trim($row->c_title_chn ?: $row->c_title ?: '') : null;
         }
+
         return $this->textCache[$id];
     }
 
-    protected function getEntryLabel($code)
-    {
+    protected function getEntryLabel($code) {
         if ($code === null || $code === '' || (int)$code === 0) {
             return null;
         }
@@ -767,11 +770,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->entryCache[$code] = $row ? trim($row->c_entry_desc_chn ?: $row->c_entry_desc ?: '') : null;
         }
+
         return $this->entryCache[$code];
     }
 
-    protected function getEventLabel($code)
-    {
+    protected function getEventLabel($code) {
         if ($code === null || $code === '' || (int)$code === 0) {
             return null;
         }
@@ -783,11 +786,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->eventCache[$code] = $row ? trim($row->c_event_name_chn ?: $row->c_event_name ?: '') : null;
         }
+
         return $this->eventCache[$code];
     }
 
-    protected function getPossessionLabel($code)
-    {
+    protected function getPossessionLabel($code) {
         if ($code === null || $code === '' || (int)$code === 0) {
             return null;
         }
@@ -799,11 +802,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->possessionCache[$code] = $row ? trim($row->c_possession_act_desc_chn ?: $row->c_possession_act_desc ?: '') : null;
         }
+
         return $this->possessionCache[$code];
     }
 
-    protected function getStatusLabel($code)
-    {
+    protected function getStatusLabel($code) {
         if ($code === null || $code === '' || (int)$code === 0) {
             return null;
         }
@@ -815,11 +818,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->statusCache[$code] = $row ? trim($row->c_status_desc_chn ?: $row->c_status_desc ?: '') : null;
         }
+
         return $this->statusCache[$code];
     }
 
-    protected function getRoleLabel($id)
-    {
+    protected function getRoleLabel($id) {
         if ($id === null || $id === '' || (int)$id === 0) {
             return null;
         }
@@ -831,11 +834,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->roleCache[$id] = $row ? trim($row->c_role_desc_chn ?: $row->c_role_desc ?: '') : null;
         }
+
         return $this->roleCache[$id];
     }
 
-    protected function getSocialInstLabel($code, $nameCode)
-    {
+    protected function getSocialInstLabel($code, $nameCode) {
         if ($code === null || $code === '' || $nameCode === null || $nameCode === '') {
             return null;
         }
@@ -848,11 +851,11 @@ class MergePreviewController extends Controller
                 ->first();
             $this->socialInstCache[$key] = $row ? trim($row->c_inst_name_hz ?: $row->c_inst_name_py ?: '') : null;
         }
+
         return $this->socialInstCache[$key];
     }
 
-    protected function getPersonLabel($id)
-    {
+    protected function getPersonLabel($id) {
         if ($id === null || $id === '' || (int)$id === 0) {
             return null;
         }
@@ -872,11 +875,11 @@ class MergePreviewController extends Controller
                 $this->personCache[$id] = null;
             }
         }
+
         return $this->personCache[$id];
     }
 
-    protected function loadSecondaryDetails(array $summary)
-    {
+    protected function loadSecondaryDetails(array $summary) {
         if (!$summary['exists']) {
             return ['altname' => [], 'kin' => [], 'assoc' => [], 'other' => []];
         }
@@ -966,6 +969,7 @@ class MergePreviewController extends Controller
                 ->get()
                 ->map(function ($row) use ($table) {
                     $rowArray = (array)$row;
+
                     return [
                         'summary' => $this->summarizeOtherRow($table, $rowArray),
                         'raw' => $rowArray,
@@ -982,8 +986,7 @@ class MergePreviewController extends Controller
         ];
     }
 
-    protected function buildTableSummaries(array $summary)
-    {
+    protected function buildTableSummaries(array $summary) {
         if (!$summary['exists']) {
             return [
                 'assoc' => ['c_personid' => 0, 'c_kin_id' => 0, 'c_assoc_id' => 0, 'c_assoc_kin_id' => 0],
@@ -1034,6 +1037,7 @@ class MergePreviewController extends Controller
             $columns = $info['columns'] ?? (isset($info['column']) ? [$info['column']] : []);
             if (empty($columns)) {
                 $counts[$key] = 0;
+
                 continue;
             }
             $counts[$key] = \DB::table($info['table'])
@@ -1052,8 +1056,7 @@ class MergePreviewController extends Controller
         return $counts;
     }
 
-    protected function shouldBlockMerge(array $primary, array $secondary)
-    {
+    protected function shouldBlockMerge(array $primary, array $secondary) {
         if (!$primary['exists'] || !$secondary['exists']) {
             return false;
         }
@@ -1064,8 +1067,7 @@ class MergePreviewController extends Controller
         return $nameDiff || $nameChnDiff;
     }
 
-    protected function namesDiffer($a, $b)
-    {
+    protected function namesDiffer($a, $b) {
         $normA = $this->normalizeName($a);
         $normB = $this->normalizeName($b);
 
@@ -1076,8 +1078,7 @@ class MergePreviewController extends Controller
         return $normA !== $normB;
     }
 
-    protected function normalizeName($value)
-    {
+    protected function normalizeName($value) {
         if ($value === null) {
             return '';
         }

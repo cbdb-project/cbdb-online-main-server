@@ -8,20 +8,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class AdminBatchLoadSocialInstitutesController extends Controller
-{
+class AdminBatchLoadSocialInstitutesController extends Controller {
     /**
      * @var OperationRepository
      */
     protected $operationRepository;
 
-    public function __construct(OperationRepository $operationRepository)
-    {
+    public function __construct(OperationRepository $operationRepository) {
         $this->operationRepository = $operationRepository;
     }
 
-    public function showForm()
-    {
+    public function showForm() {
         $this->ensureAdmin();
 
         return view('admin.batch_load_social_institutes', [
@@ -34,8 +31,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
+    public function store(Request $request) {
         $this->ensureAdmin();
 
         $data = $request->validate([
@@ -159,8 +155,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
     /**
      * Ensure the current user is an active admin.
      */
-    protected function ensureAdmin(): void
-    {
+    protected function ensureAdmin(): void {
         if (!Auth::check() || !Auth::user()->canRunBatchImport()) {
             abort(403);
         }
@@ -171,8 +166,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      *
      * @return array{0: array<int,array<string,mixed>>, 1: array<int,string>}
      */
-    protected function parseEntries(string $input): array
-    {
+    protected function parseEntries(string $input): array {
         $lines = preg_split('/\r\n|\n|\r/', $input);
         $rows = [];
         $errors = [];
@@ -188,6 +182,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
             $parts = preg_split("/\t+/", $line);
             if (!$parts || count($parts) < 6) {
                 $errors[] = "第 {$lineNumber} 行需要至少六欄資料（名稱、類型、朝代、地址名稱、地址 ID、來源 TEXT_ID）";
+
                 continue;
             }
 
@@ -221,6 +216,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
 
             if (!empty($lineErrors)) {
                 $errors = array_merge($errors, $lineErrors);
+
                 continue;
             }
 
@@ -246,8 +242,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      *
      * @return array<string,int>
      */
-    protected function getTypeMap(): array
-    {
+    protected function getTypeMap(): array {
         $records = DB::table('SOCIAL_INSTITUTION_TYPES')
             ->select('c_inst_type_code', 'c_inst_type_hz', 'c_inst_type_py')
             ->orderBy('c_inst_type_code')
@@ -277,8 +272,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      *
      * @return array<string,int>
      */
-    protected function getDynastyMap(): array
-    {
+    protected function getDynastyMap(): array {
         return DB::table('DYNASTIES')
             ->orderBy('c_dy')
             ->pluck('c_dy', 'c_dynasty_chn')
@@ -294,8 +288,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      * @param array<int,string> $names
      * @return array<string,array<string,mixed>>
      */
-    protected function getExistingNames(array $names): array
-    {
+    protected function getExistingNames(array $names): array {
         if (empty($names)) {
             return [];
         }
@@ -331,8 +324,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      * @param array<string,int> $dynastyMap
      * @return array<int,string>
      */
-    protected function validateLookups(array $rows, array $typeMap, array $dynastyMap): array
-    {
+    protected function validateLookups(array $rows, array $typeMap, array $dynastyMap): array {
         $errors = [];
 
         foreach ($rows as $row) {
@@ -354,8 +346,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      * @param array<int,int> $addrIds
      * @return array<int,string>
      */
-    protected function validateAddressIds(array $addrIds): array
-    {
+    protected function validateAddressIds(array $addrIds): array {
         $unique = array_unique($addrIds);
         if (empty($unique)) {
             return [];
@@ -385,8 +376,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      * @param array<int,int> $sourceIds
      * @return array<int,string>
      */
-    protected function validateSourceIds(array $sourceIds): array
-    {
+    protected function validateSourceIds(array $sourceIds): array {
         $unique = array_unique($sourceIds);
         if (empty($unique)) {
             return [];
@@ -419,8 +409,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      * @param int $nextNameCode
      * @return int
      */
-    protected function resolveNameCode(string $name, array $existingNames, array &$newNameCodes, int &$nextNameCode): int
-    {
+    protected function resolveNameCode(string $name, array $existingNames, array &$newNameCodes, int &$nextNameCode): int {
         if (isset($existingNames[$name])) {
             return (int) $existingNames[$name]['c_inst_name_code'];
         }
@@ -438,8 +427,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
     /**
      * Build a space separated lower-case pinyin string.
      */
-    protected function buildPinyin(string $value): string
-    {
+    protected function buildPinyin(string $value): string {
         $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $syllables = [];
 
@@ -467,8 +455,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller
      *
      * @param array<int,string> $errors
      */
-    protected function backWithErrors(array $errors)
-    {
+    protected function backWithErrors(array $errors) {
         return redirect()
             ->route('admin.batch-load-social-institutes')
             ->withInput()

@@ -1,0 +1,47 @@
+name: PHP CS Fixer
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/**
+      - claude/**
+      - fix/**
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  cs-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run PHP CS Fixer (dry-run)
+        run: |
+          vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff --verbose || \
+          (echo "::error::PHP CS Fixer reported formatting changes. Please run 'vendor/bin/php-cs-fixer fix' locally and recommit."; exit 1)

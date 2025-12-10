@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class OperationsAltnameResolverTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class OperationsAltnameResolverTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -35,17 +33,14 @@ class OperationsAltnameResolverTest extends TestCase
         ]);
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('ALTNAME_DATA');
         parent::tearDown();
     }
 
-    public function test_fetch_altname_current_row_handles_dash_in_resource_id(): void
-    {
-        $controller = new class(new OperationRepository) extends OperationsController {
-            public function resolveAltname(array $payload)
-            {
+    public function test_fetch_altname_current_row_handles_dash_in_resource_id(): void {
+        $controller = new class (new OperationRepository()) extends OperationsController {
+            public function resolveAltname(array $payload) {
                 return $this->fetchAltnameCurrentRow($payload);
             }
         };
@@ -66,4 +61,3 @@ class OperationsAltnameResolverTest extends TestCase
         $this->assertSame('Zi Jing', $row->c_alt_name);
     }
 }
-

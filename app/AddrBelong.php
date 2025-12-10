@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AddrBelong extends Model
-{
+class AddrBelong extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -21,8 +20,7 @@ class AddrBelong extends Model
      */
     public $timestamps = false;
 
-    public function addr()
-    {
+    public function addr() {
         return $this->belongsTo('App\AddrCode', 'c_belongs_to', 'c_addr_id');
     }
 }

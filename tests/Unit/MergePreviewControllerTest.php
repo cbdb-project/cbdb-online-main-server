@@ -8,27 +8,23 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
-class MergePreviewControllerTest extends TestCase
-{
+class MergePreviewControllerTest extends TestCase {
     /** @var TestableMergePreviewController */
     private $controller;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         $this->controller = new TestableMergePreviewController();
         Carbon::setTestNow(Carbon::create(2025, 1, 2, 3, 4, 5));
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Carbon::setTestNow();
         parent::tearDown();
     }
 
-    public function testCalculateMergedPersonCombinesAttributesAndNotes()
-    {
+    public function testCalculateMergedPersonCombinesAttributesAndNotes() {
         $user = new GenericUser(['id' => 999, 'name' => 'MergeAdmin']);
         Auth::guard()->setUser($user);
 
@@ -75,8 +71,7 @@ class MergePreviewControllerTest extends TestCase
         $this->assertArrayNotHasKey('c_personid', $updates);
     }
 
-    public function testCalculateMergedPersonWithoutSecondaryReturnsEmpty()
-    {
+    public function testCalculateMergedPersonWithoutSecondaryReturnsEmpty() {
         $primary = ['exists' => true, 'attributes' => []];
         $secondary = ['exists' => false];
 
@@ -86,8 +81,7 @@ class MergePreviewControllerTest extends TestCase
         $this->assertSame([], $result['updates']);
     }
 
-    public function testShouldBlockMergeDetectsNameDifference()
-    {
+    public function testShouldBlockMergeDetectsNameDifference() {
         $primary = ['exists' => true, 'name' => 'Zhang San', 'name_chn' => '張三'];
         $secondary = ['exists' => true, 'name' => 'Li Si', 'name_chn' => '李四'];
 
@@ -98,8 +92,7 @@ class MergePreviewControllerTest extends TestCase
         $this->assertFalse($this->controller->callShouldBlockMerge($primary, $secondary));
     }
 
-    public function testBuildSqlPreviewIncludesAutoArrangeStatements()
-    {
+    public function testBuildSqlPreviewIncludesAutoArrangeStatements() {
         $result = [
             'values' => ['c_name' => 'Merged'],
             'updates' => ['c_name' => 'Merged'],
@@ -113,6 +106,7 @@ class MergePreviewControllerTest extends TestCase
         foreach ($statements as $statement) {
             if (strpos($statement, "UPDATE BIOG_MAIN SET c_name = 'Merged' WHERE c_personid = 200;") !== false) {
                 $hasMainUpdate = true;
+
                 break;
             }
         }
@@ -125,14 +119,14 @@ class MergePreviewControllerTest extends TestCase
         foreach ($statements as $statement) {
             if (strpos($statement, "UPDATE BIOG_MAIN SET c_personid = 100 WHERE c_personid = 200;") !== false) {
                 $hasMinUpdate = true;
+
                 break;
             }
         }
         $this->assertTrue($hasMinUpdate, 'Auto arrange 段落應該將人物 ID 調整為較小值。');
     }
 
-    public function testBuildSqlPreviewSkipsAutoArrangeWhenDisabled()
-    {
+    public function testBuildSqlPreviewSkipsAutoArrangeWhenDisabled() {
         $statements = $this->controller->callBuildSqlPreview(300, 200, ['values' => [], 'updates' => [], 'merge_record' => null], false, null);
 
         $this->assertNotContains('-- 調整至較小 ID', $statements);
@@ -141,20 +135,16 @@ class MergePreviewControllerTest extends TestCase
     }
 }
 
-class TestableMergePreviewController extends MergePreviewController
-{
-    public function callCalculateMergedPerson(array $primary, array $secondary, $reason)
-    {
+class TestableMergePreviewController extends MergePreviewController {
+    public function callCalculateMergedPerson(array $primary, array $secondary, $reason) {
         return $this->calculateMergedPerson($primary, $secondary, $reason);
     }
 
-    public function callShouldBlockMerge(array $primary, array $secondary)
-    {
+    public function callShouldBlockMerge(array $primary, array $secondary) {
         return $this->shouldBlockMerge($primary, $secondary);
     }
 
-    public function callBuildSqlPreview($primary, $secondary, array $updates, $autoArrange, $minTargetId)
-    {
+    public function callBuildSqlPreview($primary, $secondary, array $updates, $autoArrange, $minTargetId) {
         return $this->buildSqlPreview($primary, $secondary, $updates, $autoArrange, $minTargetId);
     }
 }

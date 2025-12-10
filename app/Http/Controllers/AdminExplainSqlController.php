@@ -6,17 +6,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class AdminExplainSqlController extends Controller
-{
-    protected function ensureAdmin()
-    {
+class AdminExplainSqlController extends Controller {
+    protected function ensureAdmin() {
         if (!Auth::check() || !Auth::user()->canManageUsers()) {
             abort(403);
         }
     }
 
-    public function show()
-    {
+    public function show() {
         $this->ensureAdmin();
 
         return view('admin.explain_sql', [
@@ -30,8 +27,7 @@ class AdminExplainSqlController extends Controller
         ]);
     }
 
-    public function explain(Request $request)
-    {
+    public function explain(Request $request) {
         $this->ensureAdmin();
 
         $data = $request->validate([

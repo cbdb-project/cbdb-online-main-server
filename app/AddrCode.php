@@ -1,8 +1,10 @@
 <?php
+
 namespace App;
+
 use Illuminate\Database\Eloquent\Model;
-class AddrCode extends Model
-{
+
+class AddrCode extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -18,8 +20,8 @@ class AddrCode extends Model
      */
     public $timestamps = false;
     protected $guarded = [];
-    public function belong()
-    {
+
+    public function belong() {
         return $this->hasMany('App\AddrBelong', 'c_addr_id', 'c_addr_id');
     }
 }

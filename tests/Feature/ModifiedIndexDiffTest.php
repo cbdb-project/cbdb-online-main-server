@@ -9,10 +9,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class ModifiedIndexDiffTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class ModifiedIndexDiffTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -64,7 +62,9 @@ class ModifiedIndexDiffTest extends TestCase
         mkdir($layoutsDir, 0777, true);
         mkdir($modifiedDir, 0777, true);
 
-        file_put_contents($layoutsDir . '/dashboard.blade.php', <<<BLADE
+        file_put_contents(
+            $layoutsDir . '/dashboard.blade.php',
+            <<<BLADE
 <!doctype html>
 <html lang="zh-Hant">
 <head><meta charset="utf-8"><title>Test Layout</title></head>
@@ -75,7 +75,9 @@ class ModifiedIndexDiffTest extends TestCase
 BLADE
         );
 
-        file_put_contents($modifiedDir . '/index.blade.php', <<<BLADE
+        file_put_contents(
+            $modifiedDir . '/index.blade.php',
+            <<<BLADE
 @extends('layouts.dashboard')
 
 @section('content')
@@ -91,8 +93,7 @@ BLADE
         app('view')->setFinder(new \Illuminate\View\FileViewFinder(app('files'), [$tempBase]));
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('OFFICE_TYPE_TREE');
         Schema::dropIfExists('OFFICE_CODE_TYPE_REL');
         Schema::dropIfExists('OFFICE_CODES');
@@ -102,8 +103,7 @@ BLADE
         parent::tearDown();
     }
 
-    protected function actingAsAdmin(): User
-    {
+    protected function actingAsAdmin(): User {
         $user = User::create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
@@ -117,8 +117,7 @@ BLADE
         return $user;
     }
 
-    public function test_modified_index_handles_missing_relation_records(): void
-    {
+    public function test_modified_index_handles_missing_relation_records(): void {
         $this->actingAsAdmin();
 
         Operation::create([
@@ -141,8 +140,7 @@ BLADE
         $response->assertStatus(200)->assertSee('最近修改紀錄');
     }
 
-    public function test_modified_index_handles_empty_result_set(): void
-    {
+    public function test_modified_index_handles_empty_result_set(): void {
         $this->actingAsAdmin();
 
         $response = $this->get('/modified');

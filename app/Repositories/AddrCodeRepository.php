@@ -1,51 +1,54 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
  * Date: 2017/8/30
  * Time: 14:43
  */
+
 namespace App\Repositories;
+
+use App\AddrBelong;
 use App\AddrCode;
 use App\AddressCode;
-use App\AddrBelong;
 use Illuminate\Http\Request;
+
 /**
  * Class AddrCodeRepository
  * @package App\Repositories
  */
-class AddrCodeRepository
-{
+class AddrCodeRepository {
     /**
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function all()
-    {
+    public function all() {
         return AddressCode::paginate(200);
     }
+
     /**
      * @param $request
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    static public function addrByQuery(Request $request, $num=20)
-    {
-        if ($temp = $request->num){
+    public static function addrByQuery(Request $request, $num = 20) {
+        if ($temp = $request->num) {
             $num = $temp;
         }
-        if (!$request->q){
+        if (!$request->q) {
             return AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->paginate($num);
         }
         $names = AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate($num);
         $names->appends(['q' => $request->q])->links();
+
         return $names;
     }
-    public function byId($id)
-    {
+
+    public function byId($id) {
         return AddressCode::find($id);
     }
-    public function updateById($request, $id)
-    {
+
+    public function updateById($request, $id) {
         $data = $request->all();
         $addrcode = AddressCode::find($id);
         $addrcode->update($data);
@@ -64,48 +67,48 @@ class AddrCodeRepository
     //         $add = "";
     //         $dy = AddrBelong::where('c_addr_id', $item['id'])->value('c_belongs_to');
     //         $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-    //         if($dy == null) { 
-    //             $dy = 0; 
-    //             $add = ""; 
+    //         if($dy == null) {
+    //             $dy = 0;
+    //             $add = "";
     //         }
     //         else {
     //             $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-    //             $add = "[[".$dy." ".$dy2."]]"; 
+    //             $add = "[[".$dy." ".$dy2."]]";
     //         }
     //         $item['text'] = $originalText." ".$add;
     //     }
     //     return $data;
     // }
 
-    public function searchAddr(Request $request)
-    {
+    public function searchAddr(Request $request) {
         $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
-        foreach($data as $item){
+        foreach ($data as $item) {
             $item['id'] = $item->c_addr_id;
-            if($item['id'] === 0) $item['id'] = -999;
+            if ($item['id'] === 0) {
+                $item['id'] = -999;
+            }
             $belongs = "";
             $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
             $add = [];
-            $dy = AddrBelong::where('c_addr_id', '=' ,$item->c_addr_id)->get();
-            if($dy->isEmpty()) { 
-                $add[] = ""; 
-            }
-            else {
-                foreach($dy as $d){
+            $dy = AddrBelong::where('c_addr_id', '=', $item->c_addr_id)->get();
+            if ($dy->isEmpty()) {
+                $add[] = "";
+            } else {
+                foreach ($dy as $d) {
                     //找出上一層資料
-                    $dy2 = AddrCode::where('c_addr_id','=',$d->c_belongs_to)->first();
-                    if(!$dy2->empty){
+                    $dy2 = AddrCode::where('c_addr_id', '=', $d->c_belongs_to)->first();
+                    if (!$dy2->empty) {
                         $add_str = "[[".$dy2->c_addr_id." ".$dy2->c_name_chn." ".$dy2->c_firstyear."~".$dy2->c_lastyear."]]";
                         $add[] = $add_str;
-                    }else{
-                        $add[] = ""; 
+                    } else {
+                        $add[] = "";
                     }
-                } 
+                }
             }
             $item['text'] = trim($originalText." ".$add[0]);
-            if(count($add) > 1){
-                for($i = 1; $i < count($add); $i++){
+            if (count($add) > 1) {
+                for ($i = 1; $i < count($add); $i++) {
                     $append_item = $item->replicate();
                     $append_item['text'] = trim($originalText." ".$add[$i]);
                     $append_item['c_addr_id'] = $item->c_addr_id;
@@ -113,22 +116,22 @@ class AddrCodeRepository
                 }
             }
         }
-        
+
         $sortedResult = $data->getCollection()->sortBy('id')->values();
         $data->setCollection($sortedResult);
 
         return $data;
     }
 
-    public function searchOfficeAddr(Request $request)
-    {
+    public function searchOfficeAddr(Request $request) {
         $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
-        foreach($data as $item){
+        foreach ($data as $item) {
             $item['id'] = $item->c_addr_id == 0 ? -999 : $item->c_addr_id;
             $belongs = $item->belongs1_ID." ".$item->belongs1_Name." ".$item->belongs2_ID." ".$item->belongs2_Name." ".$item->belongs3_ID." ".$item->belongs3_Name." ".$item->belongs4_ID." ".$item->belongs4_Name." ".$item->belongs5_ID." ".$item->belongs5_Name;
             $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs);
         }
+
         return $data;
     }
 }

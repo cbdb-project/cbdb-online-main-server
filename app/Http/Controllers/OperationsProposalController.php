@@ -7,13 +7,11 @@ use App\Repositories\OperationRepository;
 use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class OperationsProposalController extends Controller
-{
+class OperationsProposalController extends Controller {
     protected $operationRepository;
     protected $nameSearchIndexService;
 
@@ -29,14 +27,12 @@ class OperationsProposalController extends Controller
         // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為手動調用索引服務
     ];
 
-    public function __construct(OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService)
-    {
+    public function __construct(OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService) {
         $this->operationRepository = $operationRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
     }
 
-    public function approve(Request $request, Operation $operation)
-    {
+    public function approve(Request $request, Operation $operation) {
         $this->ensureCanReview($operation);
 
         $payload = $this->decodeResourceData($operation);
@@ -47,6 +43,7 @@ class OperationsProposalController extends Controller
 
         if (empty($keyColumns)) {
             flash('審核失敗：提案缺少主鍵資訊。', 'error');
+
             return redirect()->back();
         }
 
@@ -63,6 +60,7 @@ class OperationsProposalController extends Controller
             });
         } catch (\Throwable $e) {
             flash('審核失敗：'.$e->getMessage(), 'error');
+
             return redirect()->back();
         }
 
@@ -70,22 +68,22 @@ class OperationsProposalController extends Controller
         $this->updateProposalStatus($operation, 'approved', $comment);
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
+
         return redirect()->back();
     }
 
-    public function reject(Request $request, Operation $operation)
-    {
+    public function reject(Request $request, Operation $operation) {
         $this->ensureCanReview($operation);
 
         $comment = trim((string) $request->input('review_comment', ''));
         $this->updateProposalStatus($operation, 'rejected', $comment);
 
         flash('提案已退回 @ '.Carbon::now(), 'info');
+
         return redirect()->back();
     }
 
-    protected function ensureCanReview(Operation $operation): void
-    {
+    protected function ensureCanReview(Operation $operation): void {
         if (!Auth::check() || !Auth::user()->canRestoreOperations()) {
             abort(403, '無權審核提案。');
         }
@@ -96,20 +94,19 @@ class OperationsProposalController extends Controller
         }
     }
 
-    protected function decodeResourceData(Operation $operation): array
-    {
+    protected function decodeResourceData(Operation $operation): array {
         $payload = json_decode($operation->resource_data, true);
+
         return is_array($payload) ? $payload : [];
     }
 
-    protected function decodeResourceOriginal(Operation $operation): array
-    {
+    protected function decodeResourceOriginal(Operation $operation): array {
         $original = json_decode($operation->resource_original, true);
+
         return is_array($original) ? $original : [];
     }
 
-    protected function sanitizePayload(array $payload): array
-    {
+    protected function sanitizePayload(array $payload): array {
         $sanitized = [];
         foreach ($payload as $key => $value) {
             if (is_string($key) && strpos($key, '__') === 0) {
@@ -117,11 +114,11 @@ class OperationsProposalController extends Controller
             }
             $sanitized[$key] = $value;
         }
+
         return $sanitized;
     }
 
-    protected function applyCreateProposal(string $table, array $data, array $keyColumns): array
-    {
+    protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
         if (!$this->hasKeyValues($keyColumns, $data)) {
             throw new \RuntimeException('缺少主鍵欄位，無法新增資料。');
         }
@@ -135,6 +132,7 @@ class OperationsProposalController extends Controller
         if (isset($this->tableModelMap[$table])) {
             $modelClass = $this->tableModelMap[$table];
             $model = $modelClass::create($data);
+
             return $this->convertRowToArray($model);
         }
 
@@ -154,8 +152,7 @@ class OperationsProposalController extends Controller
         return $this->convertRowToArray($row);
     }
 
-    protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original): array
-    {
+    protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original): array {
         if (empty($original)) {
             throw new \RuntimeException('缺少原始資料，無法更新。');
         }
@@ -223,8 +220,7 @@ class OperationsProposalController extends Controller
         return $this->convertRowToArray($row);
     }
 
-    protected function keyValuesMatch($left, $right): bool
-    {
+    protected function keyValuesMatch($left, $right): bool {
         if ($left === $right) {
             return true;
         }
@@ -236,18 +232,17 @@ class OperationsProposalController extends Controller
         return trim((string) $left) === trim((string) $right);
     }
 
-    protected function hasKeyValues(array $keyColumns, array $row): bool
-    {
+    protected function hasKeyValues(array $keyColumns, array $row): bool {
         foreach ($keyColumns as $column) {
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }
         }
+
         return true;
     }
 
-    protected function buildKeyConditions(array $keyColumns, array $row): array
-    {
+    protected function buildKeyConditions(array $keyColumns, array $row): array {
         $conditions = [];
         foreach ($keyColumns as $column) {
             if (!array_key_exists($column, $row)) {
@@ -255,22 +250,22 @@ class OperationsProposalController extends Controller
             }
             $conditions[$column] = $row[$column];
         }
+
         return $conditions;
     }
 
-    protected function convertRowToArray($row): array
-    {
+    protected function convertRowToArray($row): array {
         if (is_array($row)) {
             return $row;
         }
         if ($row instanceof \ArrayAccess) {
             return (array) $row;
         }
+
         return json_decode(json_encode($row), true) ?: [];
     }
 
-    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void
-    {
+    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {
         $proposalData = json_decode($proposal->resource_data, true) ?? [];
         $keyColumns = $proposalData['__key_columns'] ?? [];
         $resourceId = $this->buildCompositeId($keyColumns, $appliedRow);
@@ -292,8 +287,7 @@ class OperationsProposalController extends Controller
         );
     }
 
-    protected function updateProposalStatus(Operation $proposal, string $status, string $comment = null): void
-    {
+    protected function updateProposalStatus(Operation $proposal, string $status, string $comment = null): void {
         $payload = json_decode($proposal->resource_data, true) ?: [];
 
         $payload['__review_status'] = $status;
@@ -308,8 +302,7 @@ class OperationsProposalController extends Controller
         $proposal->save();
     }
 
-    protected function buildCompositeId(array $keyColumns, array $row): string
-    {
+    protected function buildCompositeId(array $keyColumns, array $row): string {
         if (empty($keyColumns)) {
             return '';
         }
@@ -328,8 +321,7 @@ class OperationsProposalController extends Controller
      * @param array $data
      * @return void
      */
-    protected function indexAltnameAfterCreate(array $data): void
-    {
+    protected function indexAltnameAfterCreate(array $data): void {
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;
         }
@@ -352,8 +344,7 @@ class OperationsProposalController extends Controller
      * @param array $updated
      * @return void
      */
-    protected function indexAltnameAfterUpdate(array $original, array $updated): void
-    {
+    protected function indexAltnameAfterUpdate(array $original, array $updated): void {
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;
         }

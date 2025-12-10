@@ -5,13 +5,11 @@ namespace Tests\Unit;
 use App\User;
 use Tests\TestCase;
 
-class UserRoleTest extends TestCase
-{
+class UserRoleTest extends TestCase {
     /**
      * 测试用户角色常量定义
      */
-    public function testRoleConstants()
-    {
+    public function testRoleConstants() {
         $this->assertSame(0, User::ROLE_REGULAR);
         $this->assertSame(1, User::ROLE_EXPERT);
         $this->assertSame(2, User::ROLE_CROWDSOURCING);
@@ -21,8 +19,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试用户状态常量定义
      */
-    public function testStatusConstants()
-    {
+    public function testStatusConstants() {
         $this->assertSame(0, User::STATUS_INACTIVE);
         $this->assertSame(1, User::STATUS_ACTIVE);
         $this->assertSame(2, User::STATUS_RESERVED);
@@ -31,8 +28,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isActive() 方法
      */
-    public function testIsActive()
-    {
+    public function testIsActive() {
         $user = new User();
 
         $user->is_active = User::STATUS_INACTIVE;
@@ -48,8 +44,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isAdmin() 方法（专家或系统管理员）
      */
-    public function testIsAdmin()
-    {
+    public function testIsAdmin() {
         $user = new User();
 
         $user->is_admin = User::ROLE_REGULAR;
@@ -68,8 +63,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isExpert() 方法
      */
-    public function testIsExpert()
-    {
+    public function testIsExpert() {
         $user = new User();
 
         $user->is_admin = User::ROLE_REGULAR;
@@ -85,8 +79,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isSuperAdmin() 方法
      */
-    public function testIsSuperAdmin()
-    {
+    public function testIsSuperAdmin() {
         $user = new User();
 
         $user->is_admin = User::ROLE_EXPERT;
@@ -99,8 +92,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isCrowdsourcingUser() 方法
      */
-    public function testIsCrowdsourcingUser()
-    {
+    public function testIsCrowdsourcingUser() {
         $user = new User();
 
         $user->is_admin = User::ROLE_REGULAR;
@@ -113,8 +105,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 isRegularUser() 方法
      */
-    public function testIsRegularUser()
-    {
+    public function testIsRegularUser() {
         $user = new User();
 
         $user->is_admin = User::ROLE_REGULAR;
@@ -127,8 +118,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 canManageUsers() 方法
      */
-    public function testCanManageUsers()
-    {
+    public function testCanManageUsers() {
         $user = new User();
 
         // 未启用的专家用户
@@ -160,8 +150,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 canRestoreOperations() 方法
      */
-    public function testCanRestoreOperations()
-    {
+    public function testCanRestoreOperations() {
         $user = new User();
 
         // 未启用的专家用户
@@ -183,8 +172,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 canWriteDirectly() 方法
      */
-    public function testCanWriteDirectly()
-    {
+    public function testCanWriteDirectly() {
         $user = new User();
 
         // 未启用的一般用户
@@ -211,8 +199,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 canRunBatchImport() 方法
      */
-    public function testCanRunBatchImport()
-    {
+    public function testCanRunBatchImport() {
         $user = new User();
 
         // 未启用的专家用户
@@ -244,8 +231,7 @@ class UserRoleTest extends TestCase
     /**
      * 测试 getRoleName() 方法
      */
-    public function testGetRoleName()
-    {
+    public function testGetRoleName() {
         $user = new User();
 
         $user->is_admin = User::ROLE_REGULAR;

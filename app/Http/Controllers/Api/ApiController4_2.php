@@ -1,4 +1,5 @@
 <?php
+
 /**
  * User: ja
  * Date: 2021/01/22
@@ -7,71 +8,68 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\BiogMain;
+use App\AddrCode;
 use App\BiogAddr;
 use App\BiogAddrCode;
-use App\AddrCode;
-use App\OfficeCode;
-use App\EntryCode;
+use App\BiogMain;
+use App\Http\Controllers\Controller;
 use App\KinshipCode;
-use App\AssocCode;
-use App\Operation;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
-ini_set('memory_limit','512M');
+ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 300);
 
-class ApiController4_2 extends Controller
-{
+class ApiController4_2 extends Controller {
     use AuthenticatesUsers;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest');
     }
 
     protected function eight_Kinship($cks) {
-      $cks = str_replace('-', '', $cks);
-      $cks = substr($cks, -2); 
-      $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
-      switch ($cks) {
-        case 'BB':
-        case 'ZB':
-          //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1); 
-          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0); 
-          break;
-        case 'BZ':
-        case 'ZZ':
-          //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1);
-          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
-          break;
-        case 'SB':
-        case 'DB':
-          //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
-          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
-          break;
-        case 'SZ':
-        case 'DZ':
-          //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
-          $s = array('U'=>0,'D'=>0,'M'=>0,'C'=>0);
-          break;
+        $cks = str_replace('-', '', $cks);
+        $cks = substr($cks, -2);
+        $s = ['U' => 0,'D' => 0,'M' => 0,'C' => 0];
+        switch ($cks) {
+            case 'BB':
+            case 'ZB':
+                //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1);
+                $s = ['U' => 0,'D' => 0,'M' => 0,'C' => 0];
 
-        default:
-          return 0;
-      }
-      return $s;
+                break;
+            case 'BZ':
+            case 'ZZ':
+                //$s = array('U'=>0,'D'=>0,'M'=>0,'C'=>1);
+                $s = ['U' => 0,'D' => 0,'M' => 0,'C' => 0];
+
+                break;
+            case 'SB':
+            case 'DB':
+                //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
+                $s = ['U' => 0,'D' => 0,'M' => 0,'C' => 0];
+
+                break;
+            case 'SZ':
+            case 'DZ':
+                //$s = array('U'=>0,'D'=>1,'M'=>0,'C'=>0);
+                $s = ['U' => 0,'D' => 0,'M' => 0,'C' => 0];
+
+                break;
+
+            default:
+                return 0;
+        }
+
+        return $s;
     }
 
     protected function sub_relativesLoop($newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop) {
         //對$newdata執行迴圈
         $cks = '';
-        $sub_newdata = array();
-        $s = $checkArr = array();
+        $sub_newdata = [];
+        $s = $checkArr = [];
         $run = $run + 1;
         foreach ($rowArr as $checkVal) {
             array_push($checkArr, $checkVal['c_personid']);
@@ -98,10 +96,10 @@ class ApiController4_2 extends Controller
                 $data['c_notes'] = $val->c_notes;
                 $data['c_kinrel_simplified'] = $cks = $val2['c_kinrel_simplified'].'-'.$val->c_kinrel_simplified;
                 //在這邊增加例外判斷的函式，轉換UDMC值。
-                if(!empty($cks)) {
+                if (!empty($cks)) {
                     $s = $this->eight_Kinship($cks);
                 }
-                if(!empty($s)) {
+                if (!empty($s)) {
                     $val->c_upstep = $s['U'];
                     $val->c_dwnstep = $s['D'];
                     $val->c_marstep = $s['M'];
@@ -116,7 +114,7 @@ class ApiController4_2 extends Controller
                 $data['c_colstep'] = $val->c_colstep;
                 $data['c_marstep'] = $val->c_marstep;
                 //20210913在這裡過濾不符合四參數的親屬。
-                if($data['c_upstep'] <= $MAncGen && $data['c_dwnstep'] <= $MDecGen && $data['c_colstep'] <= $MColLink && $data['c_marstep'] <= $MMarLink) {
+                if ($data['c_upstep'] <= $MAncGen && $data['c_dwnstep'] <= $MDecGen && $data['c_colstep'] <= $MColLink && $data['c_marstep'] <= $MMarLink) {
                     array_push($rowArr, $data);
                     array_push($sub_newdata, $data);
                 }
@@ -126,60 +124,60 @@ class ApiController4_2 extends Controller
         //if(!empty($sub_newdata) || $run <= $MLoop) {
         //if($run <= $MLoop) {
         $MLoop = $MLoop - 1;
-        if($MLoop >= 1) {
+        if ($MLoop >= 1) {
             $rowArr = $this->sub_relativesLoop($sub_newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop);
+
             return $rowArr;
-        }
-        else {
+        } else {
             return $rowArr;
         }
     }
 
     //20200609製作query_relatives API 遞迴的function
     protected function relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $firstPeople, $run) {
-        $c_kin_id = $data = $firstPeopleArr = array();
-        $newdata = $newrowArr = array();
+        $c_kin_id = $data = $firstPeopleArr = [];
+        $newdata = $newrowArr = [];
         $run = $run + 1;
         //資料庫邏輯
-        for($i=0;$i<count($people);$i++) {
-          $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
-          $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
-          $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
-          $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
-          $row->where('KINSHIP_CODES.c_marstep', '<=', $MMarLink);
-          $row->where('KINSHIP_CODES.c_colstep', '<=', $MColLink);
-          $row = $row->get();
+        for ($i = 0;$i < count($people);$i++) {
+            $row = DB::table('KIN_DATA')->where('KIN_DATA.c_personid', '=', $people[$i]);
+            $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
+            $row->where('KINSHIP_CODES.c_upstep', '<=', $MAncGen);
+            $row->where('KINSHIP_CODES.c_dwnstep', '<=', $MDecGen);
+            $row->where('KINSHIP_CODES.c_marstep', '<=', $MMarLink);
+            $row->where('KINSHIP_CODES.c_colstep', '<=', $MColLink);
+            $row = $row->get();
 
-          foreach ($row as $val) {
-            array_push($c_kin_id, $val->c_kin_id);
-            array_push($firstPeopleArr, $firstPeople[$i]);
-            $data['firstId'] = $firstPeople[$i];
-            $data['run'] = $run;
-            $data['c_personid'] = $val->c_personid;
-            $data['c_kin_id'] = $newC_kin_id = $val->c_kin_id;
-            $data['c_kin_code'] = $val->c_kin_code;
-            $data['c_notes'] = $val->c_notes;
-            $data['c_kinrel_simplified'] = $val->c_kinrel_simplified;
-            $data['c_tot_up'] = $newMAncGen = $MAncGen - $val->c_upstep + $val->c_dwnstep;
-            $data['c_tot_dwn'] = $newMDecGen = $MDecGen - $val->c_dwnstep + $val->c_upstep;
-            $data['c_tot_col'] = $newMColLink = $MColLink - $val->c_colstep;
-            $data['c_tot_mar'] = $newMMarLink = $MMarLink - $val->c_marstep;
-            $data['c_upstep'] = $val->c_upstep;
-            $data['c_dwnstep'] = $val->c_dwnstep;
-            $data['c_colstep'] = $val->c_colstep;
-            $data['c_marstep'] = $val->c_marstep;
-            array_push($rowArr, $data);
-            array_push($newdata, $data);
-          }
+            foreach ($row as $val) {
+                array_push($c_kin_id, $val->c_kin_id);
+                array_push($firstPeopleArr, $firstPeople[$i]);
+                $data['firstId'] = $firstPeople[$i];
+                $data['run'] = $run;
+                $data['c_personid'] = $val->c_personid;
+                $data['c_kin_id'] = $newC_kin_id = $val->c_kin_id;
+                $data['c_kin_code'] = $val->c_kin_code;
+                $data['c_notes'] = $val->c_notes;
+                $data['c_kinrel_simplified'] = $val->c_kinrel_simplified;
+                $data['c_tot_up'] = $newMAncGen = $MAncGen - $val->c_upstep + $val->c_dwnstep;
+                $data['c_tot_dwn'] = $newMDecGen = $MDecGen - $val->c_dwnstep + $val->c_upstep;
+                $data['c_tot_col'] = $newMColLink = $MColLink - $val->c_colstep;
+                $data['c_tot_mar'] = $newMMarLink = $MMarLink - $val->c_marstep;
+                $data['c_upstep'] = $val->c_upstep;
+                $data['c_dwnstep'] = $val->c_dwnstep;
+                $data['c_colstep'] = $val->c_colstep;
+                $data['c_marstep'] = $val->c_marstep;
+                array_push($rowArr, $data);
+                array_push($newdata, $data);
+            }
         }
         //這邊判斷$newdata是否有值，有的則繼續遞迴。
         //if(!empty($newdata)) {
         $MLoop = $MLoop - 1;
-        if($MLoop >= 1) {
-            $rowArr = $this->sub_relativesLoop($newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop); 
+        if ($MLoop >= 1) {
+            $rowArr = $this->sub_relativesLoop($newdata, $rowArr, $run, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop);
+
             return $rowArr;
-        }
-        else {
+        } else {
             return $rowArr;
         }
     }
@@ -188,35 +186,45 @@ class ApiController4_2 extends Controller
     protected function query_relatives(Request $request) {
         $json = $request['RequestPayload'];
         $arr = json_decode($json, true);
-        $people = $mCircleArr = $data = $dataV = $rowArr = array();
-        $k_addr_id_Arr = array();
+        $people = $mCircleArr = $data = $dataV = $rowArr = [];
+        $k_addr_id_Arr = [];
         $mCircle = $MAncGen = $MDecGen = $MColLink = $MMarLink = $MLoop = $outputSchema = $run = $start = $list = 0;
-        
+
         $people = $arr['people'];
-        $mCircle = $arr['mCircle']; 
+        $mCircle = $arr['mCircle'];
         $MAncGen = $arr['MAncGen'];
-        $MDecGen = $arr['MDecGen']; 
+        $MDecGen = $arr['MDecGen'];
         $MColLink = $arr['MColLink'];
-        $MMarLink = $arr['MMarLink']; 
+        $MMarLink = $arr['MMarLink'];
         $MLoop = $arr['MLoop'];
         //20211015增加outputSchema，1代表對返回的數據進行彙整，使每個人物都能指向查詢式提交的“中心人物”。0 代表直接返回數據庫中的人物關係，不做彙整。
-        if(!empty($arr['outputSchema'])) { $outputSchema = $arr['outputSchema']; }
+        if (!empty($arr['outputSchema'])) {
+            $outputSchema = $arr['outputSchema'];
+        }
 
         $debugMode = 0;
-        if(!empty($arr['debugMode'])) { $debugMode = $arr['debugMode']; }
-
-        if(!empty($arr['start'])) { 
-            if($arr['start'] <= 0) { $start = 0; } // 避免start為負數
-            else { $start = $arr['start'] - 1; } // return輸出由1開始, 程式需由0開始.
+        if (!empty($arr['debugMode'])) {
+            $debugMode = $arr['debugMode'];
         }
-        else { $start = 0; }
 
-        if(!empty($arr['list'])) {
+        if (!empty($arr['start'])) {
+            if ($arr['start'] <= 0) {
+                $start = 0;
+            } // 避免start為負數
+            else {
+                $start = $arr['start'] - 1;
+            } // return輸出由1開始, 程式需由0開始.
+        } else {
+            $start = 0;
+        }
+
+        if (!empty($arr['list'])) {
             $list = $arr['list'];
+        } else {
+            $list = 10000;
         }
-        else { $list = 10000; }
 
-        if($mCircle) {
+        if ($mCircle) {
             //資料庫邏輯
             $row = DB::table('KIN_DATA')->whereIn('KIN_DATA.c_personid', $people);
             $row->join('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code');
@@ -230,7 +238,7 @@ class ApiController4_2 extends Controller
             $row->whereIn('KIN_DATA.c_kin_code', $mCircleArr);
             $row = $row->get();
             $total = count($row);
-            if($list) {
+            if ($list) {
                 $row = $row->slice($start, $list);
             }
             foreach ($row as $val) {
@@ -242,12 +250,13 @@ class ApiController4_2 extends Controller
                 array_push($rowArr, $dataV);
             }
             $row = $rowArr;
-        }
-        else {
+        } else {
             $row = $this->relativesLoop($people, $MAncGen, $MDecGen, $MColLink, $MMarLink, $MLoop, $rowArr, $people, $run);
             $total = count($row);
             //20210126增加除錯模式的資料輸出
-            if($debugMode) { return $row; }
+            if ($debugMode) {
+                return $row;
+            }
         }
 
         //預先組合計算用的資料
@@ -255,70 +264,68 @@ class ApiController4_2 extends Controller
             //這裡是查詢親屬關係目標人物人物的[地址]BIOG_ADDR_DATA
             $k_addr_type = $k_addr_id = 0;
             $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$KBiogAddr) {
+            if (!$KBiogAddr) {
                 $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->first();
             }
-            if($KBiogAddr) {
+            if ($KBiogAddr) {
                 $k_addr_type = $KBiogAddr->c_addr_type;
                 $k_addr_id = $KBiogAddr->c_addr_id;
             }
             $KAddrCode = AddrCode::where('c_addr_id', '=', $k_addr_id)->first();
-            
+
             array_push($k_addr_id_Arr, $k_addr_id.'-'.$KAddrCode->c_name_chn);
         }
         $answer = array_count_values($k_addr_id_Arr);
         //return $answer;
-        
+
         //組合輸出資料
         foreach ($row as $val) {
-            if($outputSchema == 1) {
-              $FirstBiogMain = BiogMain::where('c_personid', '=', $val['firstId'])->first();
-              $data_val['rId'] = $val['firstId'];
-              $data_val['rName'] = $FirstBiogMain->c_name;
-              $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
+            if ($outputSchema == 1) {
+                $FirstBiogMain = BiogMain::where('c_personid', '=', $val['firstId'])->first();
+                $data_val['rId'] = $val['firstId'];
+                $data_val['rName'] = $FirstBiogMain->c_name;
+                $data_val['rNameChn'] = $FirstBiogMain->c_name_chn;
             }
-            if($outputSchema == 0) {
-              $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
-              if($BiogMain) {
-                $data_val['pId'] = $val['c_personid'];
-                $data_val['pName'] = $BiogMain->c_name;
-                $data_val['pNameChn'] = $BiogMain->c_name_chn;
-              }
-              else {
-                $data_val['pId'] = $val['c_personid'];
-                $data_val['pName'] = '';
-                $data_val['pNameChn'] = '';
-              }
-              //這裡是查詢人物的[地址]BIOG_ADDR_DATA
-              $c_addr_type = $c_addr_id = 0;
-              $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-              if(!$BiogAddr) {
-                $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->first();
-              }
-              if($BiogAddr) {
-                $c_addr_type = $BiogAddr->c_addr_type;
-                $c_addr_id = $BiogAddr->c_addr_id;
-              }
-              $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first(); 
-              $data_val['pAddrID'] = $c_addr_id;
-              $data_val['pAddrType'] = $BiogAddrCode->c_addr_desc;
-              $data_val['pAddrTypeChn'] = $BiogAddrCode->c_addr_desc_chn;
-              $AddrCode = AddrCode::where('c_addr_id', '=', $c_addr_id)->first();
-              $data_val['pAddrName'] = $AddrCode->c_name;
-              $data_val['pAddrNameChn'] = $AddrCode->c_name_chn;
-              $data_val['pX'] = $AddrCode->x_coord;
-              $data_val['pY'] = $AddrCode->y_coord;
+            if ($outputSchema == 0) {
+                $BiogMain = BiogMain::where('c_personid', '=', $val['c_personid'])->first();
+                if ($BiogMain) {
+                    $data_val['pId'] = $val['c_personid'];
+                    $data_val['pName'] = $BiogMain->c_name;
+                    $data_val['pNameChn'] = $BiogMain->c_name_chn;
+                } else {
+                    $data_val['pId'] = $val['c_personid'];
+                    $data_val['pName'] = '';
+                    $data_val['pNameChn'] = '';
+                }
+                //這裡是查詢人物的[地址]BIOG_ADDR_DATA
+                $c_addr_type = $c_addr_id = 0;
+                $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
+                if (!$BiogAddr) {
+                    $BiogAddr = BiogAddr::where('c_personid', '=', $val['c_personid'])->first();
+                }
+                if ($BiogAddr) {
+                    $c_addr_type = $BiogAddr->c_addr_type;
+                    $c_addr_id = $BiogAddr->c_addr_id;
+                }
+                $BiogAddrCode = BiogAddrCode::where('c_addr_type', '=', $c_addr_type)->first();
+                $data_val['pAddrID'] = $c_addr_id;
+                $data_val['pAddrType'] = $BiogAddrCode->c_addr_desc;
+                $data_val['pAddrTypeChn'] = $BiogAddrCode->c_addr_desc_chn;
+                $AddrCode = AddrCode::where('c_addr_id', '=', $c_addr_id)->first();
+                $data_val['pAddrName'] = $AddrCode->c_name;
+                $data_val['pAddrNameChn'] = $AddrCode->c_name_chn;
+                $data_val['pX'] = $AddrCode->x_coord;
+                $data_val['pY'] = $AddrCode->y_coord;
             }
 
             $KinBiogMain = BiogMain::where('c_personid', '=', $val['c_kin_id'])->first();
-            if($KinBiogMain) {
+            if ($KinBiogMain) {
                 $data_val['Id'] = $val['c_kin_id'];
                 $data_val['Name'] = $KinBiogMain->c_name;
                 $data_val['NameChn'] = $KinBiogMain->c_name_chn;
                 $data_val['Sex'] = $KinBiogMain->c_female ? '1-女' : '0-男';
                 $data_val['IndexYear'] = $KinBiogMain->c_index_year;
-            }
-            else {
+            } else {
                 $data_val['Id'] = $val['c_kin_id'];
                 $data_val['Name'] = '';
                 $data_val['NameChn'] = '';
@@ -328,13 +335,13 @@ class ApiController4_2 extends Controller
 
             $KinshipCode = KinshipCode::where('c_kincode', '=', $val['c_kin_code'])->first();
 
-            if($outputSchema == 0) {
-              $data_val['pkinship'] = $KinshipCode->c_kinrel_chn;
+            if ($outputSchema == 0) {
+                $data_val['pkinship'] = $KinshipCode->c_kinrel_chn;
             }
 
             $rKinshipCodeNum = 0;
             $rKinship = DB::table('KIN_DATA')->where('c_personid', '=', $val['firstId'])->where('c_kin_id', '=', $val['c_kin_id'])->get();
-            if($rKinship) {
+            if ($rKinship) {
                 foreach ($rKinship as $val2) {
                     $rKinshipCodeNum = $val2->c_kin_code;
                 }
@@ -342,8 +349,8 @@ class ApiController4_2 extends Controller
 
             $rKinshipCode = KinshipCode::where('c_kincode', '=', $rKinshipCodeNum)->first();
 
-            if($outputSchema == 1) {
-              $data_val['rKinship'] = $rKinshipCode->c_kinrel_chn;
+            if ($outputSchema == 1) {
+                $data_val['rKinship'] = $rKinshipCode->c_kinrel_chn;
             }
 
             $data_val['up'] = $KinshipCode->c_upstep;
@@ -353,10 +360,10 @@ class ApiController4_2 extends Controller
             //這裡是查詢親屬關係目標人物人物的[地址]BIOG_ADDR_DATA
             $k_addr_type = $k_addr_id = 0;
             $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$KBiogAddr) {
+            if (!$KBiogAddr) {
                 $KBiogAddr = BiogAddr::where('c_personid', '=', $val['c_kin_code'])->first();
             }
-            if($KBiogAddr) {
+            if ($KBiogAddr) {
                 $k_addr_type = $KBiogAddr->c_addr_type;
                 $k_addr_id = $KBiogAddr->c_addr_id;
             }
@@ -373,26 +380,26 @@ class ApiController4_2 extends Controller
             //這裡是查詢中心人物的[地址]BIOG_ADDR_DATA
             $r_addr_type = $r_addr_id = 0;
             $RBiogAddr = BiogAddr::where('c_personid', '=', $val['firstId'])->whereIn('c_addr_type', [1, 16, 6, 4, 2, 13, 14, 17])->first();
-            if(!$RBiogAddr) {
+            if (!$RBiogAddr) {
                 $RBiogAddr = BiogAddr::where('c_personid', '=', $val['firstId'])->first();
             }
-            if($RBiogAddr) {
+            if ($RBiogAddr) {
                 $r_addr_type = $RBiogAddr->c_addr_type;
                 $r_addr_id = $RBiogAddr->c_addr_id;
             }
             $RAddrCode = AddrCode::where('c_addr_id', '=', $r_addr_id)->first();
-            if($outputSchema == 0) {
-              $data_val['pDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $AddrCode->x_coord, $AddrCode->y_coord);
+            if ($outputSchema == 0) {
+                $data_val['pDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $AddrCode->x_coord, $AddrCode->y_coord);
             }
-            if($outputSchema == 1) {
-              $data_val['rDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $RAddrCode->x_coord, $RAddrCode->y_coord);
+            if ($outputSchema == 1) {
+                $data_val['rDistance'] = $this->getdizhi($KAddrCode->x_coord, $KAddrCode->y_coord, $RAddrCode->x_coord, $RAddrCode->y_coord);
             }
 
-            $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn]; 
+            $data_val['xy_count'] = $answer[$k_addr_id.'-'.$KAddrCode->c_name_chn];
             $data_val['Notes'] = $val['c_notes'];
 
             //增列判斷$outputSchema值的輸出欄位
-            if($outputSchema == 1) {
+            if ($outputSchema == 1) {
                 $c_kinrel_simplified = $c_kinrel = '';
                 $c_kinrel_simplified = str_replace('-', '', $val['c_kinrel_simplified']);
                 $c_kinrel = KinshipCode::where('c_kinrel_simplified', '=', $c_kinrel_simplified)->first();
@@ -405,12 +412,15 @@ class ApiController4_2 extends Controller
         }
 
         $ans['total'] = $total;
-        if(isset($start)) { $ans['start'] = (int)$start + 1; } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
-        if(isset($list) && $list >= 0) {
+        if (isset($start)) {
+            $ans['start'] = (int)$start + 1;
+        } // return輸出由1開始, 程式需由0開始, 這裡把1加回.
+        if (isset($list) && $list >= 0) {
             $ans['end'] = (int)$list + (int)$start;
-            if($ans['end'] > $ans['total']) { $ans['end'] = $ans['total']; }
-        }
-        else {
+            if ($ans['end'] > $ans['total']) {
+                $ans['end'] = $ans['total'];
+            }
+        } else {
             $ans['end'] = (int)$total;
         }
         $ans['data'] = $data;
@@ -419,7 +429,7 @@ class ApiController4_2 extends Controller
         //return $row;
     }
 
-    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit=2, $decimal=2){
+    protected function getdizhi($longitude1, $latitude1, $longitude2, $latitude2, $unit = 2, $decimal = 2) {
         /*
         * 計算兩點地理座標之間的距離
         * @param  Decimal $longitude1 起點經度
@@ -438,17 +448,18 @@ class ApiController4_2 extends Controller
         $radLat2 = $latitude2 * $PI / 180.0;
 
         $radLng1 = $longitude1 * $PI / 180.0;
-        $radLng2 = $longitude2 * $PI /180.0;
+        $radLng2 = $longitude2 * $PI / 180.0;
 
         $a = $radLat1 - $radLat2;
         $b = $radLng1 - $radLng2;
 
-        $distance = 2 * asin(sqrt(pow(sin($a/2),2) + cos($radLat1) * cos($radLat2) * pow(sin($b/2),2)));
+        $distance = 2 * asin(sqrt(pow(sin($a / 2), 2) + cos($radLat1) * cos($radLat2) * pow(sin($b / 2), 2)));
         $distance = $distance * $EARTH_RADIUS * 1000;
 
-        if($unit==2){
+        if ($unit == 2) {
             $distance = $distance / 1000;
         }
+
         return round($distance, $decimal);
     }
 }

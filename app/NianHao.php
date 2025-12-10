@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class NianHao extends Model
-{
+class NianHao extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -27,18 +26,15 @@ class NianHao extends Model
      */
     protected $guarded = [];
 
-    public function birthYearNHs()
-    {
+    public function birthYearNHs() {
         return $this->hasMany('App\BiogMain', 'c_nianhao_id', 'c_by_nh_code');
     }
 
-    public function deathYearNHs()
-    {
+    public function deathYearNHs() {
         return $this->hasMany('App\BiogMain', 'c_nianhao_id', 'c_dy_nh_code');
     }
 
-    public function dynasty()
-    {
+    public function dynasty() {
         return $this->belongsTo('App\Dynasty', 'c_dy', 'c_dy');
     }
 }

@@ -3,19 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Services\NameFtsProgressService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use ReflectionClass;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-use ReflectionClass;
-use Carbon\Carbon;
 
-class CbdbTableMaintenanceController extends Controller
-{
+class CbdbTableMaintenanceController extends Controller {
     protected $tables = [
         'CBDB__TRAD_SIMP_MAP' => [
             'name' => 'CBDB__TRAD_SIMP_MAP',
@@ -35,19 +34,18 @@ class CbdbTableMaintenanceController extends Controller
         ],
     ];
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
                 abort(403, '此功能僅限活躍管理員使用');
             }
+
             return $next($request);
         });
     }
 
-    public function index(Request $request)
-    {
+    public function index(Request $request) {
         // 獲取各表的統計信息
         $stats = [];
         foreach ($this->tables as $tableName => $tableInfo) {
@@ -73,8 +71,7 @@ class CbdbTableMaintenanceController extends Controller
         ]);
     }
 
-    public function rebuild(Request $request)
-    {
+    public function rebuild(Request $request) {
         $tableName = $request->input('table_name');
 
         if (!isset($this->tables[$tableName])) {
@@ -148,7 +145,7 @@ class CbdbTableMaintenanceController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'message' => "重建完成！資料表現有 " . number_format($count) . " 筆記錄"
+                    'message' => "重建完成！資料表現有 " . number_format($count) . " 筆記錄",
                 ]);
             }
 
@@ -159,35 +156,33 @@ class CbdbTableMaintenanceController extends Controller
                 'command' => $command,
                 'params' => isset($params) ? $params : [],
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => '重建失敗：' . $e->getMessage()
+                'message' => '重建失敗：' . $e->getMessage(),
             ], 500);
         }
     }
 
-    public function getNameFtsProgress($taskId)
-    {
+    public function getNameFtsProgress($taskId) {
         $data = NameFtsProgressService::get($taskId);
 
         if (!$data) {
             return response()->json([
                 'success' => false,
-                'message' => '找不到對應的重建任務'
+                'message' => '找不到對應的重建任務',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'progress' => $data
+            'progress' => $data,
         ]);
     }
 
-    protected function logOperation($operation, $tableName, $count = null, $additionalData = [])
-    {
+    protected function logOperation($operation, $tableName, $count = null, $additionalData = []) {
         $logData = [
             'operation' => $operation,
             'table_name' => $tableName,
@@ -216,8 +211,7 @@ class CbdbTableMaintenanceController extends Controller
      * @param  array   $params
      * @return array{int,string}
      */
-    protected function runConsoleCommand(string $command, array $params = []): array
-    {
+    protected function runConsoleCommand(string $command, array $params = []): array {
         $artisanApplication = $this->resolveArtisanApplication();
         $symfonyCommand = $artisanApplication->find($command);
 
@@ -232,8 +226,7 @@ class CbdbTableMaintenanceController extends Controller
     /**
      * 將表單輸入參數轉換成 Symfony ArrayInput 所需格式，強制指定 command 索引鍵。
      */
-    protected function formatConsoleParameters(string $command, array $params = []): array
-    {
+    protected function formatConsoleParameters(string $command, array $params = []): array {
         $formatted = ['command' => $command];
 
         foreach ($params as $key => $value) {
@@ -243,8 +236,7 @@ class CbdbTableMaintenanceController extends Controller
         return $formatted;
     }
 
-    protected function resolveArtisanApplication()
-    {
+    protected function resolveArtisanApplication() {
         $kernel = Artisan::getFacadeRoot();
 
         if (method_exists($kernel, 'getArtisan')) {
@@ -259,8 +251,7 @@ class CbdbTableMaintenanceController extends Controller
         throw new \RuntimeException('Unable to resolve Artisan console application instance.');
     }
 
-    protected function startNameFtsRebuildTask(string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
-    {
+    protected function startNameFtsRebuildTask(string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo) {
         $taskId = 'cbdb_name_fts_' . time() . '_' . Auth::id();
         $params['--task-id'] = $taskId;
         $meta = [
@@ -288,12 +279,11 @@ class CbdbTableMaintenanceController extends Controller
         return response()->json([
             'success' => true,
             'task_id' => $taskId,
-            'message' => '已啟動姓名索引重建，請透過進度條查看最新狀態。'
+            'message' => '已啟動姓名索引重建，請透過進度條查看最新狀態。',
         ]);
     }
 
-    protected function executeNameFtsRebuildTask(string $taskId, string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo)
-    {
+    protected function executeNameFtsRebuildTask(string $taskId, string $command, string $tableName, array $params, bool $truncate, $idFrom, $idTo) {
         try {
             NameFtsProgressService::update($taskId, 10, '正在準備執行 Artisan 指令…', 'running');
             [$exitCode, $outputStr] = $this->runConsoleCommand($command, $params);
@@ -330,9 +320,8 @@ class CbdbTableMaintenanceController extends Controller
                 'params' => $params,
                 'task_id' => $taskId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
-
 }

@@ -7,8 +7,7 @@
 
 namespace App;
 
-class Pinyin
-{
+class Pinyin {
     //中文字符串
     private static $string = '';
     //拼音
@@ -17,7 +16,7 @@ class Pinyin
     //短拼音
     private static $short_pinyin = '';
     //單個漢字拼音的字典
-    private static $dic = array(
+    private static $dic = [
         '腌' => 'yan',
         '嗄' => 'a',
         '迫' => 'po',
@@ -6953,18 +6952,16 @@ class Pinyin
         '螗' => 'tang',
         '螵' => 'piao',
         '蟛' => 'peng',
-    );
-
+    ];
 
     /**
      * 字符串拆分成單個字的數組
      * @param $string
      * @return array
      */
-    private static function mbStringToArray($string)
-    {
-        $stop   = mb_strlen($string, 'utf-8');
-        $result = array();
+    private static function mbStringToArray($string) {
+        $stop = mb_strlen($string, 'utf-8');
+        $result = [];
 
         for ($idx = 0; $idx < $stop; $idx++) {
             $result[] = mb_substr($string, $idx, 1, 'utf-8');
@@ -6978,12 +6975,11 @@ class Pinyin
      * @param $string
      * @param $encoding
      */
-    private static function chineseToPinyin($string, $encoding)
-    {
-        $words              = self::mbStringToArray(mb_convert_encoding($string, 'utf-8', $encoding));
-        self::$string       = $string;
-        self::$encoding     = $encoding;
-        self::$pinyin       = '';
+    private static function chineseToPinyin($string, $encoding) {
+        $words = self::mbStringToArray(mb_convert_encoding($string, 'utf-8', $encoding));
+        self::$string = $string;
+        self::$encoding = $encoding;
+        self::$pinyin = '';
         self::$short_pinyin = '';
         foreach ($words as $v) {
             if (isset(self::$dic[$v])) {
@@ -7002,11 +6998,11 @@ class Pinyin
      * @param string $encoding
      * @return string
      */
-    public static function getPinyin($string, $encoding = 'utf-8')
-    {
+    public static function getPinyin($string, $encoding = 'utf-8') {
         if ($string != self::$string || $encoding != self::$encoding) {
             self::chineseToPinyin($string, $encoding);
         }
+
         return self::$pinyin;
     }
 
@@ -7016,13 +7012,11 @@ class Pinyin
      * @param string $encoding
      * @return string
      */
-    public static function getShortPinyin($string, $encoding = 'utf-8')
-    {
+    public static function getShortPinyin($string, $encoding = 'utf-8') {
         if ($string != self::$string || $encoding != self::$encoding) {
             self::chineseToPinyin($string, $encoding);
         }
+
         return self::$short_pinyin;
     }
-
-
 }

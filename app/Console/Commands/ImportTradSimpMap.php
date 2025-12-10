@@ -7,8 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
-class ImportTradSimpMap extends Command
-{
+class ImportTradSimpMap extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -32,10 +31,10 @@ class ImportTradSimpMap extends Command
      *
      * @return int
      */
-    public function handle()
-    {
+    public function handle() {
         if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
             $this->error('資料表 CBDB__TRAD_SIMP_MAP 不存在，請先執行 migrations。');
+
             return 1;
         }
 
@@ -59,12 +58,14 @@ class ImportTradSimpMap extends Command
         } catch (\Throwable $e) {
             @unlink($tempPath);
             $this->logError('下載失敗：' . $e->getMessage());
+
             return 1;
         }
 
         if ($contents === false) {
             @unlink($tempPath);
             $this->logError('無法下載 OpenCC 對照檔。');
+
             return 1;
         }
 
@@ -75,6 +76,7 @@ class ImportTradSimpMap extends Command
         if (!$handle) {
             @unlink($tempPath);
             $this->logError('無法讀取暫存檔案。');
+
             return 1;
         }
 
@@ -108,6 +110,7 @@ class ImportTradSimpMap extends Command
                         $line
                     ));
                 }
+
                 continue;
             }
 
@@ -124,6 +127,7 @@ class ImportTradSimpMap extends Command
                             $this->describeChar($simp)
                         ));
                     }
+
                     continue;
                 }
                 if ($nonBmpSeen <= 5) {
@@ -143,6 +147,7 @@ class ImportTradSimpMap extends Command
 
         if (empty($records)) {
             $this->logError('未解析到任何對照資料。');
+
             return 1;
         }
 
@@ -200,6 +205,7 @@ class ImportTradSimpMap extends Command
                             count($batch),
                             $e->getMessage()
                         ));
+
                         throw $e;
                     }
                 }
@@ -218,6 +224,7 @@ class ImportTradSimpMap extends Command
                         count($batch),
                         $e->getMessage()
                     ));
+
                     throw $e;
                 }
             }
@@ -242,8 +249,7 @@ class ImportTradSimpMap extends Command
         return 0;
     }
 
-    protected function normalizeChar($value): ?string
-    {
+    protected function normalizeChar($value): ?string {
         if ($value === null) {
             return null;
         }
@@ -262,31 +268,27 @@ class ImportTradSimpMap extends Command
         return $char;
     }
 
-    protected function isNonBmp(string $char): bool
-    {
+    protected function isNonBmp(string $char): bool {
         return strlen(mb_convert_encoding($char, 'UTF-8')) > 3;
     }
 
-    protected function describeChar(string $char): string
-    {
+    protected function describeChar(string $char): string {
         $hex = strtoupper(bin2hex($char));
+
         return sprintf("%s (U+%s)", $char, $hex);
     }
 
-    protected function logInfo(string $message): void
-    {
+    protected function logInfo(string $message): void {
         Log::info('[cbdb:import-trad-simp-map] ' . $message);
         $this->info($message);
     }
 
-    protected function logWarn(string $message): void
-    {
+    protected function logWarn(string $message): void {
         Log::warning('[cbdb:import-trad-simp-map] ' . $message);
         $this->warn($message);
     }
 
-    protected function logError(string $message): void
-    {
+    protected function logError(string $message): void {
         Log::error('[cbdb:import-trad-simp-map] ' . $message);
         $this->error($message);
     }

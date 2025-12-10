@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Http\Request;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,7 +18,7 @@ Route::group([], function () {
     Route::match(['get', 'post'], 'name', 'Api\NameController@index');
 });
 
-Route::group(['prefix' => 'select'], function (){
+Route::group(['prefix' => 'select'], function () {
     Route::get('ethnicity', 'ApiController@ethnicity');
     Route::get('choronym', 'ApiController@choronym');
     Route::get('dynasty', 'ApiController@dynasty');
@@ -42,7 +41,7 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('occasion', 'ApiController@occasion');
 });
 
-Route::group(['prefix' => 'select'], function (){
+Route::group(['prefix' => 'select'], function () {
     Route::get('search/addr', 'ApiController@searchAddr');
     Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');
@@ -63,18 +62,18 @@ Route::group(['prefix' => 'select'], function (){
     Route::get('search/pinyin', 'ApiController@searchPinyin');
 });
 
-Route::group(['prefix' => 'code'], function (){
+Route::group(['prefix' => 'code'], function () {
     Route::get('addr', 'ApiController@codeAddr');
 });
 
 Route::middleware('guest')->post('v1/user/login', 'Api\LoginController@login');
-Route::group(['prefix' => 'v1', 'middleware' => ['auth:api']], function (){
+Route::group(['prefix' => 'v1', 'middleware' => ['auth:api']], function () {
     Route::resource('biog', 'Api\BiogMainController');
     Route::resource('biog.addr', 'Api\BiogAddressController');
 });
 
 //20181105建安新增
-Route::group(['prefix' => 'v1'], function (){
+Route::group(['prefix' => 'v1'], function () {
     Route::get('biog', 'ApiController@searchC_presonid');
     Route::get('add', 'ApiController@addC_presonid');
     Route::get('update', 'ApiController@updateC_presonid');
@@ -82,68 +81,68 @@ Route::group(['prefix' => 'v1'], function (){
     Route::get('user', 'ApiController@userC_presonid');
 });
 
-Route::group(['prefix' => 'operations'], function (){
+Route::group(['prefix' => 'operations'], function () {
     Route::match(['get', 'post'], 'token', 'Api\OperationsController@token');
     Route::post('add', 'Api\OperationsController@add');
     Route::post('update', 'Api\OperationsController@update');
     Route::post('delete', 'Api\OperationsController@del');
 });
 
-Route::group(['prefix' => 'OFFICE_CODES'], function (){
+Route::group(['prefix' => 'OFFICE_CODES'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_CODES');
 });
-Route::group(['prefix' => 'OFFICE_CODE_TYPE_REL'], function (){
+Route::group(['prefix' => 'OFFICE_CODE_TYPE_REL'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_CODE_TYPE_REL');
 });
-Route::group(['prefix' => 'OFFICE_TYPE_TREE'], function (){
+Route::group(['prefix' => 'OFFICE_TYPE_TREE'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@OFFICE_TYPE_TREE');
 });
 
-Route::group(['prefix' => '/post_list'], function (){
+Route::group(['prefix' => '/post_list'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@post_list');
 });
-Route::group(['prefix' => '/entry_list'], function (){
+Route::group(['prefix' => '/entry_list'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list');
 });
-Route::group(['prefix' => '/place_list'], function (){
+Route::group(['prefix' => '/place_list'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@place_list');
 });
-Route::group(['prefix' => '/place_belongs_to'], function (){
+Route::group(['prefix' => '/place_belongs_to'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@place_belongs_to');
 });
-Route::group(['prefix' => '/office_list_by_name'], function (){
+Route::group(['prefix' => '/office_list_by_name'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@office_list_by_name');
 });
-Route::group(['prefix' => '/entry_list_by_name'], function (){
+Route::group(['prefix' => '/entry_list_by_name'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController@entry_list_by_name');
 });
-Route::group(['prefix' => '/query_office_postings'], function (){
+Route::group(['prefix' => '/query_office_postings'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController2@query_office_postings');
 });
-Route::group(['prefix' => '/query_entry_postings'], function (){
+Route::group(['prefix' => '/query_entry_postings'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController3@query_entry_postings');
 });
-Route::group(['prefix' => '/query_relatives'], function (){
+Route::group(['prefix' => '/query_relatives'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController4@query_relatives');
 });
-Route::group(['prefix' => '/query_relatives_1'], function (){
+Route::group(['prefix' => '/query_relatives_1'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController4_1@query_relatives');
 });
-Route::group(['prefix' => '/query_relatives_2'], function (){
+Route::group(['prefix' => '/query_relatives_2'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController4_2@query_relatives');
 });
-Route::group(['prefix' => '/get_assoc'], function (){
+Route::group(['prefix' => '/get_assoc'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController5@get_assoc');
 });
-Route::group(['prefix' => '/find_assoc'], function (){
+Route::group(['prefix' => '/find_assoc'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController5@find_assoc');
 });
-Route::group(['prefix' => '/query_associates'], function (){
+Route::group(['prefix' => '/query_associates'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController5@query_associates');
 });
-Route::group(['prefix' => '/query_place'], function (){
+Route::group(['prefix' => '/query_place'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController6@query_place');
 });
-Route::group(['prefix' => '/query_assoc_network'], function (){
+Route::group(['prefix' => '/query_assoc_network'], function () {
     Route::match(['get', 'post'], '/', 'Api\ApiController7@query_assoc_network');
 });

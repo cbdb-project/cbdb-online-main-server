@@ -6,10 +6,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class CbdbApiPersonTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class CbdbApiPersonTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -272,8 +270,7 @@ class CbdbApiPersonTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('BIOG_TEXT_DATA');
         Schema::dropIfExists('TEXT_ROLE_CODES');
         Schema::dropIfExists('ASSOC_DATA');
@@ -309,8 +306,7 @@ class CbdbApiPersonTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_returns_person_profile(): void
-    {
+    public function test_it_returns_person_profile(): void {
         $this->seedPersonFixture();
 
         $response = $this->getJson('/cbdbapi/person.php?id=1001&o=json');
@@ -345,8 +341,7 @@ class CbdbApiPersonTest extends TestCase
         }
     }
 
-    public function test_it_renders_html_page(): void
-    {
+    public function test_it_renders_html_page(): void {
         $this->seedPersonFixture();
 
         $response = $this->get('/cbdbapi/person.php?id=1001');
@@ -355,15 +350,13 @@ class CbdbApiPersonTest extends TestCase
         $response->assertSee('person-content');
     }
 
-    public function test_validation_error_when_id_missing(): void
-    {
+    public function test_validation_error_when_id_missing(): void {
         $response = $this->getJson('/cbdbapi/person.php?o=json');
 
         $response->assertStatus(422);
     }
 
-    public function test_not_found_returns_404(): void
-    {
+    public function test_not_found_returns_404(): void {
         $response = $this->getJson('/cbdbapi/person.php?id=999999&o=json');
 
         $response->assertStatus(404)
@@ -374,8 +367,7 @@ class CbdbApiPersonTest extends TestCase
             ]);
     }
 
-    public function test_not_found_returns_merge_hint_when_person_was_merged(): void
-    {
+    public function test_not_found_returns_merge_hint_when_person_was_merged(): void {
         $this->seedPersonFixture();
 
         \DB::table('MERGED_PERSON_DATA')->insert([
@@ -393,8 +385,7 @@ class CbdbApiPersonTest extends TestCase
             ->assertJsonFragment(['reason' => 'Duplicate record merged']);
     }
 
-    public function test_it_returns_person_profile_by_name(): void
-    {
+    public function test_it_returns_person_profile_by_name(): void {
         $this->seedPersonFixture();
 
         $response = $this->getJson('/cbdbapi/person.php?name=張三&o=json');
@@ -404,8 +395,7 @@ class CbdbApiPersonTest extends TestCase
         $this->assertSame('1001', data_get($data, 'Package.PersonAuthority.PersonInfo.Person.BasicInfo.PersonId'));
     }
 
-    public function test_it_returns_person_profile_by_alt_name(): void
-    {
+    public function test_it_returns_person_profile_by_alt_name(): void {
         $this->seedPersonFixture();
 
         $response = $this->getJson('/cbdbapi/person.php?name=子敬&o=json');
@@ -415,8 +405,7 @@ class CbdbApiPersonTest extends TestCase
         $this->assertSame('1001', data_get($data, 'Package.PersonAuthority.PersonInfo.Person.BasicInfo.PersonId'));
     }
 
-    public function test_html_request_with_name_shows_results(): void
-    {
+    public function test_html_request_with_name_shows_results(): void {
         $this->seedPersonFixture();
 
         $response = $this->get('/cbdbapi/person.php?name=張三');
@@ -426,8 +415,7 @@ class CbdbApiPersonTest extends TestCase
         $response->assertSee('張三');
     }
 
-    public function test_name_lookup_not_found_returns_404(): void
-    {
+    public function test_name_lookup_not_found_returns_404(): void {
         $this->seedPersonFixture();
 
         $response = $this->getJson('/cbdbapi/person.php?name=不存在的人&o=json');
@@ -435,8 +423,7 @@ class CbdbApiPersonTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_html_request_with_name_not_found_shows_message(): void
-    {
+    public function test_html_request_with_name_not_found_shows_message(): void {
         $this->seedPersonFixture();
 
         $response = $this->get('/cbdbapi/person.php?name=不存在的人');
@@ -445,8 +432,7 @@ class CbdbApiPersonTest extends TestCase
         $response->assertSee('找不到符合', false);
     }
 
-    public function test_id_with_leading_zeros_json(): void
-    {
+    public function test_id_with_leading_zeros_json(): void {
         $this->seedPersonFixture();
 
         // Test with leading zeros (Wikidata format)
@@ -458,8 +444,7 @@ class CbdbApiPersonTest extends TestCase
         $this->assertSame('張三', data_get($data, 'Package.PersonAuthority.PersonInfo.Person.BasicInfo.ChName'));
     }
 
-    public function test_id_with_leading_zeros_html(): void
-    {
+    public function test_id_with_leading_zeros_html(): void {
         $this->seedPersonFixture();
 
         // Test with leading zeros in HTML mode
@@ -469,8 +454,7 @@ class CbdbApiPersonTest extends TestCase
         $response->assertSee('person-content');
     }
 
-    public function test_id_exceeding_7_digits_returns_validation_error(): void
-    {
+    public function test_id_exceeding_7_digits_returns_validation_error(): void {
         // Test ID with more than 7 digits
         $response = $this->getJson('/cbdbapi/person.php?id=12345678&o=json');
 
@@ -483,8 +467,7 @@ class CbdbApiPersonTest extends TestCase
             ]);
     }
 
-    public function test_invalid_id_format_returns_validation_error(): void
-    {
+    public function test_invalid_id_format_returns_validation_error(): void {
         // Test non-numeric ID
         $response = $this->getJson('/cbdbapi/person.php?id=abc123&o=json');
 
@@ -497,8 +480,7 @@ class CbdbApiPersonTest extends TestCase
             ]);
     }
 
-    protected function seedPersonFixture(): void
-    {
+    protected function seedPersonFixture(): void {
         \DB::table('BIOG_MAIN')->insert([
             'c_personid' => 1001,
             'c_name' => 'Zhang San',

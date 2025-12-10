@@ -1,18 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class RenameMergedToPersonidColumnInMergedPersonDataTable extends Migration
-{
+class RenameMergedToPersonidColumnInMergedPersonDataTable extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         Schema::table('MERGED_PERSON_DATA', function (Blueprint $table) {
             $table->renameColumn('c_merged_to_personid', 'c_merged_from_personid');
         });
@@ -23,8 +21,7 @@ class RenameMergedToPersonidColumnInMergedPersonDataTable extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         Schema::table('MERGED_PERSON_DATA', function (Blueprint $table) {
             $table->renameColumn('c_merged_from_personid', 'c_merged_to_personid');
         });

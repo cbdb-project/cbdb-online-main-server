@@ -3,15 +3,13 @@
 namespace Tests\Feature;
 
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
-class UserProfileTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class UserProfileTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -38,20 +36,17 @@ class UserProfileTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
-    public function testGuestCannotAccessProfile()
-    {
+    public function testGuestCannotAccessProfile() {
         $response = $this->get('/profile');
         $response->assertRedirect('/login');
     }
 
-    public function testAuthenticatedUserCanAccessProfile()
-    {
+    public function testAuthenticatedUserCanAccessProfile() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -69,8 +64,7 @@ class UserProfileTest extends TestCase
         $response->assertSee('Test Institute');
     }
 
-    public function testUserCanUpdateBasicProfile()
-    {
+    public function testUserCanUpdateBasicProfile() {
         $user = User::create([
             'name' => 'Old Name',
             'email' => 'old@example.com',
@@ -95,8 +89,7 @@ class UserProfileTest extends TestCase
         $this->assertEquals('New Institute', $user->institution);
     }
 
-    public function testUserCanChangePassword()
-    {
+    public function testUserCanChangePassword() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -122,8 +115,7 @@ class UserProfileTest extends TestCase
         $this->assertTrue(Hash::check('newpassword', $user->password));
     }
 
-    public function testPasswordChangeRequiresCurrentPassword()
-    {
+    public function testPasswordChangeRequiresCurrentPassword() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -144,8 +136,7 @@ class UserProfileTest extends TestCase
         $response->assertSessionHasErrors('current_password');
     }
 
-    public function testPasswordChangeMustVerifyCurrentPassword()
-    {
+    public function testPasswordChangeMustVerifyCurrentPassword() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -170,8 +161,7 @@ class UserProfileTest extends TestCase
         $this->assertTrue(Hash::check('oldpassword', $user->password));
     }
 
-    public function testPasswordChangeMustBeConfirmed()
-    {
+    public function testPasswordChangeMustBeConfirmed() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -196,8 +186,7 @@ class UserProfileTest extends TestCase
         $this->assertTrue(Hash::check('oldpassword', $user->password));
     }
 
-    public function testEmailMustBeUnique()
-    {
+    public function testEmailMustBeUnique() {
         $existingUser = User::create([
             'name' => 'Existing User',
             'email' => 'existing@example.com',
@@ -228,8 +217,7 @@ class UserProfileTest extends TestCase
         $this->assertEquals('test@example.com', $user->email);
     }
 
-    public function testUserCanUpdateProfileWithoutChangingPassword()
-    {
+    public function testUserCanUpdateProfileWithoutChangingPassword() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -256,8 +244,7 @@ class UserProfileTest extends TestCase
         $this->assertEquals($originalPasswordHash, $user->password);
     }
 
-    public function testNameIsRequired()
-    {
+    public function testNameIsRequired() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -276,8 +263,7 @@ class UserProfileTest extends TestCase
         $response->assertSessionHasErrors('name');
     }
 
-    public function testEmailIsRequired()
-    {
+    public function testEmailIsRequired() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -296,8 +282,7 @@ class UserProfileTest extends TestCase
         $response->assertSessionHasErrors('email');
     }
 
-    public function testInstitutionIsOptional()
-    {
+    public function testInstitutionIsOptional() {
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',

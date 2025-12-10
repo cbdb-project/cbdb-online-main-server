@@ -7,13 +7,12 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
-class BasicInformationProposalController extends Controller
-{
+class BasicInformationProposalController extends Controller {
     protected $biogMainRepository;
     protected $operationRepository;
 
@@ -71,8 +70,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 提交新增提案（子資源）
      */
-    public function proposalStore(Request $request, $personid, $resourceType)
-    {
+    public function proposalStore(Request $request, $personid, $resourceType) {
         $this->ensureCanPropose();
 
         $config = $this->getResourceConfig($resourceType);
@@ -86,6 +84,7 @@ class BasicInformationProposalController extends Controller
         // 驗證主鍵完整性
         if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
             flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
+
             return redirect()->back()->withInput();
         }
 
@@ -94,12 +93,14 @@ class BasicInformationProposalController extends Controller
         $existing = $this->fetchRowByKeys($table, $keyColumns, $conditions);
         if ($existing) {
             flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
         // 檢查是否有待審核的新增提案衝突
         if ($this->hasActiveProposalConflict($table, $keyColumns, $payload, Operation::TYPE_PROPOSAL_CREATE)) {
             flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
@@ -129,8 +130,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 提交修改提案（子資源）
      */
-    public function proposalUpdate(Request $request, $personid, $resourceType, $id)
-    {
+    public function proposalUpdate(Request $request, $personid, $resourceType, $id) {
         $this->ensureCanPropose();
 
         $config = $this->getResourceConfig($resourceType);
@@ -143,6 +143,7 @@ class BasicInformationProposalController extends Controller
 
         if (!$originalRow) {
             flash('提案失敗：找不到對應的資料列。', 'error');
+
             return redirect()->back()->withInput();
         }
 
@@ -154,6 +155,7 @@ class BasicInformationProposalController extends Controller
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
         if ($diff === null) {
             flash('提案失敗：未偵測到任何修改內容。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
@@ -184,8 +186,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 獲取資源配置
      */
-    protected function getResourceConfig($resourceType)
-    {
+    protected function getResourceConfig($resourceType) {
         if (!isset($this->resourceConfigs[$resourceType])) {
             abort(404, "未知的資源類型：{$resourceType}");
         }
@@ -196,8 +197,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 構建提案元數據
      */
-    protected function buildProposalMeta($action, $resourceType, Request $request)
-    {
+    protected function buildProposalMeta($action, $resourceType, Request $request) {
         $config = $this->getResourceConfig($resourceType);
 
         return [
@@ -245,8 +245,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 構建複合主鍵 ID
      */
-    protected function buildCompositeId($keyColumns, $data)
-    {
+    protected function buildCompositeId($keyColumns, $data) {
         $parts = [];
         foreach ($keyColumns as $column) {
             $value = $data[$column] ?? '';
@@ -258,14 +257,14 @@ class BasicInformationProposalController extends Controller
             $value = str_replace('-', 'minus', (string) $value);
             $parts[] = $value;
         }
+
         return implode('-', $parts);
     }
 
     /**
      * 解析複合主鍵 ID
      */
-    protected function parseCompositeId($id, $keyColumns)
-    {
+    protected function parseCompositeId($id, $keyColumns) {
         // 使用現有的 unionPKDef_decode
         $id = $this->biogMainRepository->unionPKDef_decode($id);
 
@@ -294,29 +293,27 @@ class BasicInformationProposalController extends Controller
     /**
      * 提取表單數據
      */
-    protected function extractFormData(Request $request)
-    {
+    protected function extractFormData(Request $request) {
         return Arr::except($request->all(), ['_token', '_method', 'action', '__proposal_comment']);
     }
 
     /**
      * 檢查主鍵完整性
      */
-    protected function hasPrimaryKeyValues($keyColumns, $row)
-    {
+    protected function hasPrimaryKeyValues($keyColumns, $row) {
         foreach ($keyColumns as $column) {
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }
         }
+
         return true;
     }
 
     /**
      * 從資料表讀取行
      */
-    protected function fetchRowByKeys($table, $keyColumns, $conditions)
-    {
+    protected function fetchRowByKeys($table, $keyColumns, $conditions) {
         $query = DB::table($table);
         foreach ($conditions as $column => $value) {
             if ($value === null) {
@@ -333,8 +330,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 構建查詢條件
      */
-    protected function buildConditionsFromRow($keyColumns, $row)
-    {
+    protected function buildConditionsFromRow($keyColumns, $row) {
         $conditions = [];
         foreach ($keyColumns as $column) {
             if (!array_key_exists($column, $row)) {
@@ -342,6 +338,7 @@ class BasicInformationProposalController extends Controller
             }
             $conditions[$column] = $row[$column];
         }
+
         return $conditions;
     }
 
@@ -352,8 +349,7 @@ class BasicInformationProposalController extends Controller
      * 返回帶引號的 JSON 字符串（如 "pending"），需要 JSON_UNQUOTE 才能正確比較。
      * 為了跨資料庫兼容性（SQLite/MySQL），採用在 PHP 端解析 JSON 的方式。
      */
-    protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType)
-    {
+    protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType) {
         $resourceId = $this->buildCompositeId($keyColumns, $data);
 
         $operations = Operation::where('resource', $table)
@@ -364,6 +360,7 @@ class BasicInformationProposalController extends Controller
         return $operations->contains(function (Operation $operation) {
             $payload = json_decode($operation->resource_data, true);
             $status = is_array($payload) ? ($payload['__review_status'] ?? null) : null;
+
             return $status === 'pending';
         });
     }
@@ -371,8 +368,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 確保用戶可以提案
      */
-    protected function ensureCanPropose()
-    {
+    protected function ensureCanPropose() {
         if (!Auth::check()) {
             abort(403, '請登入後提交提案');
         }
@@ -385,8 +381,7 @@ class BasicInformationProposalController extends Controller
     /**
      * 確保用戶可以直接儲存
      */
-    protected function ensureCanDirectSave()
-    {
+    protected function ensureCanDirectSave() {
         if (!Auth::check()) {
             abort(403, '請登入後編輯');
         }

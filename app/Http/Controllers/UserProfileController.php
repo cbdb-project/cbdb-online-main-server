@@ -7,15 +7,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
-class UserProfileController extends Controller
-{
+class UserProfileController extends Controller {
     /**
      * Create a new controller instance.
      *
      * @return void
      */
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('auth');
     }
 
@@ -24,12 +22,11 @@ class UserProfileController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function edit()
-    {
+    public function edit() {
         return view('profile.edit', [
             'user' => Auth::user(),
             'page_title' => '個人資料設定',
-            'page_description' => '修改您的個人資料'
+            'page_description' => '修改您的個人資料',
         ]);
     }
 
@@ -39,8 +36,7 @@ class UserProfileController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request)
-    {
+    public function update(Request $request) {
         $user = Auth::user();
 
         $rules = [

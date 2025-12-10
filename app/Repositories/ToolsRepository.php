@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -11,21 +12,19 @@ namespace App\Repositories;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
-class ToolsRepository
-{
+class ToolsRepository {
     /**
      * @param array $data
      */
-    public function timestamp(array $data, $isCreat = False)
-    {
+    public function timestamp(array $data, $isCreat = false) {
         if ($isCreat) {
             $data['c_created_by'] = Auth::user()->name;
             $data['c_created_date'] = Carbon::now()->format('Ymd');
-        }
-        else {
+        } else {
             $data['c_modified_by'] = Auth::user()->name;
             $data['c_modified_date'] = Carbon::now()->format('Ymd');
         }
+
         return $data;
     }
 }

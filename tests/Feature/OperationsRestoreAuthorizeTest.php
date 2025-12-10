@@ -13,19 +13,16 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 use Tests\TestCase;
 
-class OperationsRestoreAuthorizeTest extends TestCase
-{
+class OperationsRestoreAuthorizeTest extends TestCase {
     protected $repository;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         $this->repository = new FakeOperationRepository();
 
-        DB::swap(new class {
-            public function transaction(callable $callback)
-            {
+        DB::swap(new class () {
+            public function transaction(callable $callback) {
                 return $callback();
             }
         });
@@ -39,8 +36,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         }
     }
 
-    public function testActiveAdminCanTriggerRestore(): void
-    {
+    public function testActiveAdminCanTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
 
@@ -54,8 +50,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertEquals($operation->resource, $this->repository->storeCalls[0][3]);
     }
 
-    public function testRestoreUsesOriginalPersonIdWhenAvailable(): void
-    {
+    public function testRestoreUsesOriginalPersonIdWhenAvailable(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
 
@@ -68,8 +63,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertSame(456, $this->repository->storeCalls[0][1]);
     }
 
-    public function testRegularUserCannotTriggerRestore(): void
-    {
+    public function testRegularUserCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 0]);
         $this->actingAs($user);
 
@@ -80,8 +74,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
-    public function testBannedAdminCannotTriggerRestore(): void
-    {
+    public function testBannedAdminCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 2]);
         $this->actingAs($user);
 
@@ -92,8 +85,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
-    public function testInactiveUserCannotTriggerRestore(): void
-    {
+    public function testInactiveUserCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 0, 'is_admin' => 1]);
         $this->actingAs($user);
 
@@ -104,8 +96,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
-    public function testAddressResourceRestoreIsRejected(): void
-    {
+    public function testAddressResourceRestoreIsRejected(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
 
@@ -116,8 +107,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
-    public function testGuestCannotTriggerRestore(): void
-    {
+    public function testGuestCannotTriggerRestore(): void {
         Auth::logout();
 
         $controller = new SpyOperationsController($this->repository);
@@ -127,8 +117,7 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
-    protected function makeUser(array $overrides = []): User
-    {
+    protected function makeUser(array $overrides = []): User {
         $user = new User();
         $user->id = $overrides['id'] ?? rand(1, 1000);
         $user->name = $overrides['name'] ?? 'Tester';
@@ -136,11 +125,11 @@ class OperationsRestoreAuthorizeTest extends TestCase
         $user->password = bcrypt('secret');
         $user->is_active = $overrides['is_active'] ?? 1;
         $user->is_admin = $overrides['is_admin'] ?? 1;
+
         return $user;
     }
 
-    protected function makeOperation(int $opType, string $resource, array $overrides = []): Operation
-    {
+    protected function makeOperation(int $opType, string $resource, array $overrides = []): Operation {
         $operation = new Operation();
         $operation->id = 1;
         $operation->op_type = $opType;
@@ -151,30 +140,28 @@ class OperationsRestoreAuthorizeTest extends TestCase
         foreach ($overrides as $key => $value) {
             $operation->{$key} = $value;
         }
+
         return $operation;
     }
 
-    protected function makeRequest(): Request
-    {
+    protected function makeRequest(): Request {
         return Request::create('/operations/restore', 'POST');
     }
 }
 
-class SpyOperationsController extends OperationsController
-{
+class SpyOperationsController extends OperationsController {
     public $restoreInvoked = false;
     private $config;
 
-    public function __construct(OperationRepository $operationRepository, array $config = [])
-    {
+    public function __construct(OperationRepository $operationRepository, array $config = []) {
         parent::__construct($operationRepository);
         $this->config = $config;
     }
 
-    protected function performRestore(Operation $operation)
-    {
+    protected function performRestore(Operation $operation) {
         $this->restoreInvoked = true;
         $personId = $this->config['restoredPersonId'] ?? 99;
+
         return [
             'restored' => ['c_personid' => $personId, 'field' => 'restored'],
             'previous' => ['c_personid' => $personId, 'field' => 'previous'],
@@ -182,12 +169,10 @@ class SpyOperationsController extends OperationsController
     }
 }
 
-class FakeOperationRepository extends OperationRepository
-{
+class FakeOperationRepository extends OperationRepository {
     public $storeCalls = [];
 
-    public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0)
-    {
+    public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0) {
         $this->storeCalls[] = func_get_args();
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,101 +9,96 @@
 
 namespace App\Repositories;
 
-
+use App\AddrBelong;
+use App\AddrCode;
 use App\AddressCode;
 use App\AssocCode;
+use App\BiogAddrCode;
 use App\BiogMain;
 use App\Dynasty;
 use App\EntryCode;
 use App\EventCode;
 use App\KinshipCode;
 use App\OfficeCode;
+use App\Pinyin;
+use App\Repositories\Concerns\DetectsModelChanges;
 use App\SocialInst;
+use App\SocialInstAddr;
+use App\SocialInstCode;
+//20181112建安修改
 use App\StatusCode;
 use App\TextCode;
-use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
-use App\Repositories\OperationRepository;
-use App\Repositories\ToolsRepository;
-use Illuminate\Support\Facades\DB;
-use App\Repositories\Concerns\DetectsModelChanges;
-use Carbon\Carbon;
-
-//20181112建安修改
-use App\SocialInstCode;
-use App\SocialInstAddr;
 //修改結束
 
 //20210625建安修改
-use App\AddrCode;
-use App\BiogAddrCode;
-use App\AddrBelong;
-//修改結束
-
-//20230628建安修改
-use App\Pinyin;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 //修改結束
 
-ini_set('memory_limit','512M');
+//20230628建安修改
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+//修改結束
+
+ini_set('memory_limit', '512M');
 ini_set('max_execution_time', 300);
 
 /**
  * Class BiogMainRepository
  * @package App\Repositories
  */
-class BiogMainRepository
-{
+class BiogMainRepository {
     use DetectsModelChanges;
+
     /**
      * @param $id
      * @return \Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|null|static|static[]
      */
-    public function byPersonId($id)
-    {
+    public function byPersonId($id) {
         $basicinformation = BiogMain::withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
 
         //20201207新增index year推算欄位
         $c_index_year_type_code = $basicinformation->c_index_year_type_code;
-        if(!empty($c_index_year_type_code)) {
-            $simplify_type_code =  substr($c_index_year_type_code, 0, 2);
+        if (!empty($c_index_year_type_code)) {
+            $simplify_type_code = substr($c_index_year_type_code, 0, 2);
             $row = DB::table('INDEXYEAR_TYPE_CODES')->where([['c_index_year_type_code' , '=', $simplify_type_code]])->first();
             $ans_type_code = $c_index_year_type_code." ".$row->c_index_year_type_hz;
             $basicinformation->c_index_year_type_code = $ans_type_code;
+        } else {
         }
-        else { }
 
         $c_index_year_source_id = $basicinformation->c_index_year_source_id;
-        if(!empty($c_index_year_source_id)) {
+        if (!empty($c_index_year_source_id)) {
             $name = $this->byPersonId($c_index_year_source_id);
             $ans_source_id = $c_index_year_source_id." ".$name->c_name_chn;
             $basicinformation->c_index_year_source_id = $ans_source_id;
+        } else {
         }
-        else { }
         //新增結束
         //20210625新增指數地址(index_addr)與指數地址類型(index_addr_type)推算欄位
         $c_index_addr_id = $basicinformation->c_index_addr_id;
-        if(!empty($c_index_addr_id)) {
+        if (!empty($c_index_addr_id)) {
             $addr_name = AddrCode::find($c_index_addr_id);
-            if(!empty($addr_name)) {
+            if (!empty($addr_name)) {
                 $ans_index_addr = $c_index_addr_id." ".$addr_name->c_name." ".$addr_name->c_name_chn;
                 $basicinformation->c_index_addr_id = $ans_index_addr;
             }
+        } else {
         }
-        else { }
 
         $c_index_addr_type_code = $basicinformation->c_index_addr_type_code;
-        if(!empty($c_index_addr_type_code)) {
+        if (!empty($c_index_addr_type_code)) {
             $addr_type_name = BiogAddrCode::where('c_index_addr_default_rank', $c_index_addr_type_code)->first();
-            if(!empty($addr_type_name)) {
+            if (!empty($addr_type_name)) {
                 $ans_addr_type_name = $c_index_addr_type_code." ".$addr_type_name->c_addr_desc." ".$addr_type_name->c_addr_desc_chn;
                 $basicinformation->c_index_addr_type_code = $ans_addr_type_name;
             }
+        } else {
         }
-        else { }
         //新增結束
-        
+
         return $basicinformation;
     }
 
@@ -110,34 +106,33 @@ class BiogMainRepository
      * @param $id
      * @return \Illuminate\Database\Eloquent\Collection|static[]
      */
-    public function simpleByPersonId($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
+    public function simpleByPersonId($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
+
         return $basicinformation;
     }
 
-    public function byIdWithAddr($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('biog_addresses')->find($id);
+    public function byIdWithAddr($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('biog_addresses')->find($id);
+
         return $basicinformation;
     }
 
-    public function byIdWithAlt($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('altnames')->find($id);
+    public function byIdWithAlt($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('altnames')->find($id);
+
         return $basicinformation;
     }
 
-    public function byIdWithText($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('texts', 'texts_role')->find($id);
+    public function byIdWithText($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('texts', 'texts_role')->find($id);
+
         return $basicinformation;
     }
 
-    public function byIdWithSources($id)
-    {
+    public function byIdWithSources($id) {
         $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])
-            ->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')
+            ->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')
             ->with(['sources' => function ($query) {
                 $query->select('TEXT_CODES.*')->withPivot('c_pages', 'c_notes', 'c_main_source', 'c_self_bio');
             }])->find($id);
@@ -145,47 +140,51 @@ class BiogMainRepository
         return $basicinformation;
     }
 
-    public function byIdWithOff($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('offices', 'offices_addr')->find($id);
-        return $basicinformation;
-    }
-    public function byIdWithEntries($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('entries')->find($id);
-        return $basicinformation;
-    }
-    public function byIdWithStatuses($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('statuses')->find($id);
-        return $basicinformation;
-    }
-    public function byIdWithAssoc($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc', 'assoc_name')->find($id);
-        return $basicinformation;
-    }
-    public function byIdWithKinship($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('kinship', 'kinship_name')->find($id);
-        return $basicinformation;
-    }
-    public function byIdWithPossession($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('possession')->find($id);
+    public function byIdWithOff($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('offices', 'offices_addr')->find($id);
+
         return $basicinformation;
     }
 
-    public function byIdWithSocialInst($id)
-    {
-        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources','texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('inst', 'inst_name')->find($id);
+    public function byIdWithEntries($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('entries')->find($id);
+
         return $basicinformation;
     }
 
-    public function byQuery($query)
-    {
+    public function byIdWithStatuses($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('statuses')->find($id);
+
+        return $basicinformation;
+    }
+
+    public function byIdWithAssoc($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('assoc', 'assoc_name')->find($id);
+
+        return $basicinformation;
+    }
+
+    public function byIdWithKinship($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('kinship', 'kinship_name')->find($id);
+
+        return $basicinformation;
+    }
+
+    public function byIdWithPossession($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('possession')->find($id);
+
+        return $basicinformation;
+    }
+
+    public function byIdWithSocialInst($id) {
+        $basicinformation = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->with('inst', 'inst_name')->find($id);
+
+        return $basicinformation;
+    }
+
+    public function byQuery($query) {
         $params = explode(' ', $query);
-//        dump($params);
+        //        dump($params);
         /**
          * 这里我想到了两种方法，
          * 第一种：建索引表，跟搜索引擎一样，每个人物的有一个提取出一个关键特征向量，用二进制表示，把用户的查询条件转换成相应的特征向量，通过与或匹配
@@ -196,6 +195,7 @@ class BiogMainRepository
          */
         $basicinformation = BiogMain::whereIn('c_name_chn', $params)->simplePaginate(5);
         $basicinformation->withPath(url('v1/api/biog?query='.$query));
+
         return $basicinformation;
     }
 
@@ -203,10 +203,9 @@ class BiogMainRepository
      * @param $request
      * @param $id
      */
-    public function updateById($request, $id)
-    {
+    public function updateById($request, $id) {
         $data = $request->all();
-        
+
         $c_name_chn = $request->c_surname_chn.$request->c_mingzi_chn;
         $c_name = trim($request->c_surname.' '.$request->c_mingzi);
         #20230626修改外文全名呈現順序
@@ -221,34 +220,33 @@ class BiogMainRepository
         $data['c_female'] = (int)($data['c_female']);
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
-        
+
         $biogbasicinformation = BiogMain::find($id);
         $ori = $biogbasicinformation->toArray();
-        
+
         // 移除 Laravel 框架欄位，避免誤判為有變更
         $dataForComparison = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode']));
-        
+
         // 檢查是否有實質變更
         $hasChanges = $this->hasMeaningfulChanges($dataForComparison, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
-        
+
         if (!$hasChanges) {
             return [
                 'no_changes' => true,
             ];
         }
-        
-        $data = (new ToolsRepository)->timestamp($data);
-        
+
+        $data = (new ToolsRepository())->timestamp($data);
+
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
-        }
-        else {
+        } else {
             $biogbasicinformation->update($data);
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
         }
         //20190531修改結束
-        
+
         return [
             'no_changes' => false,
         ];
@@ -259,14 +257,13 @@ class BiogMainRepository
      * @param $num
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    static public function namesByQuery(Request $request, $num=20)
-    {
+    public static function namesByQuery(Request $request, $num = 20) {
         //20220303增加addslashes()防禦查詢參數
         $request->q = addslashes($request->q);
-        if ($temp = $request->num){
+        if ($temp = $request->num) {
             $num = addslashes($temp);
         }
-        if (!$request->q){
+        if (!$request->q) {
             //20211112註記，運用每次僅呈現20筆的特性，先快速提供人名資料，再查詢相關的朝代與字、號。
             //20251127修改：改為與其他查詢一致的 LeftJoin 方式，統一返回 Paginator 對象以支持 Blade 模板渲染
             //20251127性能優化：先分頁獲取 personid 列表（COUNT 快速），再 JOIN 查詢詳細信息
@@ -288,11 +285,11 @@ class BiogMainRepository
             $detailedItems = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
-                ->leftJoin('ALTNAME_DATA as A1', function($join) {
+                ->leftJoin('ALTNAME_DATA as A1', function ($join) {
                     $join->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A1.c_alt_name_type_code', '=', 4);
                 })
-                ->leftJoin('ALTNAME_DATA as A2', function($join) {
+                ->leftJoin('ALTNAME_DATA as A2', function ($join) {
                     $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A2.c_alt_name_type_code', '=', 5);
                 })
@@ -303,7 +300,7 @@ class BiogMainRepository
 
             // 第三步：將詳細資訊按原順序填充到 Paginator 的 items 中
             // 由於第一步已按 c_personid 排序，這裡保持相同順序
-            $orderedItems = collect($personIds)->map(function($personId) use ($detailedItems) {
+            $orderedItems = collect($personIds)->map(function ($personId) use ($detailedItems) {
                 return $detailedItems->get($personId);
             })->filter()->values();
 
@@ -317,6 +314,7 @@ class BiogMainRepository
             );
 
             $names->appends(['q' => $request->q])->links();
+
             return $names;
         }
 
@@ -325,11 +323,11 @@ class BiogMainRepository
             $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
-                ->leftJoin('ALTNAME_DATA as A1', function($join) {
+                ->leftJoin('ALTNAME_DATA as A1', function ($join) {
                     $join->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A1.c_alt_name_type_code', '=', 4);
                 })
-                ->leftJoin('ALTNAME_DATA as A2', function($join) {
+                ->leftJoin('ALTNAME_DATA as A2', function ($join) {
                     $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A2.c_alt_name_type_code', '=', 5);
                 })
@@ -337,6 +335,7 @@ class BiogMainRepository
                 ->groupBy('BIOG_MAIN.c_personid')
                 ->paginate($num);
             $names->appends(['q' => $request->q])->links();
+
             return $names;
         }
 
@@ -355,11 +354,11 @@ class BiogMainRepository
             $query = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
-                ->leftJoin('ALTNAME_DATA as A1', function($join) {
+                ->leftJoin('ALTNAME_DATA as A1', function ($join) {
                     $join->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A1.c_alt_name_type_code', '=', 4);
                 })
-                ->leftJoin('ALTNAME_DATA as A2', function($join) {
+                ->leftJoin('ALTNAME_DATA as A2', function ($join) {
                     $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A2.c_alt_name_type_code', '=', 5);
                 })
@@ -383,6 +382,7 @@ class BiogMainRepository
 
             $names = $query->paginate($num);
             $names->appends(['q' => $request->q])->links();
+
             return $names;
         }
 
@@ -393,13 +393,11 @@ class BiogMainRepository
         $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao');
         $names = $names->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy'); //單筆
         $names = $names->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id'); //單筆
-        $names = $names->leftJoin('ALTNAME_DATA as A1', function($names)
-        {
+        $names = $names->leftJoin('ALTNAME_DATA as A1', function ($names) {
             $names->on('A1.c_personid', '=', 'BIOG_MAIN.c_personid')
                   ->where('A1.c_alt_name_type_code', '=', 4);
         });
-        $names = $names->leftJoin('ALTNAME_DATA as A2', function($names)
-        {
+        $names = $names->leftJoin('ALTNAME_DATA as A2', function ($names) {
             $names->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                   ->where('A2.c_alt_name_type_code', '=', 5);
         });
@@ -433,6 +431,7 @@ class BiogMainRepository
             ->having('BIOG_MAIN.c_personid', '>=', 0)
             ->paginate($num);
         $names->appends(['q' => $request->q])->links();
+
         return $names;
     }
 
@@ -440,7 +439,7 @@ class BiogMainRepository
      * @param $id_
      * @return array
      */
-    public function textById($id_){
+    public function textById($id_) {
         $temp_l = explode("-", $id_);
         $row = DB::table('BIOG_TEXT_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -448,27 +447,26 @@ class BiogMainRepository
             ['c_role_id', '=', $temp_l[2]],
         ])->first();
         $text = null;
-        if($row->c_textid || $row->c_textid === 0) {
+        if ($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
             //進行查詢資訊的擴充
             $c_bibl_cat_code = $text_->c_bibl_cat_code;
             $x1 = DB::table('TEXT_BIBLCAT_CODE_TYPE_REL')->select('c_text_cat_type_id')->where('c_text_cat_code', $c_bibl_cat_code)->get();
-            $ans1 = array();
-            foreach($x1 as $object) {
+            $ans1 = [];
+            foreach ($x1 as $object) {
                 $ans1[0] = $object->c_text_cat_type_id;
             }
             //20201106這裡增加判斷式，因為TEXT_BIBLCAT_CODE_TYPE_REL的c_text_cat_code沒有完整對應TEXT_CODES資料表的c_bibl_cat_code。
-            if(!empty($ans1[0])) {
-                for($j=0; $j<=3; $j++) {
+            if (!empty($ans1[0])) {
+                for ($j = 0; $j <= 3; $j++) {
                     $x[$j] = $this->searchTextSub($ans1[$j]);
-                    foreach($x[$j] as $object) {
-                        $ans1[$j+1] = $object->c_text_cat_type_parent_id;
-                        $ans2[$j+1] = $object->c_text_cat_type_desc_chn;
+                    foreach ($x[$j] as $object) {
+                        $ans1[$j + 1] = $object->c_text_cat_type_parent_id;
+                        $ans2[$j + 1] = $object->c_text_cat_type_desc_chn;
                     }
                 }
                 $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
-            }
-            else {
+            } else {
                 $word = '';
             }
             $text = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn." ".$word;
@@ -476,45 +474,45 @@ class BiogMainRepository
 
         }
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
+
         return ['row' => $row, 'text' => $text, 'text_str' => $text_str];
     }
 
-    public function searchTextSub($request){
+    public function searchTextSub($request) {
         $data = DB::table('TEXT_BIBLCAT_TYPES')->select('c_text_cat_type_parent_id', 'c_text_cat_type_desc_chn')->where('c_text_cat_type_id', $request)->get();
+
         return $data;
     }
 
-    public function textUpdateById( )
-    {
+    public function textUpdateById() {
 
     }
 
-    public function officeById($id)
-    {
+    public function officeById($id) {
         $temp_l = explode("-", $id);
         $row = DB::table('POSTED_TO_OFFICE_DATA')->where([
             ['c_office_id', '=', $temp_l[0]],
             ['c_posting_id', '=', $temp_l[1]],
         ])->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
         $office_str = null;
-        if($row->c_office_id || $row->c_office_id === 0) {
+        if ($row->c_office_id || $row->c_office_id === 0) {
             $text_ = OfficeCode::find($row->c_office_id);
             $dy = Dynasty::where('c_dy', $text_->c_dy)->first()->c_dynasty_chn;
             $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn." ".$dy;
         }
         $posting_str = null;
-//        dd($row->c_inst_name_code);
-        if($row->c_inst_code || $row->c_inst_code === 0) {
+        //        dd($row->c_inst_name_code);
+        if ($row->c_inst_code || $row->c_inst_code === 0) {
             //20211020進行改寫
             //$text_ = SocialInst::find($row->c_inst_code);
             //$posting_str = $text_->c_inst_name_code." ".$text_->c_inst_name_py." ".$text_->c_inst_name_hz;
@@ -525,28 +523,43 @@ class BiogMainRepository
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count((array)$res) == 0 ) $addr = "未詳";
-            else {
+            if (count((array)$res) == 0) {
+                $addr = "未詳";
+            } else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }
             $dy = $text_->c_inst_begin_year;
             $dy2 = $text_->c_inst_floruit_dy;
             $dy3 = $text_->c_inst_end_year;
             $dy4 = $text_->c_inst_last_known_year;
-            if($name_hz == null) $name_hz = "未詳";
-            if($name_py == null) $name_py = "未詳";
-            if($addr == null) $addr = "未詳";
-            if($dy == null) $dy = "未詳";
-            if($dy2 == null) $dy2 = "未詳";
-            if($dy3 == null) $dy3 = "未詳";
-            if($dy4 == null) $dy4 = "未詳";
+            if ($name_hz == null) {
+                $name_hz = "未詳";
+            }
+            if ($name_py == null) {
+                $name_py = "未詳";
+            }
+            if ($addr == null) {
+                $addr = "未詳";
+            }
+            if ($dy == null) {
+                $dy = "未詳";
+            }
+            if ($dy2 == null) {
+                $dy2 = "未詳";
+            }
+            if ($dy3 == null) {
+                $dy3 = "未詳";
+            }
+            if ($dy4 == null) {
+                $dy4 = "未詳";
+            }
             $posting_str = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
             //修改結束
         }
-//        dd($posting_str);
+        //        dd($posting_str);
         $addr_ = DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $row->c_personid)->where('c_posting_id', $row->c_posting_id)->get();
         $addr_str = [];
-        foreach ($addr_ as $key=>$value) {
+        foreach ($addr_ as $key => $value) {
             $id_ = $value->c_addr_id == 0 ? -999 : $value->c_addr_id;
             $item = [$id_, $this->addr_str($value->c_addr_id)];
             $addr_str[$key] = $item;
@@ -555,8 +568,7 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str, 'office_str' => $office_str, 'posting_str' => $posting_str, 'addr_str' => $addr_str];
     }
 
-    public function officeUpdateById(Request $request, $id, $c_personid)
-    {
+    public function officeUpdateById(Request $request, $id, $c_personid) {
         $data = $request->all();
         $_id = $data['_id'];
         $_postingid = $data['_postingid'];
@@ -596,7 +608,7 @@ class BiogMainRepository
             $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
             $currentOfficeId = $previousOfficeId;
             if ($hasPostingChange) {
-                $timestamped = (new ToolsRepository)->timestamp($data);
+                $timestamped = (new ToolsRepository())->timestamp($data);
 
                 DB::table('POSTED_TO_OFFICE_DATA')
                     ->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])
@@ -615,19 +627,19 @@ class BiogMainRepository
                 );
             }
 
-	    $shouldUpdateAddress = $hasAddressChange || $previousOfficeId !== $currentOfficeId;
+            $shouldUpdateAddress = $hasAddressChange || $previousOfficeId !== $currentOfficeId;
 
-	    //20251204 issues-487，用戶在「修改」頁面保存時，若地名資訊（POSTED_TO_ADDR_DATA.c_addr_id）並沒有改變，用戶在保存的時候，則不會修改 POSTED_TO_ADDR_DATA 的 c_modified_by, c_modified_date 欄位。
-	    //有修改地名資訊時$shouldUpdateAddress = true
-	    //dd($shouldUpdateAddress);
+            //20251204 issues-487，用戶在「修改」頁面保存時，若地名資訊（POSTED_TO_ADDR_DATA.c_addr_id）並沒有改變，用戶在保存的時候，則不會修改 POSTED_TO_ADDR_DATA 的 c_modified_by, c_modified_date 欄位。
+            //有修改地名資訊時$shouldUpdateAddress = true
+            //dd($shouldUpdateAddress);
 
-	    $c_created_by = Auth::user()->name;
-	    $c_created_date = Carbon::now();
+            $c_created_by = Auth::user()->name;
+            $c_created_date = Carbon::now();
 
-	    DB::table('POSTING_DATA')->where([
-                ['c_personid', '=', $_id],
-                ['c_posting_id', '=', $_postingid],
-            ])->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
+            DB::table('POSTING_DATA')->where([
+                    ['c_personid', '=', $_id],
+                    ['c_posting_id', '=', $_postingid],
+                ])->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
 
             if ($shouldUpdateAddress) {
                 $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
@@ -643,7 +655,7 @@ class BiogMainRepository
                             'c_addr_id' => (int) $row->c_addr_id,
                         ];
                     })
-		    ->all();
+            ->all();
 
                 //dd($previousOfficeId, $currentOfficeId, $beforeRows);
 
@@ -652,49 +664,49 @@ class BiogMainRepository
                         ->where('c_personid', $_id)
                         ->where('c_posting_id', $_postingid)
                         ->where('c_office_id', $previousOfficeId)
-			->delete();
-		    //如果$previousOfficeId與$currentOfficeId不相等，而且$beforeRows有資料，就先將舊的POSTED_TO_ADDR_DATA刪除乾淨。
-		}
+            ->delete();
+                    //如果$previousOfficeId與$currentOfficeId不相等，而且$beforeRows有資料，就先將舊的POSTED_TO_ADDR_DATA刪除乾淨。
+                }
 
-		$addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+                $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
 
-		//比對修改前後的Addr陣列，刪除更新時被移除的addr。
-		$beforeAddressesForUpdate = [];
-		foreach($beforeRows as $addr_v) {
-			$beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
-		}
-		//dd($beforeRows, $addressesForInsert);
-		//dd($beforeAddressesForUpdate, $addressesForInsert);
-		$oldHave_diff = array_diff($beforeAddressesForUpdate, $addressesForInsert);
-		$newHave_diff = array_diff($addressesForInsert, $beforeAddressesForUpdate);
-		//dd($oldHave_diff);
-		//dd($newHave_diff);
+                //比對修改前後的Addr陣列，刪除更新時被移除的addr。
+                $beforeAddressesForUpdate = [];
+                foreach ($beforeRows as $addr_v) {
+                    $beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
+                }
+                //dd($beforeRows, $addressesForInsert);
+                //dd($beforeAddressesForUpdate, $addressesForInsert);
+                $oldHave_diff = array_diff($beforeAddressesForUpdate, $addressesForInsert);
+                $newHave_diff = array_diff($addressesForInsert, $beforeAddressesForUpdate);
+                //dd($oldHave_diff);
+                //dd($newHave_diff);
 
-		//比對結束，刪除更新時被移除的addr。
-		foreach($oldHave_diff as $addr_v) {
-			DB::table('POSTED_TO_ADDR_DATA')
-                        ->where('c_personid', $_id)
-                        ->where('c_posting_id', $_postingid)
-			->where('c_office_id', $previousOfficeId)
-			->where('c_addr_id', $addr_v)
-                        ->delete();
-		}
+                //比對結束，刪除更新時被移除的addr。
+                foreach ($oldHave_diff as $addr_v) {
+                    DB::table('POSTED_TO_ADDR_DATA')
+                                ->where('c_personid', $_id)
+                                ->where('c_posting_id', $_postingid)
+                    ->where('c_office_id', $previousOfficeId)
+                    ->where('c_addr_id', $addr_v)
+                                ->delete();
+                }
 
-		//比對結束，新增後來新加的addr。
-		foreach($newHave_diff as $addr_v) {
-			DB::table('POSTED_TO_ADDR_DATA')->insert(
-				[
-                                    'c_personid' => $_id,
-                                    'c_posting_id' => $_postingid,
-                                    'c_office_id' => $_officeid,
-                                    'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
-                                    'c_created_by' => $c_created_by,
-                                    'c_created_date' => $c_created_date,
-                                    'c_modified_by' => $c_created_by,
-                                    'c_modified_date' => $c_created_date,
-				]
-			);
-		}
+                //比對結束，新增後來新加的addr。
+                foreach ($newHave_diff as $addr_v) {
+                    DB::table('POSTED_TO_ADDR_DATA')->insert(
+                        [
+                                            'c_personid' => $_id,
+                                            'c_posting_id' => $_postingid,
+                                            'c_office_id' => $_officeid,
+                                            'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
+                                            'c_created_by' => $c_created_by,
+                                            'c_created_date' => $c_created_date,
+                                            'c_modified_by' => $c_created_by,
+                                            'c_modified_date' => $c_created_date,
+                        ]
+                    );
+                }
 
 
                 $this->updateAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId, $c_created_by, $c_created_date);
@@ -732,8 +744,7 @@ class BiogMainRepository
         });
     }
 
-    public function officeStoreById(Request $request, $id)
-    {
+    public function officeStoreById(Request $request, $id) {
         return DB::transaction(function () use ($request, $id) {
             $payload = $request->all();
             $c_addr = $payload['c_addr'] ?? [];
@@ -747,24 +758,24 @@ class BiogMainRepository
                 ->orderByDesc('c_posting_id')
                 ->value('c_posting_id');
             $data['c_posting_id'] = ((int) $lastPostingId) + 1;
-	    $data['c_personid'] = $id;
+            $data['c_personid'] = $id;
 
-	    //將操作新增的使用者與當下時間紀錄為c_created_by與c_created_date。
-	    $c_created_by = Auth::user()->name;
-	    $c_created_date = Carbon::now();
-	    $data['c_created_by'] = $c_created_by;
-	    $data['c_created_date'] = $c_created_date;
+            //將操作新增的使用者與當下時間紀錄為c_created_by與c_created_date。
+            $c_created_by = Auth::user()->name;
+            $c_created_date = Carbon::now();
+            $data['c_created_by'] = $c_created_by;
+            $data['c_created_date'] = $c_created_date;
 
             DB::table('POSTING_DATA')->insert([
                 'c_personid' => $data['c_personid'],
-		'c_posting_id' => $data['c_posting_id'],
-		'c_created_by' => $data['c_created_by'],
-		'c_created_date' => $data['c_created_date'],
+        'c_posting_id' => $data['c_posting_id'],
+        'c_created_by' => $data['c_created_by'],
+        'c_created_date' => $data['c_created_date'],
             ]);
 
             $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);
 
-            $data = (new ToolsRepository)->timestamp($data, true);
+            $data = (new ToolsRepository())->timestamp($data, true);
             DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
 
             (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
@@ -800,8 +811,7 @@ class BiogMainRepository
         });
     }
 
-    public function officeDeleteById($id, $c_personid)
-    {
+    public function officeDeleteById($id, $c_personid) {
         DB::transaction(function () use ($id, $c_personid) {
             $addr_l = explode('-', $id);
             $row = DB::table('POSTED_TO_OFFICE_DATA')
@@ -818,14 +828,13 @@ class BiogMainRepository
         });
     }
 
-    public function entryById($id)
-    {
+    public function entryById($id) {
         //建安修改20181109
         //$row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
-        $id = str_replace("--","-minus",$id);
+        $id = str_replace("--", "-minus", $id);
         $addr_a = explode("-", $id);
-        foreach($addr_a as $key => $value) {
-            $addr_a[$key] = str_replace("minus","-",$value);
+        foreach ($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus", "-", $value);
         }
         $row = DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
@@ -841,45 +850,45 @@ class BiogMainRepository
         ])->first();
 
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
         $entry_str = null;
-        if($row->c_entry_code || $row->c_entry_code === 0) {
+        if ($row->c_entry_code || $row->c_entry_code === 0) {
             $text_ = EntryCode::find($row->c_entry_code);
             $entry_str = $text_->c_entry_code." ".$text_->c_entry_desc_chn." ".$text_->c_entry_desc;
         }
         $addr_str = null;
-        if($row->c_entry_addr_id || $row->c_entry_addr_id === 0) {
+        if ($row->c_entry_addr_id || $row->c_entry_addr_id === 0) {
             $text_ = AddressCode::find($row->c_entry_addr_id);
             $addr_str = $text_->c_addr_id." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $kin_str = null;
-        if($row->c_kin_code || $row->c_kin_code === 0) {
+        if ($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
             $kin_str = $text_->c_kin_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         //20181112建安修改
         $biog_str = null;
-        if($row->c_kin_id || $row->c_kin_id === 0) {
+        if ($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $biog_str2 = null;
-        if($row->c_assoc_id || $row->c_assoc_id === 0) {
+        if ($row->c_assoc_id || $row->c_assoc_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_id);
             $biog_str2 = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         //修改結束
         $assoc_str = null;
-        if($row->c_assoc_code || $row->c_assoc_code === 0) {
+        if ($row->c_assoc_code || $row->c_assoc_code === 0) {
             $text_ = AssocCode::find($row->c_assoc_code);
             $assoc_str = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
         }
         //20210804建安新增社交機構輸出文字的程式碼
         $inst_code = null;
-        if($row->c_inst_code || $row->c_inst_code === 0) {
+        if ($row->c_inst_code || $row->c_inst_code === 0) {
             $text_ = SocialInstCode::where([
                 ['c_inst_code', '=', $row->c_inst_code],
                 ['c_inst_name_code', '=', $row->c_inst_name_code],
@@ -887,21 +896,36 @@ class BiogMainRepository
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count((array)$res) == 0 ) $addr = "未詳";
-            else {
+            if (count((array)$res) == 0) {
+                $addr = "未詳";
+            } else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }
             $dy = $text_->c_inst_begin_year;
             $dy2 = $text_->c_inst_floruit_dy;
             $dy3 = $text_->c_inst_end_year;
             $dy4 = $text_->c_inst_last_known_year;
-            if($name_hz == null) $name_hz = "未詳";
-            if($name_py == null) $name_py = "未詳";
-            if($addr == null) $addr = "未詳";
-            if($dy == null) $dy = "未詳";
-            if($dy2 == null) $dy2 = "未詳";
-            if($dy3 == null) $dy3 = "未詳";
-            if($dy4 == null) $dy4 = "未詳";
+            if ($name_hz == null) {
+                $name_hz = "未詳";
+            }
+            if ($name_py == null) {
+                $name_py = "未詳";
+            }
+            if ($addr == null) {
+                $addr = "未詳";
+            }
+            if ($dy == null) {
+                $dy = "未詳";
+            }
+            if ($dy2 == null) {
+                $dy2 = "未詳";
+            }
+            if ($dy3 == null) {
+                $dy3 = "未詳";
+            }
+            if ($dy4 == null) {
+                $dy4 = "未詳";
+            }
             $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
         //新增結束
@@ -909,8 +933,7 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str, 'entry_str' => $entry_str, 'addr_str' => $addr_str, 'kin_str' => $kin_str, 'assoc_str' => $assoc_str, 'biog_str' => $biog_str, 'biog_str2' => $biog_str2, 'inst_code' => $inst_code];
     }
 
-    public function entryUpdateById(Request $request, $id, $c_personid)
-    {
+    public function entryUpdateById(Request $request, $id, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token']);
@@ -920,13 +943,12 @@ class BiogMainRepository
         $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data);
-        DB::table('ENTRY_DATA')->where('tts_sysno',$id)->update($data);
+        $data = (new ToolsRepository())->timestamp($data);
+        DB::table('ENTRY_DATA')->where('tts_sysno', $id)->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ENTRY_DATA', $id, $data);
     }
 
-    public function entryStoreById(Request $request, $id)
-    {
+    public function entryStoreById(Request $request, $id) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
@@ -938,30 +960,29 @@ class BiogMainRepository
         $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
         $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         //dd($data);
         DB::table('ENTRY_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
         //新增的聯合主鍵
         $newid = $data['c_personid']."-".$data['c_entry_code']."-".$data['c_sequence'];
+
         //return $data['tts_sysno'];
         return $newid;
     }
 
-    public function entryDeleteById($id, $c_personid)
-    {
+    public function entryDeleteById($id, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
         $row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
         DB::table('ENTRY_DATA')->where('tts_sysno', $id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ENTRY_DATA', $id, $row);
     }
 
-    public function statuseById($id)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function statuseById($id) {
+        $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -970,24 +991,24 @@ class BiogMainRepository
         ])->first();
         //$row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
         $statuse_str = null;
-        if($row->c_status_code || $row->c_status_code === 0) {
+        if ($row->c_status_code || $row->c_status_code === 0) {
             $text_ = StatusCode::find($row->c_status_code);
             $statuse_str = $text_->c_status_code." ".$text_->c_status_desc_chn." ".$text_->c_status_desc;
         }
+
         return ['row' => $row, 'text_str' => $text_str, 'statuse_str' => $statuse_str];
     }
 
-    public function statuseUpdateById(Request $request, $id, $c_personid)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function statuseUpdateById(Request $request, $id, $c_personid) {
+        $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -998,7 +1019,7 @@ class BiogMainRepository
         $data = Arr::except($data, ['_token', '_method']);
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data);
+        $data = (new ToolsRepository())->timestamp($data);
         DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_sequence', '=', $temp_l[1]],
@@ -1006,11 +1027,11 @@ class BiogMainRepository
         ])->update($data);
         $new_id = $c_personid."-".$data['c_sequence']."-".$data['c_status_code'];
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data, $row);
+
         return $data;
     }
 
-    public function statuseStoreById(Request $request, $id)
-    {
+    public function statuseStoreById(Request $request, $id) {
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         #20240328移除tts_sysno
@@ -1018,24 +1039,24 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('STATUS_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_status_code'], $data);
+
         return $data;
     }
 
-    public function statuseDeleteById($id, $c_personid)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function statuseDeleteById($id, $c_personid) {
+        $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
         $row = DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
-        ])->first(); 
+        ])->first();
         //$row = DB::table('STATUS_DATA')->where('tts_sysno', $id)->first();
         DB::table('STATUS_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -1045,12 +1066,11 @@ class BiogMainRepository
         (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', $id, $row);
     }
 
-    public function kinshipById($id)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function kinshipById($id) {
+        $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
 
         $row = DB::table('KIN_DATA')->where([
@@ -1060,12 +1080,12 @@ class BiogMainRepository
         ])->first();
         //$row = DB::table('KIN_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
         $kin_str = null;
-        if($row->c_kin_code || $row->c_kin_code === 0) {
+        if ($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
             //20201026修改，提供給前端c_kincode可以更新親屬關係。
             //$kin_str = $text_->c_status_code." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
@@ -1073,7 +1093,7 @@ class BiogMainRepository
         }
         $biog_str = null;
         $kinpair_str = null;
-        if($row->c_kin_id || $row->c_kin_id === 0) {
+        if ($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $biog_str = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
             $k_p_code = DB::table('KIN_DATA')->where([['c_kin_id',$row->c_personid], ['c_personid', $row->c_kin_id]])->first()->c_kin_code;
@@ -1084,16 +1104,15 @@ class BiogMainRepository
             $kinpair_str = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
 
-//        dd($biog_str);
+        //        dd($biog_str);
         return ['row' => $row, 'text_str' => $text_str, 'kin_str' => $kin_str, 'biog_str' => $biog_str, 'kinpair_str' => $kinpair_str, 'k_p_code' => $k_p_code];
     }
 
-    public function kinshipUpdateById(Request $request, $id, $id_)
-    {
-        $id_ = str_replace("--","-minus",$id_);
+    public function kinshipUpdateById(Request $request, $id, $id_) {
+        $id_ = str_replace("--", "-minus", $id_);
         $temp_l = explode("-", $id_);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
 
         $row = DB::table('KIN_DATA')->where([
@@ -1112,7 +1131,7 @@ class BiogMainRepository
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data);
+        $data = (new ToolsRepository())->timestamp($data);
         //dump($data);
         //DB::table('KIN_DATA')->where('tts_sysno',$id_)->update($data);
         DB::table('KIN_DATA')->where([
@@ -1135,7 +1154,7 @@ class BiogMainRepository
         ->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair1]])
         ->orWhere([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair2]])
         ->get();
-        if(count($sum) == 1) {
+        if (count($sum) == 1) {
             DB::table('KIN_DATA')
             ->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair1]])
             ->orWhere([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair2]])
@@ -1144,11 +1163,11 @@ class BiogMainRepository
             DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]])->update($data);
         }
         $ori_data['err'] = count($sum) ?? 0;
+
         return $ori_data;
     }
 
-    public function kinshipStoreById(Request $request, $id)
-    {
+    public function kinshipStoreById(Request $request, $id) {
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
         $data = Arr::except($data, ['_token', 'c_kinship_pair']);
@@ -1159,7 +1178,7 @@ class BiogMainRepository
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
         (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'], $data);
@@ -1168,17 +1187,17 @@ class BiogMainRepository
         $data['c_personid'] = $data['c_kin_id'];
         $data['c_kin_id'] = $id;
         DB::table('KIN_DATA')->insert($data);
+
         //return $tts;
         return $ori_Data;
     }
 
-    public function kinshipDeleteById($id, $id_)
-    {
+    public function kinshipDeleteById($id, $id_) {
         $operationRepository = new OperationRepository();
-        $id = str_replace("--","-minus",$id);
+        $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
 
         $row = DB::table('KIN_DATA')->where([
@@ -1194,7 +1213,7 @@ class BiogMainRepository
         (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', $id, $row);
 
         $row2 = DB::table('KIN_DATA')->where([
-            ['c_kin_id',$row->c_personid], 
+            ['c_kin_id',$row->c_personid],
             ['c_personid', $row->c_kin_id],
             ['c_autogen_notes', $row->c_autogen_notes],
             ['c_kin_code', $kin_code_pair->c_kin_pair1],
@@ -1212,10 +1231,10 @@ class BiogMainRepository
         ])->delete();
 
         //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
-        if($row2 !== null && is_null($row2->c_modified_date)) {
+        if ($row2 !== null && is_null($row2->c_modified_date)) {
             DB::table('KIN_DATA')->where([
-                ['c_kin_id',$row2->c_kin_id], 
-                ['c_personid', $row2->c_personid], 
+                ['c_kin_id',$row2->c_kin_id],
+                ['c_personid', $row2->c_personid],
                 ['c_source', $row2->c_source],
                 ['c_autogen_notes', $row2->c_autogen_notes],
                 ['c_kin_code', $kin_code_pair->c_kin_pair1],
@@ -1226,8 +1245,7 @@ class BiogMainRepository
                 ['c_autogen_notes', $row2->c_autogen_notes],
                 ['c_kin_code', $kin_code_pair->c_kin_pair2],
             ])->delete();
-        }
-        else if($row2 !== null) {
+        } elseif ($row2 !== null) {
             DB::table('KIN_DATA')->where([
                 ['c_kin_id',$row2->c_kin_id],
                 ['c_personid', $row2->c_personid],
@@ -1246,20 +1264,19 @@ class BiogMainRepository
         }
     }
 
-    public function possessionById($id)
-    {
+    public function possessionById($id) {
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
 
         $addr_ = DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $id)->get();
-//        dd($addr_);
+        //        dd($addr_);
         $addr_str = [];
-        foreach ($addr_ as $key=>$value) {
+        foreach ($addr_ as $key => $value) {
             $id_ = $value->c_addr_id == 0 ? -999 : $value->c_addr_id;
             $item = [$id_, $this->addr_str($value->c_addr_id)];
             $addr_str[$key] = $item;
@@ -1268,57 +1285,58 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str, 'addr_str' => $addr_str];
     }
 
-    public function possessionUpdateById(Request $request, $id, $id_)
-    {
+    public function possessionUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
         $this->insertAddrPo($data['c_addr_id'], $id_, $id);
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data);
-        $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id',$id_)->first();
-        DB::table('POSSESSION_DATA')->where('c_possession_record_id',$id_)->update($data);
+        $data = (new ToolsRepository())->timestamp($data);
+        $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->first();
+        DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
         (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
     }
 
-    public function possessionStoreById(Request $request, $id)
-    {
+    public function possessionStoreById(Request $request, $id) {
         $data = $request->all();
         $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
         //20210205因為資料表關聯欄位的設定，資料新增的流程需要往後移動。
         //$this->insertAddrPo($data['c_addr_id'], $data['c_possession_record_id'], $data['c_personid']);
-        $addr = array();
+        $addr = [];
         $addr = $data['c_addr_id'];
         //修改段落
         $data = Arr::except($data, ['_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('POSSESSION_DATA')->insert($data);
         //移動到這裡
         $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
         //修改結束
         (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+
         return $data['c_possession_record_id'];
     }
 
-    public function possessionDeleteById($id, $c_personid)
-    {
+    public function possessionDeleteById($id, $c_personid) {
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
         DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
         DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $row->c_possession_record_id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
     }
 
-    public function socialInstById($id)
-    {
+    public function socialInstById($id) {
         //建安修改20181113 //20211022修改增加c_inst_code與c_inst_name_code
         //$row = DB::table('BIOG_INST_DATA')->where('tts_sysno', $id)->first();
         $addr_l = explode("-", $id);
-        if($addr_l[1] == '') {$addr_l[1] = NULL; }
-        if($addr_l[2] == '') {$addr_l[2] = NULL; }
+        if ($addr_l[1] == '') {
+            $addr_l[1] = null;
+        }
+        if ($addr_l[2] == '') {
+            $addr_l[2] = null;
+        }
         $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_inst_code', $addr_l[1])->where('c_inst_name_code', $addr_l[2])->where('c_bi_role_code', $addr_l[3])->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
@@ -1326,7 +1344,7 @@ class BiogMainRepository
 
         //20210804建安新增社交機構輸出文字的程式碼
         $inst_code = null;
-        if($row->c_inst_code || $row->c_inst_code === 0) {
+        if ($row->c_inst_code || $row->c_inst_code === 0) {
             $text_ = SocialInstCode::where([
                 ['c_inst_code', '=', $row->c_inst_code],
                 ['c_inst_name_code', '=', $row->c_inst_name_code],
@@ -1334,21 +1352,36 @@ class BiogMainRepository
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count((array)$res) == 0 ) $addr = "未詳";
-            else {
+            if (count((array)$res) == 0) {
+                $addr = "未詳";
+            } else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }
             $dy = $text_->c_inst_begin_year;
             $dy2 = $text_->c_inst_floruit_dy;
             $dy3 = $text_->c_inst_end_year;
             $dy4 = $text_->c_inst_last_known_year;
-            if($name_hz == null) $name_hz = "未詳";
-            if($name_py == null) $name_py = "未詳";
-            if($addr == null) $addr = "未詳";
-            if($dy == null) $dy = "未詳";
-            if($dy2 == null) $dy2 = "未詳";
-            if($dy3 == null) $dy3 = "未詳";
-            if($dy4 == null) $dy4 = "未詳";
+            if ($name_hz == null) {
+                $name_hz = "未詳";
+            }
+            if ($name_py == null) {
+                $name_py = "未詳";
+            }
+            if ($addr == null) {
+                $addr = "未詳";
+            }
+            if ($dy == null) {
+                $dy = "未詳";
+            }
+            if ($dy2 == null) {
+                $dy2 = "未詳";
+            }
+            if ($dy3 == null) {
+                $dy3 = "未詳";
+            }
+            if ($dy4 == null) {
+                $dy4 = "未詳";
+            }
             $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
         }
         //新增結束
@@ -1356,83 +1389,80 @@ class BiogMainRepository
         return ['row' => $row, 'text_str' => $text_str, 'inst_code' => $inst_code];
     }
 
-    public function socialInstUpdateById(Request $request, $id_, $c_personid)
-    {
+    public function socialInstUpdateById(Request $request, $id_, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationSocialInstController.php使用
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data);
-        DB::table('BIOG_INST_DATA')->where('tts_sysno',$id_)->update($data);
+        $data = (new ToolsRepository())->timestamp($data);
+        DB::table('BIOG_INST_DATA')->where('tts_sysno', $id_)->update($data);
         (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'BIOG_INST_DATA', $id_, $data);
     }
 
-    public function socialInstStoreById(Request $request, $id)
-    {
+    public function socialInstStoreById(Request $request, $id) {
         $data = $request->all();
         $data['c_personid'] = $id;
         $data = Arr::except($data, ['_token']);
         $data['c_source'] = ($data['c_source'] == -999) ? '0' : $data['c_source'];
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
         //新增的聯合主鍵 //20211022修改增加c_inst_code與c_inst_name_code
         $newid = $data['c_personid']."-".$data['c_inst_code']."-".$data['c_inst_name_code']."-".$data['c_bi_role_code'];
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
+
         return $newid;
     }
 
-    public function socialInstDeleteById($id, $c_personid)
-    {
+    public function socialInstDeleteById($id, $c_personid) {
         $addr_l = explode("-", $id);
         $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->first();
         DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $id, $row);
     }
 
-    public function eventById($id)
-    {
+    public function eventById($id) {
         #20240328移除tts_sysno
         $id_arr = explode("-", $id);
         $row = DB::table('EVENTS_DATA')->where('c_personid', $id_arr[0])->where('c_sequence', $id_arr[1])->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
         $addr_ = DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->get();
         $addr_str = [];
-        foreach ($addr_ as $key=>$value) {
+        foreach ($addr_ as $key => $value) {
             $id_ = $value->c_addr_id == 0 ? -999 : $value->c_addr_id;
             $item = [$id_, $this->addr_str($value->c_addr_id)];
             $addr_str[$key] = $item;
         }
         $event_str = null;
-        if($row->c_event_code || $row->c_event_code === 0) {
+        if ($row->c_event_code || $row->c_event_code === 0) {
             $text_ = EventCode::find($row->c_event_code);
             $event_str = $text_->c_event_code." ".$text_->c_event_name_chn." ".$text_->c_event_name;
         }
+
         return ['row' => $row, 'text_str' => $text_str, 'addr_str' => $addr_str, 'event_str' => $event_str];
     }
 
-    public function eventUpdateById(Request $request, $id, $id_)
-    {
+    public function eventUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
         $data = $this->formatSelect($data);
         $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
-	$data = (new ToolsRepository)->timestamp($data);
-	#20251208新增差異比對紀錄
-        $ori = DB::table('EVENTS_DATA')->where('c_personid',$id)->where('c_sequence',$id_)->first();
+        $data = (new ToolsRepository())->timestamp($data);
+        #20251208新增差異比對紀錄
+        $ori = DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->first();
         #20240328移除tts_sysno
-        DB::table('EVENTS_DATA')->where('c_personid',$id)->where('c_sequence',$id_)->update($data);
+        DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->update($data);
         (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data, $ori);
+
         return $data['c_sequence'];
     }
 
-    public function eventStoreById(Request $request, $id)
-    {
+    public function eventStoreById(Request $request, $id) {
         $data = $request->all();
         $data = $this->formatSelect($data);
         $data['c_personid'] = $id;
@@ -1442,41 +1472,43 @@ class BiogMainRepository
         #20240328移除tts_sysno
         #$data['tts_sysno'] = DB::table('EVENTS_DATA')->max('tts_sysno') + 1;
         $data['c_intercalary'] = (int)($data['c_intercalary']);
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('EVENTS_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $data['c_sequence'], $data);
+
         #20240328移除tts_sysno
         #return $data['tts_sysno'];
         return $data['c_sequence'];
     }
 
-    public function eventDeleteById($id, $c_personid)
-    {
-        $row = DB::table('EVENTS_DATA')->where('c_personid',$c_personid)->where('c_sequence',$id)->first();
-        DB::table('EVENTS_DATA')->where('c_personid',$c_personid)->where('c_sequence',$id)->delete();
+    public function eventDeleteById($id, $c_personid) {
+        $row = DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->first();
+        DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->delete();
         DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $id, $row);
     }
 
-    public function assocById($id)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function assocById($id) {
+        $id = str_replace("--", "-minus", $id);
         //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
         $id = $this->unionPKDef_decode($id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
         //20191028防止c_text_title欄位內含負號所做的字串重組
         $new_c_text_title = '';
-        if(!empty($temp_l[8])) {
-            for($i=7; $i<count($temp_l); $i++) {
-                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
-                else { $new_c_text_title .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[8])) {
+            for ($i = 7; $i < count($temp_l); $i++) {
+                if (empty($new_c_text_title)) {
+                    $new_c_text_title .= $temp_l[$i];
+                } else {
+                    $new_c_text_title .= "-".$temp_l[$i];
+                }
             }
             $temp_l[7] = $new_c_text_title;
         }
-        
+
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -1490,72 +1522,74 @@ class BiogMainRepository
         ])->first();
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
         $kin_code = null;
-        if($row->c_kin_code || $row->c_kin_code === 0) {
+        if ($row->c_kin_code || $row->c_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_kin_code);
             $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         //20210705新增，20210708[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係修改
         $kinship_pair = null;
-        if($row->c_kin_id || $row->c_kin_id === 0) {
+        if ($row->c_kin_id || $row->c_kin_id === 0) {
             $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_kin_code;
             $text_ = KinshipCode::find($k_p_code);
             $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         $assoc_kinship_pair = null;
-        if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
+        if ($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
             $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_assoc_kin_code;
             $text_ = KinshipCode::find($a_k_p_code);
             $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         //新增結束
         $kin_id = null;
-        if($row->c_kin_id || $row->c_kin_id === 0) {
+        if ($row->c_kin_id || $row->c_kin_id === 0) {
             $text_ = BiogMain::find($row->c_kin_id);
             $kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $assoc_code = null;
-        if($row->c_assoc_code || $row->c_assoc_code === 0) {
+        if ($row->c_assoc_code || $row->c_assoc_code === 0) {
             $text_ = AssocCode::find($row->c_assoc_code);
             $assoc_code = $text_->c_assoc_code." ".$text_->c_assoc_desc_chn." ".$text_->c_assoc_desc;
         }
         $assoc_id = null;
-        if($row->c_assoc_id || $row->c_assoc_id === 0) {
+        if ($row->c_assoc_id || $row->c_assoc_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_id);
             $assoc_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $assoc_kin_code = null;
-        if($row->c_assoc_kin_code || $row->c_assoc_kin_code === 0) {
+        if ($row->c_assoc_kin_code || $row->c_assoc_kin_code === 0) {
             $text_ = KinshipCode::find($row->c_assoc_kin_code);
             $assoc_kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         $assoc_kin_id = null;
-        if($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
+        if ($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_kin_id);
             $assoc_kin_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $tertiary_personid = null;
-        if($row->c_tertiary_personid || $row->c_tertiary_personid === 0) {
+        if ($row->c_tertiary_personid || $row->c_tertiary_personid === 0) {
             $text_ = BiogMain::find($row->c_tertiary_personid);
             $tertiary_personid = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $assoc_claimer_id = null;
-        if($row->c_assoc_claimer_id || $row->c_assoc_claimer_id === 0) {
+        if ($row->c_assoc_claimer_id || $row->c_assoc_claimer_id === 0) {
             $text_ = BiogMain::find($row->c_assoc_claimer_id);
             $assoc_claimer_id = $text_->c_personid." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $addr_id = null;
-        if($row->c_addr_id || $row->c_addr_id === 0) {
+        if ($row->c_addr_id || $row->c_addr_id === 0) {
             $text_ = AddressCode::find($row->c_addr_id);
-            if(!$text_) { $text_ = AddressCode::find(0); }
+            if (!$text_) {
+                $text_ = AddressCode::find(0);
+            }
             $addr_id = $text_->c_addr_id." ".$text_->c_name_chn." ".$text_->c_name;
         }
         $inst_code = null;
-        if($row->c_inst_code || $row->c_inst_code === 0) {
+        if ($row->c_inst_code || $row->c_inst_code === 0) {
             //20210204進行改寫
             //$text_ = SocialInst::find($row->c_inst_code);
             //$inst_code = $text_->c_inst_name_code." ".$text_->c_inst_name_hz." ".$text_->c_inst_name_py;
@@ -1567,44 +1601,62 @@ class BiogMainRepository
             $name_hz = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_hz;
             $name_py = SocialInst::where('c_inst_name_code', $text_->c_inst_name_code)->first()->c_inst_name_py;
             $res = SocialInstAddr::where('c_inst_code', $text_->c_inst_code)->first();
-            if(count((array)$res) == 0 ) $addr = "未詳";
-            else {
+            if (count((array)$res) == 0) {
+                $addr = "未詳";
+            } else {
                 $addr = AddressCode::where('c_addr_id', $res->c_inst_addr_id)->first()->c_name_chn;
             }
             $dy = $text_->c_inst_begin_year;
             $dy2 = $text_->c_inst_floruit_dy;
             $dy3 = $text_->c_inst_end_year;
             $dy4 = $text_->c_inst_last_known_year;
-            if($name_hz == null) $name_hz = "未詳";
-            if($name_py == null) $name_py = "未詳";
-            if($addr == null) $addr = "未詳";
-            if($dy == null) $dy = "未詳";
-            if($dy2 == null) $dy2 = "未詳";
-            if($dy3 == null) $dy3 = "未詳";
-            if($dy4 == null) $dy4 = "未詳";
+            if ($name_hz == null) {
+                $name_hz = "未詳";
+            }
+            if ($name_py == null) {
+                $name_py = "未詳";
+            }
+            if ($addr == null) {
+                $addr = "未詳";
+            }
+            if ($dy == null) {
+                $dy = "未詳";
+            }
+            if ($dy2 == null) {
+                $dy2 = "未詳";
+            }
+            if ($dy3 == null) {
+                $dy3 = "未詳";
+            }
+            if ($dy4 == null) {
+                $dy4 = "未詳";
+            }
             $inst_code = $text_->c_inst_code." (社交機構代碼)-".$name_hz." ".$name_py."(社交機構名稱)-".$text_->c_inst_name_code."(社交機構名稱代碼)-".$addr."(地址)-".$dy."(起年)-".$dy2."(最早見諸文獻年)-".$dy3."(訖年)-".$dy4."(最晚見諸文獻年)";
             //修改結束
         }
+
         return ['row' => $row, 'text_str' => $text_str, 'kin_code' => $kin_code, 'kin_id' => $kin_id,
             'assoc_code' => $assoc_code, 'assoc_id' => $assoc_id, 'assoc_kin_code' => $assoc_kin_code, 'assoc_kin_id' => $assoc_kin_id,
             'tertiary_personid' => $tertiary_personid, 'assoc_claimer_id' => $assoc_claimer_id, 'addr_id' => $addr_id, 'inst_code' => $inst_code, 'kinship_pair' => $kinship_pair, 'assoc_kinship_pair' => $assoc_kinship_pair];
     }
 
-    public function assocUpdateById(Request $request, $id, $c_personid)
-    {
-        $id = str_replace("--","-minus",$id);
+    public function assocUpdateById(Request $request, $id, $c_personid) {
+        $id = str_replace("--", "-minus", $id);
         //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id = $this->unionPKDef_decode($id); 
+        $id = $this->unionPKDef_decode($id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
         }
         //20191028防止c_text_title欄位內含負號所做的字串重組
         $new_c_text_title = '';
-        if(!empty($temp_l[8])) {
-            for($i=7; $i<count($temp_l); $i++) {
-                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
-                else { $new_c_text_title .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[8])) {
+            for ($i = 7; $i < count($temp_l); $i++) {
+                if (empty($new_c_text_title)) {
+                    $new_c_text_title .= $temp_l[$i];
+                } else {
+                    $new_c_text_title .= "-".$temp_l[$i];
+                }
             }
             $temp_l[7] = $new_c_text_title;
         }
@@ -1642,7 +1694,7 @@ class BiogMainRepository
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
-        $data = (new ToolsRepository)->timestamp($data);
+        $data = (new ToolsRepository())->timestamp($data);
         DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -1671,18 +1723,18 @@ class BiogMainRepository
         //20190118筆記 修改這邊的更新功能.
         //DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
         DB::table('ASSOC_DATA')->where([
-            ['c_assoc_id', '=', $c_personid], 
+            ['c_assoc_id', '=', $c_personid],
             ['c_personid', '=', $old_assoc_id],
             ['c_text_title', '=', $old_c_text_title],
         ])
         ->Where('c_assoc_code', '=', $old_c_assocship_pair1)
         ->orWhere('c_assoc_code', '=', $old_c_assocship_pair2)
         ->update($data);
+
         return $ori_data;
     }
 
-    public function assocStoreById(Request $request, $id)
-    {
+    public function assocStoreById(Request $request, $id) {
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
@@ -1697,10 +1749,10 @@ class BiogMainRepository
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
         #20250417「社會關係始年」缺省值製作，若「社會關係始年」為空，則自動填充為-9999。
-        if($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
+        if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
             $data['c_assoc_first_year'] = '-9999';
         }
-        $data = (new ToolsRepository)->timestamp($data, True);
+        $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;
         (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
@@ -1717,28 +1769,31 @@ class BiogMainRepository
         $data['c_assoc_kin_id'] = $id;
         //新增結束
         DB::table('ASSOC_DATA')->insert($data);
+
         //return $data['tts_sysno'];
         return $ori_Data;
     }
 
-    public function assocDeleteById($id, $c_personid)
-    {
+    public function assocDeleteById($id, $c_personid) {
         //20190118筆記, 修改這邊的刪除功能.
         //$row = DB::table('ASSOC_DATA')->where('tts_sysno', $id)->first();
         //DB::table('ASSOC_DATA')->where('tts_sysno', $row->tts_sysno)->delete();
-        $id = str_replace("--","-minus",$id);
+        $id = str_replace("--", "-minus", $id);
         //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id = $this->unionPKDef_decode($id); 
+        $id = $this->unionPKDef_decode($id);
         $temp_l = explode("-", $id);
-        foreach($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus","-",$value);
-        }        
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = str_replace("minus", "-", $value);
+        }
         //20191028防止c_text_title欄位內含負號所做的字串重組
         $new_c_text_title = '';
-        if(!empty($temp_l[8])) {
-            for($i=7; $i<count($temp_l); $i++) {
-                if(empty($new_c_text_title)) { $new_c_text_title .= $temp_l[$i]; }
-                else { $new_c_text_title .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[8])) {
+            for ($i = 7; $i < count($temp_l); $i++) {
+                if (empty($new_c_text_title)) {
+                    $new_c_text_title .= $temp_l[$i];
+                } else {
+                    $new_c_text_title .= "-".$temp_l[$i];
+                }
             }
             $temp_l[7] = $new_c_text_title;
         }
@@ -1773,7 +1828,7 @@ class BiogMainRepository
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
 
         // 檢查$row2是否存在後再刪除反向關係
-        if($row2 !== null) {
+        if ($row2 !== null) {
             DB::table('ASSOC_DATA')->where([
                 ['c_personid',$row2->c_personid],
                 ['c_assoc_id', $row2->c_assoc_id],
@@ -1782,18 +1837,20 @@ class BiogMainRepository
         }
     }
 
-    public function sourceById($id, $_id)
-    {
+    public function sourceById($id, $_id) {
         //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $_id = str_replace("--","-minus",$_id);
+        $_id = str_replace("--", "-minus", $_id);
         $_id = $this->unionPKDef_decode($_id);
         $temp_l = explode("-", $_id);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
-        if(!empty($temp_l[3])) {
-            for($i=2; $i<count($temp_l); $i++) {
-                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
-                else { $new_c_pages .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[3])) {
+            for ($i = 2; $i < count($temp_l); $i++) {
+                if (empty($new_c_pages)) {
+                    $new_c_pages .= $temp_l[$i];
+                } else {
+                    $new_c_pages .= "-".$temp_l[$i];
+                }
             }
             $temp_l[2] = $new_c_pages;
         }
@@ -1805,25 +1862,28 @@ class BiogMainRepository
         ])->first();
         //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
         $text_str = null;
-        if($row->c_textid || $row->c_textid === 0) {
+        if ($row->c_textid || $row->c_textid === 0) {
             $text_ = TextCode::find($row->c_textid);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
+
         return ['row' => $row, 'text_str' => $text_str];
     }
 
-    public function sourceUpdateById(Request $request, $id, $id_)
-    {
+    public function sourceUpdateById(Request $request, $id, $id_) {
         //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id_ = str_replace("--","-minus",$id_);
+        $id_ = str_replace("--", "-minus", $id_);
         $id_ = $this->unionPKDef_decode($id_);
         $temp_l = explode("-", $id_);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
-        if(!empty($temp_l[3])) {
-            for($i=2; $i<count($temp_l); $i++) {
-                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
-                else { $new_c_pages .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[3])) {
+            for ($i = 2; $i < count($temp_l); $i++) {
+                if (empty($new_c_pages)) {
+                    $new_c_pages .= $temp_l[$i];
+                } else {
+                    $new_c_pages .= "-".$temp_l[$i];
+                }
             }
             $temp_l[2] = $new_c_pages;
         }
@@ -1838,47 +1898,50 @@ class BiogMainRepository
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-	$c_modified_by = Auth::user()->name;
-	$c_modified_date = Carbon::now();
-	$data['c_modified_by'] = $c_modified_by;
-	$data['c_modified_date'] = $c_modified_date;
+        $c_modified_by = Auth::user()->name;
+        $c_modified_date = Carbon::now();
+        $data['c_modified_by'] = $c_modified_by;
+        $data['c_modified_date'] = $c_modified_date;
         DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->update($data);
         (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data, $row);
+
         return $data;
     }
 
-    public function sourceStoreById(Request $request, $id)
-    {
+    public function sourceStoreById(Request $request, $id) {
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
         $data['c_main_source'] = (int)$data['c_main_source'];
-	$data['c_self_bio'] = (int)$data['c_self_bio'];
-	$c_created_by = Auth::user()->name;
-	$c_created_date = Carbon::now();
-	$data['c_created_by'] = $c_created_by;
-	$data['c_created_date'] = $c_created_date;
+        $data['c_self_bio'] = (int)$data['c_self_bio'];
+        $c_created_by = Auth::user()->name;
+        $c_created_date = Carbon::now();
+        $data['c_created_by'] = $c_created_by;
+        $data['c_created_date'] = $c_created_date;
         DB::table('BIOG_SOURCE_DATA')->insert($data);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
+
         return $data;
     }
 
-    public function sourceDeleteById($id, $id_)
-    {
+    public function sourceDeleteById($id, $id_) {
         //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id_ = str_replace("--","-minus",$id_);
+        $id_ = str_replace("--", "-minus", $id_);
         $id_ = $this->unionPKDef_decode($id_);
         $temp_l = explode("-", $id_);
         //20200121防止c_pages欄位內含負號所做的字串重組
         $new_c_pages = '';
-        if(!empty($temp_l[3])) {
-            for($i=2; $i<count($temp_l); $i++) {
-                if(empty($new_c_pages)) { $new_c_pages .= $temp_l[$i]; }
-                else { $new_c_pages .= "-".$temp_l[$i]; }
+        if (!empty($temp_l[3])) {
+            for ($i = 2; $i < count($temp_l); $i++) {
+                if (empty($new_c_pages)) {
+                    $new_c_pages .= $temp_l[$i];
+                } else {
+                    $new_c_pages .= "-".$temp_l[$i];
+                }
             }
             $temp_l[2] = $new_c_pages;
         }
@@ -1898,8 +1961,7 @@ class BiogMainRepository
         (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
     }
 
-    protected function addr_str($id)
-    {
+    protected function addr_str($id) {
         /*20211015遮除，不使用[ADDRESSES]表，改以[ADDR_CODES]和[ADDR_BELONGS_DATA]查得資料。*/
         /*
         $row = AddressCode::find($id);
@@ -1912,18 +1974,18 @@ class BiogMainRepository
         $add = "";
         $dy = AddrBelong::where('c_addr_id', $row->c_addr_id)->value('c_belongs_to');
         $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
-        if($dy == null) {
-            $dy = 0; $add = "";
-        }
-        else {
+        if ($dy == null) {
+            $dy = 0;
+            $add = "";
+        } else {
             $dy2 = AddrCode::where('c_addr_id', $dy)->value('c_name_chn');
             $add = "[[".$dy." ".$dy2."]]";
         }
+
         return $originalText." ".$add;
     }
 
-    protected function insertAddr(Array $c_addr, $_id, $_postingid, $_officeid, $c_created_by='', $c_created_date='')
-    {
+    protected function insertAddr(array $c_addr, $_id, $_postingid, $_officeid, $c_created_by = '', $c_created_date = '') {
         DB::table('POSTED_TO_ADDR_DATA')
             ->where('c_personid', $_id)
             ->where('c_posting_id', $_postingid)
@@ -1935,115 +1997,114 @@ class BiogMainRepository
                     'c_personid' => $_id,
                     'c_posting_id' => $_postingid,
                     'c_office_id' => $_officeid,
-		    'c_addr_id' => $item == -999 ? 0 : $item,
-		    'c_created_by' => $c_created_by,
-		    'c_created_date' => $c_created_date,
+            'c_addr_id' => $item == -999 ? 0 : $item,
+            'c_created_by' => $c_created_by,
+            'c_created_date' => $c_created_date,
                 ]
             );
         }
     }
 
-    protected function updateAddr(Array $c_addr, $_id, $_postingid, $_officeid, $c_created_by='', $c_created_date='')
-    {
-	    foreach ($c_addr as $item) {
+    protected function updateAddr(array $c_addr, $_id, $_postingid, $_officeid, $c_created_by = '', $c_created_date = '') {
+        foreach ($c_addr as $item) {
 
-		    $addr = '';
-		    $addr = DB::table('POSTED_TO_ADDR_DATA')->where([
-			    ['c_personid', '=', $_id],
-			    ['c_posting_id', '=', $_postingid],
-			    ['c_office_id', '=', $_officeid],
-			    ['c_addr_id', '=', $item],
-		    ])->get();
+            $addr = '';
+            $addr = DB::table('POSTED_TO_ADDR_DATA')->where([
+                ['c_personid', '=', $_id],
+                ['c_posting_id', '=', $_postingid],
+                ['c_office_id', '=', $_officeid],
+                ['c_addr_id', '=', $item],
+            ])->get();
 
-		    if(!empty($addr)) {
-			    //有資料就更新
-			    DB::table('POSTED_TO_ADDR_DATA')->where([
+            if (!empty($addr)) {
+                //有資料就更新
+                DB::table('POSTED_TO_ADDR_DATA')->where([
                             ['c_personid', '=', $_id],
                             ['c_posting_id', '=', $_postingid],
                             ['c_office_id', '=', $_officeid],
                             ['c_addr_id', '=', $item],
                             ])
-			    ->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
-		    }
+                ->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
             }
+        }
     }
 
-    protected function insertAddrPo(Array $c_addr_id, $c_possession_record_id, $c_personid)
-    {
+    protected function insertAddrPo(array $c_addr_id, $c_possession_record_id, $c_personid) {
         DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $c_possession_record_id)->delete();
         foreach ($c_addr_id as $item) {
             DB::table('POSSESSION_ADDR')->insert(
                 [
                     'c_personid' => $c_personid,
                     'c_possession_record_id' => $c_possession_record_id,
-                    'c_addr_id' => $item == -999 ? 0 : $item
+                    'c_addr_id' => $item == -999 ? 0 : $item,
                 ]
             );
         }
     }
 
-    protected function insertAddrEvent(Array $c_addr_id, $c_event_record_id, $c_personid)
-    {
+    protected function insertAddrEvent(array $c_addr_id, $c_event_record_id, $c_personid) {
         DB::table('EVENTS_ADDR')->where('c_event_record_id', $c_event_record_id)->delete();
         foreach ($c_addr_id as $item) {
             DB::table('EVENTS_ADDR')->insert(
                 [
                     'c_personid' => $c_personid,
                     'c_event_record_id' => $c_event_record_id,
-                    'c_addr_id' => $item == -999 ? 0 : $item
+                    'c_addr_id' => $item == -999 ? 0 : $item,
                 ]
             );
         }
     }
 
-    protected function formatSelect(Array $array)
-    {
-        foreach ($array as $key => $value){
-            if ($value == -999) $array[$key] = 0;
+    protected function formatSelect(array $array) {
+        foreach ($array as $key => $value) {
+            if ($value == -999) {
+                $array[$key] = 0;
+            }
         }
+
         return $array;
     }
 
     //20200709聯合主鍵保留字弱點防禦函式
-    public function unionPKDef($key)
-    {
-        $key = str_replace("/","(slash)",$key);
+    public function unionPKDef($key) {
+        $key = str_replace("/", "(slash)", $key);
         //因為反斜線在php有用途, 兩個反斜線代表一個反斜線.
-        $key = str_replace("\\","(backslash)",$key);
-        $key = str_replace("{","(brackets)",$key);
-        $key = str_replace("}","(brackets_r)",$key);
+        $key = str_replace("\\", "(backslash)", $key);
+        $key = str_replace("{", "(brackets)", $key);
+        $key = str_replace("}", "(brackets_r)", $key);
         $result = $key;
+
         return $result;
     }
 
     //20200709欄位值解析保留字
-    function unionPKDef_decode($key)
-    {
-        $key = str_replace("(slash)","/",$key);
-        $key = str_replace("(backslash)","\\",$key);
-        $key = str_replace("(brackets)","{",$key);
-        $key = str_replace("(brackets_r)","}",$key);
+    public function unionPKDef_decode($key) {
+        $key = str_replace("(slash)", "/", $key);
+        $key = str_replace("(backslash)", "\\", $key);
+        $key = str_replace("(brackets)", "{", $key);
+        $key = str_replace("(brackets_r)", "}", $key);
         $result = $key;
+
         return $result;
     }
 
     //20230628觸發「自動生成」功能
-    function auto_pinyin($data)
-    {
+    public function auto_pinyin($data) {
         $c_surname_chn = $c_surname = $c_mingzi_chn = $c_mingzi = $c_name = '';
         $name = $data['c_name_chn'];
         $len = mb_strlen($name, 'utf-8');
-        for($i=$len; $i>=1; $i--){
+        for ($i = $len; $i >= 1; $i--) {
             $str = mb_substr($name, 0, $i, 'utf-8');
             $pinyin = DB::table('pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $str)->first();
-            if(!empty($pinyin->lastname_pinyin) && $len - $i <= 2) { //[名]的字長必須是小於等於二
+            if (!empty($pinyin->lastname_pinyin) && $len - $i <= 2) { //[名]的字長必須是小於等於二
                 $c_surname_chn = $str;
                 $c_surname = $pinyin->lastname_pinyin;
+
                 break;
             }
         }
 
-        if($c_surname_chn != '') {
+        if ($c_surname_chn != '') {
             $c_mingzi_chn = str_replace($c_surname_chn, '', $name);
             $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
             $c_name = $c_surname.' '.$c_mingzi;
@@ -2052,8 +2113,7 @@ class BiogMainRepository
             $data['c_mingzi_chn'] = $c_mingzi_chn;
             $data['c_mingzi'] = $c_mingzi;
             $data['c_name'] = $c_name;
-        }
-        else{
+        } else {
             $c_mingzi_chn = $name;
             $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
             $c_name = $c_surname.' '.$c_mingzi;
@@ -2061,7 +2121,7 @@ class BiogMainRepository
             $data['c_mingzi'] = $c_mingzi;
             $data['c_name'] = $c_name;
         }
+
         return $data;
     }
-
 }

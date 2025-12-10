@@ -1,19 +1,17 @@
 <?php
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class AddAdminCatCodeToAddrCodesTable extends Migration
-{
+class AddAdminCatCodeToAddrCodesTable extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         $this->ensureDefaultAdminCategoryRow();
 
         if (!Schema::hasColumn('ADDR_CODES', 'c_admin_cat_code')) {
@@ -42,8 +40,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         if ($this->foreignKeyExists('ADDR_CODES', 'fk_addr_codes_admin_cat_code')) {
             Schema::table('ADDR_CODES', function (Blueprint $table) {
                 $table->dropForeign('fk_addr_codes_admin_cat_code');
@@ -60,8 +57,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
     /**
      * Determine if a foreign key already exists on the table.
      */
-    protected function foreignKeyExists(string $table, string $keyName): bool
-    {
+    protected function foreignKeyExists(string $table, string $keyName): bool {
         $database = Schema::getConnection()->getDatabaseName();
 
         return DB::table('information_schema.TABLE_CONSTRAINTS')
@@ -75,8 +71,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
     /**
      * Normalize existing ADDR_CODES rows so they reference valid categories.
      */
-    protected function ensureValidAdminCategoryCodes(): void
-    {
+    protected function ensureValidAdminCategoryCodes(): void {
         if (!Schema::hasColumn('ADDR_CODES', 'c_admin_cat_code')) {
             return;
         }
@@ -110,8 +105,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
     /**
      * Make sure ADMIN_CAT_CODES has at least the fallback record.
      */
-    protected function ensureDefaultAdminCategoryRow(): void
-    {
+    protected function ensureDefaultAdminCategoryRow(): void {
         if (!Schema::hasTable('ADMIN_CAT_CODES')) {
             return;
         }
@@ -122,7 +116,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration
                 'c_admin_cat_py' => 'unknown',
                 'c_admin_cat_hz' => '未分類',
                 'c_admin_cat_trans' => 'Unknown category',
-                'c_notes' => 'Auto-generated fallback to satisfy ADDR_CODES foreign key.'
+                'c_notes' => 'Auto-generated fallback to satisfy ADDR_CODES foreign key.',
             ]
         );
     }

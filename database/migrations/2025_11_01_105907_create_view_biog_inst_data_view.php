@@ -3,18 +3,17 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-class CreateViewBiogInstDataView extends Migration
-{
+class CreateViewBiogInstDataView extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         DB::statement('DROP VIEW IF EXISTS View_BiogInstData');
 
-        DB::statement(<<<'SQL'
+        DB::statement(
+            <<<'SQL'
 CREATE VIEW View_BiogInstData AS
 SELECT
     bi.c_personid,
@@ -81,8 +80,7 @@ SQL
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         DB::statement('DROP VIEW IF EXISTS View_BiogInstData');
     }
 }

@@ -10,8 +10,7 @@ use Illuminate\Support\Facades\DB;
  *
  * 处理时间段分割和多级归属关系，保留数据间隙以讲述最连续的故事
  */
-class RegenerateAddresses extends Command
-{
+class RegenerateAddresses extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -43,8 +42,7 @@ class RegenerateAddresses extends Command
      *
      * @return int
      */
-    public function handle()
-    {
+    public function handle() {
         $this->info('==========================================================');
         $this->info('开始重建地址层级关系（保留间隙）...');
         $this->info('==========================================================');
@@ -88,6 +86,7 @@ class RegenerateAddresses extends Command
         } catch (\Exception $e) {
             $this->error('重建过程中发生错误: ' . $e->getMessage());
             $this->error($e->getTraceAsString());
+
             return 1;
         }
     }
@@ -96,8 +95,7 @@ class RegenerateAddresses extends Command
      * 清理 ADDR_BELONGS_DATA 中的无效数据
      * 这是 Michael 代码中的关键步骤
      */
-    protected function cleanBelongsData()
-    {
+    protected function cleanBelongsData() {
         // 创建临时表存储清理后的数据
         DB::statement('DROP TEMPORARY TABLE IF EXISTS CLEANED_BELONGS_DATA');
         DB::statement('
@@ -134,6 +132,7 @@ class RegenerateAddresses extends Command
             if (empty($row->c_belongs_to) || $row->c_belongs_to == 0) {
                 $invalidCount++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -142,6 +141,7 @@ class RegenerateAddresses extends Command
                 $this->warn("\n  警告: belongs_to 单位 {$row->c_belongs_to} 不存在");
                 $invalidCount++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -157,6 +157,7 @@ class RegenerateAddresses extends Command
                 $this->warn("\n  警告: 时间范围包含 NULL: {$row->c_addr_id} -> {$row->c_belongs_to}");
                 $invalidCount++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -164,6 +165,7 @@ class RegenerateAddresses extends Command
                 $this->warn("\n  警告: 无效时间范围: {$row->c_addr_id} -> {$row->c_belongs_to} ({$effective_first} > {$effective_last})");
                 $invalidCount++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -192,8 +194,7 @@ class RegenerateAddresses extends Command
      * 构建时间段（包含间隙）
      * 这保留了数据中的间隙，讲述最连续的故事
      */
-    protected function buildTimeSegmentsWithGaps()
-    {
+    protected function buildTimeSegmentsWithGaps() {
         // 创建结果表
         DB::statement('DROP TEMPORARY TABLE IF EXISTS TIME_SEGMENTS');
         DB::statement('
@@ -241,6 +242,7 @@ class RegenerateAddresses extends Command
             // 跳过无效年份
             if ($addrFirst === null || $addrLast === null || $addrFirst > $addrLast) {
                 $bar->advance();
+
                 continue;
             }
 
@@ -271,8 +273,8 @@ class RegenerateAddresses extends Command
                             'level1' => [
                                 'id' => $l1Id,
                                 'start' => $currentYear,
-                                'end' => $l1Start - 1
-                            ]
+                                'end' => $l1Start - 1,
+                            ],
                         ];
                         $this->insertSegment($addrId, $currentYear, $l1Start - 1, $gapChain);
                     }
@@ -292,8 +294,8 @@ class RegenerateAddresses extends Command
                             'level1' => [
                                 'id' => $lastL1->c_belongs_to,
                                 'start' => $currentYear,
-                                'end' => $addrLast
-                            ]
+                                'end' => $addrLast,
+                            ],
                         ];
                         $this->insertSegment($addrId, $currentYear, $addrLast, $gapChain);
                     }
@@ -314,8 +316,7 @@ class RegenerateAddresses extends Command
     /**
      * 处理 Level 1 归属期间，填充 Level 2+ 关系中的间隙
      */
-    protected function processLevel1WithGaps($addrId, $l1Id, $l1Start, $l1End)
-    {
+    protected function processLevel1WithGaps($addrId, $l1Id, $l1Start, $l1End) {
         if ($l1Start === null || $l1End === null) {
             return;
         }
@@ -333,7 +334,7 @@ class RegenerateAddresses extends Command
         if (empty($level2Belongs)) {
             // 整个 L1 期间没有 Level 2
             $chain = [
-                'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End]
+                'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End],
             ];
             $this->insertSegment($addrId, $l1Start, $l1End, $chain);
         } else {
@@ -352,14 +353,21 @@ class RegenerateAddresses extends Command
                 // 填充此 L2 之前的间隙（如果需要）
                 if ($currentYear < $l2EffectiveStart) {
                     $gapChain = [
-                        'level1' => ['id' => $l1Id, 'start' => $currentYear, 'end' => $l2EffectiveStart - 1]
+                        'level1' => ['id' => $l1Id, 'start' => $currentYear, 'end' => $l2EffectiveStart - 1],
                     ];
                     $this->insertSegment($addrId, $currentYear, $l2EffectiveStart - 1, $gapChain);
                 }
 
                 // 处理实际的 L2 期间及更深层级
-                $this->processLevel2WithGaps($addrId, $l1Id, $l1Start, $l1End,
-                    $l2->c_belongs_to, $l2EffectiveStart, $l2EffectiveEnd);
+                $this->processLevel2WithGaps(
+                    $addrId,
+                    $l1Id,
+                    $l1Start,
+                    $l1End,
+                    $l2->c_belongs_to,
+                    $l2EffectiveStart,
+                    $l2EffectiveEnd
+                );
 
                 $currentYear = $l2EffectiveEnd + 1;
             }
@@ -367,7 +375,7 @@ class RegenerateAddresses extends Command
             // 填充 L1 期间末尾的间隙（如果需要）
             if ($currentYear <= $l1End) {
                 $gapChain = [
-                    'level1' => ['id' => $l1Id, 'start' => $currentYear, 'end' => $l1End]
+                    'level1' => ['id' => $l1Id, 'start' => $currentYear, 'end' => $l1End],
                 ];
                 $this->insertSegment($addrId, $currentYear, $l1End, $gapChain);
             }
@@ -377,8 +385,7 @@ class RegenerateAddresses extends Command
     /**
      * 处理 Level 2 及更深层级，继续填充间隙
      */
-    protected function processLevel2WithGaps($addrId, $l1Id, $l1Start, $l1End, $l2Id, $l2Start, $l2End)
-    {
+    protected function processLevel2WithGaps($addrId, $l1Id, $l1Start, $l1End, $l2Id, $l2Start, $l2End) {
         if ($l2Start === null || $l2End === null) {
             return;
         }
@@ -397,7 +404,7 @@ class RegenerateAddresses extends Command
             // 整个 L2 期间没有 Level 3
             $chain = [
                 'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End],
-                'level2' => ['id' => $l2Id, 'start' => $l2Start, 'end' => $l2End]
+                'level2' => ['id' => $l2Id, 'start' => $l2Start, 'end' => $l2End],
             ];
             $this->insertSegment($addrId, $l2Start, $l2End, $chain);
         } else {
@@ -417,7 +424,7 @@ class RegenerateAddresses extends Command
                 if ($currentYear < $l3EffectiveStart) {
                     $gapChain = [
                         'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End],
-                        'level2' => ['id' => $l2Id, 'start' => $currentYear, 'end' => $l3EffectiveStart - 1]
+                        'level2' => ['id' => $l2Id, 'start' => $currentYear, 'end' => $l3EffectiveStart - 1],
                     ];
                     $this->insertSegment($addrId, $currentYear, $l3EffectiveStart - 1, $gapChain);
                 }
@@ -426,12 +433,18 @@ class RegenerateAddresses extends Command
                 $chain = [
                     'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End],
                     'level2' => ['id' => $l2Id, 'start' => $l2Start, 'end' => $l2End],
-                    'level3' => ['id' => $l3->c_belongs_to, 'start' => $l3EffectiveStart, 'end' => $l3EffectiveEnd]
+                    'level3' => ['id' => $l3->c_belongs_to, 'start' => $l3EffectiveStart, 'end' => $l3EffectiveEnd],
                 ];
 
                 // 继续到 L4 和 L5（如果需要）
-                $this->processDeeperLevels($addrId, $chain, $l3->c_belongs_to,
-                    $l3EffectiveStart, $l3EffectiveEnd, 3);
+                $this->processDeeperLevels(
+                    $addrId,
+                    $chain,
+                    $l3->c_belongs_to,
+                    $l3EffectiveStart,
+                    $l3EffectiveEnd,
+                    3
+                );
 
                 $currentYear = $l3EffectiveEnd + 1;
             }
@@ -440,7 +453,7 @@ class RegenerateAddresses extends Command
             if ($currentYear <= $l2End) {
                 $gapChain = [
                     'level1' => ['id' => $l1Id, 'start' => $l1Start, 'end' => $l1End],
-                    'level2' => ['id' => $l2Id, 'start' => $currentYear, 'end' => $l2End]
+                    'level2' => ['id' => $l2Id, 'start' => $currentYear, 'end' => $l2End],
                 ];
                 $this->insertSegment($addrId, $currentYear, $l2End, $gapChain);
             }
@@ -450,8 +463,7 @@ class RegenerateAddresses extends Command
     /**
      * 通用处理器，用于 level 4 和 5
      */
-    protected function processDeeperLevels($addrId, $chain, $parentId, $start, $end, $currentLevel)
-    {
+    protected function processDeeperLevels($addrId, $chain, $parentId, $start, $end, $currentLevel) {
         if ($start === null || $end === null) {
             return;
         }
@@ -459,6 +471,7 @@ class RegenerateAddresses extends Command
         if ($currentLevel >= 5) {
             // 已达到最大深度，保存段
             $this->insertSegment($addrId, $start, $end, $chain);
+
             return;
         }
 
@@ -499,12 +512,18 @@ class RegenerateAddresses extends Command
                 $newChain["level{$nextLevel}"] = [
                     'id' => $nb->c_belongs_to,
                     'start' => $nbStart,
-                    'end' => $nbEnd
+                    'end' => $nbEnd,
                 ];
 
                 // 继续更深
-                $this->processDeeperLevels($addrId, $newChain, $nb->c_belongs_to,
-                    $nbStart, $nbEnd, $nextLevel);
+                $this->processDeeperLevels(
+                    $addrId,
+                    $newChain,
+                    $nb->c_belongs_to,
+                    $nbStart,
+                    $nbEnd,
+                    $nextLevel
+                );
 
                 $currentYear = $nbEnd + 1;
             }
@@ -519,8 +538,7 @@ class RegenerateAddresses extends Command
     /**
      * 插入时间段记录
      */
-    protected function insertSegment($addrId, $start, $end, $chain)
-    {
+    protected function insertSegment($addrId, $start, $end, $chain) {
         if ($start === null || $end === null) {
             return;
         }
@@ -551,8 +569,7 @@ class RegenerateAddresses extends Command
     /**
      * 构建最终 ADDRESSES 表
      */
-    protected function buildFinalAddressesTable()
-    {
+    protected function buildFinalAddressesTable() {
         // 清空现有数据
         DB::table('ADDRESSES')->truncate();
 
@@ -631,8 +648,7 @@ class RegenerateAddresses extends Command
     /**
      * 验证特定示例案例
      */
-    protected function verifyExampleCases()
-    {
+    protected function verifyExampleCases() {
         $this->info('验证示例案例...');
         $this->newLine();
 
@@ -694,8 +710,7 @@ class RegenerateAddresses extends Command
     /**
      * 显示统计信息
      */
-    protected function displayStats()
-    {
+    protected function displayStats() {
         $this->info('=== 统计信息 ===');
         $this->info(sprintf('  ✓ 有效归属记录: %s', number_format($this->stats['cleaned_belongs'])));
         $this->info(sprintf('  ✓ 无效归属记录: %s', number_format($this->stats['invalid_belongs'])));
@@ -709,8 +724,7 @@ class RegenerateAddresses extends Command
     /**
      * 安全的 min 函数，忽略 NULL 值
      */
-    protected function safeMin(...$values)
-    {
+    protected function safeMin(...$values) {
         $validValues = array_filter($values, function ($v) {
             return $v !== null;
         });
@@ -721,8 +735,7 @@ class RegenerateAddresses extends Command
     /**
      * 安全的 max 函数，忽略 NULL 值
      */
-    protected function safeMax(...$values)
-    {
+    protected function safeMax(...$values) {
         $validValues = array_filter($values, function ($v) {
             return $v !== null;
         });

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,13 +9,10 @@
 
 namespace App\Repositories;
 
-
 use App\YearRangeCode;
 
-class YearRangeRepository
-{
-    public function yearRange()
-    {
+class YearRangeRepository {
+    public function yearRange() {
         return YearRangeCode::select(['c_range_code', 'c_range', 'c_range_chn'])->get();
     }
 }

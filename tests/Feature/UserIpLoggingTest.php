@@ -3,15 +3,13 @@
 namespace Tests\Feature;
 
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
-class UserIpLoggingTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class UserIpLoggingTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -38,14 +36,12 @@ class UserIpLoggingTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
-    public function testRegistrationPersistsIpAddresses()
-    {
+    public function testRegistrationPersistsIpAddresses() {
         $response = $this->withServerVariables(['REMOTE_ADDR' => '123.45.67.89'])
             ->post('/register', [
                 'name' => 'Register Tester',
@@ -67,8 +63,7 @@ class UserIpLoggingTest extends TestCase
         $this->assertArrayNotHasKey('last_login_at', $settings);
     }
 
-    public function testLoginUpdatesLastLoginIp()
-    {
+    public function testLoginUpdatesLastLoginIp() {
         $user = User::create([
             'name' => 'Login Tester',
             'email' => 'login@example.com',
@@ -97,8 +92,7 @@ class UserIpLoggingTest extends TestCase
         $this->assertArrayNotHasKey('registration_at', $settings);
     }
 
-    public function testLoginDoesNotBackfillRegistrationFields()
-    {
+    public function testLoginDoesNotBackfillRegistrationFields() {
         $user = User::create([
             'name' => 'No Registration Info',
             'email' => 'noreg@example.com',

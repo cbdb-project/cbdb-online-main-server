@@ -2,28 +2,25 @@
 
 namespace Tests\Feature;
 
-use App\User;
 use App\Repositories\BiogMainRepository;
-use App\Repositories\OperationRepository;
-use Illuminate\Support\Facades\Schema;
+use App\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
  * 測試 BiogMain 基本資料姓名欄位合併邏輯
- * 
+ *
  * 根據 edit.blade.php 和 BiogMainRepository::updateById() 的實作：
  * - 姓名(中) = 姓 + 名
  * - 姓名(拼音) = Xing + ' ' + Ming
  * - 外文全名 = 外文名 + ' ' + 外文姓（名+姓順序）
  * - 外文羅馬字轉寫姓名 = 外文羅馬字轉寫名 + ' ' + 外文羅馬字轉寫姓
  */
-class BiogMainBasicInfoNameMergeTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BiogMainBasicInfoNameMergeTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 數據庫
@@ -35,7 +32,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
         ]);
 
         // 創建必要的測試表結構
-        
+
         // 創建 operations 表（用於記錄操作歷史）
         Schema::dropIfExists('operations');
         Schema::create('operations', function (Blueprint $table) {
@@ -49,7 +46,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
             $table->text('resource_original')->nullable();
             $table->timestamps();
         });
-        
+
         Schema::dropIfExists('BIOG_MAIN');
         Schema::create('BIOG_MAIN', function (Blueprint $table) {
             $table->integer('c_personid')->primary();
@@ -90,8 +87,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('users');
@@ -101,8 +97,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試所有姓名欄位都有值時的合併邏輯
      */
-    public function testNameMergeWithAllFieldsFilled()
-    {
+    public function testNameMergeWithAllFieldsFilled() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -149,16 +144,16 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         // 重新查詢以獲取更新後的數據
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2345)->first();
-        
+
         // 姓名(中) = 姓 + 名
         $this->assertSame('李白', $person->c_name_chn);
-        
+
         // 姓名(拼音) = Xing + ' ' + Ming
         $this->assertSame('Li Bai', $person->c_name);
-        
+
         // 外文全名 = 外文名 + ' ' + 外文姓（名+姓順序）
         $this->assertSame('Mary Johnson', $person->c_name_proper);
-        
+
         // 外文羅馬字轉寫姓名 = 外文羅馬字轉寫名 + ' ' + 外文羅馬字轉寫姓
         $this->assertSame('Bái Lǐ', $person->c_name_rm);
     }
@@ -166,8 +161,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試部分姓名欄位為空時的合併邏輯
      */
-    public function testNameMergeWithPartialFields()
-    {
+    public function testNameMergeWithPartialFields() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -206,11 +200,11 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         // 重新查詢以獲取更新後的數據
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2346)->first();
-        
+
         // 中文姓名正常合併
         $this->assertSame('杜甫', $person->c_name_chn);
         $this->assertSame('Du Fu', $person->c_name);
-        
+
         // 外文欄位為空時，合併結果應該是空字串（trim 後）
         $this->assertSame('', $person->c_name_proper);
         $this->assertSame('', $person->c_name_rm);
@@ -219,8 +213,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試只有名沒有姓的情況
      */
-    public function testNameMergeWithOnlyGivenName()
-    {
+    public function testNameMergeWithOnlyGivenName() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -258,7 +251,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         // 重新查詢以獲取更新後的數據
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2347)->first();
-        
+
         // 只有名時，姓名欄位應該等於名
         $this->assertSame('孔子', $person->c_name_chn);
         $this->assertSame('Confucius', $person->c_name); // trim 後移除前導空格
@@ -268,8 +261,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試提交相同值時不產生變更（無操作記錄）
      */
-    public function testNameMergeWithNoChanges()
-    {
+    public function testNameMergeWithNoChanges() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -308,12 +300,12 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         $response->assertStatus(302);
         $response->assertSessionHas('flash_notification');
-        
+
         // 驗證資料未變更
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2348)->first();
         $this->assertSame('歐陽修', $person->c_name_chn);
         $this->assertSame('Ouyang Xiu', $person->c_name);
-        
+
         // 驗證沒有產生新的操作記錄（因為資料未變更）
         $operationCountAfter = DB::table('operations')->count();
         $this->assertSame($operationCountBefore, $operationCountAfter, '提交相同值時不應產生操作記錄');
@@ -322,8 +314,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試外文姓名的名+姓順序（與中文相反）
      */
-    public function testProperNameOrderIsGivenNameFirst()
-    {
+    public function testProperNameOrderIsGivenNameFirst() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -362,11 +353,11 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         // 重新查詢以獲取更新後的數據
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2349)->first();
-        
+
         // 中文：姓+名
         $this->assertSame('張三', $person->c_name_chn);
         $this->assertSame('Zhang San', $person->c_name);
-        
+
         // 外文：名+姓（與中文相反）
         $this->assertSame('Jane Doe', $person->c_name_proper);
         $this->assertSame('Sān Zhāng', $person->c_name_rm);
@@ -375,8 +366,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試空格處理（trim 功能）
      */
-    public function testNameMergeTrimsWhitespace()
-    {
+    public function testNameMergeTrimsWhitespace() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
@@ -415,7 +405,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
 
         // 重新查詢以獲取更新後的數據
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2350)->first();
-        
+
         // trim 應該移除前後空格，Laravel 的 ConvertEmptyStringsToNull 中間件會將空字串轉為 null
         $this->assertNull($person->c_name_proper);
         $this->assertNull($person->c_name_rm);
@@ -424,8 +414,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試未登入用戶無法更新
      */
-    public function testGuestCannotUpdateNames()
-    {
+    public function testGuestCannotUpdateNames() {
         \App\BiogMain::create([
             'c_personid' => 2351,
             'c_surname_chn' => '劉',
@@ -467,8 +456,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
     /**
      * 測試非活躍用戶無法更新
      */
-    public function testInactiveUserCannotUpdateNames()
-    {
+    public function testInactiveUserCannotUpdateNames() {
         $user = User::create([
             'name' => 'Inactive User',
             'email' => 'inactive@example.com',
@@ -521,8 +509,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
      * 注意：confirmation_token 必須為 null 才表示郵箱已驗證
      * 由於 is_active 不在 $fillable 中，需要直接設置屬性
      */
-    private function createActiveUser(): User
-    {
+    private function createActiveUser(): User {
         $user = new User([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -531,7 +518,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase
         ]);
         $user->is_active = 1;  // STATUS_ACTIVE - 直接設置因為不在 fillable 中
         $user->save();
-        
+
         return $user;
     }
 }

@@ -14,8 +14,7 @@ if (!function_exists('disable_foreign_keys')) {
      *
      * @return void
      */
-    function disable_foreign_keys()
-    {
+    function disable_foreign_keys() {
         $driver = DB::getDriverName();
 
         if ($driver === 'mysql') {
@@ -32,8 +31,7 @@ if (!function_exists('enable_foreign_keys')) {
      *
      * @return void
      */
-    function enable_foreign_keys()
-    {
+    function enable_foreign_keys() {
         $driver = DB::getDriverName();
 
         if ($driver === 'mysql') {
@@ -50,8 +48,7 @@ if (!function_exists('get_current_timestamp_sql')) {
      *
      * @return string
      */
-    function get_current_timestamp_sql()
-    {
+    function get_current_timestamp_sql() {
         $driver = DB::getDriverName();
 
         if ($driver === 'mysql') {
@@ -70,8 +67,7 @@ if (!function_exists('is_mysql')) {
      *
      * @return bool
      */
-    function is_mysql()
-    {
+    function is_mysql() {
         return DB::getDriverName() === 'mysql';
     }
 }
@@ -82,8 +78,7 @@ if (!function_exists('is_sqlite')) {
      *
      * @return bool
      */
-    function is_sqlite()
-    {
+    function is_sqlite() {
         return DB::getDriverName() === 'sqlite';
     }
 }

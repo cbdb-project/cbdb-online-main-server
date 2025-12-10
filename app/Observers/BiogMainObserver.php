@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * 監聽 BiogMain 模型的增刪改事件，自動維護姓名搜尋索引。
  */
-class BiogMainObserver
-{
+class BiogMainObserver {
     /**
      * 姓名索引服務
      *
@@ -25,8 +24,7 @@ class BiogMainObserver
      *
      * @param NameSearchIndexService $indexService
      */
-    public function __construct(NameSearchIndexService $indexService)
-    {
+    public function __construct(NameSearchIndexService $indexService) {
         $this->indexService = $indexService;
     }
 
@@ -36,8 +34,7 @@ class BiogMainObserver
      * @param BiogMain $person
      * @return void
      */
-    public function created(BiogMain $person)
-    {
+    public function created(BiogMain $person) {
         // 檢查索引表是否存在
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;
@@ -52,8 +49,7 @@ class BiogMainObserver
      * @param BiogMain $person
      * @return void
      */
-    public function updated(BiogMain $person)
-    {
+    public function updated(BiogMain $person) {
         // 檢查索引表是否存在
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;
@@ -71,8 +67,7 @@ class BiogMainObserver
      * @param BiogMain $person
      * @return void
      */
-    public function deleted(BiogMain $person)
-    {
+    public function deleted(BiogMain $person) {
         // 檢查索引表是否存在
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;

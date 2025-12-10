@@ -9,13 +9,12 @@ use App\Services\NameSearchIndexService;
 use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Arr;
 
-class BasicInformationAltnamesController extends Controller
-{
+class BasicInformationAltnamesController extends Controller {
     /**
      * @var BiogMainRepository
      */
@@ -28,21 +27,21 @@ class BasicInformationAltnamesController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, NameSearchIndexService $nameSearchIndexService)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository, NameSearchIndexService $nameSearchIndexService) {
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id)
-    {
+    public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAlt($id);
+
         return view('biogmains.altname.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名']);
     }
@@ -52,8 +51,7 @@ class BasicInformationAltnamesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create($id)
-    {
+    public function create($id) {
         return view('biogmains.altname.create', [
             'id' => $id,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 别名', 'page_url' => '/basicinformation/'.$id.'/altnames']);
@@ -65,16 +63,17 @@ class BasicInformationAltnamesController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, $id)
-    {
+    public function store(Request $request, $id) {
         // 權限檢查
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -90,6 +89,7 @@ class BasicInformationAltnamesController extends Controller
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -97,7 +97,7 @@ class BasicInformationAltnamesController extends Controller
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, True);
+        $data = $this->toolsRepository->timestamp($data, true);
 
         // 檢查重複資料
         $temp = DB::table('ALTNAME_DATA')->where([
@@ -108,6 +108,7 @@ class BasicInformationAltnamesController extends Controller
         ])->first();
         if (!blank($temp)) {
             flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -127,6 +128,7 @@ class BasicInformationAltnamesController extends Controller
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
         $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
+
         return redirect()->route('basicinformation.altnames.edit', [
             'basicinformation' => $id,
             'altname' => $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'],
@@ -139,8 +141,7 @@ class BasicInformationAltnamesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
 
     }
 
@@ -150,8 +151,7 @@ class BasicInformationAltnamesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $alt)
-    {
+    public function edit($id, $alt) {
         $addr_l = $this->parseAltnameId($alt);
 
         $row = DB::table('ALTNAME_DATA')->where([
@@ -173,7 +173,7 @@ class BasicInformationAltnamesController extends Controller
         }
 
         $text_str = null;
-        if($row->c_source || $row->c_source === 0) {
+        if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
             if ($text_) {
                 $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
@@ -194,16 +194,17 @@ class BasicInformationAltnamesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $alt)
-    {
+    public function update(Request $request, $id, $alt) {
         // 權限檢查
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -219,6 +220,7 @@ class BasicInformationAltnamesController extends Controller
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
 
@@ -244,7 +246,9 @@ class BasicInformationAltnamesController extends Controller
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->update($data);
 
-        if($data['c_sequence'] == NULL) { $data['c_sequence'] = 'NULL'; }
+        if ($data['c_sequence'] == null) {
+            $data['c_sequence'] = 'NULL';
+        }
         $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data, $ori);
 
@@ -278,8 +282,9 @@ class BasicInformationAltnamesController extends Controller
         //20200709引用聯合主鍵保留字弱點防禦函式
         $new_alt = $this->biogMainRepository->unionPKDef($new_alt);
         //20210715新增錯別字過濾
-        $errWord = array('?', '', '�');
+        $errWord = ['?', '', '�'];
         $new_alt = str_replace($errWord, '', $new_alt);
+
         return redirect()->route('basicinformation.altnames.edit', [
             'basicinformation' => $id,
             'altname' => $new_alt,
@@ -292,14 +297,14 @@ class BasicInformationAltnamesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $alt)
-    {
+    public function destroy($id, $alt) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $addr_l = $this->parseAltnameId($alt);
@@ -331,6 +336,7 @@ class BasicInformationAltnamesController extends Controller
         }
 
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.altnames.index', ['basicinformation' => $id]);
     }
 
@@ -341,20 +347,19 @@ class BasicInformationAltnamesController extends Controller
      * @param string $alt 複合主鍵 ID
      * @return array 包含 4 個元素的陣列 [c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
      */
-    protected function parseAltnameId($alt)
-    {
+    protected function parseAltnameId($alt) {
         // 檢測分隔符類型：支持兩種格式 '_._' 或 '-'
         if (strpos($alt, '_._') !== false) {
             // 使用 _._格式
             $addr_l = explode('_._', $alt);
         } else {
             // 使用 - 格式
-            $alt = str_replace("--","-minus",$alt);
+            $alt = str_replace("--", "-minus", $alt);
             //聯合主鍵保留字弱點防禦函式，解析保留字。
             $alt = $this->biogMainRepository->unionPKDef_decode($alt);
             $addr_l = explode("-", $alt);
-            foreach($addr_l as $key => $value) {
-                $addr_l[$key] = str_replace("minus","-",$value);
+            foreach ($addr_l as $key => $value) {
+                $addr_l[$key] = str_replace("minus", "-", $value);
             }
         }
 
@@ -369,8 +374,8 @@ class BasicInformationAltnamesController extends Controller
         }
 
         // 處理 NULL 值
-        if(isset($addr_l[1]) && $addr_l[1] == 'NULL') {
-            $addr_l[1] = NULL;
+        if (isset($addr_l[1]) && $addr_l[1] == 'NULL') {
+            $addr_l[1] = null;
         }
 
         return $addr_l;

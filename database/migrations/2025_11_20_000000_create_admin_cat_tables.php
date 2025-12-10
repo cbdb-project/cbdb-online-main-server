@@ -1,18 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class CreateAdminCatTables extends Migration
-{
+class CreateAdminCatTables extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         // Create ADMIN_CAT_CODES table
         Schema::create('ADMIN_CAT_CODES', function (Blueprint $table) {
             $table->integer('c_admin_cat_code')->primary();
@@ -58,8 +56,7 @@ class CreateAdminCatTables extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         // Drop tables in reverse order to handle foreign key constraints
         Schema::dropIfExists('ADMIN_CAT_CODE_TYPE_REL');
         Schema::dropIfExists('ADMIN_CAT_TYPES');

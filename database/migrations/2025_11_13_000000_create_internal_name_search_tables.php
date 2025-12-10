@@ -2,18 +2,16 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-class CreateInternalNameSearchTables extends Migration
-{
+class CreateInternalNameSearchTables extends Migration {
     /**
      * Run the migrations.
      *
      * @return void
      */
-    public function up()
-    {
+    public function up() {
         Schema::create('CBDB__NAME_FTS', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->charset = 'utf8mb4';
@@ -51,8 +49,7 @@ class CreateInternalNameSearchTables extends Migration
      *
      * @return void
      */
-    public function down()
-    {
+    public function down() {
         Schema::dropIfExists('CBDB__TRAD_SIMP_MAP');
         Schema::dropIfExists('CBDB__NAME_FTS');
     }

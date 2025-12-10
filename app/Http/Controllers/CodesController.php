@@ -6,17 +6,15 @@ use App\Operation;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use phpDocumentor\Reflection\Types\Null_;
 
-class CodesController extends Controller
-{
+class CodesController extends Controller {
     protected $codesrepostory;
     protected $operationRepository;
 
@@ -144,8 +142,7 @@ class CodesController extends Controller
      */
     protected $tableColumnsCache = [];
 
-    public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository)
-    {
+    public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository) {
         $this->codesrepostory = $codesRepository;
         $this->operationRepository = $operationRepository;
         $this->allowedTables = $this->codesrepostory->allowedTables();
@@ -157,18 +154,18 @@ class CodesController extends Controller
         }
     }
 
-    protected function guardTable(string $table): string
-    {
+    protected function guardTable(string $table): string {
         $key = strtoupper($table);
         if (!isset($this->allowedTablesMap[$key])) {
             abort(404);
         }
+
         return $this->allowedTablesMap[$key];
     }
 
-    public function index()
-    {
+    public function index() {
         $data = $this->codesrepostory->codes();
+
         return view('codes.index', [
             'page_title' => 'Codes',
             'page_description' => '全部表格',
@@ -177,10 +174,10 @@ class CodesController extends Controller
         ]);
     }
 
-    public function show(Request $request, $table_name)
-    {
+    public function show(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
         $search = trim((string) $request->query('search', ''));
+
         try {
             $perPage = config('codes.per_page', 20);
             $query = DB::table($table);
@@ -239,22 +236,23 @@ class CodesController extends Controller
                 'keyColumns' => $keyColumns,
                 'copyrightNote' => $copyrightNote,
             ]);
-        }catch (\PDOException $e){
+        } catch (\PDOException $e) {
             flash('找不到该数据表', 'warning');
+
             return redirect()->back();
         }
     }
 
-    public function edit($table_name,$id)
-    {
-//        dd($table_name);
+    public function edit($table_name, $id) {
+        //        dd($table_name);
         $table = $this->guardTable($table_name);
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
-        if($table){
-            try{
+        if ($table) {
+            try {
                 $keyColumns = $this->getKeyColumns($table);
                 $conditions = $this->buildConditionsFromId($keyColumns, $id);
 
@@ -266,6 +264,7 @@ class CodesController extends Controller
 
                 if (!$data) {
                     flash('找不到该数据表', 'warning');
+
                     return redirect()->back();
                 }
 
@@ -279,28 +278,31 @@ class CodesController extends Controller
                     'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
                     'id' => $compositeId, 'row' => $rowArray,
                     'table' => $table]);
-            }catch (\PDOException $e) {
+            } catch (\PDOException $e) {
                 flash('找不到该数据表', 'warning');
+
                 return redirect()->back();
             }
 
         }
+
         return redirect()->route('codes.index');
     }
 
-    public function update(Request $request, $table_name, $id)
-    {
+    public function update(Request $request, $table_name, $id) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $keyColumns = $this->getKeyColumns($table);
@@ -319,10 +321,12 @@ class CodesController extends Controller
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isDuplicateKeyException($e)) {
                 flash('更新失敗：主鍵或唯一值已存在。', 'error');
+
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['duplicate' => '更新失敗：主鍵或唯一值已存在。']);
             }
+
             throw $e;
         }
 
@@ -338,12 +342,12 @@ class CodesController extends Controller
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設遮除的第1個欄位呈現。
-    public function create($table_name)
-    {
-//        dd($table_name);
+    public function create($table_name) {
+        //        dd($table_name);
         $table = $this->guardTable($table_name);
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止新增。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $columns = $this->getTableColumns($table);
@@ -362,7 +366,7 @@ class CodesController extends Controller
         $firstColumn = $columns[0] ?? null;
         $id = $firstColumn && isset($defaults[$firstColumn]) ? $defaults[$firstColumn] : null;
 
-        return view('codes.create',[
+        return view('codes.create', [
             'page_title' => 'Codes',
             'page_description' => $table,
             'page_url' => '/codes',
@@ -374,8 +378,7 @@ class CodesController extends Controller
         ]);
     }
 
-    public function proposalStore(Request $request, $table_name)
-    {
+    public function proposalStore(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
         if ($redirect = $this->ensureEditableAccess($table)) {
             return $redirect;
@@ -386,6 +389,7 @@ class CodesController extends Controller
 
         if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
             flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
+
             return redirect()->back()->withInput();
         }
 
@@ -393,11 +397,13 @@ class CodesController extends Controller
         $existing = $this->fetchRowByKeys($table, $keyColumns, $conditions);
         if ($existing) {
             flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
         if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $payload)) {
             flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
@@ -418,8 +424,7 @@ class CodesController extends Controller
         return redirect()->route('codes.show', ['table_name' => $table]);
     }
 
-    public function proposalEdit($table_name, $operationId)
-    {
+    public function proposalEdit($table_name, $operationId) {
         $table = $this->guardTable($table_name);
         $operation = $this->findOperationOrAbort((int) $operationId);
         $payload = $this->ensureProposalEditable($operation, $table);
@@ -447,8 +452,7 @@ class CodesController extends Controller
         ]);
     }
 
-    public function proposalUpdateExisting(Request $request, $table_name, $operationId)
-    {
+    public function proposalUpdateExisting(Request $request, $table_name, $operationId) {
         $table = $this->guardTable($table_name);
         $operation = $this->findOperationOrAbort((int) $operationId);
         $payload = $this->ensureProposalEditable($operation, $table);
@@ -460,17 +464,20 @@ class CodesController extends Controller
         if ($isCreate) {
             if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
                 flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
+
                 return redirect()->back()->withInput();
             }
 
             $conditions = $this->buildConditionsFromRow($keyColumns, $data);
             if (!empty($conditions) && $this->fetchRowByKeys($table, $keyColumns, $conditions)) {
                 flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+
                 return redirect()->back()->withInput();
             }
 
             if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $data, $operation['id'])) {
                 flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+
                 return redirect()->back()->withInput();
             }
         } else {
@@ -511,11 +518,11 @@ class CodesController extends Controller
         DB::table('operations')->where('id', $operation['id'])->update($updates);
 
         flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
+
         return redirect()->route('operations.index', ['proposals_only' => 1]);
     }
 
-    public function proposalCancel(Request $request, $table_name, $operationId)
-    {
+    public function proposalCancel(Request $request, $table_name, $operationId) {
         $table = $this->guardTable($table_name);
         $operation = $this->findOperationOrAbort((int) $operationId);
         $payload = $this->ensureProposalEditable($operation, $table);
@@ -542,29 +549,32 @@ class CodesController extends Controller
         ]);
 
         flash('提案已撤回 @ '.Carbon::now(), 'info');
+
         return redirect()->route('operations.index', ['proposals_only' => 1]);
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
-    public function store(Request $request, $table_name)
-    {
+    public function store(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止新增。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $data = Arr::except($request->all(), ['_token', '__proposal_comment']);
         $keyColumns = $this->getKeyColumns($table);
         if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
             flash('新增失敗：請確認主鍵欄位已填寫完整。', 'error');
+
             return redirect()->back()
                 ->withInput()
                 ->withErrors(['missing_keys' => '新增失敗：請確認主鍵欄位已填寫完整。']);
@@ -573,18 +583,19 @@ class CodesController extends Controller
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
         //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
-            //$id = DB::table($table_name)->max($id_) + 1;
-            //$data[$id_] = $id;
+        //$id = DB::table($table_name)->max($id_) + 1;
+        //$data[$id_] = $id;
         //}
         //else {
-            //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
-            //$id = $data[$id_];
+        //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
+        //$id = $data[$id_];
         //}
         //20210323插入聯合主鍵的邏輯
         $id_name = $this->getIdName($table);
         $id_name_1 = $this->getIdName_1($table);
         $id_name_2 = $this->getIdName_2($table);
         $id = $data[$id_name].'_._'.$data[$id_name_1];
+
         //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
         //修改結束
         try {
@@ -592,10 +603,12 @@ class CodesController extends Controller
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isDuplicateKeyException($e)) {
                 flash('新增失敗：主鍵或唯一值已存在。', 'error');
+
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['duplicate' => '新增失敗：主鍵或唯一值已存在。']);
             }
+
             throw $e;
         }
 
@@ -606,11 +619,11 @@ class CodesController extends Controller
         $id = $this->buildCompositeId($keyColumns, $rowData);
 
         flash('Store success @ '.Carbon::now(), 'success');
+
         return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
     }
 
-    public function proposalUpdate(Request $request, $table_name, $id)
-    {
+    public function proposalUpdate(Request $request, $table_name, $id) {
         $table = $this->guardTable($table_name);
         if ($redirect = $this->ensureEditableAccess($table)) {
             return $redirect;
@@ -621,6 +634,7 @@ class CodesController extends Controller
         $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
         if (!$originalRow) {
             flash('提案失敗：找不到對應的資料列。', 'error');
+
             return redirect()->back()->withInput();
         }
 
@@ -632,6 +646,7 @@ class CodesController extends Controller
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
         if ($diff === null) {
             flash('提案失敗：未偵測到任何修改內容。', 'warning');
+
             return redirect()->back()->withInput();
         }
 
@@ -652,19 +667,20 @@ class CodesController extends Controller
         return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
     }
 
-    public function destroy($table_name, $id)
-    {
+    public function destroy($table_name, $id) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->isActive()){
+        } elseif (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止刪除。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
         $keyColumns = $this->getKeyColumns($table);
@@ -680,26 +696,23 @@ class CodesController extends Controller
         $query->delete();
 
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('codes.show', ['table_name' => $table]);
     }
 
-    protected function getIdName($table_name)
-    {
+    protected function getIdName($table_name) {
         return $columns = Schema::getColumnListing($table_name)[0];
     }
 
-    protected function getIdName_1($table_name)
-    {
+    protected function getIdName_1($table_name) {
         return $columns = Schema::getColumnListing($table_name)[1];
     }
 
-    protected function getIdName_2($table_name)
-    {
+    protected function getIdName_2($table_name) {
         return $columns = Schema::getColumnListing($table_name)[2];
     }
 
-    protected function buildTableHead(string $table, $sampleRow): array
-    {
+    protected function buildTableHead(string $table, $sampleRow): array {
         $upperTable = strtoupper($table);
         if (isset($this->tableColumnOverrides[$upperTable])) {
             $availableColumns = Schema::getColumnListing($table);
@@ -741,8 +754,7 @@ class CodesController extends Controller
         return array_values(array_unique($thead));
     }
 
-    protected function determineSearchableColumns(string $table, array $thead): array
-    {
+    protected function determineSearchableColumns(string $table, array $thead): array {
         $upperTable = strtoupper($table);
         if (isset($this->tableColumnOverrides[$upperTable])) {
             return $this->tableColumnOverrides[$upperTable];
@@ -755,8 +767,7 @@ class CodesController extends Controller
         return Schema::getColumnListing($table);
     }
 
-    protected function getKeyColumns(string $table): array
-    {
+    protected function getKeyColumns(string $table): array {
         static $cache = [];
         if (isset($cache[$table])) {
             return $cache[$table];
@@ -802,8 +813,7 @@ class CodesController extends Controller
      * @param string $table
      * @return bool
      */
-    protected function isReadOnlyTable(string $table): bool
-    {
+    protected function isReadOnlyTable(string $table): bool {
         return in_array(strtoupper($table), $this->readOnlyTables, true);
     }
 
@@ -812,8 +822,7 @@ class CodesController extends Controller
      *
      * @return array<int|string, string>
      */
-    protected function getDynastyNameMap(): array
-    {
+    protected function getDynastyNameMap(): array {
         if ($this->dynastyNameMap !== null) {
             return $this->dynastyNameMap;
         }
@@ -836,8 +845,7 @@ class CodesController extends Controller
         return $this->dynastyNameMap = $normalized;
     }
 
-    protected function buildCompositeId(array $keyColumns, array $row): string
-    {
+    protected function buildCompositeId(array $keyColumns, array $row): string {
         $parts = [];
         foreach ($keyColumns as $column) {
             if (array_key_exists($column, $row)) {
@@ -857,8 +865,7 @@ class CodesController extends Controller
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    protected function enforceAuditFieldsForCreate(string $table, array $data): array
-    {
+    protected function enforceAuditFieldsForCreate(string $table, array $data): array {
         $columns = $this->getTableColumns($table);
 
         if (in_array('c_created_by', $columns, true) && Auth::check()) {
@@ -878,8 +885,7 @@ class CodesController extends Controller
      * @param string $table
      * @return array<int, string>
      */
-    protected function getTableColumns(string $table): array
-    {
+    protected function getTableColumns(string $table): array {
         if (!array_key_exists($table, $this->tableColumnsCache)) {
             try {
                 $this->tableColumnsCache[$table] = Schema::getColumnListing($table);
@@ -898,10 +904,10 @@ class CodesController extends Controller
      * @param array<int, string> $keyColumns
      * @return array<int, string>
      */
-    protected function orderColumnsForCreate(array $columns, array $keyColumns): array
-    {
+    protected function orderColumnsForCreate(array $columns, array $keyColumns): array {
         $keyColumns = array_values(array_intersect($keyColumns, $columns));
         $nonKey = array_values(array_diff($columns, $keyColumns));
+
         return array_merge($keyColumns, $nonKey);
     }
 
@@ -912,8 +918,7 @@ class CodesController extends Controller
      * @param string $column
      * @return string|null
      */
-    protected function guessNextKeyValue(string $table, string $column): ?string
-    {
+    protected function guessNextKeyValue(string $table, string $column): ?string {
 
         try {
             $max = DB::table($table)->max($column);
@@ -938,8 +943,7 @@ class CodesController extends Controller
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
-    protected function prepareAuditFieldsForDisplay(array $row): array
-    {
+    protected function prepareAuditFieldsForDisplay(array $row): array {
         if (array_key_exists('c_modified_by', $row) && Auth::check()) {
             $row['c_modified_by'] = Auth::user()->name;
         }
@@ -958,8 +962,7 @@ class CodesController extends Controller
      * @param array<string, mixed> $original
      * @return array<string, mixed>
      */
-    protected function enforceAuditFieldsForUpdate(array $data, array $original): array
-    {
+    protected function enforceAuditFieldsForUpdate(array $data, array $original): array {
         foreach (['c_created_by', 'c_created_date'] as $field) {
             if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
                 $data[$field] = $original[$field];
@@ -983,19 +986,18 @@ class CodesController extends Controller
         return $data;
     }
 
-    protected function buildConditionsFromRow(array $keyColumns, array $row): array
-    {
+    protected function buildConditionsFromRow(array $keyColumns, array $row): array {
         $conditions = [];
         foreach ($keyColumns as $column) {
             if (array_key_exists($column, $row)) {
                 $conditions[$column] = $row[$column];
             }
         }
+
         return $conditions;
     }
 
-    protected function buildConditionsFromId(array $keyColumns, string $id): array
-    {
+    protected function buildConditionsFromId(array $keyColumns, string $id): array {
         $conditions = [];
         $parts = explode('_._', $id);
         foreach ($keyColumns as $index => $column) {
@@ -1003,11 +1005,11 @@ class CodesController extends Controller
                 $conditions[$column] = $parts[$index];
             }
         }
+
         return $conditions;
     }
 
-    protected function fetchRowByKeys(string $table, array $keyColumns, array $conditions)
-    {
+    protected function fetchRowByKeys(string $table, array $keyColumns, array $conditions) {
         if (empty($conditions)) {
             return null;
         }
@@ -1018,11 +1020,11 @@ class CodesController extends Controller
         }
 
         $row = $query->first();
+
         return $row ? $this->convertRowToArray($row) : null;
     }
 
-    protected function hasActiveCreateProposalConflict(string $table, array $keyColumns, array $row, ?int $excludeOperationId = null): bool
-    {
+    protected function hasActiveCreateProposalConflict(string $table, array $keyColumns, array $row, ?int $excludeOperationId = null): bool {
         if (!Schema::hasTable('operations')) {
             return false;
         }
@@ -1035,8 +1037,7 @@ class CodesController extends Controller
         return $this->operationRepository->hasPendingCreateProposal($table, $resourceId, $excludeOperationId);
     }
 
-    protected function findOperationOrAbort(int $operationId): array
-    {
+    protected function findOperationOrAbort(int $operationId): array {
         if (!Schema::hasTable('operations')) {
             abort(404);
         }
@@ -1049,8 +1050,7 @@ class CodesController extends Controller
         return (array) $row;
     }
 
-    protected function ensureProposalEditable(array $operation, string $table): array
-    {
+    protected function ensureProposalEditable(array $operation, string $table): array {
         if (!Auth::check()) {
             abort(403, '請登入後再試。');
         }
@@ -1077,8 +1077,7 @@ class CodesController extends Controller
         return $payload;
     }
 
-    protected function resetProposalReviewState(array &$payload): void
-    {
+    protected function resetProposalReviewState(array &$payload): void {
         $payload['__review_status'] = 'pending';
         unset(
             $payload['__review_comment'],
@@ -1091,8 +1090,7 @@ class CodesController extends Controller
         );
     }
 
-    protected function markProposalCancelled(array &$payload): void
-    {
+    protected function markProposalCancelled(array &$payload): void {
         $payload['__review_status'] = 'cancelled';
         unset(
             $payload['__review_comment'],
@@ -1102,46 +1100,47 @@ class CodesController extends Controller
         );
     }
 
-    protected function decodeResourceOriginal(array $operation): array
-    {
+    protected function decodeResourceOriginal(array $operation): array {
         $original = json_decode($operation['resource_original'] ?? '', true);
+
         return is_array($original) ? $original : [];
     }
 
-    protected function ensureEditableAccess(string $table): ?RedirectResponse
-    {
+    protected function ensureEditableAccess(string $table): ?RedirectResponse {
         if (!Auth::check()) {
             flash('請登入後再進行操作 @ '.Carbon::now(), 'error');
+
             return redirect()->back()->withInput();
         }
         if (!Auth::user()->isActive()) {
             flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+
             return redirect()->back()->withInput();
         }
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯或提案。', 'warning');
+
             return redirect()->route('codes.show', ['table_name' => $table]);
         }
+
         return null;
     }
 
-    protected function extractFormData(Request $request): array
-    {
+    protected function extractFormData(Request $request): array {
         return Arr::except($request->all(), ['_token', '_method', '__proposal_comment']);
     }
 
-    protected function hasPrimaryKeyValues(array $keyColumns, array $data): bool
-    {
+    protected function hasPrimaryKeyValues(array $keyColumns, array $data): bool {
         foreach ($keyColumns as $column) {
             if (!array_key_exists($column, $data) || $data[$column] === '' || $data[$column] === null) {
                 return false;
             }
         }
+
         return true;
     }
 
-    protected function buildProposalMeta(string $action, string $table, Request $request): array
-    {
+    protected function buildProposalMeta(string $action, string $table, Request $request): array {
         $user = Auth::user();
         $meta = [
             'action' => $action,
@@ -1161,8 +1160,7 @@ class CodesController extends Controller
         });
     }
 
-    protected function recordProposalOperation(int $type, string $table, array $keyColumns, array $data, array $original = [], array $meta = [])
-    {
+    protected function recordProposalOperation(int $type, string $table, array $keyColumns, array $data, array $original = [], array $meta = []) {
         if (!Auth::check()) {
             return null;
         }
@@ -1191,8 +1189,7 @@ class CodesController extends Controller
         );
     }
 
-    protected function recordOperation(int $type, string $table, array $keyColumns, array $data, array $original = [])
-    {
+    protected function recordOperation(int $type, string $table, array $keyColumns, array $data, array $original = []) {
         if (!Auth::check()) {
             return;
         }
@@ -1213,8 +1210,7 @@ class CodesController extends Controller
         );
     }
 
-    protected function convertRowToArray($row): array
-    {
+    protected function convertRowToArray($row): array {
         if (is_null($row)) {
             return [];
         }
@@ -1230,13 +1226,13 @@ class CodesController extends Controller
         return json_decode(json_encode($row), true) ?: [];
     }
 
-    protected function isDuplicateKeyException(\Illuminate\Database\QueryException $exception): bool
-    {
+    protected function isDuplicateKeyException(\Illuminate\Database\QueryException $exception): bool {
         if ($exception->getCode() === '23000') {
             return true;
         }
 
         $message = $exception->getMessage();
+
         return strpos($message, 'Duplicate entry') !== false;
     }
 
@@ -1251,8 +1247,7 @@ class CodesController extends Controller
      * @param array $thead
      * @return \Illuminate\View\View
      */
-    protected function showWithCursorPagination(Request $request, string $table, $query, string $search, int $perPage, array $thead)
-    {
+    protected function showWithCursorPagination(Request $request, string $table, $query, string $search, int $perPage, array $thead) {
         $after = $request->query('after');   // 下一页游标 (id)
         $before = $request->query('before'); // 上一页游标 (id)
 

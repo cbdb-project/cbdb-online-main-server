@@ -7,8 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class BasicInformationPossessionController extends Controller
-{
+class BasicInformationPossessionController extends Controller {
     /**
      * @var BiogMainRepository
      */
@@ -18,18 +17,18 @@ class BasicInformationPossessionController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository) {
         $this->biogMainRepository = $biogMainRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id)
-    {
+    public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithPossession($id);
+
         return view('biogmains.possession.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產']);
     }
@@ -39,8 +38,7 @@ class BasicInformationPossessionController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create($id)
-    {
+    public function create($id) {
         return view('biogmains.possession.create', [
             'id' => $id,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession']);
@@ -52,18 +50,19 @@ class BasicInformationPossessionController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, $id)
-    {
+    public function store(Request $request, $id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $_id = $this->biogMainRepository->possessionStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.possession.edit', [
             'basicinformation' => $id,
             'possession' => $_id,
@@ -77,8 +76,7 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         //
     }
 
@@ -88,10 +86,10 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $id_)
-    {
+    public function edit($id, $id_) {
         $res = $this->biogMainRepository->possessionById($id_);
-//        dd($res);
+
+        //        dd($res);
         return view('biogmains.possession.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 財產',
             'page_url' => '/basicinformation/'.$id.'/possession',
@@ -106,18 +104,19 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $id_)
-    {
+    public function update(Request $request, $id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $this->biogMainRepository->possessionUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.possession.edit', [
             'basicinformation' => $id,
             'possession' => $id_,
@@ -130,18 +129,19 @@ class BasicInformationPossessionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_)
-    {
+    public function destroy($id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $this->biogMainRepository->possessionDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.possession.index', ['basicinformation' => $id]);
     }
 }

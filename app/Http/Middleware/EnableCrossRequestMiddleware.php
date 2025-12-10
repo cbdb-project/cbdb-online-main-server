@@ -1,4 +1,5 @@
 <?php
+
 /**
  * User: ja
  * Date: 2020/03/24
@@ -9,8 +10,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 
-class EnableCrossRequestMiddleware
-{
+class EnableCrossRequestMiddleware {
     /**
      * Handle an incoming request.
      *
@@ -18,8 +18,7 @@ class EnableCrossRequestMiddleware
      * @param  \Closure $next
      * @return mixed
      */
-    public function handle($request, Closure $next)
-    {
+    public function handle($request, Closure $next) {
         $response = $next($request);
         $origin = $request->server('HTTP_ORIGIN') ? $request->server('HTTP_ORIGIN') : '';
         $allow_origin = [
@@ -33,6 +32,7 @@ class EnableCrossRequestMiddleware
             $response->header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, OPTIONS');
             $response->header('Access-Control-Allow-Credentials', 'true');
         }
+
         return $response;
     }
 }

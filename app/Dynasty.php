@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Dynasty extends Model
-{
+class Dynasty extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -30,13 +29,11 @@ class Dynasty extends Model
     /**
      * 获取这个朝代所有人物
      */
-    public function biographies()
-    {
+    public function biographies() {
         return $this->hasMany('App\BiogMain', 'c_dy', 'c_dy');
     }
 
-    public function nianhaos()
-    {
+    public function nianhaos() {
         return $this->hasMany('App\Nianhao', 'c_dy', 'c_dy');
     }
 }

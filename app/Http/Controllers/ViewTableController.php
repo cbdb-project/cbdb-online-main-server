@@ -7,15 +7,14 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 
-class ViewTableController extends Controller
-{
-    public function index()
-    {
+class ViewTableController extends Controller {
+    public function index() {
         $definitions = Config::get('view_tables', []);
 
         $items = collect($definitions)->map(function ($definition, $key) {
             $aliases = Arr::get($definition, 'aliases', []);
             $primaryAlias = $aliases[0] ?? ('View_' . Str::studly(str_replace('-', '_', $key)));
+
             return [
                 'key' => $key,
                 'primary_alias' => $primaryAlias,
@@ -34,8 +33,7 @@ class ViewTableController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $key)
-    {
+    public function show(Request $request, string $key) {
         $definitions = Config::get('view_tables', []);
 
         $definition = null;
@@ -47,6 +45,7 @@ class ViewTableController extends Controller
                 if (strcasecmp($alias, $key) === 0) {
                     $definition = $candidate;
                     $resolvedKey = $definitionKey;
+
                     break 2;
                 }
             }
@@ -105,8 +104,7 @@ class ViewTableController extends Controller
         ]);
     }
 
-    protected function renderSql(string $sql, array $bindings): string
-    {
+    protected function renderSql(string $sql, array $bindings): string {
         if (empty($bindings)) {
             return $sql;
         }

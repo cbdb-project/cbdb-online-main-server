@@ -7,8 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class RebuildNameSearchIndex extends Command
-{
+class RebuildNameSearchIndex extends Command {
     /**
      * The name and signature of the console command.
      *
@@ -62,10 +61,10 @@ class RebuildNameSearchIndex extends Command
      *
      * @return int
      */
-    public function handle()
-    {
+    public function handle() {
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             $this->error('資料表 CBDB__NAME_FTS 不存在，請先執行 migrations。');
+
             return 1;
         }
 
@@ -81,11 +80,15 @@ class RebuildNameSearchIndex extends Command
         $idTo = $this->option('id-to') ? (int) $this->option('id-to') : null;
 
         $this->info('開始重建姓名搜尋倒排索引...');
-        $this->info(sprintf('批次大小：%d，事務提交間隔：%d 條記錄',
-            $batchSize, $commitInterval));
+        $this->info(sprintf(
+            '批次大小：%d，事務提交間隔：%d 條記錄',
+            $batchSize,
+            $commitInterval
+        ));
 
         if ($idFrom !== null || $idTo !== null) {
-            $this->info(sprintf('ID 範圍：%s 到 %s',
+            $this->info(sprintf(
+                'ID 範圍：%s 到 %s',
                 $idFrom ?? '開始',
                 $idTo ?? '結束'
             ));
@@ -117,8 +120,7 @@ class RebuildNameSearchIndex extends Command
      * @param int|null $idFrom
      * @param int|null $idTo
      */
-    protected function streamProcessNames(int $batchSize, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null)
-    {
+    protected function streamProcessNames(int $batchSize, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null) {
         $recordBuffer = [];
         $totalInserted = 0;
 
@@ -137,8 +139,7 @@ class RebuildNameSearchIndex extends Command
      * @param int|null $idFrom
      * @param int|null $idTo
      */
-    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null)
-    {
+    protected function streamProcessNamesInTransaction(int $batchSize, array &$recordBuffer, int &$totalInserted, int $commitInterval, ?int $idFrom = null, ?int $idTo = null, ?string $taskId = null) {
         // 禁用查詢日誌以避免記憶體累積
         DB::connection()->disableQueryLog();
 
@@ -199,6 +200,7 @@ class RebuildNameSearchIndex extends Command
                     if (!$fullName) {
                         $bar->advance();
                         $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理本名資料…');
+
                         continue;
                     }
 
@@ -226,7 +228,8 @@ class RebuildNameSearchIndex extends Command
                         if ($totalInserted - $lastCommitCount >= $commitInterval) {
                             DB::commit();
                             $this->line('');
-                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                            $this->info(sprintf(
+                                '已提交 %s 條記錄（內存：%s MB）',
                                 number_format($totalInserted),
                                 number_format(memory_get_usage(true) / 1024 / 1024, 2)
                             ));
@@ -269,6 +272,7 @@ class RebuildNameSearchIndex extends Command
                     if (!$fullName) {
                         $bar->advance();
                         $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '正在處理別名資料…');
+
                         continue;
                     }
 
@@ -280,7 +284,8 @@ class RebuildNameSearchIndex extends Command
                         'name_type_desc_chn' => $row->c_name_type_desc_chn ?: '別名',
                         'full_name' => $fullName,
                         'source' => 'ALTNAME_DATA',
-                        'source_key' => sprintf('altname:%d-%d-%s',
+                        'source_key' => sprintf(
+                            'altname:%d-%d-%s',
                             $row->c_personid,
                             $row->c_alt_name_type_code,
                             $row->c_alt_name_chn
@@ -300,7 +305,8 @@ class RebuildNameSearchIndex extends Command
                         if ($totalInserted - $lastCommitCount >= $commitInterval) {
                             DB::commit();
                             $this->line('');
-                            $this->info(sprintf('已提交 %s 條記錄（內存：%s MB）',
+                            $this->info(sprintf(
+                                '已提交 %s 條記錄（內存：%s MB）',
                                 number_format($totalInserted),
                                 number_format(memory_get_usage(true) / 1024 / 1024, 2)
                             ));
@@ -330,8 +336,7 @@ class RebuildNameSearchIndex extends Command
         $this->reportProgressIfNeeded($taskId, $processedNames, $totalNames, '姓名資料已全部處理，正在整理索引結果…');
     }
 
-    protected function reportProgressIfNeeded(?string $taskId, int $processed, int $total, string $message = null): void
-    {
+    protected function reportProgressIfNeeded(?string $taskId, int $processed, int $total, string $message = null): void {
         if (!$taskId || $total <= 0) {
             return;
         }
@@ -343,10 +348,11 @@ class RebuildNameSearchIndex extends Command
 
         $percent = (int) floor(($processed / $total) * 75) + 15;
         $percent = max(12, min(90, $percent));
-        $message = $message ?? sprintf('已處理 %s / %s 筆姓名…',
-                number_format($processed),
-                number_format($total)
-            );
+        $message = $message ?? sprintf(
+            '已處理 %s / %s 筆姓名…',
+            number_format($processed),
+            number_format($total)
+        );
 
         NameFtsProgressService::update($taskId, $percent, $message, 'running');
         $this->lastProgressCount = $processed;
@@ -359,8 +365,7 @@ class RebuildNameSearchIndex extends Command
      * @param \Illuminate\Support\Carbon|null $timestamp
      * @return array
      */
-    protected function generateRecordsForName(array $nameInfo, $timestamp = null): array
-    {
+    protected function generateRecordsForName(array $nameInfo, $timestamp = null): array {
         $records = [];
         $insertedTerms = []; // 記錄已插入的 search_term，避免重複
 
@@ -406,10 +411,10 @@ class RebuildNameSearchIndex extends Command
     /**
      * 載入繁簡映射表
      */
-    protected function loadTradSimpMap()
-    {
+    protected function loadTradSimpMap() {
         if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
             $this->warn('CBDB__TRAD_SIMP_MAP 表不存在，將跳過繁簡轉換');
+
             return;
         }
 
@@ -429,8 +434,7 @@ class RebuildNameSearchIndex extends Command
      * @param string $name
      * @return string|null
      */
-    protected function normalizeName(string $name): ?string
-    {
+    protected function normalizeName(string $name): ?string {
         $name = trim($name);
         if ($name === '') {
             return null;
@@ -451,8 +455,7 @@ class RebuildNameSearchIndex extends Command
      * @param string $text
      * @return string
      */
-    protected function convertToSimplified(string $text): string
-    {
+    protected function convertToSimplified(string $text): string {
         if (empty($this->tradSimpMap)) {
             return $text;
         }
@@ -473,8 +476,7 @@ class RebuildNameSearchIndex extends Command
      * @param string $text
      * @return array
      */
-    protected function generateSuffixes(string $text): array
-    {
+    protected function generateSuffixes(string $text): array {
         $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
         $suffixes = [];
 
@@ -495,8 +497,7 @@ class RebuildNameSearchIndex extends Command
      * @param string $term
      * @return bool
      */
-    protected function isValidSearchTerm(string $term): bool
-    {
+    protected function isValidSearchTerm(string $term): bool {
         $term = trim($term);
 
         if ($term === '') {
@@ -515,8 +516,7 @@ class RebuildNameSearchIndex extends Command
     /**
      * 顯示統計資訊
      */
-    protected function displayStatistics()
-    {
+    protected function displayStatistics() {
         $stats = DB::table('CBDB__NAME_FTS')
             ->selectRaw('
                 COALESCE(name_type_desc_chn, "本名") as label,
@@ -535,7 +535,7 @@ class RebuildNameSearchIndex extends Command
             $rows[] = [
                 $stat->label,
                 $variant,
-                number_format($stat->count)
+                number_format($stat->count),
             ];
         }
 

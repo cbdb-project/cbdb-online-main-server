@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use App\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
 /**
  * 测试 Manage 相关页面能正常加载（不出现 500 错误）
@@ -13,13 +13,11 @@ use App\User;
  * 使用 in-memory SQLite 数据库，灌入最小化测试数据
  * 只验证 HTTP 状态码，不检查具体内容
  */
-class ManagePagesLoadTest extends TestCase
-{
+class ManagePagesLoadTest extends TestCase {
     protected $adminUser;
     protected $regularUser;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 数据库
@@ -44,8 +42,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 创建最小化表结构
      */
-    protected function createMinimalTables()
-    {
+    protected function createMinimalTables() {
         // 创建 users 表
         Schema::dropIfExists('users');
         Schema::create('users', function (Blueprint $table) {
@@ -67,8 +64,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 创建测试用户
      */
-    protected function createTestUsers()
-    {
+    protected function createTestUsers() {
         // 创建管理员用户（用于认证和访问管理页面）
         $this->adminUser = factory(User::class)->create([
             'name' => 'Admin User',
@@ -125,8 +121,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试主页面：/manage（需要管理员权限）
      */
-    public function test_manage_index_page_loads()
-    {
+    public function test_manage_index_page_loads() {
         $response = $this->actingAs($this->adminUser)->get('/manage');
         $response->assertStatus(200);
     }
@@ -134,8 +129,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试普通用户访问 /manage 会被重定向
      */
-    public function test_manage_index_redirects_non_admin()
-    {
+    public function test_manage_index_redirects_non_admin() {
         $response = $this->actingAs($this->regularUser)->get('/manage');
         $response->assertRedirect('/home');
     }
@@ -143,8 +137,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试未认证用户访问 /manage 会被重定向到登录页
      */
-    public function test_manage_index_requires_authentication()
-    {
+    public function test_manage_index_requires_authentication() {
         $response = $this->get('/manage');
         $response->assertRedirect('/login');
     }
@@ -152,8 +145,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试编辑页面加载：/manage/{id}/edit
      */
-    public function test_manage_edit_page_loads()
-    {
+    public function test_manage_edit_page_loads() {
         $response = $this->actingAs($this->adminUser)
             ->get("/manage/{$this->regularUser->id}/edit");
 
@@ -166,8 +158,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试更新用户激活状态：PUT /manage/{id}
      */
-    public function test_manage_update_active_status()
-    {
+    public function test_manage_update_active_status() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
                 'is_active' => 0,
@@ -184,8 +175,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试更新用户角色：PUT /manage/{id}
      */
-    public function test_manage_update_user_role()
-    {
+    public function test_manage_update_user_role() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
                 'is_active' => $this->regularUser->is_active,
@@ -202,8 +192,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试删除用户：PUT /manage/{id} with delete_user
      */
-    public function test_manage_delete_user()
-    {
+    public function test_manage_delete_user() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
                 'is_active' => $this->regularUser->is_active,
@@ -223,8 +212,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试非管理员无法访问编辑页面
      */
-    public function test_manage_edit_requires_admin()
-    {
+    public function test_manage_edit_requires_admin() {
         $response = $this->actingAs($this->regularUser)
             ->get("/manage/{$this->adminUser->id}/edit");
 
@@ -234,8 +222,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试非管理员无法执行更新操作
      */
-    public function test_manage_update_requires_admin()
-    {
+    public function test_manage_update_requires_admin() {
         $response = $this->actingAs($this->regularUser)
             ->put("/manage/{$this->adminUser->id}", [
                 'is_active' => 0,
@@ -248,8 +235,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试路由参数正确性
      */
-    public function test_manage_edit_route_with_correct_parameters()
-    {
+    public function test_manage_edit_route_with_correct_parameters() {
         // 测试路由能正确生成 URL
         $url = route('manage.edit', $this->regularUser->id);
         $this->assertStringContainsString("/manage/{$this->regularUser->id}/edit", $url);
@@ -258,8 +244,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试更新不存在的用户
      */
-    public function test_manage_update_nonexistent_user()
-    {
+    public function test_manage_update_nonexistent_user() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/99999", [
                 'is_active' => 1,
@@ -272,8 +257,7 @@ class ManagePagesLoadTest extends TestCase
     /**
      * 测试验证规则
      */
-    public function test_manage_update_validation()
-    {
+    public function test_manage_update_validation() {
         // 测试无效的 is_active 值
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
@@ -293,8 +277,7 @@ class ManagePagesLoadTest extends TestCase
         $response->assertSessionHasErrors('is_admin');
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         parent::tearDown();
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: fuqunchao
@@ -8,13 +9,10 @@
 
 namespace App\Repositories;
 
-
 use App\ChoronymCode;
 
-class ChoronymRepository
-{
-    public function choronyms()
-    {
+class ChoronymRepository {
+    public function choronyms() {
         return ChoronymCode::select(['c_choronym_code', 'c_choronym_chn', 'c_choronym_desc'])->get();
     }
 }

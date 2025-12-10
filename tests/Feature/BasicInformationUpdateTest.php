@@ -2,21 +2,18 @@
 
 namespace Tests\Feature;
 
-use App\User;
-use App\BiogMain;
 use App\Repositories\BiogMainRepository;
+use App\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
-class BasicInformationUpdateTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BasicInformationUpdateTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 in-memory SQLite 數據庫
@@ -86,8 +83,7 @@ class BasicInformationUpdateTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
@@ -97,8 +93,7 @@ class BasicInformationUpdateTest extends TestCase
     /**
      * 測試無修改時不寫入資料庫
      */
-    public function testNoUpdateWhenNoChanges()
-    {
+    public function testNoUpdateWhenNoChanges() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([
             'name' => 'Test User',
@@ -183,8 +178,7 @@ class BasicInformationUpdateTest extends TestCase
     /**
      * 測試有修改時正常寫入
      */
-    public function testUpdateWhenChangesExist()
-    {
+    public function testUpdateWhenChangesExist() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([
             'name' => 'Test User',
@@ -279,8 +273,7 @@ class BasicInformationUpdateTest extends TestCase
     /**
      * 測試 Laravel 框架欄位被正確過濾
      */
-    public function testFrameworkFieldsAreFilteredCorrectly()
-    {
+    public function testFrameworkFieldsAreFilteredCorrectly() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([
             'name' => 'Test User',

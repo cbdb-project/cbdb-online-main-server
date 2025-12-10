@@ -10,13 +10,10 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class BasicInformationProposalTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class BasicInformationProposalTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // Mock BiogMainRepository
@@ -25,6 +22,7 @@ class BasicInformationProposalTest extends TestCase
                 if ($value === null || $value === '') {
                     return 'NULL';
                 }
+
                 return str_replace('-', 'minus', (string) $value);
             });
             $mock->shouldReceive('unionPKDef_decode')->andReturnUsing(function ($value) {
@@ -108,16 +106,14 @@ class BasicInformationProposalTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
-    protected function makeActiveUser(): User
-    {
+    protected function makeActiveUser(): User {
         $user = User::factory()->create([
             'name' => 'activeuser',
             'email' => 'active@example.com',
@@ -128,8 +124,7 @@ class BasicInformationProposalTest extends TestCase
         return $user;
     }
 
-    protected function makeAdmin(): User
-    {
+    protected function makeAdmin(): User {
         $user = User::factory()->create([
             'name' => 'admin',
             'email' => 'admin@example.com',
@@ -140,8 +135,7 @@ class BasicInformationProposalTest extends TestCase
         return $user;
     }
 
-    protected function makeInactiveUser(): User
-    {
+    protected function makeInactiveUser(): User {
         $user = User::factory()->create([
             'name' => 'inactive',
             'email' => 'inactive@example.com',
@@ -152,8 +146,7 @@ class BasicInformationProposalTest extends TestCase
         return $user;
     }
 
-    public function testProposalStoreRequiresAuthentication()
-    {
+    public function testProposalStoreRequiresAuthentication() {
         $response = $this->post(route('basicinformation.proposal.store', [
             'personid' => 1,
             'resource' => 'altnames',
@@ -167,8 +160,7 @@ class BasicInformationProposalTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function testProposalStoreRequiresActiveUser()
-    {
+    public function testProposalStoreRequiresActiveUser() {
         $user = $this->makeInactiveUser();
         $this->actingAs($user);
 
@@ -185,8 +177,7 @@ class BasicInformationProposalTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function testProposalStoreCreatesNewProposal()
-    {
+    public function testProposalStoreCreatesNewProposal() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -228,8 +219,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertSame(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
     }
 
-    public function testProposalStoreRejectsDuplicateData()
-    {
+    public function testProposalStoreRejectsDuplicateData() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -256,8 +246,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertStringContainsString('資料已存在', $flash[0]['message'] ?? '');
     }
 
-    public function testProposalStoreDetectsConflictingProposal()
-    {
+    public function testProposalStoreDetectsConflictingProposal() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -295,8 +284,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertStringContainsString('已有其他新增提案', $flash[0]['message'] ?? '');
     }
 
-    public function testProposalUpdateCreatesUpdateProposal()
-    {
+    public function testProposalUpdateCreatesUpdateProposal() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -349,8 +337,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertSame('pending', $payload['__review_status']);
     }
 
-    public function testProposalUpdateRejectsNoChanges()
-    {
+    public function testProposalUpdateRejectsNoChanges() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -378,8 +365,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertStringContainsString('未偵測到任何修改', $flash[0]['message'] ?? '');
     }
 
-    public function testApproveCreateProposalInsertsRow()
-    {
+    public function testApproveCreateProposalInsertsRow() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 
@@ -438,8 +424,7 @@ class BasicInformationProposalTest extends TestCase
         ]);
     }
 
-    public function testApproveUpdateProposalUpdatesRow()
-    {
+    public function testApproveUpdateProposalUpdatesRow() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -507,8 +492,7 @@ class BasicInformationProposalTest extends TestCase
         ]);
     }
 
-    public function testRejectProposalUpdatesStatus()
-    {
+    public function testRejectProposalUpdatesStatus() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 
@@ -550,8 +534,7 @@ class BasicInformationProposalTest extends TestCase
         ]);
     }
 
-    public function testApproveRequiresReviewerPermission()
-    {
+    public function testApproveRequiresReviewerPermission() {
         $operation = new Operation();
         $operation->user_id = 100;
         $operation->c_personid = 1;
@@ -572,8 +555,7 @@ class BasicInformationProposalTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function testApproveRejectsNonProposalOperation()
-    {
+    public function testApproveRejectsNonProposalOperation() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 
@@ -596,8 +578,7 @@ class BasicInformationProposalTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function testApproveFailsWhenKeyColumnsMissing()
-    {
+    public function testApproveFailsWhenKeyColumnsMissing() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
 
@@ -623,8 +604,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertStringContainsString('提案缺少主鍵資訊', $flash[0]['message'] ?? '');
     }
 
-    public function testApproveCreateFailsWhenRowAlreadyExists()
-    {
+    public function testApproveCreateFailsWhenRowAlreadyExists() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -663,8 +643,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertSame(1, Operation::count());
     }
 
-    public function testApproveUpdateFailsWithoutOriginalData()
-    {
+    public function testApproveUpdateFailsWithoutOriginalData() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -707,8 +686,7 @@ class BasicInformationProposalTest extends TestCase
         ]);
     }
 
-    public function testApproveUpdateRejectsPrimaryKeyChange()
-    {
+    public function testApproveUpdateRejectsPrimaryKeyChange() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
             'c_sequence' => 1,
@@ -753,8 +731,7 @@ class BasicInformationProposalTest extends TestCase
         ]);
     }
 
-    public function testProposalStoreFailsWhenPrimaryKeyMissing()
-    {
+    public function testProposalStoreFailsWhenPrimaryKeyMissing() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -774,8 +751,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertSame(0, Operation::count());
     }
 
-    public function testProposalUpdateFailsWhenRowMissing()
-    {
+    public function testProposalUpdateFailsWhenRowMissing() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -797,8 +773,7 @@ class BasicInformationProposalTest extends TestCase
         $this->assertSame(0, Operation::count());
     }
 
-    public function testUnknownResourceTypeReturnsNotFound()
-    {
+    public function testUnknownResourceTypeReturnsNotFound() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -815,8 +790,7 @@ class BasicInformationProposalTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function testCompositeIdEncodesHyphenInResourceId()
-    {
+    public function testCompositeIdEncodesHyphenInResourceId() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 

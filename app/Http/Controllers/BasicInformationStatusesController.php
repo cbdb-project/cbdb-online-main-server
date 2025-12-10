@@ -7,8 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class BasicInformationStatusesController extends Controller
-{
+class BasicInformationStatusesController extends Controller {
     /**
      * @var BiogMainRepository
      */
@@ -18,18 +17,18 @@ class BasicInformationStatusesController extends Controller
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository)
-    {
+    public function __construct(BiogMainRepository $biogMainRepository) {
         $this->biogMainRepository = $biogMainRepository;
     }
+
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id)
-    {
+    public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithStatuses($id);
+
         return view('biogmains.statuses.index', ['basicinformation' => $biogbasicinformation,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分']);
     }
@@ -39,8 +38,7 @@ class BasicInformationStatusesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create($id)
-    {
+    public function create($id) {
         return view('biogmains.statuses.create', [
             'id' => $id,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分', 'page_url' => '/basicinformation/'.$id.'/statuses']);
@@ -52,19 +50,20 @@ class BasicInformationStatusesController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, $id)
-    {
+    public function store(Request $request, $id) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $data = $this->biogMainRepository->statuseStoreById($request, $id);
         $_id = $data['c_personid']."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Store success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.statuses.edit', [
             'basicinformation' => $id,
             'status' => $_id,
@@ -77,8 +76,7 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id) {
         //
     }
 
@@ -88,9 +86,9 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id, $id_)
-    {
+    public function edit($id, $id_) {
         $res = $this->biogMainRepository->statuseById($id_);
+
         return view('biogmains.statuses.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會區分',
             'page_url' => '/basicinformation/'.$id.'/statuses',
@@ -105,19 +103,20 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id, $id_)
-    {
+    public function update(Request $request, $id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
-        $data = $this->biogMainRepository->statuseUpdateById($request, $id_ ,$id);
+        $data = $this->biogMainRepository->statuseUpdateById($request, $id_, $id);
         $id_ = $id."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Update success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.statuses.edit', [
             'basicinformation' => $id,
             'status' => $id_,
@@ -130,18 +129,19 @@ class BasicInformationStatusesController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_)
-    {
+    public function destroy($id, $id_) {
         if (!Auth::check()) {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
-        }
-        elseif (!Auth::user()->canWriteDirectly()){
+        } elseif (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
             return redirect()->back();
         }
         $this->biogMainRepository->statuseDeleteById($id_, $id);
         flash('Delete success @ '.Carbon::now(), 'success');
+
         return redirect()->route('basicinformation.statuses.index', ['basicinformation' => $id]);
     }
 }

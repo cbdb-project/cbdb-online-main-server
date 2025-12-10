@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers\Auth;
 
-
-use App\User;
 use App\Http\Controllers\Controller;
-use Mail;
-use Illuminate\Support\Facades\Validator;
+use App\User;
 use Illuminate\Foundation\Auth\RegistersUsers;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Mail;
 use Naux\Mail\SendCloudTemplate;
 
-class RegisterController extends Controller
-{
+class RegisterController extends Controller {
     /*
     |--------------------------------------------------------------------------
     | Register Controller
@@ -38,8 +36,7 @@ class RegisterController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
+    public function __construct() {
         $this->middleware('guest');
     }
 
@@ -48,9 +45,8 @@ class RegisterController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function showRegistrationForm()
-    {
-//        return '内测阶段，暂不开放注册';
+    public function showRegistrationForm() {
+        //        return '内测阶段，暂不开放注册';
         return view('auth.register');
     }
 
@@ -60,8 +56,7 @@ class RegisterController extends Controller
      * @param  array  $data
      * @return \Illuminate\Contracts\Validation\Validator
      */
-    protected function validator(array $data)
-    {
+    protected function validator(array $data) {
         return Validator::make($data, [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -75,11 +70,10 @@ class RegisterController extends Controller
      * @param  array  $data
      * @return \App\User
      */
-    protected function create(array $data)
-    {
+    protected function create(array $data) {
         $ip = request()->ip();
 
-        $user =  User::create([
+        $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'institution' => $data['institution'],
@@ -91,17 +85,17 @@ class RegisterController extends Controller
             ],
             'password' => bcrypt($data['password']),
         ]);
+
         //20210804遮除，禁止發送帳戶激活郵件。
         //$this->sendVerifyEmailTo($user);
         return $user;
     }
 
-    private function sendVerifyEmailTo($user)
-    {
+    private function sendVerifyEmailTo($user) {
         // 模板变量
         $bind_data = [
             'url' => route('email.verify', ['token' => $user->confirmation_token]),
-            'name' => $user->name
+            'name' => $user->name,
         ];
         $template = new SendCloudTemplate('cbdb_register', $bind_data);
 

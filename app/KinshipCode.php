@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class KinshipCode extends Model
-{
+class KinshipCode extends Model {
     /**
      * 与模型关联的数据表
      *

@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class AdminExplainSqlTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class AdminExplainSqlTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -34,14 +32,12 @@ class AdminExplainSqlTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
+    protected function tearDown(): void {
         Schema::dropIfExists('users');
         parent::tearDown();
     }
 
-    protected function makeUser(array $attributes = []): User
-    {
+    protected function makeUser(array $attributes = []): User {
         $user = new User([
             'name' => 'Tester',
             'email' => uniqid().'@example.com',
@@ -67,14 +63,12 @@ class AdminExplainSqlTest extends TestCase
         return $user;
     }
 
-    public function test_guest_is_redirected_to_login(): void
-    {
+    public function test_guest_is_redirected_to_login(): void {
         $response = $this->get('/admin/explainsql');
         $response->assertStatus(302);
     }
 
-    public function test_non_admin_is_forbidden(): void
-    {
+    public function test_non_admin_is_forbidden(): void {
         $user = $this->makeUser(['is_admin' => 0]);
 
         $this->actingAs($user);
@@ -82,8 +76,7 @@ class AdminExplainSqlTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_admin_can_view_form(): void
-    {
+    public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
@@ -91,8 +84,7 @@ class AdminExplainSqlTest extends TestCase
         $response->assertStatus(200)->assertSee('SQL 語句');
     }
 
-    public function test_admin_can_run_explain(): void
-    {
+    public function test_admin_can_run_explain(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 

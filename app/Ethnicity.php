@@ -8,8 +8,7 @@ use Illuminate\Database\Eloquent\Model;
  * Class Ethnicity
  * @package App
  */
-class Ethnicity extends Model
-{
+class Ethnicity extends Model {
     /**
      * 与模型关联的数据表
      *
@@ -37,8 +36,7 @@ class Ethnicity extends Model
     /**
      *
      */
-    public function biographies()
-    {
+    public function biographies() {
         $this->hasMany('\App\BiogMain', 'c_ethnicity_code', '﻿c_ethnicity_code');
     }
 }

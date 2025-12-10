@@ -4,25 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Exception;
 
-class UnidirectionalRelationshipRepairController extends Controller
-{
+class UnidirectionalRelationshipRepairController extends Controller {
     /**
      * 默認的 c_assoc_first_year 值，用於 ASSOC_DATA 記錄
      */
-    const DEFAULT_ASSOC_FIRST_YEAR = -9999;
+    public const DEFAULT_ASSOC_FIRST_YEAR = -9999;
 
     protected OperationRepository $operationRepository;
     protected ToolsRepository $toolsRepository;
 
-    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository)
-    {
+    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
         $this->middleware('auth');
@@ -30,11 +28,12 @@ class UnidirectionalRelationshipRepairController extends Controller
             if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
                 abort(403, '此功能僅限活躍管理員使用');
             }
+
             return $next($request);
         });
     }
-    public function index(Request $request)
-    {
+
+    public function index(Request $request) {
         return view('admin.unidirectional-relationship-repair', [
             'page_title' => '單向關係修復',
             'page_description' => '修復 CBDB 資料庫中的單向親屬關係和社會關係',
@@ -45,8 +44,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 修復親屬關係
      */
-    public function repairKinship(Request $request)
-    {
+    public function repairKinship(Request $request) {
         $params = $this->validateAndExtractParams($request, 'kinship');
 
         try {
@@ -69,8 +67,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 修復社會關係
      */
-    public function repairAssoc(Request $request)
-    {
+    public function repairAssoc(Request $request) {
         $params = $this->validateAndExtractParams($request, 'assoc');
 
         try {
@@ -97,8 +94,7 @@ class UnidirectionalRelationshipRepairController extends Controller
      * @param string $type 'kinship' 或 'assoc'
      * @return array 標準化的參數數組
      */
-    protected function validateAndExtractParams(Request $request, string $type): array
-    {
+    protected function validateAndExtractParams(Request $request, string $type): array {
         if ($type === 'kinship') {
             $request->validate([
                 'c_personid' => 'required|integer',
@@ -137,8 +133,7 @@ class UnidirectionalRelationshipRepairController extends Controller
      * @param array $params 參數數組
      * @return \Illuminate\Http\JsonResponse
      */
-    protected function executeRepair(string $type, array $params)
-    {
+    protected function executeRepair(string $type, array $params) {
         return DB::transaction(function () use ($type, $params) {
             $config = $this->getRepairConfig($type);
 
@@ -193,8 +188,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 獲取關係類型的配置
      */
-    protected function getRepairConfig(string $type): array
-    {
+    protected function getRepairConfig(string $type): array {
         return $type === 'kinship' ? [
             'table' => 'KIN_DATA',
             'related_id_field' => 'c_kin_id',
@@ -211,11 +205,10 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 處理多條記錄錯誤
      */
-    protected function multipleRecordsError(string $type, $records, int $count)
-    {
+    protected function multipleRecordsError(string $type, $records, int $count) {
         $config = $this->getRepairConfig($type);
         $mapper = $type === 'kinship'
-            ? fn($r) => [
+            ? fn ($r) => [
                 'c_personid' => $r->c_personid,
                 'c_kin_id' => $r->c_kin_id,
                 'c_kin_code' => $r->c_kin_code,
@@ -223,7 +216,7 @@ class UnidirectionalRelationshipRepairController extends Controller
                 'c_created_by' => $r->c_created_by ?? null,
                 'c_created_date' => $r->c_created_date ?? null,
             ]
-            : fn($r) => [
+            : fn ($r) => [
                 'c_personid' => $r->c_personid,
                 'c_assoc_id' => $r->c_assoc_id,
                 'c_assoc_code' => $r->c_assoc_code,
@@ -236,16 +229,16 @@ class UnidirectionalRelationshipRepairController extends Controller
         return response()->json([
             'success' => false,
             'message' => "檢索到多條記錄（{$count} 條），請檢查輸入參數是否正確。",
-            'records' => $records->map($mapper)->toArray()
+            'records' => $records->map($mapper)->toArray(),
         ], 400);
     }
 
     /**
      * 處理記錄未找到錯誤
      */
-    protected function recordNotFoundError(string $type)
-    {
+    protected function recordNotFoundError(string $type) {
         $config = $this->getRepairConfig($type);
+
         return response()->json([
             'success' => false,
             'message' => "未找到符合條件的{$config['relation_name']}記錄。",
@@ -255,8 +248,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 檢查反向關係是否已存在
      */
-    protected function reverseRelationExists(string $type, $relation, array $params): bool
-    {
+    protected function reverseRelationExists(string $type, $relation, array $params): bool {
         $config = $this->getRepairConfig($type);
 
         if ($type === 'kinship') {
@@ -267,6 +259,7 @@ class UnidirectionalRelationshipRepairController extends Controller
                 ->exists();
         } else {
             $relationFirstYear = $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR;
+
             return DB::table('ASSOC_DATA')
                 ->where('c_personid', $params['related_id'])
                 ->where('c_assoc_id', $params['person_id'])
@@ -286,8 +279,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 構建反向關係記錄
      */
-    protected function buildReverseRelation(string $type, $relation, array $params): array
-    {
+    protected function buildReverseRelation(string $type, $relation, array $params): array {
         if ($type === 'kinship') {
             return [
                 'c_personid' => $params['related_id'],
@@ -345,8 +337,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 構建資源 ID
      */
-    protected function buildResourceId(string $type, array $relation): string
-    {
+    protected function buildResourceId(string $type, array $relation): string {
         if ($type === 'kinship') {
             return "{$relation['c_personid']}-{$relation['c_kin_id']}-{$relation['c_kin_code']}";
         } else {
@@ -357,8 +348,7 @@ class UnidirectionalRelationshipRepairController extends Controller
     /**
      * 返回成功響應
      */
-    protected function successResponse(string $type, array $params)
-    {
+    protected function successResponse(string $type, array $params) {
         $config = $this->getRepairConfig($type);
         $originalKey = $type === 'kinship' ? 'c_kin_id' : 'c_assoc_id';
         $codeKey = $config['relation_code_field'];
@@ -375,15 +365,14 @@ class UnidirectionalRelationshipRepairController extends Controller
                 'c_personid' => $params['related_id'],
                 $originalKey => $params['person_id'],
                 $codeKey => $params['new_relation_code'],
-            ]
+            ],
         ]);
     }
 
     /**
      * 處理修復錯誤
      */
-    protected function handleRepairError(string $typeName, Exception $e, array $params)
-    {
+    protected function handleRepairError(string $typeName, Exception $e, array $params) {
         $inputKeys = $typeName === 'Kinship'
             ? ['c_personid', 'c_kin_id', 'c_kin_code', 'new_c_kin_code']
             : ['c_personid', 'c_assoc_id', 'c_assoc_code', 'new_c_assoc_code'];
@@ -418,8 +407,7 @@ class UnidirectionalRelationshipRepairController extends Controller
      *
      * @throws ValidationException
      */
-    protected function assertKinshipDependenciesExist(int $c_personid, int $c_kin_id, int $c_kin_code, int $new_c_kin_code): void
-    {
+    protected function assertKinshipDependenciesExist(int $c_personid, int $c_kin_id, int $c_kin_code, int $new_c_kin_code): void {
         $missing = [];
 
         $biogs = DB::table('BIOG_MAIN')->whereIn('c_personid', [$c_personid, $c_kin_id])->pluck('c_personid')->all();
@@ -446,8 +434,7 @@ class UnidirectionalRelationshipRepairController extends Controller
      *
      * @throws ValidationException
      */
-    protected function assertAssociationDependenciesExist(int $c_personid, int $c_assoc_id, int $c_assoc_code, int $new_c_assoc_code): void
-    {
+    protected function assertAssociationDependenciesExist(int $c_personid, int $c_assoc_id, int $c_assoc_code, int $new_c_assoc_code): void {
         $missing = [];
 
         $biogs = DB::table('BIOG_MAIN')->whereIn('c_personid', [$c_personid, $c_assoc_id])->pluck('c_personid')->all();

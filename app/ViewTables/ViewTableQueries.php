@@ -5,13 +5,11 @@ namespace App\ViewTables;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
-class ViewTableQueries
-{
+class ViewTableQueries {
     /**
      * Build query for the Altname Data view.
      */
-    public static function altnameData(): Builder
-    {
+    public static function altnameData(): Builder {
         return DB::table('ALTNAME_DATA as a')
             ->select([
                 'a.c_personid',
@@ -36,8 +34,7 @@ class ViewTableQueries
     /**
      * Build query for the address hierarchy view (View_Address).
      */
-    public static function addressHierarchy(): Builder
-    {
+    public static function addressHierarchy(): Builder {
         return DB::table('View_Address')
             ->select([
                 'c_addr_id',
@@ -80,8 +77,7 @@ class ViewTableQueries
     /**
      * Build query for the Association Data view.
      */
-    public static function associationData(): Builder
-    {
+    public static function associationData(): Builder {
         return DB::table('ASSOC_DATA as a')
             ->select([
                 'a.c_personid',
@@ -156,8 +152,7 @@ class ViewTableQueries
     /**
      * Build query for the Biographical Address Data view.
      */
-    public static function biographicalAddressData(): Builder
-    {
+    public static function biographicalAddressData(): Builder {
         return DB::table('BIOG_ADDR_DATA as b')
             ->select([
                 'b.c_personid',
@@ -214,8 +209,7 @@ class ViewTableQueries
     /**
      * Build query for the Biographical Institution Address Data view.
      */
-    public static function biographicalInstitutionAddressData(): Builder
-    {
+    public static function biographicalInstitutionAddressData(): Builder {
         return DB::table('View_BiogInstData')
             ->select([
                 'View_BiogInstData.*',
@@ -234,8 +228,7 @@ class ViewTableQueries
     /**
      * Build query for the Biographical Institution Data view.
      */
-    public static function biographicalInstitutionData(): Builder
-    {
+    public static function biographicalInstitutionData(): Builder {
         return DB::table('View_BiogInstData')
             ->select([
                 'c_personid',
@@ -282,8 +275,7 @@ class ViewTableQueries
     /**
      * Build query for the Entry Data view.
      */
-    public static function entryData(): Builder
-    {
+    public static function entryData(): Builder {
         return DB::table('ENTRY_DATA as entry')
             ->select([
                 'entry.c_personid',
@@ -375,8 +367,7 @@ class ViewTableQueries
     /**
      * Build query for the Events Data view.
      */
-    public static function eventsData(): Builder
-    {
+    public static function eventsData(): Builder {
         return DB::table('EVENTS_DATA as ed')
             ->select([
                 'ed.c_personid',
@@ -423,8 +414,7 @@ class ViewTableQueries
     /**
      * Build query for the Kin Address Data view.
      */
-    public static function kinAddressData(): Builder
-    {
+    public static function kinAddressData(): Builder {
         return DB::table('KIN_DATA as kd')
             ->select([
                 'kd.c_personid',
@@ -456,8 +446,7 @@ class ViewTableQueries
     /**
      * Build query for the People Data view.
      */
-    public static function peopleData(): Builder
-    {
+    public static function peopleData(): Builder {
         return DB::table('BIOG_MAIN as bm')
             ->select([
                 'bm.c_personid',
@@ -576,8 +565,7 @@ class ViewTableQueries
     /**
      * Build query for the Possessions Data view.
      */
-    public static function possessionsData(): Builder
-    {
+    public static function possessionsData(): Builder {
         return DB::table('View_PossessionsData')
             ->select([
                 'View_PossessionsData.c_personid',
@@ -614,8 +602,7 @@ class ViewTableQueries
     /**
      * Build query for the Possessions Address Data view.
      */
-    public static function possessionsAddressData(): Builder
-    {
+    public static function possessionsAddressData(): Builder {
         return DB::table('View_PossessionsData as possessions')
             ->select([
                 'possessions.c_personid',
@@ -655,8 +642,7 @@ class ViewTableQueries
     /**
      * Build query for the Event Address Data view.
      */
-    public static function eventAddressData(): Builder
-    {
+    public static function eventAddressData(): Builder {
         return DB::table('EVENTS_ADDR as ea')
             ->select([
                 'ea.c_personid',
@@ -703,8 +689,7 @@ class ViewTableQueries
     /**
      * Build query for the People Address Data view.
      */
-    public static function peopleAddressData(): Builder
-    {
+    public static function peopleAddressData(): Builder {
         return DB::table('BIOG_MAIN as bm')
             ->select([
                 'bm.c_personid',
@@ -729,8 +714,7 @@ class ViewTableQueries
     /**
      * Build query for the Posting Address Data view.
      */
-    public static function postingAddressData(): Builder
-    {
+    public static function postingAddressData(): Builder {
         return DB::table('POSTED_TO_ADDR_DATA as posting')
             ->select([
                 'posting.c_personid',
@@ -748,8 +732,7 @@ class ViewTableQueries
     /**
      * Build query for the Posting Office Data view.
      */
-    public static function postingOfficeData(): Builder
-    {
+    public static function postingOfficeData(): Builder {
         return DB::table('POSTED_TO_OFFICE_DATA as po')
             ->select([
                 'po.c_personid',
@@ -832,8 +815,7 @@ class ViewTableQueries
     /**
      * Build query for the Status Data view.
      */
-    public static function statusData(): Builder
-    {
+    public static function statusData(): Builder {
         return DB::table('STATUS_DATA as sd')
             ->select([
                 'sd.c_personid',
@@ -877,8 +859,7 @@ class ViewTableQueries
     /**
      * Build query for the Biographical Source Data view.
      */
-    public static function biographicalSourceData(): Builder
-    {
+    public static function biographicalSourceData(): Builder {
         return DB::table('TEXT_CODES')
             ->select([
                 'BIOG_SOURCE_DATA.c_personid as c_personid',
@@ -905,8 +886,7 @@ class ViewTableQueries
     /**
      * Build query for the Biographical Text Data view.
      */
-    public static function biographicalTextData(): Builder
-    {
+    public static function biographicalTextData(): Builder {
         return DB::table('BIOG_TEXT_DATA as bi')
             ->select([
                 'bi.c_personid',

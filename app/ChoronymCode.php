@@ -4,8 +4,7 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ChoronymCode extends Model
-{
+class ChoronymCode extends Model {
     /**
      * 与模型关联的数据表
      *

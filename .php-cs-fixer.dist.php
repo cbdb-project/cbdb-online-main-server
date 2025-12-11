@@ -20,7 +20,7 @@ return (new Config())
     ->setRules([
         '@PSR12' => true,
         // 覆盖 PSR-12 的大括号换行要求
-        'curly_braces_position' => [
+        'braces_position' => [
             'control_structures_opening_brace' => 'same_line',
             'functions_opening_brace' => 'same_line',
             'classes_opening_brace' => 'same_line',

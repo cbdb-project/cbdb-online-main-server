@@ -1,9 +1,9 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 @include('biogmains.defense')
-    <div class="panel panel-default">
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-body">
             @if(!empty($proposals_only))
                 @php
                     $statusOptions = [
@@ -22,7 +22,7 @@
                             {{ $label }}
                         </label>
                     @endforeach
-                    <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-default btn-sm" style="margin-left: 8px;">清除篩選</a>
+                    <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-secondary btn-sm" style="margin-left: 8px;">清除篩選</a>
                 </form>
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {
@@ -213,13 +213,13 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @if($isProposal)
                                     <div class="proposal-status" style="margin-bottom:6px;">
                                         @if($reviewStatus === 'approved')
-                                            <span class="label label-success">已核准</span>
+                                            <span class="badge badge-success">已核准</span>
                                         @elseif($reviewStatus === 'rejected')
-                                            <span class="label label-danger">已退修</span>
+                                            <span class="badge badge-danger">已退修</span>
                                         @elseif($reviewStatus === 'cancelled')
-                                            <span class="label label-default">已撤回</span>
+                                            <span class="badge badge-secondary">已撤回</span>
                                         @else
-                                            <span class="label label-warning">待審核</span>
+                                            <span class="badge badge-warning">待審核</span>
                                         @endif
                                 @if(!empty($proposalMeta['comment']))
                                     <small class="text-muted" style="display:block;">
@@ -275,7 +275,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @include('components.key-value-table', ['data' => $resourceDataDisplay])
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -294,7 +294,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         </div>
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -311,7 +311,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @if($canEditProposal)
                                     <div class="proposal-actions" style="margin-top:8px;">
                                         <a href="{{ route('codes.proposals.edit', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
-                                           class="btn btn-default btn-sm">
+                                           class="btn btn-secondary btn-sm">
                                             修改提案
                                         </a>
                                         <form method="post"
@@ -355,7 +355,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                                 </div>
                                               </div>
                                               <div class="modal-footer">
-                                                <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
                                                 <button type="submit" class="btn btn-danger">確認退修</button>
                                               </div>
                                           </form>
@@ -412,7 +412,7 @@ $item->resource_data = unionPKDef($item->resource_data);
 
                 </table>
             </div>
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $lists->links() }}
             </div>
         </div>

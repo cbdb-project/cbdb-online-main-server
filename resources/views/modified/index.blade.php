@@ -1,9 +1,9 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 @include('biogmains.defense')
-    <div class="panel panel-default">
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
                 <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，2表示整體覆寫（完整替換現有記錄，主要用於 code 表修改），3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案<br />
@@ -170,11 +170,11 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @if($isProposal)
                                     <div class="proposal-status" style="margin-bottom:6px;">
                                         @if($reviewStatus === 'approved')
-                                            <span class="label label-success">已核准</span>
+                                            <span class="badge badge-success">已核准</span>
                                         @elseif($reviewStatus === 'rejected')
-                                            <span class="label label-danger">已退修</span>
+                                            <span class="badge badge-danger">已退修</span>
                                         @else
-                                            <span class="label label-warning">待審核</span>
+                                            <span class="badge badge-warning">待審核</span>
                                         @endif
                                         @if(!empty($proposalMeta['comment']))
                                             <small class="text-muted" style="display:block;">
@@ -219,7 +219,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @include('components.key-value-table', ['data' => $resourceDataDisplay])
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -238,7 +238,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         </div>
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -277,7 +277,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                                 </div>
                                             </div>
                                             <div class="modal-footer">
-                                                <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
                                                 <button type="submit" class="btn btn-danger">確認退修</button>
                                             </div>
                                           </form>
@@ -348,7 +348,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                 </tbody>
                 </table>
             </div>
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $lists->links() }}
             </div>
         </div>

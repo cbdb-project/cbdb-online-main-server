@@ -330,7 +330,7 @@
 
                     <li class="nav-item">
                         <a href="{{ route('admin.unidirectional-relationship-repair') }}" class="nav-link {{ $page_title == '單向關係修復' ? 'active' : '' }}">
-                            <i class="nav-icon fa fa-exchange"></i>
+                            <i class="nav-icon fas fa-exchange-alt"></i>
                             <p>單向關係修復</p>
                         </a>
                     </li>

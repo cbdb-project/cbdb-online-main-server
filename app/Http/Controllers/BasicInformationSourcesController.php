@@ -35,8 +35,9 @@ class BasicInformationSourcesController extends Controller {
 
         return view('biogmains.sources.index', [
             'basicinformation' => $basicinformation,
-            'page_title' => 'Basicinformation',
+            'page_title' => '出處',
             'page_description' => '基本信息表 出處',
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 
@@ -48,7 +49,7 @@ class BasicInformationSourcesController extends Controller {
     public function create($id) {
         return view('biogmains.sources.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處', 'page_url' => '/basicinformation/'.$id.'/sources']);
+            'page_title' => '出處', 'page_description' => '基本信息表 出處', 'page_url' => '/basicinformation/'.$id.'/sources', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -100,9 +101,10 @@ class BasicInformationSourcesController extends Controller {
         $res = $this->biogMainRepository->sourceById($id, $id_);
 
         return view('biogmains.sources.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 出處',
+            'page_title' => '出處', 'page_description' => '基本信息表 出處',
             'page_url' => '/basicinformation/'.$id.'/sources',
-            'archer' => "<li><a href='#'>Sources</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

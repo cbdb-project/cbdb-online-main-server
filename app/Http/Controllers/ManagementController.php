@@ -23,7 +23,7 @@ class ManagementController extends Controller {
         }
         $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
 
-        return view('manage.index', ['data' => $data, 'page_title' => 'Management', 'page_description' => '管理用戶']);
+        return view('manage.index', ['data' => $data, 'page_title' => '用戶管理', 'page_description' => '管理用戶']);
     }
 
     /**
@@ -78,8 +78,8 @@ class ManagementController extends Controller {
 
         return view('manage.edit', [
             'user' => $user,
-            'page_title' => '编辑用户',
-            'page_description' => '编辑用户 ' . $user->name . ' 的设置',
+            'page_title' => '編輯用戶',
+            'page_description' => '編輯用戶 ' . $user->name . ' 的設置',
         ]);
     }
 

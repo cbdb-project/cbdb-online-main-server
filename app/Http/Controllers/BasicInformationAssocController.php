@@ -58,7 +58,7 @@ class BasicInformationAssocController extends Controller {
         //dd($biogbasicinformation);
         //dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
-            'assoc_name' => $assoc_name, 'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係']);
+            'assoc_name' => $assoc_name, 'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -69,7 +69,7 @@ class BasicInformationAssocController extends Controller {
     public function create($id) {
         return view('biogmains.assoc.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc']);
+            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -139,9 +139,10 @@ class BasicInformationAssocController extends Controller {
         $res = $this->biogMainRepository->assocById($id_);
 
         return view('biogmains.assoc.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 社會關係',
+            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係',
             'page_url' => '/basicinformation/'.$id.'/assoc',
-            'archer' => "<li><a href='#'>Assoc</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

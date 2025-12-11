@@ -44,7 +44,7 @@ class BasicInformationOfficesController extends Controller {
 
         //        dd($serialAddr);
         return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名']);
+            'page_title' => '官名', 'page_description' => '基本信息表 官名', 'breadcrumb_home' => '人物基本資料']);
     }
 
     /**
@@ -55,7 +55,7 @@ class BasicInformationOfficesController extends Controller {
     public function create($id) {
         return view('biogmains.offices.create', [
             'id' => $id,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名', 'page_url' => '/basicinformation/'.$id.'/offices']);
+            'page_title' => '官名', 'page_description' => '基本信息表 官名', 'page_url' => '/basicinformation/'.$id.'/offices', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
     }
 
     /**
@@ -122,9 +122,10 @@ class BasicInformationOfficesController extends Controller {
         $res = $this->biogMainRepository->officeById($office);
 
         return view('biogmains.offices.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 官名',
+            'page_title' => '官名', 'page_description' => '基本信息表 官名',
             'page_url' => '/basicinformation/'.$id.'/offices',
-            'archer' => "<li><a href='#'>Offices</a></li>",
+            'archer' => "<li>編輯</li>",
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

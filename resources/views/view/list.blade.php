@@ -2,9 +2,6 @@
 
 @section('content')
     <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">檢視表總覽</h3>
-        </div>
         <div class="panel-body">
             <p class="text-muted">以下列出目前系統支援的檢視表（View_*），點選可直接進入對應的 `/view/{key}` 頁面。</p>
 

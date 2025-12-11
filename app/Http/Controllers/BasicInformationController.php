@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Schema;
  * Class BiogBasicInformationController
  * @package App\Http\Controllers
  *
- * 人物基本信息主要包括如下几个Model的内容
+ * 人物基本資料主要包括如下几个Model的内容
  * BiogMain Dynasty NianHao YearRangeCode ChoronymCode TextCode Text
  */
 class BasicInformationController extends Controller {
@@ -70,8 +70,8 @@ class BasicInformationController extends Controller {
         $names = $this->biogMainRepository->namesByQuery($request, $num);
 
         return view('biogmains.basicinformation.index', [
-            'page_title' => 'Basicinformation',
-            'page_description' => '編輯人物基本信息',
+            'page_title' => '人物基本資料',
+            'page_description' => '編輯人物基本資料',
             'names' => $names,
             'q' => $q,
         ]);
@@ -85,7 +85,7 @@ class BasicInformationController extends Controller {
     public function create() {
         $temp_id = BiogMain::max('c_personid') + 1;
 
-        return view('biogmains.basicinformation.create', ['page_title' => 'Basicinformation', 'page_description' => '新建人物基本信息', 'temp_id' => $temp_id]);
+        return view('biogmains.basicinformation.create', ['page_title' => '人物基本資料', 'page_description' => '新建人物基本資料', 'temp_id' => $temp_id]);
     }
 
     /**
@@ -171,7 +171,7 @@ class BasicInformationController extends Controller {
         $yearRange = $this->yearRangeRepository->yearRange();
 
         return view('biogmains.basicinformation.edit', ['basicinformation' => $biogbasicinformation, 'dynasties' => $dynasties, 'nianhaos' => $nianhaos, 'yearRange' => $yearRange,
-            'page_title' => 'Basicinformation', 'page_description' => '基本信息表 基本资料']);
+            'page_title' => '人物基本資料', 'page_description' => '基本信息表 基本资料']);
     }
 
     /**

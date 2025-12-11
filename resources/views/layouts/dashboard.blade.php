@@ -68,7 +68,9 @@ desired effect
                 <small>{{ $page_description ?? null }}</small>
             </h1>
             <ol class="breadcrumb">
-                <li><a href="/basicinformation"><i class="fa fa-dashboard"></i> Home</a></li>
+                @if(isset($breadcrumb_home))
+                    <li><a href="/basicinformation"><i class="fa fa-dashboard"></i> {{ $breadcrumb_home }}</a></li>
+                @endif
                 <li class="active"><a href="{{ $page_url ?? '#'}}">{{ $page_title }}</a></li>
                 {!! $archer ?? '' !!}
             </ol>

@@ -10,15 +10,6 @@
     @endphp
 
     <div class="box">
-        <div class="box-header">
-            <h3 class="box-title">代碼表</h3>
-
-            <div class="box-tools pull-right">
-                @if($showActions)
-                    <a class="btn btn-default" href="/codes/{{ $q }}/create">新增</a>
-                @endif
-            </div>
-        </div>
         <!-- /.box-header -->
         <div class="box-body">
             @if(!empty($copyrightNote))
@@ -26,21 +17,26 @@
                     <i class="fa fa-info-circle"></i> {!! $copyrightNote !!}
                 </div>
             @endif
-            <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="margin-bottom: 15px;">
-                <div class="input-group input-group-sm" style="width: 100%; max-width: 420px;">
-                    <input type="text"
-                           name="search"
-                           class="form-control"
-                           placeholder="搜尋"
-                           value="{{ $search ?? '' }}">
-                    <span class="input-group-btn">
-                        <button class="btn btn-default" type="submit">搜尋</button>
-                        @if(!empty($search))
-                            <a class="btn btn-default" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
-                        @endif
-                    </span>
-                </div>
-            </form>
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="flex: 0 0 auto; margin: 0;">
+                    <div class="input-group input-group-sm" style="width: 420px;">
+                        <input type="text"
+                               name="search"
+                               class="form-control"
+                               placeholder="搜尋"
+                               value="{{ $search ?? '' }}">
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" type="submit">搜尋</button>
+                            @if(!empty($search))
+                                <a class="btn btn-default" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
+                            @endif
+                        </span>
+                    </div>
+                </form>
+                @if($showActions)
+                    <a class="btn btn-sm btn-default" href="/codes/{{ $q }}/create">新增</a>
+                @endif
+            </div>
             <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                 <table class="table table-bordered table-striped table-condensed">
                     <thead>

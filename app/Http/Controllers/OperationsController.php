@@ -447,7 +447,7 @@ class OperationsController extends Controller {
         //echo "<pre><code>";
         //print_r($lists[0]['resource_original']); //成功
         //echo "</code></pre>";
-        $pageTitle = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
+        $pageTitle = $proposalsOnly ? '操作記錄（提案）' : '操作記錄';
         $pageDescription = $proposalsOnly ? '最近提案列表' : '最近編輯列表';
         $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
 

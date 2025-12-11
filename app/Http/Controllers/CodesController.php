@@ -269,6 +269,7 @@ class CodesController extends Controller {
                 }
 
                 $rowArray = $this->convertRowToArray($data);
+                $rowArray = $this->orderAuditFieldsForDisplay($rowArray);
                 $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
 
                 return view('codes.edit', [
@@ -976,6 +977,47 @@ class CodesController extends Controller {
         }
 
         return $data;
+    }
+
+    /**
+     * Reorder fields to display audit columns in a logical sequence.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    protected function orderAuditFieldsForDisplay(array $row): array {
+        // 定义审计字段的理想顺序
+        $auditFieldOrder = [
+            'c_created_by',
+            'c_created_date',
+            'c_created_date_timestamp_temporary',
+            'c_modified_by',
+            'c_modified_date',
+            'c_modified_date_timestamp_temporary',
+        ];
+
+        // 分离审计字段和其他字段
+        $auditFields = [];
+        $otherFields = [];
+
+        foreach ($row as $key => $value) {
+            if (in_array($key, $auditFieldOrder, true)) {
+                $auditFields[$key] = $value;
+            } else {
+                $otherFields[$key] = $value;
+            }
+        }
+
+        // 按照定义的顺序重新排列审计字段
+        $orderedAuditFields = [];
+        foreach ($auditFieldOrder as $field) {
+            if (array_key_exists($field, $auditFields)) {
+                $orderedAuditFields[$field] = $auditFields[$field];
+            }
+        }
+
+        // 合并：其他字段在前，审计字段在后（按顺序）
+        return array_merge($otherFields, $orderedAuditFields);
     }
 
     protected function buildConditionsFromRow(array $keyColumns, array $row): array {

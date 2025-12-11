@@ -406,6 +406,21 @@ class OperationsController extends Controller {
                             }
 
                         }
+
+                        // 檢查陣列長度是否足夠（BIOG_SOURCE_DATA 需要 3 個欄位）
+                        if (count($source_1) < 3) {
+                            // 記錄錯誤並跳過此筆資料
+                            \Log::warning("BIOG_SOURCE_DATA resource_id 格式不正確: {$resource_id}", [
+                                'parsed' => $source_1,
+                                'expected_count' => 3,
+                                'actual_count' => count($source_1),
+                                'operation_id' => $listsArr['data'][$x]['id'] ?? null,
+                            ]);
+                            $arr3 = null;
+
+                            break;
+                        }
+
                         $arr3 = DB::table('BIOG_SOURCE_DATA')->where([
                             ['c_personid', '=', $source_1[0]],
                             ['c_textid', '=', $source_1[1]],
@@ -424,8 +439,8 @@ class OperationsController extends Controller {
                 $arr3 = [];
             }
 
-            $arr1Decoded = json_decode($arr1, true);
-            $arr2Decoded = json_decode($arr2, true);
+            $arr1Decoded = $arr1 ? json_decode($arr1, true) : null;
+            $arr2Decoded = $arr2 ? json_decode($arr2, true) : null;
             $arr1Decoded = is_array($arr1Decoded) ? $arr1Decoded : [];
             $arr2Decoded = is_array($arr2Decoded) ? $arr2Decoded : [];
 

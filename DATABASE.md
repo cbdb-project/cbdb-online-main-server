@@ -22,6 +22,7 @@
 - **版本資訊**：`mysql Ver 15.1 Distrib 10.3.39-MariaDB, for debian-linux-gnu (x86_64) using readline 5.2`
 - **字符集**：utf8mb4
 - **排序規則**：utf8mb4_general_ci
+- **時區設定**：目前 database 內部分表格欄位出現 datetime 與 timestamp 混用的情況。為避免日期衝突，統一使用 GMT+8 時區。
 
 ### 測試環境
 - **CI/CD**：SQLite in-memory (`:memory:`)

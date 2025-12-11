@@ -5,6 +5,7 @@
     @php
         $currentUserName = optional(Auth::user())->name;
         $currentDateYmd = \Carbon\Carbon::now()->format('Ymd');
+        $currentTimestampTaipei = \Carbon\Carbon::now('Asia/Taipei')->format('Y-m-d H:i:s');
     @endphp
 
     <div class="panel panel-default">
@@ -41,7 +42,7 @@
                                 } elseif ($key === 'c_modified_date') {
                                     $helpText = '欄位內容提交後會被替換為：' . $currentDateYmd;
                                 } elseif ($key === 'c_modified_date_timestamp_temporary') {
-                                    $helpText = '欄位內容提交後會被替換為：' . \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestampTaipei . ' (GMT+8)';
                                 }
                             }
                         @endphp

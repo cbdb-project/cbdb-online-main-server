@@ -1004,13 +1004,32 @@ class CodesController extends Controller {
             'c_modified_date_timestamp_temporary',
         ];
 
+        // 时间戳字段需要转换时区
+        $timestampFields = [
+            'c_created_date_timestamp_temporary',
+            'c_modified_date_timestamp_temporary',
+        ];
+
         // 分离审计字段和其他字段
         $auditFields = [];
         $otherFields = [];
 
         foreach ($row as $key => $value) {
             if (in_array($key, $auditFieldOrder, true)) {
-                $auditFields[$key] = $value;
+                // 时间戳字段转换为本地时区（Asia/Taipei, GMT+8）
+                if (in_array($key, $timestampFields, true) && $value !== null && $value !== '') {
+                    try {
+                        $carbon = Carbon::parse($value);
+                        // 转换为 Asia/Taipei 时区（GMT+8）
+                        $carbon->setTimezone('Asia/Taipei');
+                        $auditFields[$key] = $carbon->format('Y-m-d H:i:s');
+                    } catch (\Exception $e) {
+                        // 如果解析失败，保持原值
+                        $auditFields[$key] = $value;
+                    }
+                } else {
+                    $auditFields[$key] = $value;
+                }
             } else {
                 $otherFields[$key] = $value;
             }

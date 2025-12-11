@@ -868,17 +868,19 @@ class CodesController extends Controller {
      */
     protected function enforceAuditFieldsForCreate(string $table, array $data): array {
         $columns = $this->getTableColumns($table);
+        $now = Carbon::now();
 
         if (in_array('c_created_by', $columns, true) && Auth::check()) {
             $data['c_created_by'] = Auth::user()->name;
         }
 
+        // Dual write: c_created_date (Ymd format) 和 c_created_date_timestamp_temporary (Y-m-d H:i:s format)
         if (in_array('c_created_date', $columns, true)) {
-            $data['c_created_date'] = Carbon::now()->format('Ymd');
+            $data['c_created_date'] = $now->format('Ymd');
         }
 
         if (in_array('c_created_date_timestamp_temporary', $columns, true)) {
-            $data['c_created_date_timestamp_temporary'] = Carbon::now()->format('Y-m-d H:i:s');
+            $data['c_created_date_timestamp_temporary'] = $now->format('Y-m-d H:i:s');
         }
 
         return $data;
@@ -950,12 +952,16 @@ class CodesController extends Controller {
      * @return array<string, mixed>
      */
     protected function enforceAuditFieldsForUpdate(array $data, array $original): array {
+        $now = Carbon::now();
+
+        // 保护 created_* 字段不被修改
         foreach (['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'] as $field) {
             if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
                 $data[$field] = $original[$field];
             }
         }
 
+        // 更新 c_modified_by
         if (array_key_exists('c_modified_by', $data)) {
             if (Auth::check()) {
                 $data['c_modified_by'] = Auth::user()->name;
@@ -964,14 +970,16 @@ class CodesController extends Controller {
             }
         }
 
+        // Dual write: c_modified_date (Ymd format) 和 c_modified_date_timestamp_temporary (Y-m-d H:i:s format)
+        // 使用同一个时间戳确保两者完全一致
         if (array_key_exists('c_modified_date', $data)) {
-            $data['c_modified_date'] = Carbon::now()->format('Ymd');
+            $data['c_modified_date'] = $now->format('Ymd');
         } elseif (array_key_exists('c_modified_date', $original)) {
             $data['c_modified_date'] = $original['c_modified_date'];
         }
 
         if (array_key_exists('c_modified_date_timestamp_temporary', $data)) {
-            $data['c_modified_date_timestamp_temporary'] = Carbon::now()->format('Y-m-d H:i:s');
+            $data['c_modified_date_timestamp_temporary'] = $now->format('Y-m-d H:i:s');
         } elseif (array_key_exists('c_modified_date_timestamp_temporary', $original)) {
             $data['c_modified_date_timestamp_temporary'] = $original['c_modified_date_timestamp_temporary'];
         }

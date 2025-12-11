@@ -135,6 +135,28 @@
             display: inline;
         }
 
+        /* Pagination 链接颜色统一为 v2 蓝色主题 */
+        .pagination .page-link {
+            color: #3c8dbc;
+        }
+        .pagination .page-link:hover {
+            color: #357ca5;
+        }
+        .pagination .page-item.active .page-link {
+            background-color: #3c8dbc;
+            border-color: #3c8dbc;
+        }
+
+        /* 修复移动版翻页按钮位置 */
+        @media (max-width: 767.98px) {
+            .float-right {
+                float: none !important;
+                display: flex;
+                justify-content: center;
+                margin-top: 1rem;
+            }
+        }
+
         /* 修复移动版下方留白问题 */
         @media (max-width: 767.98px) {
             .wrapper {

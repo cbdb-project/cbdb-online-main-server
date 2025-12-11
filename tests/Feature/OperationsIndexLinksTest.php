@@ -3,17 +3,12 @@
 namespace Tests\Feature;
 
 use App\Operation;
-use App\Repositories\OperationRepository;
 use App\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
-class OperationsIndexLinksTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class OperationsIndexLinksTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 使用 SQLite 内存数据库
@@ -57,8 +52,7 @@ class OperationsIndexLinksTest extends TestCase
         });
     }
 
-    public function test_operations_index_generates_links_for_non_person_code_resources()
-    {
+    public function test_operations_index_generates_links_for_non_person_code_resources() {
         // 创建测试用户
         $user = User::create([
             'name' => 'Test User',
@@ -91,8 +85,7 @@ class OperationsIndexLinksTest extends TestCase
         $response->assertSee('(本修改不涉及人物)');
     }
 
-    public function test_code_resource_link_generation_logic()
-    {
+    public function test_code_resource_link_generation_logic() {
         // 测试 codes 表配置是否正确
         $codeTableKeys = array_keys(config('codes.tables', []));
         $codeTables = array_map('strtoupper', $codeTableKeys);
@@ -116,8 +109,7 @@ class OperationsIndexLinksTest extends TestCase
         $this->assertEquals('/codes/OFFICE_CODES/803819/edit', $expectedLink);
     }
 
-    public function test_person_specific_link_priority_logic()
-    {
+    public function test_person_specific_link_priority_logic() {
         // 测试链接优先级逻辑：人物特定链接优先于代码表链接
 
         $codeTableKeys = array_keys(config('codes.tables', []));
@@ -155,8 +147,7 @@ class OperationsIndexLinksTest extends TestCase
         $this->assertStringNotContainsString('/codes/ALTNAME_DATA/', $resourceLink);
     }
 
-    public function test_operations_index_does_not_generate_links_for_deleted_operations()
-    {
+    public function test_operations_index_does_not_generate_links_for_deleted_operations() {
         // 创建测试用户
         $user = User::create([
             'name' => 'Test User',

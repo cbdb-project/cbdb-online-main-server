@@ -1,3 +1,395 @@
+# AdminLTE 在 CBDB Online 項目中的使用與升級
+
+## 目录
+
+1. [AdminLTE v3 升级进度](#adminlte-v3-升级进度)
+2. [AdminLTE v2 使用分析](#adminlte-在-cbdb-online-項目中的使用分析)
+3. [版本分析与升级建议](#adminlte-版本分析與升級建議)
+
+---
+
+# AdminLTE v3 升级进度
+
+## 概述
+
+本文档记录 AdminLTE 从 v2.3.8 升级到 v3.2 的进度和说明。
+
+## 当前状态
+
+### 已完成
+
+✅ **创建 AdminLTE v3 布局文件（使用 CDN）**
+- `resources/views/layouts/dashboard-v3.blade.php` - 主布局文件
+- `resources/views/layouts/header-v3.blade.php` - 导航栏组件
+- `resources/views/layouts/sidebar-v3.blade.php` - 侧边栏组件
+- `resources/views/layouts/footer.blade.php` - 底部组件（Bootstrap 4 网格布局）
+
+✅ **替换 /codes 列表页面為 v3 版本**
+- `resources/views/codes/index.blade.php` 採用 AdminLTE v3 佈局（原 v3 測試頁已合併進正式路由 `/codes`）
+
+✅ **迁移 operations 和 modified 页面到 v3**
+- `resources/views/operations/index.blade.php` - 操作/提案列表页面
+- `resources/views/modified/index.blade.php` - 近期修改列表页面
+
+✅ **迁移 view 检视表页面到 v3**
+- `resources/views/view/index.blade.php` - 检视表总览页面
+- `resources/views/view/list.blade.php` - 检视表详情页面
+
+✅ **修复 v3 布局问题**
+- 修复侧边栏 hover 展开时的文本显示
+- 修复 brand logo 只在收缩时显示
+- 修复 footer 版本号对齐到右下角
+- 修复移动端分页按钮位置和颜色
+- 修复 modal header 中 title 和 close button 的顺序（Bootstrap 4 标准）
+
+### 使用的 CDN 资源
+
+```html
+<!-- Font Awesome 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- AdminLTE v3.2 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Bootstrap 4 -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- AdminLTE App -->
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+```
+
+## 如何测试
+
+### 访问页面
+
+1. 确保你已登录系统
+2. 访问已迁移的页面:
+   - `/codes` - 代码表列表
+   - `/operations` - 操作/提案列表
+   - `/modified` - 近期修改列表
+   - `/view` - 检视表总览
+
+### 主要变化对比
+
+#### 1. 布局结构
+
+**v2:**
+```blade
+@extends('layouts.dashboard')
+```
+
+**v3:**
+```blade
+@extends('layouts.dashboard-v3')
+```
+
+#### 2. Box/Panel → Card
+
+**v2:**
+```html
+<div class="box box-default">
+    <div class="box-header with-border">
+        <h3 class="box-title">标题</h3>
+        <div class="box-tools pull-right">
+            <button data-widget="collapse"><i class="fa fa-minus"></i></button>
+        </div>
+    </div>
+    <div class="box-body">
+        内容
+    </div>
+</div>
+```
+
+**v3:**
+```html
+<div class="card card-default">
+    <div class="card-header">
+        <h3 class="card-title">标题</h3>
+        <div class="card-tools">
+            <button data-card-widget="collapse"><i class="fas fa-minus"></i></button>
+        </div>
+    </div>
+    <div class="card-body">
+        内容
+    </div>
+</div>
+```
+
+#### 3. 侧边栏菜单
+
+**v2:**
+```html
+<ul class="sidebar-menu">
+    <li class="header">HEADER</li>
+    <li class="active">
+        <a href="#"><i class="fa fa-dashboard"></i> <span>Link</span></a>
+    </li>
+</ul>
+```
+
+**v3:**
+```html
+<ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview">
+    <li class="nav-header">HEADER</li>
+    <li class="nav-item">
+        <a href="#" class="nav-link active">
+            <i class="nav-icon fa fa-dashboard"></i>
+            <p>Link</p>
+        </a>
+    </li>
+</ul>
+```
+
+#### 4. 表格类名
+
+**v2:**
+```html
+<table class="table table-hover table-condensed">
+```
+
+**v3:**
+```html
+<table class="table table-hover table-sm">
+```
+
+#### 5. 工具类
+
+| v2 | v3 |
+|----|----|
+| `pull-right` | `float-right` |
+| `pull-left` | `float-left` |
+| `hidden-xs` | `d-none d-sm-inline` |
+| `label label-*` | `badge badge-*` |
+
+#### 6. Modal 模态框结构
+
+**v2 (Bootstrap 3):**
+```html
+<div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal">&times;</button>
+    <h4 class="modal-title">标题</h4>
+</div>
+```
+
+**v3 (Bootstrap 4):**
+```html
+<div class="modal-header">
+    <h4 class="modal-title">标题</h4>
+    <button type="button" class="close" data-dismiss="modal">&times;</button>
+</div>
+```
+
+**注意**: Bootstrap 4 中 modal-title 必须在 close button 之前，以保证正确的布局和无障碍性。
+
+## v3 布局的特殊 CSS 修复
+
+### 1. 分页按钮颜色统一
+```css
+/* Pagination 链接颜色统一为 v2 蓝色主题 */
+.pagination .page-link {
+    color: #3c8dbc;
+}
+.pagination .page-link:hover {
+    color: #357ca5;
+}
+.pagination .page-item.active .page-link {
+    background-color: #3c8dbc;
+    border-color: #3c8dbc;
+}
+```
+
+### 2. 移动端分页按钮居中
+```css
+/* 修复移动版翻页按钮位置 */
+@media (max-width: 767.98px) {
+    .float-right {
+        float: none !important;
+        display: flex;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+}
+```
+
+### 3. Brand Logo 只在收缩时显示
+```css
+/* Brand logo 只在 sidebar 收缩时显示 */
+.sidebar-mini.sidebar-collapse .brand-logo {
+    display: inline;
+}
+.brand-logo {
+    display: none;
+}
+```
+
+## 类名映射速查表
+
+### 容器组件
+
+| v2 | v3 |
+|----|-----|
+| `box` | `card` |
+| `box-header` | `card-header` |
+| `box-title` | `card-title` |
+| `box-body` | `card-body` |
+| `box-footer` | `card-footer` |
+| `box-tools` | `card-tools` |
+| `panel` | `card` |
+| `panel-heading` | `card-header` |
+| `panel-body` | `card-body` |
+| `panel-footer` | `card-footer` |
+
+### 表格
+
+| v2 | v3 |
+|----|-----|
+| `table-condensed` | `table-sm` |
+
+### 工具类
+
+| v2 | v3 |
+|----|-----|
+| `pull-right` | `float-right` |
+| `pull-left` | `float-left` |
+| `hidden-xs` | `d-none d-sm-block` |
+| `hidden-sm` | `d-none d-md-block` |
+| `hidden-md` | `d-none d-lg-block` |
+| `visible-xs` | `d-block d-sm-none` |
+
+### 标签和徽章
+
+| v2 | v3 |
+|----|-----|
+| `label label-default` | `badge badge-secondary` |
+| `label label-primary` | `badge badge-primary` |
+| `label label-success` | `badge badge-success` |
+| `label label-info` | `badge badge-info` |
+| `label label-warning` | `badge badge-warning` |
+| `label label-danger` | `badge badge-danger` |
+
+### 导航菜单
+
+| v2 | v3 |
+|----|-----|
+| `sidebar-menu` | `nav nav-pills nav-sidebar flex-column` |
+| `<li class="header">` | `<li class="nav-header">` |
+| `<li>` | `<li class="nav-item">` |
+| `<a>` | `<a class="nav-link">` |
+| `treeview` | `has-treeview` |
+| `treeview-menu` | `nav nav-treeview` |
+
+### 数据属性
+
+| v2 | v3 |
+|----|-----|
+| `data-widget="collapse"` | `data-card-widget="collapse"` |
+| `data-widget="remove"` | `data-card-widget="remove"` |
+
+### 图标
+
+| v2 (Font Awesome 4) | v3 (Font Awesome 5) |
+|---------------------|---------------------|
+| `fa fa-dashboard` | `fas fa-tachometer-alt` |
+| `fa fa-minus` | `fas fa-minus` |
+| `fa fa-plus` | `fas fa-plus` |
+
+## 已迁移页面统计
+
+| 页面 | 路由 | 状态 | 说明 |
+|------|------|------|------|
+| codes/index.blade.php | /codes | ✅ 完成 | 代码表列表 |
+| operations/index.blade.php | /operations | ✅ 完成 | 操作/提案列表 |
+| modified/index.blade.php | /modified | ✅ 完成 | 近期修改列表 |
+| view/index.blade.php | /view | ✅ 完成 | 检视表总览 |
+| view/list.blade.php | /view/{id} | ✅ 完成 | 检视表详情 |
+
+**总计**: 5 个页面已迁移到 AdminLTE v3
+
+## 下一步计划
+
+### 短期任务
+
+1. **测试 v3 布局**
+   - [x] 测试所有导航菜单链接
+   - [x] 测试响应式布局
+   - [x] 测试用户下拉菜单
+   - [x] 测试模态框
+   - [x] 测试折叠功能
+
+2. **迁移更多页面**
+   - [x] operations/index.blade.php
+   - [x] modified/index.blade.php
+   - [x] view/index.blade.php
+   - [x] view/list.blade.php
+   - [ ] codes/show.blade.php
+   - [ ] basicinformation/index.blade.php
+   - [ ] 其他常用页面
+
+3. **处理插件兼容性**
+   - [x] DataTables - 已在迁移的页面中使用
+   - [ ] Select2 - 需要测试兼容性
+   - [ ] DatePicker - 需要测试兼容性
+   - [ ] iCheck - 考虑替代方案
+
+### 中期任务
+
+1. **批量迁移**
+   - [ ] 创建自动化脚本批量替换类名
+   - [ ] 迁移所有 69+ 个使用 dashboard 布局的页面
+
+2. **自定义样式适配**
+   - [ ] 检查 `resources/assets/css/styles.css` 的兼容性
+   - [ ] 调整与 Bootstrap 4 冲突的样式
+
+3. **JavaScript 更新**
+   - [ ] 更新依赖 Bootstrap 3 的 JS 代码
+   - [ ] 测试所有交互功能
+
+### 长期任务
+
+1. **完全替换 v2**
+   - [ ] 将所有页面迁移到 v3
+   - [ ] 移除旧的 AdminLTE v2 文件
+   - [ ] 从 Bower 迁移到 npm
+
+2. **性能优化**
+   - [ ] 考虑本地化 CDN 资源
+   - [ ] 优化资源加载
+
+## 注意事项
+
+1. **Font Awesome 升级**
+   - v2 使用 Font Awesome 4.5.0
+   - v3 使用 Font Awesome 5.15.4
+   - 部分图标名称已更改，需要逐一检查
+
+2. **Bootstrap 4 变化**
+   - 不再支持 IE9 及以下版本
+   - Flexbox 作为默认布局系统
+   - 部分组件结构有重大变化（如 input-group）
+
+3. **兼容性**
+   - v2 和 v3 可以共存
+   - 通过不同的布局文件（dashboard.blade.php vs dashboard-v3.blade.php）实现隔离
+   - 建议逐步迁移，而非一次性替换
+
+## 问题和解决方案
+
+### 已知问题
+
+暂无
+
+### 待确认
+
+- [ ] 所有第三方插件的 Bootstrap 4 兼容性
+- [ ] 自定义 CSS 是否需要大幅调整
+- [ ] 是否所有图标都能找到对应的 FA5 版本
+
+---
+
 # AdminLTE 在 CBDB Online 項目中的使用分析
 
 ## 概述
@@ -52,8 +444,8 @@ require('./../../bower_components/AdminLTE/dist/js/app.min');
 
 ### 以 CDN 載入 AdminLTE（暫時免除 npm 構建）的可行性說明
 
-- **現況限制**：上述 CSS/JS 透過 Laravel Mix 在 `resources/assets` 中打包，路徑依賴本地 `bower_components`。直接改為 CDN 需要調整 Blade 佈局以改從遠端載入，並避開 Mix 對這些檔案的 require/import。 【F:ADMINLTE.md†L16-L49】
-- **可行作法**：在升級探索階段，可於 `resources/views/layouts/dashboard.blade.php` 等主佈局中改用 CDN `<link>` / `<script>` 載入 AdminLTE 3 及其依賴（Bootstrap 4、jQuery、FontAwesome 5、OverlayScrollbars 等），並暫時停用對應的 Mix import，讓現有 PHP 功能先跑通。此方案不需要 npm 打包。 【F:ADMINLTE.md†L53-L84】
+- **現況限制**：上述 CSS/JS 透過 Laravel Mix 在 `resources/assets` 中打包，路徑依賴本地 `bower_components`。直接改為 CDN 需要調整 Blade 佈局以改從遠端載入，並避開 Mix 對這些檔案的 require/import。
+- **可行作法**：在升級探索階段，可於 `resources/views/layouts/dashboard.blade.php` 等主佈局中改用 CDN `<link>` / `<script>` 載入 AdminLTE 3 及其依賴（Bootstrap 4、jQuery、FontAwesome 5、OverlayScrollbars 等），並暫時停用對應的 Mix import，讓現有 PHP 功能先跑通。此方案不需要 npm 打包。
 - **風險/代價**：
   - 需逐頁確認外掛版本相容性（如 DataTables、Select2、iCheck）並替換新版相容的 CDN；舊版插件路徑寫死在混編 JS 中，可能失效。
   - 缺乏版本鎖定與離線能力，部署時需確保環境允許外網存取 CDN，且考量 CSP 設定。
@@ -211,42 +603,6 @@ require('./../../bower_components/AdminLTE/dist/js/app.min');
 - **Ionicons 2.0.1**: 通過 CDN 載入
 - **Bootstrap Glyphicons**: 包含在 AdminLTE 中
 
-## 升級到 AdminLTE 3 準備清單
-
-### 現況重點（AdminLTE 2.3.8 深度整合）
-- 样式來源依賴 `resources/bower_components/AdminLTE`，`resources/assets/sass/app.scss` 直接匯入 Bootstrap 3、AdminLTE 主題與外掛（DataTables、Select2、iCheck 等）。【F:resources/assets/sass/app.scss†L10-L18】
-- `resources/assets/js/bootstrap.js` 透過 Bower 路徑載入 AdminLTE 2 的 Bootstrap 3 版 JS 與多個插件，當前構建鏈仍基於 Bootstrap 3。【F:resources/assets/js/bootstrap.js†L13-L20】
-- 佈局使用舊版 `skin-blue sidebar-mini` 等皮膚類別，頂部仍透過 CDN 載入 FontAwesome 4.5.0 / Ionicons 2.0.1。【F:resources/views/layouts/dashboard.blade.php†L15-L22】【F:resources/views/layouts/dashboard.blade.php†L36-L51】
-- 側邊欄依舊採用 AdminLTE 2 的 `.sidebar-menu` 清單結構，無 data-widget 屬性，未使用 v3 的 nav 結構。【F:resources/views/layouts/sidebar.blade.php†L38-L95】
-- 前端依賴仍包含 `bootstrap-sass@3.4` 等 Bootstrap 3 工具包，尚未導入 AdminLTE 3 所需的 Bootstrap 4/FontAwesome 5 依賴。【F:package.json†L12-L24】
-
-### 主要差異與升級風險
-- AdminLTE 3 基於 **Bootstrap 4** 並改用 **FontAwesome 5**，`skin-*` 與部分布局類別已移除；現有頁面皮膚、按鈕 (`btn-default`) 與表單樣式需全面換膚。
-- 官方取消 Bower 發佈，需改以 npm 套件載入，並引入 Popper.js、overlayScrollbars、icheck-bootstrap 等新的插件組合；舊版 SlimScroll、iCheck 2.3.8、DataTables Bootstrap 3 皮膚皆需替換。
-- AdminLTE 3 的側邊欄/控制面板採用新的 `.nav-sidebar` 標記與 `data-widget="treeview"` 初始化方式，現有 Blade 模板需要結構性調整。
-- 多數頁面使用 `.panel` 組件（Bootstrap 3），在 Bootstrap 4 中需改為 `.card`，同時表單間距、栅格欄位類別（`col-xs-*` → `col-*`）都要對應更新。【F:resources/views/addrbelongsdata/index.blade.php†L4-L14】
-
-### 建議的升級步驟
-1. **資源與構建鏈調整**
-   - 將 AdminLTE 改為 npm 安裝（`admin-lte@^3`），同步升級 `bootstrap` 至 4.x、`@fortawesome/fontawesome-free`、`popper.js` / `@popperjs/core`，並引入 `overlayScrollbars`、`icheck-bootstrap` 等 v3 依賴；移除 Bower 目錄與 `bootstrap-sass`。
-   - 重寫 `resources/assets/sass/app.scss` 與 `resources/assets/js/bootstrap.js` 的引用路徑，改用 `node_modules` 版本的 AdminLTE 3 打包入口（CSS/JS、DataTables Bootstrap4 皮膚、Select2 Bootstrap4 皮膚等），確保 Laravel Mix 能編譯。
-
-2. **佈局與導覽結構**
-   - 更新 `resources/views/layouts/dashboard.blade.php` 的 `<body>` 類別與 wrapper 結構，採用 AdminLTE 3 標準類別（如 `layout-navbar-fixed sidebar-mini layout-fixed`），並替換頂部資源為 FontAwesome 5。
-   - 重構 `resources/views/layouts/sidebar.blade.php`，改用 `.nav nav-pills nav-sidebar flex-column`、`data-widget="treeview"` 及 `.nav-icon` 標記；同時調整 breadcrumbs 與控制側欄標記以符合 v3。
-
-3. **頁面組件替換**
-   - 將所有 `.panel`/`.panel-*` 容器替換為 Bootstrap 4 `.card` 結構，並調整按鈕顏色（`btn-default` → `btn-secondary` 等）、表單間距與網格欄位類別以符合 Bootstrap 4。
-   - 檢查 DataTables、Select2、iCheck 等插件的初始化腳本與樣式類別，改用對應的 Bootstrap 4 皮膚與 AdminLTE 3 初始化方式（例如 `overlayScrollbars` 取代 SlimScroll）。
-
-4. **圖標與樣式一致性**
-   - 將 FontAwesome 4 圖標名稱替換成 FontAwesome 5，逐頁確認 Ionicons 2 依賴是否仍需保留或替換。
-   - 檢查自訂樣式（`resources/assets/css/styles` 等）是否覆寫了 AdminLTE 2 的類別，必要時同步調整到 AdminLTE 3 的新 class 命名。
-
-5. **驗證與回歸**
-   - 針對主要頁面（基本信息、任官管理、檢視表、管理工具等）建立手動驗證清單，確認側邊欄折疊、麵包屑、模態窗、表格操作、頁面提醒等行為在 AdminLTE 3 下正常。
-   - 若前端 JS 有初始化 AdminLTE 2 版特性（如 `$('.sidebar-menu').tree()`），需改用 AdminLTE 3 的 API 並撰寫 smoke tests 或瀏覽器驗證腳本。
-
 ## 插件生態系統
 
 ### 已整合的 AdminLTE 插件
@@ -362,11 +718,12 @@ AdminLTE 在 CBDB Online 項目中的作用：
 
 ### 🎯 漸進式升級路徑 (強烈推薦)
 
-#### 階段1: AdminLTE 2.3.8 → 3.2.0
+#### 階段1: AdminLTE 2.3.8 → 3.2.0 (正在进行)
 **目標**: 升級到 Bootstrap 4，降低升級風險
 - **時程**: 4-6週
 - **優勢**: 較好的向後兼容性，社群支援度高
 - **風險**: 中等，主要是 Bootstrap 3 → 4 的變更
+- **進度**: 已完成 5 個頁面的遷移，使用 CDN 方式部署
 
 #### 階段2: AdminLTE 3.2.0 → 4.0.0 (等穩定版)
 **目標**: 升級到最新版本，享受所有現代化特性
@@ -379,7 +736,7 @@ AdminLTE 在 CBDB Online 項目中的作用：
 #### 高複雜度項目 - 預估總工作量: 3-6個月
 
 **主要挑戰:**
-1. **Bootstrap 3 → 5 的破壞性變更**
+1. **Bootstrap 3 → 4 的破壞性變更**
    - CSS 類名重大變化 (`pull-left` → `float-start`, `text-right` → `text-end`)
    - Grid 系統改變
    - JavaScript 組件 API 完全重構
@@ -395,19 +752,19 @@ AdminLTE 在 CBDB Online 項目中的作用：
 
 ### 📅 詳細升級計劃
 
-#### 準備階段 (1-2週)
-- [ ] 完整備份現有系統
-- [ ] 建立獨立測試環境
-- [ ] 分析現有 AdminLTE 組件使用情況
-- [ ] 製作組件對照表 (舊版 → 新版)
-- [ ] 制定詳細升級時程和回滾計劃
+#### 準備階段 (1-2週) ✅ 已完成
+- [x] 完整備份現有系統
+- [x] 建立獨立測試環境
+- [x] 分析現有 AdminLTE 組件使用情況
+- [x] 製作組件對照表 (舊版 → 新版)
+- [x] 制定詳細升級時程和回滾計劃
 
-#### 第一階段：升級到 AdminLTE 3.2.0 (4-6週)
-- [ ] 更新包管理器 (Bower → npm)
-- [ ] 更新 SCSS 導入路徑
-- [ ] 修改 HTML 模板 (Bootstrap 3 → 4 語法)
-- [ ] 更新 JavaScript 初始化代碼
-- [ ] 重構 CSS 類名 (`panel` → `card`, `pull-*` → `float-*`)
+#### 第一階段：升級到 AdminLTE 3.2.0 (4-6週) 🔄 進行中
+- [x] 創建 v3 布局文件（使用 CDN）
+- [x] 遷移测试页面验证可行性
+- [x] 遷移 5 個核心頁面（codes, operations, modified, view）
+- [x] 修復響應式和樣式問題
+- [ ] 繼續遷移其他頁面
 - [ ] 測試所有頁面和功能
 - [ ] 性能測試和優化
 
@@ -449,17 +806,17 @@ AdminLTE 在 CBDB Online 項目中的作用：
 
 ## 🎯 立即行動建議
 
-### 短期 (1個月內)
-1. **技術評估**: 詳細分析現有組件使用情況
-2. **測試環境**: 建立完整的升級測試環境
-3. **團隊培訓**: 開始學習新版本特性和API
-4. **時程規劃**: 制定詳細的升級時程表
+### 短期 (1個月內) ✅ 已完成
+1. ✅ **技術評估**: 詳細分析現有組件使用情況
+2. ✅ **測試環境**: 建立完整的升級測試環境
+3. ✅ **團隊培訓**: 開始學習新版本特性和API
+4. ✅ **時程規劃**: 制定詳細的升級時程表
 
-### 中期 (3-6個月)
-1. **執行升級**: 按階段完成升級到 AdminLTE 3.2.0
-2. **全面測試**: 確保所有功能正常運作
-3. **性能優化**: 充分利用新版本的性能特性
-4. **文檔更新**: 更新開發文檔和維護指南
+### 中期 (3-6個月) 🔄 進行中
+1. 🔄 **執行升級**: 按階段完成升級到 AdminLTE 3.2.0
+2. 🔄 **全面測試**: 確保所有功能正常運作
+3. 🔄 **性能優化**: 充分利用新版本的性能特性
+4. 🔄 **文檔更新**: 更新開發文檔和維護指南
 
 ### 長期 (1年內)
 1. **監控穩定版**: 關注 AdminLTE 4.0 穩定版發布
@@ -498,3 +855,52 @@ AdminLTE 在 CBDB Online 項目中的作用：
 - 完善的回滾預案
 
 AdminLTE 2.3.8 確實已經過於老舊，升級是必要且迫切的。雖然工作量不小，但這是對項目長期健康發展的重要投資。建議儘快啟動升級準備工作，採用漸進式策略以降低風險。
+
+## 升級到 AdminLTE 3 準備清單
+
+### 現況重點（AdminLTE 2.3.8 深度整合）
+- 样式來源依賴 `resources/bower_components/AdminLTE`，`resources/assets/sass/app.scss` 直接匯入 Bootstrap 3、AdminLTE 主題與外掛（DataTables、Select2、iCheck 等）。
+- `resources/assets/js/bootstrap.js` 透過 Bower 路徑載入 AdminLTE 2 的 Bootstrap 3 版 JS 與多個插件，當前構建鏈仍基於 Bootstrap 3。
+- 佈局使用舊版 `skin-blue sidebar-mini` 等皮膚類別，頂部仍透過 CDN 載入 FontAwesome 4.5.0 / Ionicons 2.0.1。
+- 側邊欄依舊採用 AdminLTE 2 的 `.sidebar-menu` 清單結構，無 data-widget 屬性，未使用 v3 的 nav 結構。
+- 前端依賴仍包含 `bootstrap-sass@3.4` 等 Bootstrap 3 工具包，尚未導入 AdminLTE 3 所需的 Bootstrap 4/FontAwesome 5 依賴。
+
+### 主要差異與升級風險
+- AdminLTE 3 基於 **Bootstrap 4** 並改用 **FontAwesome 5**，`skin-*` 與部分布局類別已移除；現有頁面皮膚、按鈕 (`btn-default`) 與表單樣式需全面換膚。
+- 官方取消 Bower 發佈，需改以 npm 套件載入，並引入 Popper.js、overlayScrollbars、icheck-bootstrap 等新的插件組合；舊版 SlimScroll、iCheck 2.3.8、DataTables Bootstrap 3 皮膚皆需替換。
+- AdminLTE 3 的側邊欄/控制面板採用新的 `.nav-sidebar` 標記與 `data-widget="treeview"` 初始化方式，現有 Blade 模板需要結構性調整。
+- 多數頁面使用 `.panel` 組件（Bootstrap 3），在 Bootstrap 4 中需改為 `.card`，同時表單間距、栅格欄位類別（`col-xs-*` → `col-*`）都要對應更新。
+
+### 建議的升級步驟
+1. **資源與構建鏈調整**
+   - 將 AdminLTE 改為 npm 安裝（`admin-lte@^3`），同步升級 `bootstrap` 至 4.x、`@fortawesome/fontawesome-free`、`popper.js` / `@popperjs/core`，並引入 `overlayScrollbars`、`icheck-bootstrap` 等 v3 依賴；移除 Bower 目錄與 `bootstrap-sass`。
+   - 重寫 `resources/assets/sass/app.scss` 與 `resources/assets/js/bootstrap.js` 的引用路徑，改用 `node_modules` 版本的 AdminLTE 3 打包入口（CSS/JS、DataTables Bootstrap4 皮膚、Select2 Bootstrap4 皮膚等），確保 Laravel Mix 能編譯。
+
+2. **佈局與導覽結構**
+   - 更新 `resources/views/layouts/dashboard.blade.php` 的 `<body>` 類別與 wrapper 結構，採用 AdminLTE 3 標準類別（如 `layout-navbar-fixed sidebar-mini layout-fixed`），並替換頂部資源為 FontAwesome 5。
+   - 重構 `resources/views/layouts/sidebar.blade.php`，改用 `.nav nav-pills nav-sidebar flex-column`、`data-widget="treeview"` 及 `.nav-icon` 標記；同時調整 breadcrumbs 與控制側欄標記以符合 v3。
+
+3. **頁面組件替換**
+   - 將所有 `.panel`/`.panel-*` 容器替換為 Bootstrap 4 `.card` 結構，並調整按鈕顏色（`btn-default` → `btn-secondary` 等）、表單間距與網格欄位類別以符合 Bootstrap 4。
+   - 檢查 DataTables、Select2、iCheck 等插件的初始化腳本與樣式類別，改用對應的 Bootstrap 4 皮膚與 AdminLTE 3 初始化方式（例如 `overlayScrollbars` 取代 SlimScroll）。
+
+4. **圖標與樣式一致性**
+   - 將 FontAwesome 4 圖標名稱替換成 FontAwesome 5，逐頁確認 Ionicons 2 依賴是否仍需保留或替換。
+   - 檢查自訂樣式（`resources/assets/css/styles` 等）是否覆寫了 AdminLTE 2 的類別，必要時同步調整到 AdminLTE 3 的新 class 命名。
+
+5. **驗證與回歸**
+   - 針對主要頁面（基本信息、任官管理、檢視表、管理工具等）建立手動驗證清單，確認側邊欄折疊、麵包屑、模態窗、表格操作、頁面提醒等行為在 AdminLTE 3 下正常。
+   - 若前端 JS 有初始化 AdminLTE 2 版特性（如 `$('.sidebar-menu').tree()`），需改用 AdminLTE 3 的 API 並撰寫 smoke tests 或瀏覽器驗證腳本。
+
+## 参考资源
+
+- [AdminLTE v3 官方文档](https://adminlte.io/docs/3.2/)
+- [AdminLTE v3 升级指南](https://adminlte.io/docs/3.2/upgrade-guide.html)
+- [Bootstrap 4 迁移指南](https://getbootstrap.com/docs/4.6/migration/)
+- [Font Awesome 4 到 5 升级](https://fontawesome.com/docs/web/setup/upgrade/)
+
+---
+
+**最后更新**: 2025-12-11
+**当前分支**: `claude/view-pages-v3-013XbCqYBRHQZ4LhChViYDsL`
+**基于分支**: `feature/adminlte3-upgrade`

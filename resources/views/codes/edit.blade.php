@@ -5,6 +5,7 @@
     @php
         $currentUserName = optional(Auth::user())->name;
         $currentDateYmd = \Carbon\Carbon::now()->format('Ymd');
+        $currentTimestampTaipei = \Carbon\Carbon::now('Asia/Taipei')->format('Y-m-d H:i:s');
     @endphp
 
     <div class="panel panel-default">
@@ -27,17 +28,23 @@
                     @endif
                     @foreach($row as $key => $value)
                         @php
-                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date'], true);
-                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date'], true);
+                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'], true);
+                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date', 'c_modified_date_timestamp_temporary'], true);
+                            // 显示原始值而不是替换后的值
                             $inputValue = $value;
-                            if ($isModifiedField) {
+                            $shouldDisable = $isCreatedField || $isModifiedField;
+
+                            // 为 modified_* 字段准备提示文字
+                            $helpText = null;
+                            if ($isModifiedField && Auth::check() && Auth::user()->isActive()) {
                                 if ($key === 'c_modified_by' && $currentUserName !== null) {
-                                    $inputValue = $currentUserName;
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentUserName;
                                 } elseif ($key === 'c_modified_date') {
-                                    $inputValue = $currentDateYmd;
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentDateYmd;
+                                } elseif ($key === 'c_modified_date_timestamp_temporary') {
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestampTaipei . ' (GMT+8)';
                                 }
                             }
-                            $shouldDisable = $isCreatedField || $isModifiedField;
                         @endphp
                         <div class="form-group">
                             <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
@@ -57,17 +64,26 @@
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
                                 <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                                @if($helpText)
+                                <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
+                                @endif
                             </div>
                             @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_belongs_to')
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
                                 <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                                @if($helpText)
+                                <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
+                                @endif
                             </div>
                             @else
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
+                                @if($helpText)
+                                <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
+                                @endif
                             </div>
                             @endif
                         </div>

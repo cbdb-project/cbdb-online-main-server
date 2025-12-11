@@ -27,8 +27,8 @@
                     @endif
                     @foreach($row as $key => $value)
                         @php
-                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date'], true);
-                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date'], true);
+                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'], true);
+                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date', 'c_modified_date_timestamp_temporary'], true);
                             // 显示原始值而不是替换后的值
                             $inputValue = $value;
                             $shouldDisable = $isCreatedField || $isModifiedField;
@@ -40,6 +40,8 @@
                                     $helpText = '欄位內容提交後會被替換為：' . $currentUserName;
                                 } elseif ($key === 'c_modified_date') {
                                     $helpText = '欄位內容提交後會被替換為：' . $currentDateYmd;
+                                } elseif ($key === 'c_modified_date_timestamp_temporary') {
+                                    $helpText = '欄位內容提交後會被替換為：' . \Carbon\Carbon::now()->format('Y-m-d H:i:s');
                                 }
                             }
                         @endphp

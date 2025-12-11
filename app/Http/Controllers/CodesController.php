@@ -876,6 +876,10 @@ class CodesController extends Controller {
             $data['c_created_date'] = Carbon::now()->format('Ymd');
         }
 
+        if (in_array('c_created_date_timestamp_temporary', $columns, true)) {
+            $data['c_created_date_timestamp_temporary'] = Carbon::now()->format('Y-m-d H:i:s');
+        }
+
         return $data;
     }
 
@@ -945,7 +949,7 @@ class CodesController extends Controller {
      * @return array<string, mixed>
      */
     protected function enforceAuditFieldsForUpdate(array $data, array $original): array {
-        foreach (['c_created_by', 'c_created_date'] as $field) {
+        foreach (['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'] as $field) {
             if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
                 $data[$field] = $original[$field];
             }
@@ -963,6 +967,12 @@ class CodesController extends Controller {
             $data['c_modified_date'] = Carbon::now()->format('Ymd');
         } elseif (array_key_exists('c_modified_date', $original)) {
             $data['c_modified_date'] = $original['c_modified_date'];
+        }
+
+        if (array_key_exists('c_modified_date_timestamp_temporary', $data)) {
+            $data['c_modified_date_timestamp_temporary'] = Carbon::now()->format('Y-m-d H:i:s');
+        } elseif (array_key_exists('c_modified_date_timestamp_temporary', $original)) {
+            $data['c_modified_date_timestamp_temporary'] = $original['c_modified_date_timestamp_temporary'];
         }
 
         return $data;

@@ -127,7 +127,7 @@ class ModifiedController extends Controller {
 
         return view('modified.index', ['lists' => $lists,
             'page_title' => '修改紀錄', 'page_description' => '最近修改紀錄',
-            'page_url' => '/modified'
+            'page_url' => '/modified',
         ]);
     }
 }

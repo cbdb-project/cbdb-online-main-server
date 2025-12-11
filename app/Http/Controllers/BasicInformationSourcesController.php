@@ -37,7 +37,7 @@ class BasicInformationSourcesController extends Controller {
             'basicinformation' => $basicinformation,
             'page_title' => '出處',
             'page_description' => '基本信息表 出處',
-            'breadcrumb_home' => '人物基本資料'
+            'breadcrumb_home' => '人物基本資料',
         ]);
     }
 

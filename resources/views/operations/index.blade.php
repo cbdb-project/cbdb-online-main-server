@@ -51,7 +51,8 @@
                 </thead>
                 <tbody>
                     @php
-                        $codeTables = array_map('strtoupper', config('codes.tables', []));
+                        $codeTableKeys = array_keys(config('codes.tables', []));
+                        $codeTables = array_map('strtoupper', $codeTableKeys);
                     @endphp
                     @foreach($lists as $item)
 @php
@@ -124,10 +125,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $hasPersonLink = $personLink && !empty($item->biogmain);
                                 $isCodeResource = in_array(strtoupper($item->resource), $codeTables, true);
                                 $resourceLink = null;
-                                if (!$hasPersonLink && $isCodeResource) {
-                                    $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
-                                } elseif ($hasPersonLink && $resourceSpecificLink) {
+
+                                // 优先使用人物相关的特定资源链接
+                                if ($hasPersonLink && $resourceSpecificLink) {
                                     $resourceLink = $resourceSpecificLink;
+                                }
+                                // 对于代码表资源（无论是否涉及人物），如果没有特定资源链接，则使用 codes 路由
+                                elseif ($isCodeResource && $item->op_type != 4) {
+                                    $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
                                 }
                             @endphp
                             @if(!$hasPersonLink)

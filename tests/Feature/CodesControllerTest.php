@@ -648,27 +648,34 @@ class CodesControllerTest extends TestCase {
 
         $response->assertStatus(200);
         $content = $response->getContent();
+
+        // c_created_by 应显示原始值并且 readonly
         $createdByPos = strpos($content, 'name="c_created_by"');
         $this->assertNotFalse($createdByPos);
         $this->assertNotFalse(strpos($content, 'value="origin"', $createdByPos));
         $this->assertNotFalse(strpos($content, 'readonly', $createdByPos));
 
+        // c_created_date 应显示原始值并且 readonly
         $createdDatePos = strpos($content, 'name="c_created_date"');
         $this->assertNotFalse($createdDatePos);
         $this->assertNotFalse(strpos($content, 'value="20200101"', $createdDatePos));
         $this->assertNotFalse(strpos($content, 'readonly', $createdDatePos));
 
+        // c_modified_by 应显示原始值（"previous"）而非当前用户，并且 readonly
         $modifiedByPos = strpos($content, 'name="c_modified_by"');
         $this->assertNotFalse($modifiedByPos);
-        $this->assertNotFalse(strpos($content, 'value="text-admin"', $modifiedByPos));
+        $this->assertNotFalse(strpos($content, 'value="previous"', $modifiedByPos));
         $this->assertNotFalse(strpos($content, 'readonly', $modifiedByPos));
 
+        // c_modified_date 应显示原始值（"20200102"）而非当前日期，并且 readonly
         $modifiedDatePos = strpos($content, 'name="c_modified_date"');
         $this->assertNotFalse($modifiedDatePos);
-        $this->assertNotFalse(strpos($content, 'value="'.Carbon::now()->format('Ymd').'"', $modifiedDatePos));
+        $this->assertNotFalse(strpos($content, 'value="20200102"', $modifiedDatePos));
         $this->assertNotFalse(strpos($content, 'readonly', $modifiedDatePos));
-        $response->assertDontSee('value="previous"', false);
-        $response->assertDontSee('value="20200102"', false);
+
+        // 应该有提示文字说明提交后会被替换的值
+        $response->assertSee('欄位內容提交後會被替換為：text-admin', false);
+        $response->assertSee('欄位內容提交後會被替換為：'.Carbon::now()->format('Ymd'), false);
 
         Carbon::setTestNow();
     }

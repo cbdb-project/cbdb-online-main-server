@@ -268,7 +268,7 @@ class CodesController extends Controller {
                     return redirect()->back();
                 }
 
-                $rowArray = $this->prepareAuditFieldsForDisplay($this->convertRowToArray($data));
+                $rowArray = $this->convertRowToArray($data);
                 $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
 
                 return view('codes.edit', [
@@ -935,24 +935,6 @@ class CodesController extends Controller {
         }
 
         return null;
-    }
-
-    /**
-     * Prepare immutable/mutable audit columns before rendering edit form.
-     *
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    protected function prepareAuditFieldsForDisplay(array $row): array {
-        if (array_key_exists('c_modified_by', $row) && Auth::check()) {
-            $row['c_modified_by'] = Auth::user()->name;
-        }
-
-        if (array_key_exists('c_modified_date', $row)) {
-            $row['c_modified_date'] = Carbon::now()->format('Ymd');
-        }
-
-        return $row;
     }
 
     /**

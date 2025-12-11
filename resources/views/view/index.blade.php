@@ -1,8 +1,8 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-body">
             @if(!empty($description))
                 <p>{{ $description }}</p>
             @endif
@@ -15,16 +15,16 @@
                     </div>
                     <button type="submit" class="btn btn-primary">搜尋</button>
                     @if(request()->has('search') && request('search') !== '')
-                        <a href="{{ route('view.show', $key) }}" class="btn btn-default" style="margin-left: 8px;">清除</a>
+                        <a href="{{ route('view.show', $key) }}" class="btn btn-secondary" style="margin-left: 8px;">清除</a>
                     @endif
                 </form>
-                <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#view-sql-modal">
+                <button type="button" class="btn btn-secondary btn-sm" data-toggle="modal" data-target="#view-sql-modal">
                     顯示 SQL
                 </button>
             </div>
 
             <div class="table-responsive table-scroll-x view-table-responsive">
-                <table class="table table-bordered table-striped table-condensed">
+                <table class="table table-bordered table-striped table-sm">
                     <thead>
                     <tr>
                         @foreach($columns as $label)
@@ -48,7 +48,7 @@
                 </table>
             </div>
 
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $rows->links() }}
             </div>
         </div>
@@ -73,7 +73,7 @@
                     @endif
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">關閉</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
                 </div>
             </div>
         </div>

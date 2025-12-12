@@ -66,7 +66,7 @@ class BiogMainController extends Controller {
             flash('person id 过大 '.Carbon::now(), 'error');
 
             return redirect()->back();
-	}
+        }
         #$data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         (new ToolsRepository())->timestamp($data, true);
         $flight = BiogMain::create($data);

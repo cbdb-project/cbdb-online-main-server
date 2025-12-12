@@ -10,7 +10,6 @@
   - 自動排序主鍵欄位並預估下一個編號（含複合鍵組合）。
   - 在新增／編輯時計入 `c_created_*`、`c_modified_*` 與 `operations` 日誌。
 - **只讀表**：部分表格設為只讀模式，僅供查詢，禁止新增、修改或刪除：
-  - `CBDB_NAME_LIST`：姓名列表（無主鍵定義，為確保數據完整性設為只讀）
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引（內部輔助表，由系統自動維護）
   - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射表（內部輔助表，透過 `cbdb:import-trad-simp-map` 指令匯入）
     - ⚠️ **授權例外**：此表數據來自 [OpenCC 項目](https://github.com/BYVoid/OpenCC) 的字典文件，以 **Apache 2.0 License** 授權，而非 CBDB 其他部分使用的 CC BY-NC-SA 4.0 International 授權

@@ -32,7 +32,6 @@ class CodesController extends Controller {
      * @var array<int, string>
      */
     protected $readOnlyTables = [
-        'CBDB_NAME_LIST',
         'CBDB__NAME_FTS',
         'CBDB__TRAD_SIMP_MAP',
         'DYNASTIES',
@@ -54,7 +53,6 @@ class CodesController extends Controller {
     protected $tableColumnOverrides = [
         'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
         'ADDR_CODES' => ['c_addr_id', 'c_name_chn', 'c_name', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
-        'CBDB_NAME_LIST' => ['c_personid', 'name', 'source'],
         'CBDB__NAME_FTS' => [
             'id',
             'c_personid',
@@ -130,7 +128,6 @@ class CodesController extends Controller {
      * @var array<string, array<int, string>>
      */
     protected $tablePrimaryKeyOverrides = [
-        'CBDB_NAME_LIST' => ['c_personid', 'name', 'source'],
         'CBDB__NAME_FTS' => ['id'],
         'CBDB__TRAD_SIMP_MAP' => ['trad_char'],
         'TEXT_CODES' => ['c_textid'],

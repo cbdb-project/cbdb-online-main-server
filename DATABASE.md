@@ -255,43 +255,7 @@ DB::table('ALTNAME_DATA')
 
 ## 具體場景指南
 
-### 場景 1：中文姓名搜索優化
-
-**需求**：加速 CBDB_NAME_LIST 表的姓名搜索
-
-**❌ 錯誤方案**：使用 MySQL ngram 全文索引
-```sql
--- 問題：MariaDB 10.3 不支持 ngram parser
-ALTER TABLE CBDB_NAME_LIST
-ADD FULLTEXT INDEX idx_name_fulltext (name) WITH PARSER ngram;
-```
-
-**✅ 正確方案**：使用標準 B-Tree 索引 + 前綴匹配
-```php
-// 現有的 B-Tree 索引 (idx_name) 已足夠
-// 性能測試結果：
-// - 單字查詢 "張%"：88ms
-// - 2字查詢 "張三%"：3ms ⭐ 極快
-// - 全名查詢 "蘇軾%"：2ms ⭐ 極快
-
-// 根據查詢長度選擇策略
-if (mb_strlen($query) >= 2) {
-    // 2+ 字符：使用前綴匹配（毫秒級）
-    $personIds = DB::table('CBDB_NAME_LIST')
-        ->where('name', 'like', $query . '%')
-        ->distinct()
-        ->limit(500)
-        ->pluck('c_personid');
-} else {
-    // 單字查詢：使用 BIOG_MAIN（避免過多結果）
-    $results = DB::table('BIOG_MAIN')
-        ->where('c_name_chn', 'like', '%' . $query . '%')
-        ->limit(20)
-        ->get();
-}
-```
-
-### 場景 2：複雜查詢優化
+### 場景 1：複雜查詢優化
 
 **❌ 錯誤方案**：使用數據庫特定的查詢優化器提示
 ```sql
@@ -308,7 +272,7 @@ CREATE INDEX idx_name ON users(name);
 SELECT * FROM users WHERE name = 'John';
 ```
 
-### 場景 3：JSON 數據存儲
+### 場景 2：JSON 數據存儲
 
 **⚠️ 謹慎使用**：JSON 功能在不同數據庫中差異較大
 

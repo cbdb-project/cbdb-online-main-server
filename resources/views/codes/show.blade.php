@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
@@ -9,12 +9,12 @@
         $keyColumns = $keyColumns ?? [];
     @endphp
 
-    <div class="box">
-        <!-- /.box-header -->
-        <div class="box-body">
+    <div class="card card-default">
+        <!-- /.card-header -->
+        <div class="card-body">
             @if(!empty($copyrightNote))
                 <div class="alert alert-info">
-                    <i class="fa fa-info-circle"></i> {!! $copyrightNote !!}
+                    <i class="fas fa-info-circle"></i> {!! $copyrightNote !!}
                 </div>
             @endif
             <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
@@ -25,20 +25,20 @@
                                class="form-control"
                                placeholder="搜尋"
                                value="{{ $search ?? '' }}">
-                        <span class="input-group-btn">
-                            <button class="btn btn-default" type="submit">搜尋</button>
+                        <div class="input-group-append">
+                            <button class="btn btn-secondary" type="submit">搜尋</button>
                             @if(!empty($search))
-                                <a class="btn btn-default" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
+                                <a class="btn btn-secondary" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
                             @endif
-                        </span>
+                        </div>
                     </div>
                 </form>
                 @if($showActions)
-                    <a class="btn btn-sm btn-default" href="/codes/{{ $q }}/create">新增</a>
+                    <a class="btn btn-sm btn-secondary" href="/codes/{{ $q }}/create">新增</a>
                 @endif
             </div>
             <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table class="table table-bordered table-striped table-condensed">
+                <table class="table table-bordered table-striped table-sm">
                     <thead>
                     <tr>
                         @foreach ($thead as $item)
@@ -125,34 +125,34 @@
                     </tfoot>
                 </table>
             </div>
-            <div class="pull-right">
+            <div class="float-right">
                 @if($useCursorPagination ?? false)
                     {{-- 游标分页导航 --}}
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="btn-group" role="group">
                             @if($data['has_prev_pages'])
                                 <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['before' => $data['prev_cursor']])) }}"
-                                   class="btn btn-default btn-sm">
-                                    <i class="fa fa-chevron-left"></i> 上一頁
+                                   class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-chevron-left"></i> 上一頁
                                 </a>
                             @else
-                                <button class="btn btn-default btn-sm" disabled>
-                                    <i class="fa fa-chevron-left"></i> 上一頁
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    <i class="fas fa-chevron-left"></i> 上一頁
                                 </button>
                             @endif
 
-                            <span class="btn btn-default btn-sm" disabled style="cursor: default;">
+                            <span class="btn btn-secondary btn-sm" disabled style="cursor: default;">
                                 ID: {{ number_format($data['first_id']) }} - {{ number_format($data['last_id']) }}
                             </span>
 
                             @if($data['has_more_pages'])
                                 <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['after' => $data['next_cursor']])) }}"
-                                   class="btn btn-default btn-sm">
-                                    下一頁 <i class="fa fa-chevron-right"></i>
+                                   class="btn btn-secondary btn-sm">
+                                    下一頁 <i class="fas fa-chevron-right"></i>
                                 </a>
                             @else
-                                <button class="btn btn-default btn-sm" disabled>
-                                    下一頁 <i class="fa fa-chevron-right"></i>
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    下一頁 <i class="fas fa-chevron-right"></i>
                                 </button>
                             @endif
                         </div>
@@ -165,9 +165,9 @@
                             <div class="input-group input-group-sm" style="width: 200px;">
                                 <input type="number" name="after" placeholder="跳轉到 ID"
                                        class="form-control" min="0">
-                                <span class="input-group-btn">
+                                <div class="input-group-append">
                                     <button type="submit" class="btn btn-primary">跳轉</button>
-                                </span>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -177,7 +177,7 @@
                 @endif
             </div>
         </div>
-        <!-- /.box-body -->
+        <!-- /.card-body -->
     </div>
-    <!-- /.box -->
+    <!-- /.card -->
 @endsection

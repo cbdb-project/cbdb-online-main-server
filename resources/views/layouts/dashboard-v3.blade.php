@@ -17,15 +17,19 @@
     <!-- AdminLTE -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
 
-    <!-- Custom styles (不包含 v2 的 AdminLTE CSS，避免冲突) -->
+    <!-- Custom styles (功能性样式，不包含 AdminLTE 主题覆盖) -->
     <style>
+        /* 基础布局样式 */
         html, body {
             overscroll-behavior-x: none;
             touch-action: pan-y;
         }
+
         .content-alert {
             padding: 10px;
         }
+
+        /* 表格响应式滚动 */
         .table-scroll-x {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -33,6 +37,8 @@
         .table-scroll-x table {
             min-width: 720px;
         }
+
+        /* View 表格响应式样式 */
         .view-table-responsive table {
             min-width: 100%;
             width: max-content;
@@ -45,133 +51,16 @@
             word-break: break-word;
         }
 
-        /* 使用 AdminLTE v2 的蓝色主题 #3c8dbc */
-        :root {
-            --primary: #3c8dbc;
-            --primary-hover: #357ca5;
-            --primary-dark: #2e6c9e;
-        }
-
-        /* Sidebar primary 颜色 */
-        .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
-        .sidebar-light-primary .nav-sidebar > .nav-item > .nav-link.active {
-            background-color: #3c8dbc;
-            color: #fff;
-        }
-
-        /* Sidebar hover 效果 */
-        .sidebar-dark-primary .nav-sidebar > .nav-item:hover > .nav-link,
-        .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link:focus {
-            background-color: #357ca5;
-            color: #fff;
-        }
-
-        /* Brand link hover */
-        .brand-link:hover {
-            color: #fff;
-        }
-
-        /* User header 背景色 */
-        .user-header {
-            background-color: #3c8dbc !important;
-        }
-
-        /* 链接颜色 */
-        a {
-            color: #3c8dbc;
-        }
-
-        a:hover {
-            color: #357ca5;
-        }
-
-        /* 按钮颜色 */
-        .btn-primary {
-            background-color: #3c8dbc;
-            border-color: #3c8dbc;
-        }
-
-        .btn-primary:hover,
-        .btn-primary:focus,
-        .btn-primary:active {
-            background-color: #357ca5;
-            border-color: #2e6c9e;
-        }
-
-        /* Badge primary */
-        .badge-primary {
-            background-color: #3c8dbc;
-        }
-
-        /* 面包屑 active */
-        .breadcrumb-item.active {
+        /* Navbar breadcrumb 分隔符 */
+        .navbar .breadcrumb-item + .breadcrumb-item::before {
+            content: "/";
+            padding-right: 0.5rem;
+            padding-left: 0.5rem;
             color: #6c757d;
-        }
-
-        /* 收縮狀態 hover 展開時，讓文字與常態展開一致可換行且保持預期寬度 */
-        .sidebar-mini.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p {
-            display: inline-block;
-            width: calc(100% - 34px);
-            white-space: normal;
-            word-break: break-word;
-        }
-
-        /* 控制側邊欄在 hover 展開時的高度與捲動，避免底部出現過多空白 */
-        .main-sidebar .sidebar {
-            height: calc(100vh - 3.5rem);
-            overflow-y: auto;
-        }
-        .sidebar-mini.sidebar-collapse .main-sidebar:hover .sidebar {
-            height: calc(100vh - 3.5rem);
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        /* Brand logo 只在 sidebar 收缩时显示 */
-        .sidebar-mini .brand-image {
-            display: none;
-        }
-        .sidebar-mini.sidebar-collapse .brand-image {
-            display: inline;
-        }
-
-        /* Pagination 链接颜色统一为 v2 蓝色主题 */
-        .pagination .page-link {
-            color: #3c8dbc;
-        }
-        .pagination .page-link:hover {
-            color: #357ca5;
-        }
-        .pagination .page-item.active .page-link {
-            background-color: #3c8dbc;
-            border-color: #3c8dbc;
-        }
-
-        /* 修复移动版翻页按钮位置 */
-        @media (max-width: 767.98px) {
-            .float-right {
-                float: none !important;
-                display: flex;
-                justify-content: center;
-                margin-top: 1rem;
-            }
-        }
-
-        /* 修复移动版下方留白问题 */
-        @media (max-width: 767.98px) {
-            .wrapper {
-                min-height: 100vh;
-            }
-            .content-wrapper {
-                min-height: calc(100vh - 3.5rem - 3.5rem) !important;
-            }
-            .main-sidebar {
-                bottom: 0 !important;
-            }
         }
     </style>
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition">
 <div class="wrapper" id="app">
 
     <!-- Navbar -->
@@ -189,27 +78,16 @@
         </div>
 
         <!-- Content Header (Page header) -->
+        @if(isset($page_title) || isset($page_description))
         <div class="content-header">
             <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1 class="m-0">{{ $page_title ?? 'Page Title' }}</h1>
-                        @if(!empty($page_description))
-                            <small class="text-muted">{{ $page_description }}</small>
-                        @endif
-                    </div>
-                    <div class="col-sm-6">
-                        <ol class="breadcrumb float-sm-right">
-                            @if(isset($breadcrumb_home))
-                                <li class="breadcrumb-item"><a href="/basicinformation"><i class="fas fa-tachometer-alt"></i> {{ $breadcrumb_home }}</a></li>
-                            @endif
-                            <li class="breadcrumb-item active">{{ $page_title ?? '' }}</li>
-                            {!! $archer ?? '' !!}
-                        </ol>
-                    </div>
-                </div>
+                <h1 class="m-0">{{ $page_title ?? 'Page Title' }}</h1>
+                @if(!empty($page_description))
+                    <small class="text-muted">{{ $page_description }}</small>
+                @endif
             </div>
         </div>
+        @endif
         <!-- /.content-header -->
 
         <!-- Main content -->

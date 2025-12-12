@@ -220,10 +220,10 @@ class CodesController extends Controller {
             $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
             return view('codes.show', [
-                'page_title' => 'Codes',
-                'page_description' => $table,
+                'page_title' => $table,
+                'page_description' => '',
                 'page_url' => '/codes',
-                'archer' => "<li class='active'>".e($table)."</li>",
+                'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
                 'q' => $table,
                 'thead' => $thead,
                 'data' => $data,
@@ -270,10 +270,10 @@ class CodesController extends Controller {
                 $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
 
                 return view('codes.edit', [
-                    'page_title' => 'Codes',
-                    'page_description' => $table,
+                    'page_title' => '編輯',
+                    'page_description' => '',
                     'page_url' => '/codes',
-                    'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
+                    'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
                     'id' => $compositeId, 'row' => $rowArray,
                     'table' => $table]);
             } catch (\PDOException $e) {
@@ -365,10 +365,10 @@ class CodesController extends Controller {
         $id = $firstColumn && isset($defaults[$firstColumn]) ? $defaults[$firstColumn] : null;
 
         return view('codes.create', [
-            'page_title' => 'Codes',
-            'page_description' => $table,
+            'page_title' => '新增',
+            'page_description' => '',
             'page_url' => '/codes',
-            'archer' => "<li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
+            'archer' => "<li class='breadcrumb-item'><a href='/codes'>Codes</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
             'row' => $columns,
             'id' => $id,
             'defaults' => $defaults,
@@ -446,7 +446,7 @@ class CodesController extends Controller {
             'page_title' => 'Codes',
             'page_description' => $table . ' 提案調整',
             'page_url' => route('codes.show', ['table_name' => $table]),
-            'archer' => "<li><a href='/codes'>Codes</a></li><li><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li><li><a href='#'>提案調整</a></li>",
+            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li><li class='breadcrumb-item active'>提案調整</li>",
         ]);
     }
 
@@ -1371,10 +1371,10 @@ class CodesController extends Controller {
         $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
         return view('codes.show', [
-            'page_title' => 'Codes',
-            'page_description' => $table,
+            'page_title' => $table,
+            'page_description' => '',
             'page_url' => '/codes',
-            'archer' => "<li class='active'>".e($table)."</li>",
+            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
             'q' => $table,
             'thead' => $thead,
             'data' => $cursorMeta,  // 传递游标元数据而非标准分页对象

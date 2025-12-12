@@ -22,7 +22,7 @@
                             <div class="col-sm-2">
                                 <button type="button" id="button_ajax_load" class="btn btn-info">Load Data</button>
                             </div>
-                            <div class="col-sm-offset-2 col-sm-10">
+                            <div class="offset-sm-2 col-sm-10">
                                 <p class="help-block text-muted">請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入</p>
                             </div>
                             @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_addr_id')

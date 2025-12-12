@@ -28,7 +28,6 @@ return [
         'BIOG_MAIN' => '人物傳記主表',
         'BIOG_SOURCE_DATA' => '傳記資料來源資料表',
         'BIOG_TEXT_DATA' => '傳記文本資料表',
-        'CBDB_NAME_LIST' => '人名索引（現以被 CBDB__NAME_FTS 代替）',
         'CBDB__NAME_FTS' => '人名全文檢索表',
         'CBDB__TRAD_SIMP_MAP' => '繁簡字對照表',
         'CHORONYM_CODES' => '地名類型代碼表',

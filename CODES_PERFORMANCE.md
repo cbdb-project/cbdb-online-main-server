@@ -84,7 +84,6 @@ $thead = $this->buildTableHead($table, $sampleRow);
 **影響的表（有 `tableColumnOverrides` 配置）**：
 - `CBDB__NAME_FTS` ✅
 - `CBDB__TRAD_SIMP_MAP` ✅
-- `CBDB_NAME_LIST` ✅
 - `ADDR_BELONGS_DATA` ✅
 - `ADDR_CODES` ✅
 - `ADDRESSES` ✅
@@ -136,7 +135,6 @@ if (empty($keys)) {
 **影響的表（有 `tablePrimaryKeyOverrides` 配置）**：
 - `CBDB__NAME_FTS` ✅
 - `CBDB__TRAD_SIMP_MAP` ✅
-- `CBDB_NAME_LIST` ✅
 - `TEXT_CODES` ✅
 
 **效能提升**：

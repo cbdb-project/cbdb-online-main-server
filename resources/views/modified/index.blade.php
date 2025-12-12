@@ -212,8 +212,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">內容快照</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @include('components.key-value-table', ['data' => $resourceDataDisplay])
@@ -229,8 +229,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">比較</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         <div>
@@ -267,8 +267,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                           <form method="post" action="{{ route('operations.proposals.reject', $item->id) }}">
                                             {{ csrf_field() }}
                                             <div class="modal-header">
-                                                <button type="button" class="close" data-dismiss="modal">&times;</button>
                                                 <h4 class="modal-title">退修提案</h4>
+                                                <button type="button" class="close" data-dismiss="modal">&times;</button>
                                             </div>
                                             <div class="modal-body">
                                                 <div class="form-group">

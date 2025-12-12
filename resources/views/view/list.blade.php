@@ -1,12 +1,12 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-body">
             <p class="text-muted">以下列出目前系統支援的檢視表（View_*），點選可直接進入對應的 `/view/{key}` 頁面。</p>
 
             <div class="table-responsive">
-                <table class="table table-striped table-bordered table-condensed">
+                <table class="table table-striped table-bordered table-sm">
                     <thead>
                     <tr>
                         <th style="width: 12%">操作</th>

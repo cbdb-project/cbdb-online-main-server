@@ -207,9 +207,9 @@ class OperationsController extends Controller {
         $data = $data[0]['resource_data'];
         $data = json_decode($data, true);
         $new_id = BiogMain::max('c_personid') + 1;
-        $new_ttsid = BiogMain::max('tts_sysno') + 1;
+        #$new_ttsid = BiogMain::max('tts_sysno') + 1;
         $data['c_personid'] = $new_id;
-        $data['tts_sysno'] = $new_ttsid;
+        #$data['tts_sysno'] = $new_ttsid;
         $message = BiogMain::create($data);
         $message ? $message = '200' : $message = '500';
 

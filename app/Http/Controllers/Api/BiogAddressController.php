@@ -65,17 +65,17 @@ class BiogAddressController extends Controller {
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-        $data['tts_sysno'] = DB::table('BIOG_ADDR_DATA')->max('tts_sysno') + 1;
+        #$data['tts_sysno'] = DB::table('BIOG_ADDR_DATA')->max('tts_sysno') + 1;
         //        dd($data);
-        (new ToolsRepository())->timestamp($data, true);
-        DB::table('BIOG_ADDR_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['tts_sysno'], $data);
+        #(new ToolsRepository())->timestamp($data, true);
+        #DB::table('BIOG_ADDR_DATA')->insert($data);
+        #(new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['tts_sysno'], $data);
 
-        return response()->json([
-            "error" => 0,
-            "message" => "新增成功",
-            "hint" => "",
-        ]);
+        #return response()->json([
+        #    "error" => 0,
+        #    "message" => "新增成功",
+        #    "hint" => "",
+        #]);
     }
 
     /**
@@ -120,7 +120,7 @@ class BiogAddressController extends Controller {
 
         $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
-        DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr_id)->update($data);
+        #DB::table('BIOG_ADDR_DATA')->where('tts_sysno', $addr_id)->update($data);
         //        dd(DB::table('BIOG_ADDR_DATA')->where('tts_sysno',$id)->first());
         (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $addr_id, $data);
 

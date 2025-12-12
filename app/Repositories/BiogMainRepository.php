@@ -935,47 +935,47 @@ class BiogMainRepository {
 
     public function entryUpdateById(Request $request, $id, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
-        $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
-        $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
-        $data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
-        $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
-        $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
-        $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
-        $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository())->timestamp($data);
-        DB::table('ENTRY_DATA')->where('tts_sysno', $id)->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ENTRY_DATA', $id, $data);
+        #$data = $request->all();
+        #$data = Arr::except($data, ['_method', '_token']);
+        #$data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
+        #$data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
+        #$data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
+        #$data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
+        #$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
+        #$data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        #$data = (new ToolsRepository())->timestamp($data);
+        #DB::table('ENTRY_DATA')->where('tts_sysno', $id)->update($data);
+        #(new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ENTRY_DATA', $id, $data);
     }
 
     public function entryStoreById(Request $request, $id) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
-        $data = $request->all();
-        $data = Arr::except($data, ['_token']);
-        $data['tts_sysno'] = DB::table('ENTRY_DATA')->max('tts_sysno') + 1;
-        $data['c_personid'] = $id;
-        $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
+        #$data = $request->all();
+        #$data = Arr::except($data, ['_token']);
+        #$data['tts_sysno'] = DB::table('ENTRY_DATA')->max('tts_sysno') + 1;
+        #$data['c_personid'] = $id;
+        #$data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
         //$data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
-        $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
-        $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
-        $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
-        $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository())->timestamp($data, true);
+        #$data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
+        #$data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
+        #$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
+        #$data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        #$data = (new ToolsRepository())->timestamp($data, true);
         //dd($data);
-        DB::table('ENTRY_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
+        #DB::table('ENTRY_DATA')->insert($data);
+        #(new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', $data['tts_sysno'], $data);
         //新增的聯合主鍵
-        $newid = $data['c_personid']."-".$data['c_entry_code']."-".$data['c_sequence'];
+        #$newid = $data['c_personid']."-".$data['c_entry_code']."-".$data['c_sequence'];
 
         //return $data['tts_sysno'];
-        return $newid;
+        #return $newid;
     }
 
     public function entryDeleteById($id, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationEntriesController.php使用
-        $row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
-        DB::table('ENTRY_DATA')->where('tts_sysno', $id)->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ENTRY_DATA', $id, $row);
+        #$row = DB::table('ENTRY_DATA')->where('tts_sysno', $id)->first();
+        #DB::table('ENTRY_DATA')->where('tts_sysno', $id)->delete();
+        #(new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ENTRY_DATA', $id, $row);
     }
 
     public function statuseById($id) {
@@ -1391,12 +1391,12 @@ class BiogMainRepository {
 
     public function socialInstUpdateById(Request $request, $id_, $c_personid) {
         #20240328移除tts_sysno，檢查此函式未被BasicInformationSocialInstController.php使用
-        $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
-        $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
-        $data = (new ToolsRepository())->timestamp($data);
-        DB::table('BIOG_INST_DATA')->where('tts_sysno', $id_)->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'BIOG_INST_DATA', $id_, $data);
+        #$data = $request->all();
+        #$data = Arr::except($data, ['_method', '_token']);
+        #$data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        #$data = (new ToolsRepository())->timestamp($data);
+        #DB::table('BIOG_INST_DATA')->where('tts_sysno', $id_)->update($data);
+        #(new OperationRepository())->store(Auth::id(), $c_personid, 3, 'BIOG_INST_DATA', $id_, $data);
     }
 
     public function socialInstStoreById(Request $request, $id) {

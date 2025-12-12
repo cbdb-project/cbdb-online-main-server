@@ -730,7 +730,7 @@ class OperationsController extends Controller {
             'OFFICE_CODE_TYPE_REL' => ['c_office_id','c_office_tree_id'],
             'OFFICE_TYPE_TREE' => ['c_office_type_node_id'],
             'BIOG_SOURCE_DATA' => ['c_personid','c_textid','c_pages'],
-            'ENTRY_DATA' => ['tts_sysno'],
+            'ENTRY_DATA' => ['c_personid', 'c_entry_code', 'c_sequence', 'c_kin_code',  'c_assoc_code',  'c_kin_id',  'c_year', 'c_assoc_id',  'c_inst_code',  'c_inst_name_code'],
             'STATUS_DATA' => ['c_personid','c_sequence','c_status_code'],
             'KIN_DATA' => ['c_personid','c_kin_id','c_kin_code'],
             'POSSESSION_DATA' => ['c_possession_record_id'],

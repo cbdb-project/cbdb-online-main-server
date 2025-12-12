@@ -67,16 +67,16 @@ class BiogMainController extends Controller {
 
             return redirect()->back();
         }
-        $data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
+        #$data['tts_sysno'] = BiogMain::max('tts_sysno') + 1;
         (new ToolsRepository())->timestamp($data, true);
         $flight = BiogMain::create($data);
-        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['tts_sysno'], $data);
+        #(new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['tts_sysno'], $data);
 
-        return response()->json([
-            "error" => 0,
-            "message" => "新增成功",
-            "hint" => "",
-        ]);
+        #return response()->json([
+        #    "error" => 0,
+        #    "message" => "新增成功",
+        #    "hint" => "",
+        #]);
     }
 
     /**

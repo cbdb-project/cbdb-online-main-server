@@ -273,12 +273,15 @@ DB::table('configs')->insert([
 ### 快速示例
 
 ```php
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Database\Migrations\Migration;
+<?php
 
-class CreateExampleTable extends Migration
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::create('example', function (Blueprint $table) {
             $table->bigIncrements('id');
@@ -288,11 +291,11 @@ class CreateExampleTable extends Migration
         });
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('example');
     }
-}
+};
 ```
 
 ### 常用命令

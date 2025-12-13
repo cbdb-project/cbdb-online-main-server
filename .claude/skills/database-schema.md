@@ -349,8 +349,7 @@ DB::select('SELECT /*+ INDEX(users idx_name) */ * FROM users WHERE name = ?', ['
 // 在 AppServiceProvider.php 中
 use Illuminate\Support\Facades\DB;
 
-public function boot()
-{
+public function boot() {
     DB::listen(function ($query) {
         if ($query->time > 1000) { // 超過 1 秒的查詢
             \Log::warning('Slow query', [

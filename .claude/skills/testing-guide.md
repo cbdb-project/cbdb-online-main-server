@@ -45,10 +45,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 
-class ExampleTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class ExampleTest extends TestCase {
+    protected function setUp(): void {
         parent::setUp();
 
         // 配置 SQLite 內存數據庫
@@ -66,8 +64,7 @@ class ExampleTest extends TestCase
         $this->seedTestData();
     }
 
-    private function createTestTables(): void
-    {
+    private function createTestTables(): void {
         // 創建測試所需的表
         Schema::create('users', function (Blueprint $table) {
             $table->id();
@@ -83,8 +80,7 @@ class ExampleTest extends TestCase
         // 根據需要創建其他表...
     }
 
-    private function seedTestData(): void
-    {
+    private function seedTestData(): void {
         // 使用 DB::table()->insert() 預填充測試數據
         DB::table('users')->insert([
             'email' => 'test@example.com',
@@ -177,8 +173,7 @@ class ExampleTest extends TestCase
 
 1. **授權測試**：驗證權限控制
    ```php
-   public function test_regular_user_cannot_restore_operations()
-   {
+   public function test_regular_user_cannot_restore_operations() {
        $user = User::factory()->create(); // 普通用戶
 
        $response = $this->actingAs($user)
@@ -190,8 +185,7 @@ class ExampleTest extends TestCase
 
 2. **Side Effect 測試**：驗證數據變動
    ```php
-   public function test_restore_creates_new_operation_record()
-   {
+   public function test_restore_creates_new_operation_record() {
        $admin = User::factory()->active()->superAdmin()->create();
 
        $this->actingAs($admin)
@@ -206,8 +200,7 @@ class ExampleTest extends TestCase
 
 3. **例外情境測試**：測試資料缺失或查不到的情況
    ```php
-   public function test_restore_non_existent_operation_returns_404()
-   {
+   public function test_restore_non_existent_operation_returns_404() {
        $admin = User::factory()->active()->superAdmin()->create();
 
        $response = $this->actingAs($admin)
@@ -225,8 +218,7 @@ class ExampleTest extends TestCase
 use Illuminate\Support\Facades\DB;
 use Mockery;
 
-public function test_transaction_rollback_on_error()
-{
+public function test_transaction_rollback_on_error() {
     // 創建假的 DB connection
     $mockConnection = Mockery::mock('connection');
     $mockConnection->shouldReceive('beginTransaction')->once();
@@ -246,16 +238,13 @@ public function test_transaction_rollback_on_error()
 use Tests\TestCase;
 use App\Models\User;
 
-class CodesControllerTest extends TestCase
-{
-    public function test_guest_cannot_access_codes()
-    {
+class CodesControllerTest extends TestCase {
+    public function test_guest_cannot_access_codes() {
         $response = $this->get('/codes');
         $response->assertRedirect('/login');
     }
 
-    public function test_authenticated_user_can_access_codes()
-    {
+    public function test_authenticated_user_can_access_codes() {
         $user = User::factory()->active()->create();
 
         $response = $this->actingAs($user)->get('/codes');
@@ -272,12 +261,10 @@ use App\Repositories\OperationRepository;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 
-class OperationRepositoryTest extends TestCase
-{
+class OperationRepositoryTest extends TestCase {
     private $repository;
 
-    protected function setUp(): void
-    {
+    protected function setUp(): void {
         parent::setUp();
 
         config()->set('database.default', 'sqlite');
@@ -298,8 +285,7 @@ class OperationRepositoryTest extends TestCase
         $this->repository = new OperationRepository();
     }
 
-    public function test_store_creates_operation_record()
-    {
+    public function test_store_creates_operation_record() {
         $data = [
             'op_type' => '1',
             'resource_id' => 'test-123',
@@ -321,8 +307,7 @@ class OperationRepositoryTest extends TestCase
 某些功能需要登入用戶資訊（如 `ToolsRepository::timestamp()`）：
 
 ```php
-public function test_office_update_requires_authenticated_user()
-{
+public function test_office_update_requires_authenticated_user() {
     $user = User::factory()->active()->create([
         'name' => '測試用戶',
     ]);

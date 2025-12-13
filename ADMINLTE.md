@@ -344,7 +344,7 @@
    - [x] DataTables - 已在迁移的页面中使用
    - [ ] Select2 - 需要测试兼容性
    - [ ] DatePicker - 需要测试兼容性
-   - [ ] iCheck - 考虑替代方案
+   - [x] iCheck - 已移除（2025-12-13 完成，仅用于美化 login 页面一个 checkbox，不支援 Bootstrap 4）
 
 ### 中期任务
 

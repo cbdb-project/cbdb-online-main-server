@@ -54,7 +54,7 @@
             </div>
             <div class="row">
                 <div class="col-xs-8">
-                    <div class="checkbox icheck">
+                    <div class="checkbox">
                         <label>
                             <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> Remember Me
                         </label>
@@ -78,14 +78,5 @@
 
 <!-- Scripts -->
 <script src="{{ mix('js/app.js') }}"></script>
-<script>
-    $(function () {
-        $('input').iCheck({
-            checkboxClass: 'icheckbox_square-blue',
-            radioClass: 'iradio_square-blue',
-            increaseArea: '20%' // optional
-        });
-    });
-</script>
 </body>
 </html>

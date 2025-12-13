@@ -131,80 +131,34 @@ php artisan migrate
 
 ## 最佳實踐
 
-### 索引策略
+> 💡 **詳細的索引策略、查詢優化和性能調優技巧**，請參考 [database-schema.md skill](./.claude/skills/database-schema.md)。
+
+### 索引策略概述
 
 #### B-Tree 索引（推薦）
+- ✅ 所有數據庫都支持
+- ✅ 前綴匹配高效（`LIKE 'prefix%'`）
+- ✅ 排序和範圍查詢優秀
 
 ```php
 Schema::table('users', function (Blueprint $table) {
-    // ✅ 單列索引
-    $table->index('name');
-
-    // ✅ 複合索引
-    $table->index(['last_name', 'first_name']);
-
-    // ✅ 唯一索引
-    $table->unique('email');
+    $table->index('name');                      // 單列索引
+    $table->index(['last_name', 'first_name']); // 複合索引
+    $table->unique('email');                    // 唯一索引
 });
 ```
-
-**優勢**：
-- 所有數據庫都支持
-- 前綴匹配高效（`LIKE 'prefix%'`）
-- 排序和範圍查詢優秀
 
 #### 全文索引（謹慎使用）
+⚠️ 不同數據庫實現差異大，建議使用應用層全文搜索方案（Elasticsearch、Meilisearch）。
 
-```php
-// ⚠️ 謹慎：不同數據庫實現差異大
-Schema::table('articles', function (Blueprint $table) {
-    // MySQL/MariaDB 特定
-    DB::statement('ALTER TABLE articles ADD FULLTEXT(content)');
+### 查詢優化概述
 
-    // PostgreSQL 需要完全不同的語法
-    // DB::statement('CREATE INDEX ... USING GIN(to_tsvector(...))');
-});
-```
+**索引友好的查詢**：
+- ✅ 前綴匹配：`WHERE name LIKE 'John%'`
+- ✅ 等值查詢：`WHERE name = 'John'`
+- ❌ 中間匹配：`WHERE name LIKE '%John%'`（無法使用 B-Tree 索引）
 
-**建議**：未來如需全文搜索，使用應用層方案
-
-### 查詢優化
-
-#### 索引友好的查詢
-
-```php
-// ✅ 好：前綴匹配，可使用索引
-DB::table('users')
-    ->where('name', 'like', 'John%')
-    ->get();
-
-// ❌ 壞：中間匹配，無法使用索引
-DB::table('users')
-    ->where('name', 'like', '%John%')
-    ->get();
-```
-
-#### 複合索引使用
-
-```php
-// 假設有複合索引：['last_name', 'first_name']
-
-// ✅ 好：使用索引前導列
-$users = DB::table('users')
-    ->where('last_name', 'Smith')
-    ->get();
-
-// ✅ 好：使用索引全部列
-$users = DB::table('users')
-    ->where('last_name', 'Smith')
-    ->where('first_name', 'John')
-    ->get();
-
-// ❌ 壞：跳過索引前導列，無法使用索引
-$users = DB::table('users')
-    ->where('first_name', 'John')
-    ->get();
-```
+**複合索引規則**：查詢必須包含索引的**前導列**才能有效使用索引。
 
 ### ORM 使用策略
 
@@ -300,40 +254,40 @@ DB::table('configs')->insert([
 
 ## Migration 指南
 
-### 基本模板
+> 💡 **詳細的 Migration 編寫指南、模板和檢查清單**，請參考 [migration-guide.md skill](./.claude/skills/migration-guide.md)。
+
+### 核心原則
+
+✅ **要做的事情**：
+- 使用 Laravel Schema Builder
+- 使用標準 SQL 語法
+- 使用 B-Tree 索引（默認）
+- `down()` 方法能正確回滾
+
+❌ **避免的事情**：
+- 數據庫專屬功能（ngram parser、專屬插件）
+- 供應商特定語法（REGEXP、優化器提示）
+- 直接執行原始 SQL（除非必要）
+- 修改基線 migration 文件
+
+### 快速示例
 
 ```php
-<?php
-
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
 class CreateExampleTable extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
         Schema::create('example', function (Blueprint $table) {
-            // ✅ 使用 Laravel Schema Builder
             $table->bigIncrements('id');
             $table->string('name', 255);
-            $table->text('description')->nullable();
             $table->timestamps();
-
-            // ✅ 標準索引
             $table->index('name');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down()
     {
         Schema::dropIfExists('example');
@@ -341,120 +295,49 @@ class CreateExampleTable extends Migration
 }
 ```
 
-### 避免的模式
+### 常用命令
 
-```php
-public function up()
-{
-    // ❌ 壞：直接執行數據庫特定 SQL
-    DB::statement('
-        CREATE FULLTEXT INDEX idx_name
-        ON table_name(name) WITH PARSER ngram
-    ');
-
-    // ❌ 壞：使用數據庫特定函數
-    DB::statement('
-        ALTER TABLE users
-        ADD COLUMN full_name VARCHAR(255)
-        GENERATED ALWAYS AS (CONCAT(first_name, " ", last_name))
-    ');
-
-    // ❌ 壞：使用 MySQL 特定的 ENGINE
-    DB::statement('
-        CREATE TABLE logs (
-            id INT PRIMARY KEY
-        ) ENGINE=ARCHIVE
-    ');
-}
+```bash
+php artisan make:migration create_example_table  # 創建 migration
+php artisan migrate                               # 執行 migration
+php artisan migrate:status                        # 查看狀態
+php artisan migrate:rollback                      # 回滾
 ```
-
-### Migration 檢查清單
-
-在執行 `php artisan migrate` 之前，請檢查：
-
-- [ ] 是否使用了 Laravel Schema Builder？
-- [ ] 是否避免了數據庫專屬語法？
-- [ ] 索引是否使用標準類型（B-Tree、UNIQUE）？
-- [ ] `down()` 方法是否能正確回滾？
-- [ ] 是否在 SQLite 測試環境中測試過？
-- [ ] 功能是否在 MySQL 5.7+ 和 MariaDB 10.3+ 上都能運行？
 
 ---
 
 ## 測試策略
 
-### In-Memory SQLite 測試（推薦）
+> 💡 **詳細的 PHPUnit 測試編寫指南、In-Memory 數據庫測試和最佳實踐**，請參考 [testing-guide.md skill](./.claude/skills/testing-guide.md)。
 
+### 推薦方法：In-Memory SQLite 測試
+
+**核心原則**：
+1. ✅ **隔離性**：每個測試使用獨立的 in-memory 數據庫
+2. ✅ **最小化**：只創建測試所需的表結構
+3. ✅ **快速**：避免依賴完整的 schema migration
+4. ✅ **可靠**：不依賴外部數據庫服務
+
+**基本設置**：
 ```php
-<?php
-
-namespace Tests\Feature;
-
-use Tests\TestCase;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
-
-class ExampleTest extends TestCase
+protected function setUp(): void
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
+    parent::setUp();
 
-        // 配置 SQLite in-memory
-        config()->set('database.default', 'sqlite');
-        config()->set('database.connections.sqlite.database', ':memory:');
+    // 配置 SQLite in-memory
+    config()->set('database.default', 'sqlite');
+    config()->set('database.connections.sqlite.database', ':memory:');
 
-        // 創建測試所需的最小化表結構
-        Schema::create('users', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamps();
-        });
-
-        // 插入測試數據
-        DB::table('users')->insert([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-    }
-
-    public function test_can_query_users()
-    {
-        $user = DB::table('users')->first();
-        $this->assertEquals('Test User', $user->name);
-    }
+    // 創建最小化表結構
+    Schema::create('users', function (Blueprint $table) {
+        $table->bigIncrements('id');
+        $table->string('name');
+        $table->timestamps();
+    });
 }
 ```
 
-### 多數據庫兼容性測試
-
-```php
-// phpunit.xml 配置
-<php>
-    <env name="DB_CONNECTION" value="sqlite"/>
-    <env name="DB_DATABASE" value=":memory:"/>
-</php>
-
-// 如需測試真實數據庫
-public function test_works_on_mariadb()
-{
-    if (env('DB_CONNECTION') !== 'mysql') {
-        $this->markTestSkipped('MariaDB test');
-    }
-
-    // 測試代碼...
-}
-```
-
-### 測試原則
-
-1. **隔離性**：每個測試使用獨立的 in-memory 數據庫
-2. **最小化**：只創建測試所需的表結構
-3. **快速**：避免依賴完整的 schema migration
-4. **可靠**：不依賴外部數據庫服務
-
-參考範例：
+**參考範例**：
 - `tests/Feature/CodesControllerTest.php`
 - `tests/Feature/WikiMaintenanceControllerTest.php`
 - `tests/Feature/UserIpLoggingTest.php`
@@ -484,6 +367,12 @@ public function test_works_on_mariadb()
 ---
 
 ## 參考資源
+
+### 項目 Skills（操作指南）
+- [database-schema.md](./.claude/skills/database-schema.md) - 數據庫 Schema 查詢、索引策略、查詢優化
+- [migration-guide.md](./.claude/skills/migration-guide.md) - Migration 編寫完整指南
+- [testing-guide.md](./.claude/skills/testing-guide.md) - PHPUnit 測試編寫指南
+- [pre-commit-checks.md](./.claude/skills/pre-commit-checks.md) - 代碼提交前檢查規範
 
 ### 官方文檔
 - [Laravel 10.x Database](https://laravel.com/docs/10.x/database)

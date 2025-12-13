@@ -41,6 +41,7 @@
 - `POSTED_TO_ADDR_DATA` 操作紀錄的 `resource_id`（列表上標示為「資源tts」）會沿用對應 `POSTED_TO_OFFICE_DATA` 的 `{c_office_id}-{c_posting_id}` 值，以共用 `/basicinformation/{personid}/offices/{pk}/edit` 編輯介面；實際資料表主鍵為 `c_personid`、`c_posting_id`、`c_office_id` 三欄，完整變更內容紀錄在 `resource_data['rows']` 中。
 
 ## 常用命令
+
 | 操作 | 指令 |
 |------|------|
 | 安裝 PHP 依賴 | `composer install` |
@@ -48,96 +49,87 @@
 | 編譯前端資源 | `npm run prod`（或 `npm run dev` 用於調試）|
 | 執行完整測試 | `./vendor/bin/phpunit` |
 | 執行單一測試 | `./vendor/bin/phpunit --filter TestName` |
+| 代碼格式化 | `./vendor/bin/php-cs-fixer fix` |
 | 匯入繁簡映射 | `php artisan cbdb:import-trad-simp-map --truncate` |
-| 管理用戶 | `php artisan cbdb:manage-user` （交互式）或帶選項創建/更新 |
+| 管理用戶 | `php artisan cbdb:manage-user` |
 
 > 若修改 Vue/JS，記得在本機跑 `npm run prod` 產出 `public/js/app.js`；專案不會自動編譯。
+> 詳細的用戶管理、測試、數據庫 schema 查詢等操作指南，請參考 [AI 代理專用 Skills](#ai-代理專用-skills)。
 
-### 用戶管理
-- **管理用戶命令**：使用 `php artisan cbdb:manage-user` 創建或更新用戶。適用於環境初始設置和日常用戶管理。
-  - **交互式模式**：直接運行 `php artisan cbdb:manage-user`，系統會逐步詢問所需信息。
-  - **命令行模式**：使用選項直接指定參數，適合腳本自動化：
-    ```bash
-    # 創建系統管理員
-    php artisan cbdb:manage-user \
-      --email=admin@example.com \
-      --name="系統管理員" \
-      --password=secret123 \
-      --active=1 \
-      --role=super-admin
-
-    # 更新現有用戶角色
-    php artisan cbdb:manage-user --email=user@example.com --role=expert
-
-    # 列出所有用戶
-    php artisan cbdb:manage-user --list
-    ```
-  - **支持的角色**：`regular`（一般）、`expert`（專家）、`crowdsourcing`（眾包）、`super-admin`（系統管理員）
-  - **激活狀態**：`0`（未激活）、`1`（激活）、`2`（預留）
-- **User Factory**：測試和內部工具可使用 `User::factory()` 創建測試用戶：
-  ```php
-  // 創建普通用戶
-  $user = User::factory()->create();
-
-  // 創建活躍的系統管理員
-  $admin = User::factory()->active()->superAdmin()->create();
-
-  // 批量創建用戶
-  $users = User::factory()->count(5)->create();
-
-  // 舊語法仍然支持（向後兼容）
-  $user = factory(User::class)->create();
-  ```
-
-### 內部表維護
-- **繁簡映射表**：使用 `php artisan cbdb:import-trad-simp-map --truncate` 從 OpenCC 匯入最新繁簡對照。支援 `--batch=N` 參數調整批次大小（預設 1000）。
-- **檢視內部表**：可透過 `/codes/CBDB__NAME_FTS` 和 `/codes/CBDB__TRAD_SIMP_MAP` 檢視表內容（只讀）。
-- **项目未用表格**：`ADDRESSES` 表僅供 CBDB Public API 使用。`CBDB_NAME_SEARCH` 表格僅供舊版 CBDB API 姓名搜索功能使用，其功能現已被 `CBDB__NAME_FTS` 替代。
-
-### 檢視表 ViewTable 模組補充
+## 檢視表 ViewTable 模組補充
 - 新增或調整檢視請更新 `config/view_tables.php`（欄位標題、描述、每頁筆數、對應 builder）。
 - 搜尋欄位維護在 `config/view_table_searchable.php`，欄位名稱必須與查詢 builder 中使用的資料表別名一致。
 - 查詢邏輯集中在 `app/ViewTables/ViewTableQueries.php`。若需透過資料庫 view，請確保 migration 會建立對應 View_*，否則改以查詢組合實作。
 - `/view` 首頁會列出所有檢視；如需逐一查看別名、說明，建議參考 `VIEWS.md`，並保持此文件與設定內容同步。
 - 頁面右上角的「顯示 SQL」會呈現實際執行語句及 bindings，可用來對照 `ViewTableQueries` 或資料庫查詢。
 
-## 測試策略
-1. **PHPUnit 基本原則**
-   - 預設使用 SQLite 內存資料庫（若測試自行切換，記得還原）。
-   - Feature 測試已停用 CSRF middleware；若需要真正驗證 CSRF，請額外撰寫整合測試。
+## AI 代理專用 Skills
 
-2. **In-Memory 數據庫測試模式**（⭐ 推薦標準做法）
-   - **遵循現有模式**：參考 `tests/Feature/UserIpLoggingTest.php` 等現有測試
-   - **配置方式**：在 `setUp()` 方法中設置：
-     ```php
-     config()->set('database.default', 'sqlite');
-     config()->set('database.connections.sqlite', [
-         'driver' => 'sqlite',
-         'database' => ':memory:',
-         'prefix' => '',
-     ]);
-     ```
-   - **表結構創建**：使用 `Schema::create()` 創建測試所需的最小化表結構
-   - **測試數據**：使用 `DB::table()->insert()` 預填充必要的測試數據
-   - **隔離性**：每個測試方法都有獨立的內存數據庫，完全隔離
-   - **優勢**：快速、可靠、不依賴外部數據庫，CI 環境友好
+本專案在 `.claude/skills/` 目錄下提供了專門的技能指南，供 AI 代理（如 Claude Code）在特定場景下參考使用。這些 skills 整合了專案的最佳實踐和規範，可提高工作效率並確保代碼質量。
 
-3. **避免複雜數據庫依賴**
-   - ❌ **不要**：依賴完整的 MySQL 數據庫遷移
-   - ❌ **不要**：依賴複雜的外鍵約束和大型 schema
-   - ✅ **要**：創建測試所需的最小化表結構
-   - ✅ **要**：模擬業務邏輯而非數據庫結構
+### 可用的 Skills
 
-4. **範例測試**
-   - `tests/Feature/CodesControllerTest.php`：涵蓋 `/codes/*` 授權、搜尋、操作記錄等行為。
-   - `tests/Feature/OperationsRestoreAuthorizeTest.php`：驗證操作復原的授權與記錄流程。
-   - `tests/Feature/WikiMaintenanceControllerTest.php`：In-memory SQLite 測試的標準範例
+#### 1. **database-schema.md** - 數據庫表格 Schema 查詢與維護
+**何時使用**：需要了解數據庫表格結構、字段類型、索引，或維護內部表格時。
 
-5. **撰寫測試建議**
-   - 覆蓋授權、Side effect（資料變動）、例外情境（資料缺失或查不到）。
-   - 優先使用 in-memory 數據庫模式，避免外部依賴
-   - 測試邏輯而非數據庫結構，保持測試簡潔和可維護
-   - 需 mock DB transaction 時，可使用 `DB::swap()` 注入假交易器。
+**主要內容**：
+- 從 `database/migrations/2025_01_01_*` 找到 baseline migration
+- 使用 `grep` 搜索表格的後續修改
+- 使用 `php artisan tinker` 驗證 schema 並查看示例數據
+- 複合主鍵表格的特殊處理說明
+- 內部輔助表（`CBDB__` 前綴）的識別和維護
+- 繁簡映射表的匯入和更新
+
+#### 2. **pre-commit-checks.md** - 代碼提交前檢查規範
+**何時使用**：在提交任何代碼變更到 Git 之前（必須執行）。
+
+**必要檢查項目**：
+- ✅ 代碼格式化：`./vendor/bin/php-cs-fixer fix`
+- ✅ 測試驗證：`./vendor/bin/phpunit`（必須全部通過）
+- ✅ 前端編譯：`npm run prod`（如修改了 Vue/JS/SCSS）
+- ✅ 提交信息使用繁體中文
+
+#### 3. **user-management.md** - 用戶管理操作指南
+**何時使用**：需要創建、更新用戶帳號，或在測試中使用 User Factory 時。
+
+**主要內容**：
+- `php artisan cbdb:manage-user` 命令的交互式和命令行模式
+- 支持的角色：`regular`、`expert`、`crowdsourcing`、`super-admin`
+- User Factory 在測試中的使用方法
+- Feature 測試中的用戶認證設置
+- 常見用戶管理場景和最佳實踐
+
+#### 4. **testing-guide.md** - PHPUnit 測試編寫指南
+**何時使用**：編寫或運行測試時，了解項目的測試策略和最佳實踐。
+
+**主要內容**：
+- PHPUnit 基本原則和運行方法
+- ⭐ In-Memory 數據庫測試模式（推薦標準做法）
+- 避免複雜數據庫依賴的策略
+- 測試編寫建議（授權、Side effect、例外情境）
+- 常見測試場景範例（Controller、Repository）
+- 測試數據庫常見陷阱和解決方案
+- PHPUnit 10.1 版本兼容性說明
+
+#### 5. **migration-guide.md** - Laravel Migration 編寫指南
+**何時使用**：需要創建或修改數據庫結構時。
+
+**主要內容**：
+- Migration 編寫核心原則（數據庫兼容性）
+- 創建新表和修改現有表的完整模板
+- 複合主鍵表的 Migration 處理
+- 常用字段類型和索引策略
+- 避免的模式（數據庫專屬功能）
+- Migration 檢查清單
+- 常見錯誤和解決方案
+
+### 如何使用 Skills
+
+- **AI 代理**：在需要時直接讀取對應的 skill 文件（如 `.claude/skills/database-schema.md`）
+- **開發者**：可以作為快速參考指南查閱
+- **擴展**：如發現新的通用場景，可以添加新的 skill 文件並更新此列表
+
+> **注意**：Skills 的內容會隨專案演進持續更新，請以 `.claude/skills/` 目錄中的最新版本為準。
 
 ## 迭代流程與守則
 1. **變更前**：檢查 `git status`，確認工作樹是否乾淨；若不乾淨，先理解現存修改，避免誤刪。

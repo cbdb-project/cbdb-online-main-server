@@ -37,20 +37,21 @@ php artisan migrate:status
 
 ### 創建新表
 
+**Laravel 10 推薦格式**（使用匿名類）：
+
 ```php
 <?php
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class CreateExampleTable extends Migration
+return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
         Schema::create('example', function (Blueprint $table) {
             // ✅ 主鍵
@@ -79,27 +80,31 @@ class CreateExampleTable extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('example');
     }
-}
+};
 ```
+
+**重要變化**（Laravel 8+ 新格式）：
+- ✅ 使用 `return new class extends Migration` 代替命名類
+- ✅ 方法使用 `: void` 返回類型聲明
+- ✅ 文件結尾是 `};` 而不是 `}`
 
 ### 修改現有表
 
 ```php
 <?php
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class AddColumnsToExampleTable extends Migration
+return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::table('example', function (Blueprint $table) {
             // ✅ 添加新欄位
@@ -110,7 +115,7 @@ class AddColumnsToExampleTable extends Migration
         });
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::table('example', function (Blueprint $table) {
             // ✅ 先刪除索引
@@ -120,7 +125,7 @@ class AddColumnsToExampleTable extends Migration
             $table->dropColumn('phone');
         });
     }
-}
+};
 ```
 
 ## 複合主鍵表的 Migration
@@ -130,13 +135,13 @@ class AddColumnsToExampleTable extends Migration
 ```php
 <?php
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-class CreateCompositeKeyTable extends Migration
+return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::create('altname_data', function (Blueprint $table) {
             // ✅ 定義字段
@@ -161,11 +166,11 @@ class CreateCompositeKeyTable extends Migration
         });
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::dropIfExists('altname_data');
     }
-}
+};
 ```
 
 **操作複合主鍵表**：
@@ -357,10 +362,12 @@ php artisan make:migration add_column_to_example_table
 
 ## 常見場景範例
 
+> **注意**：以下示例為簡化版本，僅展示 `up()` 和 `down()` 方法內部邏輯。完整的 migration 文件應使用 `return new class extends Migration` 格式（參考上方的基本模板）。
+
 ### 場景 1：添加可空欄位
 
 ```php
-public function up()
+public function up(): void
 {
     Schema::table('users', function (Blueprint $table) {
         // ✅ 新欄位設為 nullable，避免現有數據報錯
@@ -368,7 +375,7 @@ public function up()
     });
 }
 
-public function down()
+public function down(): void
 {
     Schema::table('users', function (Blueprint $table) {
         $table->dropColumn('phone');
@@ -384,7 +391,7 @@ composer require doctrine/dbal
 ```
 
 ```php
-public function up()
+public function up(): void
 {
     Schema::table('users', function (Blueprint $table) {
         // ✅ 修改欄位長度
@@ -395,7 +402,7 @@ public function up()
     });
 }
 
-public function down()
+public function down(): void
 {
     Schema::table('users', function (Blueprint $table) {
         $table->string('name', 255)->change();
@@ -408,7 +415,7 @@ public function down()
 
 ```php
 // 重命名欄位
-public function up()
+public function up(): void
 {
     Schema::table('users', function (Blueprint $table) {
         $table->renameColumn('name', 'full_name');
@@ -416,7 +423,7 @@ public function up()
 }
 
 // 重命名表
-public function up()
+public function up(): void
 {
     Schema::rename('old_table', 'new_table');
 }
@@ -425,7 +432,7 @@ public function up()
 ### 場景 4：添加外鍵（謹慎使用）
 
 ```php
-public function up()
+public function up(): void
 {
     Schema::table('posts', function (Blueprint $table) {
         // ✅ 添加外鍵
@@ -437,7 +444,7 @@ public function up()
     });
 }
 
-public function down()
+public function down(): void
 {
     Schema::table('posts', function (Blueprint $table) {
         // ✅ 先刪除外鍵約束

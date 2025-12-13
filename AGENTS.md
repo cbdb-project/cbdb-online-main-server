@@ -24,6 +24,72 @@
   - `routes/web.php`：所有 Web 端路由。
   - `phpunit.xml`：測試環境設定（已設定 `SKIP_CSRF_TOKEN=true`，避免 Feature 測試碰到 CSRF）。
 
+## 代碼風格規範
+
+本專案使用 **PHP-CS-Fixer** 自動化代碼格式化工具，配置文件為 `.php-cs-fixer.dist.php`。所有代碼提交前必須運行格式化工具以確保風格一致性。
+
+### 核心規範
+
+**基礎標準**：遵循 PSR-12 標準，並進行以下覆蓋調整：
+
+**大括號位置**（重要！）：
+- ✅ **函數/方法**：開括號與聲明在同一行
+  ```php
+  public function example() {
+      // code
+  }
+  ```
+- ✅ **類**：開括號與類名在同一行
+  ```php
+  class Example {
+      // code
+  }
+  ```
+- ✅ **控制結構**：開括號與條件在同一行
+  ```php
+  if ($condition) {
+      // code
+  }
+
+  foreach ($items as $item) {
+      // code
+  }
+  ```
+
+**其他重要規範**：
+- ✅ **陣列語法**：使用短陣列語法 `[]`，不使用 `array()`
+- ✅ **導入排序**：`use` 語句按字母順序排列
+- ✅ **多行陣列**：結尾必須有逗號
+- ✅ **返回類型聲明**：PHP 7.0+ 函數應使用返回類型聲明（如 `: void`、`: array`）
+
+### 格式化命令
+
+```bash
+# 格式化所有代碼（提交前必須執行）
+./vendor/bin/php-cs-fixer fix
+
+# 預覽將要修改的文件（不實際修改）
+./vendor/bin/php-cs-fixer fix --dry-run --diff
+```
+
+### 覆蓋範圍
+
+格式化工具會自動處理以下目錄：
+- `app/` - 應用程序邏輯
+- `config/` - 配置文件
+- `database/` - 資料庫遷移和填充
+- `routes/` - 路由定義
+- `tests/` - 測試文件
+
+**注意**：Blade 模板（`*.blade.php`）會自動排除，不進行格式化。
+
+### 文檔代碼範例規範
+
+在撰寫或更新文檔時，所有 PHP 代碼範例也應遵循項目的 same_line 大括號風格，確保文檔與實際代碼風格一致。這包括：
+- `AGENTS.md`、`DATABASE.md` 等核心文檔
+- `.claude/skills/` 目錄下的所有 skill 文件
+- `README.md` 和其他項目文檔
+
 ## 核心功能備忘
 - 官名設定在寫入操作紀錄時會將地址清單（POSTED_TO_ADDR_DATA）以 JSON rows 輸出，方便稽核與還原。 目前這類操作在 Operations 頁面暫停提供一鍵復原。
 

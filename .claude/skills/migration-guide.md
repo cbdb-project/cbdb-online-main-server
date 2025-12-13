@@ -46,13 +46,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
+    public function up(): void {
         Schema::create('example', function (Blueprint $table) {
             // ✅ 主鍵
             $table->bigIncrements('id');
@@ -81,8 +79,7 @@ return new class extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down(): void
-    {
+    public function down(): void {
         Schema::dropIfExists('example');
     }
 };
@@ -102,10 +99,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    public function up(): void
-    {
+return new class extends Migration {
+    public function up(): void {
         Schema::table('example', function (Blueprint $table) {
             // ✅ 添加新欄位
             $table->string('phone', 20)->nullable()->after('email');
@@ -115,8 +110,7 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
-    {
+    public function down(): void {
         Schema::table('example', function (Blueprint $table) {
             // ✅ 先刪除索引
             $table->dropIndex(['phone']);
@@ -139,10 +133,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    public function up(): void
-    {
+return new class extends Migration {
+    public function up(): void {
         Schema::create('altname_data', function (Blueprint $table) {
             // ✅ 定義字段
             $table->integer('c_personid');
@@ -166,8 +158,7 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
-    {
+    public function down(): void {
         Schema::dropIfExists('altname_data');
     }
 };
@@ -367,16 +358,14 @@ php artisan make:migration add_column_to_example_table
 ### 場景 1：添加可空欄位
 
 ```php
-public function up(): void
-{
+public function up(): void {
     Schema::table('users', function (Blueprint $table) {
         // ✅ 新欄位設為 nullable，避免現有數據報錯
         $table->string('phone', 20)->nullable()->after('email');
     });
 }
 
-public function down(): void
-{
+public function down(): void {
     Schema::table('users', function (Blueprint $table) {
         $table->dropColumn('phone');
     });
@@ -391,8 +380,7 @@ composer require doctrine/dbal
 ```
 
 ```php
-public function up(): void
-{
+public function up(): void {
     Schema::table('users', function (Blueprint $table) {
         // ✅ 修改欄位長度
         $table->string('name', 500)->change();
@@ -402,8 +390,7 @@ public function up(): void
     });
 }
 
-public function down(): void
-{
+public function down(): void {
     Schema::table('users', function (Blueprint $table) {
         $table->string('name', 255)->change();
         $table->string('phone', 20)->nullable(false)->change();
@@ -415,16 +402,14 @@ public function down(): void
 
 ```php
 // 重命名欄位
-public function up(): void
-{
+public function up(): void {
     Schema::table('users', function (Blueprint $table) {
         $table->renameColumn('name', 'full_name');
     });
 }
 
 // 重命名表
-public function up(): void
-{
+public function up(): void {
     Schema::rename('old_table', 'new_table');
 }
 ```
@@ -432,8 +417,7 @@ public function up(): void
 ### 場景 4：添加外鍵（謹慎使用）
 
 ```php
-public function up(): void
-{
+public function up(): void {
     Schema::table('posts', function (Blueprint $table) {
         // ✅ 添加外鍵
         $table->unsignedBigInteger('user_id');
@@ -444,8 +428,7 @@ public function up(): void
     });
 }
 
-public function down(): void
-{
+public function down(): void {
     Schema::table('posts', function (Blueprint $table) {
         // ✅ 先刪除外鍵約束
         $table->dropForeign(['user_id']);
@@ -498,20 +481,17 @@ php artisan migrate --database=sqlite
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-class MigrationTest extends TestCase
-{
+class MigrationTest extends TestCase {
     use RefreshDatabase;
 
-    public function test_migration_creates_table()
-    {
+    public function test_migration_creates_table() {
         // RefreshDatabase trait 會自動運行 migration
         $this->assertTrue(
             Schema::hasTable('example')
         );
     }
 
-    public function test_migration_creates_columns()
-    {
+    public function test_migration_creates_columns() {
         $this->assertTrue(
             Schema::hasColumn('example', 'name')
         );
@@ -538,16 +518,14 @@ $table->index(
 
 ```php
 // ❌ 錯誤順序
-public function down()
-{
+public function down() {
     Schema::table('users', function (Blueprint $table) {
         $table->dropColumn('email'); // 錯誤：email 上有 unique 索引
     });
 }
 
 // ✅ 正確順序
-public function down()
-{
+public function down() {
     Schema::table('users', function (Blueprint $table) {
         $table->dropUnique(['email']); // 先刪除索引
         $table->dropColumn('email');    // 再刪除欄位

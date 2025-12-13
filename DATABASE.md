@@ -323,8 +323,7 @@ php artisan migrate:rollback                      # 回滾
 
 **基本設置**：
 ```php
-protected function setUp(): void
-{
+protected function setUp(): void {
     parent::setUp();
 
     // 配置 SQLite in-memory

@@ -132,10 +132,8 @@ $user = User::factory()->create();
 use Tests\TestCase;
 use App\Models\User;
 
-class ExampleTest extends TestCase
-{
-    public function test_admin_can_access_page()
-    {
+class ExampleTest extends TestCase {
+    public function test_admin_can_access_page() {
         // 創建並登入管理員
         $admin = User::factory()->active()->superAdmin()->create();
 
@@ -145,8 +143,7 @@ class ExampleTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_regular_user_cannot_access_admin_page()
-    {
+    public function test_regular_user_cannot_access_admin_page() {
         // 創建普通用戶
         $user = User::factory()->create();
 
@@ -166,8 +163,7 @@ class ExampleTest extends TestCase
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 
-protected function setUp(): void
-{
+protected function setUp(): void {
     parent::setUp();
 
     // 配置 SQLite

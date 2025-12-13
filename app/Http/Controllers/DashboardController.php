@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
-class DashboardController extends Controller
-{
-    public function index()
-    {
+class DashboardController extends Controller {
+    public function index() {
         // 基础统计
         $totalPersons = DB::table('BIOG_MAIN')->count();
         $totalAltnames = DB::table('ALTNAME_DATA')->count();
@@ -62,6 +60,7 @@ class DashboardController extends Controller
                     3 => '刪除',
                     4 => '提案',
                 ];
+
                 return [$typeNames[$item->op_type] ?? '未知' => $item->count];
             });
 

@@ -1,12 +1,14 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
-    <div class="panel panel-default">
-        <div class="panel-heading">最近眾包錄入記錄</div>
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">最近眾包錄入記錄</h3>
+        </div>
+        <div class="card-body">
             <div class="table-responsive">
-                <table id="example1" class="table table-bordered table-striped">
+                <table id="example1" class="table table-bordered table-striped table-sm">
                 <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，2表示整體覆寫（完整替換現有記錄，主要用於 code 表修改），3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案<br />
                 * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄尚未處理，3表示記錄reject，4表示記錄處理失敗。
                 </p>
@@ -56,14 +58,14 @@
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">resource_data</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @include('components.key-value-table', ['data' => $resourceDataParsed])
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -73,8 +75,8 @@
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">compare</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         <div>
@@ -82,7 +84,7 @@
                                         </div>
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -125,7 +127,7 @@
                 </tbody>
                 </table>
             </div>
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $lists->links() }}
             </div>
         </div>

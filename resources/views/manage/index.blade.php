@@ -1,11 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
-    <div class="box">
-        <div class="box-body">
+    <div class="card card-default">
+        <div class="card-body">
 
-            <table id="example1" class="table table-bordered table-striped">
+            <table id="example1" class="table table-bordered table-striped table-sm">
                 <thead>
                 <tr>
                     <th>ID</th>
@@ -26,13 +26,13 @@
                         <td>{{ $user->institution }}</td>
                         <td>
                             @if($user->isActive())
-                                <span class="label label-success">已激活</span>
+                                <span class="badge badge-success">已激活</span>
                             @else
-                                <span class="label label-warning">未激活</span>
+                                <span class="badge badge-warning">未激活</span>
                             @endif
                         </td>
                         <td>
-                            <span class="label label-primary">{{ $user->getRoleName() }}</span>
+                            <span class="badge badge-primary">{{ $user->getRoleName() }}</span>
                         </td>
                         <td>
                             <div class="btn-group">
@@ -46,9 +46,9 @@
                 </tbody>
             </table>
         </div>
-        <!-- /.box-body -->
+        <!-- /.card-body -->
     </div>
-    <!-- /.box -->
+    <!-- /.card -->
     <passport-clients></passport-clients>
     <passport-authorized-clients></passport-authorized-clients>
     <passport-personal-access-tokens></passport-personal-access-tokens>

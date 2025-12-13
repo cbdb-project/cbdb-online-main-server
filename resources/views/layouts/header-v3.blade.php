@@ -10,6 +10,17 @@
         </li>
     </ul>
 
+    <!-- Breadcrumb -->
+    <ol class="breadcrumb float-sm-left ml-2 mb-0 bg-transparent">
+        @if(isset($breadcrumb_home))
+            <li class="breadcrumb-item"><a href="/basicinformation"><i class="fas fa-tachometer-alt"></i> {{ $breadcrumb_home }}</a></li>
+        @endif
+        {!! $archer ?? '' !!}
+        @if(isset($page_title))
+            <li class="breadcrumb-item active">{{ $page_title }}</li>
+        @endif
+    </ol>
+
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
         @if (Auth::guest())

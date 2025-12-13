@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
@@ -8,16 +8,17 @@
         $currentTimestampTaipei = \Carbon\Carbon::now('Asia/Taipei')->format('Y-m-d H:i:s');
     @endphp
 
-    <div class="panel panel-default">
-        <div class="panel-heading">{{ $table }}</div>
-        <div class="panel-body">
-            <div class="panel-body">
-                <form action="/codes/{{ $table }}/{{ $id }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">{{ $table }}</h3>
+        </div>
+        <div class="card-body">
+                <form action="/codes/{{ $table }}/{{ $id }}" method="post">
                     {{ method_field('PATCH') }}
                     {{ csrf_field() }}
                     @if($table === 'TEXT_CODES')
-                    <div class="form-group">
-                        <label for="author" class="col-sm-2 control-label">author</label>
+                    <div class="form-group row">
+                        <label for="author" class="col-sm-2 col-form-label">author</label>
                         <div class="col-sm-8">
                             <select class="form-control author" name="" readonly="readonly"></select>
                         </div>
@@ -46,8 +47,8 @@
                                 }
                             }
                         @endphp
-                        <div class="form-group">
-                            <label for="{{ $key }}" class="col-sm-2 control-label">{{ $key }}</label>
+                        <div class="form-group row">
+                            <label for="{{ $key }}" class="col-sm-2 col-form-label">{{ $key }}</label>
                             @if($table === 'TEXT_INSTANCE_DATA' && $key === 'c_textid')
                             <div class="col-sm-8">
                                 <input type="text" name="{{ $key }}" class="form-control"
@@ -56,7 +57,7 @@
                             <div class="col-sm-2">
                                 <button type="button" id="button_ajax_load_instance" class="btn btn-info">Load Data</button>
                             </div>
-                            <div class="col-sm-offset-2 col-sm-10">
+                            <div class="offset-sm-2 col-sm-10">
                                 <p class="help-block text-muted">請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入</p>
                             </div>
                             @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_addr_id')
@@ -89,15 +90,15 @@
                         </div>
                     @endforeach
                     @if(Auth::check() && Auth::user()->isActive())
-                    <div class="form-group">
-                        <label for="__proposal_comment" class="col-sm-2 control-label">提案說明</label>
+                    <div class="form-group row">
+                        <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
                         <div class="col-sm-10">
                             <textarea name="__proposal_comment" id="__proposal_comment" class="form-control" rows="3" placeholder="僅在提交提案時填寫（選填）">{{ old('__proposal_comment') }}</textarea>
                             <p class="help-block">如果直接儲存，此欄位會被忽略。</p>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <div class="col-sm-offset-2 col-sm-10">
+                    <div class="form-group row">
+                        <div class="col-sm-10 offset-sm-2">
                             <button type="submit" class="btn btn-primary">直接儲存</button>
                             <button type="submit" class="btn btn-info"
                                     formaction="{{ route('codes.propose.update', ['table_name' => $table, 'id' => $id], false) }}">
@@ -107,7 +108,6 @@
                     </div>
                     @endif
                 </form>
-            </div>
         </div>
     </div>
 

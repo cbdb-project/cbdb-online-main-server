@@ -96,6 +96,7 @@ class ViewTableController extends Controller {
             'page_title' => $definition['title'] ?? $effectiveKey,
             'page_description' => $definition['description'] ?? '',
             'page_url' => route('view.show', $effectiveKey),
+            'archer' => "<li class='breadcrumb-item'><a href='/view'>檢視表總覽</a></li>",
             'debug_sql' => $debugSql,
             'debug_sql_formatted' => $debugRenderedSql,
             'debug_bindings' => $debugBindings,

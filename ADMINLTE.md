@@ -301,12 +301,19 @@
 | 页面 | 路由 | 状态 | 说明 |
 |------|------|------|------|
 | codes/index.blade.php | /codes | ✅ 完成 | 代码表列表 |
+| codes/show.blade.php | /codes/{table} | ✅ 完成 | 代码表详情（表格数据展示） |
+| codes/edit.blade.php | /codes/{table}/{id}/edit | ✅ 完成 | 代码表编辑 |
+| codes/create.blade.php | /codes/{table}/create | ✅ 完成 | 代码表新增 |
+| codes/proposal-edit.blade.php | /codes/{table}/proposals/{operation}/edit | ✅ 完成 | 代码表提案编辑 |
 | operations/index.blade.php | /operations | ✅ 完成 | 操作/提案列表 |
 | modified/index.blade.php | /modified | ✅ 完成 | 近期修改列表 |
 | view/index.blade.php | /view | ✅ 完成 | 检视表总览 |
 | view/list.blade.php | /view/{id} | ✅ 完成 | 检视表详情 |
 
-**总计**: 5 个页面已迁移到 AdminLTE v3
+**总计**: 9 个页面已迁移到 AdminLTE v3
+
+### 🎉 已完成模块
+- ✅ **codes 模块** - 全部 5 个页面已迁移 (2025-12-11 完成)
 
 ## 下一步计划
 
@@ -324,7 +331,12 @@
    - [x] modified/index.blade.php
    - [x] view/index.blade.php
    - [x] view/list.blade.php
-   - [ ] codes/show.blade.php
+   - [x] codes/show.blade.php ⭐ 2025-12-11 完成
+   - [x] codes/edit.blade.php ⭐ 2025-12-11 完成
+   - [x] codes/create.blade.php ⭐ 2025-12-11 完成
+   - [x] codes/proposal-edit.blade.php ⭐ 2025-12-11 完成
+   - [ ] home.blade.php - 主页
+   - [ ] profile/edit.blade.php - 用户资料编辑
    - [ ] basicinformation/index.blade.php
    - [ ] 其他常用页面
 

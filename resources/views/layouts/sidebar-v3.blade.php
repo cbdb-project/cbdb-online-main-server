@@ -35,6 +35,13 @@
                 <li class="nav-header">MAIN NAVIGATION</li>
 
                 <li class="nav-item">
+                    <a href="{{ route('dashboard') }}" class="nav-link {{ $page_title == '系統總覽' ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-tachometer-alt"></i>
+                        <p>系統總覽</p>
+                    </a>
+                </li>
+
+                <li class="nav-item">
                     <a href="{{ route('basicinformation.index') }}" class="nav-link {{ $page_title == 'Basicinformation' ? 'active' : '' }}">
                         <i class="nav-icon ion ion-ios-people-outline"></i>
                         <p>個人基本信息</p>

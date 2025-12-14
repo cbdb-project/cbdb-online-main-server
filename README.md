@@ -38,6 +38,10 @@
 - **Web Server**: Caddy
 - **Node.js**: 12.x
 
+### 前端構建現況
+- 併存兩條管線：舊版 AdminLTE 2/Bootstrap 3 仍用 `laravel-mix`；新版 AdminLTE 3（`layouts/dashboard-v3` 及其頁面）使用 Vite，內建共用的 `resources/js/jquery-global.js`（提供 jQuery/Bootstrap/Datatables 與 modal 焦點修復），請勿再引入外部 CDN 的 jQuery/Bootstrap。
+- `package-lock.json` 目前為歷史積累，尚難乾淨重建；在全站切換至 Vite + AdminLTE 3 後再統一清理。
+
 ⚠️ **重要**：本專案現已升級到 Laravel 10.0 並要求 PHP 8.1+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。雖然 Laravel 10.0 官方僅測試到 PHP 8.2，但經測試表明 PHP 8.4 可正常運行。
 
 ### 數據庫兼容性原則

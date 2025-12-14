@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3（透過 `laravel-mix` 編譯）、Bootstrap 3/AdminLTE 2（部分頁面已逐步切換至 AdminLTE 3 CDN 佈局，如 `/codes`）。
+- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端存在兩條管線：舊版 AdminLTE 2/Bootstrap 3 仍用 `laravel-mix`，新版 AdminLTE 3+（`layouts/dashboard-v3` 及其頁面如 `/codes`、`/operations`、`/view` 等）改用 Vite 並內建 `resources/js/jquery-global.js`、Bootstrap 4 bundle 與 modal 焦點修復。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
@@ -222,6 +222,8 @@
 - `resource_id` 可能是複合主鍵並經過特殊編碼（`(slash)`、`minus` 等），還原/比對前需解析。
 - Feature 測試手動建立資料表時，記得設置必要的 primary key 與時間戳；否則模型邏輯可能出錯。
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
+- dashboard-v3 佈局改用 Vite 打包（`@vite` 載入），共用 `resources/js/jquery-global.js` 並內建 Bootstrap 4 bundle；不要再引用外部 CDN 的 jQuery/Bootstrap/Datatables 以免載入順序衝突。modal 關閉的焦點修復也在 Vite 入口內，全站共用。
+- `package-lock.json` 為長期歷史產物，當前難以乾淨重建；若非必要請勿刪除重生，待全站切換到 Vite + AdminLTE 3 後再集中清理。
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
 - **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。

@@ -67,7 +67,7 @@ class OperationsIndexLinksTest extends TestCase {
         $operation = Operation::create([
             'user_id' => $user->id,
             'c_personid' => 0,
-            'op_type' => 2, // 整體覆寫
+            'op_type' => Operation::TYPE_UPDATE_FULL, // 整體覆寫
             'resource' => 'TEXT_CODES',
             'resource_id' => '68942',
             'resource_data' => json_encode(['c_textid' => 68942, 'c_text_name' => 'Test Text']),

@@ -55,10 +55,12 @@ class DashboardController extends Controller {
             ->get()
             ->mapWithKeys(function ($item) {
                 $typeNames = [
-                    1 => '新增',
-                    2 => '修改',
-                    3 => '刪除',
-                    4 => '提案',
+                    \App\Operation::TYPE_CREATE => '新增',
+                    \App\Operation::TYPE_UPDATE => '修改',
+                    \App\Operation::TYPE_RESTORE => '復原',
+                    \App\Operation::TYPE_DELETE => '刪除',
+                    \App\Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
+                    \App\Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
                 ];
 
                 return [$typeNames[$item->op_type] ?? '未知' => $item->count];

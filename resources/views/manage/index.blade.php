@@ -1,7 +1,8 @@
 @extends('layouts.dashboard-v3')
 
 @push('styles')
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">
+    {{-- DataTables 和 Passport 组件通过 Vite 加载 --}}
+    @vite(['resources/js/datatables.js', 'resources/js/passport.js'])
 @endpush
 
 @section('content')
@@ -54,22 +55,26 @@
         <!-- /.card-body -->
     </div>
     <!-- /.card -->
-    <passport-clients></passport-clients>
-    <passport-authorized-clients></passport-authorized-clients>
-    <passport-personal-access-tokens></passport-personal-access-tokens>
+
+    {{-- Modern World: Vue 3 Passport 组件 --}}
+    <div id="app">
+        <passport-clients></passport-clients>
+        <passport-authorized-clients></passport-authorized-clients>
+        <passport-personal-access-tokens></passport-personal-access-tokens>
+    </div>
 @endsection
 @section('js')
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
     <script>
-        $(function() {
-            $('#example1').DataTable({
-                lengthMenu: [10, 25, 50, 75, 100],
-                pageLength: 50,
-                order: [[0, 'asc']],
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json'
-                }
+        onViteReady(function() {
+            $(function() {
+                $('#example1').DataTable({
+                    lengthMenu: [10, 25, 50, 75, 100],
+                    pageLength: 50,
+                    order: [[0, 'asc']],
+                    language: {
+                        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json'
+                    }
+                });
             });
         });
     </script>

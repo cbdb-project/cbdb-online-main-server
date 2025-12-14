@@ -14,8 +14,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <!-- Ionicons -->
     <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
-    <!-- AdminLTE -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+
+    <!-- Vite 加载完成前的回调队列 -->
+    <script>
+        window.viteReadyCallbacks = [];
+        window.onViteReady = function(fn) {
+            if (window.viteReady) {
+                fn();
+            } else {
+                window.viteReadyCallbacks.push(fn);
+            }
+        };
+    </script>
+
+    <!-- Modern World: Vite bundles (AdminLTE v3 + jQuery + Bootstrap + Vue 3) -->
+    @vite(['resources/js/app.js'])
     @stack('styles')
 
     <!-- Custom styles (功能性样式，不包含 AdminLTE 主题覆盖) -->
@@ -175,19 +188,15 @@
 </div>
 <!-- ./wrapper -->
 
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- Bootstrap 4 -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- AdminLTE App -->
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
-
-<!-- Custom Scripts (暫停載入 v2 編譯資產，避免與 AdminLTE v3 衝突) -->
+<!-- Modern World: jQuery, Bootstrap, AdminLTE 全部通过 Vite 构建 -->
+<!-- Legacy World (AdminLTE v2) 資產已棄用，避免與 AdminLTE v3 衝突 -->
 {{-- <script src="{{ mix('js/app.js') }}"></script> --}}
 @yield('js')
 @stack('scripts')
 <script>
-    $('#flash-overlay-modal').modal();
+    onViteReady(function() {
+        $('#flash-overlay-modal').modal();
+    });
 </script>
 </body>
 </html>

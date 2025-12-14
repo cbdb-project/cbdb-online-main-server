@@ -1,0 +1,12 @@
+/* Align select2 single select height with Bootstrap 4 form-control */
+.select2-container .select2-selection--single {
+    height: 38px;
+}
+
+.select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 38px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}

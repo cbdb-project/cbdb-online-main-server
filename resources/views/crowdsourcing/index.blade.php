@@ -1,7 +1,8 @@
 @extends('layouts.dashboard-v3')
 
 @push('styles')
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">
+    {{-- 使用 Vite 構建的 DataTables 資產，避免 CDN 與 jQuery 載入順序問題 --}}
+    @vite(['resources/js/datatables.js'])
 @endpush
 
 @section('content')
@@ -140,8 +141,6 @@
 @endsection
 
 @section('js')
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
     <script>
         var userTimeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
         var userOffsetMinutes = new Date().getTimezoneOffset();
@@ -208,17 +207,20 @@
             });
         }
 
-        $(function() {
-            $('#example1').DataTable({
-                lengthMenu: [10, 25, 50, 75, 100, 150, 200],
-                pageLength: 100,
-                order: [[6, 'desc']],
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json'
-                }
-            });
+        onViteReady(function() {
+            // 等待 DOM ready，確保 DataTables 插件已註冊在 jQuery 上
+            $(function() {
+                $('#example1').DataTable({
+                    lengthMenu: [10, 25, 50, 75, 100, 150, 200],
+                    pageLength: 100,
+                    order: [[6, 'desc']],
+                    language: {
+                        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json'
+                    }
+                });
 
-            applyTimestampFormatting();
+                applyTimestampFormatting();
+            });
         });
     </script>
 @endsection

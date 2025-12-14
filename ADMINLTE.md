@@ -42,24 +42,14 @@
 - 修复移动端分页按钮位置和颜色
 - 修复 modal header 中 title 和 close button 的顺序（Bootstrap 4 标准）
 
-### 使用的 CDN 资源
+### Vite 資產與共用腳本
 
-```html
-<!-- Font Awesome 5 -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-<!-- AdminLTE v3.2 -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<!-- Bootstrap 4 -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- AdminLTE App -->
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
-```
+- `@vite(['resources/js/app.js'])` 為 v3 入口，內含：
+  - `resources/js/jquery-global.js`：統一注入 jQuery 到 `window`，供 AdminLTE/Bootstrap/Datatables 等插件使用
+  - AdminLTE 3 + Bootstrap 4 bundle（無外部 CDN JS）
+  - 全域 modal 焦點修復（避免 aria-hidden/focus 警告）
+- DataTables 需求頁面透過 `@vite(['resources/js/datatables.js'])` 引入，避免手動掛載 CDN。
+- 目前僅 Font Awesome 仍使用 CDN；其他 AdminLTE/Bootstrap/Datatables 均隨 Vite bundle 提供。
 
 ## 如何测试
 

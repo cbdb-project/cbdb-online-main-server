@@ -20,7 +20,7 @@
                     <div class="form-group row">
                         <label for="author" class="col-sm-2 col-form-label">author</label>
                         <div class="col-sm-8">
-                            <select class="form-control author" name="" readonly="readonly"></select>
+                            <select class="form-control author js-person-select" name="" disabled></select>
                         </div>
                         <div class="col-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>
@@ -59,6 +59,24 @@
                             </div>
                             <div class="offset-sm-2 col-sm-10">
                                 <p class="help-block text-muted">請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入</p>
+                            </div>
+                            @elseif($table === 'ALTNAME_DATA' && $key === 'c_personid')
+                            <div class="col-sm-10">
+                                <select class="form-control altname-person js-person-select" name="{{ $key }}" data-initial-id="{{ $inputValue }}">
+                                    <option value="{{ $inputValue }}" selected>{{ $inputValue }}</option>
+                                </select>
+                                @if($helpText)
+                                <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
+                                @endif
+                            </div>
+                            @elseif($key === 'c_personid' || $key === 'c_kin_id')
+                            <div class="col-sm-10">
+                                <select class="form-control person-select js-person-select" name="{{ $key }}" data-initial-id="{{ $inputValue }}">
+                                    <option value="{{ $inputValue }}" selected>{{ $inputValue }}</option>
+                                </select>
+                                @if($helpText)
+                                <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
+                                @endif
                             </div>
                             @elseif($table === 'ADDR_BELONGS_DATA' && $key === 'c_addr_id')
                             <div class="col-sm-10">
@@ -115,29 +133,38 @@
 @section('js')
 @if($table === 'TEXT_CODES')
 <script>
-    author_first_load();
-    function author_first_load(){
-        let c_textid = $("input[name='c_textid']").val();
-        let data = [{
-            id: 0,
-            text: 'author'
-        }];
-        $.get('/api/select/search/textauthor', {q: c_textid}, function (data, textStatus){
-            for (let i=data.data.length-1; i>-1; i--){
-                item = data.data[i];
-                $(".author").append(new Option(item['text'], item['value']));
-            }
-        });
-    }
+    onViteReady(function() {
+        const $author = $('.author');
 
-    $("#button_ajax_load").click(function(){
-        let author = $(".author").val();
-        if (!author) {
-            return;
-        }
-        let url = "/basicinformation/" + author + "/texts";
-        let new_window = window.open('_blank');
-        new_window.location = url ;
+        // 首次載入作者列表（沿用舊行為：按 textid 預先帶出作者供跳轉）
+        const author_first_load = function() {
+            const c_textid = $("input[name='c_textid']").val();
+            if (!c_textid) {
+                return;
+            }
+            $.get('/api/select/search/textauthor', { q: c_textid }, function (data) {
+                $author.empty();
+                if (data && Array.isArray(data.data)) {
+                    data.data.forEach(function(item) {
+                        const option = new Option(item.text, item.value, false, false);
+                        $author.append(option);
+                    });
+                }
+                $author.trigger('change');
+            });
+        };
+
+        author_first_load();
+
+        $("#button_ajax_load").click(function(){
+            const author = $author.val();
+            if (!author) {
+                return;
+            }
+            const url = "/basicinformation/" + author + "/texts";
+            const new_window = window.open('_blank');
+            new_window.location = url ;
+        });
     });
 </script>
 @endif
@@ -194,6 +221,36 @@ $(document).ready(function (){
     });
 
 });
+</script>
+@endif
+@php
+    $hasPersonIdField = in_array('c_personid', array_keys($row ?? []), true) || in_array('c_kin_id', array_keys($row ?? []), true);
+@endphp
+@if(in_array($table, ['ALTNAME_DATA', 'BIOG_ADDR_DATA']) || $hasPersonIdField)
+<script>
+    onViteReady(function() {
+        const $persons = $('.js-person-select');
+
+        $persons.each(function() {
+            const $person = $(this);
+            const initialId = $person.data('initial-id') || $person.data('initial-value') || $person.val();
+
+            window.initPersonSelect($person, {
+                placeholder: '輸入姓名或 ID 搜尋人物',
+            });
+
+            if (initialId) {
+                window.fetchPersonOption(initialId).then(function(opt) {
+                    if (opt) {
+                        const option = new Option(opt.text, opt.id, true, true);
+                        $person.append(option).trigger('change.select2');
+                    } else {
+                        $person.val(initialId).trigger('change.select2');
+                    }
+                });
+            }
+        });
+    });
 </script>
 @endif
 @endsection

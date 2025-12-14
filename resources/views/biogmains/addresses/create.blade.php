@@ -216,7 +216,7 @@
             },
             placeholder: '请搜索',
             escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-            minimumInputLength: 0,
+            minimumInputLength: 1, // addr 是大表，需要至少输入 1 个字符
             templateResult: formatRepo,
             templateSelection: formatRepoSelection
         });
@@ -268,7 +268,7 @@
             },
             placeholder: '请搜索',
             escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-            minimumInputLength: 0,
+            minimumInputLength: 1, // text 是大表，需要至少输入 1 个字符
             templateResult: formatRepo,
             templateSelection: formatRepoSelection
         });

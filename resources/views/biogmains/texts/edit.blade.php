@@ -127,7 +127,7 @@
             },
             placeholder: '请搜索',
             escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-            minimumInputLength: 0,
+            minimumInputLength: 1, // 大表保护
             templateResult: formatRepo,
             templateSelection: formatRepoSelection
         });

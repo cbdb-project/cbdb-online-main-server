@@ -12,7 +12,6 @@ try {
 
     // require('bootstrap-sass');
     require('./../../bower_components/AdminLTE/bootstrap/js/bootstrap.min');
-    require('./../../bower_components/AdminLTE/plugins/iCheck/icheck.min');
     require('./../../bower_components/AdminLTE/plugins/datatables/jquery.dataTables.min');
     // require('./../../bower_components/AdminLte/plugins/datatables/dataTables.bootstrap.min');
     require('./../../bower_components/AdminLTE/plugins/slimScroll/jquery.slimscroll.min');

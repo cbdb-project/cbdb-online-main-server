@@ -38,8 +38,6 @@
 
 /*! Select2 4.0.3 | https://github.com/select2/select2/blob/master/LICENSE.md */
 
-/*! iCheck v1.0.1 by Damir Sultanov, http://git.io/arlzeA, MIT Licensed */
-
 /*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
 
 /**

@@ -1,9 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-<div class="panel panel-default">
-    <div class="panel-heading">Wiki 對照資料維護</div>
-    <div class="panel-body">
+<div class="card card-default">
+    <div class="card-header">
+        <h3 class="card-title">Wiki 對照資料維護</h3>
+    </div>
+    <div class="card-body">
 
         {{-- 統計信息 --}}
         <div class="row" style="margin-bottom: 20px;">
@@ -28,13 +30,13 @@
         {{-- URL 導入功能 --}}
         <div class="row" style="margin-bottom: 20px;">
             <div class="col-md-12">
-                <div class="panel panel-info">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
+                <div class="card card-info">
+                    <div class="card-header">
+                        <h3 class="card-title">
                             <i class="fa fa-download"></i> 從 URL 導入 Wiki 對照資料
                         </h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <form id="import-form" method="POST" action="{{ route('admin.wiki-maintenance.import-url') }}" class="form-horizontal">
                             {{ csrf_field() }}
 
@@ -71,7 +73,7 @@
                                                 <i class="fa fa-download"></i> 下載並導入資料
                                             </button>
                                         </div>
-                                        <div class="btn-group pull-right" role="group">
+                                        <div class="btn-group float-right" role="group">
                                             <form method="POST" action="{{ route('admin.wiki-maintenance.delete-all') }}" style="display: inline;">
                                                 {{ csrf_field() }}
                                                 <input type="hidden" name="source_id" value="{{ $currentSourceId }}">
@@ -92,11 +94,11 @@
                             {{-- 進度顯示區域 --}}
                             <div id="progress-container" class="form-group" style="display: none;">
                                 <div class="col-sm-offset-2 col-sm-10">
-                                    <div class="panel panel-default">
-                                        <div class="panel-body">
+                                    <div class="card card-default">
+                                        <div class="card-body">
                                             <h4 id="progress-title">正在處理導入任務...</h4>
                                             <div class="progress">
-                                                <div id="progress-bar" class="progress-bar progress-bar-info progress-bar-striped active"
+                                                <div id="progress-bar" class="progress-bar progress-bar-info progress-bar-striped progress-bar-animated"
                                                      role="progressbar" style="width: 0%">
                                                     <span id="progress-text">0%</span>
                                                 </div>
@@ -197,18 +199,18 @@
                     </p>
                 </div>
                 <div class="col-md-6">
-                    <nav aria-label="分頁導航" class="pull-right">
+                    <nav aria-label="分頁導航" class="float-right">
                         <ul class="pagination">
                             {{-- 上一頁 --}}
                             @if($hasPrev)
-                                <li>
-                                    <a href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $page - 1]) }}">
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $page - 1]) }}">
                                         <span aria-hidden="true">&laquo;</span>
                                     </a>
                                 </li>
                             @else
-                                <li class="disabled">
-                                    <span aria-hidden="true">&laquo;</span>
+                                <li class="page-item disabled">
+                                    <span class="page-link" aria-hidden="true">&laquo;</span>
                                 </li>
                             @endif
 
@@ -220,12 +222,12 @@
 
                             @for($i = $startPage; $i <= $endPage; $i++)
                                 @if($i == $page)
-                                    <li class="active">
-                                        <span>{{ $i }}</span>
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ $i }}</span>
                                     </li>
                                 @else
-                                    <li>
-                                        <a href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $i]) }}">
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $i]) }}">
                                             {{ $i }}
                                         </a>
                                     </li>
@@ -234,14 +236,14 @@
 
                             {{-- 下一頁 --}}
                             @if($hasNext)
-                                <li>
-                                    <a href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $page + 1]) }}">
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ route('admin.wiki-maintenance', ['source_id' => $currentSourceId, 'page' => $page + 1]) }}">
                                         <span aria-hidden="true">&raquo;</span>
                                     </a>
                                 </li>
                             @else
-                                <li class="disabled">
-                                    <span aria-hidden="true">&raquo;</span>
+                                <li class="page-item disabled">
+                                    <span class="page-link" aria-hidden="true">&raquo;</span>
                                 </li>
                             @endif
                         </ul>
@@ -289,7 +291,7 @@ a:hover {
 }
 
 @media (max-width: 768px) {
-    .btn-toolbar .btn-group.pull-right {
+    .btn-toolbar .btn-group.float-right {
         float: none !important;
         display: block;
         margin-top: 10px;
@@ -458,7 +460,7 @@ $(document).ready(function() {
             var originalText = '<i class="fa fa-download"></i> 下載並導入資料';
 
             if (progress.status === 'completed') {
-                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped active')
+                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-success');
                 $('#progress-title').text('導入完成！').addClass('text-success');
 
@@ -469,7 +471,7 @@ $(document).ready(function() {
                 }, 1000);
 
             } else if (progress.status === 'cancelled') {
-                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped active')
+                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-warning');
                 $('#progress-title').text('導入已取消').addClass('text-warning');
 
@@ -480,7 +482,7 @@ $(document).ready(function() {
                 }, 1000);
 
             } else {
-                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped active')
+                $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-danger');
                 $('#progress-title').text('導入失敗').addClass('text-danger');
 

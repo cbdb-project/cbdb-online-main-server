@@ -1,11 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">批次匯入官職</h3>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">批次匯入官職</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p class="text-muted">
                 每行輸入 <code>中文職名</code>、<code>英文職名</code>、<code>朝代（中文）</code>、
                 <code>官職類型 ID</code>、<code>所屬單位（備註用，可空白）</code>、<code>來源 TEXT_ID</code>，

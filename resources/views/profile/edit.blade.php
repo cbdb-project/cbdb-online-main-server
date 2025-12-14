@@ -1,10 +1,12 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
-<div class="panel panel-default">
-    <div class="panel-heading">個人資料設定</div>
-    <div class="panel-body">
+<div class="card card-default">
+    <div class="card-header">
+        <h3 class="card-title">個人資料設定</h3>
+    </div>
+    <div class="card-body">
 
         @if(session('success'))
             <div class="alert alert-success alert-dismissible">
@@ -30,11 +32,11 @@
             {{ method_field('PATCH') }}
             {{ csrf_field() }}
 
-            <div class="box box-primary">
-                <div class="box-header with-border">
-                    <h3 class="box-title">基本資料</h3>
+            <div class="card card-primary">
+                <div class="card-header">
+                    <h3 class="card-title">基本資料</h3>
                 </div>
-                <div class="box-body">
+                <div class="card-body">
                     <div class="form-group">
                         <label for="name" class="col-sm-2 control-label">姓名 <span class="text-red">*</span></label>
                         <div class="col-sm-10">
@@ -61,14 +63,14 @@
                 </div>
             </div>
 
-            <div class="box box-warning">
-                <div class="box-header with-border">
-                    <h3 class="box-title">修改密碼</h3>
-                    <div class="box-tools">
+            <div class="card card-warning">
+                <div class="card-header">
+                    <h3 class="card-title">修改密碼</h3>
+                    <div class="card-tools">
                         <p class="help-block" style="margin: 0;">如果不需要修改密碼，請留空以下欄位</p>
                     </div>
                 </div>
-                <div class="box-body">
+                <div class="card-body">
                     <div class="form-group">
                         <label for="current_password" class="col-sm-2 control-label">當前密碼</label>
                         <div class="col-sm-10">
@@ -97,7 +99,7 @@
             <div class="form-group">
                 <div class="col-sm-offset-2 col-sm-10">
                     <button type="submit" class="btn btn-primary">儲存變更</button>
-                    <a href="{{ url('/home') }}" class="btn btn-default">取消</a>
+                    <a href="{{ url('/home') }}" class="btn btn-secondary">取消</a>
                 </div>
             </div>
         </form>

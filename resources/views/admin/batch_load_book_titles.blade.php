@@ -1,11 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">批次匯入書稿資料</h3>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">批次匯入書稿資料</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p class="text-muted">
                 將作者 CBDB ID、書名、來源 <code>TEXT_ID</code> 貼在下方文字框，每行以 <code>Tab</code> 分隔三欄。
                 範例：<code>12345[TAB]某某書名[TAB]67890</code>。系統會依序建立 <code>TEXT_CODES</code>，

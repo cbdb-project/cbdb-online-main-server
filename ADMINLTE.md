@@ -18,8 +18,8 @@
 
 ### 已完成
 
-✅ **创建 AdminLTE v3 布局文件（使用 CDN）**
-- `resources/views/layouts/dashboard-v3.blade.php` - 主布局文件
+✅ **创建 AdminLTE v3 布局文件（改用 Vite 資產）**
+- `resources/views/layouts/dashboard-v3.blade.php` - 主布局文件（@vite 載入）
 - `resources/views/layouts/header-v3.blade.php` - 导航栏组件
 - `resources/views/layouts/sidebar-v3.blade.php` - 侧边栏组件
 - `resources/views/layouts/footer.blade.php` - 底部组件（Bootstrap 4 网格布局）
@@ -48,8 +48,9 @@
   - `resources/js/jquery-global.js`：統一注入 jQuery 到 `window`，供 AdminLTE/Bootstrap/Datatables 等插件使用
   - AdminLTE 3 + Bootstrap 4 bundle（無外部 CDN JS）
   - 全域 modal 焦點修復（避免 aria-hidden/focus 警告）
+  - 通用人物下拉 `initPersonSelect`（select2 連 `/api/name`，含初始值補全）
 - DataTables 需求頁面透過 `@vite(['resources/js/datatables.js'])` 引入，避免手動掛載 CDN。
-- 目前僅 Font Awesome 仍使用 CDN；其他 AdminLTE/Bootstrap/Datatables 均隨 Vite bundle 提供。
+- 目前僅 Font Awesome 仍使用 CDN；其他 AdminLTE/Bootstrap/Datatables/Select2 均隨 Vite bundle 提供，Select2 套用 bootstrap4 主題。
 
 ## 如何测试
 
@@ -322,27 +323,18 @@
    - [x] 测试折叠功能
 
 2. **迁移更多页面**
-   - [x] operations/index.blade.php
-   - [x] modified/index.blade.php
-   - [x] view/index.blade.php
-   - [x] view/list.blade.php
-   - [x] codes/show.blade.php ⭐ 2025-12-11 完成
-   - [x] codes/edit.blade.php ⭐ 2025-12-11 完成
-   - [x] codes/create.blade.php ⭐ 2025-12-11 完成
-   - [x] codes/proposal-edit.blade.php ⭐ 2025-12-11 完成
-   - [x] manage/index.blade.php ⭐ 2025-12-13 完成
-   - [x] manage/edit.blade.php ⭐ 2025-12-13 完成
-   - [x] crowdsourcing/index.blade.php ⭐ 2025-12-13 完成
-   - [ ] home.blade.php - 主页
-   - [ ] profile/edit.blade.php - 用户资料编辑
-   - [ ] basicinformation/index.blade.php
-   - [ ] 其他常用页面
+   - 已完成：operations / modified / view / codes 全套、manage 列表&编辑、crowdsourcing
+   - 待迁移（分类）：
+     - Profile/用户：`profile/edit.blade.php`、登入/註冊/忘記密碼等 auth 頁
+     - 人物主资料：`basicinformation/index.blade.php` 及所有子页（kinship/assoc/entries/addresses/texts/...）
+     - 管理員工具：`admin/*`、`/admin/explainsql`、`unidirectional-relationship-repair` 等
+     - 主页：`home.blade.php`
 
 3. **处理插件兼容性**
    - [x] DataTables - 已在迁移的页面中使用
-   - [ ] Select2 - 需要测试兼容性
-   - [ ] DatePicker - 需要测试兼容性
-   - [x] iCheck - 已移除（2025-12-13 完成，仅用于美化 login 页面一个 checkbox，不支援 Bootstrap 4）
+   - [x] Select2 - 已切換至 Vite 內建的 bootstrap4 主題，通用人物下拉使用 select2 + `/api/name`
+   - [x] DatePicker - 已確認現有頁面未使用（無阻塞）
+   - [x] iCheck - 已移除（2025-12-13 完成，僅 login checkbox 用途，與 Bootstrap 4 不相容）
 
 ### 中期任务
 
@@ -451,17 +443,6 @@ require('./../../bower_components/AdminLTE/plugins/select2/select2.min');
 // AdminLTE 核心應用邏輯
 require('./../../bower_components/AdminLTE/dist/js/app.min');
 ```
-
-### 以 CDN 載入 AdminLTE（暫時免除 npm 構建）的可行性說明
-
-- **現況限制**：上述 CSS/JS 透過 Laravel Mix 在 `resources/assets` 中打包，路徑依賴本地 `bower_components`。直接改為 CDN 需要調整 Blade 佈局以改從遠端載入，並避開 Mix 對這些檔案的 require/import。
-- **可行作法**：在升級探索階段，可於 `resources/views/layouts/dashboard.blade.php` 等主佈局中改用 CDN `<link>` / `<script>` 載入 AdminLTE 3 及其依賴（Bootstrap 4、jQuery、FontAwesome 5、OverlayScrollbars 等），並暫時停用對應的 Mix import，讓現有 PHP 功能先跑通。此方案不需要 npm 打包。
-- **風險/代價**：
-  - 需逐頁確認外掛版本相容性（如 DataTables、Select2、iCheck）並替換新版相容的 CDN；舊版插件路徑寫死在混編 JS 中，可能失效。
-  - 缺乏版本鎖定與離線能力，部署時需確保環境允許外網存取 CDN，且考量 CSP 設定。
-  - 若後續仍需整合自訂樣式/JS，仍建議補上 npm 流程以避免日後二次切換成本。
-
-> 結論：以 CDN 方式短期驗證 AdminLTE 3 可行，但需同步調整佈局引用與插件版本，並接受外部依賴與相容性驗證的額外成本。
 
 ## 界面結構 - 完全採用 AdminLTE 架構
 
@@ -909,8 +890,3 @@ AdminLTE 2.3.8 確實已經過於老舊，升級是必要且迫切的。雖然�
 - [Bootstrap 4 迁移指南](https://getbootstrap.com/docs/4.6/migration/)
 - [Font Awesome 4 到 5 升级](https://fontawesome.com/docs/web/setup/upgrade/)
 
----
-
-**最后更新**: 2025-12-11
-**当前分支**: `claude/view-pages-v3-013XbCqYBRHQZ4LhChViYDsL`
-**基于分支**: `feature/adminlte3-upgrade`

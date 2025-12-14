@@ -36,7 +36,8 @@
 - `Operation::TYPE_PROPOSAL_CREATE = 8`：新增提案
 - `Operation::TYPE_PROPOSAL_UPDATE = 9`：修改提案
 - `Operation::TYPE_CREATE = 1`：正式新增（核准後）
-- `Operation::TYPE_UPDATE = 2`：正式更新（核准後）
+- `Operation::TYPE_UPDATE = 3`：正式更新（核准後）
+- `Operation::TYPE_UPDATE_FULL = 2`：完整更新（主要用於 code 表修改）
 
 #### 提案數據結構
 ```json

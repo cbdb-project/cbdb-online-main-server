@@ -53,16 +53,21 @@ class DashboardController extends Controller {
             ->where('created_at', '>=', $oneMonthAgo)
             ->groupBy('op_type')
             ->get()
-            ->mapWithKeys(function ($item) {
+            ->reduce(function ($carry, $item) {
                 $typeNames = [
-                    1 => '新增',
-                    2 => '修改',
-                    3 => '刪除',
-                    4 => '提案',
+                    \App\Operation::TYPE_CREATE => '新增',
+                    \App\Operation::TYPE_UPDATE_FULL => '修改', // full update
+                    \App\Operation::TYPE_UPDATE => '修改', // partial update
+                    \App\Operation::TYPE_DELETE => '刪除',
+                    \App\Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
+                    \App\Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
                 ];
 
-                return [$typeNames[$item->op_type] ?? '未知' => $item->count];
-            });
+                $typeName = $typeNames[$item->op_type] ?? '未知';
+                $carry[$typeName] = ($carry[$typeName] ?? 0) + $item->count;
+
+                return $carry;
+            }, []);
 
         return view('dashboard.index', [
             'page_title' => '系統總覽',

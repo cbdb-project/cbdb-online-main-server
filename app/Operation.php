@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Operation extends Model {
     public const TYPE_CREATE = 1;
-    public const TYPE_UPDATE = 2;
-    public const TYPE_RESTORE = 3;
+    public const TYPE_UPDATE_FULL = 2; // Put(Update 全部信息) - 修改
+    public const TYPE_UPDATE = 3; // Patch(Update 部分属性) - 修改
     public const TYPE_DELETE = 4;
     public const TYPE_PROPOSAL_CREATE = 8;
     public const TYPE_PROPOSAL_UPDATE = 9;

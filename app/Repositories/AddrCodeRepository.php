@@ -81,6 +81,11 @@ class AddrCodeRepository {
     // }
 
     public function searchAddr(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $data = AddrCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
@@ -124,6 +129,11 @@ class AddrCodeRepository {
     }
 
     public function searchOfficeAddr(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {

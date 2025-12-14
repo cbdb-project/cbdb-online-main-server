@@ -127,7 +127,7 @@
             },
             placeholder: '请搜索',
             escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-            minimumInputLength: 1,
+            minimumInputLength: 0,
             templateResult: formatRepo,
             templateSelection: formatRepoSelection
         });

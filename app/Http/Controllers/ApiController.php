@@ -171,6 +171,11 @@ class ApiController extends Controller {
     }
 
     public function searchText(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         //20190708依據需求修改輸出內容
         $data = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
@@ -425,6 +430,11 @@ class ApiController extends Controller {
     }
 
     public function searchBiog(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $data = BiogMain::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         //        return $data;
@@ -441,6 +451,11 @@ class ApiController extends Controller {
     }
 
     public function searchEvent(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $data = EventCode::where('c_event_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_event_name', 'like', '%'.$request->q.'%')->orWhere('c_event_code', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {

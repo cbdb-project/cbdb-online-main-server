@@ -20,7 +20,7 @@
                     <div class="form-group row">
                         <label for="author" class="col-sm-2 col-form-label">author</label>
                         <div class="col-sm-8">
-                            <select class="form-control author" name="" readonly="readonly"></select>
+                            <select class="form-control author" name=""></select>
                         </div>
                         <div class="col-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>
@@ -115,29 +115,77 @@
 @section('js')
 @if($table === 'TEXT_CODES')
 <script>
-    author_first_load();
-    function author_first_load(){
-        let c_textid = $("input[name='c_textid']").val();
-        let data = [{
-            id: 0,
-            text: 'author'
-        }];
-        $.get('/api/select/search/textauthor', {q: c_textid}, function (data, textStatus){
-            for (let i=data.data.length-1; i>-1; i--){
-                item = data.data[i];
-                $(".author").append(new Option(item['text'], item['value']));
-            }
+    onViteReady(function() {
+        // 初始化 select2
+        const $author = $('.author');
+        $author.select2({
+            width: '100%',
+            placeholder: '輸入姓名或 ID 搜尋作者',
+            theme: 'bootstrap4',
+            minimumInputLength: 1,
+            ajax: {
+                url: '/api/name',
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    return {
+                        q: params.term,
+                        num: 20,
+                    };
+                },
+                processResults: function(data) {
+                    const rows = Array.isArray(data?.data) ? data.data : [];
+                    const results = rows.map(function(item) {
+                        const parts = [];
+                        if (item.c_name_chn) {
+                            parts.push(item.c_name_chn);
+                        }
+                        if (item.c_name) {
+                            parts.push(item.c_name);
+                        }
+                        const dynasty = item.c_dynasty_chn ? `（${item.c_dynasty_chn}）` : '';
+                        const zi = item.c_alt_name_chn_zi ? `，字：${item.c_alt_name_chn_zi}` : '';
+                        const hao = item.c_alt_name_chn_hao ? `，號：${item.c_alt_name_chn_hao}` : '';
+                        const addr = item.ADDR_c_name_chn ? `，籍：${item.ADDR_c_name_chn}` : '';
+                        const label = `${parts.join(' / ')}${dynasty}${zi}${hao}${addr}`;
+                        return {
+                            id: item.c_personid,
+                            text: label || item.c_personid,
+                        };
+                    });
+                    return { results };
+                },
+            },
         });
-    }
 
-    $("#button_ajax_load").click(function(){
-        let author = $(".author").val();
-        if (!author) {
-            return;
-        }
-        let url = "/basicinformation/" + author + "/texts";
-        let new_window = window.open('_blank');
-        new_window.location = url ;
+        // 首次載入作者列表（沿用舊行為：按 textid 預先帶出作者供跳轉）
+        const author_first_load = function() {
+            const c_textid = $("input[name='c_textid']").val();
+            if (!c_textid) {
+                return;
+            }
+            $.get('/api/select/search/textauthor', { q: c_textid }, function (data) {
+                $author.empty();
+                if (data && Array.isArray(data.data)) {
+                    data.data.forEach(function(item) {
+                        $author.append(new Option(item.text, item.value, false, false));
+                    });
+                }
+                $author.trigger('change.select2');
+            });
+        };
+
+        author_first_load();
+
+        $("#button_ajax_load").click(function(){
+            const author = $author.val();
+            if (!author) {
+                return;
+            }
+            const url = "/basicinformation/" + author + "/texts";
+            const new_window = window.open('_blank');
+            new_window.location = url ;
+        });
     });
 </script>
 @endif

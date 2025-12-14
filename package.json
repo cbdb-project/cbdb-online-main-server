@@ -27,6 +27,7 @@
     "vue-loader": "^16.0.0"
   },
   "dependencies": {
+    "@ttskch/select2-bootstrap4-theme": "^1.5.2",
     "admin-lte": "^3.2.0",
     "datatables.net": "^1.13.8",
     "datatables.net-bs": "^1.13.8",

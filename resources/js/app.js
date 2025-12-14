@@ -17,6 +17,12 @@ import 'admin-lte/plugins/bootstrap/js/bootstrap.bundle';
 // Import AdminLTE v3 JS
 import 'admin-lte';
 
+// Select2 (jQuery plugin) for enhanced selects on dashboard-v3 pages
+import 'select2/dist/css/select2.min.css';
+import '@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css';
+import select2 from 'select2';
+select2(window, $);
+
 // Import Axios for HTTP requests
 import axios from 'axios';
 window.axios = axios;

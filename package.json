@@ -22,5 +22,9 @@
     "sass-loader": "^12.1.0",
     "vue": "^3.0.0",
     "vue-loader": "^16.0.0"
+  },
+  "dependencies": {
+    "datatables.net": "^1.13.8",
+    "datatables.net-bs": "^1.13.8"
   }
 }

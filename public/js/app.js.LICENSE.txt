@@ -32,8 +32,8 @@
  *
  */
 
-/*! DataTables 1.10.7
- * ©2008-2015 SpryMedia Ltd - datatables.net/license
+/*! DataTables 1.13.7
+ * ©2008-2023 SpryMedia Ltd - datatables.net/license
  */
 
 /*! Select2 4.0.3 | https://github.com/select2/select2/blob/master/LICENSE.md */

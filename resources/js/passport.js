@@ -5,6 +5,10 @@
  * NO require(), NO AdminLTE, NO jQuery plugins.
  */
 
+// jQuery + Bootstrap are required for the legacy Passport modals
+import $ from './jquery-global';
+import 'admin-lte/plugins/bootstrap/js/bootstrap.bundle';
+
 import { createApp } from 'vue';
 import axios from 'axios';
 

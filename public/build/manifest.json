@@ -1,44 +1,48 @@
 {
-  "_jquery-DsMni6o9.js": {
-    "file": "assets/jquery-DsMni6o9.js",
-    "name": "jquery"
+  "_jquery-global-DQKcnbis.js": {
+    "file": "assets/jquery-global-DQKcnbis.js",
+    "name": "jquery-global"
   },
-  "_vue.esm-bundler-DHuBgOph.js": {
-    "file": "assets/vue.esm-bundler-DHuBgOph.js",
-    "name": "vue.esm-bundler"
+  "_vue.esm-bundler-DPqoXctQ.js": {
+    "file": "assets/vue.esm-bundler-DPqoXctQ.js",
+    "name": "vue.esm-bundler",
+    "imports": [
+      "_jquery-global-DQKcnbis.js"
+    ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-NI-zYE6X.js",
+    "file": "assets/app-YPyAT38Z.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_jquery-DsMni6o9.js",
-      "_vue.esm-bundler-DHuBgOph.js"
+      "_jquery-global-DQKcnbis.js",
+      "_vue.esm-bundler-DPqoXctQ.js"
     ],
     "css": [
       "assets/app-CMti5Rgz.css"
     ]
   },
   "resources/js/datatables.js": {
-    "file": "assets/datatables-BVeCh86p.js",
+    "file": "assets/datatables-uXmsrUne.js",
     "name": "datatables",
     "src": "resources/js/datatables.js",
     "isEntry": true,
     "imports": [
-      "_jquery-DsMni6o9.js"
+      "_jquery-global-DQKcnbis.js"
     ],
     "css": [
       "assets/datatables-BFBci21a.css"
     ]
   },
   "resources/js/passport.js": {
-    "file": "assets/passport-DQ0QVD22.js",
+    "file": "assets/passport-CGJLPGjV.js",
     "name": "passport",
     "src": "resources/js/passport.js",
     "isEntry": true,
     "imports": [
-      "_vue.esm-bundler-DHuBgOph.js"
+      "_jquery-global-DQKcnbis.js",
+      "_vue.esm-bundler-DPqoXctQ.js"
     ],
     "css": [
       "assets/passport-DHhJKTA6.css"

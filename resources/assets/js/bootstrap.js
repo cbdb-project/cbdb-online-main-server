@@ -12,8 +12,8 @@ try {
 
     // require('bootstrap-sass');
     require('./../../bower_components/AdminLTE/bootstrap/js/bootstrap.min');
-    require('./../../bower_components/AdminLTE/plugins/datatables/jquery.dataTables.min');
-    // require('./../../bower_components/AdminLte/plugins/datatables/dataTables.bootstrap.min');
+    require('datatables.net');
+    require('datatables.net-bs/css/dataTables.bootstrap.css');
     require('./../../bower_components/AdminLTE/plugins/slimScroll/jquery.slimscroll.min');
     require('./../../bower_components/AdminLTE/plugins/select2/select2.min');
     require('./../../bower_components/AdminLTE/dist/js/app.min');

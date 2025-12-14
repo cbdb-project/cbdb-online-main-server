@@ -308,6 +308,11 @@ class ApiController extends Controller {
     /*20210205新增的API，提供社交機構(social_institution)查詢，20210309修改。*/
     /*20210315新增漢字與英文對SOCIAL_INSTITUTION_NAME_CODES的檢索。*/
     public function socialinstcode(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $temp = explode("-", $request->q);
         $c_inst_code = $temp[0];
         if (!empty($temp[1])) {
@@ -456,11 +461,6 @@ class ApiController extends Controller {
     }
 
     public function searchEvent(Request $request) {
-        // 防止空查询导致全表扫描
-        if (empty($request->q)) {
-            return response()->json(['data' => [], 'total' => 0]);
-        }
-
         $data = EventCode::where('c_event_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_event_name', 'like', '%'.$request->q.'%')->orWhere('c_event_code', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {

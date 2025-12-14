@@ -246,7 +246,7 @@
                 },
                 placeholder: '请搜索',
                 escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-                minimumInputLength: (model === 'biog' || model === 'text' || model === 'event' || model === 'addr' || model === 'officeaddr') ? 1 : 0,
+                minimumInputLength: (model === 'biog' || model === 'text' || model === 'event' || model === 'addr' || model === 'officeaddr' || model === 'office') ? 1 : 0,
                 templateResult: formatRepo,
                 templateSelection: formatRepoSelection
             }

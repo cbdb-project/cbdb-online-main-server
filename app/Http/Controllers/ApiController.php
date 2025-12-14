@@ -241,6 +241,11 @@ class ApiController extends Controller {
     }
 
     public function searchOffice(Request $request) {
+        // 防止空查询导致全表扫描
+        if (empty($request->q)) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+
         $data = OfficeCode::where('c_office_chn', 'like', '%'.$request->q.'%')->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')->orWhere('c_office_id', $request->q)->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {

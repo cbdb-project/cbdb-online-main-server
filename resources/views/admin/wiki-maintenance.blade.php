@@ -14,7 +14,7 @@
                 <a href="{{ route('admin.wiki-maintenance', ['source_id' => $id]) }}" style="text-decoration: none;">
                     <div class="info-box{{ $currentSourceId == $id ? ' info-box-selected' : '' }}">
                         <span class="info-box-icon bg-{{ $id == 60795 ? 'blue' : ($id == 68942 ? 'green' : 'orange') }}">
-                            <i class="fa fa-{{ $id == 68942 ? 'globe' : 'wikipedia-w' }}"></i>
+                            <i class="{{ $id == 68942 ? 'fas fa-globe' : 'fab fa-wikipedia-w' }}"></i>
                         </span>
                         <div class="info-box-content">
                             <span class="info-box-text">{{ $sourceNames[$id] }}</span>

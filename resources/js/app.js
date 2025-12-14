@@ -23,6 +23,83 @@ import '@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css';
 import select2 from 'select2';
 select2(window, $);
 
+// Person select2 helper (shared across dashboard-v3 pages)
+const formatPersonLabel = (item) => {
+    const parts = [];
+    if (item.c_personid) {
+        parts.push(item.c_personid);
+    }
+    if (item.c_name_chn) {
+        parts.push(item.c_name_chn);
+    }
+    if (item.c_name) {
+        parts.push(item.c_name);
+    }
+    const dynasty = item.c_dynasty_chn ? `（${item.c_dynasty_chn}）` : '';
+    const zi = item.c_alt_name_chn_zi ? `，字：${item.c_alt_name_chn_zi}` : '';
+    const hao = item.c_alt_name_chn_hao ? `，號：${item.c_alt_name_chn_hao}` : '';
+    const addr = item.ADDR_c_name_chn ? `，籍：${item.ADDR_c_name_chn}` : '';
+    return `${parts.join(' - ')}${dynasty}${zi}${hao}${addr}`.trim();
+};
+
+const fetchPersonOption = (id) => {
+    if (!id) {
+        return Promise.resolve(null);
+    }
+    return $.get('/api/name', { q: id, num: 1 }).then((data) => {
+        const item = Array.isArray(data?.data) && data.data.length > 0 ? data.data[0] : null;
+        if (!item) {
+            return null;
+        }
+        return {
+            id: item.c_personid,
+            text: formatPersonLabel(item) || item.c_personid,
+        };
+    }).catch(() => null);
+};
+
+window.initPersonSelect = ($el, options = {}) => {
+    const initialId = $el.data('initial-id');
+    $el.select2({
+        width: '100%',
+        theme: 'bootstrap4',
+        minimumInputLength: 1,
+        ajax: {
+            url: '/api/name',
+            dataType: 'json',
+            delay: 250,
+            data: (params) => ({
+                q: params.term,
+                num: 20,
+            }),
+            processResults: (data) => {
+                const rows = Array.isArray(data?.data) ? data.data : [];
+                return {
+                    results: rows.map((item) => ({
+                        id: item.c_personid,
+                        text: formatPersonLabel(item) || item.c_personid,
+                    })),
+                };
+            },
+        },
+        ...options,
+    });
+
+    if (initialId) {
+        fetchPersonOption(initialId).then((opt) => {
+            if (opt) {
+                const option = new Option(opt.text, opt.id, true, true);
+                $el.append(option).trigger('change.select2');
+            } else {
+                $el.val(initialId).trigger('change.select2');
+            }
+        });
+    }
+};
+
+window.formatPersonLabel = formatPersonLabel;
+window.fetchPersonOption = fetchPersonOption;
+
 // Import Axios for HTTP requests
 import axios from 'axios';
 window.axios = axios;

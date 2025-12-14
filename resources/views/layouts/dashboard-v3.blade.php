@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
     <!-- AdminLTE -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    @stack('styles')
 
     <!-- Custom styles (功能性样式，不包含 AdminLTE 主题覆盖) -->
     <style>

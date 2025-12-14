@@ -309,11 +309,16 @@
 | modified/index.blade.php | /modified | ✅ 完成 | 近期修改列表 |
 | view/index.blade.php | /view | ✅ 完成 | 检视表总览 |
 | view/list.blade.php | /view/{id} | ✅ 完成 | 检视表详情 |
+| manage/index.blade.php | /manage | ✅ 完成 | 用户管理列表 |
+| manage/edit.blade.php | /manage/{id}/edit | ✅ 完成 | 用户编辑 |
+| crowdsourcing/index.blade.php | /crowdsourcing | ✅ 完成 | 众包录入记录 |
 
-**总计**: 9 个页面已迁移到 AdminLTE v3
+**总计**: 12 个页面已迁移到 AdminLTE v3
 
 ### 🎉 已完成模块
 - ✅ **codes 模块** - 全部 5 个页面已迁移 (2025-12-11 完成)
+- ✅ **manage 模块** - 全部 2 个页面已迁移 (2025-12-13 完成)
+- ✅ **crowdsourcing 模块** - 1 个页面已迁移 (2025-12-13 完成)
 
 ## 下一步计划
 
@@ -335,6 +340,9 @@
    - [x] codes/edit.blade.php ⭐ 2025-12-11 完成
    - [x] codes/create.blade.php ⭐ 2025-12-11 完成
    - [x] codes/proposal-edit.blade.php ⭐ 2025-12-11 完成
+   - [x] manage/index.blade.php ⭐ 2025-12-13 完成
+   - [x] manage/edit.blade.php ⭐ 2025-12-13 完成
+   - [x] crowdsourcing/index.blade.php ⭐ 2025-12-13 完成
    - [ ] home.blade.php - 主页
    - [ ] profile/edit.blade.php - 用户资料编辑
    - [ ] basicinformation/index.blade.php

@@ -1,13 +1,13 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 <div class="row">
     <div class="col-md-12">
-        <div class="box box-primary">
-            <div class="box-header with-border">
-                <h3 class="box-title">编辑用户设置</h3>
-                <div class="box-tools pull-right">
-                    <a href="{{ route('manage.index') }}" class="btn btn-sm btn-default">
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">编辑用户设置</h3>
+                <div class="card-tools">
+                    <a href="{{ route('manage.index') }}" class="btn btn-sm btn-secondary">
                         <i class="fa fa-arrow-left"></i> 返回列表
                     </a>
                 </div>
@@ -17,7 +17,7 @@
                 @csrf
                 @method('PUT')
 
-                <div class="box-body">
+                <div class="card-body">
                     <!-- 基本信息（只读） -->
                     <div class="row">
                         <div class="col-md-6">
@@ -77,7 +77,7 @@
                                     <option value="1" {{ $user->is_active == 1 ? 'selected' : '' }}>已激活</option>
                                     <option value="0" {{ $user->is_active == 0 ? 'selected' : '' }}>未激活</option>
                                 </select>
-                                <p class="help-block">未激活的用户无法登录系统</p>
+                                <small class="form-text text-muted">未激活的用户无法登录系统</small>
                             </div>
                         </div>
 
@@ -90,12 +90,12 @@
                                     <option value="2" {{ $user->is_admin == 2 ? 'selected' : '' }}>众包</option>
                                     <option value="3" {{ $user->is_admin == 3 ? 'selected' : '' }}>系统管理员</option>
                                 </select>
-                                <p class="help-block">
+                                <small class="form-text text-muted">
                                     <strong>一般用户：</strong>基本权限<br>
                                     <strong>专家：</strong>拥有管理权限<br>
                                     <strong>众包：</strong>众包用户权限<br>
                                     <strong>系统管理员：</strong>最高权限
-                                </p>
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -111,19 +111,19 @@
                                     <input type="checkbox" name="delete_user" id="delete_user" value="1">
                                     删除此用户
                                 </label>
-                                <p class="help-block text-danger">
+                                <small class="form-text text-danger">
                                     <strong>警告：</strong>勾选此项并保存将会删除该用户账号。此操作不可恢复！
-                                </p>
+                                </small>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="box-footer">
+                <div class="card-footer">
                     <button type="submit" class="btn btn-primary">
                         <i class="fa fa-save"></i> 保存修改
                     </button>
-                    <a href="{{ route('manage.index') }}" class="btn btn-default">
+                    <a href="{{ route('manage.index') }}" class="btn btn-secondary">
                         <i class="fa fa-times"></i> 取消
                     </a>
                 </div>

@@ -1,12 +1,18 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
+
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">
+@endpush
 
 @section('content')
 
-    <div class="panel panel-default">
-        <div class="panel-heading">最近眾包錄入記錄</div>
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">最近眾包錄入記錄</h3>
+        </div>
+        <div class="card-body">
             <div class="table-responsive">
-                <table id="example1" class="table table-bordered table-striped">
+                <table id="example1" class="table table-bordered table-striped table-sm">
                 <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，2表示整體覆寫（完整替換現有記錄，主要用於 code 表修改），3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案<br />
                 * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄尚未處理，3表示記錄reject，4表示記錄處理失敗。
                 </p>
@@ -56,14 +62,14 @@
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">resource_data</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @include('components.key-value-table', ['data' => $resourceDataParsed])
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -73,8 +79,8 @@
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         <h4 class="modal-title">compare</h4>
+                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         <div>
@@ -82,7 +88,7 @@
                                         </div>
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                       </div>
                                     </div>
                                   </div>
@@ -125,7 +131,7 @@
                 </tbody>
                 </table>
             </div>
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $lists->links() }}
             </div>
         </div>
@@ -134,211 +140,9 @@
 @endsection
 
 @section('js')
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
     <script>
-        (function(window, document, undefined){
-
-            let factory = function( $, DataTable ) {
-                "use strict";
-
-
-                /* Set the defaults for DataTables initialisation */
-                $.extend( true, DataTable.defaults, {
-                    dom:
-                    "<'row'<'col-sm-6'l><'col-sm-6'f>>" +
-                    "<'row'<'col-sm-12'tr>>" +
-                    "<'row'<'col-sm-5'i><'col-sm-7'p>>",
-                    renderer: 'bootstrap'
-                } );
-
-
-                /* Default class modification */
-                $.extend( DataTable.ext.classes, {
-                    sWrapper:      "dataTables_wrapper form-inline dt-bootstrap",
-                    sFilterInput:  "form-control input-sm",
-                    sLengthSelect: "form-control input-sm"
-                } );
-
-                /* Bootstrap paging button renderer */
-                DataTable.ext.renderer.pageButton.bootstrap = function ( settings, host, idx, buttons, page, pages ) {
-                    let api     = new DataTable.Api( settings );
-                    let classes = settings.oClasses;
-                    let lang    = settings.oLanguage.oPaginate;
-                    let btnDisplay, btnClass, counter=0;
-
-                    let attach = function( container, buttons ) {
-                        let i, ien, node, button;
-                        let clickHandler = function ( e ) {
-                            e.preventDefault();
-                            if ( !$(e.currentTarget).hasClass('disabled') ) {
-                                api.page( e.data.action ).draw( false );
-                            }
-                        };
-
-                        for ( i=0, ien=buttons.length ; i<ien ; i++ ) {
-                            button = buttons[i];
-
-                            if ( $.isArray( button ) ) {
-                                attach( container, button );
-                            }
-                            else {
-                                btnDisplay = '';
-                                btnClass = '';
-
-                                switch ( button ) {
-                                    case 'ellipsis':
-                                        btnDisplay = '&hellip;';
-                                        btnClass = 'disabled';
-                                        break;
-
-                                    case 'first':
-                                        btnDisplay = lang.sFirst;
-                                        btnClass = button + (page > 0 ?
-                                            '' : ' disabled');
-                                        break;
-
-                                    case 'previous':
-                                        btnDisplay = lang.sPrevious;
-                                        btnClass = button + (page > 0 ?
-                                            '' : ' disabled');
-                                        break;
-
-                                    case 'next':
-                                        btnDisplay = lang.sNext;
-                                        btnClass = button + (page < pages-1 ?
-                                            '' : ' disabled');
-                                        break;
-
-                                    case 'last':
-                                        btnDisplay = lang.sLast;
-                                        btnClass = button + (page < pages-1 ?
-                                            '' : ' disabled');
-                                        break;
-
-                                    default:
-                                        btnDisplay = button + 1;
-                                        btnClass = page === button ?
-                                            'active' : '';
-                                        break;
-                                }
-
-                                if ( btnDisplay ) {
-                                    node = $('<li>', {
-                                        'class': classes.sPageButton+' '+btnClass,
-                                        'id': idx === 0 && typeof button === 'string' ?
-                                            settings.sTableId +'_'+ button :
-                                            null
-                                    } )
-                                        .append( $('<a>', {
-                                                'href': '#',
-                                                'aria-controls': settings.sTableId,
-                                                'data-dt-idx': counter,
-                                                'tabindex': settings.iTabIndex
-                                            } )
-                                                .html( btnDisplay )
-                                        )
-                                        .appendTo( container );
-
-                                    settings.oApi._fnBindAction(
-                                        node, {action: button}, clickHandler
-                                    );
-
-                                    counter++;
-                                }
-                            }
-                        }
-                    };
-
-                    // IE9 throws an 'unknown error' if document.activeElement is used
-                    // inside an iframe or frame.
-                    let activeEl;
-
-                    try {
-                        // Because this approach is destroying and recreating the paging
-                        // elements, focus is lost on the select button which is bad for
-                        // accessibility. So we want to restore focus once the draw has
-                        // completed
-                        activeEl = $(document.activeElement).data('dt-idx');
-                    }
-                    catch (e) {}
-
-                    attach(
-                        $(host).empty().html('<ul class="pagination"/>').children('ul'),
-                        buttons
-                    );
-
-                    if ( activeEl ) {
-                        $(host).find( '[data-dt-idx='+activeEl+']' ).focus();
-                    }
-                };
-
-
-                /*
-                 * TableTools Bootstrap compatibility
-                 * Required TableTools 2.1+
-                 */
-                if ( DataTable.TableTools ) {
-                    // Set the classes that TableTools uses to something suitable for Bootstrap
-                    $.extend( true, DataTable.TableTools.classes, {
-                        "container": "DTTT btn-group",
-                        "buttons": {
-                            "normal": "btn btn-default",
-                            "disabled": "disabled"
-                        },
-                        "collection": {
-                            "container": "DTTT_dropdown dropdown-menu",
-                            "buttons": {
-                                "normal": "",
-                                "disabled": "disabled"
-                            }
-                        },
-                        "print": {
-                            "info": "DTTT_print_info"
-                        },
-                        "select": {
-                            "row": "active"
-                        }
-                    } );
-
-                    // Have the collection use a bootstrap compatible drop down
-                    $.extend( true, DataTable.TableTools.DEFAULTS.oTags, {
-                        "collection": {
-                            "container": "ul",
-                            "button": "li",
-                            "liner": "a"
-                        }
-                    } );
-                }
-
-            }; // /factory
-
-
-// Define as an AMD module if possible
-            if ( typeof define === 'function' && define.amd ) {
-                define( ['jquery', 'datatables'], factory );
-            }
-            else if ( typeof exports === 'object' ) {
-                // Node/CommonJS
-                factory( require('jquery'), require('datatables') );
-            }
-            else if ( jQuery ) {
-                // Otherwise simply initialise as normal, stopping multiple evaluation
-                factory( jQuery, jQuery.fn.dataTable );
-            }
-
-
-        })(window, document);
-        $(function () {
-
-            $("#example1").DataTable({
-                "lengthMenu": [10, 25, 50, 75, 100, 150, 200],
-                "pageLength": 100,
-                "aaSorting" : [[6, "desc"]]
-            });
-
-            applyTimestampFormatting();
-
-        });
-
         var userTimeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
         var userOffsetMinutes = new Date().getTimezoneOffset();
 
@@ -403,5 +207,18 @@
                 }
             });
         }
+
+        $(function() {
+            $('#example1').DataTable({
+                lengthMenu: [10, 25, 50, 75, 100, 150, 200],
+                pageLength: 100,
+                order: [[6, 'desc']],
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json'
+                }
+            });
+
+            applyTimestampFormatting();
+        });
     </script>
 @endsection

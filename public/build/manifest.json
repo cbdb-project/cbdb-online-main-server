@@ -1,0 +1,47 @@
+{
+  "_jquery-DsMni6o9.js": {
+    "file": "assets/jquery-DsMni6o9.js",
+    "name": "jquery"
+  },
+  "_vue.esm-bundler-DHuBgOph.js": {
+    "file": "assets/vue.esm-bundler-DHuBgOph.js",
+    "name": "vue.esm-bundler"
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-NI-zYE6X.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "_jquery-DsMni6o9.js",
+      "_vue.esm-bundler-DHuBgOph.js"
+    ],
+    "css": [
+      "assets/app-CMti5Rgz.css"
+    ]
+  },
+  "resources/js/datatables.js": {
+    "file": "assets/datatables-BVeCh86p.js",
+    "name": "datatables",
+    "src": "resources/js/datatables.js",
+    "isEntry": true,
+    "imports": [
+      "_jquery-DsMni6o9.js"
+    ],
+    "css": [
+      "assets/datatables-BFBci21a.css"
+    ]
+  },
+  "resources/js/passport.js": {
+    "file": "assets/passport-DQ0QVD22.js",
+    "name": "passport",
+    "src": "resources/js/passport.js",
+    "isEntry": true,
+    "imports": [
+      "_vue.esm-bundler-DHuBgOph.js"
+    ],
+    "css": [
+      "assets/passport-DHhJKTA6.css"
+    ]
+  }
+}

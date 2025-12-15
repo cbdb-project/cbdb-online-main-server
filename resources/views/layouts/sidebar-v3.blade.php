@@ -102,8 +102,8 @@
                     </a>
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
-                            <a href="/codes" class="nav-link {{ $page_title == 'Codes' ? 'active' : '' }}">
-                                <i class="far fa-circle nav-icon"></i>
+                            <a href="/codes" class="nav-link {{ in_array($page_title, ['Codes', '全部表格'], true) ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-th-list"></i>
                                 <p>全部表格首頁</p>
                             </a>
                         </li>

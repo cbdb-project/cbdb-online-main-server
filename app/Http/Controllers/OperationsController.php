@@ -465,9 +465,10 @@ class OperationsController extends Controller {
         $pageTitle = $proposalsOnly ? '操作記錄（提案）' : '操作記錄';
         $pageDescription = $proposalsOnly ? '最近提案列表' : '最近編輯列表';
         $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
+        $pageTitleKey = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
 
         return view('operations.index', ['lists' => $lists,
-            'page_title' => $pageTitle, 'page_description' => $pageDescription,
+            'page_title' => $pageTitleKey, 'page_description' => $pageDescription,
             'page_url' => $pageUrl,
             'proposals_only' => $proposalsOnly,
             'status_filters' => $statusFilters,

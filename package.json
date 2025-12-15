@@ -5,9 +5,7 @@
     "development": "vite",
     "build": "vite build",
     "prod": "vite build",
-    "production": "vite build",
-    "legacy-dev": "mix",
-    "legacy-prod": "mix --production"
+    "production": "vite build"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.2",
@@ -16,15 +14,13 @@
     "bootstrap-sass": "^3.4.1",
     "cross-env": "^7.0.3",
     "jquery": "^3.5.0",
-    "laravel-mix": "^6.0.49",
     "laravel-vite-plugin": "^2.0.1",
     "lodash": "^4.17.21",
     "resolve-url-loader": "^5.0.0",
     "sass": "^1.79.4",
     "sass-loader": "^12.1.0",
     "vite": "^7.2.4",
-    "vue": "^3.0.0",
-    "vue-loader": "^16.0.0"
+    "vue": "^3.0.0"
   },
   "dependencies": {
     "@ttskch/select2-bootstrap4-theme": "^1.5.2",

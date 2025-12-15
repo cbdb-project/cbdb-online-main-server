@@ -164,8 +164,6 @@ import { createApp } from 'vue';
 
 // Import Vue components
 import SelectVue from '../assets/js/components/Select.vue';
-import Select2 from '../assets/js/components/Select2.vue';
-import Select2Addr from '../assets/js/components/Select2Addr.vue';
 
 // Make createApp globally available for pages that need it
 window.createVueApp = createApp;
@@ -180,8 +178,6 @@ $(function() {
         const app = createApp({
             components: {
                 'select-vue': SelectVue,
-                'select2': Select2,
-                'select2-addr': Select2Addr,
             }
         });
         app.mount('#app');

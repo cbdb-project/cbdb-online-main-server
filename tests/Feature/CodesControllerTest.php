@@ -292,8 +292,9 @@ class CodesControllerTest extends TestCase {
         $response = $this->get('/codes/TEST_CODES');
 
         $response->assertStatus(200);
-        $response->assertDontSee('edit');
-        $response->assertDontSee('delete');
+        // Avoid matching sidebar labels containing「修改」/「刪除」，so assert on the action button classes instead.
+        $response->assertDontSee('btn btn-sm btn-info');
+        $response->assertDontSee('btn btn-sm btn-danger');
         $response->assertDontSee('新增');
         $this->assertEmpty($this->operationSpy->calls);
     }

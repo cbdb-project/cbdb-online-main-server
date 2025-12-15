@@ -57,7 +57,7 @@
     <!-- /.card -->
 
     {{-- Modern World: Vue 3 Passport 组件 --}}
-    <div id="app">
+    <div id="passport-app">
         <passport-clients></passport-clients>
         <passport-authorized-clients></passport-authorized-clients>
         <passport-personal-access-tokens></passport-personal-access-tokens>

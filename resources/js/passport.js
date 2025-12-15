@@ -34,12 +34,16 @@ import PassportAuthorizedClients from './components/passport/AuthorizedClients.v
 import PassportPersonalAccessTokens from './components/passport/PersonalAccessTokens.vue';
 
 // Create Vue app with only Passport components
-const app = createApp({
-    components: {
-        'passport-clients': PassportClients,
-        'passport-authorized-clients': PassportAuthorizedClients,
-        'passport-personal-access-tokens': PassportPersonalAccessTokens,
-    }
-});
+const mountTarget = document.getElementById('passport-app');
 
-app.mount('#app');
+if (mountTarget) {
+    const app = createApp({
+        components: {
+            'passport-clients': PassportClients,
+            'passport-authorized-clients': PassportAuthorizedClients,
+            'passport-personal-access-tokens': PassportPersonalAccessTokens,
+        }
+    });
+
+    app.mount(mountTarget);
+}

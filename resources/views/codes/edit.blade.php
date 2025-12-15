@@ -13,7 +13,7 @@
             <h3 class="card-title">{{ $table }}</h3>
         </div>
         <div class="card-body">
-                <form action="/codes/{{ $table }}/{{ $id }}" method="post">
+                <form action="{{ route('codes.update', ['table_name' => $table, 'id' => $id], false) }}" method="post">
                     {{ method_field('PATCH') }}
                     {{ csrf_field() }}
                     @if($table === 'TEXT_CODES')

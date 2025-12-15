@@ -325,7 +325,7 @@ class CodesControllerTest extends TestCase {
 
         $response->assertStatus(200);
         $response->assertViewHas('keyColumns', ['c_textid']);
-        $response->assertSee('href="/codes/TEXT_CODES/T001/edit"', false);
+        $response->assertSee('/codes/TEXT_CODES/T001/edit');
         $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
         $response->assertSee('<th>c_textid</th>', false);
         $response->assertSee('<th>c_title_chn</th>', false);

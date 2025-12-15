@@ -59,16 +59,16 @@ Route::post('basicinformation/{personid}/{resource}/{id}/proposal', 'BasicInform
 
 Route::get('codes', 'CodesController@index')->name('codes.index');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
-Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit');
-Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->name('codes.update');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
-Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->name('codes.propose.update');
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');
 Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')->name('codes.proposals.update');
 Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')->name('codes.proposals.cancel');
+Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->name('codes.propose.update')->where('id', '.*');
+Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit')->where('id', '.*');
+Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->name('codes.update')->where('id', '.*');
 Route::post('codes/{table_name}', 'CodesController@store')->name('codes.store');
-Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy');
+Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy')->where('id', '.*');
 
 Route::post('operations/{operation}/approve', 'OperationsProposalController@approve')->name('operations.proposals.approve');
 Route::post('operations/{operation}/reject', 'OperationsProposalController@reject')->name('operations.proposals.reject');

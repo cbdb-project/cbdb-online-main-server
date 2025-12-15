@@ -7,7 +7,7 @@
             <h3 class="card-title">{{ $table }}</h3>
         </div>
         <div class="card-body">
-                <form action="/codes/{{ $table }}" method="post">
+                <form action="{{ route('codes.store', ['table_name' => $table], false) }}" method="post">
                     {{ csrf_field() }}
                     @php($i = 1)
                     @foreach($row as $key)

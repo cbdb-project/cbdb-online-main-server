@@ -93,12 +93,12 @@
                             @if($showActions)
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="/codes/{{ $q }}/{{ $id_ }}/edit">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="/codes/{{ $q }}/{{ $id_ }}/edit">修改</a>
                                         <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
                                            onclick="alert('确认删除');
                                                     event.preventDefault();
                                                    document.getElementById('delete-form-{{ $id_ }}').submit();"
-                                           class="btn btn-sm btn-danger">delete</a>
+                                           class="btn btn-sm btn-danger">刪除</a>
                                     </div>
                                     <form id="delete-form-{{ $id_ }}" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}

@@ -39,6 +39,16 @@
             touch-action: pan-y;
         }
 
+        .wrapper {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-wrapper {
+            flex: 1 0 auto;
+        }
+
         .content-alert {
             padding: 10px;
         }
@@ -72,9 +82,28 @@
             padding-left: 0.5rem;
             color: #6c757d;
         }
+
+        /* Desktop: 固定側邊欄並獨立滾動，右側內容獨立滾動 */
+        @media (min-width: 992px) {
+            .main-sidebar {
+                position: fixed;
+                height: 100vh;
+                overflow-y: auto;
+            }
+
+            .content-wrapper,
+            .main-footer {
+                margin-left: 250px;
+            }
+
+            body.sidebar-collapse .content-wrapper,
+            body.sidebar-collapse .main-footer {
+                margin-left: 80px;
+            }
+        }
     </style>
 </head>
-<body class="hold-transition">
+<body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper" id="app">
 
     <!-- Navbar -->

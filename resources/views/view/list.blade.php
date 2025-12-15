@@ -9,8 +9,7 @@
                 <table class="table table-striped table-bordered table-sm">
                     <thead>
                     <tr>
-                        <th style="width: 12%">操作</th>
-                        <th style="width: 24%">檢視名稱 (ENG)</th>
+                        <th style="width: 28%">檢視名稱 (ENG)</th>
                         <th style="width: 24%">檢視名稱 (CHN)</th>
                         <th>說明</th>
                     </tr>
@@ -18,9 +17,10 @@
                     <tbody>
                     @foreach($views as $view)
                         <tr>
-                            <td><a href="{{ route('view.show', $view['key']) }}" class="btn btn-xs btn-primary">前往檢視</a></td>
                             <td>
-                                <code>{{ $view['primary_alias'] }}</code>
+                                <a href="{{ route('view.show', $view['key']) }}">
+                                    <code>{{ $view['primary_alias'] }}</code>
+                                </a>
                                 @if(!empty($view['aliases']))
                                     @php($extra = array_slice($view['aliases'], 1))
                                     @if(count($extra) > 0)

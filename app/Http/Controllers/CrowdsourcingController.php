@@ -95,8 +95,11 @@ class CrowdsourcingController extends Controller {
             }
         }
 
-        return view('crowdsourcing.index', ['lists' => $lists,
-            'page_title' => '眾包錄入', 'page_description' => '最近眾包錄入紀錄',
+        return view('crowdsourcing.index', [
+            'lists' => $lists,
+            'page_title' => '最近眾包錄入記錄',
+            'page_title_key' => 'Crowdsourcing',
+            'page_description' => '最近眾包錄入紀錄',
             'page_url' => '/crowdsourcing',
         ]);
     }

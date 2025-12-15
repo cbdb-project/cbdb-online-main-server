@@ -462,12 +462,16 @@ class OperationsController extends Controller {
         //echo "<pre><code>";
         //print_r($lists[0]['resource_original']); //成功
         //echo "</code></pre>";
-        $pageTitle = $proposalsOnly ? '操作記錄（提案）' : '操作記錄';
+        $pageTitle = $proposalsOnly ? '最近提案列表' : '最近操作記錄';
         $pageDescription = $proposalsOnly ? '最近提案列表' : '最近編輯列表';
         $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
+        $pageTitleKey = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
 
-        return view('operations.index', ['lists' => $lists,
-            'page_title' => $pageTitle, 'page_description' => $pageDescription,
+        return view('operations.index', [
+            'lists' => $lists,
+            'page_title' => $pageTitle,
+            'page_title_key' => $pageTitleKey,
+            'page_description' => $pageDescription,
             'page_url' => $pageUrl,
             'proposals_only' => $proposalsOnly,
             'status_filters' => $statusFilters,

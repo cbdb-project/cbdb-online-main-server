@@ -131,9 +131,7 @@ class CrowdsourcingController extends Controller {
             switch ($resource) {
                 case "BIOG_MAIN":
                     $new_id = BiogMain::max('c_personid') + 1;
-                    #$new_ttsid = BiogMain::max('tts_sysno') + 1;
                     $data['c_personid'] = $new_id;
-                    #$data['tts_sysno'] = $new_ttsid;
                     $data = $this->toolRepository->timestamp($data); //建檔資訊
 
                     //$errorMsg = "您提供的JSON格式不符合，請refect這筆紀錄。";
@@ -150,9 +148,7 @@ class CrowdsourcingController extends Controller {
                     //20191223新增官職API
                 case "OFFICE_CODES":
                     $new_id = OfficeCode::max('c_office_id') + 1;
-                    #$new_ttsid = OfficeCode::max('tts_sysno') + 1;
                     $data['c_office_id'] = $new_id;
-                    #$data['tts_sysno'] = $new_ttsid;
                     $message = OfficeCode::create($data);
                     if ($message == true) {
                         DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);

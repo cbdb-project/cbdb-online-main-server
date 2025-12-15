@@ -23,6 +23,9 @@ import '@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css';
 import select2 from 'select2';
 select2(window, $);
 
+// Set global defaults for all Select2 instances to use Bootstrap 4 theme
+$.fn.select2.defaults.set('theme', 'bootstrap4');
+
 // Person select2 helper (shared across dashboard-v3 pages)
 const formatPersonLabel = (item) => {
     const parts = [];
@@ -159,15 +162,39 @@ if (token) {
 // Vue 3 setup (for pages that need Vue components)
 import { createApp } from 'vue';
 
+// Import Vue components
+import SelectVue from '../assets/js/components/Select.vue';
+import Select2 from '../assets/js/components/Select2.vue';
+import Select2Addr from '../assets/js/components/Select2Addr.vue';
+
 // Make createApp globally available for pages that need it
 window.createVueApp = createApp;
 
 // Install global modal focus guard when DOM is ready
 $(installModalFocusFix);
 
-// Signal that all global libraries are loaded
-window.viteReady = true;
-if (window.viteReadyCallbacks) {
-    window.viteReadyCallbacks.forEach(fn => fn());
-    window.viteReadyCallbacks = [];
-}
+// Auto-mount Vue app if #app element exists, then signal readiness
+$(function() {
+    const appElement = document.getElementById('app');
+    if (appElement) {
+        const app = createApp({
+            components: {
+                'select-vue': SelectVue,
+                'select2': Select2,
+                'select2-addr': Select2Addr,
+            }
+        });
+        app.mount('#app');
+
+        // Store app instance globally for debugging
+        window.vueApp = app;
+    }
+
+    // Only mark Vite ready after DOM is ready and Vue (if any) has mounted.
+    // This ensures onViteReady callbacks run after custom elements (e.g. <select-vue>) exist.
+    window.viteReady = true;
+    if (window.viteReadyCallbacks) {
+        window.viteReadyCallbacks.forEach(fn => fn());
+        window.viteReadyCallbacks = [];
+    }
+});

@@ -193,7 +193,7 @@
 
 @section('js')
 <script>
-$(document).ready(function() {
+onViteReady(function() {
     var progressPollers = {};
     var PROGRESS_POLL_INTERVAL = 5000;
 

@@ -1,13 +1,15 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
-    <div class="panel panel-default">
-        <div class="panel-heading">人名查詢</div>
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">人名查詢</h3>
+        </div>
+        <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
+                    <a href="{{ route('basicinformation.create') }}" class="float-right btn btn-secondary">新增</a>
                 @endif
             @endauth
             <div class="clearfix"></div>
@@ -18,9 +20,9 @@
                 <form method="GET" action="{{ route('basicinformation.index') }}" class="form-inline">
                     <div class="input-group" style="width: 100%;">
                         <input name="q" type="text" class="form-control" placeholder="Search" value="{{ $q }}" style="width: 100%;">
-                        <div class="input-group-btn">
-                            <button type="submit" class="btn btn-default">
-                                <i class="glyphicon glyphicon-search"></i>
+                        <div class="input-group-append">
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="fas fa-search"></i>
                             </button>
                         </div>
                     </div>
@@ -29,7 +31,7 @@
 
             {{-- 人物列表表格 --}}
             <div class="table-responsive table-scroll-x">
-                <table class="table table-hover table-condensed">
+                <table class="table table-hover table-sm">
                     <caption>共計 {{ $names->total() }} 條記錄</caption>
                     <thead>
                         <tr>
@@ -65,7 +67,7 @@
             </div>
 
             {{-- 分页 --}}
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $names->appends(['q' => $q])->links() }}
             </div>
         </div>

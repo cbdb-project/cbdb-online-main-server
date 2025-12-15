@@ -1,10 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">別名 Alt. Names</div>
-        <div class="panel-body">
-            <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+        <h3 class="card-title">別名 Alt. Names</div>
+        <div class="card-body">
+            <div class="card-body">
             <form action="{{ route('basicinformation.altnames.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -91,7 +92,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
+                    <div class="offset-sm-2 col-sm-10">
                         @if(Auth::check() && Auth::user()->isActive())
                             <!-- 直接儲存按鈕（非眾包用戶可見） -->
                             @if(Auth::user()->canWriteDirectly())
@@ -106,7 +107,7 @@
                             </button>
                         @endif
 
-                        <a href="{{ route('basicinformation.altnames.index', ['basicinformation' => $id]) }}" class="btn btn-default">
+                        <a href="{{ route('basicinformation.altnames.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
                             <i class="fa fa-times"></i> 取消
                         </a>
                     </div>

@@ -101,6 +101,29 @@
                 margin-left: 80px;
             }
         }
+
+        /* Select2 高度修复 - 与 Bootstrap 4 form-control 保持一致 */
+        .select2-container--bootstrap4 .select2-selection--single {
+            height: calc(1.5em + .75rem + 2px) !important;
+            padding: .375rem .75rem !important;
+            font-size: 1rem !important;
+            line-height: 1.5 !important;
+        }
+        .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            line-height: 1.5 !important;
+        }
+        .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+            height: calc(1.5em + .75rem + 2px) !important;
+            top: 0 !important;
+            right: 0 !important;
+        }
+
+        /* Banner 链接布局优化 */
+        .text-left > [class*="col-"] {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">

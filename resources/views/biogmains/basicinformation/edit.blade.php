@@ -1,86 +1,92 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
     @include('biogmains.banner')
-    <div class="panel panel-default">
-        <div class="panel-heading">基本资料</div>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">基本资料</h3>
+        </div>
 
-        <div id='check_info' style='display:none;' class="alert alert-error alert-dismissible">訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。</div>
+        <div id='check_info' style='display:none;' class="alert alert-danger alert-dismissible">訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。</div>
         <div id='pinyin_info' style='display:none;' class="alert alert-success alert-dismissible">訊息提示：「生成拼音」已經完成。</div>
 
-        <div class="panel-body">
-            <form id="basic-info-form" action="/basicinformation/{{ $basicinformation->c_personid }}" class="form-horizontal"
+        <div class="card-body">
+            <form id="basic-info-form" action="/basicinformation/{{ $basicinformation->c_personid }}"
                   method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="c_persionid" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="c_persionid" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_personid" class="form-control"
                                value="{{ $basicinformation->c_personid }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="{{ $errors->has('c_surname_chn') ? ' has-error' : '' }}">
-                        <label for="c_surname_chn" class="col-sm-2 control-label">姓</label>
-                        <div class="col-sm-4">
-                            <input type="text" name="c_surname_chn" class="form-control"
-                                   value="{{ old('c_surname_chn') ? old('c_surname_chn') : $basicinformation->c_surname_chn }}">
-                            @if ($errors->has('c_surname_chn'))
-                                <span class="help-block">
-                                <strong>{{ $errors->first('c_surname_chn') }}</strong>
+                <div class="form-group row">
+                    <div class="col-sm-6">
+                        <div class="form-group row">
+                            <label for="c_surname_chn" class="col-sm-4 col-form-label">姓</label>
+                            <div class="col-sm-8 {{ $errors->has('c_surname_chn') ? ' has-error' : '' }}">
+                                <input type="text" name="c_surname_chn" class="form-control"
+                                       value="{{ old('c_surname_chn') ? old('c_surname_chn') : $basicinformation->c_surname_chn }}">
+                                @if ($errors->has('c_surname_chn'))
+                                    <span class="help-block">
+                                    <strong>{{ $errors->first('c_surname_chn') }}</strong>
+                                </span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="c_mingzi_chn" class="col-sm-4 col-form-label">名</label>
+                            <div class="col-sm-8 {{ $errors->has('c_mingzi_chn') ? ' has-error' : '' }}">
+                                <input type="text" name="c_mingzi_chn" class="form-control"
+                                       value="{{ old('c_mingzi_chn') ? old('c_mingzi_chn') : $basicinformation->c_mingzi_chn }}">
+                                @if ($errors->has('c_mingzi_chn'))
+                                    <span class="help-block">
+                                <strong>{{ $errors->first('c_mingzi_chn') }}</strong>
                             </span>
-                            @endif
+                                @endif
+                            </div>
                         </div>
                     </div>
-                    <label for="c_surname" class="col-sm-2 control-label">Xing</label>
-                    <div class="col-sm-4">
-                        <input type="text" name="c_surname" class="form-control"
-                               value="{{ old('c_surname') ? old('c_surname') : $basicinformation->c_surname }}">
-                        @if ($errors->has('c_surname'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_surname') }}</strong>
-                        </span>
-                        @endif
-                    </div>
-                </div>
-                <div class="form-group">
-                    <div class="{{ $errors->has('c_mingzi_chn') ? ' has-error' : '' }}">
-                        <label for="c_mingzi_chn" class="col-sm-2 control-label">名</label>
-                        <div class="col-sm-4">
-                            <input type="text" name="c_mingzi_chn" class="form-control"
-                                   value="{{ old('c_mingzi_chn') ? old('c_mingzi_chn') : $basicinformation->c_mingzi_chn }}">
-                            @if ($errors->has('c_mingzi_chn'))
-                                <span class="help-block">
-                            <strong>{{ $errors->first('c_mingzi_chn') }}</strong>
-                        </span>
-                            @endif
+                    <div class="col-sm-6">
+                        <div class="form-group row">
+                            <label for="c_surname" class="col-sm-4 col-form-label">Xing</label>
+                            <div class="col-sm-8 {{ $errors->has('c_surname') ? ' has-error' : '' }}">
+                                <input type="text" name="c_surname" class="form-control"
+                                       value="{{ old('c_surname') ? old('c_surname') : $basicinformation->c_surname }}">
+                                @if ($errors->has('c_surname'))
+                                    <span class="help-block">
+                                    <strong>{{ $errors->first('c_surname') }}</strong>
+                                </span>
+                                @endif
+                            </div>
                         </div>
-                    </div>
-                    <div class="{{ $errors->has('c_mingzi') ? ' has-error' : '' }}">
-                        <label for="c_mingzi" class="col-sm-2 control-label">Ming</label>
-                        <div class="col-sm-4">
-                            <input type="text" name="c_mingzi" class="form-control"
-                                   value="{{ old('c_mingzi') ? old('c_mingzi') : $basicinformation->c_mingzi }}">
-                            @if ($errors->has('c_mingzi'))
-                                <span class="help-block">
-                            <strong>{{ $errors->first('c_mingzi') }}</strong>
-                        </span>
-                            @endif
+                        <div class="form-group row">
+                            <label for="c_mingzi" class="col-sm-4 col-form-label">Ming</label>
+                            <div class="col-sm-8 {{ $errors->has('c_mingzi') ? ' has-error' : '' }}">
+                                <input type="text" name="c_mingzi" class="form-control"
+                                       value="{{ old('c_mingzi') ? old('c_mingzi') : $basicinformation->c_mingzi }}">
+                                @if ($errors->has('c_mingzi'))
+                                    <span class="help-block">
+                                <strong>{{ $errors->first('c_mingzi') }}</strong>
+                            </span>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="button_ajax_load" class="col-sm-2 control-label"></label>
+                <div class="form-group row">
+                    <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
                     <div class="col-sm-4">
                         <button type="button" id="button_ajax_load" class="btn btn-info">生成拼音</button>
                     </div>
-                    <label for="button_ajax_load" class="col-sm-2 control-label"></label>
+                    <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
                     <div class="col-sm-4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_surname_proper" class="col-sm-2 control-label">外文姓</label>
+                <div class="form-group row">
+                    <label for="c_surname_proper" class="col-sm-2 col-form-label">外文姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_proper" class="form-control"
                                value="{{ old('c_surname_proper') ? old('c_surname_proper') : $basicinformation->c_surname_proper }}">
@@ -90,7 +96,7 @@
                         </span>
                         @endif
                     </div>
-                    <label for="c_mingzi_proper" class="col-sm-2 control-label">外文名</label>
+                    <label for="c_mingzi_proper" class="col-sm-2 col-form-label">外文名</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_mingzi_proper" class="form-control"
                                value="{{ old('c_mingzi_proper') ? old('c_mingzi_proper') : $basicinformation->c_mingzi_proper }}">
@@ -101,8 +107,8 @@
                         @endif
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_surname_rm" class="col-sm-2 control-label">外文羅馬字轉寫姓</label>
+                <div class="form-group row">
+                    <label for="c_surname_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_rm" class="form-control"
                                value="{{ old('c_surname_rm') ? old('c_surname_rm') : $basicinformation->c_surname_rm }}">
@@ -112,7 +118,7 @@
                         </span>
                         @endif
                     </div>
-                    <label for="c_mingzi_rm" class="col-sm-2 control-label">外文羅馬字轉寫名</label>
+                    <label for="c_mingzi_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫名</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_mingzi_rm" class="form-control"
                                value="{{ old('c_mingzi_rm') ? old('c_mingzi_rm') : $basicinformation->c_mingzi_rm }}">
@@ -123,8 +129,8 @@
                         @endif
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_name_chn" class="col-sm-2 control-label">姓名(中)</label>
+                <div class="form-group row">
+                    <label for="c_name_chn" class="col-sm-2 col-form-label">姓名(中)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name_chn" class="form-control" readonly
                                value="{{ $basicinformation->c_name_chn }}"
@@ -134,8 +140,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_name" class="col-sm-2 control-label">姓名(拼音)</label>
+                <div class="form-group row">
+                    <label for="c_name" class="col-sm-2 col-form-label">姓名(拼音)</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name" class="form-control" readonly
                                value="{{ $basicinformation->c_name }}"
@@ -145,8 +151,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_name_proper" class="col-sm-2 control-label">外文全名</label>
+                <div class="form-group row">
+                    <label for="c_name_proper" class="col-sm-2 col-form-label">外文全名</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name_proper" class="form-control" readonly
                                value="{{ $basicinformation->c_name_proper }}"
@@ -156,8 +162,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_name_rm" class="col-sm-2 control-label">外文羅馬字轉寫姓名</label>
+                <div class="form-group row">
+                    <label for="c_name_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫姓名</label>
                     <div class="col-sm-10">
                         <input type="text" name="c_name_rm" class="form-control" readonly
                                value="{{ $basicinformation->c_name_rm }}"
@@ -167,8 +173,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_female" class="col-sm-2 control-label">性别（原female）</label>
+                <div class="form-group row">
+                    <label for="c_female" class="col-sm-2 col-form-label">性别（原female）</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_female">
                             <option value="0"></option>
@@ -178,20 +184,20 @@
                             </option>
                         </select>
                     </div>
-                    <label for="c_ethnicity_code" class="col-sm-2 control-label">種族/部族</label>
+                    <label for="c_ethnicity_code" class="col-sm-2 col-form-label">種族/部族</label>
                     <div class="col-sm-4">
                         <select-vue name="c_ethnicity_code" model="ethnicity" selected="{{ $basicinformation->c_ethnicity_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_dy" class="col-sm-2 control-label">朝代(dy)</label>
+                <div class="form-group row">
+                    <label for="c_dy" class="col-sm-2 col-form-label">朝代(dy)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_dy" model="dynasty" selected="{{ $basicinformation->c_dy }}"></select-vue>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">生年(birth year)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">生年(birth year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_birthyear" class="form-control"
                                value="{{ $basicinformation->c_birthyear }}" onchange="indexYear()">
@@ -229,8 +235,8 @@
                         <select-vue name="c_by_day_gz" model="ganzhi" selected="{{ $basicinformation->c_by_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">卒年(death year)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">卒年(death year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_deathyear" class="form-control"
                                value="{{ $basicinformation->c_deathyear }}" onchange="indexYear()">
@@ -269,7 +275,7 @@
                     </div>
                 </div>
                 <div class="form-group{{ $errors->has('c_index_year') ? ' has-error' : '' }}">
-                    <label for="c_index_year" class="col-sm-2 control-label">指數年(index year)</label>
+                    <label for="c_index_year" class="col-sm-2 col-form-label">指數年(index year)</label>
                     <div class="col-sm-10">
                         <input type="number" name="c_index_year" class="form-control" readonly
                                value="{{ $basicinformation->c_index_year }}"
@@ -284,9 +290,9 @@
                         @endif
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <label for="c_index_year_type_code"
-                           class="col-sm-2 control-label">指數年推算方法(c_index_year_type_code)</label>
+                           class="col-sm-2 col-form-label">指數年推算方法(c_index_year_type_code)</label>
                     <div class="col-sm-4">
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_year_type_code }}"
@@ -296,7 +302,7 @@
                         </span>
                     </div>
                     <label for="c_index_year_source_id"
-                           class="col-sm-2 control-label">指數年推算來源(c_index_year_source_id)</label>
+                           class="col-sm-2 col-form-label">指數年推算來源(c_index_year_source_id)</label>
                     <div class="col-sm-4">
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_year_source_id }}"
@@ -306,9 +312,9 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <label for="c_index_addr_id"
-                           class="col-sm-2 control-label">指數地址(index_addr)</label>
+                           class="col-sm-2 col-form-label">指數地址(index_addr)</label>
                     <div class="col-sm-4">
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_addr_id }}"
@@ -318,7 +324,7 @@
                         </span>
                     </div>
                     <label for="c_index_addr_type_code"
-                           class="col-sm-2 control-label">指數地址類型(index_addr_type)</label>
+                           class="col-sm-2 col-form-label">指數地址類型(index_addr_type)</label>
                     <div class="col-sm-4">
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_addr_type_code }}"
@@ -329,7 +335,7 @@
                     </div>
                 </div>
                 <div class="form-group{{ $errors->has('c_death_age') ? ' has-error' : '' }}">
-                    <label for="c_death_age" class="col-sm-2 control-label">享年(death_age)</label>
+                    <label for="c_death_age" class="col-sm-2 col-form-label">享年(death_age)</label>
                     <div class="col-sm-4">
                         <input type="number" name="c_death_age" class="form-control"
                                value="{{ $basicinformation->c_death_age }}">
@@ -339,7 +345,7 @@
                         </span>
                         @endif
                     </div>
-                    <label for="" class="col-sm-2 control-label">范围</label>
+                    <label for="" class="col-sm-2 col-form-label">范围</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_death_age_range">
                             {{--<option value="null"></option>--}}
@@ -354,9 +360,9 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <label for="c_fl_earliest_year"
-                           class="col-sm-2 control-label">在世始年(fl_earliest_year)</label>
+                           class="col-sm-2 col-form-label">在世始年(fl_earliest_year)</label>
                     <div class="col-sm-10 form-inline">
                         <input type="text" name="c_fl_earliest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_earliest_year }}">
@@ -369,9 +375,9 @@
 
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <label for="c_fl_latest_year"
-                           class="col-sm-2 control-label">在世終年(fl_latest_year)</label>
+                           class="col-sm-2 col-form-label">在世終年(fl_latest_year)</label>
                     <div class="col-sm-10 form-inline">
                         <input type="text" name="c_fl_latest_year" class="form-control"
                                value="{{ $basicinformation->c_fl_latest_year }}">
@@ -384,36 +390,36 @@
 
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_choronym_code" class="col-sm-2 control-label">郡望(choronym_code)</label>
+                <div class="form-group row">
+                    <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望(choronym_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_choronym_code" model="choronym" selected="{{ $basicinformation->c_choronym_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_household_status_code" class="col-sm-2 control-label">戶籍(c_household_status)</label>
+                <div class="form-group row">
+                    <label for="c_household_status_code" class="col-sm-2 col-form-label">戶籍(c_household_status)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_household_status_code" model="household" selected="{{ $basicinformation->c_household_status_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $basicinformation->c_notes }}</textarea>
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $basicinformation->c_created_by.'/'.$basicinformation->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $basicinformation->c_modified_by.'/'.$basicinformation->c_modified_date }}"
@@ -422,9 +428,9 @@
                 </div>
                 @auth
                     @if(Auth::user()->isActive())
-                        <div class="form-group">
-                            <div class="col-sm-offset-2 col-sm-10">
-                                <button type="submit" class="btn btn-default" id="basic-info-submit">Submit</button>
+                        <div class="form-group row">
+                            <div class="offset-sm-2 col-sm-10">
+                                <button type="submit" class="btn btn-secondary" id="basic-info-submit">Submit</button>
                             </div>
                         </div>
                     @endif
@@ -433,7 +439,7 @@
             </form>
             @auth
                 @if(Auth::user()->isActive())
-                    <div class="btn-group pull-right">
+                    <div class="btn-group float-right">
                         <a href=""
                            onclick="
                                        let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -451,10 +457,10 @@
             @endauth
             @auth
                 @if(Auth::user()->isActive())
-                    <div class="btn-group pull-right">
+                    <div class="btn-group float-right">
                         <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
                     </div>
-                    <div class="btn-group pull-right">
+                    <div class="btn-group float-right">
                         <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Duplicate Basic Info</a>
                     </div>
                 @endif
@@ -472,6 +478,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         var $basicInfoForm = $('#basic-info-form');
         var $submitButton = $('#basic-info-submit');
         var pristineSnapshot = $basicInfoForm.serialize();
@@ -505,10 +512,11 @@
             }
             // let index =
         }
+    });
     </script>
 <!-- Javascript -->
 <script type="text/javascript">
-$(document).ready(function (){
+onViteReady(function(){
 
     var DoAjax = function(requestUrl, sentData, sHandler, eHandler, pageNotFoundHandler){
         $.ajax({

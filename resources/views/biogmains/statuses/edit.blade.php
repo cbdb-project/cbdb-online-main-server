@@ -1,27 +1,29 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">社會區分 Status</div>
-        <div class="panel-body">
-            <div class="panel-body">
-            <form action="{{ route('basicinformation.statuses.update', ['basicinformation' => $id, 'status' => $row->c_personid.'-'.$row->c_sequence.'-'.$row->c_status_code]) }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">社會區分 Status</h3>
+        </div>
+        <div class="card-body">
+            <div class="card-body">
+            <form action="{{ route('basicinformation.statuses.update', ['basicinformation' => $id, 'status' => $row->c_personid.'-'.$row->c_sequence.'-'.$row->c_status_code]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(c_sequence)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">社會區分(c_status_code)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">社會區分(c_status_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_status_code" name="c_status_code">
                             @if($res['statuse_str'])
@@ -30,15 +32,15 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_supplement" class="col-sm-2 control-label">補充文字(c_supplement)</label>
+                <div class="form-group row">
+                    <label for="c_supplement" class="col-sm-2 col-form-label">補充文字(c_supplement)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_supplement" value="{{ $row->c_supplement }}">
                         請補充 “並稱/齊名” 的稱號 , 如「東南三賢」,「四俊」等
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_firstyear" class="form-control"
                                value="{{ $row->c_firstyear }}">
@@ -55,8 +57,8 @@
                         <select-vue name="c_fy_range" model="range" selected="{{ $row->c_fy_range }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
+                <div class="form-group row">
+                    <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_lastyear" class="form-control"
                                value="{{ $row->c_lastyear }}">
@@ -73,8 +75,8 @@
                         <select-vue name="c_ly_range" model="range" selected="{{ $row->c_ly_range }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($res['text_str'])
@@ -85,46 +87,46 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
+                        <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
                 </div>
             </form>
@@ -135,6 +137,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_source").select2(options('text'));
@@ -235,5 +238,6 @@
             });
         });
 
+    });
     </script>
 @endsection

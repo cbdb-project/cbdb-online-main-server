@@ -1,28 +1,30 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">事件 Event</div>
-        <div class="panel-body">
-            <div class="panel-body">
-            <form action="{{ route('basicinformation.events.update', ['basicinformation' => $id, 'event' => $row->c_sequence]) }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">事件 Event</h3>
+        </div>
+        <div class="card-body">
+            <div class="card-body">
+            <form action="{{ route('basicinformation.events.update', ['basicinformation' => $id, 'event' => $row->c_sequence]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
                 <input type="text" class="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(sequence)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">事件名稱</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">事件名稱</label>
                     <div class="col-sm-10">
                         <select class="form-control c_event_code" name="c_event_code">
                             @if($res['event_str'])
@@ -31,14 +33,14 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_role" class="col-sm-2 control-label">傳主在該事件中角色</label>
+                <div class="form-group row">
+                    <label for="c_role" class="col-sm-2 col-form-label">傳主在該事件中角色</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_role" value="{{ $row->c_role }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_year" class="col-sm-2 control-label">事件發生年</label>
+                <div class="form-group row">
+                    <label for="c_year" class="col-sm-2 col-form-label">事件發生年</label>
                     <div class="col-md-1">
                         <input type="number" name="c_year" class="form-control"
                                value="{{ $row->c_year }}">
@@ -76,8 +78,8 @@
                         <select-vue name="c_day_ganzhi" model="ganzhi" selected="{{ $row->c_day_ganzhi }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_addr_id" class="col-sm-2 control-label">地名</label>
+                <div class="form-group row">
+                    <label for="c_addr_id" class="col-sm-2 col-form-label">地名</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
                             @if($res['addr_str'])
@@ -90,8 +92,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($res['text_str'])
@@ -102,53 +104,53 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_event" class="col-sm-2 control-label">大事件</label>
+                <div class="form-group row">
+                    <label for="c_event" class="col-sm-2 col-form-label">大事件</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_event" id="" cols="30"
                                   rows="5">{{ $row->c_event }}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
+                        <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
                 </div>
             </form>
@@ -159,6 +161,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_source").select2(options('text'));
@@ -260,5 +263,6 @@
             });
         });
 
+    });
     </script>
 @endsection

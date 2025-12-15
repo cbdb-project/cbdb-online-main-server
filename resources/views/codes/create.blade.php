@@ -72,7 +72,7 @@
 @section('js')
 @if($table === 'TEXT_INSTANCE_DATA')
 <script type="text/javascript">
-$(document).ready(function (){
+onViteReady(function (){
 
     var DoAjax = function(requestUrl, sentData, sHandler, eHandler, pageNotFoundHandler){
         $.ajax({

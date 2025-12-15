@@ -71,7 +71,7 @@ class DashboardController extends Controller {
 
         return view('dashboard.index', [
             'page_title' => '系統總覽',
-            'breadcrumb_home' => 'Home',
+            'page_title_key' => '系統總覽',
             'totalPersons' => $totalPersons,
             'totalAltnames' => $totalAltnames,
             'totalOffices' => $totalOffices,

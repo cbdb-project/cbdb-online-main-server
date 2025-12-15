@@ -1,21 +1,23 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-<div class="panel panel-default">
-    <div class="panel-heading">單向關係修復</div>
-    <div class="panel-body">
+<div class="card card-default">
+    <div class="card-header">
+        <h3 class="card-title">單向關係修復</h3>
+    </div>
+    <div class="card-body">
 
         {{-- 上半部分：親屬關係修復 --}}
         <div class="row" style="margin-bottom: 30px;">
             <div class="col-md-12">
-                <div class="panel panel-primary">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">
                             <i class="fa fa-users"></i>
                             親屬關係修復
                         </h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <div id="kinship-result-container"></div>
 
                         <form id="kinship-repair-form">
@@ -52,7 +54,7 @@
                             <button type="submit" class="btn btn-primary" id="kinship-submit-btn">
                                 <i class="fa fa-check"></i> 修復親屬關係
                             </button>
-                            <button type="reset" class="btn btn-default">
+                            <button type="reset" class="btn btn-secondary">
                                 <i class="fa fa-undo"></i> 重置
                             </button>
                         </form>
@@ -64,14 +66,14 @@
         {{-- 下半部分：社會關係修復 --}}
         <div class="row" style="margin-bottom: 30px;">
             <div class="col-md-12">
-                <div class="panel panel-success">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
+                <div class="card card-success">
+                    <div class="card-header">
+                        <h3 class="card-title">
                             <i class="fa fa-sitemap"></i>
                             社會關係修復
                         </h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <div id="assoc-result-container"></div>
 
                         <form id="assoc-repair-form">
@@ -108,7 +110,7 @@
                             <button type="submit" class="btn btn-success" id="assoc-submit-btn">
                                 <i class="fa fa-check"></i> 修復社會關係
                             </button>
-                            <button type="reset" class="btn btn-default">
+                            <button type="reset" class="btn btn-secondary">
                                 <i class="fa fa-undo"></i> 重置
                             </button>
                         </form>

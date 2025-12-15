@@ -1,9 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-<div class="panel panel-default">
-    <div class="panel-heading">CBDB 內部表維護</div>
-    <div class="panel-body">
+<div class="card card-default">
+    <div class="card-header">
+        <h3 class="card-title">CBDB 內部表維護</h3>
+    </div>
+    <div class="card-body">
 
         {{-- 顯示操作結果消息 --}}
         @if(session('success'))
@@ -31,14 +33,14 @@
         <div class="row" style="margin-bottom: 20px;">
             @foreach($tables as $tableName => $tableInfo)
             <div class="col-md-6">
-                <div class="panel panel-{{ $tableInfo['color'] }}">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
+                <div class="card card-{{ $tableInfo['color'] }}">
+                    <div class="card-header">
+                        <h3 class="card-title">
                             <i class="fa fa-{{ $tableInfo['icon'] }}"></i>
                             {{ $tableInfo['name_chn'] }}
                         </h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <p><strong>資料表：</strong><code>{{ $tableInfo['name'] }}</code></p>
                         <p><strong>說明：</strong>{{ $tableInfo['description'] }}</p>
                         <p><strong>Artisan 命令：</strong><code>{{ $tableInfo['command'] }}</code></p>
@@ -51,7 +53,7 @@
                             </p>
                         @else
                             <p><strong>狀態：</strong>
-                                <span class="label label-warning">資料表不存在</span>
+                                <span class="badge badge-warning">資料表不存在</span>
                             </p>
                         @endif
 
@@ -128,11 +130,11 @@
         </div>
 
         {{-- 說明文字 --}}
-        <div class="panel panel-info">
-            <div class="panel-heading">
-                <h3 class="panel-title"><i class="fa fa-info-circle"></i> 說明</h3>
+        <div class="card card-info">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa fa-info-circle"></i> 說明</h3>
             </div>
-            <div class="panel-body">
+            <div class="card-body">
                 <h4>繁簡映射表 (CBDB__TRAD_SIMP_MAP)</h4>
                 <ul>
                     <li>從 OpenCC 專案下載最新的繁簡對照資料</li>

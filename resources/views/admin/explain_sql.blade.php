@@ -1,11 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">MySQL EXPLAIN</h3>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">MySQL EXPLAIN</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p class="text-muted">
                 這個工具僅供管理員用於診斷查詢效能。請輸入只讀 SQL（僅支援 SELECT / WITH），系統會送出
                 <code>EXPLAIN</code> 並顯示 MySQL 回傳的執行計畫，方便評估索引或查詢設計是否需要調整。
@@ -31,7 +31,7 @@
 
             @if(is_array($results) && count($results) > 0)
                 <div class="table-responsive" style="margin-top: 20px;">
-                    <table class="table table-bordered table-striped table-condensed">
+                    <table class="table table-bordered table-striped table-sm">
                         <thead>
                         <tr>
                             @foreach($columns as $column)

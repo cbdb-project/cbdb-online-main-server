@@ -1,9 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">人物記錄合併</div>
-        <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">人物記錄合併</h3>
+        </div>
+        <div class="card-body">
             <form method="post" action="{{ route('merge-preview.index') }}" class="form-horizontal">
                 {{ csrf_field() }}
                 <div class="form-group">
@@ -49,7 +51,7 @@
                 <div class="form-group">
                     <div class="col-sm-offset-2 col-sm-10">
                         <button type="submit" class="btn btn-primary" id="preview-button">預覽合併結果</button>
-                        <button type="button" class="btn btn-default" id="copy_merge_link" data-base="{{ route('merge-preview.index') }}">複製連結</button>
+                        <button type="button" class="btn btn-secondary" id="copy_merge_link" data-base="{{ route('merge-preview.index') }}">複製連結</button>
                     </div>
                 </div>
             </form>
@@ -65,7 +67,7 @@
                 <div class="row">
                     <div class="col-md-6">
                         <h5>保留人物</h5>
-                        <table class="table table-bordered table-condensed">
+                        <table class="table table-bordered table-sm">
                             <tr>
                                 <th>ID</th>
                                 <td>
@@ -110,7 +112,7 @@
                     </div>
                     <div class="col-md-6">
                         <h5>合併來源</h5>
-                        <table class="table table-bordered table-condensed">
+                        <table class="table table-bordered table-sm">
                             <tr>
                                 <th>ID</th>
                                 <td>

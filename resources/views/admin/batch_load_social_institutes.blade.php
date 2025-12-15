@@ -1,11 +1,11 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">批次匯入社會機構</h3>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">批次匯入社會機構</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p class="text-muted">
                 每行請依序輸入：<code>機構名稱</code>、<code>類型（中文）</code>、<code>朝代（中文）</code>、<code>地址名稱（可留白）</code>、
                 <code>地址 ID</code>、<code>來源 TEXT_ID</code>，以 <code>Tab</code> 分隔。

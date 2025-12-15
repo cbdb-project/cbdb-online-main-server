@@ -302,14 +302,25 @@
 | view/list.blade.php | /view/{id} | ✅ 完成 | 检视表详情 |
 | manage/index.blade.php | /manage | ✅ 完成 | 用户管理列表 |
 | manage/edit.blade.php | /manage/{id}/edit | ✅ 完成 | 用户编辑 |
+| manage/merge-preview.blade.php | /manage/merge-preview | ✅ 完成 | 人物记录合并预览 |
 | crowdsourcing/index.blade.php | /crowdsourcing | ✅ 完成 | 众包录入记录 |
+| profile/edit.blade.php | /profile/edit | ✅ 完成 | 用户资料编辑 |
+| admin/wiki-maintenance.blade.php | /admin/wiki-maintenance | ✅ 完成 | Wiki 对照资料维护 |
+| admin/cbdb-table-maintenance.blade.php | /admin/cbdb-table-maintenance | ✅ 完成 | CBDB 内部表维护 |
+| admin/explain_sql.blade.php | /admin/explainsql | ✅ 完成 | MySQL EXPLAIN 工具 |
+| admin/unidirectional-relationship-repair.blade.php | /admin/unidirectional-relationship-repair | ✅ 完成 | 单向关系修复 |
+| admin/batch_load_book_titles.blade.php | /admin/batch-load-book-titles | ✅ 完成 | 批次汇入书稿资料 |
+| admin/batch_load_offices.blade.php | /admin/batch-load-offices | ✅ 完成 | 批次汇入官职 |
+| admin/batch_load_social_institutes.blade.php | /admin/batch-load-social-institutes | ✅ 完成 | 批次汇入社会机构 |
 
-**总计**: 12 个页面已迁移到 AdminLTE v3
+**总计**: 21 个页面已迁移到 AdminLTE v3
 
 ### 🎉 已完成模块
 - ✅ **codes 模块** - 全部 5 个页面已迁移 (2025-12-11 完成)
-- ✅ **manage 模块** - 全部 2 个页面已迁移 (2025-12-13 完成)
+- ✅ **manage 模块** - 全部 3 个页面已迁移 (2025-12-14 完成)
 - ✅ **crowdsourcing 模块** - 1 个页面已迁移 (2025-12-13 完成)
+- ✅ **profile 模块** - 1 个页面已迁移 (2025-12-14 完成)
+- ✅ **admin 模块** - 全部 8 个管理员工具页面已迁移 (2025-12-14 完成)
 
 ## 下一步计划
 

@@ -10,7 +10,7 @@
             <form action="{{ route('basicinformation.events.update', ['basicinformation' => $id, 'event' => $row->c_sequence]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <input type="text" class="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">
+                <input type="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">
                 <div class="form-group row">
                     <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">

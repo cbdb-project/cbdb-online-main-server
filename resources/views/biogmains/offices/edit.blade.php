@@ -10,9 +10,9 @@
             <form id="office-edit-form" action="{{ route('basicinformation.offices.update', ['basicinformation' => $id, 'office'=> $row->c_office_id.'-'.$row->c_posting_id]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <input name="_id" type="text" class="hidden" value="{{ $id }}">
-                <input name="_postingid" type="text" class="hidden" value="{{ $row->c_posting_id }}">
-                <input name="_officeid" type="text" class="hidden" value="{{ $row->c_office_id }}">
+                <input name="_id" type="hidden" value="{{ $id }}">
+                <input name="_postingid" type="hidden" value="{{ $row->c_posting_id }}">
+                <input name="_officeid" type="hidden" value="{{ $row->c_office_id }}">
                 <div class="form-group row">
                     <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">

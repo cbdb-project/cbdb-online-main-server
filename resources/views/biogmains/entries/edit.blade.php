@@ -1,27 +1,29 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">入仕 Entry</div>
-        <div class="panel-body">
-            <div class="panel-body">
-            <form action="{{ route('basicinformation.entries.update', ['basicinformation' => $id, 'entry' => $row->c_personid.'-'.$row->c_entry_code.'-'.$row->c_sequence.'-'.$row->c_kin_code.'-'.$row->c_assoc_code.'-'.$row->c_kin_id.'-'.$row->c_year.'-'.$row->c_assoc_id.'-'.$row->c_inst_code.'-'.$row->c_inst_name_code]) }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">入仕 Entry</h3>
+        </div>
+        <div class="card-body">
+            <div class="card-body">
+            <form action="{{ route('basicinformation.entries.update', ['basicinformation' => $id, 'entry' => $row->c_personid.'-'.$row->c_entry_code.'-'.$row->c_sequence.'-'.$row->c_kin_code.'-'.$row->c_assoc_code.'-'.$row->c_kin_id.'-'.$row->c_year.'-'.$row->c_assoc_id.'-'.$row->c_inst_code.'-'.$row->c_inst_name_code]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_entry_code" class="col-sm-2 control-label">入仕法(entry_code)</label>
+                <div class="form-group row">
+                    <label for="c_entry_code" class="col-sm-2 col-form-label">入仕法(entry_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_entry_code" name="c_entry_code">
                             @if($res['entry_str'])
@@ -30,8 +32,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_year" class="col-sm-2 control-label">入仕年(year)</label>
+                <div class="form-group row">
+                    <label for="c_year" class="col-sm-2 col-form-label">入仕年(year)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_year" class="form-control"
                                value="{{ $row->c_year }}">
@@ -48,33 +50,33 @@
                         <select-vue name="c_entry_range" model="range" selected="{{ $row->c_entry_range }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_exam_rank" class="col-sm-2 control-label">科第名次(exam_rank)</label>
+                <div class="form-group row">
+                    <label for="c_exam_rank" class="col-sm-2 col-form-label">科第名次(exam_rank)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_exam_rank" value="{{ $row->c_exam_rank }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_attempt_count" class="col-sm-2 control-label">第幾舉(c_attempt_count)</label>
+                <div class="form-group row">
+                    <label for="c_attempt_count" class="col-sm-2 col-form-label">第幾舉(c_attempt_count)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_attempt_count" value="{{ $row->c_attempt_count }}">
                         請填阿拉伯數字(半形/半角)
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_exam_field" class="col-sm-2 control-label">考試科目(c_exam_field)</label>
+                <div class="form-group row">
+                    <label for="c_exam_field" class="col-sm-2 col-form-label">考試科目(c_exam_field)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_exam_field" value="{{ $row->c_exam_field }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_parental_status" class="col-sm-2 control-label">父母狀態(c_parental_status)</label>
+                <div class="form-group row">
+                    <label for="c_parental_status" class="col-sm-2 col-form-label">父母狀態(c_parental_status)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_parental_status" model="parentstatus" selected="{{ $row->c_parental_status }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_entry_addr_id" class="col-sm-2 control-label">地點(c_addr_id)</label>
+                <div class="form-group row">
+                    <label for="c_entry_addr_id" class="col-sm-2 col-form-label">地點(c_addr_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_entry_addr_id" required>
                             @if($res['addr_str'])
@@ -83,20 +85,20 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_age" class="col-sm-2 control-label">入仕年齡(age)</label>
+                <div class="form-group row">
+                    <label for="c_age" class="col-sm-2 col-form-label">入仕年齡(age)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_age" value="{{ $row->c_age }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_posting_notes" class="col-sm-2 control-label">授官(posting_id)</label>
+                <div class="form-group row">
+                    <label for="c_posting_notes" class="col-sm-2 col-form-label">授官(posting_id)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_posting_notes" value="{{ $row->c_posting_notes }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_kin_code" class="col-sm-2 control-label">親屬關係類別(kin_code)</label>
+                <div class="form-group row">
+                    <label for="c_kin_code" class="col-sm-2 col-form-label">親屬關係類別(kin_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kin_code" name="c_kin_code">
                             @if($res['kin_str'])
@@ -105,8 +107,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">親戚(kin_id)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">親戚(kin_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kin_id" name="c_kin_id">
                             @if($res['biog_str'])
@@ -115,8 +117,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_assoc_code" class="col-sm-2 control-label">社會關係類別(assoc_code)</label>
+                <div class="form-group row">
+                    <label for="c_assoc_code" class="col-sm-2 col-form-label">社會關係類別(assoc_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_assoc_code" name="c_assoc_code">
                             @if($res['assoc_str'])
@@ -125,8 +127,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_assoc_id" class="col-sm-2 control-label">社會關係人(assoc_id)</label>
+                <div class="form-group row">
+                    <label for="c_assoc_id" class="col-sm-2 col-form-label">社會關係人(assoc_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_assoc_id" name="c_assoc_id">
                             @if($res['biog_str2'])
@@ -135,8 +137,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                <div class="form-group row">
+                    <label for="c_inst_code" class="col-sm-2 col-form-label">社交機構(social_institution)</label>
                     <input name="c_inst_name_code" type="hidden">
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
@@ -146,8 +148,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($res['text_str'])
@@ -158,46 +160,46 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
+                        <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
                 </div>
             </form>
@@ -208,6 +210,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_entry_code").select2(options('entry'));
@@ -314,5 +317,6 @@
             });
         });
 
+    });
     </script>
 @endsection

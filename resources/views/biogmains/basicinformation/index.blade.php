@@ -1,35 +1,32 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 
-    <div class="panel panel-default">
-        <div class="panel-heading">人名查詢</div>
-        <div class="panel-body">
-            @auth
-                @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.create') }}" class="pull-right btn btn-default">新增</a>
-                @endif
-            @endauth
-            <div class="clearfix"></div>
-
-            {{-- 搜索表单 --}}
-            <div class="form-group">
-                <div class="text-center">查詢人物</div>
-                <form method="GET" action="{{ route('basicinformation.index') }}" class="form-inline">
-                    <div class="input-group" style="width: 100%;">
-                        <input name="q" type="text" class="form-control" placeholder="Search" value="{{ $q }}" style="width: 100%;">
-                        <div class="input-group-btn">
-                            <button type="submit" class="btn btn-default">
-                                <i class="glyphicon glyphicon-search"></i>
+    <div class="card card-default">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-3 flex-nowrap">
+                <form method="GET" action="{{ route('basicinformation.index') }}" class="flex-grow-1 mr-2">
+                    <div class="input-group w-100">
+                        <input name="q" type="text" class="form-control" placeholder="搜尋人物" aria-label="搜尋人物" value="{{ $q }}">
+                        <div class="input-group-append">
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="fas fa-search"></i>
                             </button>
                         </div>
                     </div>
                 </form>
+                @auth
+                    @if(Auth::user()->isActive())
+                        <a href="{{ route('basicinformation.create') }}" class="btn btn-secondary">
+                            新增
+                        </a>
+                    @endif
+                @endauth
             </div>
 
             {{-- 人物列表表格 --}}
             <div class="table-responsive table-scroll-x">
-                <table class="table table-hover table-condensed">
+                <table class="table table-hover table-sm">
                     <caption>共計 {{ $names->total() }} 條記錄</caption>
                     <thead>
                         <tr>
@@ -65,7 +62,7 @@
             </div>
 
             {{-- 分页 --}}
-            <div class="pull-right">
+            <div class="float-right">
                 {{ $names->appends(['q' => $q])->links() }}
             </div>
         </div>

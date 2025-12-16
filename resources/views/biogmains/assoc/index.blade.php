@@ -1,19 +1,21 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
     @include('biogmains.banner')
     @include('biogmains.defense')
-    <div class="panel panel-default">
-        <div class="panel-heading">社會關係清單</div>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">社會關係清單</h3>
+        </div>
 
-        <div class="panel-body">
+        <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.assoc.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-default pull-right">新增</a>
+                    <a href="{{ route('basicinformation.assoc.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
                 @endif
             @endauth
             <div class="table-responsive">
-                <table class="table table-hover table-condensed">
+                <table class="table table-hover table-sm">
                 <caption>共查询到{{ $basicinformation->assoc_count }}条记录</caption>
                 <thead>
                 <tr>

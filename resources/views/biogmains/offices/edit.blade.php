@@ -1,37 +1,39 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">官名 Postings</div>
-        <div class="panel-body">
-            <div class="panel-body">
-            <form id="office-edit-form" action="{{ route('basicinformation.offices.update', ['basicinformation' => $id, 'office'=> $row->c_office_id.'-'.$row->c_posting_id]) }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">官名 Postings</h3>
+        </div>
+        <div class="card-body">
+            <div class="card-body">
+            <form id="office-edit-form" action="{{ route('basicinformation.offices.update', ['basicinformation' => $id, 'office'=> $row->c_office_id.'-'.$row->c_posting_id]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <input name="_id" type="text" class="hidden" value="{{ $id }}">
-                <input name="_postingid" type="text" class="hidden" value="{{ $row->c_posting_id }}">
-                <input name="_officeid" type="text" class="hidden" value="{{ $row->c_office_id }}">
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <input name="_id" type="hidden" value="{{ $id }}">
+                <input name="_postingid" type="hidden" value="{{ $row->c_posting_id }}">
+                <input name="_officeid" type="hidden" value="{{ $row->c_office_id }}">
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">posting_id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">posting_id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" value="{{ $row->c_posting_id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">次序(sequence)</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">次序(sequence)</label>
                     <div class="col-sm-10">
                         <input name="c_sequence" type="text" class="form-control" value="{{ $row->c_sequence }}" maxlength="4">
                         <p>註:若有同時任命的官職, 請手動填上相同的sequence</p>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_office_id" class="col-sm-2 control-label">官名(office_id)</label>
+                <div class="form-group row">
+                    <label for="c_office_id" class="col-sm-2 col-form-label">官名(office_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_office_id" name="c_office_id">
                             @if($res['office_str'])
@@ -40,8 +42,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_office_id" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                <div class="form-group row">
+                    <label for="c_office_id" class="col-sm-2 col-form-label">社交機構(social_institution)</label>
                     <input name="c_inst_name_code" type="hidden">
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
@@ -51,8 +53,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_addr" class="col-sm-2 control-label">地名</label>
+                <div class="form-group row">
+                    <label for="c_addr" class="col-sm-2 col-form-label">地名</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr" name="c_addr[]" multiple="multiple">
                             @if($res['addr_str'])
@@ -65,8 +67,8 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="c_source" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($res['text_str'])
@@ -77,14 +79,14 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">始年(firstyear)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">始年(firstyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_firstyear" class="form-control"
                                value="{{ $row->c_firstyear }}">
@@ -122,8 +124,8 @@
                         <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $row->c_fy_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_lastyear" class="col-sm-2 control-label">終年(lastyear)</label>
+                <div class="form-group row">
+                    <label for="c_lastyear" class="col-sm-2 col-form-label">終年(lastyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_lastyear" class="form-control"
                                value="{{ $row->c_lastyear }}">
@@ -161,65 +163,65 @@
                         <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $row->c_ly_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_appt_code" class="col-sm-2 control-label">除授類別(c_appt_code)</label>
+                <div class="form-group row">
+                    <label for="c_appt_code" class="col-sm-2 col-form-label">除授類別(c_appt_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_appt_code" model="appttype" selected="{{ $row->c_appt_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_assume_office_code" class="col-sm-2 control-label">是否赴任(c_assume_office_code)</label>
+                <div class="form-group row">
+                    <label for="c_assume_office_code" class="col-sm-2 col-form-label">是否赴任(c_assume_office_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_assume_office_code" model="assumeoffice" selected="{{ $row->c_assume_office_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_office_category_id" class="col-sm-2 control-label">職官類別(c_office_category_id)</label>
+                <div class="form-group row">
+                    <label for="c_office_category_id" class="col-sm-2 col-form-label">職官類別(c_office_category_id)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_office_category_id" model="officecate" selected="{{ $row->c_office_category_id }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
 
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_dy" class="col-sm-2 control-label">朝代(dy)</label>
+                <div class="form-group row">
+                    <label for="c_dy" class="col-sm-2 col-form-label">朝代(dy)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_dy" model="dynasty" selected="{{ $row->c_dy }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default" id="office-edit-submit">Submit</button>
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
+                        <button type="submit" class="btn btn-secondary" id="office-edit-submit">Submit</button>
                         <a href="../../../../basicinformation/{{ $row->c_personid }}/offices/{{ $row->c_office_id.'-'.$row->c_posting_id }}/saveas" class="btn btn-success" style="margin-left:40px;">save as</a>
                     </div>
                 </div>
@@ -232,6 +234,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         var $officeForm = $('#office-edit-form');
         var $submitButton = $('#office-edit-submit');
         var pristineSnapshot = $officeForm.serialize();
@@ -354,5 +357,6 @@
             });
         });
 
+    });
     </script>
 @endsection

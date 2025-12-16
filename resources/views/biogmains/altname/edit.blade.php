@@ -1,34 +1,35 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
 @include('biogmains.defense')
-    <div class="panel panel-default">
-        <div class="panel-heading">別名 Alt. Names </div>
-        <div class="panel-body">
-            <div class="panel-body">
+    <div class="card card-default">
+        <div class="card-header">
+        <h3 class="card-title">別名 Alt. Names </div>
+        <div class="card-body">
+            <div class="card-body">
 @php
 $alt = unionPKDef($alt);
 $row->c_alt_name_chn = unionPKDef($row->c_alt_name_chn);
 $row->c_alt_name = unionPKDef($row->c_alt_name);
 $row->c_notes = unionPKDef($row->c_notes);
 @endphp
-            <form action="{{ route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt]) }}"  method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(c_sequence)</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_alt_name_chn" class="col-sm-2 control-label">別名漢字(c_alt_name_chn)</label>
+                <div class="form-group row">
+                    <label for="c_alt_name_chn" class="col-sm-2 col-form-label">別名漢字(c_alt_name_chn)</label>
                     <div class="col-sm-10">
 @php
 $row->c_alt_name_chn = unionPKDef_decode_for_convert($row->c_alt_name_chn);
@@ -36,8 +37,8 @@ $row->c_alt_name_chn = unionPKDef_decode_for_convert($row->c_alt_name_chn);
                         <input name="c_alt_name_chn" type="text" class="form-control" value="{{ $row->c_alt_name_chn }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_alt_name" class="col-sm-2 control-label">別名拼音(c_alt_name)</label>
+                <div class="form-group row">
+                    <label for="c_alt_name" class="col-sm-2 col-form-label">別名拼音(c_alt_name)</label>
                     <div class="col-sm-10">
 @php
 $row->c_alt_name = unionPKDef_decode_for_convert($row->c_alt_name);
@@ -45,14 +46,14 @@ $row->c_alt_name = unionPKDef_decode_for_convert($row->c_alt_name);
                         <input name="c_alt_name" type="text" class="form-control" value="{{ $row->c_alt_name }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_alt_name_type_code" class="col-sm-2 control-label">別名類別代碼(c_alt_name_type_code)</label>
+                <div class="form-group row">
+                    <label for="c_alt_name_type_code" class="col-sm-2 col-form-label">別名類別代碼(c_alt_name_type_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_alt_name_type_code" model="altcode" selected="{{ $row->c_alt_name_type_code }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="c_source" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($text_str)
@@ -63,14 +64,14 @@ $row->c_alt_name = unionPKDef_decode_for_convert($row->c_alt_name);
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
 @php
 $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
@@ -80,39 +81,39 @@ $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
 
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="__proposal_comment" class="col-sm-2 control-label">提案說明</label>
+                <div class="form-group row">
+                    <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="提交提案時請簡述修改原因或補充說明"></textarea>
                         <small class="text-muted">僅在提交提案時需要填寫，直接儲存時可略過</small>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
                         @if(Auth::check() && Auth::user()->isActive())
                             <!-- 直接儲存按鈕（非眾包用戶可見） -->
                             @if(Auth::user()->canWriteDirectly())
@@ -127,7 +128,7 @@ $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
                             </button>
                         @endif
 
-                        <a href="{{ route('basicinformation.altnames.index', ['basicinformation' => $id]) }}" class="btn btn-default">
+                        <a href="{{ route('basicinformation.altnames.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
                             <i class="fa fa-times"></i> 取消
                         </a>
                     </div>
@@ -141,6 +142,7 @@ $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_source").select2({
@@ -236,5 +238,6 @@ $row->c_notes = unionPKDef_decode_for_convert($row->c_notes);
             });
         });
 
+    });
     </script>
 @endsection

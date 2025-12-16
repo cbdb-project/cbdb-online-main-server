@@ -307,7 +307,7 @@ a:hover {
 
 @section('js')
 <script>
-$(document).ready(function() {
+onViteReady(function() {
     let progressInterval;
     let currentTaskId;
 

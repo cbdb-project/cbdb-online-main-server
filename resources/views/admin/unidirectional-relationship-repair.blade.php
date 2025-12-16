@@ -234,7 +234,7 @@
 
 @section('js')
 <script>
-$(document).ready(function() {
+onViteReady(function() {
     // 親屬關係修復表單提交
     $('#kinship-repair-form').on('submit', function(e) {
         e.preventDefault();

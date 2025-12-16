@@ -1,33 +1,35 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard-v3')
 
 @section('content')
-    <div class="panel panel-default">
-        <div class="panel-heading">地址 Address</div>
-        <div class="panel-body">
-            <div class="panel-body">
-            <form action="{{ route('basicinformation.addresses.update', ['basicinformation' => $id, 'address'=> $id.'-'.$row->c_addr_id.'-'.$row->c_addr_type.'-'.$row->c_sequence]) }}" class="form-horizontal" method="post">
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title">地址 Address</h3>
+        </div>
+        <div class="card-body">
+            <div class="card-body">
+            <form action="{{ route('basicinformation.addresses.update', ['basicinformation' => $id, 'address'=> $id.'-'.$row->c_addr_id.'-'.$row->c_addr_type.'-'.$row->c_sequence]) }}" method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">遷徙次序</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">遷徙次序</label>
                     <div class="col-sm-10">
                         <input type="number" class="form-control" name="c_sequence" value="{{ $row->c_sequence }}" maxlength="4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_addr_type" class="col-sm-2 control-label">地址類別(c_addr_type)</label>
+                <div class="form-group row">
+                    <label for="c_addr_type" class="col-sm-2 col-form-label">地址類別(c_addr_type)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_addr_type" model="biogaddr" selected="{{ $row->c_addr_type }}" ></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_addr_id" class="col-sm-2 control-label">地名(c_addr_id)</label>
+                <div class="form-group row">
+                    <label for="c_addr_id" class="col-sm-2 col-form-label">地名(c_addr_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_addr_id">
                             @if($addr_str)
@@ -39,8 +41,8 @@
                         @endif
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_firstyear" class="form-control"
                                value="{{ $row->c_firstyear }}">
@@ -78,8 +80,8 @@
                         <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $row->c_fy_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
+                <div class="form-group row">
+                    <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_lastyear" class="form-control"
                                value="{{ $row->c_lastyear }}">
@@ -117,8 +119,8 @@
                         <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $row->c_ly_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_source" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="c_source" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-5">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             @if($text_str)
@@ -129,22 +131,22 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="{{ $row->c_pages }}">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $row->c_notes }}</textarea>
 
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_natal" class="col-sm-2 control-label">娘家地址(c_natal)</label>
+                <div class="form-group row">
+                    <label for="c_natal" class="col-sm-2 col-form-label">娘家地址(c_natal)</label>
                     <div class="col-sm-10">
                         <select class="form-control select2" name="c_natal">
                             <option disabled value="">请选择</option>
@@ -155,33 +157,33 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">建檔</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">建檔</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">更新</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">更新</label>
                     <div class="col-sm-10">
                         <input type="text" name="" class="form-control"
                                value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
                                disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <div class="col-sm-offset-2 col-sm-10">
-                        <button type="submit" class="btn btn-default">Submit</button>
+                <div class="form-group row">
+                    <div class="offset-sm-2 col-sm-10">
+                        <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
                 </div>
             </form>
@@ -192,6 +194,7 @@
 @endsection
 @section('js')
     <script>
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_addr_id").select2(options('addr'));
@@ -291,6 +294,6 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
-
+    });
     </script>
 @endsection

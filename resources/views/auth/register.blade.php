@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
 
     <!-- Styles -->
-    <link href="{{ mix('css/app.css') }}" rel="stylesheet">
+    @vite(['resources/js/app.js'])
 
     <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -23,73 +23,74 @@
     <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
 </head>
-<body class="hold-transition register-page">
-<div class="register-box" id="app">
-    <div class="register-logo">
-        <a href="/home"><small>{{ config('app.name', 'Laravel') }}</small></a>
-    </div>
+<body class="bg-light">
+<div class="container min-vh-100 d-flex align-items-center justify-content-center py-4" id="app">
+    <div class="row w-100 justify-content-center">
+        <div class="col-sm-10 col-md-8 col-lg-6">
+            <div class="text-center mb-4">
+                <a href="/home" class="text-decoration-none text-dark">
+                    <div class="h4 mb-1">{{ config('app.name', 'Laravel') }}</div>
+                    <small class="text-muted">建立新帳號 · Create account</small>
+                </a>
+            </div>
 
-    <div class="register-box-body">
-        <p class="login-box-msg">Register a new membership</p>
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h5 text-center mb-4">加入我們 · Join us</h1>
 
-        <form action="{{ route('register') }}" method="post">
-            {{ csrf_field() }}
-            <div class="form-group has-feedback{{ $errors->has('name') ? ' has-error' : '' }}">
-                <input id="name" type="text" class="form-control" name="name" value="{{ old('name') }}" placeholder="Full name" required autofocus>
-                <span class="glyphicon glyphicon-user form-control-feedback"></span>
-                @if ($errors->has('name'))
-                    <span class="help-block">
-                        <strong>{{ $errors->first('name') }}</strong>
-                    </span>
-                @endif
-            </div>
-            <div class="form-group has-feedback{{ $errors->has('email') ? ' has-error' : '' }}">
-                <input id="email" type="email" class="form-control" name="email" value="{{ old('email') }}" placeholder="Email" required>
-                <span class="glyphicon glyphicon-envelope form-control-feedback"></span>
-                @if ($errors->has('email'))
-                    <span class="help-block">I
-                        <strong>{{ $errors->first('email') }}</strong>
-                    </span>
-                @endif
-            </div>
-            <div class="form-group has-feedback{{ $errors->has('institution') ? ' has-error' : '' }}">
-                <input id="institution" type="text" class="form-control" name="institution" value="{{ old('institution') }}" placeholder="Institution" required>
-                <span class="glyphicon glyphicon-briefcase form-control-feedback"></span>
-                @if ($errors->has('institution'))
-                    <span class="help-block">
-                        <strong>{{ $errors->first('institution') }}</strong>
-                    </span>
-                @endif
-            </div>
-            <div class="form-group has-feedback{{ $errors->has('password') ? ' has-error' : '' }}">
-                <input id="password" type="password" class="form-control" name="password" placeholder="Password" required>
-                <span class="glyphicon glyphicon-lock form-control-feedback"></span>
-                @if ($errors->has('password'))
-                    <span class="help-block">
-                        <strong>{{ $errors->first('password') }}</strong>
-                    </span>
-                @endif
-            </div>
-            <div class="form-group has-feedback">
-                <input id="password-confirm" type="password" class="form-control" name="password_confirmation" placeholder="Retype password" required>
-                <span class="glyphicon glyphicon-log-in form-control-feedback"></span>
-            </div>
-            <div class="row">
-                <!-- /.col -->
-                <div class="col-xs-4">
-                    <button type="submit" class="btn btn-primary btn-block btn-flat">Register</button>
+                    <form action="{{ route('register') }}" method="post" novalidate>
+                        {{ csrf_field() }}
+                        <div class="form-group mb-3">
+                            <label for="name" class="form-label small text-muted">姓名 / Name</label>
+                            <input id="name" type="text" class="form-control{{ $errors->has('name') ? ' is-invalid' : '' }}" name="name" value="{{ old('name') }}" placeholder="您的姓名 / Full name" required autofocus>
+                            @if ($errors->has('name'))
+                                <div class="invalid-feedback">
+                                    {{ $errors->first('name') }}
+                                </div>
+                            @endif
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
+                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ old('email') }}" placeholder="name@example.com / 電子郵件" required>
+                            @if ($errors->has('email'))
+                                <div class="invalid-feedback">
+                                    {{ $errors->first('email') }}
+                                </div>
+                            @endif
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="institution" class="form-label small text-muted">服務單位 / Institution</label>
+                            <input id="institution" type="text" class="form-control{{ $errors->has('institution') ? ' is-invalid' : '' }}" name="institution" value="{{ old('institution') }}" placeholder="例如：某某大學 / Your institution" required>
+                            @if ($errors->has('institution'))
+                                <div class="invalid-feedback">
+                                    {{ $errors->first('institution') }}
+                                </div>
+                            @endif
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="password" class="form-label small text-muted">密碼 / Password</label>
+                            <input id="password" type="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" name="password" placeholder="請設定密碼 / Choose a password" required>
+                            @if ($errors->has('password'))
+                                <div class="invalid-feedback">
+                                    {{ $errors->first('password') }}
+                                </div>
+                            @endif
+                        </div>
+                        <div class="form-group mb-4">
+                            <label for="password-confirm" class="form-label small text-muted">確認密碼 / Confirm password</label>
+                            <input id="password-confirm" type="password" class="form-control" name="password_confirmation" placeholder="再次輸入密碼 / Confirm password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">建立帳號 / Create account</button>
+                    </form>
                 </div>
-                <!-- /.col -->
+                <div class="card-footer text-center bg-white">
+                    <span class="small text-muted">已經有帳號？ / Already have an account?</span>
+                    <a href="{{ route('login') }}" class="ml-1">直接登入 / Sign in</a>
+                </div>
             </div>
-        </form>
-        <div class="social-auth-links text-center"></div>
-        <a href="{{ route('login') }}" class="text-center">I already have a membership</a>
+        </div>
     </div>
-    <!-- /.form-box -->
 </div>
-<!-- /.register-box -->
 
-<!-- Scripts -->
-<script src="{{ mix('js/app.js') }}"></script>
 </body>
 </html>

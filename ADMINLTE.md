@@ -312,8 +312,23 @@
 | admin/batch_load_book_titles.blade.php | /admin/batch-load-book-titles | ✅ 完成 | 批次汇入书稿资料 |
 | admin/batch_load_offices.blade.php | /admin/batch-load-offices | ✅ 完成 | 批次汇入官职 |
 | admin/batch_load_social_institutes.blade.php | /admin/batch-load-social-institutes | ✅ 完成 | 批次汇入社会机构 |
+| basicinformation/index.blade.php | /basicinformation | ✅ 完成 | 人物查询列表 |
+| basicinformation/create.blade.php | /basicinformation/create | ✅ 完成 | 新增人物基本信息 |
+| basicinformation/edit.blade.php | /basicinformation/{id}/edit | ✅ 完成 | 编辑人物基本信息 |
+| basicinformation.addresses/* | /basicinformation/{id}/addresses | ✅ 完成 | 地址管理（index/create/edit）|
+| basicinformation.altnames/* | /basicinformation/{id}/altnames | ✅ 完成 | 别名管理（index/create/edit）|
+| basicinformation.texts/* | /basicinformation/{id}/texts | ✅ 完成 | 文本管理（index/create/edit）|
+| basicinformation.offices/* | /basicinformation/{id}/offices | ✅ 完成 | 任官管理（index/create/edit）|
+| basicinformation.assoc/* | /basicinformation/{id}/assoc | ✅ 完成 | 社会关系管理（index/create/edit）|
+| basicinformation.entries/* | /basicinformation/{id}/entries | ✅ 完成 | 入仕管理（index/create/edit）|
+| basicinformation.events/* | /basicinformation/{id}/events | ✅ 完成 | 事件管理（index/create/edit）|
+| basicinformation.kinship/* | /basicinformation/{id}/kinship | ✅ 完成 | 亲属关系管理（index/create/edit）|
+| basicinformation.statuses/* | /basicinformation/{id}/statuses | ✅ 完成 | 身份管理（index/create/edit）|
+| basicinformation.possession/* | /basicinformation/{id}/possession | ✅ 完成 | 财产管理（index/create/edit）|
+| basicinformation.socialinst/* | /basicinformation/{id}/socialinst | ✅ 完成 | 社会机构管理（index/create/edit）|
+| basicinformation.sources/* | /basicinformation/{id}/sources | ✅ 完成 | 来源管理（index/create/edit）|
 
-**总计**: 21 个页面已迁移到 AdminLTE v3
+**总计**: 60 个页面已迁移到 AdminLTE v3
 
 ### 🎉 已完成模块
 - ✅ **codes 模块** - 全部 5 个页面已迁移 (2025-12-11 完成)
@@ -321,6 +336,7 @@
 - ✅ **crowdsourcing 模块** - 1 个页面已迁移 (2025-12-13 完成)
 - ✅ **profile 模块** - 1 个页面已迁移 (2025-12-14 完成)
 - ✅ **admin 模块** - 全部 8 个管理员工具页面已迁移 (2025-12-14 完成)
+- ✅ **basicinformation 模块** - 全部 39 个页面已迁移 (2025-12-15 完成)
 
 ## 下一步计划
 
@@ -334,11 +350,9 @@
    - [x] 测试折叠功能
 
 2. **迁移更多页面**
-   - 已完成：operations / modified / view / codes 全套、manage 列表&编辑、crowdsourcing
+   - 已完成：operations / modified / view / codes 全套、manage 全套、crowdsourcing、profile、admin 全套、basicinformation 全模块（主页面及12个子模块共39个页面）
    - 待迁移（分类）：
-     - Profile/用户：`profile/edit.blade.php`、登入/註冊/忘記密碼等 auth 頁
-     - 人物主资料：`basicinformation/index.blade.php` 及所有子页（kinship/assoc/entries/addresses/texts/...）
-     - 管理員工具：`admin/*`、`/admin/explainsql`、`unidirectional-relationship-repair` 等
+     - Auth 頁：登入/註冊/忘記密碼等
      - 主页：`home.blade.php`
 
 3. **处理插件兼容性**

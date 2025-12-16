@@ -1,23 +1,23 @@
 {
-  "_jquery-global-CGkMYsxL.js": {
-    "file": "assets/jquery-global-CGkMYsxL.js",
-    "name": "jquery-global"
-  },
-  "_vue.esm-bundler-DGfljEgi.js": {
-    "file": "assets/vue.esm-bundler-DGfljEgi.js",
-    "name": "vue.esm-bundler",
+  "__plugin-vue_export-helper-DPE6w98q.js": {
+    "file": "assets/_plugin-vue_export-helper-DPE6w98q.js",
+    "name": "_plugin-vue_export-helper",
     "imports": [
       "_jquery-global-CGkMYsxL.js"
     ]
   },
+  "_jquery-global-CGkMYsxL.js": {
+    "file": "assets/jquery-global-CGkMYsxL.js",
+    "name": "jquery-global"
+  },
   "resources/js/app.js": {
-    "file": "assets/app-BniBXMBZ.js",
+    "file": "assets/app-DOXy02db.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
       "_jquery-global-CGkMYsxL.js",
-      "_vue.esm-bundler-DGfljEgi.js"
+      "__plugin-vue_export-helper-DPE6w98q.js"
     ],
     "css": [
       "assets/app-Btz1TXuX.css"
@@ -36,13 +36,13 @@
     ]
   },
   "resources/js/passport.js": {
-    "file": "assets/passport-C5z8DSKq.js",
+    "file": "assets/passport-3deKAxb3.js",
     "name": "passport",
     "src": "resources/js/passport.js",
     "isEntry": true,
     "imports": [
       "_jquery-global-CGkMYsxL.js",
-      "_vue.esm-bundler-DGfljEgi.js"
+      "__plugin-vue_export-helper-DPE6w98q.js"
     ],
     "css": [
       "assets/passport-mQZEI7wb.css"

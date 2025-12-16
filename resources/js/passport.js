@@ -33,10 +33,13 @@ import PassportClients from './components/passport/Clients.vue';
 import PassportAuthorizedClients from './components/passport/AuthorizedClients.vue';
 import PassportPersonalAccessTokens from './components/passport/PersonalAccessTokens.vue';
 
-// Create Vue app with only Passport components
-const mountTarget = document.getElementById('passport-app');
+// Mount Passport app after Vite bootstrap (ensures jQuery/Bootstrap modal plugins are ready)
+const mountPassportApp = () => {
+    const mountTarget = document.getElementById('passport-app');
+    if (!mountTarget) {
+        return;
+    }
 
-if (mountTarget) {
     const app = createApp({
         components: {
             'passport-clients': PassportClients,
@@ -46,4 +49,10 @@ if (mountTarget) {
     });
 
     app.mount(mountTarget);
+};
+
+if (window.onViteReady) {
+    window.onViteReady(mountPassportApp);
+} else {
+    mountPassportApp();
 }

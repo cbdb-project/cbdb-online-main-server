@@ -1,7 +1,7 @@
 @extends('layouts.dashboard-v3')
 
-@push('styles')
-    {{-- DataTables 和 Passport 组件通过 Vite 加载 --}}
+@push('scripts')
+    {{-- DataTables 和 Passport 组件通过 Vite 加载（置底以确保 DOM 已存在） --}}
     @vite(['resources/js/datatables.js', 'resources/js/passport.js'])
 @endpush
 

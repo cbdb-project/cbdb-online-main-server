@@ -113,17 +113,9 @@
             .search-actions button {
                 padding: 10px 16px;
                 font-size: 15px;
-                border: none;
-                border-radius: 6px;
                 cursor: pointer;
-                color: #fff;
-                background-color: #3c8dbc;
                 height: 100%;
                 white-space: nowrap;
-            }
-
-            .search-actions button:hover {
-                background-color: #337ab7;
             }
 
             .suggestions {

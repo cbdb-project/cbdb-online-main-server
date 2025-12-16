@@ -20,6 +20,14 @@
 
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
+        <!-- Dark Mode Toggle -->
+        <li class="nav-item">
+            <a class="nav-link" href="#" role="button" id="darkModeToggle" title="切換深色模式"
+               onclick="event.preventDefault(); window.toggleDarkMode();">
+                <i class="fas fa-moon" id="darkModeIcon"></i>
+            </a>
+        </li>
+
         @if (Auth::guest())
             <li class="nav-item">
                 <a href="{{ route('login') }}" class="nav-link">Login</a>

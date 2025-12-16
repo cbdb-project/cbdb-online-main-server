@@ -125,15 +125,30 @@
             margin-bottom: 10px;
         }
 
-        /* 只修改 content 和 footer 區域的藍色連結飽和度 - 降低 10%（排除按鈕） */
-        .content a:not(.btn),
-        .main-footer a:not(.btn) {
-            color: #2d8cc2 !important;  /* 原 #007bff，降低飽和度約 10% */
+        /* 浅色模式：降低藍色連結飽和度，更柔和（排除按鈕） */
+        body:not(.dark-mode) .content a:not(.btn),
+        body:not(.dark-mode) .main-footer a:not(.btn),
+        body:not(.dark-mode) .main-header a:not(.btn):not(.nav-link) {
+            color: #2d8cc2;  /* 原 #007bff，降低飽和度約 38% */
         }
 
-        .content a:not(.btn):hover,
-        .main-footer a:not(.btn):hover {
-            color: #2068a5 !important;  /* 原 #0056b3，降低飽和度約 10% */
+        body:not(.dark-mode) .content a:not(.btn):hover,
+        body:not(.dark-mode) .main-footer a:not(.btn):hover,
+        body:not(.dark-mode) .main-header a:not(.btn):not(.nav-link):hover {
+            color: #2068a5;  /* 原 #0056b3，降低飽和度約 38% */
+        }
+
+        /* Dark mode：使用更亮的藍色以提高可讀性（排除按鈕） */
+        body.dark-mode .content a:not(.btn),
+        body.dark-mode .main-footer a:not(.btn),
+        body.dark-mode .main-header a:not(.btn):not(.nav-link) {
+            color: #5dade2;  /* 明亮的藍色，在深色背景下清晰可見 */
+        }
+
+        body.dark-mode .content a:not(.btn):hover,
+        body.dark-mode .main-footer a:not(.btn):hover,
+        body.dark-mode .main-header a:not(.btn):not(.nav-link):hover {
+            color: #85c1e9;  /* hover 時更亮 */
         }
     </style>
 </head>
@@ -260,6 +275,77 @@
     onViteReady(function() {
         $('#flash-overlay-modal').modal();
     });
+</script>
+
+<!-- Dark Mode Toggle Script -->
+<script>
+    // 全局切換函數，供內聯 onclick 調用（參考 logout 按鈕的實現方式）
+    window.toggleDarkMode = function() {
+        const body = document.body;
+        const darkModeIcon = document.getElementById('darkModeIcon');
+        const navbar = document.querySelector('.main-header');
+
+        console.log('Dark mode toggle clicked!');
+
+        // 切換 dark-mode class
+        body.classList.toggle('dark-mode');
+        const isNowDark = body.classList.contains('dark-mode');
+
+        console.log('Dark mode is now:', isNowDark);
+
+        // 保存到 localStorage
+        localStorage.setItem('darkMode', isNowDark);
+
+        // 更新 navbar 樣式
+        if (navbar) {
+            if (isNowDark) {
+                navbar.classList.remove('navbar-white', 'navbar-light');
+                navbar.classList.add('navbar-dark');
+            } else {
+                navbar.classList.remove('navbar-dark');
+                navbar.classList.add('navbar-white', 'navbar-light');
+            }
+        }
+
+        // 更新圖標
+        if (darkModeIcon) {
+            if (isNowDark) {
+                darkModeIcon.classList.remove('fa-moon');
+                darkModeIcon.classList.add('fa-sun');
+            } else {
+                darkModeIcon.classList.remove('fa-sun');
+                darkModeIcon.classList.add('fa-moon');
+            }
+        }
+    };
+
+    // 初始化：從 localStorage 讀取並應用用戶偏好
+    (function() {
+        const isDarkMode = localStorage.getItem('darkMode') === 'true';
+        console.log('Initial dark mode from localStorage:', isDarkMode);
+
+        if (isDarkMode) {
+            const body = document.body;
+            const darkModeIcon = document.getElementById('darkModeIcon');
+            const navbar = document.querySelector('.main-header');
+
+            body.classList.add('dark-mode');
+
+            // 更新 navbar 樣式
+            if (navbar) {
+                navbar.classList.remove('navbar-white', 'navbar-light');
+                navbar.classList.add('navbar-dark');
+            }
+
+            // 更新圖標
+            if (darkModeIcon) {
+                darkModeIcon.classList.remove('fa-moon');
+                darkModeIcon.classList.add('fa-sun');
+            }
+        }
+
+        console.log('Dark mode initialized');
+    })();
 </script>
 </body>
 </html>

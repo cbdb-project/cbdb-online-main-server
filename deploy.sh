@@ -38,4 +38,8 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# 6. 重建前端靜態資源
+echo "重建缓存靜態資源..."
+npm run prod
+
 echo "部署完成！"

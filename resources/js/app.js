@@ -163,7 +163,7 @@ if (token) {
 import { createApp } from 'vue';
 
 // Import Vue components
-import SelectVue from '../assets/js/components/Select.vue';
+import SelectVue from './components/Select.vue';
 
 // Make createApp globally available for pages that need it
 window.createVueApp = createApp;

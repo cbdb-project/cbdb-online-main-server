@@ -155,6 +155,19 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         $reviewedUtc = $reviewedAt;
                                     }
                                 }
+                                $cancelledDisplay = '';
+                                $cancelledUtc = '';
+                                if (!empty($proposalMeta['cancelled_at'])) {
+                                    try {
+                                        $cancelledCarbon = \Carbon\Carbon::parse($proposalMeta['cancelled_at'], config('app.timezone', 'Asia/Shanghai'));
+                                        $cancelledDisplay = $cancelledCarbon;
+                                        $cancelledUtc = $cancelledCarbon->copy()->setTimezone('UTC')->toIso8601String();
+                                    } catch (\Exception $e) {
+                                        $cancelledDisplay = $proposalMeta['cancelled_at'];
+                                        $cancelledUtc = $proposalMeta['cancelled_at'];
+                                    }
+                                }
+                                $cancelledBy = $proposalMeta['cancelled_by'] ?? null;
                                 $isProposal = in_array((int) $item->op_type, [\App\Operation::TYPE_PROPOSAL_CREATE, \App\Operation::TYPE_PROPOSAL_UPDATE], true);
                                 $resourceDataDisplay = $resourceDataParsed;
                                 if (is_array($resourceDataDisplay)) {
@@ -173,6 +186,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             <span class="badge badge-success">已核准</span>
                                         @elseif($reviewStatus === 'rejected')
                                             <span class="badge badge-danger">已退修</span>
+                                        @elseif($reviewStatus === 'cancelled')
+                                            <span class="badge badge-secondary">已撤回</span>
                                         @else
                                             <span class="badge badge-warning">待審核</span>
                                         @endif
@@ -188,6 +203,17 @@ $item->resource_data = unionPKDef($item->resource_data);
                                                     （<span class="js-utc-datetime" data-utc="{{ $submittedUtc }}">{{ $submittedDisplay }}</span>）
                                                 @endif
                                             </small>
+                                        @endif
+                                        @if($reviewStatus === 'cancelled')
+                                            <small class="text-muted" style="display:block;">
+                                                撤回者：{{ $cancelledBy ?? '（未知）' }}
+                                                @if($cancelledUtc)
+                                                    （<span class="js-utc-datetime" data-utc="{{ $cancelledUtc }}">{{ $cancelledDisplay }}</span>）
+                                                @endif
+                                            </small>
+                                            @if(!empty($proposalMeta['cancel_reason']))
+                                                <small class="text-muted" style="display:block;">撤回原因：{{ $proposalMeta['cancel_reason'] }}</small>
+                                            @endif
                                         @endif
                                         @if($reviewComment)
                                             <small class="text-muted" style="display:block;">審核備註：{{ $reviewComment }}</small>

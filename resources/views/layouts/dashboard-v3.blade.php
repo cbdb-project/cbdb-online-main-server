@@ -124,6 +124,17 @@
         .text-left > [class*="col-"] {
             margin-bottom: 10px;
         }
+
+        /* 只修改 content 和 footer 區域的藍色連結飽和度 - 降低 10%（排除按鈕） */
+        .content a:not(.btn),
+        .main-footer a:not(.btn) {
+            color: #2d8cc2 !important;  /* 原 #007bff，降低飽和度約 10% */
+        }
+
+        .content a:not(.btn):hover,
+        .main-footer a:not(.btn):hover {
+            color: #2068a5 !important;  /* 原 #0056b3，降低飽和度約 10% */
+        }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">

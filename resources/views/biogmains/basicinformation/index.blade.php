@@ -3,23 +3,11 @@
 @section('content')
 
     <div class="card card-default">
-        <div class="card-header">
-            <h3 class="card-title">人名查詢</h3>
-        </div>
         <div class="card-body">
-            @auth
-                @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.create') }}" class="float-right btn btn-secondary">新增</a>
-                @endif
-            @endauth
-            <div class="clearfix"></div>
-
-            {{-- 搜索表单 --}}
-            <div class="form-group">
-                <div class="text-center">查詢人物</div>
-                <form method="GET" action="{{ route('basicinformation.index') }}" class="form-inline">
-                    <div class="input-group" style="width: 100%;">
-                        <input name="q" type="text" class="form-control" placeholder="Search" value="{{ $q }}" style="width: 100%;">
+            <div class="d-flex align-items-center mb-3 flex-nowrap">
+                <form method="GET" action="{{ route('basicinformation.index') }}" class="flex-grow-1 mr-2">
+                    <div class="input-group w-100">
+                        <input name="q" type="text" class="form-control" placeholder="搜尋人物" aria-label="搜尋人物" value="{{ $q }}">
                         <div class="input-group-append">
                             <button type="submit" class="btn btn-secondary">
                                 <i class="fas fa-search"></i>
@@ -27,6 +15,13 @@
                         </div>
                     </div>
                 </form>
+                @auth
+                    @if(Auth::user()->isActive())
+                        <a href="{{ route('basicinformation.create') }}" class="btn btn-secondary">
+                            新增
+                        </a>
+                    @endif
+                @endauth
             </div>
 
             {{-- 人物列表表格 --}}

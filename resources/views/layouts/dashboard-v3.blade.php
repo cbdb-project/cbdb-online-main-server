@@ -150,9 +150,125 @@
         body.dark-mode .main-header a:not(.btn):not(.nav-link):hover {
             color: #85c1e9;  /* hover 時更亮 */
         }
+
+        /* Dark mode：覆蓋硬編碼的背景色，確保可讀性 */
+        body.dark-mode {
+            /* 禁用輸入框的淺灰色背景 (#f5f5f5) -> 深色 */
+            --disabled-bg-light: #f5f5f5;
+            --disabled-bg-dark: #3a3a3a;
+        }
+
+        /* 覆蓋內聯樣式的淺色背景 */
+        body.dark-mode input[style*="background-color: #f5f5f5"],
+        body.dark-mode input[style*="background-color: rgb(245, 245, 245)"],
+        body.dark-mode select[style*="background-color: #f5f5f5"],
+        body.dark-mode textarea[style*="background-color: #f5f5f5"],
+        body.dark-mode .form-control[style*="background-color: #f5f5f5"] {
+            background-color: #3a3a3a !important;
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+
+        /* 其他常見的淺色背景 */
+        body.dark-mode [style*="background-color: #fff"],
+        body.dark-mode [style*="background-color: white"],
+        body.dark-mode [style*="background-color: #fafafa"],
+        body.dark-mode [style*="background-color: #eee"] {
+            background-color: #2d2d2d !important;
+        }
+
+        /* 高亮色調整 */
+        body.dark-mode [style*="background-color: #dff0d8"] {
+            background-color: #2d4a2d !important;  /* 淺綠 -> 深綠 */
+        }
+
+        body.dark-mode [style*="background-color: #ffebee"] {
+            background-color: #4a2d2d !important;  /* 淺紅 -> 深紅 */
+        }
+
+        /* Dark mode：Select2 控件樣式 */
+        body.dark-mode .select2-container--bootstrap4 .select2-selection {
+            background-color: #343a40 !important;
+            border-color: #495057 !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--single .select2-selection__placeholder {
+            color: #adb5bd !important;
+        }
+
+        /* Select2 下拉菜單 */
+        body.dark-mode .select2-dropdown {
+            background-color: #343a40 !important;
+            border-color: #495057 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-results__option {
+            color: #e0e0e0 !important;
+        }
+
+        /* Select2 hover 和選中狀態 */
+        body.dark-mode .select2-container--bootstrap4 .select2-results__option--highlighted {
+            background-color: #495057 !important;
+            color: #fff !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-results__option[aria-selected="true"] {
+            background-color: #3a4248 !important;
+        }
+
+        /* Select2 搜索框 */
+        body.dark-mode .select2-search--dropdown .select2-search__field {
+            background-color: #2b3035 !important;
+            border-color: #495057 !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .select2-search--dropdown .select2-search__field:focus {
+            border-color: #5dade2 !important;
+        }
+
+        /* Select2 多選模式 */
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--multiple {
+            background-color: #343a40 !important;
+            border-color: #495057 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+            background-color: #495057 !important;
+            border-color: #6c757d !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove:hover {
+            color: #ff6b6b !important;
+        }
+
+        /* Select2 禁用狀態 */
+        body.dark-mode .select2-container--bootstrap4.select2-container--disabled .select2-selection {
+            background-color: #2b3035 !important;
+            color: #6c757d !important;
+            cursor: not-allowed;
+>>>>>>> 94f5819 (feat: 添加完整的 dark mode 切换功能)
+        }
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
+<script>
+    // 在 body 解析后立即应用 dark mode，避免闪烁
+    // 这个脚本会在页面内容渲染前执行
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+</script>
 <div class="wrapper" id="app">
 
     <!-- Navbar -->
@@ -319,17 +435,15 @@
         }
     };
 
-    // 初始化：從 localStorage 讀取並應用用戶偏好
+    // 初始化：更新 navbar 和圖標樣式
+    // 注意：body 的 dark-mode class 已在頁面加載早期應用，這裡只需更新其他元素
     (function() {
-        const isDarkMode = localStorage.getItem('darkMode') === 'true';
-        console.log('Initial dark mode from localStorage:', isDarkMode);
+        const isDarkMode = document.body.classList.contains('dark-mode');
+        console.log('Dark mode is active:', isDarkMode);
 
         if (isDarkMode) {
-            const body = document.body;
             const darkModeIcon = document.getElementById('darkModeIcon');
             const navbar = document.querySelector('.main-header');
-
-            body.classList.add('dark-mode');
 
             // 更新 navbar 樣式
             if (navbar) {

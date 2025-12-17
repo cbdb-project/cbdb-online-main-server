@@ -106,8 +106,9 @@
 
 @endsection
 @section('js')
-    <script>    onViteReady(function() {
+    <script>
 
+    onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_inst_code").select2(options('socialinstcode'));

@@ -7,37 +7,37 @@
         </div>
         <div class="card-body">
             <div class="card-body">
-            <form action="{{ route('basicinformation.statuses.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.statuses.store', ['basicinformation' => $id]) }}" method="post">
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(c_sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(c_sequence)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_sequence" maxlength="4" value="0">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">社會區分(c_status_code)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">社會區分(c_status_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_status_code" name="c_status_code">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_supplement" class="col-sm-2 control-label">補充文字(c_supplement)</label>
+                <div class="form-group row">
+                    <label for="c_supplement" class="col-sm-2 col-form-label">補充文字(c_supplement)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_supplement" value="">
                         請補充 “並稱/齊名” 的稱號 , 如「東南三賢」,「四俊」等
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_firstyear" class="col-sm-2 control-label">始年(c_firstyear)</label>
+                <div class="form-group row">
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_firstyear" class="form-control"
                                value="">
@@ -54,8 +54,8 @@
                         <select-vue name="c_fy_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_lastyear" class="col-sm-2 control-label">終年(c_lastyear)</label>
+                <div class="form-group row">
+                    <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_lastyear" class="form-control"
                                value="">
@@ -72,36 +72,36 @@
                         <select-vue name="c_ly_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="offset-sm-2 col-sm-10">
                         <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
@@ -113,7 +113,8 @@
 
 @endsection
 @section('js')
-    <script>
+    <script>    onViteReady(function() {
+
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_source").select2(options('text'));
@@ -213,6 +214,7 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
+    });
 
     </script>
 @endsection

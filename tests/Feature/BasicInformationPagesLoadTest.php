@@ -80,8 +80,12 @@ class BasicInformationPagesLoadTest extends TestCase {
             $table->integer('c_index_addr_id')->nullable();  // 指数地址ID
             $table->string('c_created_by', 50)->nullable();
             $table->string('c_created_date', 50)->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by', 50)->nullable();
             $table->string('c_modified_date', 50)->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
             $table->timestamps();
         });
 

@@ -12,13 +12,13 @@
                 <div class="form-group row">
                     <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
-                        <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
+                        <input type="text" class="form-control person_id" name="person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
                 <div class="form-group row">
                     <label for="c_sequence" class="col-sm-2 col-form-label">遷徙次序</label>
                     <div class="col-sm-10">
-                        <input type="number" class="form-control" name="c_sequence" value="" maxlength="4">
+                        <input type="number" class="form-control" name="c_sequence" value="" maxlength="4" required>
                     </div>
                 </div>
                 <div class="form-group row">
@@ -184,6 +184,7 @@
 @endsection
 @section('js')
     <script>
+
     onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();

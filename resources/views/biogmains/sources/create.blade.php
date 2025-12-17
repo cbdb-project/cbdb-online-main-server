@@ -67,8 +67,9 @@
 
 @endsection
 @section('js')
-    <script>    onViteReady(function() {
+    <script>
 
+    onViteReady(function() {
         $(".select2").select2();
         $(".c_source").select2(options('text'));
 

@@ -39,8 +39,10 @@
 - **Node.js**: 12.x
 
 ### 前端構建現況
-- 併存兩條管線：舊版 AdminLTE 2/Bootstrap 3 仍用 `laravel-mix`；新版 AdminLTE 3（`layouts/dashboard-v3` 及其頁面）使用 Vite，內建共用的 `resources/js/jquery-global.js`（提供 jQuery/Bootstrap/Datatables 與 modal 焦點修復），請勿再引入外部 CDN 的 jQuery/Bootstrap。
-- `package-lock.json` 目前為歷史積累，尚難乾淨重建；在全站切換至 Vite + AdminLTE 3 後再統一清理。
+- 全站已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。
+- 主要入口：`resources/js/app.js`（UI 組件）、`resources/js/datatables.js`（DataTables）、`resources/js/passport.js`（Laravel Passport）。
+- `resources/js/jquery-global.js` 將 jQuery 暴露到全局；Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現。
+- 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
 
 ⚠️ **重要**：本專案現已升級到 Laravel 10.0 並要求 PHP 8.1+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。雖然 Laravel 10.0 官方僅測試到 PHP 8.2，但經測試表明 PHP 8.4 可正常運行。
 
@@ -119,15 +121,28 @@ php artisan make:request BiogBasicInformationRequest
 
 参考文档：[Laravel 10.x Controllers](https://laravel.com/docs/10.x/controllers)
 
-### webpack打包
+### 前端資源構建
 
-修改resource/assets/js/bootstrape和resource/assets/css/app.scss
-执行npm run dev
+本專案已從 Laravel Mix/webpack 遷移至 **Vite**。
 
-### vue
-vue模板放在`resource\assets\js\components`
-在`bootstrap.js`注册
-npm run dev
+**開發環境**：
+```bash
+npm run dev    # 啟動 Vite 開發伺服器
+```
+
+**生產環境**：
+```bash
+npm run build  # 或 npm run prod，編譯並優化前端資源
+```
+
+**入口文件**：
+- `resources/js/app.js` - 主要 UI 組件
+- `resources/js/datatables.js` - DataTables 功能
+- `resources/js/passport.js` - Laravel Passport
+
+**Vue 元件**：
+- Vue 3 模板放在 `resources/js/components/`
+- 在對應的 JS 入口文件中引入並註冊
 
 ### 已处理数据库表格
 BIOG_MAIN
@@ -310,26 +325,30 @@ Contributed by [Yawei SUN](https://github.com/yaweisun)
 
 https://github.com/cbdb-project/cbdb-online-main-server/issues/116
 
-### rebuild vue 的前端（感謝盧建安先生貢獻）
+### 前端依賴問題排查
 
-`npm run dev`如果出現錯誤訊息：`error code ELIFECYCLE`
+如果 `npm run dev` 或 `npm run build` 出現錯誤（如 `error code ELIFECYCLE`），可嘗試以下步驟：
 
-執行命令：
-```
+**步驟 1：清理並重裝依賴**
+```bash
 rm -rf node_modules
-rm package-lock.json
 npm cache clear --force
 npm install
 ```
 
-詳細說明：
+**步驟 2：重新執行構建**
+```bash
+npm run dev    # 開發環境
+# 或
+npm run build  # 生產環境
+```
 
-* rm -rf node_modules 是將node_modules資料夾整個刪除
-* rm package-lock.json 是將最低需求的版本控制資訊移除，直接取得最新版本，這可能會在較新的主機遇到。
-* npm cache clear –force 清除快取
-* npm install 重新安裝
+**說明**：
+- `rm -rf node_modules` - 刪除所有已安裝的依賴
+- `npm cache clear --force` - 清除 npm 緩存
+- `npm install` - 根據 `package-lock.json` 重新安裝依賴
 
-之後再執行 `npm run dev` 就可以通過了。
+⚠️ **注意**：一般情況下**不需要**刪除 `package-lock.json`，該檔案確保依賴版本一致性。僅在確認鎖定檔案損壞時才考慮刪除。
 
 ### Install the proper version of node and npm in ubuntu
 

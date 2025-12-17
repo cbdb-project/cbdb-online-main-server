@@ -1,6 +1,6 @@
 # AdminLTE 在 CBDB Online 項目中的現況與指引
 
-本文件針對本分支最新狀態更新，已剔除不再存在的 AdminLTE 2 / Bower / Laravel Mix 內容。
+本文件記錄專案前端技術棧現況。專案已完成從 AdminLTE 2 / Bower / Laravel Mix 到 AdminLTE 3 / Vite 的完整遷移。
 
 ## 現況總覽（v3.2 + Vite）
 - 全站已切換至 AdminLTE v3.2（Bootstrap 4、Font Awesome 5），所有使用 dashboard 佈局的頁面都走 `layouts/dashboard-v3.blade.php`，專案中不存在 `layouts/dashboard.blade.php`。
@@ -14,9 +14,13 @@
 - 登入/註冊等 Auth 頁面也改用 Vite 入口與 Bootstrap 4 表單樣式，不再載入 AdminLTE 2 資產。
 - `resources/views/layouts/app.blade.php`（Auth 用）與 `resources/views/layouts/dashboard-v3.blade.php`（主站）均透過 `@vite(['resources/js/app.js'])`。
 
-## 遺留檔案說明（不再生產）
-- `resources/assets/js/bootstrap.js`、`resources/assets/sass/app.scss` 仍保留，但內部引用 `resources/bower_components/AdminLTE` 與 Laravel Mix；倉庫沒有 `resources/bower_components` 目錄，也沒有 `public/js` / `public/css` 輸出，這條管線已停用。
-- `resources/assets/css/styles.css` 為舊版樣式，現行頁面未透過 Vite 引用；若需保留其中的實用樣式，請將必要段落移植到 Vite 入口後再刪除 legacy 檔。
+## 遺留檔案清理狀態
+Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案**已完全移除**：
+- ~~`resources/assets/js/bootstrap.js`~~、~~`resources/assets/sass/app.scss`~~ - 原 Mix 入口
+- ~~`resources/assets/css/styles.css`~~ - 舊版樣式檔
+- 相關的 Mix 配置檔案（`webpack.mix.js`）也已移除
+
+所有前端資源現由 **Vite** 統一管理，入口位於 `resources/js/` 目錄。
 
 ## 類名對照（歷史備查）
 升版時常用的 v2 → v3 對照，供查漏用：
@@ -33,5 +37,8 @@
 - 若有前端改動，使用 `npm run dev`（或 `npm run build`）重建 `public/build`。
 
 ## 後續工作方向
-- 移除未使用的 legacy 檔（`resources/assets/*`、舊 Mix 設定）以避免誤導。
-- 準備 AdminLTE 4（Bootstrap 5）升級時，重點關注 `data-toggle` → `data-bs-toggle`、`float-*` → `d-flex`/utilities、Font Awesome 6 對照，以及 Vite 產物測試。
+- **AdminLTE 4 升級準備**（Bootstrap 5）：
+  - Data attributes：`data-toggle` → `data-bs-toggle`
+  - 工具類：`float-*` → `d-flex` / Flexbox utilities
+  - 圖標：Font Awesome 5 → Font Awesome 6
+  - 測試重點：Vite 構建產物、響應式佈局、JavaScript 插件兼容性

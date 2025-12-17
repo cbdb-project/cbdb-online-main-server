@@ -12,13 +12,20 @@
 |
 */
 
-Route::middleware('auth:api')->get('/user', 'Api\UserController@show');
+Route::middleware('auth:sanctum')->get('/user', 'Api\UserController@show');
 
 Route::group([], function () {
     Route::match(['get', 'post'], 'name', 'Api\NameController@index');
 });
 
-Route::group(['prefix' => 'select'], function () {
+// Select APIs with optional authentication
+// Allows both authenticated users and guests to access
+// - Authenticated users: Rate limited per user (120 req/min)
+// - Guest users: Rate limited per IP address (120 req/min)
+Route::group([
+    'prefix' => 'select',
+    'middleware' => ['auth.optional', 'throttle:120,1'],
+], function () {
     Route::get('ethnicity', 'ApiController@ethnicity');
     Route::get('choronym', 'ApiController@choronym');
     Route::get('dynasty', 'ApiController@dynasty');
@@ -39,9 +46,8 @@ Route::group(['prefix' => 'select'], function () {
     Route::get('birole', 'ApiController@birole');
     Route::get('topic', 'ApiController@topic');
     Route::get('occasion', 'ApiController@occasion');
-});
 
-Route::group(['prefix' => 'select'], function () {
+    // Search endpoints
     Route::get('search/addr', 'ApiController@searchAddr');
     Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');

@@ -37,14 +37,16 @@ class Kernel extends HttpKernel {
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \Laravel\Passport\Http\Middleware\CreateFreshApiToken::class,
         ],
         /**
          *20211112建安修改
          *Laravel has a default throttle limit for all api routes.
          *60 >> 600 attempts then locked out for 1 minute
+         *
+         * Laravel Sanctum for SPA and API token authentication
          */
         'api' => [
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             'throttle:600,1',
             'bindings',
         ],
@@ -60,6 +62,7 @@ class Kernel extends HttpKernel {
     protected $routeMiddleware = [
         'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+        'auth.optional' => \App\Http\Middleware\OptionalAuthentication::class,
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,

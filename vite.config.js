@@ -8,7 +8,6 @@ export default defineConfig({
             input: [
                 // Modern World (AdminLTE v3 + Vue 3)
                 'resources/js/app.js',          // Main entry: AdminLTE v3 + base setup
-                'resources/js/passport.js',     // Passport components entry
                 'resources/js/datatables.js',   // DataTables plugin
             ],
             refresh: true,

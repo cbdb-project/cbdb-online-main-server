@@ -112,6 +112,12 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
     Route::patch('profile', 'UserProfileController@update')->name('profile.update');
 
+    // API Token 管理
+    Route::get('api-tokens', 'ApiTokenController@index')->name('api-tokens.index');
+    Route::post('api-tokens', 'ApiTokenController@store')->name('api-tokens.store');
+    Route::delete('api-tokens/{tokenId}', 'ApiTokenController@destroy')->name('api-tokens.destroy');
+    Route::delete('api-tokens', 'ApiTokenController@destroyAll')->name('api-tokens.destroy-all');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

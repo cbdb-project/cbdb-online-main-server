@@ -1,8 +1,8 @@
 @extends('layouts.dashboard-v3')
 
 @push('scripts')
-    {{-- DataTables 和 Passport 组件通过 Vite 加载（置底以确保 DOM 已存在） --}}
-    @vite(['resources/js/datatables.js', 'resources/js/passport.js'])
+    {{-- DataTables 透過 Vite 載入（置底以確保 DOM 已存在） --}}
+    @vite(['resources/js/datatables.js'])
 @endpush
 
 @section('content')
@@ -56,12 +56,6 @@
     </div>
     <!-- /.card -->
 
-    {{-- Modern World: Vue 3 Passport 组件 --}}
-    <div id="passport-app">
-        <passport-clients></passport-clients>
-        <passport-authorized-clients></passport-authorized-clients>
-        <passport-personal-access-tokens></passport-personal-access-tokens>
-    </div>
 @endsection
 @section('js')
     <script>

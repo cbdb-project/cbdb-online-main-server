@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端存在兩條管線：舊版 AdminLTE 2/Bootstrap 3 仍用 `laravel-mix`，新版 AdminLTE 3+（`layouts/dashboard-v3` 及其頁面如 `/codes`、`/operations`、`/view` 等）改用 Vite 並內建 `resources/js/jquery-global.js`、Bootstrap 4 bundle 與 modal 焦點修復。
+- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
@@ -17,7 +17,7 @@
   - `app/Http/Controllers`：Laravel 控制器（如 `OperationsController`）。
   - `app/Repositories`：資料存取與封裝邏輯（如 `OperationRepository`）。
   - `resources/views`：Blade 模板與各模組頁面。
-  - `resources/assets/js`：Vue 元件與前端入口（代碼提交前需跑 `npm run prod` 重新編譯）。
+  - `resources/js`：Vue 元件與前端入口（使用 Vite 構建，代碼提交前需跑 `npm run build`）。
   - `tests/Feature`、`tests/Unit`：PHPUnit 測試。
 - **重要設定**：
   - `config/codes.php`：`/codes/*` 白名單。
@@ -211,7 +211,7 @@
    - 嚴禁在未授權情況下直接修改資料庫結構或大量資料。
    - 避免在 Controller 中直接寫 SQL；如需操作資料庫，優先利用 Repository。對於**單一主鍵**的表可以使用 Eloquent 模型，但對於**複合主鍵**的表（如 `ALTNAME_DATA`、`POSTED_TO_ADDR_DATA` 等）必須使用 Query Builder（`DB::table()`）而非 Eloquent 模型。
    - 所有新路由需通過授權檢查，避免只靠前端限制。
-  - 目前前端樣式與互動高度依賴 AdminLTE（`resources/assets/sass/app.scss`、`resources/assets/js/bootstrap.js` 持續匯入相關資產）；`/codes` 已改用 `layouts/dashboard-v3`（AdminLTE 3 CDN、未載入 Mix 產物），其他頁面仍是 AdminLTE 2。若要移除舊資產需先規畫替代的樣式框架、重構 Blade 樣板與 JS 初始化流程，並逐頁驗證後才能刪除舊資產，避免界面崩壞。
+  - 全站已完成 AdminLTE 3 升級，所有頁面使用 `layouts/dashboard-v3.blade.php` 佈局，透過 Vite 載入前端資源（入口位於 `resources/js/`）。請勿引入外部 CDN 的 jQuery/Bootstrap，以免與 Vite bundle 產生版本衝突。Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案已完全移除。
 5. **文檔更新建議**：
    - 有任何 UI／流程重大調整時，請同步更新 `README.md` 與 `CHANGELOG.md`。
    - 若整理出新的知識或踩坑，務必補充至 `AGENTS.md`，讓後續代理能快速掌握背景。
@@ -223,7 +223,6 @@
 - Feature 測試手動建立資料表時，記得設置必要的 primary key 與時間戳；否則模型邏輯可能出錯。
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
 - dashboard-v3 佈局改用 Vite 打包（`@vite` 載入），共用 `resources/js/jquery-global.js` 並內建 Bootstrap 4 bundle；不要再引用外部 CDN 的 jQuery/Bootstrap/Datatables 以免載入順序衝突。modal 關閉的焦點修復也在 Vite 入口內，全站共用。
-- `package-lock.json` 為長期歷史產物，當前難以乾淨重建；若非必要請勿刪除重生，待全站切換到 Vite + AdminLTE 3 後再集中清理。
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
 - **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。

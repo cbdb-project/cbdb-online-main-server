@@ -25,21 +25,22 @@ composer install --optimize-autoloader
 # 3. 强制触发 package discovery
 php artisan package:discover --ansi
 
-# 4. 清除缓存
+# 4. 重建前端静态资源
+echo "重建前端静态资源..."
+npm install
+npm run prod
+
+# 5. 清除缓存
 echo "清除应用缓存..."
 php artisan cache:clear
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 
-# 5. 重建缓存
+# 6. 重建缓存
 echo "重建缓存..."
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-
-# 6. 重建前端靜態資源
-echo "重建缓存靜態資源..."
-npm run prod
 
 echo "部署完成！"

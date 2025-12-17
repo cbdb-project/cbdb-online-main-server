@@ -144,8 +144,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             $table->text('c_autogen_notes')->nullable();
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
             $table->primary(['c_kin_code', 'c_kin_id', 'c_personid']);
 
             // 添加外键约束
@@ -210,8 +214,12 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
 
             // 添加外键约束
             $table->foreign('c_assoc_code')->references('c_assoc_code')->on('ASSOC_CODES');

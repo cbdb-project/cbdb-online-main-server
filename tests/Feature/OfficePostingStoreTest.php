@@ -24,8 +24,12 @@ class OfficePostingStoreTest extends TestCase {
             $table->integer('c_personid');
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
@@ -37,8 +41,12 @@ class OfficePostingStoreTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
@@ -48,8 +56,12 @@ class OfficePostingStoreTest extends TestCase {
             $table->integer('c_addr_id');
             $table->string('c_created_by')->nullable();
             $table->string('c_created_date')->nullable();
+
+            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
+
+            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {

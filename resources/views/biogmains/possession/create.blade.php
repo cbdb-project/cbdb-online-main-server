@@ -7,40 +7,40 @@
         </div>
         <div class="card-body">
             <div class="card-body">
-            <form action="{{ route('basicinformation.possession.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.possession.store', ['basicinformation' => $id]) }}" method="post">
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_sequence" class="col-sm-2 control-label">次序(entry_sequence)</label>
+                <div class="form-group row">
+                    <label for="c_sequence" class="col-sm-2 col-form-label">次序(entry_sequence)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_sequence" value="" maxlength="4">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_possession_act_code" class="col-sm-2 control-label">行為&#60;擁有、捐出等&#62;(possession_act_code)</label>
+                <div class="form-group row">
+                    <label for="c_possession_act_code" class="col-sm-2 col-form-label">行為&#60;擁有、捐出等&#62;(possession_act_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_possession_act_code" model="possact" selected="0"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_possession_desc" class="col-sm-2 control-label">財產&#60;英文描述&#62;(possession_desc)</label>
+                <div class="form-group row">
+                    <label for="c_possession_desc" class="col-sm-2 col-form-label">財產&#60;英文描述&#62;(possession_desc)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_possession_desc" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_possession_desc_chn" class="col-sm-2 control-label">財產&#60;中文描述&#62;(possession_desc_chn)</label>
+                <div class="form-group row">
+                    <label for="c_possession_desc_chn" class="col-sm-2 col-form-label">財產&#60;中文描述&#62;(possession_desc_chn)</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control" name="c_possession_desc_chn" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_quantity" class="col-sm-2 control-label">數量(quantity)</label>
+                <div class="form-group row">
+                    <label for="c_quantity" class="col-sm-2 col-form-label">數量(quantity)</label>
                     <div class="col-md-1">
                         <input type="text" name="c_quantity" class="form-control"
                                value="">
@@ -50,8 +50,8 @@
                         <select-vue name="c_measure_code" model="measure" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_possession_yr" class="col-sm-2 control-label">年份(possession_yr)</label>
+                <div class="form-group row">
+                    <label for="c_possession_yr" class="col-sm-2 col-form-label">年份(possession_yr)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_possession_yr" class="form-control"
                                value="">
@@ -68,44 +68,44 @@
                         <select-vue name="c_possession_yr_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_addr_id" class="col-sm-2 control-label">地名</label>
+                <div class="form-group row">
+                    <label for="c_addr_id" class="col-sm-2 col-form-label">地名</label>
                     <div class="col-sm-10">
                         <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
                             <option value="0" selected></option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="offset-sm-2 col-sm-10">
                         <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
@@ -117,7 +117,8 @@
 
 @endsection
 @section('js')
-    <script>
+    <script>    onViteReady(function() {
+
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_source").select2(options('text'));
@@ -217,6 +218,7 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
+    });
 
     </script>
 @endsection

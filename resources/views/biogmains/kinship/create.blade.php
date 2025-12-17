@@ -7,75 +7,75 @@
         </div>
         <div class="card-body">
             <div class="card-body">
-            <form action="{{ route('basicinformation.kinship.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.kinship.store', ['basicinformation' => $id]) }}" method="post">
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_kin_code" class="col-sm-2 control-label">親屬關係(c_kin_code)</label>
+                <div class="form-group row">
+                    <label for="c_kin_code" class="col-sm-2 col-form-label">親屬關係(c_kin_code)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
                             <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_kin_id" class="col-sm-2 control-label">親戚姓名(c_kin_id)</label>
+                <div class="form-group row">
+                    <label for="c_kin_id" class="col-sm-2 col-form-label">親戚姓名(c_kin_id)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kin_id" name="c_kin_id">
                             <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             <option value="0" selected="selected">0 未详</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_autogen_notes" class="col-sm-2 control-label">c_autogen_notes</label>
+                <div class="form-group row">
+                    <label for="c_autogen_notes" class="col-sm-2 col-form-label">c_autogen_notes</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_autogen_notes" id="" cols="30"
                                   rows="5"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">成對親屬關係</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">成對親屬關係</label>
                     <div class="col-sm-10">
                         <select class="form-control c_kinship_pair" name="c_kinship_pair">
                             <option value="0">無對應親屬關係</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="offset-sm-2 col-sm-10">
                         <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
@@ -87,7 +87,8 @@
 
 @endsection
 @section('js')
-    <script>
+    <script>    onViteReady(function() {
+
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_kinship_pair").select2();
@@ -214,6 +215,7 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
+    });
 
     </script>
 @endsection

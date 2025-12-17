@@ -7,30 +7,30 @@
         </div>
         <div class="card-body">
             <div class="card-body">
-            <form action="{{ route('basicinformation.socialinst.store', ['basicinformation' => $id]) }}" class="form-horizontal" method="post">
+            <form action="{{ route('basicinformation.socialinst.store', ['basicinformation' => $id]) }}" method="post">
                 {{ csrf_field() }}
-                <div class="form-group">
-                    <label for="person_id" class="col-sm-2 control-label">person id</label>
+                <div class="form-group row">
+                    <label for="person_id" class="col-sm-2 col-form-label">person id</label>
                     <div class="col-sm-10">
                         <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_inst_code" class="col-sm-2 control-label">社交機構(social_institution)</label>
+                <div class="form-group row">
+                    <label for="c_inst_code" class="col-sm-2 col-form-label">社交機構(social_institution)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_inst_code" name="c_inst_code">
                             <option value="0-0" selected="selected">0 [Unknown] [未詳] </option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_bi_role_code" class="col-sm-2 control-label">社交機構角色(c_bi_role_code)</label>
+                <div class="form-group row">
+                    <label for="c_bi_role_code" class="col-sm-2 col-form-label">社交機構角色(c_bi_role_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_bi_role_code" model="birole" selected="0"></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_bi_begin_year" class="col-sm-2 control-label">始年(firstyear)</label>
+                <div class="form-group row">
+                    <label for="c_bi_begin_year" class="col-sm-2 col-form-label">始年(firstyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_bi_begin_year" class="form-control"
                                value="">
@@ -47,8 +47,8 @@
                         <select-vue name="c_bi_by_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_bi_end_year" class="col-sm-2 control-label">終年(lastyear)</label>
+                <div class="form-group row">
+                    <label for="c_bi_end_year" class="col-sm-2 col-form-label">終年(lastyear)</label>
                     <div class="col-md-1">
                         <input type="number" name="c_bi_end_year" class="form-control"
                                value="">
@@ -65,36 +65,36 @@
                         <select-vue name="c_bi_ey_range" model="range" selected=""></select-vue>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="" class="col-sm-2 control-label">出處(c_source)</label>
+                <div class="form-group row">
+                    <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
                     <div class="col-sm-10">
                         <select class="form-control c_source" name="c_source" id="c_source">
                             <option value="0" selected="selected"></option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_pages" class="col-sm-2 control-label">頁數/條目</label>
+                <div class="form-group row">
+                    <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
                     <div class="col-sm-4">
                         <input type="text" class="form-control" name="c_pages" value="">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c_notes" class="col-sm-2 control-label">注(c_notes)</label>
+                <div class="form-group row">
+                    <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="textperson_pair" class="col-sm-2 control-label">候選出處與頁數</label>
+                <div class="form-group row">
+                    <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
                     <div class="col-sm-10">
                         <select class="form-control textperson_pair" name="">
                             <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="offset-sm-2 col-sm-10">
                         <button type="submit" class="btn btn-secondary">Submit</button>
                     </div>
@@ -106,7 +106,8 @@
 
 @endsection
 @section('js')
-    <script>
+    <script>    onViteReady(function() {
+
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_inst_code").select2(options('socialinstcode'));
@@ -206,6 +207,7 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
+    });
 
     </script>
 @endsection

@@ -768,9 +768,9 @@ class BiogMainRepository {
 
             DB::table('POSTING_DATA')->insert([
                 'c_personid' => $data['c_personid'],
-        'c_posting_id' => $data['c_posting_id'],
-        'c_created_by' => $data['c_created_by'],
-        'c_created_date' => $data['c_created_date'],
+                'c_posting_id' => $data['c_posting_id'],
+                'c_created_by' => $data['c_created_by'],
+                'c_created_date' => $data['c_created_date'],
             ]);
 
             $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);

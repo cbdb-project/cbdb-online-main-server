@@ -41,8 +41,35 @@ class BasicInformationAddressesController extends Controller {
     public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAddr($id);
 
-        return view('biogmains.addresses.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '地址', 'page_description' => '基本信息表 地址', 'breadcrumb_home' => '人物基本資料']);
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($biogbasicinformation) {
+                $nameChn = $biogbasicinformation->c_name_chn ?? '';
+                $name = $biogbasicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
+        return view('biogmains.addresses.index', [
+            'basicinformation' => $biogbasicinformation,
+            'page_title' => '地址',
+            'page_description' => '基本信息表 地址',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '地址', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -51,9 +78,39 @@ class BasicInformationAddressesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create($id) {
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.addresses.create', [
             'id' => $id,
-            'page_title' => '地址', 'page_description' => '基本信息表 地址', 'page_url' => '/basicinformation/'.$id.'/addresses', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
+            'page_title' => '地址',
+            'page_description' => '基本信息表 地址',
+            'page_url' => '/basicinformation/'.$id.'/addresses',
+            'breadcrumb_home' => '人物基本資料',
+            'archer' => '<li>新增</li>',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => '新增', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -187,11 +244,42 @@ class BasicInformationAddressesController extends Controller {
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
 
-        return view('biogmains.addresses.edit', ['id' => $id, 'row' => $row, 'addr_str' => $addr_str, 'text_str' => $text_str,
-            'page_title' => '地址', 'page_description' => '基本信息表 地址',
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
+        return view('biogmains.addresses.edit', [
+            'id' => $id,
+            'row' => $row,
+            'addr_str' => $addr_str,
+            'text_str' => $text_str,
+            'page_title' => '地址',
+            'page_description' => '基本信息表 地址',
             'page_url' => '/basicinformation/'.$id.'/addresses',
-            'archer' => "<li>編輯</li>", 'other_belongs_str' => $other_belongs_str,
+            'archer' => "<li>編輯</li>",
+            'other_belongs_str' => $other_belongs_str,
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
         ]);
     }
 

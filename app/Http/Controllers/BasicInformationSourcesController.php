@@ -33,11 +33,34 @@ class BasicInformationSourcesController extends Controller {
             abort(404);
         }
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.sources.index', [
             'basicinformation' => $basicinformation,
             'page_title' => '出處',
             'page_description' => '基本信息表 出處',
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '出处', 'url' => '#'],
+            ],
         ]);
     }
 
@@ -47,9 +70,39 @@ class BasicInformationSourcesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create($id) {
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.sources.create', [
             'id' => $id,
-            'page_title' => '出處', 'page_description' => '基本信息表 出處', 'page_url' => '/basicinformation/'.$id.'/sources', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
+            'page_title' => '出處',
+            'page_description' => '基本信息表 出處',
+            'page_url' => '/basicinformation/'.$id.'/sources',
+            'breadcrumb_home' => '人物基本資料',
+            'archer' => '<li>新增</li>',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '出处', 'url' => route('basicinformation.sources.index', $id)],
+                ['label' => '新增', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -100,11 +153,40 @@ class BasicInformationSourcesController extends Controller {
     public function edit($id, $id_) {
         $res = $this->biogMainRepository->sourceById($id, $id_);
 
-        return view('biogmains.sources.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '出處', 'page_description' => '基本信息表 出處',
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
+        return view('biogmains.sources.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'page_title' => '出處',
+            'page_description' => '基本信息表 出處',
             'page_url' => '/basicinformation/'.$id.'/sources',
             'archer' => "<li>編輯</li>",
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '出处', 'url' => route('basicinformation.sources.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
         ]);
     }
 

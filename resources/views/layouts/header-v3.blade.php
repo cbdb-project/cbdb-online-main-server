@@ -12,9 +12,21 @@
 
     <!-- Breadcrumb -->
     <ol class="breadcrumb float-sm-left ml-2 mb-0 bg-transparent">
-        {!! $archer ?? '' !!}
-        @if(isset($page_title))
-            <li class="breadcrumb-item active">{{ $page_title }}</li>
+        @if(isset($breadcrumbs) && is_array($breadcrumbs))
+            @foreach($breadcrumbs as $index => $crumb)
+                @if($index < count($breadcrumbs) - 1)
+                    <li class="breadcrumb-item">
+                        <a href="{{ $crumb['url'] }}">{{ $crumb['label'] }}</a>
+                    </li>
+                @else
+                    <li class="breadcrumb-item active">{{ $crumb['label'] }}</li>
+                @endif
+            @endforeach
+        @else
+            {!! $archer ?? '' !!}
+            @if(isset($page_title))
+                <li class="breadcrumb-item active">{{ $page_title }}</li>
+            @endif
         @endif
     </ol>
 

@@ -11,7 +11,6 @@
         "laracasts/flash": "^3.0",
         "laravel/framework": "^10.0",
         "laravel/legacy-factories": "^1.0",
-        "laravel/passport": "^11.0",
         "laravel/sanctum": "^3.2",
         "laravel/serializable-closure": "^1.3",
         "laravel/tinker": "^2.8",

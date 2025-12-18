@@ -29,22 +29,18 @@
 
                 // 1. 检查缓存
                 if (selectDataCache[model]) {
-                    console.log(`[Select.vue] 使用缓存数据: ${model}`);
                     this.data = selectDataCache[model];
                     return;
                 }
 
                 // 2. 检查是否有正在进行的请求
                 if (pendingRequests[model]) {
-                    console.log(`[Select.vue] 等待现有请求: ${model}`);
-                    const data = await pendingRequests[model];
-                    this.data = data;
+                    this.data = await pendingRequests[model];
                     return;
                 }
 
                 // 3. 发送新请求并缓存
-                console.log(`[Select.vue] 发送新请求: ${model}`);
-                pendingRequests[model] = axios.get('/api/select/' + model)
+                const requestPromise = axios.get('/api/select/' + model)
                     .then(response => {
                         selectDataCache[model] = response.data;
                         delete pendingRequests[model];
@@ -56,7 +52,8 @@
                         throw error;
                     });
 
-                this.data = await pendingRequests[model];
+                pendingRequests[model] = requestPromise;
+                this.data = await requestPromise;
             },
             normalization(item) {
                 let str = '';

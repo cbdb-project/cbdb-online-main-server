@@ -35,7 +35,12 @@
 
                 // 2. 检查是否有正在进行的请求
                 if (pendingRequests[model]) {
-                    this.data = await pendingRequests[model];
+                    try {
+                        this.data = await pendingRequests[model];
+                    } catch (error) {
+                        console.error(`Failed to load select data for ${model}:`, error);
+                        this.data = {};
+                    }
                     return;
                 }
 
@@ -53,7 +58,12 @@
                     });
 
                 pendingRequests[model] = requestPromise;
-                this.data = await requestPromise;
+                try {
+                    this.data = await requestPromise;
+                } catch (error) {
+                    console.error(`Failed to load select data for ${model}:`, error);
+                    this.data = {};
+                }
             },
             normalization(item) {
                 let str = '';

@@ -55,10 +55,34 @@ class BasicInformationAssocController extends Controller {
             return ['c_personid' => 0, 'c_sequence' => 0, 'assoc_name' => '', 'c_text_title' => ''];
         });
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($biogbasicinformation) {
+                $nameChn = $biogbasicinformation->c_name_chn ?? '';
+                $name = $biogbasicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         //dd($biogbasicinformation);
         //dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
-            'assoc_name' => $assoc_name, 'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'breadcrumb_home' => '人物基本資料']);
+            'assoc_name' => $assoc_name, 'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '社會關係', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -67,9 +91,35 @@ class BasicInformationAssocController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create($id) {
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.assoc.create', [
             'id' => $id,
-            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
+            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '社會關係', 'url' => route('basicinformation.assoc.index', $id)],
+                ['label' => '新增', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -138,11 +188,36 @@ class BasicInformationAssocController extends Controller {
     public function edit($id, $id_) {
         $res = $this->biogMainRepository->assocById($id_);
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.assoc.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係',
             'page_url' => '/basicinformation/'.$id.'/assoc',
             'archer' => "<li>編輯</li>",
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '社會關係', 'url' => route('basicinformation.assoc.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
         ]);
     }
 

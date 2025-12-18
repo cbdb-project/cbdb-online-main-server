@@ -37,8 +37,32 @@ class BasicInformationEntriesController extends Controller {
     public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithEntries($id);
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($biogbasicinformation) {
+                $nameChn = $biogbasicinformation->c_name_chn ?? '';
+                $name = $biogbasicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.entries.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '入仕', 'page_description' => '基本信息表 入仕', 'breadcrumb_home' => '人物基本資料']);
+            'page_title' => '入仕', 'page_description' => '基本信息表 入仕', 'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '入仕', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -47,9 +71,35 @@ class BasicInformationEntriesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create($id) {
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.entries.create', [
             'id' => $id,
-            'page_title' => '入仕', 'page_description' => '基本信息表 入仕', 'page_url' => '/basicinformation/'.$id.'/entries', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
+            'page_title' => '入仕', 'page_description' => '基本信息表 入仕', 'page_url' => '/basicinformation/'.$id.'/entries', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '入仕', 'url' => route('basicinformation.entries.index', $id)],
+                ['label' => '新增', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -154,11 +204,36 @@ class BasicInformationEntriesController extends Controller {
         //"c_personid":34445,"c_entry_code":39,"c_sequence":1,"c_kin_code":0,"c_kin_id":0,"c_assoc_code":0,"c_assoc_id":0,"c_year":1351,"c_inst_code":0,"c_inst_name_code":0
         $res = $this->biogMainRepository->entryById($id_);
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.entries.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => '入仕', 'page_description' => '基本信息表 入仕',
             'page_url' => '/basicinformation/'.$id.'/entries',
             'archer' => "<li>編輯</li>",
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '入仕', 'url' => route('basicinformation.entries.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
         ]);
     }
 

@@ -29,8 +29,32 @@ class BasicInformationPossessionController extends Controller {
     public function index($id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithPossession($id);
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($biogbasicinformation) {
+                $nameChn = $biogbasicinformation->c_name_chn ?? '';
+                $name = $biogbasicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.possession.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'breadcrumb_home' => '人物基本資料']);
+            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '財產', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -39,9 +63,35 @@ class BasicInformationPossessionController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create($id) {
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         return view('biogmains.possession.create', [
             'id' => $id,
-            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>']);
+            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => '新增', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -89,12 +139,37 @@ class BasicInformationPossessionController extends Controller {
     public function edit($id, $id_) {
         $res = $this->biogMainRepository->possessionById($id_);
 
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
         //        dd($res);
         return view('biogmains.possession.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
             'page_title' => '財產', 'page_description' => '基本信息表 財產',
             'page_url' => '/basicinformation/'.$id.'/possession',
             'archer' => "<li>編輯</li>",
             'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
         ]);
     }
 

@@ -350,19 +350,38 @@ npm run build  # 生產環境
 
 ⚠️ **注意**：一般情況下**不需要**刪除 `package-lock.json`，該檔案確保依賴版本一致性。僅在確認鎖定檔案損壞時才考慮刪除。
 
-### Install the proper version of node and npm in ubuntu
+### 在 Ubuntu 上安裝正確版本的 Node.js 和 npm
 
-https://github.com/nodesource/distributions
+本專案需要 **Node.js 22** 和 **npm 10**（根據 `package.json` 中的 engines 要求）。
 
+推薦使用 **nvm (Node Version Manager)** 來安裝和管理 Node.js 版本：
+
+**步驟 1：安裝 nvm**
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 ```
-curl -fsSL https://deb.nodesource.com/setup_12.x | sudo -E bash -
 
-sudo apt-get install -y nodejs
+**步驟 2：載入 nvm（或重新開啟終端）**
+```bash
+source ~/.bashrc
+# 如果使用 zsh，則執行：source ~/.zshrc
 ```
 
-The proper version of nodejs is 12, while the default version of nodejs(apt) in ubuntu 20 is 10.
+**步驟 3：安裝 Node.js 22**
+```bash
+nvm install 22
+nvm use 22
+```
 
-If you still get an error, please check whether you have python 2.7 for the 'gpy' package.
+**步驟 4：驗證版本**
+```bash
+node --version  # 應該顯示 v22.x.x
+npm --version   # 應該顯示 10.x.x
+```
+
+安裝完成後，npm 版本會自動符合 Node 22 對應的 npm 10。
+
+**參考文檔**：[nvm-sh/nvm](https://github.com/nvm-sh/nvm)
 
 ### If your laravel.log(storage/logs/laravel.log) stops recording log
 

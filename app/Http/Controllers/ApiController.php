@@ -425,15 +425,57 @@ class ApiController extends Controller {
     }
 
     public function searchBiog(Request $request) {
-        $data = BiogMain::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate(20);
+        // 20251218性能優化：使用與 /api/name 相同的 FTS 索引查詢邏輯
+        $request->q = addslashes($request->q);
+        $num = 20;
+
+        // 優化1：當輸入為純數字時，直接按 c_personid 精確查詢
+        if (ctype_digit($request->q)) {
+            $data = BiogMain::where('c_personid', '=', $request->q)->paginate($num);
+        } else {
+            // 優化2：使用 CBDB__NAME_FTS 倒排索引表進行高效前綴匹配
+            $personIds = DB::table('CBDB__NAME_FTS')
+                ->where('search_term', 'LIKE', $request->q . '%')
+                ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
+                ->limit(500)  // 限制最多 500 個候選人
+                ->pluck('c_personid')
+                ->unique()
+                ->toArray();
+
+            if (!empty($personIds)) {
+                // 使用 FIELD() 排序保持匹配質量順序
+                $driver = DB::connection()->getDriverName();
+                $query = BiogMain::whereIn('c_personid', $personIds);
+
+                if ($driver === 'mysql') {
+                    $query->orderByRaw('FIELD(c_personid, ' . implode(',', $personIds) . ')');
+                } else {
+                    // SQLite 回退方案
+                    $caseClauses = [];
+                    foreach ($personIds as $index => $personId) {
+                        $caseClauses[] = "WHEN c_personid = {$personId} THEN {$index}";
+                    }
+                    $caseStatement = 'CASE ' . implode(' ', $caseClauses) . ' ELSE 999999 END';
+                    $query->orderByRaw($caseStatement);
+                }
+
+                $data = $query->paginate($num);
+            } else {
+                // 回退方案：FTS 未找到結果時，使用原有的 LIKE 查詢
+                $data = BiogMain::where('c_name_chn', 'like', '%'.$request->q.'%')
+                    ->orWhere('c_name', 'like', '%'.$request->q.'%')
+                    ->orWhere('c_personid', $request->q)
+                    ->paginate($num);
+            }
+        }
+
         $data->appends(['q' => $request->q])->links();
-        //        return $data;
+
         foreach ($data as $item) {
             $item['id'] = $item->c_personid;
             if ($item['id'] === 0) {
                 $item['id'] = -999;
             }
-            //            $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
             $item['text'] = $item->c_personid." ".$item->c_name_chn." ".$item->c_name." index_year:".$item->c_index_year;
         }
 

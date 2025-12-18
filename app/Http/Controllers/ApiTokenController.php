@@ -15,9 +15,9 @@ class ApiTokenController extends Controller {
                     'id' => $token->id,
                     'name' => $token->name,
                     'abilities' => $token->abilities,
-                    'last_used_at' => $token->last_used_at?->toDateTimeString(),
-                    'created_at' => $token->created_at->toDateTimeString(),
-                    'expires_at' => $token->expires_at?->toDateTimeString(),
+                    'last_used_at' => $token->last_used_at?->toIso8601String(),
+                    'created_at' => $token->created_at->toIso8601String(),
+                    'expires_at' => $token->expires_at?->toIso8601String(),
                 ];
             })
         );
@@ -52,8 +52,8 @@ class ApiTokenController extends Controller {
                     'id' => $token->accessToken->id,
                     'name' => $token->accessToken->name,
                     'abilities' => $token->accessToken->abilities,
-                    'created_at' => $token->accessToken->created_at->toDateTimeString(),
-                    'expires_at' => $token->accessToken->expires_at?->toDateTimeString(),
+                    'created_at' => $token->accessToken->created_at->toIso8601String(),
+                    'expires_at' => $token->accessToken->expires_at?->toIso8601String(),
                     // 只在創建時返回完整 token（之後無法再次查看）
                     'plainTextToken' => $token->plainTextToken,
                 ],

@@ -26,14 +26,18 @@ class OptionalAuthentication {
             }
         } else {
             // 嘗試使用 Sanctum 認證（Bearer Token）
-            // 如果有 token，嘗試認證；沒有或失敗也不報錯
-            try {
-                if ($request->bearerToken()) {
-                    Auth::shouldUse('sanctum');
-                    $request->user();
+            $token = $request->bearerToken();
+            if ($token) {
+                Auth::shouldUse('sanctum');
+
+                try {
+                    // 有帶 Bearer token 時必須驗證通過，否則直接拒絕
+                    if (!$request->user()) {
+                        abort(401, 'Invalid API token.');
+                    }
+                } catch (\Exception $e) {
+                    abort(401, 'Invalid API token.');
                 }
-            } catch (\Exception $e) {
-                // 認證失敗不報錯，繼續作為 guest 處理
             }
         }
 

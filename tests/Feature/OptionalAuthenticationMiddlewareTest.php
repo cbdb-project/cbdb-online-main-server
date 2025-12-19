@@ -13,11 +13,6 @@ class OptionalAuthenticationMiddlewareTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        // Force in-memory SQLite to avoid external DB dependency
-        config([
-            'database.default' => 'sqlite',
-            'database.connections.sqlite.database' => ':memory:',
-        ]);
         $this->setUpInMemoryDatabase();
 
         Route::middleware('auth.optional')->get('/testing/auth-optional', function (Request $request) {

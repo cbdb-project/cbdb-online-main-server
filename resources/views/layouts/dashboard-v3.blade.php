@@ -119,6 +119,10 @@
             top: 0 !important;
             right: 0 !important;
         }
+        .select2-container--bootstrap4 {
+            width: 100% !important;
+            max-width: 100%;
+        }
 
         /* Banner 链接布局优化 */
         .text-left > [class*="col-"] {

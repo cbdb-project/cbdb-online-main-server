@@ -53,6 +53,25 @@
 - 如需使用數據庫特性，應在代碼中提供降級方案或文檔說明
 - 索引策略應基於通用的 B-Tree 或其他跨數據庫支持的類型
 
+### 帳號權限分離（重要）
+
+基線 migration 會觸及完整 schema，為了降低事故風險，**務必**將一般應用連線與 migration 連線分離，避免日常帳號擁有過高權限。
+
+**配置原則**：
+- `foo`：一般應用使用者，僅需 CRUD 權限（不含 DROP/ALTER/CREATE）。
+- `foo_migrate`：僅供 migration 使用的專用帳號，具備 schema 變更所需權限。
+
+**範例設定（.env）**：
+```env
+DB_USERNAME=foo
+DB_PASSWORD=***
+
+DB_MIGRATE_USERNAME=foo_migrate
+DB_MIGRATE_PASSWORD=***
+```
+
+> 實際對應欄位請以 `config/database.php` 為準。
+
 ## 原始说明 (歷史檔案)
 
 ### Database migrations
@@ -163,81 +182,6 @@ CHORONYM_CODES
 
 ### 优化：
 1. 添加提示，保存错误提示，尤其是操作数据库的提示
-
-### 构建API资源服务
-
-参考文档：[Laravel 10.x Eloquent Resources](https://laravel.com/docs/10.x/eloquent-resources)
-
-创建API资源控制器，如人物主要信息
-
-```sh
-php artisan make:controller Api/BiogMainController --resource
-```
-
-在api.php里添加路由
-
-```php
-Route::resource('biog', 'Api\BiogMainController', ['name' => [
-        'show' => 'biog.show',
-        'create' => 'biog.create',
-        'edit' => 'biog.edit',
-        'update' => 'biog.update',
-        'index' => 'biog.index',
-    ]]);
-```
-
-包含了对改资源的操作
-
-创建API RESOURCE格式化函数
-```sh
-php artisan make:resource BiogMain
-```
-
-使用如下：
-修改BiogMain的toArray方法
-
-```php
-public function toArray($request)
-    {
-        return [
-            'c_name_chn' => $this->c_name_chn,
-            'source_count' => $this->source_count,
-        ];
-    }
-```
-
-在controller中
-
-```php
-public function show($id)
-    {
-        $data = $this->biogMainRepository->byPersonId($id);
-        return new BiogMain($data);
-    }
-```
-
-其他的方法可完全参照对应Controller的方法
-
-批量查询使用API Resource Collection功能
-
-```sh
-php artisan make:resource BiogCollection
-```
-
-Api相关代码在
-`app/Http/Controllers/Api`和`app/Http/Resources`和`routes/api.php`当中
-
-~~### 修改通知~~
-
-~~在此文件中：~~
-
-~~cbdb-online-main-server/resources/views/layouts/dashboard.blade.php~~
-
-~~修改 `<div class="callout callout-warning">` 和 `</div>` 中间的内容。如需要分段，则用 `<p>` 标签。~~
-        
-~~实例参见 old-server 分支：~~
-
-~~https://github.com/cbdb-project/cbdb-online-main-server/blob/old-server/resources/views/layouts/dashboard.blade.php~~
 
 
 ### 首页迁移（503 page）

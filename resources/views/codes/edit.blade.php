@@ -20,7 +20,7 @@
                     <div class="form-group row">
                         <label for="author" class="col-sm-2 col-form-label">author</label>
                         <div class="col-sm-8">
-                            <select class="form-control author js-person-select" name="" disabled></select>
+                            <select class="form-control author" id="author_select"></select>
                         </div>
                         <div class="col-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>
@@ -144,13 +144,30 @@
             }
             $.get('/api/select/search/textauthor', { q: c_textid }, function (data) {
                 $author.empty();
-                if (data && Array.isArray(data.data)) {
+
+                // 添加默認選項
+                $author.append(new Option('-- 請選擇作者 --', '', true, true));
+
+                if (data && Array.isArray(data.data) && data.data.length > 0) {
                     data.data.forEach(function(item) {
                         const option = new Option(item.text, item.value, false, false);
                         $author.append(option);
                     });
+
+                    // 如果只有一個作者，自動選中
+                    if (data.data.length === 1) {
+                        $author.val(data.data[0].value);
+                    }
+                } else {
+                    // 如果沒有作者數據
+                    $author.append(new Option('無作者資料', '', false, false));
                 }
+
                 $author.trigger('change');
+            }).fail(function() {
+                console.error('Failed to load author data');
+                $author.empty();
+                $author.append(new Option('載入失敗', '', false, false));
             });
         };
 
@@ -158,12 +175,12 @@
 
         $("#button_ajax_load").click(function(){
             const author = $author.val();
-            if (!author) {
+            if (!author || author === '') {
+                alert('請先選擇一個作者');
                 return;
             }
             const url = "/basicinformation/" + author + "/texts";
-            const new_window = window.open('_blank');
-            new_window.location = url ;
+            window.open(url, '_blank');
         });
     });
 </script>

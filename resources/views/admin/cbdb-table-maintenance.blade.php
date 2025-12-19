@@ -67,23 +67,23 @@
                             {{ csrf_field() }}
                             <input type="hidden" name="table_name" value="{{ $tableName }}">
 
-                            {{-- 繁簡映射表：只需要 truncate --}}
+                            {{-- 繁簡映射表：只需要清空 --}}
                             @if($tableName == 'CBDB__TRAD_SIMP_MAP')
                                 <div class="checkbox">
                                     <label>
                                         <input type="checkbox" name="truncate" value="1" checked>
-                                        清空後重建（truncate）
+                                        清空後重建
                                     </label>
                                 </div>
                             @endif
 
-                            {{-- 姓名搜索索引：需要 truncate, id_from, id_to --}}
+                            {{-- 姓名搜索索引：需要清空, id_from, id_to --}}
                             @if($tableName == 'CBDB__NAME_FTS')
                                 <div class="form-group">
                                     <div class="checkbox">
                                         <label>
                                             <input type="checkbox" name="truncate" value="1">
-                                            清空後重建（truncate）
+                                            清空後重建
                                         </label>
                                         <span class="help-block small">不勾選則為增量更新（僅更新指定範圍的記錄）</span>
                                     </div>
@@ -148,8 +148,8 @@
                     <li>根據 BIOG_MAIN 和 ALTNAME_DATA 重建姓名搜尋索引</li>
                     <li>生成所有姓名的後綴索引（包含繁簡體變體）</li>
                     <li>用於快速姓名搜尋功能</li>
-                    <li><strong>Truncate 模式：</strong>清空並重新生成所有索引記錄（預設勾選）</li>
-                    <li><strong>增量模式：</strong>不勾選 truncate，僅更新指定 ID 範圍的記錄</li>
+                    <li><strong>清空模式：</strong>清空並重新生成所有索引記錄（預設勾選）</li>
+                    <li><strong>增量模式：</strong>不勾選清空，僅更新指定 ID 範圍的記錄</li>
                     <li><strong>ID 範圍：</strong>可指定 c_personid 的起始和結束範圍，留空則處理全部</li>
                     <li>執行時間：全量重建約 5-10 分鐘，系統會顯示進度條並自動刷新狀態；增量更新視範圍而定</li>
                 </ul>

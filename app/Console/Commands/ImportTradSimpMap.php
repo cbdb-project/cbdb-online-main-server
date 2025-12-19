@@ -164,8 +164,8 @@ class ImportTradSimpMap extends Command {
 
         DB::connection()->transaction(function () use ($records, $batchSize, $total) {
             if ($this->option('truncate')) {
-                $this->logInfo('Truncating CBDB__TRAD_SIMP_MAP before import.');
-                DB::table('CBDB__TRAD_SIMP_MAP')->truncate();
+                $this->logInfo('Clearing CBDB__TRAD_SIMP_MAP before import.');
+                DB::table('CBDB__TRAD_SIMP_MAP')->delete();
             }
 
             $this->logInfo(sprintf('Starting batch insert (batch size: %d)…', $batchSize));

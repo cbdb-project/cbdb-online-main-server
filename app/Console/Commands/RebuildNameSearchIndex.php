@@ -99,7 +99,7 @@ class RebuildNameSearchIndex extends Command {
 
         if ($this->option('truncate')) {
             $this->info('清空現有索引資料...');
-            DB::table('CBDB__NAME_FTS')->truncate();
+            DB::table('CBDB__NAME_FTS')->delete();
         }
 
         // 流式處理：邊收集邊生成邊插入

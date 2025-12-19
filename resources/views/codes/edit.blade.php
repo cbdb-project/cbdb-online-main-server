@@ -20,7 +20,7 @@
                     <div class="form-group row">
                         <label for="author" class="col-sm-2 col-form-label">author</label>
                         <div class="col-sm-8">
-                            <select class="form-control author" name="" id="author_select"></select>
+                            <select class="form-control author" id="author_select"></select>
                         </div>
                         <div class="col-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>

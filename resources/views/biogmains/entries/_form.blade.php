@@ -88,7 +88,7 @@
     <div class="form-group row">
         <label for="c_entry_addr_id" class="col-sm-2 col-form-label">地點(c_addr_id)</label>
         <div class="col-sm-10">
-            <select class="form-control {{ $isEdit ? 'c_addr_id' : 'c_entry_addr_id' }}" name="c_entry_addr_id" {{ $isEdit ? 'required' : '' }}>
+            <select class="form-control c_entry_addr_id" name="c_entry_addr_id" {{ $isEdit ? 'required' : '' }}>
                 @if($isEdit && isset($res['addr_str']))
                     <option value="{{ $row->c_entry_addr_id }}" selected="selected">{{ $res['addr_str'] }}</option>
                 @else
@@ -245,11 +245,7 @@
         $(".select2").select2();
         textperson_pair_first_load();
         $(".c_entry_code").select2(options('entry'));
-        @if($isEdit)
-        $(".c_addr_id").select2(options('addr'));
-        @else
         $(".c_entry_addr_id").select2(options('addr'));
-        @endif
         $(".c_kin_code").select2(options('kincode'));
         $(".c_assoc_code").select2(options('assoccode'));
         $(".c_inst_code").select2(options('socialinstcode'));

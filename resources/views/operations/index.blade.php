@@ -428,47 +428,14 @@ $item->resource_data = unionPKDef($item->resource_data);
 @section('js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var userTimeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
-    var userOffsetMinutes = new Date().getTimezoneOffset();
-
-    function formatTimestamp(utcTimeString, targetTimeZone) {
-        try {
-            var utcDate = new Date(utcTimeString);
-            if (isNaN(utcDate.getTime())) {
-                console.warn('Invalid time:', utcTimeString);
-                return utcTimeString;
-            }
-
-            var zone = targetTimeZone || userTimeZone;
-            var parts = new Intl.DateTimeFormat(undefined, {
-                timeZone: zone,
-                timeZoneName: 'short'
-            }).formatToParts(utcDate);
-            var timeZoneName = '';
-            for (var i = 0; i < parts.length; i++) {
-                if (parts[i].type === 'timeZoneName') {
-                    timeZoneName = parts[i].value || '';
-                    break;
-                }
-            }
-
-            var dateTimeWithoutTZ = utcDate.toLocaleString('sv-SE', {
-                timeZone: zone,
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-
-            return dateTimeWithoutTZ + ' ' + timeZoneName;
-        } catch (error) {
-            console.warn('Time conversion failed:', utcTimeString, error);
-            return utcTimeString;
-        }
-    }
+    var getFormatTimestampFn = function() {
+        return typeof window.formatTimestamp === 'function'
+            ? window.formatTimestamp
+            : function(value) { return value; };
+    };
+    var userOffsetMinutes = typeof window.getUserOffsetMinutes === 'function'
+        ? window.getUserOffsetMinutes()
+        : new Date().getTimezoneOffset();
 
     var nodes = document.querySelectorAll('.js-utc-datetime');
     Array.prototype.forEach.call(nodes, function (node) {
@@ -477,10 +444,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        var displayText = formatTimestamp(original);
+        var displayText = getFormatTimestampFn()(original);
         node.textContent = displayText;
         if (userOffsetMinutes !== -480) {
-            var chinaText = formatTimestamp(original, 'Asia/Shanghai');
+            var chinaText = getFormatTimestampFn()(original, 'Asia/Shanghai');
             if (chinaText && chinaText !== original) {
                 node.setAttribute('title', chinaText);
             } else {

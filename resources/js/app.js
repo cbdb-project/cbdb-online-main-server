@@ -23,6 +23,8 @@ import '@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css';
 import select2 from 'select2';
 select2(window, $);
 
+import { formatTimestamp, getUserOffsetMinutes, getUserTimeZone } from './utils/datetime';
+
 // Set global defaults for all Select2 instances to use Bootstrap 4 theme
 $.fn.select2.defaults.set('theme', 'bootstrap4');
 
@@ -102,6 +104,11 @@ window.initPersonSelect = ($el, options = {}) => {
 
 window.formatPersonLabel = formatPersonLabel;
 window.fetchPersonOption = fetchPersonOption;
+window.formatTimestamp = formatTimestamp;
+const detectedTimeZone = getUserTimeZone();
+const detectedOffset = getUserOffsetMinutes();
+window.getUserTimeZone = () => detectedTimeZone;
+window.getUserOffsetMinutes = () => detectedOffset;
 
 // Import Axios for HTTP requests
 import axios from 'axios';

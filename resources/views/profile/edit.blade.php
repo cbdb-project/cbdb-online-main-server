@@ -176,45 +176,11 @@
 
 @section('js')
 <script>
-// 時區相關變數與函數（參考 operations 頁面）
-var userTimeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
-
-function formatTimestamp(utcTimeString, targetTimeZone) {
-    try {
-        var utcDate = new Date(utcTimeString);
-        if (isNaN(utcDate.getTime())) {
-            console.warn('Invalid time:', utcTimeString);
-            return utcTimeString;
-        }
-
-        var zone = targetTimeZone || userTimeZone;
-        var parts = new Intl.DateTimeFormat(undefined, {
-            timeZone: zone,
-            timeZoneName: 'short'
-        }).formatToParts(utcDate);
-        var timeZoneName = '';
-        for (var i = 0; i < parts.length; i++) {
-            if (parts[i].type === 'timeZoneName') {
-                timeZoneName = parts[i].value || '';
-                break;
-            }
-        }
-
-        var dateTimeWithoutTZ = utcDate.toLocaleString('sv-SE', {
-            timeZone: zone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-
-        return dateTimeWithoutTZ.replace(' ', ' ') + ' (' + timeZoneName + ')';
-    } catch (e) {
-        console.error('formatTimestamp error:', e);
-        return utcTimeString;
-    }
+// 時區相關函數（動態取得，避免 Vite 模組尚未載入時抓不到）
+function getFormatTimestampFn() {
+    return typeof window.formatTimestamp === 'function'
+        ? window.formatTimestamp
+        : function(value) { return value; };
 }
 
 // Show inline alert message
@@ -385,7 +351,7 @@ function revokeAllTokens() {
 // Format date to localized string (使用 formatTimestamp 處理 UTC 時間)
 function formatDate(dateString) {
     if (!dateString) return '';
-    return formatTimestamp(dateString);
+    return getFormatTimestampFn()(dateString);
 }
 
 // Escape HTML to prevent XSS

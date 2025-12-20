@@ -507,12 +507,26 @@ class ApiController extends Controller {
     public function searchKinPair(Request $request) {
         $kin_code = $request->kin_code;
         $person_id = $request->person_id;
+
         //20201026修改成對親屬關係的選項
-        $res = KinshipCode::where('c_kin_pair1', '=', $kin_code)->orWhere('c_kin_pair2', '=', $kin_code)->orderBy('c_pick_sorting', 'desc')->get();
-        $res_arr = json_decode($res, true);
-        if (count((array)$res_arr) == 0) {
+        // 首先查找所有 c_kin_pair1 或 c_kin_pair2 等于选中的 kin_code 的记录
+        $res = KinshipCode::where('c_kin_pair1', '=', $kin_code)
+            ->orWhere('c_kin_pair2', '=', $kin_code)
+            ->orderBy('c_kincode', 'asc')  // 按 kincode 升序排列
+            ->get();
+
+        // 如果没有找到，尝试查找该 kin_code 自身的 pair1 和 pair2
+        if ($res->isEmpty()) {
             $data = KinshipCode::find($kin_code);
-            $res = KinshipCode::find([$data->c_kin_pair2, $data->c_kin_pair1]);
+            if ($data) {
+                // 收集非空的 pair 值
+                $pair_codes = array_filter([$data->c_kin_pair1, $data->c_kin_pair2]);
+                if (!empty($pair_codes)) {
+                    $res = KinshipCode::whereIn('c_kincode', $pair_codes)
+                        ->orderBy('c_kincode', 'asc')  // 按 kincode 升序排列
+                        ->get();
+                }
+            }
         }
 
         return $res;
@@ -522,9 +536,19 @@ class ApiController extends Controller {
         $assoc_code = $request->assoc_code;
         $person_id = $request->person_id;
         $data = AssocCode::find($assoc_code);
-        $res = AssocCode::find([$data->c_assoc_pair, $data->c_assoc_pair2]);
 
-        return $res;
+        if ($data) {
+            // 收集非空的 pair 值
+            $pair_codes = array_filter([$data->c_assoc_pair, $data->c_assoc_pair2]);
+            if (!empty($pair_codes)) {
+                $res = AssocCode::whereIn('c_assoc_code', $pair_codes)
+                    ->orderBy('c_assoc_code', 'asc')  // 按 assoc_code 升序排列
+                    ->get();
+                return $res;
+            }
+        }
+
+        return collect();  // 返回空集合
     }
 
     public function searchPinyin(Request $request) {

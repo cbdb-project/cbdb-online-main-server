@@ -234,6 +234,19 @@
   - 避免 Eloquent 在複合主鍵下的各種問題（`delete()`/`update()` 方法無法正常運作、`getDirty()` 判斷失效等）
   - 手動調用服務比 Observer 更加明確且易於測試
 
+- **HTTPS 混合內容問題**：在 Blade 模板中使用 `route()` 函數生成 URL 時，預設會產生**絕對 URL**（包含協議和域名，如 `http://localhost/api/endpoint`）。當應用程式透過 Cloudflare 等反向代理以 HTTPS 提供服務時，會導致瀏覽器阻擋混合內容（Mixed Content）錯誤。
+  
+  **解決方案**：使用 `route()` 的第三個參數設為 `false` 來生成**相對 URL**：
+  ```php
+  // ❌ 錯誤：會生成 http://localhost/query-playground/run
+  url: "{{ route('query-playground.run') }}"
+  
+  // ✅ 正確：會生成 /query-playground/run
+  url: "{{ route('query-playground.run', [], false) }}"
+  ```
+  
+  參考範例：`resources/views/profile/edit.blade.php` 中的 API token 相關 AJAX 請求。
+
 ## 快速回顧
 - 需要了解的主要模組：`CodesController`、`OperationsController`、`OperationRepository`、`resources/views/operations/*`。
 - 測試重點：保持 PHPUnit 可隨時跑、復原流程需有充分覆蓋。

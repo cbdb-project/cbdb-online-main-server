@@ -57,6 +57,7 @@ class UserProfileTest extends TestCase {
         ]);
 
         $response = $this->actingAs($user)->get('/profile');
+
         $response->assertStatus(200);
         $response->assertSee('個人資料設定');
         $response->assertSee('Test User');

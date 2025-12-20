@@ -215,7 +215,7 @@ class ApiController extends Controller {
 
     //20220121新增著作編碼表添加作者資訊作為錄入參考
     public function searchTextAuthor(Request $request) {
-        $data = DB::table('BIOG_TEXT_DATA')->where('c_textid', '=', $request->q)->paginate(20);
+        $data = DB::table('BIOG_TEXT_DATA')->where('c_textid', '=', $request->q)->paginate(100);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $person = $role = '';

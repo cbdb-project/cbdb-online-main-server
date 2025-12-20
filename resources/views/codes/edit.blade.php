@@ -18,12 +18,9 @@
                     {{ csrf_field() }}
                     @if($table === 'TEXT_CODES')
                     <div class="form-group row">
-                        <label for="author" class="col-sm-2 col-form-label">author</label>
-                        <div class="col-sm-8">
-                            <select class="form-control author" id="author_select"></select>
-                        </div>
-                        <div class="col-sm-2">
-                            <button type="button" id="button_ajax_load" class="btn btn-info">Jump to author</button>
+                        <label class="col-sm-2 col-form-label">作者</label>
+                        <div class="col-sm-10" id="author_list_container">
+                            <span class="text-muted">載入作者中...</span>
                         </div>
                     </div>
                     @endif
@@ -130,56 +127,89 @@
 @endsection
 @section('js')
 @if($table === 'TEXT_CODES')
+<style>
+    .author-list-scroll {
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+    .author-list-scroll::-webkit-scrollbar {
+        width: 10px;
+    }
+    .author-list-scroll::-webkit-scrollbar-thumb {
+        background-color: #6c757d;
+        border-radius: 6px;
+        border: 2px solid #f8f9fa;
+    }
+    .author-list-scroll::-webkit-scrollbar-track {
+        background-color: #e9ecef;
+    }
+    .author-list-scroll {
+        scrollbar-width: auto;
+        scrollbar-color: #6c757d #e9ecef;
+    }
+</style>
 <script>
     onViteReady(function() {
-        const $author = $('.author');
+        const $authorList = $('#author_list_container');
 
-        // 首次載入作者列表（沿用舊行為：按 textid 預先帶出作者供跳轉）
-        const author_first_load = function() {
+        const loadAuthors = function() {
             const c_textid = $("input[name='c_textid']").val();
             if (!c_textid) {
+                $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">無 c_textid，無法載入作者</span>');
                 return;
             }
-            $.get('/api/select/search/textauthor', { q: c_textid }, function (data) {
-                $author.empty();
 
-                // 添加默認選項
-                $author.append(new Option('-- 請選擇作者 --', '', true, true));
+            $.get('/api/select/search/textauthor', { q: c_textid }, function (data) {
+                $authorList.empty();
 
                 if (data && Array.isArray(data.data) && data.data.length > 0) {
-                    data.data.forEach(function(item) {
-                        const option = new Option(item.text, item.value, false, false);
-                        $author.append(option);
-                    });
-
-                    // 如果只有一個作者，自動選中
-                    if (data.data.length === 1) {
-                        $author.val(data.data[0].value);
+                    const list = $('<ul class="list-unstyled mb-0" style="padding-top: 7px;"></ul>');
+                    if (data.data.length > 5) {
+                        list.css({
+                            'max-height': '160px',
+                            'overflow-y': 'auto',
+                            'padding-right': '8px',
+                        });
+                        list.addClass('author-list-scroll');
                     }
-                } else {
-                    // 如果沒有作者數據
-                    $author.append(new Option('無作者資料', '', false, false));
-                }
+                    data.data.forEach(function(item) {
+                        const id = item.value;
+                        let displayText = item.text;
+                        // Remove ID prefix
+                        if (displayText.startsWith(id + ' - ')) {
+                            displayText = displayText.substring(id.toString().length + 3);
+                        }
+                        // Connect Name and Pinyin with / instead of -
+                        const firstHyphen = displayText.indexOf(' - ');
+                        if (firstHyphen !== -1) {
+                            displayText = displayText.substring(0, firstHyphen) + ' / ' + displayText.substring(firstHyphen + 3);
+                        }
 
-                $author.trigger('change');
+                        // Create elements securely
+                        const $li = $('<li></li>');
+                        const $link = $('<a></a>')
+                            .attr('href', `/basicinformation/${id}/texts`)
+                            .attr('target', '_blank')
+                            .attr('rel', 'noopener noreferrer')
+                            .text(`[${id}]`);
+                        
+                        $li.append($link);
+                        // Safely append text node
+                        $li.append(document.createTextNode(' ' + displayText));
+                        
+                        list.append($li);
+                    });
+                    $authorList.append(list);
+                } else {
+                    $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">無作者資料</span>');
+                }
             }).fail(function() {
-                console.error('Failed to load author data');
-                $author.empty();
-                $author.append(new Option('載入失敗', '', false, false));
+                $authorList.html('<span class="text-danger" style="padding-top: 7px; display: inline-block;">載入失敗</span>');
             });
         };
 
-        author_first_load();
-
-        $("#button_ajax_load").click(function(){
-            const author = $author.val();
-            if (!author || author === '') {
-                alert('請先選擇一個作者');
-                return;
-            }
-            const url = "/basicinformation/" + author + "/texts";
-            window.open(url, '_blank');
-        });
+        loadAuthors();
     });
 </script>
 @endif

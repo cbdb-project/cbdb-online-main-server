@@ -33,9 +33,9 @@ else
 fi
 
 # 4. 确保 storage 和 bootstrap/cache 有正确权限
-echo "🔒 设置目录权限..."
-chown -R www-data:www-data storage bootstrap/cache database 2>/dev/null || true
-chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
+#echo "🔒 设置目录权限..."
+#chown -R www-data:www-data storage bootstrap/cache database 2>/dev/null || true
+#chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
 
 # 5. 处理 SQLite 数据库位置 (自动迁移)
 # 目标路径: /app/db-data/database.sqlite3 (Docker Volume)
@@ -71,16 +71,30 @@ if [ -f "$DB_FILE" ]; then
     echo "📊 数据库状态:"
     ls -lh "$DB_FILE"
 else
-    echo "⚠️  警告: 数据库文件仍不存在"
-fi
-else
     echo "⚠️  SQLite 数据库文件不存在，可能需要创建或迁移"
 fi
 
 echo "✨ FrankenPHP 准备就绪！"
 echo "🌐 服务将在端口 80 启动..."
 
-# 9. 启动 FrankenPHP（替代 php-fpm）
+# 10. 检查并创建默认管理员账户
+echo "🔍 检查管理员账户..."
+# 使用 grep 检查用户列表中是否存在 admin@example.com
+if ! php artisan cbdb:manage-user --list | grep -q "admin@example.com"; then
+    echo "👤 未检测到管理员账户，正在创建..."
+    # 创建超级管理员 (active=1, role=super-admin)
+    php artisan cbdb:manage-user \
+        --email="admin@example.com" \
+        --name="System Admin" \
+        --password="password" \
+        --active=1 \
+        --role="super-admin"
+    echo "✅ 管理员账户已创建: admin@example.com / password"
+else
+    echo "✅ 管理员账户已存在: admin@example.com"
+fi
+
+# 11. 启动 FrankenPHP（替代 php-fpm）
 # 使用 Classic 模式（兼容开发环境，支持热重载）
 # 如需 Worker 模式性能，可以改为: frankenphp octane:start
 exec frankenphp run --config /etc/caddy/Caddyfile

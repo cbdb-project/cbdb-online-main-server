@@ -36,6 +36,8 @@ class User extends Authenticatable {
         'password',
         'avatar',
         'confirmation_token',
+        'is_active',
+        'is_admin',
     ];
 
     /**

@@ -329,6 +329,7 @@
                             'CBDB 內部表維護',
                             '單向關係修復',
                             'MergePreview',
+                            'Query Playground',
                         ];
                         $adminMenuOpen = in_array($activePage, $adminPages, true);
                     @endphp
@@ -345,6 +346,12 @@
                                 <a href="{{ route('manage.index') }}" class="nav-link {{ in_array($activePage, ['用戶管理'], true) ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-user-cog"></i>
                                     <p>用戶管理</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-terminal"></i>
+                                    <p>SQL 查詢練習場</p>
                                 </a>
                             </li>
                             <li class="nav-item">

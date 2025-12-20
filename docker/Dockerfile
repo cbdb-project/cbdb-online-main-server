@@ -11,7 +11,10 @@ RUN apt-get update && apt-get install -y \
     git \
     zip \
     unzip \
+    zip \
+    unzip \
     wget \
+    tini \
     build-essential \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -43,6 +46,11 @@ RUN install-php-extensions \
     bcmath \
     opcache
 
+# Install Node.js and NPM
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm@latest
+
 # 复制 Composer（FrankenPHP 镜像已包含 Composer，但我们确保使用最新版本）
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -71,4 +79,5 @@ EXPOSE 443
 EXPOSE 443/udp
 
 # 使用自定义启动脚本
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+# 使用自定义启动脚本 (Wrapped with tini for signal handling)
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

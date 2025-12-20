@@ -118,6 +118,7 @@
     </form>
 
 <!-- API Token 管理 -->
+@if(Route::has('api-tokens.index'))
 <div class="card card-info mt-3">
     <div class="card-header">
         <h3 class="card-title">API 訪問令牌管理</h3>
@@ -171,10 +172,12 @@
         </div>
     </div>
 </div>
+@endif
 
 @endsection
 
 @section('js')
+@if(Route::has('api-tokens.index'))
 <script>
 // 時區相關函數（動態取得，避免 Vite 模組尚未載入時抓不到）
 function getFormatTimestampFn() {
@@ -528,4 +531,5 @@ if (window.onViteReady) {
 }
 
 </script>
+@endif
 @endsection

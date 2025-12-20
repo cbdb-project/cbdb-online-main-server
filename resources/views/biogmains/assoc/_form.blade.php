@@ -453,15 +453,11 @@
             let c_assoc_code = $('.c_assoc_code').val();
             let c_assoc_id = $('.c_assoc_id').val();
 
-            console.log('assocship_pair called with:', c_assoc_code, c_assoc_id);
-
             // 清空现有选项
             $(".c_assocship_pair").empty();
 
             // 调用API获取成对社会关系
             $.get('/api/select/search/assocpair', {assoc_code: c_assoc_code, person_id: c_assoc_id}, function (data, textStatus){
-                console.log('Assoc API response:', data);
-
                 // 如果API返回了数据，添加所有选项
                 if (data && data.length > 0) {
                     for (let i = 0; i < data.length; i++){
@@ -476,7 +472,6 @@
                     $(".c_assocship_pair").append(new Option('無對應社會關係', '0', true, true));
                 }
             }).fail(function(jqXHR, textStatus, errorThrown) {
-                console.error('Assoc API error:', textStatus, errorThrown);
                 $(".c_assocship_pair").append(new Option('無對應社會關係', '0', true, true));
             });
 
@@ -486,15 +481,11 @@
             let c_kin_code = $('.c_kin_code').val();
             let c_kin_id = $('.c_kin_id').val();
 
-            console.log('kinship_pair called with:', c_kin_code, c_kin_id);
-
             // 清空现有选项
             $(".c_kinship_pair").empty();
 
             // 调用API获取成对亲属关系
             $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
-                console.log('Kinship API response:', data);
-
                 // 如果API返回了数据，添加所有选项
                 if (data && data.length > 0) {
                     for (let i = 0; i < data.length; i++){
@@ -509,7 +500,6 @@
                     $(".c_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
                 }
             }).fail(function(jqXHR, textStatus, errorThrown) {
-                console.error('Kinship API error:', textStatus, errorThrown);
                 $(".c_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
             });
 
@@ -519,15 +509,11 @@
             let c_assoc_kin_code = $('.c_assoc_kin_code').val();
             let c_assoc_kin_id = $('.c_assoc_kin_id').val();
 
-            console.log('assoc_kinship_pair called with:', c_assoc_kin_code, c_assoc_kin_id);
-
             // 清空现有选项
             $(".c_assoc_kinship_pair").empty();
 
             // 调用API获取成对亲属关系
             $.get('/api/select/search/kinpair', {kin_code: c_assoc_kin_code, person_id: c_assoc_kin_id}, function (data, textStatus){
-                console.log('Assoc Kinship API response:', data);
-
                 // 如果API返回了数据，添加所有选项
                 if (data && data.length > 0) {
                     for (let i = 0; i < data.length; i++){
@@ -542,7 +528,6 @@
                     $(".c_assoc_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
                 }
             }).fail(function(jqXHR, textStatus, errorThrown) {
-                console.error('Assoc Kinship API error:', textStatus, errorThrown);
                 $(".c_assoc_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
             });
 
@@ -573,7 +558,6 @@
                 //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    console.log(item);
                     var textperson_text = item['text'];
                 }
                 //console.log(textperson_value);

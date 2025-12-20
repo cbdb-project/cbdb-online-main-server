@@ -544,6 +544,7 @@ class ApiController extends Controller {
                 $res = AssocCode::whereIn('c_assoc_code', $pair_codes)
                     ->orderBy('c_assoc_code', 'asc')  // 按 assoc_code 升序排列
                     ->get();
+
                 return $res;
             }
         }

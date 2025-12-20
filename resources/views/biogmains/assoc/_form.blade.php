@@ -36,7 +36,7 @@
         <label for="" class="col-sm-2 col-form-label">親屬關係人</label>
         <div class="col-sm-1">關係</div>
         <div class="col-sm-3">
-            <select class="form-control c_kin_code" name="c_kin_code" onchange="kinship_pair()">
+            <select class="form-control c_kin_code" name="c_kin_code">
                 @if($isEdit && isset($res['kin_code']))
                     <option value="{{ $row->c_kin_code }}" selected="selected">{{ $res['kin_code'] }}</option>
                 @else
@@ -60,7 +60,7 @@
         <label for="" class="col-sm-2 col-form-label">社會關係人Y</label>
         <div class="col-sm-1">關係</div>
         <div class="col-sm-3">
-            <select class="form-control c_assoc_code" name="c_assoc_code" onchange="assocship_pair()">
+            <select class="form-control c_assoc_code" name="c_assoc_code">
                 @if($isEdit && isset($res['assoc_code']))
                     <option value="{{ $row->c_assoc_code }}" selected="selected">{{ $res['assoc_code'] }}</option>
                 @else
@@ -84,7 +84,7 @@
         <label for="" class="col-sm-2 col-form-label">社會關係人親屬</label>
         <div class="col-sm-1">關係</div>
         <div class="col-sm-3">
-            <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code" onchange="assoc_kinship_pair()">
+            <select class="form-control c_assoc_kin_code" name="c_assoc_kin_code">
                 @if($isEdit && isset($res['assoc_kin_code']))
                     <option value="{{ $row->c_assoc_kin_code }}" selected="selected">{{ $res['assoc_kin_code'] }}</option>
                 @else
@@ -380,6 +380,19 @@
         $(".c_source").select2(options('text'));
         $(".c_assocship_pair").select2();
 
+        // 绑定事件监听器
+        $(".c_kin_code").on('change', function() {
+            kinship_pair();
+        });
+
+        $(".c_assoc_code").on('change', function() {
+            assocship_pair();
+        });
+
+        $(".c_assoc_kin_code").on('change', function() {
+            assoc_kinship_pair();
+        });
+
         @if($isEdit)
             assocship_pair();
         @endif
@@ -439,23 +452,27 @@
         function assocship_pair(){
             let c_assoc_code = $('.c_assoc_code').val();
             let c_assoc_id = $('.c_assoc_id').val();
-            // console.log(c_assoc_id, c_assoc_code);
-            // if (c_kin_id == 0 || c_kin_id == -999) {return}
-            let data = [{
-                id: 0,
-                text: '请选择对应社会关系'
-            }];
-            // $(".c_kinship_pair").val(null).trigger("change");
-            // console.log($(".c_kinship_pair").val());
-            $.get('/api/select/search/assocpair', {assoc_code: c_assoc_code, person_id: c_assoc_id}, function (data, textStatus){
-                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                // console.log(data);
-                for (let i=data.length-1; i>-1; i--){
 
-                    item = data[i];
-                    // console.log(item);
-                    $(".c_assocship_pair").append(new Option(item['c_assoc_code'] + ' ' + item['c_assoc_desc_chn'] + ' ' + item['c_assoc_desc'], item['c_assoc_code'], false, true));
+            // 清空现有选项
+            $(".c_assocship_pair").empty();
+
+            // 调用API获取成对社会关系
+            $.get('/api/select/search/assocpair', {assoc_code: c_assoc_code, person_id: c_assoc_id}, function (data, textStatus){
+                // 如果API返回了数据，添加所有选项
+                if (data && data.length > 0) {
+                    for (let i = 0; i < data.length; i++){
+                        const item = data[i];
+                        const optionText = item['c_assoc_code'] + ' ' + item['c_assoc_desc_chn'] + ' ' + item['c_assoc_desc'];
+                        $(".c_assocship_pair").append(new Option(optionText, item['c_assoc_code'], false, false));
+                    }
+                    // 默认选中第一个选项
+                    $(".c_assocship_pair").val(data[0]['c_assoc_code']).trigger('change');
+                } else {
+                    // 没有匹配的成对关系，添加默认选项
+                    $(".c_assocship_pair").append(new Option('無對應社會關係', '0', true, true));
                 }
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                $(".c_assocship_pair").append(new Option('無對應社會關係', '0', true, true));
             });
 
         }
@@ -463,24 +480,27 @@
         function kinship_pair(){
             let c_kin_code = $('.c_kin_code').val();
             let c_kin_id = $('.c_kin_id').val();
-            // console.log(c_kin_id, c_kin_code);
-            // if (c_kin_id == 0 || c_kin_id == -999) {return}
-            let data = [{
-                id: 0,
-                text: '请选择对应亲属关系'
-            }];
-            // $(".c_kinship_pair").val(null).trigger("change");
-            // console.log($(".c_kinship_pair").val());
-            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
-                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                // console.log(data);
-                for (let i=data.length-1; i>-1; i--){
 
-                    item = data[i];
-                    // console.log(item);
-                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
-                    $(".c_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
+            // 清空现有选项
+            $(".c_kinship_pair").empty();
+
+            // 调用API获取成对亲属关系
+            $.get('/api/select/search/kinpair', {kin_code: c_kin_code, person_id: c_kin_id}, function (data, textStatus){
+                // 如果API返回了数据，添加所有选项
+                if (data && data.length > 0) {
+                    for (let i = 0; i < data.length; i++){
+                        const item = data[i];
+                        const optionText = item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'];
+                        $(".c_kinship_pair").append(new Option(optionText, item['c_kincode'], false, false));
+                    }
+                    // 默认选中第一个选项
+                    $(".c_kinship_pair").val(data[0]['c_kincode']).trigger('change');
+                } else {
+                    // 没有匹配的成对关系，添加默认选项
+                    $(".c_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
                 }
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                $(".c_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
             });
 
         }
@@ -488,24 +508,27 @@
         function assoc_kinship_pair(){
             let c_assoc_kin_code = $('.c_assoc_kin_code').val();
             let c_assoc_kin_id = $('.c_assoc_kin_id').val();
-            // console.log(c_kin_id, c_kin_code);
-            // if (c_kin_id == 0 || c_kin_id == -999) {return}
-            let data = [{
-                id: 0,
-                text: '请选择对应亲属关系'
-            }];
-            // $(".c_kinship_pair").val(null).trigger("change");
-            // console.log($(".c_kinship_pair").val());
-            $.get('/api/select/search/kinpair', {kin_code: c_assoc_kin_code, person_id: c_assoc_kin_id}, function (data, textStatus){
-                //返回的 data 可以是 xmlDoc, jsonObj, html, text, 等等.
-                // console.log(data);
-                for (let i=data.length-1; i>-1; i--){
 
-                    item = data[i];
-                    // console.log(item);
-                    //$(".c_kinship_pair").append(new Option(item['c_kinrel'] + ' ' + item['c_kinrel_chn'], item['c_kincode'], false, true));
-                    $(".c_assoc_kinship_pair").append(new Option(item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'], item['c_kincode'], false, true));
+            // 清空现有选项
+            $(".c_assoc_kinship_pair").empty();
+
+            // 调用API获取成对亲属关系
+            $.get('/api/select/search/kinpair', {kin_code: c_assoc_kin_code, person_id: c_assoc_kin_id}, function (data, textStatus){
+                // 如果API返回了数据，添加所有选项
+                if (data && data.length > 0) {
+                    for (let i = 0; i < data.length; i++){
+                        const item = data[i];
+                        const optionText = item['c_kincode'] + ' ' + item['c_kinrel_chn'] + ' ' + item['c_kinrel'];
+                        $(".c_assoc_kinship_pair").append(new Option(optionText, item['c_kincode'], false, false));
+                    }
+                    // 默认选中第一个选项
+                    $(".c_assoc_kinship_pair").val(data[0]['c_kincode']).trigger('change');
+                } else {
+                    // 没有匹配的成对关系，添加默认选项
+                    $(".c_assoc_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
                 }
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                $(".c_assoc_kinship_pair").append(new Option('無對應親屬關係', '0', true, true));
             });
 
         }
@@ -535,7 +558,6 @@
                 //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    console.log(item);
                     var textperson_text = item['text'];
                 }
                 //console.log(textperson_value);

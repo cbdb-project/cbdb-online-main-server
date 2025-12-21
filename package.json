@@ -1,4 +1,5 @@
 {
+  "name": "cbdb-online-main-server",
   "private": true,
   "scripts": {
     "dev": "vite",

@@ -15,6 +15,8 @@
   - **時區設定**：統一使用 GMT+8 時區（Asia/Shanghai）。
   - **CRITICAL 配置要求**：`.env` 中的 `DB_TIMEZONE` **必須**與 `config/app.php` 的 `timezone` 匹配！
     - 正確設定：`DB_TIMEZONE=+08:00`（對應 `APP_TIMEZONE=Asia/Shanghai`）
+    - **必須使用數字偏移格式**（如 `+08:00`），不可使用命名時區（如 `Asia/Shanghai`）
+    - 原因：MySQL 命名時區需要載入 time zone tables，否則會導致 "Unknown or incorrect time zone" 錯誤並中斷所有資料庫連線
     - 如果不匹配：MySQL TIMESTAMP 欄位會產生 8 小時時區偏移（字串看起來相同，但底層 UNIX timestamp 錯誤）
     - 詳細說明請參考 `app/Repositories/ToolsRepository.php` 中的註釋
 - **主要資料夾**：

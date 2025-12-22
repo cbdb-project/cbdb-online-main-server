@@ -12,7 +12,11 @@
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
   - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
 - **日期/時間處理**：使用 Carbon 2.x。
-  - **時區設定**：目前 database 內部分表格欄位出現 datetime 與 timestamp 混用的情況。為避免日期衝突，統一使用 GMT+8 時區。
+  - **時區設定**：統一使用 GMT+8 時區（Asia/Shanghai）。
+  - **CRITICAL 配置要求**：`.env` 中的 `DB_TIMEZONE` **必須**與 `config/app.php` 的 `timezone` 匹配！
+    - 正確設定：`DB_TIMEZONE=+08:00`（對應 `APP_TIMEZONE=Asia/Shanghai`）
+    - 如果不匹配：MySQL TIMESTAMP 欄位會產生 8 小時時區偏移（字串看起來相同，但底層 UNIX timestamp 錯誤）
+    - 詳細說明請參考 `app/Repositories/ToolsRepository.php` 中的註釋
 - **主要資料夾**：
   - `app/Http/Controllers`：Laravel 控制器（如 `OperationsController`）。
   - `app/Repositories`：資料存取與封裝邏輯（如 `OperationRepository`）。

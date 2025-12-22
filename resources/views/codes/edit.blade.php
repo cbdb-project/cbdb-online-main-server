@@ -4,7 +4,8 @@
 
     @php
         $currentUserName = optional(Auth::user())->name;
-        $currentTimestampTaipei = \Carbon\Carbon::now('Asia/Taipei')->format('Y-m-d H:i:s');
+        // Use application timezone (consistent with write operations)
+        $currentTimestamp = \Carbon\Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s');
     @endphp
 
     <div class="card card-default">
@@ -40,7 +41,7 @@
                                 if ($key === 'c_modified_by' && $currentUserName !== null) {
                                     $helpText = '欄位內容提交後會被替換為：' . $currentUserName;
                                 } elseif ($key === 'c_modified_date') {
-                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestampTaipei . ' (GMT+8)';
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestamp;
                                 }
                             }
                         @endphp

@@ -682,9 +682,9 @@ class CodesControllerTest extends TestCase {
 
         // 应该有提示文字说明提交后会被替换的值
         $response->assertSee('欄位內容提交後會被替換為：text-admin', false);
-        // Use Carbon to derive the expected timestamp in Asia/Taipei timezone
-        $expectedTimestamp = Carbon::now()->timezone('Asia/Taipei')->format('Y-m-d H:i:s');
-        $response->assertSee('欄位內容提交後會被替換為：'.$expectedTimestamp.' (GMT+8)', false);
+        // Use config timezone (consistent with write operations)
+        $expectedTimestamp = Carbon::now()->timezone(config('app.timezone'))->format('Y-m-d H:i:s');
+        $response->assertSee('欄位內容提交後會被替換為：'.$expectedTimestamp, false);
 
         Carbon::setTestNow();
     }

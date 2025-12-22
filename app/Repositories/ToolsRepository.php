@@ -19,10 +19,9 @@ class ToolsRepository {
     public function timestamp(array $data, $isCreat = false) {
         if ($isCreat) {
             $data['c_created_by'] = Auth::user()->name;
-            // Store as Carbon object (UTC), which Laravel will:
-            // 1. Convert to TIMESTAMP in database (UTC stored, no timezone info in column)
-            // 2. Serialize to ISO-8601 in JSON (e.g., "2024-12-22T12:00:00.000000Z")
-            // Display logic (CodesController) will convert to Asia/Taipei when showing to users
+            // Store as Carbon object in local timezone (Asia/Shanghai)
+            // Laravel will convert to MySQL TIMESTAMP which stores UTC internally
+            // but displays in system timezone, giving us the correct local time
             $data['c_created_date'] = Carbon::now();
         } else {
             $data['c_modified_by'] = Auth::user()->name;

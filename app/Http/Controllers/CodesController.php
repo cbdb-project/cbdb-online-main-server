@@ -1001,12 +1001,12 @@ class CodesController extends Controller {
 
         foreach ($row as $key => $value) {
             if (in_array($key, $auditFieldOrder, true)) {
-                // 时间戳字段转换为本地时区（Asia/Taipei, GMT+8）
+                // 时间戳字段转换为应用配置的时区
                 if (in_array($key, $timestampFields, true) && $value !== null && $value !== '') {
                     try {
                         $carbon = Carbon::parse($value);
-                        // 转换为 Asia/Taipei 时区（GMT+8）
-                        $carbon->setTimezone('Asia/Taipei');
+                        // 转换为应用配置的时区（与写入时保持一致）
+                        $carbon->setTimezone(config('app.timezone'));
                         $auditFields[$key] = $carbon->format('Y-m-d H:i:s');
                     } catch (\Exception $e) {
                         // 如果解析失败，保持原值

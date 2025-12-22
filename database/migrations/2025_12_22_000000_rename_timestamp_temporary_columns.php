@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -102,10 +101,19 @@ class RenameTimestampTemporaryColumns extends Migration {
     /**
      * Reverse the migrations.
      *
-     * WARNING: This rollback involves DATA LOSS.
-     * - Time components (H:i:s) will be permanently lost during rollback
-     * - Only date components (Y-m-d) are preserved in Ymd format
-     * - Consider this a destructive emergency-only operation
+     * CRITICAL WARNING: This rollback is STRUCTURE-ONLY.
+     *
+     * Due to composite primary keys in most tables (e.g., ALTNAME_DATA has
+     * c_alt_name_chn + c_alt_name_type_code + c_personid), automatic data
+     * conversion is unsafe and could cause data corruption.
+     *
+     * This rollback will:
+     * 1. Rename TIMESTAMP columns back to temporary names
+     * 2. Re-create empty VARCHAR columns
+     * 3. Leave data conversion as a MANUAL operation
+     *
+     * If you need to populate the VARCHAR columns, you must manually run
+     * UPDATE statements with proper WHERE clauses for each table's composite key.
      *
      * @return void
      */
@@ -128,7 +136,8 @@ class RenameTimestampTemporaryColumns extends Migration {
                 });
             }
 
-            // Step 2: Re-create VARCHAR columns
+            // Step 2: Re-create empty VARCHAR columns
+            // NOTE: Data conversion is NOT performed automatically due to composite key complexity
             if (!Schema::hasColumn($table, 'c_created_date')) {
                 Schema::table($table, function ($blueprint) {
                     $blueprint->string('c_created_date', 255)->nullable();
@@ -141,72 +150,7 @@ class RenameTimestampTemporaryColumns extends Migration {
                 });
             }
 
-            // Step 3: Convert timestamp data back to VARCHAR Ymd format
-            // Use database-agnostic approach with Query Builder for portability
-            // Time components will be permanently lost during this conversion
-            if (Schema::hasColumn($table, 'c_created_date_timestamp_temporary')) {
-                // Process in chunks to handle large tables without memory issues
-                $primaryKey = $this->getPrimaryKeyColumn($table);
-                DB::table($table)
-                    ->whereNotNull('c_created_date_timestamp_temporary')
-                    ->orderBy($primaryKey)
-                    ->chunk(1000, function ($rows) use ($table, $primaryKey) {
-                        foreach ($rows as $row) {
-                            $timestamp = $row->c_created_date_timestamp_temporary;
-                            if ($timestamp) {
-                                try {
-                                    $ymd = \Carbon\Carbon::parse($timestamp)->format('Ymd');
-                                    DB::table($table)
-                                        ->where($primaryKey, $row->{$primaryKey})
-                                        ->update(['c_created_date' => $ymd]);
-                                } catch (\Exception $e) {
-                                    // Skip unparseable timestamps
-                                    continue;
-                                }
-                            }
-                        }
-                    });
-            }
-
-            if (Schema::hasColumn($table, 'c_modified_date_timestamp_temporary')) {
-                $primaryKey = $this->getPrimaryKeyColumn($table);
-                DB::table($table)
-                    ->whereNotNull('c_modified_date_timestamp_temporary')
-                    ->orderBy($primaryKey)
-                    ->chunk(1000, function ($rows) use ($table, $primaryKey) {
-                        foreach ($rows as $row) {
-                            $timestamp = $row->c_modified_date_timestamp_temporary;
-                            if ($timestamp) {
-                                try {
-                                    $ymd = \Carbon\Carbon::parse($timestamp)->format('Ymd');
-                                    DB::table($table)
-                                        ->where($primaryKey, $row->{$primaryKey})
-                                        ->update(['c_modified_date' => $ymd]);
-                                } catch (\Exception $e) {
-                                    // Skip unparseable timestamps
-                                    continue;
-                                }
-                            }
-                        }
-                    });
-            }
+            // Data conversion is intentionally skipped - see docblock for details
         }
-    }
-
-    /**
-     * Get the primary key column for a table.
-     * Most tables use c_personid, but some have different primary keys.
-     *
-     * @param string $table
-     * @return string
-     */
-    protected function getPrimaryKeyColumn(string $table): string {
-        // Map of tables to their primary key columns
-        $primaryKeys = [
-            'TEXT_CODES' => 'c_textid',
-            'TEXT_INSTANCE_DATA' => 'c_inst_id',
-        ];
-
-        return $primaryKeys[$table] ?? 'c_personid';
     }
 }

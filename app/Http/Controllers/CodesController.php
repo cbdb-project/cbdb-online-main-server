@@ -965,7 +965,8 @@ class CodesController extends Controller {
 
         // 更新 c_modified_date
         if (array_key_exists('c_modified_date', $data)) {
-            $data['c_modified_date'] = $now->format('Y-m-d H:i:s');
+            // Store as Carbon object (Laravel will convert to TIMESTAMP in DB)
+            $data['c_modified_date'] = $now;
         } elseif (array_key_exists('c_modified_date', $original)) {
             $data['c_modified_date'] = $original['c_modified_date'];
         }

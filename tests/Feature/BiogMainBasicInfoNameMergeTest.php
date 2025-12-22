@@ -68,13 +68,9 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
             $table->smallInteger('c_by_intercalary')->default(0);
             $table->smallInteger('c_dy_intercalary')->default(0);
             $table->string('c_created_by', 50)->nullable();
-            $table->string('c_created_date', 8)->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_created_date')->nullable();
             $table->string('c_modified_by', 50)->nullable();
-            $table->string('c_modified_date', 8)->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
             // BiogMain 模型不使用 Laravel timestamps
         });
 

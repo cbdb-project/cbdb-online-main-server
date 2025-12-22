@@ -871,13 +871,9 @@ class CodesController extends Controller {
             $data['c_created_by'] = Auth::user()->name;
         }
 
-        // Dual write: c_created_date (Ymd format) 和 c_created_date_timestamp_temporary (Y-m-d H:i:s format)
         if (in_array('c_created_date', $columns, true)) {
-            $data['c_created_date'] = $now->format('Ymd');
-        }
-
-        if (in_array('c_created_date_timestamp_temporary', $columns, true)) {
-            $data['c_created_date_timestamp_temporary'] = $now->format('Y-m-d H:i:s');
+            // Store as Carbon object (Laravel will convert to TIMESTAMP in DB)
+            $data['c_created_date'] = $now;
         }
 
         return $data;
@@ -952,7 +948,7 @@ class CodesController extends Controller {
         $now = Carbon::now();
 
         // 保护 created_* 字段不被修改
-        foreach (['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'] as $field) {
+        foreach (['c_created_by', 'c_created_date'] as $field) {
             if (array_key_exists($field, $data) && array_key_exists($field, $original)) {
                 $data[$field] = $original[$field];
             }
@@ -967,18 +963,12 @@ class CodesController extends Controller {
             }
         }
 
-        // Dual write: c_modified_date (Ymd format) 和 c_modified_date_timestamp_temporary (Y-m-d H:i:s format)
-        // 使用同一个时间戳确保两者完全一致
+        // 更新 c_modified_date
         if (array_key_exists('c_modified_date', $data)) {
-            $data['c_modified_date'] = $now->format('Ymd');
+            // Store as Carbon object (Laravel will convert to TIMESTAMP in DB)
+            $data['c_modified_date'] = $now;
         } elseif (array_key_exists('c_modified_date', $original)) {
             $data['c_modified_date'] = $original['c_modified_date'];
-        }
-
-        if (array_key_exists('c_modified_date_timestamp_temporary', $data)) {
-            $data['c_modified_date_timestamp_temporary'] = $now->format('Y-m-d H:i:s');
-        } elseif (array_key_exists('c_modified_date_timestamp_temporary', $original)) {
-            $data['c_modified_date_timestamp_temporary'] = $original['c_modified_date_timestamp_temporary'];
         }
 
         return $data;
@@ -995,16 +985,14 @@ class CodesController extends Controller {
         $auditFieldOrder = [
             'c_created_by',
             'c_created_date',
-            'c_created_date_timestamp_temporary',
             'c_modified_by',
             'c_modified_date',
-            'c_modified_date_timestamp_temporary',
         ];
 
         // 时间戳字段需要转换时区
         $timestampFields = [
-            'c_created_date_timestamp_temporary',
-            'c_modified_date_timestamp_temporary',
+            'c_created_date',
+            'c_modified_date',
         ];
 
         // 分离审计字段和其他字段
@@ -1013,12 +1001,12 @@ class CodesController extends Controller {
 
         foreach ($row as $key => $value) {
             if (in_array($key, $auditFieldOrder, true)) {
-                // 时间戳字段转换为本地时区（Asia/Taipei, GMT+8）
+                // 时间戳字段转换为应用配置的时区
                 if (in_array($key, $timestampFields, true) && $value !== null && $value !== '') {
                     try {
                         $carbon = Carbon::parse($value);
-                        // 转换为 Asia/Taipei 时区（GMT+8）
-                        $carbon->setTimezone('Asia/Taipei');
+                        // 转换为应用配置的时区（与写入时保持一致）
+                        $carbon->setTimezone(config('app.timezone'));
                         $auditFields[$key] = $carbon->format('Y-m-d H:i:s');
                     } catch (\Exception $e) {
                         // 如果解析失败，保持原值

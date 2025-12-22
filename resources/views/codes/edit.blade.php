@@ -4,8 +4,8 @@
 
     @php
         $currentUserName = optional(Auth::user())->name;
-        $currentDateYmd = \Carbon\Carbon::now()->format('Ymd');
-        $currentTimestampTaipei = \Carbon\Carbon::now('Asia/Taipei')->format('Y-m-d H:i:s');
+        // Use application timezone (consistent with write operations)
+        $currentTimestamp = \Carbon\Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s');
     @endphp
 
     <div class="card card-default">
@@ -29,8 +29,8 @@
                     @endif
                     @foreach($row as $key => $value)
                         @php
-                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date', 'c_created_date_timestamp_temporary'], true);
-                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date', 'c_modified_date_timestamp_temporary'], true);
+                            $isCreatedField = in_array($key, ['c_created_by', 'c_created_date'], true);
+                            $isModifiedField = in_array($key, ['c_modified_by', 'c_modified_date'], true);
                             // 显示原始值而不是替换后的值
                             $inputValue = $value;
                             $shouldDisable = $isCreatedField || $isModifiedField;
@@ -41,9 +41,7 @@
                                 if ($key === 'c_modified_by' && $currentUserName !== null) {
                                     $helpText = '欄位內容提交後會被替換為：' . $currentUserName;
                                 } elseif ($key === 'c_modified_date') {
-                                    $helpText = '欄位內容提交後會被替換為：' . $currentDateYmd;
-                                } elseif ($key === 'c_modified_date_timestamp_temporary') {
-                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestampTaipei . ' (GMT+8)';
+                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestamp;
                                 }
                             }
                         @endphp

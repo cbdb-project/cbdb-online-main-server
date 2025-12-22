@@ -39,12 +39,8 @@ class BasicInformationSourcesControllerTest extends TestCase {
             $table->tinyInteger('c_self_bio')->default(0);
             $table->string('c_created_by')->nullable();
             $table->timestamp('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {

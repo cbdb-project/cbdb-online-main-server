@@ -40,13 +40,9 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             $table->string('c_source')->nullable();
             $table->longText('c_notes')->nullable();
             $table->string('c_created_by')->nullable();
-            $table->string('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
-            $table->string('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
         });
 
         Schema::create('BIOG_MAIN', function (Blueprint $table) {

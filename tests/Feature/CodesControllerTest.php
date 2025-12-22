@@ -219,14 +219,20 @@ class CodesControllerTest extends TestCase {
         $this->assertCount(1, $this->fakeDb->tables['TEXT_CODES']);
         $row = $this->fakeDb->tables['TEXT_CODES'][0];
         $this->assertSame('audit-user', $row['c_created_by']);
-        $this->assertSame(Carbon::now()->format('Ymd'), $row['c_created_date']);
+        // Carbon object is stored directly in fake DB (real DB would convert to TIMESTAMP)
+        $this->assertInstanceOf(Carbon::class, $row['c_created_date']);
+        $this->assertEquals(Carbon::now()->timestamp, $row['c_created_date']->timestamp, '', 1);
         $this->assertSame('Sample', $row['c_title']);
         $this->assertSame('範例', $row['c_title_chn']);
 
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
         $this->assertSame('audit-user', $call['resource_data']['c_created_by']);
-        $this->assertSame(Carbon::now()->format('Ymd'), $call['resource_data']['c_created_date']);
+        // After DB round-trip, Laravel Query Builder returns TIMESTAMP as ISO-8601 string
+        $this->assertIsString($call['resource_data']['c_created_date']);
+        // Parse the ISO-8601 string and verify it matches expected time
+        $parsedTime = Carbon::parse($call['resource_data']['c_created_date']);
+        $this->assertEquals(Carbon::now()->timestamp, $parsedTime->timestamp, '', 1);
 
         Carbon::setTestNow();
     }
@@ -630,9 +636,9 @@ class CodesControllerTest extends TestCase {
                 'c_title' => 'Sample Title',
                 'c_title_chn' => 'Sample Title CHN',
                 'c_created_by' => 'origin',
-                'c_created_date' => '20200101',
+                'c_created_date' => '2020-01-01 00:00:00',
                 'c_modified_by' => 'previous',
-                'c_modified_date' => '20200102',
+                'c_modified_date' => '2020-01-02 00:00:00',
             ],
         ]);
 
@@ -659,7 +665,7 @@ class CodesControllerTest extends TestCase {
         // c_created_date 应显示原始值并且 readonly
         $createdDatePos = strpos($content, 'name="c_created_date"');
         $this->assertNotFalse($createdDatePos);
-        $this->assertNotFalse(strpos($content, 'value="20200101"', $createdDatePos));
+        $this->assertNotFalse(strpos($content, 'value="2020-01-01 00:00:00"', $createdDatePos));
         $this->assertNotFalse(strpos($content, 'readonly', $createdDatePos));
 
         // c_modified_by 应显示原始值（"previous"）而非当前用户，并且 readonly
@@ -668,15 +674,17 @@ class CodesControllerTest extends TestCase {
         $this->assertNotFalse(strpos($content, 'value="previous"', $modifiedByPos));
         $this->assertNotFalse(strpos($content, 'readonly', $modifiedByPos));
 
-        // c_modified_date 应显示原始值（"20200102"）而非当前日期，并且 readonly
+        // c_modified_date 应显示原始值（"2020-01-02 00:00:00"）而非当前日期，并且 readonly
         $modifiedDatePos = strpos($content, 'name="c_modified_date"');
         $this->assertNotFalse($modifiedDatePos);
-        $this->assertNotFalse(strpos($content, 'value="20200102"', $modifiedDatePos));
+        $this->assertNotFalse(strpos($content, 'value="2020-01-02 00:00:00"', $modifiedDatePos));
         $this->assertNotFalse(strpos($content, 'readonly', $modifiedDatePos));
 
         // 应该有提示文字说明提交后会被替换的值
         $response->assertSee('欄位內容提交後會被替換為：text-admin', false);
-        $response->assertSee('欄位內容提交後會被替換為：'.Carbon::now()->format('Ymd'), false);
+        // Use config timezone (consistent with write operations)
+        $expectedTimestamp = Carbon::now()->timezone(config('app.timezone'))->format('Y-m-d H:i:s');
+        $response->assertSee('欄位內容提交後會被替換為：'.$expectedTimestamp, false);
 
         Carbon::setTestNow();
     }

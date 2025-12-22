@@ -85,13 +85,9 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             $table->string('c_alt_name_chn')->nullable();
             $table->integer('c_source')->nullable();
             $table->string('c_created_by')->nullable();
-            $table->string('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
-            $table->string('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
 
             // 實際資料庫使用復合主鍵，但 SQLite 測試環境簡化處理
             $table->index(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], 'idx_altname_pk');

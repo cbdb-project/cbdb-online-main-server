@@ -39,8 +39,6 @@ class OfficeAddressOperationLoggingTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
@@ -50,12 +48,8 @@ class OfficeAddressOperationLoggingTest extends TestCase {
             $table->integer('c_addr_id');
             $table->string('c_created_by')->nullable();
             $table->timestamp('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('POSTING_DATA', function (Blueprint $table) {
@@ -63,12 +57,8 @@ class OfficeAddressOperationLoggingTest extends TestCase {
             $table->integer('c_posting_id')->primary();
             $table->string('c_created_by')->nullable();
             $table->timestamp('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
         });
 
         Schema::create('operations', function (Blueprint $table) {

@@ -11,7 +11,8 @@ class CreateViewAddressesView extends Migration {
             $table->index(['c_addr_id', 'c_firstyear', 'c_lastyear'], 'idx_addr_year');
         });
 
-        DB::statement("
+        $isSqlite = DB::getDriverName() === 'sqlite';
+        $sql = "
           CREATE OR REPLACE VIEW View_Address AS
           SELECT
             a0.c_addr_id,
@@ -137,7 +138,16 @@ class CreateViewAddressesView extends Migration {
           
           -- 过滤掉无效的时间段（结束年早于开始年）
           HAVING c_lastyear >= c_firstyear OR c_lastyear = 9999
-        ");
+        ";
+
+        if ($isSqlite) {
+            DB::statement("DROP VIEW IF EXISTS View_Address");
+            $sql = str_replace('CREATE OR REPLACE VIEW', 'CREATE VIEW', $sql);
+            $sql = str_replace('GREATEST', 'MAX', $sql);
+            $sql = str_replace('LEAST', 'MIN', $sql);
+        }
+
+        DB::statement($sql);
     }
 
     public function down() {

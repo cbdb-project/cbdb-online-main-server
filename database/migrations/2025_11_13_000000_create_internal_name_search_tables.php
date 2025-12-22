@@ -35,13 +35,22 @@ class CreateInternalNameSearchTables extends Migration {
         // 使用 VARBINARY(4) 以繞過 MySQL 8.0 對 utf8mb4 非BMP字符主鍵索引的 bug
         // utf8mb4 字符類型 (CHAR/VARCHAR) 會將不同的4字節字符誤判為重複
         // VARBINARY 按字節存儲，使用二進制比較，可正確區分所有 UTF-8 字符
-        DB::statement("
+        $sql = "
             CREATE TABLE CBDB__TRAD_SIMP_MAP (
                 trad_char VARBINARY(4) NOT NULL COMMENT '繁體字（UTF-8二進制）',
                 simp_char VARBINARY(4) NOT NULL COMMENT '簡體字（UTF-8二進制）',
                 PRIMARY KEY (trad_char)
             ) ENGINE=InnoDB
-        ");
+        ";
+
+        if (DB::getDriverName() === 'sqlite') {
+            // Remove COMMENT clauses
+            $sql = preg_replace('/COMMENT\s+\'[^\']*\'/i', '', $sql);
+            // Remove ENGINE clause
+            $sql = preg_replace('/ENGINE\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+        }
+
+        DB::statement($sql);
     }
 
     /**

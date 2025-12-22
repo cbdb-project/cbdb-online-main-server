@@ -13,7 +13,7 @@ class MichaelRestructurePlanSchemaUpdates extends Migration {
      */
     public function up() {
         // Disable foreign key checks to allow modifying columns used in foreign keys
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        disable_foreign_keys();
 
         // Add NOT NULL constraints to GANZHI_CODES
         if (Schema::hasTable('GANZHI_CODES')) {
@@ -215,7 +215,7 @@ class MichaelRestructurePlanSchemaUpdates extends Migration {
         }
 
         // Re-enable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        enable_foreign_keys();
     }
 
     /**
@@ -225,7 +225,7 @@ class MichaelRestructurePlanSchemaUpdates extends Migration {
      */
     public function down() {
         // Disable foreign key checks to allow modifying columns used in foreign keys
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        disable_foreign_keys();
 
         // Reverse NOT NULL constraints for GANZHI_CODES
         if (Schema::hasTable('GANZHI_CODES')) {
@@ -357,6 +357,6 @@ class MichaelRestructurePlanSchemaUpdates extends Migration {
         }
 
         // Re-enable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        enable_foreign_keys();
     }
 }

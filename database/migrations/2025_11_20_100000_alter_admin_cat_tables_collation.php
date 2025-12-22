@@ -12,6 +12,10 @@ class AlterAdminCatTablesCollation extends Migration {
      * @return void
      */
     public function up() {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Step 1: Drop foreign key constraints from ADMIN_CAT_CODE_TYPE_REL
         Schema::table('ADMIN_CAT_CODE_TYPE_REL', function (Blueprint $table) {
             $table->dropForeign('fk_admin_cat_code');

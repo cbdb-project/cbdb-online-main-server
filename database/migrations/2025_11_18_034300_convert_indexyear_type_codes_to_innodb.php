@@ -17,7 +17,9 @@ class ConvertIndexyearTypeCodesToInnodb extends Migration {
      */
     public function up() {
         // 將 INDEXYEAR_TYPE_CODES 表轉換為 InnoDB 引擎
-        DB::statement('ALTER TABLE INDEXYEAR_TYPE_CODES ENGINE=InnoDB');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE INDEXYEAR_TYPE_CODES ENGINE=InnoDB');
+        }
     }
 
     /**
@@ -27,6 +29,8 @@ class ConvertIndexyearTypeCodesToInnodb extends Migration {
      */
     public function down() {
         // 還原為 MyISAM 引擎
-        DB::statement('ALTER TABLE INDEXYEAR_TYPE_CODES ENGINE=MyISAM');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE INDEXYEAR_TYPE_CODES ENGINE=MyISAM');
+        }
     }
 }

@@ -140,5 +140,9 @@ Route::middleware('auth')->group(function () {
         ->name('admin.cbdb-table-maintenance.progress');
     Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')->name('admin.unidirectional-relationship-repair');
     Route::post('admin/unidirectional-relationship-repair/kinship', 'UnidirectionalRelationshipRepairController@repairKinship')->name('admin.unidirectional-relationship-repair.kinship');
+    // Query Playground
+    Route::get('query-playground', 'QueryPlaygroundController@index')->name('query-playground.index');
+    Route::post('query-playground/run', 'QueryPlaygroundController@run')->name('query-playground.run');
+
     Route::post('admin/unidirectional-relationship-repair/assoc', 'UnidirectionalRelationshipRepairController@repairAssoc')->name('admin.unidirectional-relationship-repair.assoc');
 });

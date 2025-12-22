@@ -13,13 +13,18 @@ class ImportCbdbSchema extends Migration {
      * matches the current database structure.
      */
     public function up(): void {
+        // Disable foreign key checks to allow modifying columns used in foreign keys
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
         $statements = $this->extractCreateStatements($this->schemaSql());
 
         if (empty($statements)) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
             return;
         }
 
-        DB::transaction(function () use ($statements) {
+        try {
             foreach ($statements as $table => $statement) {
                 if (Schema::hasTable($table)) {
                     continue;
@@ -27,7 +32,10 @@ class ImportCbdbSchema extends Migration {
 
                 DB::statement($statement);
             }
-        });
+        } finally {
+            // Re-enable foreign key checks even if a statement fails.
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        }
     }
 
     protected function schemaSql(): string {

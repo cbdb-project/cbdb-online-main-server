@@ -19,15 +19,14 @@ class ToolsRepository {
     public function timestamp(array $data, $isCreat = false) {
         if ($isCreat) {
             $data['c_created_by'] = Auth::user()->name;
-            #20251217更新 create 和 modify 欄位時間的寫入方式
-            # 同時更新新舊兩個欄位以保持相容性
-            $data['c_created_date'] = Carbon::now()->format('Ymd');
-            $data['c_created_date_timestamp_temporary'] = Carbon::now();
+            // Store as Carbon object (UTC), which Laravel will:
+            // 1. Convert to TIMESTAMP in database (UTC stored, no timezone info in column)
+            // 2. Serialize to ISO-8601 in JSON (e.g., "2024-12-22T12:00:00.000000Z")
+            // Display logic (CodesController) will convert to Asia/Taipei when showing to users
+            $data['c_created_date'] = Carbon::now();
         } else {
             $data['c_modified_by'] = Auth::user()->name;
-            # 同時更新新舊兩個欄位以保持相容性
-            $data['c_modified_date'] = Carbon::now()->format('Ymd');
-            $data['c_modified_date_timestamp_temporary'] = Carbon::now();
+            $data['c_modified_date'] = Carbon::now();
         }
 
         return $data;

@@ -98,13 +98,9 @@ class CbdbApiPersonTest extends TestCase {
             $table->integer('c_source')->nullable();
             $table->string('c_pages')->nullable();
             $table->string('c_created_by')->nullable();
-            $table->string('c_created_date')->nullable();
-
-            $table->timestamp('c_created_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
-            $table->string('c_modified_date')->nullable();
-
-            $table->timestamp('c_modified_date_timestamp_temporary')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
         });
 
         Schema::create('ADDR_CODES', function (Blueprint $table) {

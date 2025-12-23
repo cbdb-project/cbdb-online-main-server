@@ -2,7 +2,7 @@
 # FrankenPHP 容器启动脚本
 # 用于开发环境，处理依赖安装和缓存清理
 
-set -e
+# set -e  # 注释掉以便调试，允许脚本在错误后继续运行
 
 echo "🧟 FrankenPHP 容器启动中..."
 
@@ -37,36 +37,44 @@ fi
 #chown -R www-data:www-data storage bootstrap/cache database 2>/dev/null || true
 #chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
 
-# 5. 处理 SQLite 数据库位置 (自动迁移)
-# 目标路径: /app/db-data/database.sqlite3 (Docker Volume)
-# 源路径: /app/database/database.sqlite3 (代码库中, 可能存在)
+# 5. 处理 SQLite 数据库位置
+# Single Source of Truth: /app/db-data/database.sqlite3 (Docker Volume，持久化)
+# 初始化源: /app/database/database.sqlite3 (仅在首次初始化时使用)
 DB_DIR="/app/db-data"
 DB_FILE="$DB_DIR/database.sqlite3"
-OLD_DB_FILE="/app/database/database.sqlite3"
+INIT_DB_FILE="/app/database/database.sqlite3"
 
 # 确保目录存在
 mkdir -p "$DB_DIR"
 chown -R www-data:www-data "$DB_DIR"
 chmod -R 775 "$DB_DIR"
 
-if [ ! -f "$DB_FILE" ]; then
-    echo "🗄️  新数据库文件不存在: $DB_FILE"
-    if [ -f "$OLD_DB_FILE" ]; then
-        echo "🔄 检测到旧数据库文件，正在迁移..."
-        cp "$OLD_DB_FILE" "$DB_FILE"
-        echo "✅ 迁移完成"
-    else
-        echo "🆕 创建空数据库文件..."
-        touch "$DB_FILE"
-    fi
+# 数据库初始化逻辑（db-data 为 SoT）
+if [ -f "$DB_FILE" ]; then
+    echo "✅ 使用持久化数据库 (SoT): $DB_FILE"
+elif [ -f "$INIT_DB_FILE" ]; then
+    echo "🔄 首次初始化: 从 $INIT_DB_FILE 复制到 $DB_FILE"
+    cp "$INIT_DB_FILE" "$DB_FILE"
+    echo "✅ 初始化完成，后续将使用 $DB_FILE 作为 SoT"
     # 确保文件权限
     chown www-data:www-data "$DB_FILE"
     chmod 664 "$DB_FILE"
 else
-    echo "✅ 使用持久化数据库: $DB_FILE"
+    echo "🆕 未找到数据库文件，创建空数据库..."
+    touch "$DB_FILE"
+    chown www-data:www-data "$DB_FILE"
+    chmod 664 "$DB_FILE"
 fi
 
-# 6. 显示 SQLite 信息
+# 6. 更新 .env 中的数据库路径
+echo "🔧 更新 .env 数据库路径..."
+if [ -f ".env" ]; then
+    # 使用 sed 替换 DB_DATABASE 路径
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_FILE|" .env
+    echo "✅ 数据库路径已更新为: $DB_FILE"
+fi
+
+# 7. 显示 SQLite 信息
 if [ -f "$DB_FILE" ]; then
     echo "📊 数据库状态:"
     ls -lh "$DB_FILE"
@@ -83,13 +91,26 @@ echo "🔍 检查管理员账户..."
 if ! php artisan cbdb:manage-user --list | grep -q "admin@example.com"; then
     echo "👤 未检测到管理员账户，正在创建..."
     # 创建超级管理员 (active=1, role=super-admin)
-    php artisan cbdb:manage-user \
+    if php artisan cbdb:manage-user \
         --email="admin@example.com" \
         --name="System Admin" \
         --password="password" \
         --active=1 \
-        --role="super-admin"
-    echo "✅ 管理员账户已创建: admin@example.com / password"
+        --role="super-admin" \
+        --no-interaction; then
+        echo "✅ 管理员账户已创建: admin@example.com / password"
+    else
+        echo "❌ 管理员账户创建失败！"
+        echo "🐛 容器将保持运行以便调试..."
+        echo "💡 使用以下命令进入容器调试:"
+        echo "   docker exec -it cbdb-frankenphp /bin/bash"
+        echo "💡 或者使用 docker-compose:"
+        echo "   docker-compose exec frankenphp /bin/bash"
+        echo ""
+        echo "⏸️  容器将保持运行状态..."
+        # 保持容器运行，等待手动调试
+        tail -f /dev/null
+    fi
 else
     echo "✅ 管理员账户已存在: admin@example.com"
 fi

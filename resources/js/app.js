@@ -160,6 +160,32 @@ const installModalFocusFix = () => {
     });
 };
 
+const installMobileSidebarDismiss = () => {
+    if (!$.fn?.PushMenu) {
+        return;
+    }
+
+    const shouldClose = (event) => {
+        if (window.innerWidth > 991) {
+            return;
+        }
+        if (!document.body.classList.contains('sidebar-open')) {
+            return;
+        }
+        if (event.target.closest('.main-sidebar')) {
+            return;
+        }
+        if (event.target.closest('[data-widget="pushmenu"]')) {
+            return;
+        }
+
+        $('[data-widget="pushmenu"]').PushMenu('collapse');
+    };
+
+    document.addEventListener('click', shouldClose, true);
+    document.addEventListener('touchstart', shouldClose, { capture: true, passive: true });
+};
+
 // CSRF token setup
 const token = document.head.querySelector('meta[name="csrf-token"]');
 if (token) {
@@ -179,6 +205,7 @@ window.createVueApp = createApp;
 
 // Install global modal focus guard when DOM is ready
 $(installModalFocusFix);
+$(installMobileSidebarDismiss);
 
 // Auto-mount Vue app if #app element exists, then signal readiness
 $(function() {

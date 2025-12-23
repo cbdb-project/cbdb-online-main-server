@@ -14,12 +14,11 @@ class ImportCbdbSchema extends Migration {
      */
     public function up(): void {
         // Disable foreign key checks to allow modifying columns used in foreign keys
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
-
+        disable_foreign_keys();
         $statements = $this->extractCreateStatements($this->schemaSql());
 
         if (empty($statements)) {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            enable_foreign_keys();
 
             return;
         }
@@ -30,11 +29,15 @@ class ImportCbdbSchema extends Migration {
                     continue;
                 }
 
+                if (is_sqlite()) {
+                    $statement = $this->sanitizeForSqlite($statement);
+                }
+
                 DB::statement($statement);
             }
         } finally {
             // Re-enable foreign key checks even if a statement fails.
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            enable_foreign_keys();
         }
     }
 
@@ -2387,6 +2390,62 @@ SQL;
      */
     public function down(): void {
         // Intentionally left blank. This migration serves as a historical baseline.
+    }
+
+    /**
+     * Sanitize MySQL-specific SQL statements for SQLite compatibility.
+     */
+    protected function sanitizeForSqlite(string $sql): string {
+        // 1. Remove MySQL table options (ENGINE, CHARSET, COLLATE, ROW_FORMAT, etc.)
+        // These typically appear after the final closing parenthesis.
+        $sql = preg_replace('/\)\s*(ENGINE|DEFAULT\s+CHARSET|COLLATE|ROW_FORMAT)\s*=\s*[a-zA-Z0-9_]+.*$/is', ')', $sql);
+
+        // 2. Remove COLLATE and CHARACTER SET from column definitions
+        $sql = preg_replace('/COLLATE\s+[a-zA-Z0-9_]+/i', '', $sql);
+        $sql = preg_replace('/CHARACTER SET\s+[a-zA-Z0-9_]+/i', '', $sql);
+
+        // 3. Remove MySQL-specific index hints and storage options
+        $sql = preg_replace('/USING\s+(BTREE|HASH)/i', '', $sql);
+
+        // 4. Remove standalone KEY/INDEX definitions (SQLite doesn't support them inside CREATE TABLE)
+        $lines = explode("\n", $sql);
+        $filtered = [];
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            // Match standalone KEY or INDEX, but NOT PRIMARY KEY or UNIQUE KEY
+            // SQLite supports UNIQUE (cols) but not UNIQUE KEY `name` (cols)
+            if (preg_match('/^(KEY|INDEX)\s+[`a-zA-Z0-9_]+/i', $trimmed)) {
+                continue;
+            }
+            if (preg_match('/^UNIQUE\s+KEY\s+[`a-zA-Z0-9_]+/i', $trimmed)) {
+                // Convert to standard UNIQUE constraint
+                $line = preg_replace('/UNIQUE\s+KEY\s+[`a-zA-Z0-9_]+/i', 'UNIQUE', $line);
+            }
+            $filtered[] = $line;
+        }
+        $sql = implode("\n", $filtered);
+
+        // 5. Handle AUTO_INCREMENT and unsigned types
+        // SQLite uses INTEGER PRIMARY KEY AUTOINCREMENT for auto-incrementing IDs.
+        if (stripos($sql, 'AUTO_INCREMENT') !== false) {
+            if (preg_match('/`([^`]+)`\s+(?:int|bigint|tinyint|smallint)(?:\(\d+\))?\s*(?:unsigned)?\s*(?:NOT\s+NULL)?\s+AUTO_INCREMENT/i', $sql, $matches)) {
+                $colName = $matches[1];
+                $sql = preg_replace('/`' . preg_quote($colName, '/') . '`\s+(?:int|bigint|tinyint|smallint)(?:\(\d+\))?\s*(?:unsigned)?\s*(?:NOT\s+NULL)?\s+AUTO_INCREMENT/i', "`$colName` INTEGER PRIMARY KEY AUTOINCREMENT", $sql);
+
+                // Remove the redundant PRIMARY KEY constraint at the bottom
+                $sql = preg_replace('/,\s*PRIMARY\s+KEY\s+\(\s*[`\'"]?' . preg_quote($colName, '/') . '[`\'"]?\s*\)/i', '', $sql);
+            }
+        }
+
+        // 6. Remove remaining 'unsigned' and 'int(11)' style types
+        $sql = preg_replace('/\bunsigned\b/i', '', $sql);
+        $sql = preg_replace('/\b(?:int|bigint|tinyint|smallint)\(\d+\)/i', 'INTEGER', $sql);
+        $sql = preg_replace('/\b(int|bigint|tinyint|smallint)\b(?! PRIMARY KEY)/i', 'INTEGER', $sql);
+
+        // 7. Final clean up of trailing commas
+        $sql = preg_replace('/,\s*\)/m', "\n)", $sql);
+
+        return $sql;
     }
 
     /**

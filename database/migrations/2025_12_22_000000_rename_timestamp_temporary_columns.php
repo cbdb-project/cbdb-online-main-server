@@ -65,6 +65,9 @@ class RenameTimestampTemporaryColumns extends Migration {
         }
 
         // All validation passed, proceed with migration
+        // Disable foreign key checks to allow modifying columns used in foreign keys
+        disable_foreign_keys();
+
         foreach ($this->tables as $table) {
             if (!Schema::hasTable($table)) {
                 continue;
@@ -96,6 +99,7 @@ class RenameTimestampTemporaryColumns extends Migration {
                 });
             }
         }
+        enable_foreign_keys();
     }
 
     /**

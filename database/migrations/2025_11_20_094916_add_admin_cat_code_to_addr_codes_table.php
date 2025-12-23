@@ -43,7 +43,9 @@ class AddAdminCatCodeToAddrCodesTable extends Migration {
     public function down() {
         if ($this->foreignKeyExists('ADDR_CODES', 'fk_addr_codes_admin_cat_code')) {
             Schema::table('ADDR_CODES', function (Blueprint $table) {
-                $table->dropForeign('fk_addr_codes_admin_cat_code');
+                if (DB::getDriverName() !== 'sqlite') {
+                    $table->dropForeign('fk_addr_codes_admin_cat_code');
+                }
             });
         }
 
@@ -58,6 +60,20 @@ class AddAdminCatCodeToAddrCodesTable extends Migration {
      * Determine if a foreign key already exists on the table.
      */
     protected function foreignKeyExists(string $table, string $keyName): bool {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't store named constraints in a systemic table like information_schema.
+            // We check for the existence of a foreign key targeting the specific table and column.
+            $foreignKeys = DB::select("PRAGMA foreign_key_list(`{$table}`)");
+            foreach ($foreignKeys as $fk) {
+                // In this specific migration, we check for c_admin_cat_code -> ADMIN_CAT_CODES
+                if ($fk->table === 'ADMIN_CAT_CODES' && $fk->from === 'c_admin_cat_code') {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $database = Schema::getConnection()->getDatabaseName();
 
         return DB::table('information_schema.TABLE_CONSTRAINTS')

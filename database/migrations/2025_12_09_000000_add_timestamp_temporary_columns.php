@@ -108,26 +108,58 @@ class AddTimestampTemporaryColumns extends Migration {
      * @return void
      */
     protected function convertDates(string $table): void {
+        $isSqlite = DB::getDriverName() === 'sqlite';
+
         // Update c_created_date_timestamp_temporary
         if (Schema::hasColumn($table, 'c_created_date')) {
-            DB::statement("
-                UPDATE `{$table}`
-                SET `c_created_date_timestamp_temporary` = STR_TO_DATE(`c_created_date`, '%Y%m%d')
-                WHERE `c_created_date` IS NOT NULL
-                  AND `c_created_date` != ''
-                  AND `c_created_date` REGEXP '^[0-9]{8}$'
-            ");
+            if ($isSqlite) {
+                DB::statement("
+                    UPDATE `{$table}`
+                    SET `c_created_date_timestamp_temporary` = datetime(
+                        substr(`c_created_date`, 1, 4) || '-' || 
+                        substr(`c_created_date`, 5, 2) || '-' || 
+                        substr(`c_created_date`, 7, 2) || ' 00:00:00'
+                    )
+                    WHERE `c_created_date` IS NOT NULL
+                      AND `c_created_date` != ''
+                      AND length(`c_created_date`) = 8
+                      AND `c_created_date` GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                ");
+            } else {
+                DB::statement("
+                    UPDATE `{$table}`
+                    SET `c_created_date_timestamp_temporary` = STR_TO_DATE(`c_created_date`, '%Y%m%d')
+                    WHERE `c_created_date` IS NOT NULL
+                      AND `c_created_date` != ''
+                      AND `c_created_date` REGEXP '^[0-9]{8}$'
+                ");
+            }
         }
 
         // Update c_modified_date_timestamp_temporary
         if (Schema::hasColumn($table, 'c_modified_date')) {
-            DB::statement("
-                UPDATE `{$table}`
-                SET `c_modified_date_timestamp_temporary` = STR_TO_DATE(`c_modified_date`, '%Y%m%d')
-                WHERE `c_modified_date` IS NOT NULL
-                  AND `c_modified_date` != ''
-                  AND `c_modified_date` REGEXP '^[0-9]{8}$'
-            ");
+            if ($isSqlite) {
+                DB::statement("
+                    UPDATE `{$table}`
+                    SET `c_modified_date_timestamp_temporary` = datetime(
+                        substr(`c_modified_date`, 1, 4) || '-' || 
+                        substr(`c_modified_date`, 5, 2) || '-' || 
+                        substr(`c_modified_date`, 7, 2) || ' 00:00:00'
+                    )
+                    WHERE `c_modified_date` IS NOT NULL
+                      AND `c_modified_date` != ''
+                      AND length(`c_modified_date`) = 8
+                      AND `c_modified_date` GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                ");
+            } else {
+                DB::statement("
+                    UPDATE `{$table}`
+                    SET `c_modified_date_timestamp_temporary` = STR_TO_DATE(`c_modified_date`, '%Y%m%d')
+                    WHERE `c_modified_date` IS NOT NULL
+                      AND `c_modified_date` != ''
+                      AND `c_modified_date` REGEXP '^[0-9]{8}$'
+                ");
+            }
         }
     }
 }

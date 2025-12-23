@@ -37,7 +37,7 @@ class BasicInformationPagesLoadTest extends TestCase {
         $this->createMinimalTables();
 
         // 创建测试用户（用于需要认证的页面）
-        $this->user = factory(User::class)->create([
+        $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'is_active' => 1,

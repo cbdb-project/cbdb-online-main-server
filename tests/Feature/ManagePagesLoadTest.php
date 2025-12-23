@@ -67,7 +67,7 @@ class ManagePagesLoadTest extends TestCase {
      */
     protected function createTestUsers() {
         // 创建管理员用户（用于认证和访问管理页面）
-        $this->adminUser = factory(User::class)->create([
+        $this->adminUser = User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'is_active' => 1,
@@ -77,7 +77,7 @@ class ManagePagesLoadTest extends TestCase {
         ]);
 
         // 创建普通用户（用于在列表中显示）
-        $this->regularUser = factory(User::class)->create([
+        $this->regularUser = User::factory()->create([
             'name' => 'Regular User',
             'email' => 'regular@example.com',
             'institution' => 'Test Institution',
@@ -88,7 +88,7 @@ class ManagePagesLoadTest extends TestCase {
         ]);
 
         // 创建一个专家用户
-        factory(User::class)->create([
+        User::factory()->create([
             'name' => 'Expert User',
             'email' => 'expert@example.com',
             'is_active' => 1,
@@ -98,7 +98,7 @@ class ManagePagesLoadTest extends TestCase {
         ]);
 
         // 创建一个众包用户
-        factory(User::class)->create([
+        User::factory()->create([
             'name' => 'Crowdsource User',
             'email' => 'crowd@example.com',
             'is_active' => 0,
@@ -108,7 +108,7 @@ class ManagePagesLoadTest extends TestCase {
         ]);
 
         // 创建一个被删除的用户（不应该在列表中显示）
-        factory(User::class)->create([
+        User::factory()->create([
             'name' => 'Deleted User',
             'email' => 'deleted@example.com-2024-01-01',
             'is_active' => 0,

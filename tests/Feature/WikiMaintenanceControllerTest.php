@@ -32,7 +32,7 @@ class WikiMaintenanceControllerTest extends TestCase {
         $this->createTestTables();
 
         // 创建测试用户
-        $this->user = factory(User::class)->create([
+        $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'is_active' => 1,

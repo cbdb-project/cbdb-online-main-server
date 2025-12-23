@@ -46,7 +46,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
         $this->createMinimalTables();
 
         // 創建管理員用戶（使用 factory）
-        $this->adminUser = factory(User::class)->create([
+        $this->adminUser = User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@test.com',
             'is_admin' => 1,
@@ -55,7 +55,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
         ]);
 
         // 創建普通用戶（使用 factory）
-        $this->regularUser = factory(User::class)->create([
+        $this->regularUser = User::factory()->create([
             'name' => 'Regular User',
             'email' => 'regular@test.com',
             'is_admin' => 0,

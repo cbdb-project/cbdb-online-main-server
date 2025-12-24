@@ -1,9 +1,9 @@
 <!-- Main Sidebar Container -->
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <!-- Brand -->
-    <a href="/home" class="brand-link d-flex justify-content-center">
+    <div class="brand-link d-flex justify-content-center">
         <span class="brand-text font-weight-light text-center w-100">{{ config('app.name', 'CBDB') }}</span>
-    </a>
+    </div>
 
     <!-- Sidebar -->
     <div class="sidebar">

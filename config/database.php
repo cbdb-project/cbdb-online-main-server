@@ -62,6 +62,29 @@ return [
             ] : [],
         ],
 
+        'mysql_migrate' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE'),
+            'username' => env('DB_MIGRATE_USERNAME'),
+            'password' => env('DB_MIGRATE_PASSWORD'),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+            'engine' => null,
+            // CRITICAL: DB_TIMEZONE must match config('app.timezone') to prevent TIMESTAMP drift
+            // Default '+08:00' corresponds to 'Asia/Shanghai' (GMT+8)
+            // MUST use numeric offset format (e.g., '+08:00'), NOT named timezones (e.g., 'Asia/Shanghai')
+            // If APP_TIMEZONE is changed, DB_TIMEZONE must be updated accordingly in .env
+            'timezone' => env('DB_TIMEZONE', '+08:00'),
+            'options' => extension_loaded('pdo_mysql') ? [
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
+            ] : [],
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'host' => env('DB_HOST', '127.0.0.1'),

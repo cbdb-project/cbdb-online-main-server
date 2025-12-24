@@ -34,6 +34,6 @@ class Dynasty extends Model {
     }
 
     public function nianhaos() {
-        return $this->hasMany('App\Nianhao', 'c_dy', 'c_dy');
+        return $this->hasMany('App\Models\NianHao', 'c_dy', 'c_dy');
     }
 }

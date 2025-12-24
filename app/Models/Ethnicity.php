@@ -37,6 +37,6 @@ class Ethnicity extends Model {
      *
      */
     public function biographies() {
-        $this->hasMany('\App\BiogMain', 'c_ethnicity_code', '﻿c_ethnicity_code');
+        return $this->hasMany('App\Models\BiogMain', 'c_ethnicity_code', '﻿c_ethnicity_code');
     }
 }

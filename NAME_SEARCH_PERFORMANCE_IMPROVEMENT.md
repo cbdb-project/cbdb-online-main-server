@@ -496,7 +496,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use App\BiogMain;
+use App\Models\BiogMain;
 
 class RebuildNameSearchIndex extends Command
 {
@@ -674,7 +674,7 @@ protected $commands = [
 
 namespace App\Observers;
 
-use App\BiogMain;
+use App\Models\BiogMain;
 use App\Services\NameSearchIndexService;
 
 class BiogMainObserver

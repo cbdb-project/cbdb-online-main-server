@@ -22,15 +22,16 @@
 │   ├── entrypoint.sh   # 容器启动脚本
 │   └── php.ini         # PHP 配置
 ├── docker-compose.yml  # Docker Compose 配置
-├── database/
-│   └── database.sqlite3  # SQLite 数据库文件
+├── db-data/            # [新] SQLite 数据库持久化目录 (Docker Volume)
+├── database/           # 数据库模板目录
+│   └── database.sqlite3  # 初始数据库模板
 ├── .env                # 环境配置文件
 └── .env.docker.example # Docker 环境配置示例
 ```
 
 **默认配置**：
 - 架构：FrankenPHP（1 个容器）
-- 数据库：SQLite (`database/database.sqlite3`)
+- 数据库：SQLite (`/app/db-data/database.sqlite3`)
 - 端口：8000
 - 工作目录：`/app`
 
@@ -74,16 +75,16 @@ FrankenPHP 是新一代 PHP 应用服务器，将 PHP 与现代 Web 服务器（
 
 ## 快速开始
 
-### 1. 准备 SQLite 数据库
+### 1. 准备 SQLite 数据库 (可选)
 
-如果还没有 SQLite 数据库文件，可以：
+容器启动时会自动处理数据库初始化，逻辑如下：
+1. **持久化优先**：如果 `db-data/database.sqlite3` 已存在，则直接使用。
+2. **模板初始化**：如果持久化文件不存在，但 `database/database.sqlite3` 存在，则复制模板到持久化目录。
+3. **自动创建**：如果两者都不存在，则创建一个空的数据库文件。
 
-**方式一：创建空数据库并运行迁移**
-```bash
-touch database/database.sqlite3
-```
+如果你想手动准备数据，可以：
 
-**方式二：从 MySQL 导出（如果已有 MySQL 数据）**
+**方式：从 MySQL 导出（如果已有 MySQL 数据）**
 ```bash
 php artisan db:export-to-sqlite --output=database/database.sqlite3 --limit-records=5000
 ```
@@ -99,10 +100,10 @@ cp .env.docker.example .env
 编辑 `.env` 文件，确保数据库配置正确：
 ```env
 DB_CONNECTION=sqlite
-DB_DATABASE=/app/database/database.sqlite3
+DB_DATABASE=/app/db-data/database.sqlite3
 ```
 
-**重要**：路径必须是容器内的路径 `/app/database/database.sqlite3`，不是本地路径。
+**重要**：路径必须是容器内的持久化路径 `/app/db-data/database.sqlite3`，容器启动脚本会自动检测并更新 `.env` 中的该路径。
 
 ### 3. 生成应用密钥（首次运行）
 
@@ -125,6 +126,16 @@ docker compose up --build
 ```
 http://localhost:8000
 ```
+
+### 6. 初始管理员账户
+
+容器首次启动（或数据库中不存在该用户时）会自动创建一个默认的超级管理员账户：
+
+- **Email**: `admin@example.com`
+- **Password**: `password`
+
+你可以使用此账户登录后台管理系统。登录后**强烈建议**立即修改密码。
+
 
 ## 常用命令
 
@@ -244,12 +255,13 @@ SELECT * FROM users; # 执行查询
 
 **方式二：在容器内查看**
 ```bash
-docker compose exec app sqlite3 /app/database/database.sqlite3
+docker compose exec app sqlite3 /app/db-data/database.sqlite3
 ```
 
 ### 备份数据库
 ```bash
-cp database/database.sqlite3 database/database.sqlite3.backup
+# 备份持久化目录下的数据库
+cp db-data/database.sqlite3 db-data/database.sqlite3.backup
 ```
 
 ### 从 MySQL 重新导出
@@ -346,8 +358,8 @@ composer install --verbose
 ### 数据库连接失败
 检查 `.env` 文件：
 - `DB_CONNECTION=sqlite`
-- `DB_DATABASE=/app/database/database.sqlite3`（容器内路径）
-- 确保 `database/database.sqlite3` 文件存在且有读写权限
+- `DB_DATABASE=/app/db-data/database.sqlite3`（容器内持久化路径）
+- 确保 `db-data/database.sqlite3` 文件存在且有读写权限
 
 ### 容器无响应
 

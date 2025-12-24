@@ -99,7 +99,7 @@
 ## 核心功能備忘
 - 官名設定在寫入操作紀錄時會將地址清單（POSTED_TO_ADDR_DATA）以 JSON rows 輸出，方便稽核與還原。 目前這類操作在 Operations 頁面暫停提供一鍵復原。
 
-- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單目前已納入 `ADDRESSES`、`CBDB__NAME_FTS`（姓名倒排索引）、`CBDB__TRAD_SIMP_MAP`（繁簡映射表），可直接檢視原始資料。內部表（`CBDB__` 前綴）為只讀模式，僅供查詢不可編輯。
+- `/codes/{table}` 泛用代碼表頁面：`CodesController` 根據表名直接查資料庫，會套用欄位覆寫、搜尋功能。白名單配置於 `config/codes.php`，包含所有主要代碼表及資料表，詳細清單請參考 `CODES_TABLES.md`。內部表（`CBDB__` 前綴）為只讀模式，僅供查詢不可編輯。
 - `/view/{key}` 檢視表頁面：`ViewTableController` 會依 `config/view_tables.php` 設定執行查詢並套用分頁／搜尋；實際 SQL 可透過頁面右上角「顯示 SQL」按鈕檢視，判斷是否符合預期。只有登入使用者能瀏覽該模組。
 - `/view` 提供檢視表總覽，列表資料源自 `config/view_tables.php` 並會依 `View_*` 名稱排序；如需檢視完整清單與說明可參考 `VIEWS.md`。
 - 管理工具 `/admin/explainsql`：僅限活躍管理員，可輸入 SELECT / WITH 語句並查看 MySQL `EXPLAIN` 計畫，輸出表格供調校索引或查詢效能。

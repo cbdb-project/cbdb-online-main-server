@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\CodesController;
-use App\Operation;
+use App\Models\Operation;
+use App\Models\User;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
-use App\User;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -367,7 +367,7 @@ class CodesControllerTest extends TestCase {
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
         $this->assertSame(0, $call['c_personid']);
-        $this->assertSame(\App\Operation::TYPE_PROPOSAL_CREATE, $call['op_type']);
+        $this->assertSame(\App\Models\Operation::TYPE_PROPOSAL_CREATE, $call['op_type']);
         $this->assertSame('TEST_CODES', $call['resource']);
         $this->assertSame('PX_._01', substr($call['resource_id'], 0, 7));
         $this->assertSame('pending', $call['resource_data']['__review_status']);
@@ -512,7 +512,7 @@ class CodesControllerTest extends TestCase {
 
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
-        $this->assertSame(\App\Operation::TYPE_PROPOSAL_UPDATE, $call['op_type']);
+        $this->assertSame(\App\Models\Operation::TYPE_PROPOSAL_UPDATE, $call['op_type']);
         $this->assertSame('pending', $call['resource_data']['__review_status']);
         $this->assertSame('Updated Desc', $call['resource_data']['description']);
         $this->assertSame('Original', $call['ori']['description']);

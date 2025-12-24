@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\User;
+use App\Models\User;
 use Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;

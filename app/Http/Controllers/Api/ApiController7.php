@@ -8,11 +8,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\AddrCode;
-use App\AssocCode;
-use App\BiogMain;
-use App\Dynasty;
 use App\Http\Controllers\Controller;
+use App\Models\AddrCode;
+use App\Models\AssocCode;
+use App\Models\BiogMain;
+use App\Models\Dynasty;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

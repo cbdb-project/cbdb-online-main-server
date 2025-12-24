@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\AddressCode;
-use App\AssocCode;
-use App\BiogMain;
-use App\Dynasty;
-use App\EntryCode;
-use App\EventCode;
-use App\KinshipCode;
-use App\OfficeCode;
-use App\Pinyin;
+use App\Models\AddressCode;
+use App\Models\AssocCode;
+use App\Models\BiogMain;
+use App\Models\Dynasty;
+use App\Models\EntryCode;
+use App\Models\EventCode;
+use App\Models\KinshipCode;
+use App\Models\OfficeCode;
+use App\Models\Pinyin;
+use App\Models\SocialInst;
+use App\Models\SocialInstAddr;
+use App\Models\SocialInstCode;
+use App\Models\StatusCode;
+use App\Models\TextCode;
 use App\Repositories\AddrCodeRepository;
 use App\Repositories\AltCodeRepository;
 use App\Repositories\BiogAddrCodeRepository;
@@ -19,11 +24,6 @@ use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
-use App\SocialInst;
-use App\SocialInstAddr;
-use App\SocialInstCode;
-use App\StatusCode;
-use App\TextCode;
 use App\v1;
 use Illuminate\Http\Request;
 //20181017建安新增

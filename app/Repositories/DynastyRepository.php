@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\Dynasty;
+use App\Models\Dynasty;
 
 class DynastyRepository {
     public function dynasties() {

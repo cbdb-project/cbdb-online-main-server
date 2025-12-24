@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\OperationsController;
-use App\Operation;
+use App\Models\Operation;
+use App\Models\User;
 use App\Repositories\OperationRepository;
-use App\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;

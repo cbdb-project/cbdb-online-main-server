@@ -9,25 +9,25 @@
 
 namespace App\Repositories;
 
-use App\AddrBelong;
-use App\AddrCode;
-use App\AddressCode;
-use App\AssocCode;
-use App\BiogAddrCode;
-use App\BiogMain;
-use App\Dynasty;
-use App\EntryCode;
-use App\EventCode;
-use App\KinshipCode;
-use App\OfficeCode;
-use App\Pinyin;
-use App\Repositories\Concerns\DetectsModelChanges;
-use App\SocialInst;
-use App\SocialInstAddr;
-use App\SocialInstCode;
+use App\Models\AddrBelong;
+use App\Models\AddrCode;
+use App\Models\AddressCode;
+use App\Models\AssocCode;
+use App\Models\BiogAddrCode;
+use App\Models\BiogMain;
+use App\Models\Dynasty;
+use App\Models\EntryCode;
+use App\Models\EventCode;
+use App\Models\KinshipCode;
+use App\Models\OfficeCode;
+use App\Models\Pinyin;
+use App\Models\SocialInst;
+use App\Models\SocialInstAddr;
+use App\Models\SocialInstCode;
+use App\Models\StatusCode;
 //20181112建安修改
-use App\StatusCode;
-use App\TextCode;
+use App\Models\TextCode;
+use App\Repositories\Concerns\DetectsModelChanges;
 //修改結束
 
 //20210625建安修改

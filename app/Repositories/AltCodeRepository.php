@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\AltnameCode;
+use App\Models\AltnameCode;
 use Illuminate\Http\Request;
 
 class AltCodeRepository {

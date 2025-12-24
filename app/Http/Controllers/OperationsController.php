@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\BiogMain;
-use App\OfficeCode;
-use App\OfficeCodeTypeRel;
-use App\OfficeTypeTree;
-use App\Operation;
+use App\Models\BiogMain;
+use App\Models\OfficeCode;
+use App\Models\OfficeCodeTypeRel;
+use App\Models\OfficeTypeTree;
+use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;

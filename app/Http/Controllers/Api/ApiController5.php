@@ -8,12 +8,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\AddrCode;
-use App\AssocCode;
-use App\BiogAddr;
-use App\BiogMain;
 use App\Http\Controllers\Controller;
-use App\KinshipCode;
+use App\Models\AddrCode;
+use App\Models\AssocCode;
+use App\Models\BiogAddr;
+use App\Models\BiogMain;
+use App\Models\KinshipCode;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

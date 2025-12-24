@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\BiogMain;
-use App\User;
+use App\Models\BiogMain;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;

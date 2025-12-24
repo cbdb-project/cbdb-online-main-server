@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\AddrCode;
+use App\Models\AddrCode;
 use Illuminate\Http\Request;
 
 class AddrCode2Repository {

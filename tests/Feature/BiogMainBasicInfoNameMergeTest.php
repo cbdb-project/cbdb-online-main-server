@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Repositories\BiogMainRepository;
-use App\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -102,7 +102,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $this->actingAs($user);
 
         // 使用 Eloquent 模型創建測試人物（這樣才能正確觸發更新邏輯）
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2345,
             'c_surname_chn' => '王',
             'c_mingzi_chn' => '安石',
@@ -165,7 +165,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2346,
             'c_surname_chn' => '蘇',
             'c_mingzi_chn' => '軾',
@@ -217,7 +217,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2347,
             'c_surname_chn' => '',
             'c_mingzi_chn' => '佛陀',
@@ -265,7 +265,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2348,
             'c_surname_chn' => '歐陽',
             'c_mingzi_chn' => '修',
@@ -318,7 +318,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2349,
             'c_surname_chn' => '王',
             'c_mingzi_chn' => '五',
@@ -370,7 +370,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         $user = $this->createActiveUser();
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2350,
             'c_surname_chn' => '趙',
             'c_mingzi_chn' => '雲',
@@ -415,7 +415,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
      * 測試未登入用戶無法更新
      */
     public function testGuestCannotUpdateNames() {
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2351,
             'c_surname_chn' => '劉',
             'c_mingzi_chn' => '備',
@@ -466,7 +466,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         ]);
         $this->actingAs($user);
 
-        \App\BiogMain::create([
+        \App\Models\BiogMain::create([
             'c_personid' => 2352,
             'c_surname_chn' => '諸葛',
             'c_mingzi_chn' => '亮',

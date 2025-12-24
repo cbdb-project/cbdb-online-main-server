@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\BiogMain;
-use App\Dynasty;
+use App\Models\BiogMain;
+use App\Models\Dynasty;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

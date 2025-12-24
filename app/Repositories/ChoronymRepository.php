@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\ChoronymCode;
+use App\Models\ChoronymCode;
 
 class ChoronymRepository {
     public function choronyms() {

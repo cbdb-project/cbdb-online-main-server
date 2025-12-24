@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Pinyin;
+use App\Models\Pinyin;
+use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\TextCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;

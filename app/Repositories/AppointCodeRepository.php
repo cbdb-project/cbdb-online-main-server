@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\AppointmentTypeCode;
+use App\Models\AppointmentTypeCode;
 use Illuminate\Http\Request;
 
 class AppointCodeRepository {

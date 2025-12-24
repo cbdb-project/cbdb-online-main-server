@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\NianHao;
+use App\Models\NianHao;
 
 class NianHaoRepository {
     public function nianhaos() {

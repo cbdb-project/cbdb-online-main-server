@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\BiogMain;
 use App\Http\Requests\BasicInformationRequest;
+use App\Models\BiogMain;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
 use App\Repositories\DynastyRepository;

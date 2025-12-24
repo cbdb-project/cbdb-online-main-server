@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\BiogMain;
 use App\Http\Controllers\Controller;
-use App\OfficeCode;
-use App\OfficeCodeTypeRel;
-use App\OfficeTypeTree;
-use App\Operation;
+use App\Models\BiogMain;
+use App\Models\OfficeCode;
+use App\Models\OfficeCodeTypeRel;
+use App\Models\OfficeTypeTree;
+use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use Auth;
 use Illuminate\Http\Request;
@@ -219,7 +219,7 @@ class OperationsController extends Controller {
         $user_password = $request->p;
         //呼叫這行就可以進行帳號與密碼的認證了
         if (Auth::attempt(['email' => $user_id, 'password' => $user_password])) {
-            $user = \App\User::where('email', $user_id)->first();
+            $user = \App\Models\User::where('email', $user_id)->first();
             if ($user && !$user->isCrowdsourcingUser()) {
                 return "帳號須為眾包身分，才可以取得token。";
             }

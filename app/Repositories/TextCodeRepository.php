@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\TextCode;
+use App\Models\TextCode;
 use Illuminate\Http\Request;
 
 class TextCodeRepository {

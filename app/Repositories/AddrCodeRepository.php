@@ -9,9 +9,9 @@
 
 namespace App\Repositories;
 
-use App\AddrBelong;
-use App\AddrCode;
-use App\AddressCode;
+use App\Models\AddrBelong;
+use App\Models\AddrCode;
+use App\Models\AddressCode;
 use Illuminate\Http\Request;
 
 /**

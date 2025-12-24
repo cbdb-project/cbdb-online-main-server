@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\AddrBelong;
-use App\AddrCode;
-use App\AddressCode;
+use App\Models\AddrBelong;
+use App\Models\AddrCode;
+use App\Models\AddressCode;
+use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\TextCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;

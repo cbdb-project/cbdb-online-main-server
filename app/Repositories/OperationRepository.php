@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\Operation;
+use App\Models\Operation;
 use Illuminate\Support\Facades\DB;
 
 class OperationRepository {

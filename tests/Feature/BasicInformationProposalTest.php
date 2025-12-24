@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Operation;
+use App\Models\Operation;
+use App\Models\User;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
-use App\User;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;

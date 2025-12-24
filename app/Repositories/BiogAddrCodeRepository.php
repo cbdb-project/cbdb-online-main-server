@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\BiogAddrCode;
+use App\Models\BiogAddrCode;
 
 class BiogAddrCodeRepository {
     public function biogaddr() {

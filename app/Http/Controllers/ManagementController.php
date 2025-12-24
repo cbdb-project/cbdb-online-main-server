@@ -42,7 +42,10 @@ class ManagementController extends Controller {
 
         // 支持排序
         $sortBy = $request->get('sort_by', 'id');
-        $sortOrder = $request->get('sort_order', 'asc');
+        $sortOrder = strtolower((string) $request->get('sort_order', 'asc'));
+        if (!in_array($sortOrder, ['asc', 'desc'], true)) {
+            $sortOrder = 'asc';
+        }
         $allowedSorts = ['id', 'name', 'email', 'institution', 'is_active', 'is_admin'];
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder);

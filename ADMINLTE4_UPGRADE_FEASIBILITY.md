@@ -31,7 +31,7 @@
 - **Blade 模板數量**: 約 90 個
 - **使用 Bootstrap 4 data attributes**: 18 處 (`data-toggle`, `data-widget` 等)
 - **使用 Bootstrap 4 工具類**: 28 處 (`float-*`, `hidden-xs`, `visible-*` 等)
-- **前端入口文件**: 3 個 (app.js, datatables.js, passport.js)
+- **前端入口文件**: 2 個 (app.js, datatables.js)
 
 ---
 

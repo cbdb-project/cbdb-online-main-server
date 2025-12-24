@@ -40,7 +40,7 @@
 
 ### 前端構建現況
 - 全站已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。
-- 主要入口：`resources/js/app.js`（UI 組件）、`resources/js/datatables.js`（DataTables）、`resources/js/passport.js`（Laravel Passport）。
+- 主要入口：`resources/js/app.js`（UI 組件）、`resources/js/datatables.js`（DataTables）。
 - `resources/js/jquery-global.js` 將 jQuery 暴露到全局；Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現。
 - 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
 
@@ -157,7 +157,6 @@ npm run build  # 或 npm run prod，編譯並優化前端資源
 **入口文件**：
 - `resources/js/app.js` - 主要 UI 組件
 - `resources/js/datatables.js` - DataTables 功能
-- `resources/js/passport.js` - Laravel Passport
 
 **Vue 元件**：
 - Vue 3 模板放在 `resources/js/components/`

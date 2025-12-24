@@ -19,7 +19,10 @@ class ExportMysqlToSqlite extends Command {
                             {--source=mysql : 源数据库连接名称}
                             {--with-indexes : 包含索引定义（默认跳过）}
                             {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}
-                            {--limit-records= : 限制每张表导出的最大记录数}';
+                            {--limit-records= : 限制每张表导出的最大记录数}
+                            {--chunk-size=5000 : 分块查询的大小（减少内存使用）}
+                            {--min-free-space=1 : 最小可用磁盘空间（GB）}
+                            {--skip-space-check : 跳过磁盘空间检查}';
 
     /**
      * The console command description.
@@ -74,6 +77,11 @@ class ExportMysqlToSqlite extends Command {
             return 1;
         }
 
+        // 检查磁盘空间
+        if (!$this->option('skip-space-check') && !$this->checkDiskSpace()) {
+            return 1;
+        }
+
         // 准备 SQLite 数据库
         if (!$this->prepareSqliteDatabase()) {
             return 1;
@@ -97,6 +105,11 @@ class ExportMysqlToSqlite extends Command {
 
         foreach ($tables as $table) {
             try {
+                // 显示当前正在导出的表名
+                $bar->clear();
+                $this->info(sprintf('正在导出表: %s', $table['name']));
+                $bar->display();
+
                 $this->exportTable($table);
                 $bar->advance();
             } catch (\Exception $e) {
@@ -142,6 +155,62 @@ class ExportMysqlToSqlite extends Command {
 
             return false;
         }
+    }
+
+    /**
+     * 检查磁盘空间是否足够
+     *
+     * @return bool
+     */
+    protected function checkDiskSpace() {
+        $paths = [
+            base_path(dirname($this->outputPath)), // SQLite 输出目录
+            sys_get_temp_dir(), // 系统临时目录
+        ];
+
+        $minFreeSpaceGB = (float) $this->option('min-free-space');
+        $minFreeSpaceBytes = $minFreeSpaceGB * 1024 * 1024 * 1024;
+
+        $allOk = true;
+
+        foreach ($paths as $path) {
+            if (!is_dir($path)) {
+                continue;
+            }
+
+            $freeSpace = disk_free_space($path);
+
+            if ($freeSpace === false) {
+                $this->warn(sprintf('⚠ 无法检查 %s 的磁盘空间', $path));
+
+                continue;
+            }
+
+            $freeSpaceGB = $freeSpace / 1024 / 1024 / 1024;
+
+            if ($freeSpace < $minFreeSpaceBytes) {
+                $this->error(sprintf(
+                    '✗ 磁盘空间不足: %s (可用: %.2f GB, 需要: %.2f GB)',
+                    $path,
+                    $freeSpaceGB,
+                    $minFreeSpaceGB
+                ));
+                $allOk = false;
+            } else {
+                $this->info(sprintf('✓ 磁盘空间充足: %s (可用: %.2f GB)', $path, $freeSpaceGB));
+            }
+        }
+
+        if (!$allOk) {
+            $this->output->newLine();
+            $this->line('建议解决方案:');
+            $this->line('  1. 清理临时文件: rm -rf /tmp/*');
+            $this->line('  2. 使用 --limit-records=N 限制导出数据量');
+            $this->line('  3. 使用 --skip-space-check 强制继续（不推荐）');
+            $this->output->newLine();
+        }
+
+        return $allOk;
     }
 
     /**
@@ -432,6 +501,16 @@ class ExportMysqlToSqlite extends Command {
             $chunkColumn = $firstColumn;
         }
 
+        // 记录该列是否为单列主键（可安全用于 chunkById）
+        $isSingleColumnPrimaryKey = false;
+        foreach ($primaryKeyColumnsList as $pkColumns) {
+            if (count($pkColumns) === 1 && $pkColumns[0] === $chunkColumn) {
+                $isSingleColumnPrimaryKey = true;
+
+                break;
+            }
+        }
+
         $body = array_merge($columns, $primaryKeys);
 
         if (empty($body)) {
@@ -448,6 +527,7 @@ class ExportMysqlToSqlite extends Command {
             'indexes' => $exportIndexes,
             'meta' => [
                 'chunk_column' => $chunkColumn,
+                'is_unique_column' => $isSingleColumnPrimaryKey,
             ],
         ];
     }
@@ -656,23 +736,9 @@ class ExportMysqlToSqlite extends Command {
     protected function exportTableData($tableName, $rowCount = 0, $limit = null) {
         $metadata = $this->tableMetadata[$tableName] ?? [];
         $chunkColumn = $metadata['chunk_column'] ?? null;
+        $isUniqueColumn = $metadata['is_unique_column'] ?? false;
         $insertBatchSize = $this->getSqliteInsertBatchSize();
-        $buffer = [];
-
-        $query = DB::connection($this->sourceConnection)
-            ->table($tableName);
-
-        if ($chunkColumn) {
-            $query->orderBy($chunkColumn);
-        }
-
-        if ($limit === null) {
-            $limit = $this->getRecordLimit();
-        }
-
-        if ($limit !== null) {
-            $query->limit($limit);
-        }
+        $chunkSize = (int) $this->option('chunk-size');
 
         // 禁用外键约束
         DB::connection('sqlite_export')->statement('PRAGMA foreign_keys = OFF');
@@ -687,27 +753,112 @@ class ExportMysqlToSqlite extends Command {
             $dataBar->start();
         }
 
-        foreach ($query->cursor() as $row) {
-            $buffer[] = (array) $row;
+        if ($limit === null) {
+            $limit = $this->getRecordLimit();
+        }
 
-            if (count($buffer) >= $insertBatchSize) {
+        // 使用分块查询，总是保证排序以确保数据完整性
+        $processedRows = 0;
+        $buffer = [];
+
+        try {
+            $query = DB::connection($this->sourceConnection)
+                ->table($tableName);
+
+            $chunkCallback = function ($rows) use (
+                $tableName,
+                $insertBatchSize,
+                &$buffer,
+                &$processedRows,
+                $dataBar,
+                $limit
+            ) {
+                foreach ($rows as $row) {
+                    // 检查是否达到限制
+                    if ($limit !== null && $processedRows >= $limit) {
+                        return false; // 停止 chunk 迭代
+                    }
+
+                    $buffer[] = (array) $row;
+                    $processedRows++;
+
+                    // 当缓冲区达到批次大小时，写入 SQLite
+                    if (count($buffer) >= $insertBatchSize) {
+                        $count = count($buffer);
+                        $this->insertRowsIntoSqlite($tableName, $buffer);
+                        $this->stats['rows'] += $count;
+
+                        if ($dataBar) {
+                            $dataBar->advance($count);
+                        }
+
+                        $buffer = [];
+
+                        // 定期释放内存
+                        if ($processedRows % 10000 === 0) {
+                            gc_collect_cycles();
+                        }
+                    }
+                }
+
+                return true; // 继续下一批
+            };
+
+            // 总是使用排序以保证数据完整性
+            // 只在列是唯一且单调的（单列主键）时使用 chunkById()
+            // 否则使用 orderBy + chunk（避免 chunkById 跳过重复值）
+            if ($chunkColumn && $isUniqueColumn) {
+                // 安全：单列主键，值唯一且单调，可用 chunkById
+                $query->chunkById($chunkSize, $chunkCallback, $chunkColumn);
+            } else {
+                // 回退到 orderBy + chunk（数据完整性优先）
+                if (!$chunkColumn) {
+                    // 如果连列都没有，获取第一列
+                    $columns = DB::connection($this->sourceConnection)
+                        ->getSchemaBuilder()
+                        ->getColumnListing($tableName);
+
+                    if (empty($columns)) {
+                        throw new \RuntimeException(sprintf('表 %s 没有任何列', $tableName));
+                    }
+
+                    $chunkColumn = $columns[0];
+                }
+
+                $query->orderBy($chunkColumn)->chunk($chunkSize, $chunkCallback);
+            }
+
+            // 写入剩余的数据
+            if (!empty($buffer)) {
                 $count = count($buffer);
                 $this->insertRowsIntoSqlite($tableName, $buffer);
                 $this->stats['rows'] += $count;
+
                 if ($dataBar) {
                     $dataBar->advance($count);
                 }
-                $buffer = [];
             }
-        }
-
-        if (!empty($buffer)) {
-            $count = count($buffer);
-            $this->insertRowsIntoSqlite($tableName, $buffer);
-            $this->stats['rows'] += $count;
+        } catch (\Exception $e) {
             if ($dataBar) {
-                $dataBar->advance($count);
+                $dataBar->finish();
+                $this->output->newLine(2);
             }
+
+            // 提供更有帮助的错误信息
+            $errorMsg = $e->getMessage();
+
+            if (strpos($errorMsg, 'No space left on device') !== false) {
+                $this->output->newLine();
+                $this->error('磁盘空间不足！');
+                $this->line('建议解决方案:');
+                $this->line('  1. 清理 /tmp 目录: sudo rm -rf /tmp/MY* /tmp/ib*');
+                $this->line('  2. 使用 --chunk-size=1000 减小分块大小');
+                $this->line('  3. 使用 --limit-records=10000 限制导出数据量');
+                $this->line('  4. 增加 /tmp 目录的可用空间');
+                $this->output->newLine();
+            }
+
+            throw $e;
         }
 
         if ($dataBar) {
@@ -717,6 +868,9 @@ class ExportMysqlToSqlite extends Command {
 
         // 重新启用外键约束
         DB::connection('sqlite_export')->statement('PRAGMA foreign_keys = ON');
+
+        // 最终清理
+        gc_collect_cycles();
     }
 
     /**
@@ -789,13 +943,6 @@ class ExportMysqlToSqlite extends Command {
         // 显示文件大小
         $fileSize = filesize(base_path($this->outputPath));
         $this->info(sprintf('文件大小: %s', $this->formatBytes($fileSize)));
-
-        $this->output->newLine();
-        $this->info('下一步:');
-        $this->line('  1. 更新 .env 文件:');
-        $this->line('     DB_CONNECTION=sqlite');
-        $this->line(sprintf('     DB_DATABASE=%s', base_path($this->outputPath)));
-        $this->line('  2. 测试应用: php artisan serve');
     }
 
     /**

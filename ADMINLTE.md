@@ -4,7 +4,7 @@
 
 ## 現況總覽（v3.2 + Vite）
 - 全站已切換至 AdminLTE v3.2（Bootstrap 4、Font Awesome 5），所有使用 dashboard 佈局的頁面都走 `layouts/dashboard-v3.blade.php`，專案中不存在 `layouts/dashboard.blade.php`。
-- 前端資產以 **Vite** 打包，輸出在 `public/build`。入口：`resources/js/app.js`（主要 UI + jQuery/Bootstrap/AdminLTE/Select2）、`resources/js/datatables.js`（DataTables）、`resources/js/passport.js`（Laravel Passport）。
+- 前端資產以 **Vite** 打包，輸出在 `public/build`。入口：`resources/js/app.js`（主要 UI + jQuery/Bootstrap/AdminLTE/Select2）、`resources/js/datatables.js`（DataTables）。
 - `resources/js/jquery-global.js` 會先將 jQuery 掛到 `window`，再載入 Bootstrap 4 bundle（含 Popper）、AdminLTE 3、Select2（Bootstrap 4 主題）與共用的 modal 焦點修復、`initPersonSelect`。
 - 版型套用 Font Awesome 5 CDN，其餘 AdminLTE/Bootstrap/Datatables/Select2 皆由 Vite bundle 提供，無外部 JS CDN 依賴。
 - 佈局中的客製樣式集中於 `layouts/dashboard-v3.blade.php` 內的 `<style>`（scroll/表格寬度/Select2 高度修正等）；文檔先前列出的 pagination/brand-logo 類 CSS 已被移除，程式碼中無對應片段。

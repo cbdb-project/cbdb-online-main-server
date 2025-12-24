@@ -13,12 +13,12 @@
 
             <form method="post" action="{{ route('admin.explainsql') }}" class="form">
                 {{ csrf_field() }}
-                <div class="form-group @if($errors->has('sql')) has-error @endif">
+                <div class="form-group">
                     <label for="sql">SQL 語句（僅支援 SELECT / WITH）</label>
-                    <textarea name="sql" id="sql" rows="5" class="form-control" placeholder="SELECT ...">{{ old('sql', $sql) }}</textarea>
-                    @if($errors->has('sql'))
-                        <span class="help-block">{{ $errors->first('sql') }}</span>
-                    @endif
+                    <textarea name="sql" id="sql" rows="5" class="form-control @error('sql') is-invalid @enderror" placeholder="SELECT ...">{{ old('sql', $sql) }}</textarea>
+                    @error('sql')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
                 <button type="submit" class="btn btn-primary">執行 EXPLAIN</button>
             </form>

@@ -167,9 +167,6 @@ BIOG_MAIN
 DYNASTIES
 CHORONYM_CODES
 
-### passport API认证
-参考文档：[Laravel 10.x Passport](https://laravel.com/docs/10.x/passport)
-
 ### 对数据库的修改
 
 **migrate 设置主键 寻找解决方法**

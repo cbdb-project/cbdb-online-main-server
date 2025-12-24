@@ -17,13 +17,46 @@ class ManagementController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
+    public function index(Request $request) {
         if (!Auth::user()->isAdmin()) {
             return redirect('/home');
         }
-        $data = User::all()->where('confirmation_token', '!=', '-')->where('remember_token', '!=', '-')->where('password', '!=', '-');
 
-        return view('manage.index', ['data' => $data, 'page_title' => '用戶管理', 'page_description' => '管理用戶']);
+        // 構建查詢：只顯示有效用戶（未被軟刪除的用戶）
+        $query = User::query()
+            ->where('confirmation_token', '!=', '-')
+            ->where(function ($q) {
+                $q->whereNull('remember_token')
+                    ->orWhere('remember_token', '!=', '-');
+            })
+            ->where('password', '!=', '-');
+
+        // 支持搜索
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('institution', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // 支持排序
+        $sortBy = $request->get('sort_by', 'id');
+        $sortOrder = $request->get('sort_order', 'asc');
+        $allowedSorts = ['id', 'name', 'email', 'institution', 'is_active', 'is_admin'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+
+        // 分頁
+        $perPage = (int) $request->get('per_page', 50);
+        $data = $query->paginate($perPage)->appends($request->except('page'));
+
+        return view('manage.index', [
+            'data' => $data,
+            'page_title' => '用戶管理',
+            'page_description' => '管理用戶',
+        ]);
     }
 
     /**

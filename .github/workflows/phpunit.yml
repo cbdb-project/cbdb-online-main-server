@@ -27,7 +27,6 @@ jobs:
           php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, curl, pdo_sqlite
           coverage: none
-        # 注：Laravel 8.83 LTS 官方支援 PHP 7.3-8.1
         # PHP 8.4 經測試可正常運行，建議使用以獲得最佳性能
 
       - name: Get Composer cache directory

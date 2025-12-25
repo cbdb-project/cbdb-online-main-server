@@ -46,17 +46,8 @@ class ManageUserCommandTest extends TestCase {
             ->expectsQuestion('請輸入用戶 Email', 'interactive@example.com')
             ->expectsQuestion('請輸入用戶名稱', 'Interactive User')
             ->expectsQuestion('請輸入密碼（至少 6 個字符）', 'password123')
-            ->expectsChoice('請選擇激活狀態', '2', ['0' => '未激活', '1' => '激活', '2' => '預留'])
-            ->expectsChoice('請選擇用戶角色', 'expert', [
-                'crowdsourcing',
-                'expert',
-                'regular',
-                'super-admin',
-                '一般用戶',
-                '專家',
-                '眾包用戶',
-                '系統管理員',
-            ])
+            ->expectsChoice('請選擇激活狀態', '預留', ['未激活', '激活', '預留'])
+            ->expectsChoice('請選擇用戶角色', '專家', ['一般用戶', '專家', '眾包用戶', '系統管理員'])
             ->assertExitCode(0);
 
         $user = User::where('email', 'interactive@example.com')->first();

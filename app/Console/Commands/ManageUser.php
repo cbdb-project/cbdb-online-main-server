@@ -111,9 +111,26 @@ class ManageUser extends Command {
         if ($active === null) {
             $active = $this->choice(
                 '請選擇激活狀態',
-                ['0' => '未激活', '1' => '激活', '2' => '預留'],
-                '1'
+                ['未激活', '激活', '預留'],
+                '激活'
             );
+        }
+        $activeMap = [
+            'inactive' => User::STATUS_INACTIVE,
+            'active' => User::STATUS_ACTIVE,
+            'reserved' => User::STATUS_RESERVED,
+            '未激活' => User::STATUS_INACTIVE,
+            '激活' => User::STATUS_ACTIVE,
+            '預留' => User::STATUS_RESERVED,
+            '0' => User::STATUS_INACTIVE,
+            '1' => User::STATUS_ACTIVE,
+            '2' => User::STATUS_RESERVED,
+            0 => User::STATUS_INACTIVE,
+            1 => User::STATUS_ACTIVE,
+            2 => User::STATUS_RESERVED,
+        ];
+        if (array_key_exists($active, $activeMap)) {
+            $active = $activeMap[$active];
         }
 
         // 獲取或詢問角色
@@ -121,17 +138,22 @@ class ManageUser extends Command {
         if (!$roleInput) {
             $roleInput = $this->choice(
                 '請選擇用戶角色',
-                [
-                    'regular' => '一般用戶',
-                    'expert' => '專家',
-                    'crowdsourcing' => '眾包用戶',
-                    'super-admin' => '系統管理員',
-                ],
-                'regular'
+                ['一般用戶', '專家', '眾包用戶', '系統管理員'],
+                '一般用戶'
             );
         }
 
-        $role = $this->roleMap[$roleInput] ?? User::ROLE_REGULAR;
+        $roleInputMap = [
+            'regular' => User::ROLE_REGULAR,
+            'expert' => User::ROLE_EXPERT,
+            'crowdsourcing' => User::ROLE_CROWDSOURCING,
+            'super-admin' => User::ROLE_SUPER_ADMIN,
+            '一般用戶' => User::ROLE_REGULAR,
+            '專家' => User::ROLE_EXPERT,
+            '眾包用戶' => User::ROLE_CROWDSOURCING,
+            '系統管理員' => User::ROLE_SUPER_ADMIN,
+        ];
+        $role = $roleInputMap[$roleInput] ?? User::ROLE_REGULAR;
 
         // 創建用戶（直接使用模型，避免依賴 dev-only 的 Faker）
         $user = User::create([
@@ -188,9 +210,26 @@ class ManageUser extends Command {
         if ($active === null && $this->confirm("是否更新激活狀態？（當前：{$user->is_active}）", false)) {
             $active = $this->choice(
                 '請選擇激活狀態',
-                ['0' => '未激活', '1' => '激活', '2' => '預留'],
-                (string)$user->is_active
+                ['未激活', '激活', '預留'],
+                $this->getStatusText($user->is_active)
             );
+        }
+        $activeMap = [
+            'inactive' => User::STATUS_INACTIVE,
+            'active' => User::STATUS_ACTIVE,
+            'reserved' => User::STATUS_RESERVED,
+            '未激活' => User::STATUS_INACTIVE,
+            '激活' => User::STATUS_ACTIVE,
+            '預留' => User::STATUS_RESERVED,
+            '0' => User::STATUS_INACTIVE,
+            '1' => User::STATUS_ACTIVE,
+            '2' => User::STATUS_RESERVED,
+            0 => User::STATUS_INACTIVE,
+            1 => User::STATUS_ACTIVE,
+            2 => User::STATUS_RESERVED,
+        ];
+        if ($active !== null && array_key_exists($active, $activeMap)) {
+            $active = $activeMap[$active];
         }
         if ($active !== null && (int)$active !== $user->is_active) {
             $user->is_active = (int)$active;
@@ -204,18 +243,23 @@ class ManageUser extends Command {
             if ($this->confirm("是否更新用戶角色？（當前：{$user->getRoleName()}）", false)) {
                 $roleInput = $this->choice(
                     '請選擇用戶角色',
-                    [
-                        'regular' => '一般用戶',
-                        'expert' => '專家',
-                        'crowdsourcing' => '眾包用戶',
-                        'super-admin' => '系統管理員',
-                    ],
-                    $currentRoleName
+                    ['一般用戶', '專家', '眾包用戶', '系統管理員'],
+                    $user->getRoleName()
                 );
             }
         }
         if ($roleInput) {
-            $role = $this->roleMap[$roleInput] ?? User::ROLE_REGULAR;
+            $roleInputMap = [
+                'regular' => User::ROLE_REGULAR,
+                'expert' => User::ROLE_EXPERT,
+                'crowdsourcing' => User::ROLE_CROWDSOURCING,
+                'super-admin' => User::ROLE_SUPER_ADMIN,
+                '一般用戶' => User::ROLE_REGULAR,
+                '專家' => User::ROLE_EXPERT,
+                '眾包用戶' => User::ROLE_CROWDSOURCING,
+                '系統管理員' => User::ROLE_SUPER_ADMIN,
+            ];
+            $role = $roleInputMap[$roleInput] ?? User::ROLE_REGULAR;
             if ($role !== $user->is_admin) {
                 $user->is_admin = $role;
                 $updated = true;

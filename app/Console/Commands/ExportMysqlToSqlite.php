@@ -504,6 +504,8 @@ class ExportMysqlToSqlite extends Command {
         // 记录该列是否为单列主键（可安全用于 chunkById）
         $isSingleColumnPrimaryKey = false;
         $compositePrimaryKey = [];
+        $hasPrimaryKey = !empty($primaryKeyColumnsList);
+
         foreach ($primaryKeyColumnsList as $pkColumns) {
             if (count($pkColumns) === 1 && $pkColumns[0] === $chunkColumn) {
                 $isSingleColumnPrimaryKey = true;
@@ -534,6 +536,7 @@ class ExportMysqlToSqlite extends Command {
                 'chunk_column' => $chunkColumn,
                 'is_unique_column' => $isSingleColumnPrimaryKey,
                 'composite_primary_key' => $compositePrimaryKey,
+                'has_primary_key' => $hasPrimaryKey,
             ],
         ];
     }
@@ -744,6 +747,7 @@ class ExportMysqlToSqlite extends Command {
         $chunkColumn = $metadata['chunk_column'] ?? null;
         $isUniqueColumn = $metadata['is_unique_column'] ?? false;
         $compositePrimaryKey = $metadata['composite_primary_key'] ?? [];
+        $hasPrimaryKey = $metadata['has_primary_key'] ?? true;
         $insertBatchSize = $this->getSqliteInsertBatchSize();
         $chunkSize = (int) $this->option('chunk-size');
 
@@ -811,24 +815,50 @@ class ExportMysqlToSqlite extends Command {
                 return true; // 继续下一批
             };
 
-            // 总是使用排序以保证数据完整性
-            // 只在列是唯一且单调的（单列主键）时使用 chunkById()
-            // 否则使用 orderBy + chunk（避免 chunkById 跳过重复值）
-            if ($chunkColumn && $isUniqueColumn) {
-                // 安全：单列主键，值唯一且单调，可用 chunkById
+            // 根據表結構選擇最佳的數據讀取策略
+            if (!$hasPrimaryKey) {
+                // 無主鍵表：使用 cursor() 單次查詢，保證順序絕對穩定
+                // 這樣避免 offset/limit 在非唯一列上的不確定行為
+                foreach ($query->cursor() as $row) {
+                    // 检查是否达到限制
+                    if ($limit !== null && $processedRows >= $limit) {
+                        break;
+                    }
+
+                    $buffer[] = (array) $row;
+                    $processedRows++;
+
+                    // 当缓冲区达到批次大小时，写入 SQLite
+                    if (count($buffer) >= $insertBatchSize) {
+                        $count = count($buffer);
+                        $this->insertRowsIntoSqlite($tableName, $buffer);
+                        $this->stats['rows'] += $count;
+
+                        if ($dataBar) {
+                            $dataBar->advance($count);
+                        }
+
+                        $buffer = [];
+
+                        // 定期释放内存
+                        if ($processedRows % 10000 === 0) {
+                            gc_collect_cycles();
+                        }
+                    }
+                }
+            } elseif ($chunkColumn && $isUniqueColumn) {
+                // 單列主鍵表：使用 chunkById()，高效且安全
                 $query->chunkById($chunkSize, $chunkCallback, $chunkColumn);
             } else {
-                // 回退到 orderBy + chunk（数据完整性优先）
-                // 對於複合主鍵表，按所有主鍵列排序以確保穩定的排序結果
+                // 複合主鍵表：按所有主鍵列排序 + chunk()，確保穩定排序
                 if (!empty($compositePrimaryKey)) {
-                    // 使用複合主鍵的所有列進行排序
                     foreach ($compositePrimaryKey as $pkColumn) {
                         $query->orderBy($pkColumn);
                     }
+                    $query->chunk($chunkSize, $chunkCallback);
                 } else {
-                    // 單列排序（非主鍵或無主鍵表）
+                    // 備用路徑（理論上不應該到達這裡）
                     if (!$chunkColumn) {
-                        // 如果连列都没有，获取第一列
                         $columns = DB::connection($this->sourceConnection)
                             ->getSchemaBuilder()
                             ->getColumnListing($tableName);
@@ -840,10 +870,8 @@ class ExportMysqlToSqlite extends Command {
                         $chunkColumn = $columns[0];
                     }
 
-                    $query->orderBy($chunkColumn);
+                    $query->orderBy($chunkColumn)->chunk($chunkSize, $chunkCallback);
                 }
-
-                $query->chunk($chunkSize, $chunkCallback);
             }
 
             // 写入剩余的数据

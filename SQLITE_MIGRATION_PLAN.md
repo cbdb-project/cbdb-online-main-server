@@ -68,7 +68,7 @@
 
 **使用方式：**
 ```bash
-# 从当前 MySQL 数据库导出到 SQLite
+# 基本用法
 php artisan db:export-to-sqlite --limit-records=5000
 
 # 指定输出文件
@@ -79,7 +79,30 @@ php artisan db:export-to-sqlite --schema-only
 
 # 导出特定表
 php artisan db:export-to-sqlite --tables=BIOG_MAIN,ALTNAME_DATA --limit-records=5000
+
+# 调整性能参数（处理大表或磁盘空间受限时）
+php artisan db:export-to-sqlite \
+  --chunk-size=1000 \           # 减小分块大小，降低内存使用
+  --min-free-space=2 \          # 要求至少 2GB 可用空间（默认 1GB）
+  --limit-records=10000         # 限制每表最大行数
+
+# 跳过磁盘空间检查（不推荐，仅在确认有足够空间时使用）
+php artisan db:export-to-sqlite --skip-space-check
 ```
+
+**重要提示：**
+- 🔒 **数据完整性保证**：
+  - 根据表结构自动选择最安全的导出策略，**绝对保证**不会跳过或重复行
+  - **无主键表**（如 ADDRESSES, PLACE_CODES）：使用 `cursor()` 单次查询，避免 offset/limit 的不确定性
+  - **单列主键表**（如 BIOG_MAIN）：使用高效的 `chunkById()`，基于 `WHERE id > lastValue` 分批读取
+  - **复合主键表**（如 KIN_DATA）：按所有主键列排序（如 `ORDER BY c_kin_code, c_kin_id, c_personid`），确保稳定排序
+- ⚡ **智能分块策略**：
+  - 自动检测表是否有主键、主键类型（单列/复合）
+  - 针对不同表结构选择最优的读取方法，平衡性能与数据安全
+  - 无主键表使用 cursor() 虽稍慢但保证正确性
+- 🎯 **自动磁盘检查**：导出前会检查输出目录和 `/tmp` 的可用空间
+- 💾 **内存优化**：所有策略均分批写入 SQLite，定期释放内存（每 10000 行），适合大表导出
+- ⚠️ **临时文件**：大表导出时可能在 `/tmp` 产生临时文件，请确保有足够空间
 
 ---
 
@@ -576,9 +599,21 @@ git push
 
 ## 🔍 常见问题
 
+**Q: 导出时遇到 "No space left on device" 错误？**
+
+A: 这个问题通常是因为 `/tmp` 目录空间不足（大表排序时会产生临时文件）。解决方案：
+1. 清理 `/tmp` 目录：`sudo rm -rf /tmp/MY* /tmp/ib*`
+2. 调小分块大小：`--chunk-size=1000`
+3. 限制导出数据量：`--limit-records=10000`
+4. 增加 `/tmp` 目录的可用空间（挂载更大的分区或清理其他文件）
+
 **Q: 导出脚本会导出所有数据吗？**
 
 A: 默认会导出所有表的结构和数据。可以使用 `--schema-only` 只导出结构，或使用 `--tables` 指定特定表。
+
+**Q: 导出的数据顺序会和 MySQL 中一样吗？**
+
+A: 数据按主键或索引列的顺序导出。脚本总是使用排序（通过 `chunkById()` 或 `orderBy()`）以确保数据完整性，不会出现跳过或重复行的情况。
 
 **Q: SQLite 数据库文件应该提交到 git 吗？**
 

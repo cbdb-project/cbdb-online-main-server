@@ -9,14 +9,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\AddrBelongsData;
-use App\AddrCode;
-use App\EntryCode;
-use App\EntryCodeTypeRel;
 use App\Http\Controllers\Controller;
-use App\OfficeCode;
-use App\OfficeCodeTypeRel;
-use App\OfficeTypeTree;
+use App\Models\AddrBelongsData;
+use App\Models\AddrCode;
+use App\Models\EntryCode;
+use App\Models\EntryCodeTypeRel;
+use App\Models\OfficeCode;
+use App\Models\OfficeCodeTypeRel;
+use App\Models\OfficeTypeTree;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 

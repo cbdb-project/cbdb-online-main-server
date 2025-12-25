@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Operation;
-use App\User;
+use App\Models\Operation;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

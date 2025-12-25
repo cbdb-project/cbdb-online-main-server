@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Operation;
+use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use Carbon\Carbon;

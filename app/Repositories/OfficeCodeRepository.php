@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\OfficeCode;
+use App\Models\OfficeCode;
 use Illuminate\Http\Request;
 
 class OfficeCodeRepository {

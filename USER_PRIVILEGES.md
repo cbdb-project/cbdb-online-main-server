@@ -164,7 +164,7 @@ php artisan cbdb:manage-user --list
 #### 基本用法
 
 ```php
-use App\User;
+use App\Models\User;
 
 // 創建普通用戶（默認為激活狀態、一般角色）
 $user = User::factory()->create();
@@ -217,7 +217,7 @@ $activeAdmin = User::factory()->activeAdmin()->create();
 
 ```php
 use Tests\TestCase;
-use App\User;
+use App\Models\User;
 
 class MyFeatureTest extends TestCase
 {

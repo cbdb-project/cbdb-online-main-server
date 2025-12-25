@@ -2,7 +2,7 @@
 
 namespace App\Observers;
 
-use App\BiogMain;
+use App\Models\BiogMain;
 use App\Services\NameSearchIndexService;
 use Illuminate\Support\Facades\Schema;
 

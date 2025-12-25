@@ -470,8 +470,8 @@ public function store(Request $request, $id)
 namespace Tests\Feature;
 
 use Tests\TestCase;
-use App\User;
-use App\Operation;
+use App\Models\User;
+use App\Models\Operation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 

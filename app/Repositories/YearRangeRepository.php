@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\YearRangeCode;
+use App\Models\YearRangeCode;
 
 class YearRangeRepository {
     public function yearRange() {

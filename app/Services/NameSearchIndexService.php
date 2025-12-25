@@ -63,7 +63,7 @@ class NameSearchIndexService {
     /**
      * 為人物創建索引（新增時使用）
      *
-     * @param \App\BiogMain $person
+     * @param \App\Models\BiogMain $person
      * @return void
      */
     public function indexPerson($person) {
@@ -94,7 +94,7 @@ class NameSearchIndexService {
     /**
      * 重新索引人物（修改時使用）
      *
-     * @param \App\BiogMain $person
+     * @param \App\Models\BiogMain $person
      * @return void
      */
     public function reindexPerson($person) {

@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\BiogMain;
+use App\Models\BiogMain;
 use App\Observers\BiogMainObserver;
 use App\Services\QueryProfile;
 use Illuminate\Database\Events\QueryExecuted;

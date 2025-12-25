@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\Ethnicity;
+use App\Models\Ethnicity;
 
 class EthnicityRepository {
     public function ethnicities() {

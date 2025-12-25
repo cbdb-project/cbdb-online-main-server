@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Pinyin;
+use App\Models\Pinyin;
 use App\Repositories\OperationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

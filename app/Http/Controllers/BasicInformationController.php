@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\BiogMain;
 use App\Http\Requests\BasicInformationRequest;
+use App\Models\BiogMain;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
 use App\Repositories\DynastyRepository;
@@ -153,7 +153,7 @@ class BasicInformationController extends Controller {
      * Display the specified resource.
      *
      * @param  int $id
-     * @return \App\BiogMain|BiogMainRepository|BiogMainRepository[]|\Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|\Illuminate\Http\Response
+     * @return \App\Models\BiogMain|BiogMainRepository|BiogMainRepository[]|\Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|\Illuminate\Http\Response
      */
     public function show($id) {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);

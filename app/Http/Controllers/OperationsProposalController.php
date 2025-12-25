@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Operation;
+use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
@@ -22,7 +22,7 @@ class OperationsProposalController extends Controller {
      * @var array
      */
     protected $tableModelMap = [
-        'BIOG_MAIN' => \App\BiogMain::class,
+        'BIOG_MAIN' => \App\Models\BiogMain::class,
         // 未來可以添加更多表的映射
         // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為手動調用索引服務
     ];

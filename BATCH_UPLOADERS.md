@@ -35,7 +35,7 @@
 
 - 自動分配 `c_textid`（目前為 `max(c_textid) + 1`）。
 - 替書名清理多餘空白與標點（冒號前後留空格，冒號之後的卷次資訊僅保留於原始欄位）。
-- 使用 `App\Pinyin` 生成 `c_title`（拼音）；非漢字會保留原字詞。
+- 使用 `App\Models\Pinyin` 生成 `c_title`（拼音）；非漢字會保留原字詞。
 - 透過 `BIOG_MAIN` 取得作者朝代 (`c_dy`)，若查無資料則保留空值。
 - `c_text_type_id` 固定為 `01`（可視需求後續調整）。
 - 所有新增紀錄的 `c_notes` 會帶上批次編號（格式：`[YYYYMMDDHHMMSS]`）。
@@ -81,7 +81,7 @@
 
 - 先檢查名稱是否已存在：
   - 若已存在，沿用既有 `c_inst_name_code` 與拼音。
-  - 若不存在，分配新 `c_inst_name_code`、以 `App\Pinyin` 生成拼音並建立名稱紀錄。
+  - 若不存在，分配新 `c_inst_name_code`、以 `App\Models\Pinyin` 生成拼音並建立名稱紀錄。
 - 逐筆分配 `c_inst_code`（`max(c_inst_code) + 1`），寫入 `SOCIAL_INSTITUTION_CODES`。
 - 為每筆建立對應的 `SOCIAL_INSTITUTION_ADDR`，`c_inst_addr_type_code` 固定使用 `1`，座標預設為 `0`。
 - 每個步驟皆寫入 `operations`，包含名稱（視需要）、機構本體、地址變動。
@@ -128,7 +128,7 @@
 
 - 逐筆檢查朝代、類型 ID、來源是否存在。
 - 自動分配 `c_office_id`（`max(c_office_id) + 1`）。
-- 使用 `App\Pinyin` 轉換中文職名為 `c_office_pinyin`。
+- 使用 `App\Models\Pinyin` 轉換中文職名為 `c_office_pinyin`。
 - `OFFICE_CODES` 新增紀錄後，立即建立 `OFFICE_CODE_TYPE_REL`。
 - 在 `operations` 中分別記錄兩張表的新增行為。
 

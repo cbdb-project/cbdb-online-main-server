@@ -8,10 +8,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\AddrCode;
-use App\BiogAddrCode;
-use App\BiogMain;
 use App\Http\Controllers\Controller;
+use App\Models\AddrCode;
+use App\Models\BiogAddrCode;
+use App\Models\BiogMain;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

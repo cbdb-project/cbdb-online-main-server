@@ -200,7 +200,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     }
                                 }
                                 $cancelledBy = $proposalMeta['cancelled_by'] ?? null;
-                                $isProposal = in_array((int) $item->op_type, [\App\Operation::TYPE_PROPOSAL_CREATE, \App\Operation::TYPE_PROPOSAL_UPDATE], true);
+                                $isProposal = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true);
                                 $submittedById = $proposalMeta['submitted_by_id'] ?? null;
                                 $isProposalOwner = Auth::check() && $submittedById !== null && (int) Auth::id() === (int) $submittedById;
                                 $canEditProposal = $isProposalOwner && in_array($reviewStatus, ['pending', 'rejected'], true);
@@ -383,8 +383,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         2 => '2-整體覆寫',
                                         3 => '3-修改',
                                         4 => '4-刪除',
-                                        \App\Operation::TYPE_PROPOSAL_CREATE => '8-提案（新增）',
-                                        \App\Operation::TYPE_PROPOSAL_UPDATE => '9-提案（修改）',
+                                        \App\Models\Operation::TYPE_PROPOSAL_CREATE => '8-提案（新增）',
+                                        \App\Models\Operation::TYPE_PROPOSAL_UPDATE => '9-提案（修改）',
                                     ];
                                 @endphp
                                 {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}

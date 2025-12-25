@@ -13,10 +13,10 @@
             if (Auth::check() && Auth::user()->canManageUsers()) {
                 try {
                     if (\Illuminate\Support\Facades\Schema::hasTable('operations')) {
-                        $hasPendingProposals = \App\Operation::where('crowdsourcing_status', 0)
+                        $hasPendingProposals = \App\Models\Operation::where('crowdsourcing_status', 0)
                             ->whereIn('op_type', [
-                                \App\Operation::TYPE_PROPOSAL_CREATE,
-                                \App\Operation::TYPE_PROPOSAL_UPDATE,
+                                \App\Models\Operation::TYPE_PROPOSAL_CREATE,
+                                \App\Models\Operation::TYPE_PROPOSAL_UPDATE,
                             ])
                             ->where('resource_data', 'like', '%"__review_status":"pending"%')
                             ->exists();

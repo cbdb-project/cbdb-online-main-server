@@ -55,12 +55,12 @@ class DashboardController extends Controller {
             ->get()
             ->reduce(function ($carry, $item) {
                 $typeNames = [
-                    \App\Operation::TYPE_CREATE => '新增',
-                    \App\Operation::TYPE_UPDATE_FULL => '修改', // full update
-                    \App\Operation::TYPE_UPDATE => '修改', // partial update
-                    \App\Operation::TYPE_DELETE => '刪除',
-                    \App\Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
-                    \App\Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
+                    \App\Models\Operation::TYPE_CREATE => '新增',
+                    \App\Models\Operation::TYPE_UPDATE_FULL => '修改', // full update
+                    \App\Models\Operation::TYPE_UPDATE => '修改', // partial update
+                    \App\Models\Operation::TYPE_DELETE => '刪除',
+                    \App\Models\Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
+                    \App\Models\Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
                 ];
 
                 $typeName = $typeNames[$item->op_type] ?? '未知';

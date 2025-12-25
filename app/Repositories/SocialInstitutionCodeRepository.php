@@ -9,7 +9,7 @@
 
 namespace App\Repositories;
 
-use App\SocialInstitutionCode;
+use App\Models\SocialInstitutionCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 

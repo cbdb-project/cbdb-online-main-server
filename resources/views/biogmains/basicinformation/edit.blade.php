@@ -26,52 +26,44 @@
                     <div class="col-sm-6">
                         <div class="form-group row">
                             <label for="c_surname_chn" class="col-sm-4 col-form-label">姓</label>
-                            <div class="col-sm-8 {{ $errors->has('c_surname_chn') ? ' has-error' : '' }}">
-                                <input type="text" name="c_surname_chn" class="form-control"
+                            <div class="col-sm-8">
+                                <input type="text" name="c_surname_chn" class="form-control @error('c_surname_chn') is-invalid @enderror"
                                        value="{{ old('c_surname_chn') ? old('c_surname_chn') : $basicinformation->c_surname_chn }}">
-                                @if ($errors->has('c_surname_chn'))
-                                    <span class="help-block">
-                                    <strong>{{ $errors->first('c_surname_chn') }}</strong>
-                                </span>
-                                @endif
+                                @error('c_surname_chn')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
                         <div class="form-group row">
                             <label for="c_mingzi_chn" class="col-sm-4 col-form-label">名</label>
-                            <div class="col-sm-8 {{ $errors->has('c_mingzi_chn') ? ' has-error' : '' }}">
-                                <input type="text" name="c_mingzi_chn" class="form-control"
+                            <div class="col-sm-8">
+                                <input type="text" name="c_mingzi_chn" class="form-control @error('c_mingzi_chn') is-invalid @enderror"
                                        value="{{ old('c_mingzi_chn') ? old('c_mingzi_chn') : $basicinformation->c_mingzi_chn }}">
-                                @if ($errors->has('c_mingzi_chn'))
-                                    <span class="help-block">
-                                <strong>{{ $errors->first('c_mingzi_chn') }}</strong>
-                            </span>
-                                @endif
+                                @error('c_mingzi_chn')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
                     </div>
                     <div class="col-sm-6">
                         <div class="form-group row">
                             <label for="c_surname" class="col-sm-4 col-form-label">Xing</label>
-                            <div class="col-sm-8 {{ $errors->has('c_surname') ? ' has-error' : '' }}">
-                                <input type="text" name="c_surname" class="form-control"
+                            <div class="col-sm-8">
+                                <input type="text" name="c_surname" class="form-control @error('c_surname') is-invalid @enderror"
                                        value="{{ old('c_surname') ? old('c_surname') : $basicinformation->c_surname }}">
-                                @if ($errors->has('c_surname'))
-                                    <span class="help-block">
-                                    <strong>{{ $errors->first('c_surname') }}</strong>
-                                </span>
-                                @endif
+                                @error('c_surname')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
                         <div class="form-group row">
                             <label for="c_mingzi" class="col-sm-4 col-form-label">Ming</label>
-                            <div class="col-sm-8 {{ $errors->has('c_mingzi') ? ' has-error' : '' }}">
-                                <input type="text" name="c_mingzi" class="form-control"
+                            <div class="col-sm-8">
+                                <input type="text" name="c_mingzi" class="form-control @error('c_mingzi') is-invalid @enderror"
                                        value="{{ old('c_mingzi') ? old('c_mingzi') : $basicinformation->c_mingzi }}">
-                                @if ($errors->has('c_mingzi'))
-                                    <span class="help-block">
-                                <strong>{{ $errors->first('c_mingzi') }}</strong>
-                            </span>
-                                @endif
+                                @error('c_mingzi')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
                     </div>
@@ -88,45 +80,37 @@
                 <div class="form-group row">
                     <label for="c_surname_proper" class="col-sm-2 col-form-label">外文姓</label>
                     <div class="col-sm-4">
-                        <input type="text" name="c_surname_proper" class="form-control"
+                        <input type="text" name="c_surname_proper" class="form-control @error('c_surname_proper') is-invalid @enderror"
                                value="{{ old('c_surname_proper') ? old('c_surname_proper') : $basicinformation->c_surname_proper }}">
-                        @if ($errors->has('c_surname_proper'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_surname_proper') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_surname_proper')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                     <label for="c_mingzi_proper" class="col-sm-2 col-form-label">外文名</label>
                     <div class="col-sm-4">
-                        <input type="text" name="c_mingzi_proper" class="form-control"
+                        <input type="text" name="c_mingzi_proper" class="form-control @error('c_mingzi_proper') is-invalid @enderror"
                                value="{{ old('c_mingzi_proper') ? old('c_mingzi_proper') : $basicinformation->c_mingzi_proper }}">
-                        @if ($errors->has('c_mingzi_proper'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_mingzi_proper') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_mingzi_proper')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                 </div>
                 <div class="form-group row">
                     <label for="c_surname_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫姓</label>
                     <div class="col-sm-4">
-                        <input type="text" name="c_surname_rm" class="form-control"
+                        <input type="text" name="c_surname_rm" class="form-control @error('c_surname_rm') is-invalid @enderror"
                                value="{{ old('c_surname_rm') ? old('c_surname_rm') : $basicinformation->c_surname_rm }}">
-                        @if ($errors->has('c_surname_rm'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_surname_rm') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_surname_rm')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                     <label for="c_mingzi_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫名</label>
                     <div class="col-sm-4">
-                        <input type="text" name="c_mingzi_rm" class="form-control"
+                        <input type="text" name="c_mingzi_rm" class="form-control @error('c_mingzi_rm') is-invalid @enderror"
                                value="{{ old('c_mingzi_rm') ? old('c_mingzi_rm') : $basicinformation->c_mingzi_rm }}">
-                        @if ($errors->has('c_mingzi_rm'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_mingzi_rm') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_mingzi_rm')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                 </div>
                 <div class="form-group row">
@@ -274,20 +258,18 @@
                         <select-vue name="c_dy_day_gz" model="ganzhi" selected="{{ $basicinformation->c_dy_day_gz }}"></select-vue>
                     </div>
                 </div>
-                <div class="form-group{{ $errors->has('c_index_year') ? ' has-error' : '' }}">
+                <div class="form-group row">
                     <label for="c_index_year" class="col-sm-2 col-form-label">指數年(index year)</label>
                     <div class="col-sm-10">
-                        <input type="number" name="c_index_year" class="form-control" readonly
+                        <input type="number" name="c_index_year" class="form-control @error('c_index_year') is-invalid @enderror" readonly
                                value="{{ $basicinformation->c_index_year }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
                         <span class="help-block">
                             <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
                         </span>
-                        @if ($errors->has('c_index_year'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_index_year') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_index_year')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                 </div>
                 <div class="form-group row">
@@ -334,16 +316,14 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group{{ $errors->has('c_death_age') ? ' has-error' : '' }}">
+                <div class="form-group row">
                     <label for="c_death_age" class="col-sm-2 col-form-label">享年(death_age)</label>
                     <div class="col-sm-4">
-                        <input type="number" name="c_death_age" class="form-control"
+                        <input type="number" name="c_death_age" class="form-control @error('c_death_age') is-invalid @enderror"
                                value="{{ $basicinformation->c_death_age }}">
-                        @if ($errors->has('c_death_age'))
-                            <span class="help-block">
-                            <strong>{{ $errors->first('c_death_age') }}</strong>
-                        </span>
-                        @endif
+                        @error('c_death_age')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                     <label for="" class="col-sm-2 col-form-label">范围</label>
                     <div class="col-sm-4">

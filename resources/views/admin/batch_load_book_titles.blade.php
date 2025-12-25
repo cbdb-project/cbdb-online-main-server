@@ -37,12 +37,12 @@
 
             <form method="post" action="{{ route('admin.batch-load-book-titles.store') }}">
                 {{ csrf_field() }}
-                <div class="form-group @if($errors->has('entries')) has-error @endif">
+                <div class="form-group">
                     <label for="entries">批次資料（以 Tab 分隔）</label>
-                    <textarea name="entries" id="entries" class="form-control" rows="10" placeholder="作者ID[TAB]書名[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
-                    @if($errors->has('entries'))
-                        <span class="help-block">{{ $errors->first('entries') }}</span>
-                    @endif
+                    <textarea name="entries" id="entries" class="form-control @error('entries') is-invalid @enderror" rows="10" placeholder="作者ID[TAB]書名[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
+                    @error('entries')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
                 <button type="submit" class="btn btn-primary">送出匯入</button>
                 <a href="{{ route('admin.batch-load-book-titles') }}" class="btn btn-default">清除重填</a>

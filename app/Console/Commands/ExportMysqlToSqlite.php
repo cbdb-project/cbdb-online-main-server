@@ -503,11 +503,16 @@ class ExportMysqlToSqlite extends Command {
 
         // 记录该列是否为单列主键（可安全用于 chunkById）
         $isSingleColumnPrimaryKey = false;
+        $compositePrimaryKey = [];
         foreach ($primaryKeyColumnsList as $pkColumns) {
             if (count($pkColumns) === 1 && $pkColumns[0] === $chunkColumn) {
                 $isSingleColumnPrimaryKey = true;
 
                 break;
+            }
+            if (count($pkColumns) > 1) {
+                // 記錄複合主鍵列，用於穩定排序
+                $compositePrimaryKey = $pkColumns;
             }
         }
 
@@ -528,6 +533,7 @@ class ExportMysqlToSqlite extends Command {
             'meta' => [
                 'chunk_column' => $chunkColumn,
                 'is_unique_column' => $isSingleColumnPrimaryKey,
+                'composite_primary_key' => $compositePrimaryKey,
             ],
         ];
     }
@@ -737,6 +743,7 @@ class ExportMysqlToSqlite extends Command {
         $metadata = $this->tableMetadata[$tableName] ?? [];
         $chunkColumn = $metadata['chunk_column'] ?? null;
         $isUniqueColumn = $metadata['is_unique_column'] ?? false;
+        $compositePrimaryKey = $metadata['composite_primary_key'] ?? [];
         $insertBatchSize = $this->getSqliteInsertBatchSize();
         $chunkSize = (int) $this->option('chunk-size');
 
@@ -812,20 +819,31 @@ class ExportMysqlToSqlite extends Command {
                 $query->chunkById($chunkSize, $chunkCallback, $chunkColumn);
             } else {
                 // 回退到 orderBy + chunk（数据完整性优先）
-                if (!$chunkColumn) {
-                    // 如果连列都没有，获取第一列
-                    $columns = DB::connection($this->sourceConnection)
-                        ->getSchemaBuilder()
-                        ->getColumnListing($tableName);
+                // 對於複合主鍵表，按所有主鍵列排序以確保穩定的排序結果
+                if (!empty($compositePrimaryKey)) {
+                    // 使用複合主鍵的所有列進行排序
+                    foreach ($compositePrimaryKey as $pkColumn) {
+                        $query->orderBy($pkColumn);
+                    }
+                } else {
+                    // 單列排序（非主鍵或無主鍵表）
+                    if (!$chunkColumn) {
+                        // 如果连列都没有，获取第一列
+                        $columns = DB::connection($this->sourceConnection)
+                            ->getSchemaBuilder()
+                            ->getColumnListing($tableName);
 
-                    if (empty($columns)) {
-                        throw new \RuntimeException(sprintf('表 %s 没有任何列', $tableName));
+                        if (empty($columns)) {
+                            throw new \RuntimeException(sprintf('表 %s 没有任何列', $tableName));
+                        }
+
+                        $chunkColumn = $columns[0];
                     }
 
-                    $chunkColumn = $columns[0];
+                    $query->orderBy($chunkColumn);
                 }
 
-                $query->orderBy($chunkColumn)->chunk($chunkSize, $chunkCallback);
+                $query->chunk($chunkSize, $chunkCallback);
             }
 
             // 写入剩余的数据

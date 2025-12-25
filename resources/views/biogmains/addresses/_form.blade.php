@@ -51,69 +51,119 @@
 
     <div class="form-group row">
         <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_firstyear" class="form-control" value="{{ $isEdit ? $row->c_firstyear : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_fy_nh_code">年号</label>
-            <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_fy_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_fy_nh_year" class="form-control" value="{{ $isEdit ? $row->c_fy_nh_year : '' }}">
-            <span for="">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_fy_range" model="range" selected="{{ $isEdit ? $row->c_fy_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_fy_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_fy_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_fy_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_fy_month" class="form-control" value="{{ $isEdit ? $row->c_fy_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_fy_day" class="form-control" value="{{ $isEdit ? $row->c_fy_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_fy_day_gz : '' }}"></select-vue>
+        <div class="col-sm-10">
+            <div class="d-flex align-items-center flex-wrap">
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 12ch; flex: 1 1 12ch;">
+                    <input type="number" name="c_firstyear" class="form-control" style="width: 12ch; min-width: 12ch;" value="{{ $isEdit ? $row->c_firstyear : '' }}">
+                </div>
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
+                    <label class="mb-0 mr-2" for="c_fy_nh_code">年号</label>
+                    <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">
+                        <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_fy_nh_code : '' }}"></select-vue>
+                    </div>
+                    <input type="number" name="c_fy_nh_year" class="form-control mr-2"
+                           style="width: 8ch; min-width: 8ch;"
+                           value="{{ $isEdit ? $row->c_fy_nh_year : '' }}">
+                    <span>年</span>
+                </div>
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
+                    <label class="mb-0 mr-2" for="c_fy_range">時限</label>
+                    <div class="flex-grow-1" style="min-width: 16ch;">
+                        <select-vue name="c_fy_range" model="range" selected="{{ $isEdit ? $row->c_fy_range : '' }}"></select-vue>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center flex-wrap" style="min-width: 56ch; flex: 1 1 56ch;">
+                    <div class="custom-control custom-checkbox mr-4">
+                        <input type="hidden" name="c_fy_intercalary" value="0">
+                        <input type="checkbox"
+                               class="custom-control-input"
+                               id="c_fy_intercalary"
+                               name="c_fy_intercalary"
+                               value="1"
+                               {{ ($isEdit && $row->c_fy_intercalary == 1) ? 'checked' : '' }}>
+                        <label class="custom-control-label" for="c_fy_intercalary">閏月</label>
+                    </div>
+                    <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
+                        <input type="number" name="c_fy_month" class="form-control lunar-month"
+                               min="1"
+                               max="12"
+                               value="{{ $isEdit ? $row->c_fy_month : '' }}">
+                        <div class="invalid-feedback">請輸入 1-12 或留空</div>
+                    </div>
+                    <span class="mr-2">月</span>
+                    <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
+                        <input type="number" name="c_fy_day" class="form-control lunar-day"
+                               min="1"
+                               max="30"
+                               value="{{ $isEdit ? $row->c_fy_day : '' }}">
+                        <div class="invalid-feedback">請輸入 1-30 或留空</div>
+                    </div>
+                    <span class="mr-2">日</span>
+                    <label class="mb-0 mr-2">日(干支)</label>
+                    <div class="flex-grow-1" style="min-width: 12ch;">
+                        <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_fy_day_gz : '' }}"></select-vue>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="form-group row">
         <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_lastyear" class="form-control" value="{{ $isEdit ? $row->c_lastyear : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_ly_nh_code">年号</label>
-            <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_ly_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_ly_nh_year" class="form-control" value="{{ $isEdit ? $row->c_ly_nh_year : '' }}">
-            <span for="">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_ly_range" model="range" selected="{{ $isEdit ? $row->c_ly_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_ly_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_ly_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_ly_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_ly_month" class="form-control" value="{{ $isEdit ? $row->c_ly_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_ly_day" class="form-control" value="{{ $isEdit ? $row->c_ly_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_ly_day_gz : '' }}"></select-vue>
+        <div class="col-sm-10">
+            <div class="d-flex align-items-center flex-wrap">
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 12ch; flex: 1 1 12ch;">
+                    <input type="number" name="c_lastyear" class="form-control" style="width: 12ch; min-width: 12ch;" value="{{ $isEdit ? $row->c_lastyear : '' }}">
+                </div>
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
+                    <label class="mb-0 mr-2" for="c_ly_nh_code">年号</label>
+                    <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">
+                        <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_ly_nh_code : '' }}"></select-vue>
+                    </div>
+                    <input type="number" name="c_ly_nh_year" class="form-control mr-2"
+                           style="width: 8ch; min-width: 8ch;"
+                           value="{{ $isEdit ? $row->c_ly_nh_year : '' }}">
+                    <span>年</span>
+                </div>
+                <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
+                    <label class="mb-0 mr-2" for="c_ly_range">時限</label>
+                    <div class="flex-grow-1" style="min-width: 16ch;">
+                        <select-vue name="c_ly_range" model="range" selected="{{ $isEdit ? $row->c_ly_range : '' }}"></select-vue>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center flex-wrap" style="min-width: 56ch; flex: 1 1 56ch;">
+                    <div class="custom-control custom-checkbox mr-4">
+                        <input type="hidden" name="c_ly_intercalary" value="0">
+                        <input type="checkbox"
+                               class="custom-control-input"
+                               id="c_ly_intercalary"
+                               name="c_ly_intercalary"
+                               value="1"
+                               {{ ($isEdit && $row->c_ly_intercalary == 1) ? 'checked' : '' }}>
+                        <label class="custom-control-label" for="c_ly_intercalary">閏月</label>
+                    </div>
+                    <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
+                        <input type="number" name="c_ly_month" class="form-control lunar-month"
+                               min="1"
+                               max="12"
+                               value="{{ $isEdit ? $row->c_ly_month : '' }}">
+                        <div class="invalid-feedback">請輸入 1-12 或留空</div>
+                    </div>
+                    <span class="mr-2">月</span>
+                    <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
+                        <input type="number" name="c_ly_day" class="form-control lunar-day"
+                               min="1"
+                               max="30"
+                               value="{{ $isEdit ? $row->c_ly_day : '' }}">
+                        <div class="invalid-feedback">請輸入 1-30 或留空</div>
+                    </div>
+                    <span class="mr-2">日</span>
+                    <label class="mb-0 mr-2">日(干支)</label>
+                    <div class="flex-grow-1" style="min-width: 12ch;">
+                        <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_ly_day_gz : '' }}"></select-vue>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -192,6 +242,37 @@
         textperson_pair_first_load();
         $(".c_addr_id").select2(options('addr'));
         $(".c_source").select2(options('text'));
+
+        function validateLunarInput($input, max) {
+            var value = $input.val().trim();
+            if (value === '') {
+                $input.removeClass('is-invalid');
+                return;
+            }
+            var parsed = Number(value);
+            var isInteger = Number.isInteger(parsed);
+            var isValid = isInteger && parsed >= 1 && parsed <= max;
+            $input.toggleClass('is-invalid', !isValid);
+        }
+
+        function bindLunarValidation() {
+            $('.lunar-month').each(function () {
+                var $input = $(this);
+                validateLunarInput($input, 12);
+                $input.on('input change', function () {
+                    validateLunarInput($input, 12);
+                });
+            });
+            $('.lunar-day').each(function () {
+                var $input = $(this);
+                validateLunarInput($input, 30);
+                $input.on('input change', function () {
+                    validateLunarInput($input, 30);
+                });
+            });
+        }
+
+        bindLunarValidation();
 
         function formatRepo (repo) {
             if (repo.loading) {

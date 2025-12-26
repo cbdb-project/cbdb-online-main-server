@@ -32,15 +32,23 @@
 
 <div class="col-sm-10">
     <div class="d-flex align-items-center flex-wrap">
-        <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 12ch; flex: 1 1 12ch;">
+        <div class="d-flex align-items-center flex-wrap mr-2" style="min-width: 12ch; flex: 1 1 12ch;">
             <input type="{{ $yearInputType }}"
                    name="{{ $yearName }}"
-                   class="form-control"
+                   class="form-control era-year-input"
                    style="width: 12ch; min-width: 12ch;"
                    value="{{ $yearValue }}"
+                   data-nh-code-name="{{ $nhCodeName }}"
+                   data-nh-year-name="{{ $nhYearName }}"
                    @if($yearRequired) required @endif
                    @foreach($yearAttributes as $attr => $value) {{ $attr }}="{{ $value }}" @endforeach>
         </div>
+        <button type="button"
+                class="btn btn-sm btn-outline-secondary era-convert-btn mr-3"
+                title="將公元年份轉換為年號"
+                data-toggle="tooltip">
+            <i class="fas fa-search"></i>
+        </button>
         <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
             <label class="mb-0 mr-2" for="{{ $nhCodeName }}">{{ $nhLabel }}</label>
             <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">

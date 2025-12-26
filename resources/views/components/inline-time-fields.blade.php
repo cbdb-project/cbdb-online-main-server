@@ -44,7 +44,7 @@
         <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
             <label class="mb-0 mr-2" for="{{ $nhCodeName }}">{{ $nhLabel }}</label>
             <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">
-                <select-vue name="{{ $nhCodeName }}" model="nianhao" selected="{{ $nhCodeValue }}"></select-vue>
+                <select-vue id="{{ $nhCodeName }}" name="{{ $nhCodeName }}" model="nianhao" id-key="c_nianhao_id" selected="{{ $nhCodeValue }}"></select-vue>
             </div>
             <input type="number"
                    name="{{ $nhYearName }}"
@@ -57,7 +57,7 @@
             <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
                 <label class="mb-0 mr-2" for="{{ $rangeName }}">{{ $rangeLabel }}</label>
                 <div class="flex-grow-1" style="min-width: 16ch;">
-                    <select-vue name="{{ $rangeName }}" model="range" selected="{{ $rangeValue }}"></select-vue>
+                    <select-vue id="{{ $rangeName }}" name="{{ $rangeName }}" model="range" id-key="c_range_code" selected="{{ $rangeValue }}"></select-vue>
                 </div>
             </div>
         @endif
@@ -93,9 +93,9 @@
                     <div class="invalid-feedback">請輸入 1-30 或留空</div>
                 </div>
                 <span class="mr-2">日</span>
-                <label class="mb-0 mr-2">{{ $dayGzLabel }}</label>
+                <label class="mb-0 mr-2" for="{{ $dayGzName }}">{{ $dayGzLabel }}</label>
                 <div class="flex-grow-1" style="min-width: 12ch;">
-                    <select-vue name="{{ $dayGzName }}" model="ganzhi" selected="{{ $dayGzValue }}"></select-vue>
+                    <select-vue id="{{ $dayGzName }}" name="{{ $dayGzName }}" model="ganzhi" id-key="c_ganzhi_code" selected="{{ $dayGzValue }}"></select-vue>
                 </div>
             </div>
         @elseif($showLunarPlaceholder)

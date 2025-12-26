@@ -261,7 +261,6 @@
             background-color: #2b3035 !important;
             color: #6c757d !important;
             cursor: not-allowed;
->>>>>>> 94f5819 (feat: 添加完整的 dark mode 切换功能)
         }
     </style>
 </head>

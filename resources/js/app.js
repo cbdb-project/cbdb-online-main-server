@@ -118,7 +118,7 @@ window.axios.defaults.headers.common['Accept'] = 'application/json';
 window.axios.defaults.headers.post['Content-Type'] = 'application/json';
 
 // Import cn-era for Chinese era conversion
-import { convertYear } from 'cn-era';
+import { convertYear, Dynasty } from 'cn-era';
 
 // Global modal focus management to avoid aria-hidden warnings when closing
 const installModalFocusFix = () => {
@@ -304,15 +304,32 @@ function initEraConversion() {
         }
 
         try {
+            // 嘗試從頁面獲取朝代信息以提高轉換精確度
+            const $dynastySelect = $('select[name="c_dy"]');
+            const dynastyCode = $dynastySelect.length ? parseInt($dynastySelect.val(), 10) : null;
+
             // 調用 cn-era 進行轉換
-            const results = convertYear(year, { mode: 'mainline' });
+            let results;
+            if (dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0) {
+                // 如果有朝代信息，使用朝代過濾
+                results = convertYear(year, { dynasty: dynastyCode });
+
+                // 如果指定朝代沒有結果，降級到 mainline 模式
+                if (!results || results.length === 0) {
+                    console.warn(`朝代 ${dynastyCode} 中沒有找到對應年號，嘗試使用主線朝代`);
+                    results = convertYear(year, { mode: 'mainline' });
+                }
+            } else {
+                // 沒有朝代信息，使用主線朝代
+                results = convertYear(year, { mode: 'mainline' });
+            }
 
             if (!results || results.length === 0) {
                 alert(`無法找到公元 ${year} 年對應的年號`);
                 return;
             }
 
-            // 使用第一個結果（主線朝代）
+            // 使用第一個結果
             const eraResult = results[0];
             const reignTitle = eraResult.reign_title;
             const yearNum = eraResult.year;

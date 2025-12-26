@@ -154,4 +154,38 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(403);
         $this->assertStringContainsString('Forbidden character detected', $response->json()['error'] ?? '');
     }
+
+    /** @test */
+    public function guests_cannot_generate_from_nl() {
+        auth()->logout();
+        $response = $this->postJson(route('query-playground.generate-from-nl'), [
+            'question' => 'test question',
+        ]);
+        $response->assertStatus(401);
+    }
+
+    /** @test */
+    public function regular_users_cannot_generate_from_nl() {
+        $this->be($this->regularUser);
+        $response = $this->postJson(route('query-playground.generate-from-nl'), [
+            'question' => 'test question',
+        ]);
+        $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function it_requires_question_parameter() {
+        $this->be($this->adminUser);
+        $response = $this->postJson(route('query-playground.generate-from-nl'), []);
+        $response->assertStatus(422);
+    }
+
+    /** @test */
+    public function it_validates_question_length() {
+        $this->be($this->adminUser);
+        $response = $this->postJson(route('query-playground.generate-from-nl'), [
+            'question' => str_repeat('a', 1001),
+        ]);
+        $response->assertStatus(422);
+    }
 }

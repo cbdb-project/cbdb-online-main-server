@@ -1,5 +1,5 @@
 <template>
-    <select class="form-control select2" v-bind:name="name" v-model="selectedid">
+    <select class="form-control select2" :id="id" v-bind:name="name" v-model="selectedid">
         <!--<option disabled value="">请选择</option>-->
         <option value="">请选择</option>
         <option v-for="item in data" v-bind:value="id(item)">{{ normalization(item) }}</option>
@@ -13,7 +13,7 @@
     const pendingRequests = {};
 
     export default {
-        props: ['name', 'model', 'selected'],
+        props: ['name', 'model', 'selected', 'id', 'idKey'],
         data() {
           return {
               data: {},
@@ -73,10 +73,53 @@
                 return str.trim();
             },
             id(item) {
-                for (let key in item) {
-//                    console.log(item[key]);
-                    return item[key];
+                const modelIdKeyMap = {
+                    ethnicity: 'c_ethnicity_code',
+                    choronym: 'c_choronym_code',
+                    dynasty: 'c_dy',
+                    nianhao: 'c_nianhao_id',
+                    biogaddr: 'c_addr_type',
+                    altcode: 'c_name_type_code',
+                    role: 'c_role_id',
+                    range: 'c_range_code',
+                    ganzhi: 'c_ganzhi_code',
+                    household: 'c_household_status_code',
+                    appttype: 'c_appt_code',
+                    assumeoffice: 'c_assume_office_code',
+                    officecate: 'c_office_category_id',
+                    parentstatus: 'c_parental_status_code',
+                    measure: 'c_measure_code',
+                    possact: 'c_possession_act_code',
+                    birole: 'c_bi_role_code',
+                    topic: 'c_topic_code',
+                    occasion: 'c_occasion_code',
+                };
+
+                const preferredKey = this.idKey || modelIdKeyMap[this.model];
+                if (preferredKey && Object.prototype.hasOwnProperty.call(item, preferredKey)) {
+                    return item[preferredKey];
                 }
+
+                if (Object.prototype.hasOwnProperty.call(item, 'id')) {
+                    return item.id;
+                }
+
+                const keys = Object.keys(item);
+                if (keys.length === 1) {
+                    return item[keys[0]];
+                }
+
+                const suffixPriority = ['_id', '_code'];
+                for (const suffix of suffixPriority) {
+                    const matches = keys.filter((key) => key.endsWith(suffix));
+                    if (matches.length > 0) {
+                        matches.sort();
+                        return item[matches[0]];
+                    }
+                }
+
+                keys.sort();
+                return keys.length > 0 ? item[keys[0]] : '';
             }
         },
     }

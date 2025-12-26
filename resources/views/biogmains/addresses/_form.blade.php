@@ -51,70 +51,48 @@
 
     <div class="form-group row">
         <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_firstyear" class="form-control" value="{{ $isEdit ? $row->c_firstyear : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_fy_nh_code">年号</label>
-            <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_fy_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_fy_nh_year" class="form-control" value="{{ $isEdit ? $row->c_fy_nh_year : '' }}">
-            <span for="">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_fy_range" model="range" selected="{{ $isEdit ? $row->c_fy_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_fy_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_fy_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_fy_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_fy_month" class="form-control" value="{{ $isEdit ? $row->c_fy_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_fy_day" class="form-control" value="{{ $isEdit ? $row->c_fy_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_fy_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_fy_day_gz : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_firstyear"
+            :yearValue="$isEdit ? $row->c_firstyear : ''"
+            nhCodeName="c_fy_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_fy_nh_code : ''"
+            nhYearName="c_fy_nh_year"
+            :nhYearValue="$isEdit ? $row->c_fy_nh_year : ''"
+            rangeName="c_fy_range"
+            :rangeValue="$isEdit ? $row->c_fy_range : ''"
+            :showLunar="true"
+            intercalaryName="c_fy_intercalary"
+            :intercalaryValue="$isEdit ? $row->c_fy_intercalary : ''"
+            monthName="c_fy_month"
+            :monthValue="$isEdit ? $row->c_fy_month : ''"
+            dayName="c_fy_day"
+            :dayValue="$isEdit ? $row->c_fy_day : ''"
+            dayGzName="c_fy_day_gz"
+            :dayGzValue="$isEdit ? $row->c_fy_day_gz : ''"
+        />
     </div>
 
     <div class="form-group row">
         <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_lastyear" class="form-control" value="{{ $isEdit ? $row->c_lastyear : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_ly_nh_code">年号</label>
-            <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_ly_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_ly_nh_year" class="form-control" value="{{ $isEdit ? $row->c_ly_nh_year : '' }}">
-            <span for="">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_ly_range" model="range" selected="{{ $isEdit ? $row->c_ly_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_ly_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_ly_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_ly_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_ly_month" class="form-control" value="{{ $isEdit ? $row->c_ly_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_ly_day" class="form-control" value="{{ $isEdit ? $row->c_ly_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_ly_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_ly_day_gz : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_lastyear"
+            :yearValue="$isEdit ? $row->c_lastyear : ''"
+            nhCodeName="c_ly_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_ly_nh_code : ''"
+            nhYearName="c_ly_nh_year"
+            :nhYearValue="$isEdit ? $row->c_ly_nh_year : ''"
+            rangeName="c_ly_range"
+            :rangeValue="$isEdit ? $row->c_ly_range : ''"
+            :showLunar="true"
+            intercalaryName="c_ly_intercalary"
+            :intercalaryValue="$isEdit ? $row->c_ly_intercalary : ''"
+            monthName="c_ly_month"
+            :monthValue="$isEdit ? $row->c_ly_month : ''"
+            dayName="c_ly_day"
+            :dayValue="$isEdit ? $row->c_ly_day : ''"
+            dayGzName="c_ly_day_gz"
+            :dayGzValue="$isEdit ? $row->c_ly_day_gz : ''"
+        />
     </div>
 
     <div class="form-group row">
@@ -138,7 +116,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" cols="30" rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
         </div>
@@ -192,6 +170,10 @@
         textperson_pair_first_load();
         $(".c_addr_id").select2(options('addr'));
         $(".c_source").select2(options('text'));
+
+        if (window.initLunarValidation) {
+            window.initLunarValidation();
+        }
 
         function formatRepo (repo) {
             if (repo.loading) {

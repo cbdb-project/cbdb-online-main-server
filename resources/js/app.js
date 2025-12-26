@@ -203,6 +203,36 @@ import SelectVue from './components/Select.vue';
 // Make createApp globally available for pages that need it
 window.createVueApp = createApp;
 
+// Lunar month/day validation helper for forms
+window.initLunarValidation = function(scope = document) {
+    const $scope = $(scope);
+    const validateLunarInput = ($input, max) => {
+        const value = $input.val().trim();
+        if (value === '') {
+            $input.removeClass('is-invalid');
+            return;
+        }
+        const parsed = Number(value);
+        const isInteger = Number.isInteger(parsed);
+        const isValid = isInteger && parsed >= 1 && parsed <= max;
+        $input.toggleClass('is-invalid', !isValid);
+    };
+
+    const bindInputs = (selector, max) => {
+        const $inputs = $scope.find(selector);
+        $inputs.each(function() {
+            const $input = $(this);
+            validateLunarInput($input, max);
+        });
+        $inputs.off('.lunarValidation').on('input.lunarValidation change.lunarValidation', function() {
+            validateLunarInput($(this), max);
+        });
+    };
+
+    bindInputs('.lunar-month', 12);
+    bindInputs('.lunar-day', 30);
+};
+
 // Install global modal focus guard when DOM is ready
 $(installModalFocusFix);
 $(installMobileSidebarDismiss);

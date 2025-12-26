@@ -49,40 +49,30 @@
 
     <div class="form-group row">
         <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_firstyear" class="form-control"
-                   value="{{ $isEdit ? $row->c_firstyear : '' }}">
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_fy_nh_code">年号</label>
-            <select-vue name="c_fy_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_fy_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_fy_nh_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_fy_nh_year : '' }}">
-            <span for="c_fy_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_fy_range">時限</label>
-            <select-vue name="c_fy_range" model="range" selected="{{ $isEdit ? $row->c_fy_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_firstyear"
+            :yearValue="$isEdit ? $row->c_firstyear : ''"
+            nhCodeName="c_fy_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_fy_nh_code : ''"
+            nhYearName="c_fy_nh_year"
+            :nhYearValue="$isEdit ? $row->c_fy_nh_year : ''"
+            rangeName="c_fy_range"
+            :rangeValue="$isEdit ? $row->c_fy_range : ''"
+        />
     </div>
 
     <div class="form-group row">
         <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_lastyear" class="form-control"
-                   value="{{ $isEdit ? $row->c_lastyear : '' }}">
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_ly_nh_code">年号</label>
-            <select-vue name="c_ly_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_ly_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_ly_nh_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_ly_nh_year : '' }}">
-            <span for="c_ly_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_ly_range">時限</label>
-            <select-vue name="c_ly_range" model="range" selected="{{ $isEdit ? $row->c_ly_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_lastyear"
+            :yearValue="$isEdit ? $row->c_lastyear : ''"
+            nhCodeName="c_ly_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_ly_nh_code : ''"
+            nhYearName="c_ly_nh_year"
+            :nhYearValue="$isEdit ? $row->c_ly_nh_year : ''"
+            rangeName="c_ly_range"
+            :rangeValue="$isEdit ? $row->c_ly_range : ''"
+        />
     </div>
 
     <div class="form-group row">
@@ -106,7 +96,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>

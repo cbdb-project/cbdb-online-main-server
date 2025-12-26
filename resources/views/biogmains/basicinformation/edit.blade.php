@@ -182,81 +182,49 @@
 
                 <div class="form-group row">
                     <label for="c_firstyear" class="col-sm-2 col-form-label">生年(birth year)</label>
-                    <div class="col-md-1">
-                        <input type="number" name="c_birthyear" class="form-control"
-                               value="{{ $basicinformation->c_birthyear }}" onchange="indexYear()">
-                    </div>
-
-                    <div class="col-md-2 from-inline">
-                        <label for="c_fy_nh_code">年号</label>
-                        <select-vue name="c_by_nh_code" model="nianhao" selected="{{ $basicinformation->c_by_nh_code }}"></select-vue>
-                        <input type="number" name="c_by_nh_year" class="form-control"
-                               value="{{ $basicinformation->c_by_nh_year }}">
-                        <span for="">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="">時限</label>
-                        <select-vue name="c_by_range" model="range" selected="{{ $basicinformation->c_by_range }}"></select-vue>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="">閏</label>
-                        <select name="c_by_intercalary" class="form-control select2">
-                            <option disabled value="">请选择</option>
-                            <option value="0" {{ $basicinformation->c_by_intercalary == 0? 'selected': '' }}>0-否
-                            </option>
-                            <option value="1" {{ $basicinformation->c_by_intercalary == 1? 'selected': '' }}>1-是
-                            </option>
-                        </select>
-                    </div>
-                    <div class="col-sm-2">
-                        <input type="number" name="c_by_month" class="form-control"
-                               value="{{ $basicinformation->c_by_month }}">
-                        <span for="">月</span>
-                        <input type="number" name="c_by_day" class="form-control"
-                               value="{{ $basicinformation->c_by_day }}">
-                        <span for="">日</span>
-                        <label for="">日(干支) </label>
-                        <select-vue name="c_by_day_gz" model="ganzhi" selected="{{ $basicinformation->c_by_day_gz }}"></select-vue>
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_birthyear"
+                        :yearValue="$basicinformation->c_birthyear"
+                        :yearAttributes="['onchange' => 'indexYear()']"
+                        nhCodeName="c_by_nh_code"
+                        :nhCodeValue="$basicinformation->c_by_nh_code"
+                        nhYearName="c_by_nh_year"
+                        :nhYearValue="$basicinformation->c_by_nh_year"
+                        rangeName="c_by_range"
+                        :rangeValue="$basicinformation->c_by_range"
+                        :showLunar="true"
+                        intercalaryName="c_by_intercalary"
+                        :intercalaryValue="$basicinformation->c_by_intercalary"
+                        monthName="c_by_month"
+                        :monthValue="$basicinformation->c_by_month"
+                        dayName="c_by_day"
+                        :dayValue="$basicinformation->c_by_day"
+                        dayGzName="c_by_day_gz"
+                        :dayGzValue="$basicinformation->c_by_day_gz"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_firstyear" class="col-sm-2 col-form-label">卒年(death year)</label>
-                    <div class="col-md-1">
-                        <input type="number" name="c_deathyear" class="form-control"
-                               value="{{ $basicinformation->c_deathyear }}" onchange="indexYear()">
-                    </div>
-
-                    <div class="col-md-2 from-inline">
-                        <label for="c_dy_nh_code">年号</label>
-                        <select-vue name="c_dy_nh_code" model="nianhao" selected="{{ $basicinformation->c_dy_nh_code }}"></select-vue>
-                        <input type="number" name="c_dy_nh_year" class="form-control"
-                               value="{{ $basicinformation->c_dy_nh_year }}">
-                        <span for="">年</span>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="">時限</label>
-                        <select-vue name="c_dy_range" model="range" selected="{{ $basicinformation->c_dy_range }}"></select-vue>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="">閏</label>
-                        <select name="c_dy_intercalary" class="form-control select2">
-                            <option disabled value="">请选择</option>
-                            <option value="0" {{ $basicinformation->c_dy_intercalary == 0? 'selected': '' }}>0-否
-                            </option>
-                            <option value="1" {{ $basicinformation->c_dy_intercalary == 1? 'selected': '' }}>1-是
-                            </option>
-                        </select>
-                    </div>
-                    <div class="col-sm-2">
-                        <input type="number" name="c_dy_month" class="form-control"
-                               value="{{ $basicinformation->c_dy_month }}">
-                        <span for="">月</span>
-                        <input type="number" name="c_dy_day" class="form-control"
-                               value="{{ $basicinformation->c_dy_day }}">
-                        <span for="">日</span>
-                        <label for="">日(干支) </label>
-                        <select-vue name="c_dy_day_gz" model="ganzhi" selected="{{ $basicinformation->c_dy_day_gz }}"></select-vue>
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_deathyear"
+                        :yearValue="$basicinformation->c_deathyear"
+                        :yearAttributes="['onchange' => 'indexYear()']"
+                        nhCodeName="c_dy_nh_code"
+                        :nhCodeValue="$basicinformation->c_dy_nh_code"
+                        nhYearName="c_dy_nh_year"
+                        :nhYearValue="$basicinformation->c_dy_nh_year"
+                        rangeName="c_dy_range"
+                        :rangeValue="$basicinformation->c_dy_range"
+                        :showLunar="true"
+                        intercalaryName="c_dy_intercalary"
+                        :intercalaryValue="$basicinformation->c_dy_intercalary"
+                        monthName="c_dy_month"
+                        :monthValue="$basicinformation->c_dy_month"
+                        dayName="c_dy_day"
+                        :dayValue="$basicinformation->c_dy_day"
+                        dayGzName="c_dy_day_gz"
+                        :dayGzValue="$basicinformation->c_dy_day_gz"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_index_year" class="col-sm-2 col-form-label">指數年(index year)</label>
@@ -325,9 +293,9 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
-                    <label for="" class="col-sm-2 col-form-label">范围</label>
+                    <label for="c_death_age_range" class="col-sm-2 col-form-label">范围(c_death_age_range)</label>
                     <div class="col-sm-4">
-                        <select class="form-control select2" name="c_death_age_range">
+                        <select class="form-control select2" name="c_death_age_range" id="c_death_age_range">
                             {{--<option value="null"></option>--}}
                             @foreach($yearRange as $item )
                                 @if($item->c_range_code === $basicinformation->c_death_age_range)
@@ -343,32 +311,36 @@
                 <div class="form-group row">
                     <label for="c_fl_earliest_year"
                            class="col-sm-2 col-form-label">在世始年(fl_earliest_year)</label>
-                    <div class="col-sm-10 form-inline">
-                        <input type="text" name="c_fl_earliest_year" class="form-control"
-                               value="{{ $basicinformation->c_fl_earliest_year }}">
-                        <label for="">年号</label>
-                        <select-vue name="c_fl_ey_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
-                        <input type="text" name="c_fl_ey_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ey_nh_year }}">
-                        <label for="">年</label>
-                        在世始年注
-                        <input type="text" name="c_fl_ey_notes" class="form-control" value="{{ $basicinformation->c_fl_ey_notes }}">
-
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_fl_earliest_year"
+                        :yearValue="$basicinformation->c_fl_earliest_year"
+                        nhCodeName="c_fl_ey_nh_code"
+                        :nhCodeValue="$basicinformation->c_fl_ey_nh_code"
+                        nhYearName="c_fl_ey_nh_year"
+                        :nhYearValue="$basicinformation->c_fl_ey_nh_year"
+                        :showNotes="true"
+                        :showLunarPlaceholder="true"
+                        notesName="c_fl_ey_notes"
+                        :notesValue="$basicinformation->c_fl_ey_notes"
+                        notesLabel="在世始年註"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_fl_latest_year"
                            class="col-sm-2 col-form-label">在世終年(fl_latest_year)</label>
-                    <div class="col-sm-10 form-inline">
-                        <input type="text" name="c_fl_latest_year" class="form-control"
-                               value="{{ $basicinformation->c_fl_latest_year }}">
-                        <label for="">年号</label>
-                        <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
-                        <input type="text" name="c_fl_ly_nh_year" class="form-control" value="{{ $basicinformation->c_fl_ly_nh_year }}">
-                        <label for="">年</label>
-                        在世終年注
-                        <input type="text" name="c_fl_ly_notes" class="form-control" value="{{ $basicinformation->c_fl_ly_notes }}">
-
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_fl_latest_year"
+                        :yearValue="$basicinformation->c_fl_latest_year"
+                        nhCodeName="c_fl_ly_nh_code"
+                        :nhCodeValue="$basicinformation->c_fl_ly_nh_code"
+                        nhYearName="c_fl_ly_nh_year"
+                        :nhYearValue="$basicinformation->c_fl_ly_nh_year"
+                        :showNotes="true"
+                        :showLunarPlaceholder="true"
+                        notesName="c_fl_ly_notes"
+                        :notesValue="$basicinformation->c_fl_ly_notes"
+                        notesLabel="在世終年註"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望(choronym_code)</label>
@@ -383,7 +355,7 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_notes" class="col-sm-2 col-form-label">注</label>
+                    <label for="c_notes" class="col-sm-2 col-form-label">註</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $basicinformation->c_notes }}</textarea>
@@ -480,6 +452,11 @@
         });
 
         $(".select2").select2();
+
+        if (window.initLunarValidation) {
+            window.initLunarValidation();
+        }
+
         function indexYear() {
             let birth = $('input[name=c_birthyear]').val();
             let death = $('input[name=c_deathyear]').val();

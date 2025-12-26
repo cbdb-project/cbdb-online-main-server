@@ -41,19 +41,17 @@
 
     <div class="form-group row">
         <label for="c_year" class="col-sm-2 col-form-label">入仕年(year)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_year" class="form-control" value="{{ $isEdit ? $row->c_year : '0' }}" {{ $isEdit ? '' : 'required' }}>
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_nianhao_id">年号</label>
-            <select-vue name="c_nianhao_id" model="nianhao" selected="{{ $isEdit ? $row->c_nianhao_id : '' }}"></select-vue>
-            <input type="text" name="c_entry_nh_year" class="form-control" value="{{ $isEdit ? $row->c_entry_nh_year : '' }}">
-            <span for="c_entry_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_entry_range">時限</label>
-            <select-vue name="c_entry_range" model="range" selected="{{ $isEdit ? $row->c_entry_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_year"
+            :yearValue="$isEdit ? $row->c_year : '0'"
+            :yearRequired="!$isEdit"
+            nhCodeName="c_nianhao_id"
+            :nhCodeValue="$isEdit ? $row->c_nianhao_id : ''"
+            nhYearName="c_entry_nh_year"
+            :nhYearValue="$isEdit ? $row->c_entry_nh_year : ''"
+            rangeName="c_entry_range"
+            :rangeValue="$isEdit ? $row->c_entry_range : ''"
+        />
     </div>
 
     <div class="form-group row">
@@ -201,7 +199,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30" rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
         </div>

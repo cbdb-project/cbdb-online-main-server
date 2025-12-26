@@ -106,74 +106,52 @@
 
     <div class="form-group row">
         <label for="c_assoc_fy_year" class="col-sm-2 col-form-label">社會關係始年</label>
-        <div class="col-md-1">
-            <input type="number" name="c_assoc_first_year" class="form-control" value="{{ $isEdit ? $row->c_assoc_first_year : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_assoc_fy_nh_code">年号</label>
-            <select-vue name="c_assoc_fy_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_assoc_fy_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_assoc_fy_nh_year" class="form-control" value="{{ $isEdit ? $row->c_assoc_fy_nh_year : '' }}">
-            <span for="c_assoc_fy_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_assoc_fy_range" model="range" selected="{{ $isEdit ? $row->c_assoc_fy_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_assoc_fy_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_assoc_fy_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_assoc_fy_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_assoc_fy_month" class="form-control" value="{{ $isEdit ? $row->c_assoc_fy_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_assoc_fy_day" class="form-control" value="{{ $isEdit ? $row->c_assoc_fy_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_assoc_fy_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_assoc_fy_day_gz : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_assoc_first_year"
+            :yearValue="$isEdit ? $row->c_assoc_first_year : ''"
+            nhCodeName="c_assoc_fy_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_assoc_fy_nh_code : ''"
+            nhYearName="c_assoc_fy_nh_year"
+            :nhYearValue="$isEdit ? $row->c_assoc_fy_nh_year : ''"
+            rangeName="c_assoc_fy_range"
+            :rangeValue="$isEdit ? $row->c_assoc_fy_range : ''"
+            :showLunar="true"
+            intercalaryName="c_assoc_fy_intercalary"
+            :intercalaryValue="$isEdit ? $row->c_assoc_fy_intercalary : ''"
+            monthName="c_assoc_fy_month"
+            :monthValue="$isEdit ? $row->c_assoc_fy_month : ''"
+            dayName="c_assoc_fy_day"
+            :dayValue="$isEdit ? $row->c_assoc_fy_day : ''"
+            dayGzName="c_assoc_fy_day_gz"
+            :dayGzValue="$isEdit ? $row->c_assoc_fy_day_gz : ''"
+        />
     </div>
 
     <div class="form-group row">
         <label for="c_assoc_ly_year" class="col-sm-2 col-form-label">社會關係終年</label>
-        <div class="col-md-1">
-            <input type="number" name="c_assoc_last_year" class="form-control" value="{{ $isEdit ? $row->c_assoc_last_year : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_assoc_ly_nh_code">年号</label>
-            <select-vue name="c_assoc_ly_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_assoc_ly_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_assoc_ly_nh_year" class="form-control" value="{{ $isEdit ? $row->c_assoc_ly_nh_year : '' }}">
-            <span for="c_assoc_ly_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="">時限</label>
-            <select-vue name="c_assoc_ly_range" model="range" selected="{{ $isEdit ? $row->c_assoc_ly_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_assoc_ly_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_assoc_ly_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_assoc_ly_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_assoc_ly_month" class="form-control" value="{{ $isEdit ? $row->c_assoc_ly_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_assoc_ly_day" class="form-control" value="{{ $isEdit ? $row->c_assoc_ly_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_assoc_ly_day_gz" model="ganzhi" selected="{{ $isEdit ? $row->c_assoc_ly_day_gz : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_assoc_last_year"
+            :yearValue="$isEdit ? $row->c_assoc_last_year : ''"
+            nhCodeName="c_assoc_ly_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_assoc_ly_nh_code : ''"
+            nhYearName="c_assoc_ly_nh_year"
+            :nhYearValue="$isEdit ? $row->c_assoc_ly_nh_year : ''"
+            rangeName="c_assoc_ly_range"
+            :rangeValue="$isEdit ? $row->c_assoc_ly_range : ''"
+            :showLunar="true"
+            intercalaryName="c_assoc_ly_intercalary"
+            :intercalaryValue="$isEdit ? $row->c_assoc_ly_intercalary : ''"
+            monthName="c_assoc_ly_month"
+            :monthValue="$isEdit ? $row->c_assoc_ly_month : ''"
+            dayName="c_assoc_ly_day"
+            :dayValue="$isEdit ? $row->c_assoc_ly_day : ''"
+            dayGzName="c_assoc_ly_day_gz"
+            :dayGzValue="$isEdit ? $row->c_assoc_ly_day_gz : ''"
+        />
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             @php
                 $notes_value = $isEdit ? unionPKDef_decode_for_convert($row->c_notes) : '';
@@ -379,6 +357,10 @@
         $(".c_inst_code").select2(options('socialinstcode'));
         $(".c_source").select2(options('text'));
         $(".c_assocship_pair").select2();
+
+        if (window.initLunarValidation) {
+            window.initLunarValidation();
+        }
 
         // 绑定事件监听器
         $(".c_kin_code").on('change', function() {

@@ -61,21 +61,16 @@
 
     <div class="form-group row">
         <label for="c_possession_yr" class="col-sm-2 col-form-label">年份(possession_yr)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_possession_yr" class="form-control"
-                   value="{{ $isEdit ? $row->c_possession_yr : '' }}">
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_possession_nh_code">年号</label>
-            <select-vue name="c_possession_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_possession_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_possession_nh_yr" class="form-control"
-                   value="{{ $isEdit ? $row->c_possession_nh_yr : '' }}">
-            <span for="c_possession_nh_yr">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_possession_yr_range">時限</label>
-            <select-vue name="c_possession_yr_range" model="range" selected="{{ $isEdit ? $row->c_possession_yr_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_possession_yr"
+            :yearValue="$isEdit ? $row->c_possession_yr : ''"
+            nhCodeName="c_possession_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_possession_nh_code : ''"
+            nhYearName="c_possession_nh_yr"
+            :nhYearValue="$isEdit ? $row->c_possession_nh_yr : ''"
+            rangeName="c_possession_yr_range"
+            :rangeValue="$isEdit ? $row->c_possession_yr_range : ''"
+        />
     </div>
 
     <div class="form-group row">
@@ -114,7 +109,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>

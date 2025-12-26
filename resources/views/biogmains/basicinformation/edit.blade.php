@@ -182,129 +182,49 @@
 
                 <div class="form-group row">
                     <label for="c_firstyear" class="col-sm-2 col-form-label">生年(birth year)</label>
-                    <div class="col-sm-10">
-                        <div class="d-flex align-items-center flex-wrap">
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 12ch; flex: 1 1 12ch;">
-                                <input type="number" name="c_birthyear" class="form-control"
-                                       style="width: 12ch; min-width: 12ch;"
-                                       value="{{ $basicinformation->c_birthyear }}" onchange="indexYear()">
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
-                                <label class="mb-0 mr-2" for="c_fy_nh_code">年号</label>
-                                <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">
-                                    <select-vue name="c_by_nh_code" model="nianhao" selected="{{ $basicinformation->c_by_nh_code }}"></select-vue>
-                                </div>
-                                <input type="number" name="c_by_nh_year" class="form-control mr-2"
-                                       style="width: 8ch; min-width: 8ch;"
-                                       value="{{ $basicinformation->c_by_nh_year }}">
-                                <span>年</span>
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
-                                <label class="mb-0 mr-2" for="c_by_range">時限</label>
-                                <div class="flex-grow-1" style="min-width: 16ch;">
-                                    <select-vue name="c_by_range" model="range" selected="{{ $basicinformation->c_by_range }}"></select-vue>
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap" style="min-width: 56ch; flex: 1 1 56ch;">
-                                <div class="custom-control custom-checkbox mr-4">
-                                    <input type="hidden" name="c_by_intercalary" value="0">
-                                    <input type="checkbox"
-                                           class="custom-control-input"
-                                           id="c_by_intercalary"
-                                           name="c_by_intercalary"
-                                           value="1"
-                                           {{ $basicinformation->c_by_intercalary == 1 ? 'checked' : '' }}>
-                                    <label class="custom-control-label" for="c_by_intercalary">閏月</label>
-                                </div>
-                                <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
-                                    <input type="number" class="form-control lunar-month intercalary-month"
-                                           data-field="c_by_month"
-                                           name="c_by_month"
-                                           min="1"
-                                           max="12"
-                                           step="1"
-                                           value="{{ $basicinformation->c_by_month }}">
-                                    <div class="invalid-feedback">請輸入 1-12 或留空</div>
-                                </div>
-                                <span class="mr-2">月</span>
-                                <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
-                                    <input type="number" name="c_by_day" class="form-control lunar-day"
-                                           min="1"
-                                           max="30"
-                                           value="{{ $basicinformation->c_by_day }}">
-                                    <div class="invalid-feedback">請輸入 1-30 或留空</div>
-                                </div>
-                                <span class="mr-2">日</span>
-                                <label class="mb-0 mr-2">日(干支)</label>
-                                <div class="flex-grow-1" style="min-width: 12ch;">
-                                    <select-vue name="c_by_day_gz" model="ganzhi" selected="{{ $basicinformation->c_by_day_gz }}"></select-vue>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_birthyear"
+                        :yearValue="$basicinformation->c_birthyear"
+                        :yearAttributes="['onchange' => 'indexYear()']"
+                        nhCodeName="c_by_nh_code"
+                        :nhCodeValue="$basicinformation->c_by_nh_code"
+                        nhYearName="c_by_nh_year"
+                        :nhYearValue="$basicinformation->c_by_nh_year"
+                        rangeName="c_by_range"
+                        :rangeValue="$basicinformation->c_by_range"
+                        :showLunar="true"
+                        intercalaryName="c_by_intercalary"
+                        :intercalaryValue="$basicinformation->c_by_intercalary"
+                        monthName="c_by_month"
+                        :monthValue="$basicinformation->c_by_month"
+                        dayName="c_by_day"
+                        :dayValue="$basicinformation->c_by_day"
+                        dayGzName="c_by_day_gz"
+                        :dayGzValue="$basicinformation->c_by_day_gz"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_firstyear" class="col-sm-2 col-form-label">卒年(death year)</label>
-                    <div class="col-sm-10">
-                        <div class="d-flex align-items-center flex-wrap">
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 12ch; flex: 1 1 12ch;">
-                                <input type="number" name="c_deathyear" class="form-control"
-                                       style="width: 12ch; min-width: 12ch;"
-                                       value="{{ $basicinformation->c_deathyear }}" onchange="indexYear()">
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
-                                <label class="mb-0 mr-2" for="c_dy_nh_code">年号</label>
-                                <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">
-                                    <select-vue name="c_dy_nh_code" model="nianhao" selected="{{ $basicinformation->c_dy_nh_code }}"></select-vue>
-                                </div>
-                                <input type="number" name="c_dy_nh_year" class="form-control mr-2"
-                                       style="width: 8ch; min-width: 8ch;"
-                                       value="{{ $basicinformation->c_dy_nh_year }}">
-                                <span>年</span>
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
-                                <label class="mb-0 mr-2" for="c_dy_range">時限</label>
-                                <div class="flex-grow-1" style="min-width: 16ch;">
-                                    <select-vue name="c_dy_range" model="range" selected="{{ $basicinformation->c_dy_range }}"></select-vue>
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center flex-wrap" style="min-width: 56ch; flex: 1 1 56ch;">
-                                <div class="custom-control custom-checkbox mr-4">
-                                    <input type="hidden" name="c_dy_intercalary" value="0">
-                                    <input type="checkbox"
-                                           class="custom-control-input"
-                                           id="c_dy_intercalary"
-                                           name="c_dy_intercalary"
-                                           value="1"
-                                           {{ $basicinformation->c_dy_intercalary == 1 ? 'checked' : '' }}>
-                                    <label class="custom-control-label" for="c_dy_intercalary">閏月</label>
-                                </div>
-                                <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
-                                    <input type="number" class="form-control lunar-month intercalary-month"
-                                           data-field="c_dy_month"
-                                           name="c_dy_month"
-                                           min="1"
-                                           max="12"
-                                           step="1"
-                                           value="{{ $basicinformation->c_dy_month }}">
-                                    <div class="invalid-feedback">請輸入 1-12 或留空</div>
-                                </div>
-                                <span class="mr-2">月</span>
-                                <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
-                                    <input type="number" name="c_dy_day" class="form-control lunar-day"
-                                           min="1"
-                                           max="30"
-                                           value="{{ $basicinformation->c_dy_day }}">
-                                    <div class="invalid-feedback">請輸入 1-30 或留空</div>
-                                </div>
-                                <span class="mr-2">日</span>
-                                <label class="mb-0 mr-2">日(干支)</label>
-                                <div class="flex-grow-1" style="min-width: 12ch;">
-                                    <select-vue name="c_dy_day_gz" model="ganzhi" selected="{{ $basicinformation->c_dy_day_gz }}"></select-vue>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_deathyear"
+                        :yearValue="$basicinformation->c_deathyear"
+                        :yearAttributes="['onchange' => 'indexYear()']"
+                        nhCodeName="c_dy_nh_code"
+                        :nhCodeValue="$basicinformation->c_dy_nh_code"
+                        nhYearName="c_dy_nh_year"
+                        :nhYearValue="$basicinformation->c_dy_nh_year"
+                        rangeName="c_dy_range"
+                        :rangeValue="$basicinformation->c_dy_range"
+                        :showLunar="true"
+                        intercalaryName="c_dy_intercalary"
+                        :intercalaryValue="$basicinformation->c_dy_intercalary"
+                        monthName="c_dy_month"
+                        :monthValue="$basicinformation->c_dy_month"
+                        dayName="c_dy_day"
+                        :dayValue="$basicinformation->c_dy_day"
+                        dayGzName="c_dy_day_gz"
+                        :dayGzValue="$basicinformation->c_dy_day_gz"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_index_year" class="col-sm-2 col-form-label">指數年(index year)</label>
@@ -391,50 +311,36 @@
                 <div class="form-group row">
                     <label for="c_fl_earliest_year"
                            class="col-sm-2 col-form-label">在世始年(fl_earliest_year)</label>
-                    <div class="col-sm-10">
-                        <div class="d-flex align-items-center flex-wrap">
-                            <input type="text" name="c_fl_earliest_year" class="form-control mr-3"
-                                   style="width: 120px;"
-                                   value="{{ $basicinformation->c_fl_earliest_year }}">
-                            <label class="mb-0 mr-2" for="c_fl_ey_nh_code">年号</label>
-                            <div class="mr-2" style="min-width: 140px;">
-                                <select-vue name="c_fl_ey_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ey_nh_code }}"></select-vue>
-                            </div>
-                            <input type="text" name="c_fl_ey_nh_year" class="form-control mr-2"
-                                   style="width: 80px;"
-                                   value="{{ $basicinformation->c_fl_ey_nh_year }}">
-                            <span class="mr-3">年</span>
-                            <div class="w-100 my-2"></div>
-                            <label class="mb-0 mr-2" for="c_fl_ey_notes">在世始年注</label>
-                            <input type="text" name="c_fl_ey_notes" id="c_fl_ey_notes" class="form-control"
-                                   value="{{ $basicinformation->c_fl_ey_notes }}">
-                        </div>
-
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_fl_earliest_year"
+                        :yearValue="$basicinformation->c_fl_earliest_year"
+                        nhCodeName="c_fl_ey_nh_code"
+                        :nhCodeValue="$basicinformation->c_fl_ey_nh_code"
+                        nhYearName="c_fl_ey_nh_year"
+                        :nhYearValue="$basicinformation->c_fl_ey_nh_year"
+                        :showNotes="true"
+                        :showLunarPlaceholder="true"
+                        notesName="c_fl_ey_notes"
+                        :notesValue="$basicinformation->c_fl_ey_notes"
+                        notesLabel="在世始年註"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_fl_latest_year"
                            class="col-sm-2 col-form-label">在世終年(fl_latest_year)</label>
-                    <div class="col-sm-10">
-                        <div class="d-flex align-items-center flex-wrap">
-                            <input type="text" name="c_fl_latest_year" class="form-control mr-3"
-                                   style="width: 120px;"
-                                   value="{{ $basicinformation->c_fl_latest_year }}">
-                            <label class="mb-0 mr-2" for="c_fl_ly_nh_code">年号</label>
-                            <div class="mr-2" style="min-width: 140px;">
-                                <select-vue name="c_fl_ly_nh_code" model="nianhao" selected="{{ $basicinformation->c_fl_ly_nh_code }}"></select-vue>
-                            </div>
-                            <input type="text" name="c_fl_ly_nh_year" class="form-control mr-2"
-                                   style="width: 80px;"
-                                   value="{{ $basicinformation->c_fl_ly_nh_year }}">
-                            <span class="mr-3">年</span>
-                            <div class="w-100 my-2"></div>
-                            <label class="mb-0 mr-2" for="c_fl_ly_notes">在世終年注</label>
-                            <input type="text" name="c_fl_ly_notes" id="c_fl_ly_notes" class="form-control"
-                                   value="{{ $basicinformation->c_fl_ly_notes }}">
-                        </div>
-
-                    </div>
+                    <x-inline-time-fields
+                        yearName="c_fl_latest_year"
+                        :yearValue="$basicinformation->c_fl_latest_year"
+                        nhCodeName="c_fl_ly_nh_code"
+                        :nhCodeValue="$basicinformation->c_fl_ly_nh_code"
+                        nhYearName="c_fl_ly_nh_year"
+                        :nhYearValue="$basicinformation->c_fl_ly_nh_year"
+                        :showNotes="true"
+                        :showLunarPlaceholder="true"
+                        notesName="c_fl_ly_notes"
+                        :notesValue="$basicinformation->c_fl_ly_notes"
+                        notesLabel="在世終年註"
+                    />
                 </div>
                 <div class="form-group row">
                     <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望(choronym_code)</label>
@@ -449,7 +355,7 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_notes" class="col-sm-2 col-form-label">注</label>
+                    <label for="c_notes" class="col-sm-2 col-form-label">註</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5">{{ $basicinformation->c_notes }}</textarea>
@@ -547,36 +453,9 @@
 
         $(".select2").select2();
 
-        function validateLunarInput($input, max) {
-            var value = $input.val().trim();
-            if (value === '') {
-                $input.removeClass('is-invalid');
-                return;
-            }
-            var parsed = Number(value);
-            var isInteger = Number.isInteger(parsed);
-            var isValid = isInteger && parsed >= 1 && parsed <= max;
-            $input.toggleClass('is-invalid', !isValid);
+        if (window.initLunarValidation) {
+            window.initLunarValidation();
         }
-
-        function bindLunarValidation() {
-            $('.lunar-month').each(function () {
-                var $input = $(this);
-                validateLunarInput($input, 12);
-                $input.on('input change', function () {
-                    validateLunarInput($input, 12);
-                });
-            });
-            $('.lunar-day').each(function () {
-                var $input = $(this);
-                validateLunarInput($input, 30);
-                $input.on('input change', function () {
-                    validateLunarInput($input, 30);
-                });
-            });
-        }
-
-        bindLunarValidation();
 
         function indexYear() {
             let birth = $('input[name=c_birthyear]').val();

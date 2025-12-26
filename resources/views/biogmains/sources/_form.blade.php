@@ -61,7 +61,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             @php
                 $notes_value = $isEdit ? unionPKDef_decode_for_convert($row->c_notes) : '';

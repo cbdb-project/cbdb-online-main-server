@@ -44,40 +44,30 @@
 
     <div class="form-group row">
         <label for="c_bi_begin_year" class="col-sm-2 col-form-label">始年(firstyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_bi_begin_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_bi_begin_year : '' }}">
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_bi_by_nh_code">年号</label>
-            <select-vue name="c_bi_by_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_bi_by_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_bi_by_nh_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_bi_by_nh_year : '' }}">
-            <span for="c_bi_by_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_bi_by_range">時限</label>
-            <select-vue name="c_bi_by_range" model="range" selected="{{ $isEdit ? $row->c_bi_by_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_bi_begin_year"
+            :yearValue="$isEdit ? $row->c_bi_begin_year : ''"
+            nhCodeName="c_bi_by_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_bi_by_nh_code : ''"
+            nhYearName="c_bi_by_nh_year"
+            :nhYearValue="$isEdit ? $row->c_bi_by_nh_year : ''"
+            rangeName="c_bi_by_range"
+            :rangeValue="$isEdit ? $row->c_bi_by_range : ''"
+        />
     </div>
 
     <div class="form-group row">
         <label for="c_bi_end_year" class="col-sm-2 col-form-label">終年(lastyear)</label>
-        <div class="col-md-1">
-            <input type="number" name="c_bi_end_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_bi_end_year : '' }}">
-        </div>
-        <div class="col-md-2 from-inline">
-            <label for="c_bi_ey_nh_code">年号</label>
-            <select-vue name="c_bi_ey_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_bi_ey_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_bi_ey_nh_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_bi_ey_nh_year : '' }}">
-            <span for="c_bi_ey_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_bi_ey_range">時限</label>
-            <select-vue name="c_bi_ey_range" model="range" selected="{{ $isEdit ? $row->c_bi_ey_range : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_bi_end_year"
+            :yearValue="$isEdit ? $row->c_bi_end_year : ''"
+            nhCodeName="c_bi_ey_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_bi_ey_nh_code : ''"
+            nhYearName="c_bi_ey_nh_year"
+            :nhYearValue="$isEdit ? $row->c_bi_ey_nh_year : ''"
+            rangeName="c_bi_ey_range"
+            :rangeValue="$isEdit ? $row->c_bi_ey_range : ''"
+        />
     </div>
 
     <div class="form-group row">
@@ -101,7 +91,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>

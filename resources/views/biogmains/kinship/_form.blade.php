@@ -66,7 +66,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30" rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
         </div>

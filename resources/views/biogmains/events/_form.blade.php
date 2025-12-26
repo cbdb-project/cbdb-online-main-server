@@ -49,40 +49,26 @@
 
     <div class="form-group row">
         <label for="c_year" class="col-sm-2 col-form-label">事件發生年</label>
-        <div class="col-md-1">
-            <input type="number" name="c_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_year : '' }}">
-        </div>
-
-        <div class="col-md-2 from-inline">
-            <label for="c_nh_code">事件年號</label>
-            <select-vue name="c_nh_code" model="nianhao" selected="{{ $isEdit ? $row->c_nh_code : '' }}"></select-vue>
-            <input type="number" name="c_nh_year" class="form-control"
-                   value="{{ $isEdit ? $row->c_nh_year : '' }}">
-            <span for="c_nh_year">年</span>
-        </div>
-        <div class="col-md-3">
-            <label for="c_yr_range">時限</label>
-            <select-vue name="c_yr_range" model="range" selected="{{ $isEdit ? $row->c_yr_range : '' }}"></select-vue>
-        </div>
-        <div class="col-md-2">
-            <label for="">閏</label>
-            <select name="c_intercalary" class="form-control select2">
-                <option disabled value="">请选择</option>
-                <option value="0" {{ ($isEdit && $row->c_intercalary == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_intercalary == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <div class="col-sm-2">
-            <input type="number" name="c_month" class="form-control"
-                   value="{{ $isEdit ? $row->c_month : '' }}">
-            <span for="">月</span>
-            <input type="number" name="c_day" class="form-control"
-                   value="{{ $isEdit ? $row->c_day : '' }}">
-            <span for="">日</span>
-            <label for="">日(干支) </label>
-            <select-vue name="c_day_ganzhi" model="ganzhi" selected="{{ $isEdit ? $row->c_day_ganzhi : '' }}"></select-vue>
-        </div>
+        <x-inline-time-fields
+            yearName="c_year"
+            :yearValue="$isEdit ? $row->c_year : ''"
+            nhCodeName="c_nh_code"
+            :nhCodeValue="$isEdit ? $row->c_nh_code : ''"
+            nhYearName="c_nh_year"
+            :nhYearValue="$isEdit ? $row->c_nh_year : ''"
+            rangeName="c_yr_range"
+            :rangeValue="$isEdit ? $row->c_yr_range : ''"
+            :showLunar="true"
+            intercalaryName="c_intercalary"
+            :intercalaryValue="$isEdit ? $row->c_intercalary : ''"
+            monthName="c_month"
+            :monthValue="$isEdit ? $row->c_month : ''"
+            dayName="c_day"
+            :dayValue="$isEdit ? $row->c_day : ''"
+            dayGzName="c_day_ganzhi"
+            :dayGzValue="$isEdit ? $row->c_day_ganzhi : ''"
+            nhLabel="事件年號"
+        />
     </div>
 
     <div class="form-group row">
@@ -129,7 +115,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">注</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">註</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
@@ -179,6 +165,10 @@
         $(".c_source").select2(options('text'));
         $(".c_addr_id").select2(options('addr'));
         $(".c_event_code").select2(options('event'));
+
+        if (window.initLunarValidation) {
+            window.initLunarValidation();
+        }
 
         function formatRepo (repo) {
             if (repo.loading) {

@@ -354,12 +354,23 @@ function initEraConversion() {
  */
 async function findNianhaoIdByName(reignTitle) {
     try {
-        // 特殊映射
-        const specialMapping = {
+        // 特殊 ID 映射：直接返回 CBDB 年號記錄 ID
+        const specialIdMapping = {
+            '至元 (世祖)': 623,
+            '至元 (順帝)': 635,
+        };
+
+        // 檢查是否有直接 ID 映射
+        if (specialIdMapping[reignTitle]) {
+            return specialIdMapping[reignTitle];
+        }
+
+        // 特殊名稱映射：名稱轉換
+        const specialNameMapping = {
             '民國': '中華民國',
         };
 
-        const searchTitle = specialMapping[reignTitle] || reignTitle;
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
         // 獲取年號數據
         const response = await axios.get('/api/select/nianhao');

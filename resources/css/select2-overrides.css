@@ -12,7 +12,7 @@
 }
 
 /* Increase font size for nav-tabs badge counts in basic information pages */
-.nav-tabs .nav-link .badge {
+.biogmain-navigation .nav-tabs .nav-link .badge {
     font-size: 1.1em;
     font-weight: 600;
     padding: 0.3em 0.5em;

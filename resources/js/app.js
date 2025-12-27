@@ -8,9 +8,6 @@
 // Import AdminLTE v3 CSS from NPM
 import 'admin-lte/dist/css/adminlte.min.css';
 
-// Import custom CSS overrides
-import '../css/select2-overrides.css';
-
 // Import jQuery and expose globally before any plugins run
 import $ from './jquery-global';
 
@@ -25,6 +22,9 @@ import 'select2/dist/css/select2.min.css';
 import '@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css';
 import select2 from 'select2';
 select2(window, $);
+
+// Import custom CSS overrides (must come after Select2 CSS to properly override)
+import '../css/select2-overrides.css';
 
 import { formatTimestamp, getUserOffsetMinutes, getUserTimeZone } from './utils/datetime';
 

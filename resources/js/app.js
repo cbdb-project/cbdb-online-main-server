@@ -63,12 +63,30 @@ const fetchPersonOption = (id) => {
     }).catch(() => null);
 };
 
+/**
+ * 人物选择 Select2 初始化助手函数
+ * 专门用于人物搜索，显示完整的人物信息（ID、姓名、朝代、字、号、籍贯）
+ * 内部调用 window.initAjaxSelect 实现统一架构
+ *
+ * @param {jQuery} $el - jQuery 选择器对象
+ * @param {object} options - 额外配置选项
+ *
+ * @example
+ * // 基础用法
+ * window.initPersonSelect($('.js-person-select'));
+ *
+ * @example
+ * // 带初始值（通过 data-initial-id 属性）
+ * // <select class="person-select" data-initial-id="12345"></select>
+ * window.initPersonSelect($('.person-select'), {
+ *     placeholder: '輸入姓名或 ID 搜尋人物'
+ * });
+ */
 window.initPersonSelect = ($el, options = {}) => {
     const initialId = $el.data('initial-id');
-    $el.select2({
-        width: '100%',
-        theme: 'bootstrap4',
-        minimumInputLength: 1,
+
+    // 使用 initAjaxSelect 统一框架，传递人物特定配置
+    window.initAjaxSelect($el, 'person', {
         ajax: {
             url: '/api/name',
             dataType: 'json',
@@ -90,6 +108,7 @@ window.initPersonSelect = ($el, options = {}) => {
         ...options,
     });
 
+    // 异步加载初始值（人物数据需要格式化）
     if (initialId) {
         fetchPersonOption(initialId).then((opt) => {
             if (opt) {
@@ -109,6 +128,88 @@ const detectedTimeZone = getUserTimeZone();
 const detectedOffset = getUserOffsetMinutes();
 window.getUserTimeZone = () => detectedTimeZone;
 window.getUserOffsetMinutes = () => detectedOffset;
+
+/**
+ * 通用 AJAX 搜索 Select2 初始化助手函数
+ * 用于统一管理所有使用 AJAX 搜索的 Select2 下拉框
+ *
+ * @param {jQuery} $el - jQuery 选择器对象
+ * @param {string} model - API 模型名称 (office/text/addr/socialinstcode 等)
+ * @param {object} options - 额外配置选项，会深度合并到默认配置中
+ *
+ * @example
+ * // 基础用法
+ * window.initAjaxSelect($(".c_office_id"), 'office');
+ *
+ * @example
+ * // 带初始值（通过 data 属性）
+ * // <select class="c_source" data-initial-id="123" data-initial-text="書名"></select>
+ * window.initAjaxSelect($(".c_source"), 'text');
+ *
+ * @example
+ * // 自定义配置
+ * window.initAjaxSelect($(".c_addr"), 'addr', {
+ *     placeholder: '請選擇地址',
+ *     minimumInputLength: 2
+ * });
+ */
+window.initAjaxSelect = function($el, model, options = {}) {
+    const defaults = {
+        ajax: {
+            url: `/api/select/search/${model}`,
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    q: params.term,
+                    page: params.page || 1,
+                };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                return {
+                    results: data.data || [],
+                    pagination: {
+                        more: (params.page * 30) < (data.total || 0)
+                    }
+                };
+            },
+            cache: true
+        },
+        placeholder: '请搜索',
+        minimumInputLength: 1,
+        width: '100%',
+        theme: 'bootstrap4',
+        escapeMarkup: function (markup) { return markup; },
+        templateResult: function(item) {
+            if (item.loading) {
+                return item.text;
+            }
+            return `<div class="select2-result-repository clearfix">
+                <div class="select2-result-repository__meta">
+                    <div class="select2-result-repository__title">${item.text}</div>
+                </div>
+            </div>`;
+        },
+        templateSelection: function(item) {
+            return item.text || item.text;
+        }
+    };
+
+    // 深度合并用户配置
+    const config = $.extend(true, {}, defaults, options);
+
+    $el.select2(config);
+
+    // 处理初始值（如果有 data-initial-* 属性）
+    const initialId = $el.data('initial-id') || $el.data('initial-value');
+    const initialText = $el.data('initial-text');
+
+    if (initialId && initialText) {
+        const option = new Option(initialText, initialId, true, true);
+        $el.append(option).trigger('change.select2');
+    }
+};
 
 // Import Axios for HTTP requests
 import axios from 'axios';

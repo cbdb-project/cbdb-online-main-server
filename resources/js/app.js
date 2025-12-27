@@ -603,6 +603,46 @@ async function findNianhaoIdByName(reignTitle) {
     }
 }
 
+// 全局朝代範圍數據緩存
+let dynastyRangesCache = null;
+
+/**
+ * 獲取朝代年份範圍數據
+ * 從 API 動態加載並緩存
+ */
+async function getDynastyRanges() {
+    if (dynastyRangesCache) {
+        return dynastyRangesCache;
+    }
+
+    try {
+        const response = await axios.get('/api/select/dynasty');
+        const dynasties = response.data;
+
+        // 轉換為以朝代 ID 為鍵的對象
+        const ranges = {};
+        for (const dynasty of dynasties) {
+            const values = Object.values(dynasty);
+            // 假設格式為 [c_dy, ..., c_start, c_end, ...]
+            // 需要找到 c_dy, c_start, c_end 的位置
+            const dynastyId = dynasty.c_dy || values[0];
+            const start = dynasty.c_start;
+            const end = dynasty.c_end;
+
+            if (dynastyId && start !== undefined && end !== undefined) {
+                ranges[dynastyId] = { start, end };
+            }
+        }
+
+        dynastyRangesCache = ranges;
+        return ranges;
+    } catch (error) {
+        console.error('獲取朝代範圍數據失敗:', error);
+        // 返回默認範圍
+        return {};
+    }
+}
+
 /**
  * 根據年號名稱、年數和朝代反向轉換為公元年份
  * 使用二分搜索優化性能
@@ -619,44 +659,10 @@ async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
 
         const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
-        // 定義歷史搜索範圍
-        const SEARCH_RANGES = {
-            29: { start: -206, end: -1 },    // 西漢
-            46: { start: 9, end: 23 },       // 新
-            25: { start: 25, end: 220 },     // 東漢
-            26: { start: 220, end: 266 },    // 三國魏
-            53: { start: 221, end: 263 },    // 三國蜀
-            42: { start: 222, end: 280 },    // 三國吳
-            23: { start: 265, end: 316 },    // 西晉
-            27: { start: 317, end: 420 },    // 東晉
-            28: { start: 420, end: 479 },    // 劉宋
-            32: { start: 479, end: 502 },    // 南齊
-            44: { start: 502, end: 557 },    // 南梁
-            24: { start: 557, end: 589 },    // 陳
-            30: { start: 386, end: 534 },    // 北魏
-            41: { start: 534, end: 550 },    // 東魏
-            40: { start: 535, end: 556 },    // 西魏
-            35: { start: 550, end: 577 },    // 北齊
-            31: { start: 557, end: 581 },    // 北周
-            5:  { start: 581, end: 619 },    // 隋
-            6:  { start: 618, end: 907 },    // 唐
-            77: { start: 690, end: 705 },    // 武周
-            34: { start: 907, end: 923 },    // 後梁
-            47: { start: 923, end: 936 },    // 後唐
-            48: { start: 936, end: 947 },    // 後晉
-            52: { start: 947, end: 951 },    // 後漢
-            49: { start: 951, end: 960 },    // 後周
-            15: { start: 960, end: 1279 },   // 宋
-            16: { start: 907, end: 1125 },   // 遼
-            78: { start: 1038, end: 1227 },  // 西夏
-            17: { start: 1115, end: 1234 },  // 金
-            18: { start: 1271, end: 1368 },  // 元
-            19: { start: 1368, end: 1644 },  // 明
-            20: { start: 1644, end: 1912 },  // 清
-            21: { start: 1912, end: 2020 },  // 中華民國
-        };
+        // 獲取朝代搜索範圍（從 API 動態加載）
+        const SEARCH_RANGES = await getDynastyRanges();
 
-        // 獲取朝代搜索範圍
+        // 獲取指定朝代的範圍，或使用默認範圍
         const range = (dynastyCode && SEARCH_RANGES[dynastyCode]) || { start: -200, end: 2020 };
 
         // 決定搜索模式

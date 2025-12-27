@@ -101,24 +101,13 @@
         </div>
     </div>
 
-    @if($isEdit)
-        <div class="form-group row">
-            <label for="" class="col-sm-2 col-form-label">建檔</label>
-            <div class="col-sm-10">
-                <input type="text" name="" class="form-control"
-                       value="{{ $row->c_created_by.'/'.$row->c_created_date }}"
-                       disabled>
-            </div>
-        </div>
-        <div class="form-group row">
-            <label for="" class="col-sm-2 col-form-label">更新</label>
-            <div class="col-sm-10">
-                <input type="text" name="" class="form-control"
-                       value="{{ $row->c_modified_by.'/'.$row->c_modified_date }}"
-                       disabled>
-            </div>
-        </div>
-    @endif
+    <x-forms.audit-fields
+        :show="$isEdit"
+        :createdBy="$isEdit ? $row->c_created_by : null"
+        :createdDate="$isEdit ? $row->c_created_date : null"
+        :modifiedBy="$isEdit ? $row->c_modified_by : null"
+        :modifiedDate="$isEdit ? $row->c_modified_date : null"
+    />
 
     <div class="form-group row">
         <div class="offset-sm-2 col-sm-10">

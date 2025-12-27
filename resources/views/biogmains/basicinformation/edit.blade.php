@@ -362,22 +362,13 @@
                     </div>
                 </div>
                 
-                <div class="form-group row">
-                    <label for="" class="col-sm-2 col-form-label">建檔</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_created_by.'/'.$basicinformation->c_created_date }}"
-                               disabled>
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <label for="" class="col-sm-2 col-form-label">更新</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="" class="form-control"
-                               value="{{ $basicinformation->c_modified_by.'/'.$basicinformation->c_modified_date }}"
-                               disabled>
-                    </div>
-                </div>
+                <x-forms.audit-fields
+                    :show="true"
+                    :createdBy="$basicinformation->c_created_by"
+                    :createdDate="$basicinformation->c_created_date"
+                    :modifiedBy="$basicinformation->c_modified_by"
+                    :modifiedDate="$basicinformation->c_modified_date"
+                />
                 @auth
                     @if(Auth::user()->isActive())
                         <div class="form-group row">

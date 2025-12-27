@@ -181,47 +181,134 @@
                                             @php
                                                 $responseData = json_decode($log->llm_response, true);
                                             @endphp
-                                            @if($responseData && isset($responseData['choices'][0]))
+                                            @if($responseData)
                                                 <div class="mt-2">
                                                     <h6 class="text-muted">關鍵信息：</h6>
                                                     <table class="table table-sm table-bordered">
                                                         <tbody>
-                                                            @if(isset($responseData['choices'][0]['finish_reason']))
+                                                            {{-- OpenAI 格式：model --}}
+                                                            @if(isset($responseData['model']))
                                                                 <tr>
-                                                                    <th style="width: 150px;">Finish Reason</th>
-                                                                    <td><code>{{ $responseData['choices'][0]['finish_reason'] }}</code></td>
+                                                                    <th style="width: 150px;">模型</th>
+                                                                    <td><code>{{ $responseData['model'] }}</code></td>
                                                                 </tr>
                                                             @endif
-                                                            @if(isset($responseData['choices'][0]['finishReason']))
-                                                                <tr>
-                                                                    <th>Finish Reason (Gemini)</th>
-                                                                    <td><code>{{ $responseData['choices'][0]['finishReason'] }}</code></td>
-                                                                </tr>
-                                                            @endif
-                                                            @if(isset($responseData['usageMetadata']))
-                                                                <tr>
-                                                                    <th>Token 使用</th>
-                                                                    <td>
-                                                                        提示詞: {{ $responseData['usageMetadata']['promptTokenCount'] ?? 'N/A' }}，
-                                                                        響應: {{ $responseData['usageMetadata']['candidatesTokenCount'] ?? 'N/A' }}，
-                                                                        總計: {{ $responseData['usageMetadata']['totalTokenCount'] ?? 'N/A' }}
-                                                                        @if(isset($responseData['usageMetadata']['thoughtsTokenCount']))
-                                                                            <br><small class="text-muted">思考 tokens: {{ $responseData['usageMetadata']['thoughtsTokenCount'] }}</small>
-                                                                        @endif
-                                                                    </td>
-                                                                </tr>
-                                                            @endif
+
+                                                            {{-- Gemini 格式：modelVersion --}}
                                                             @if(isset($responseData['modelVersion']))
                                                                 <tr>
                                                                     <th>模型版本</th>
                                                                     <td><code>{{ $responseData['modelVersion'] }}</code></td>
                                                                 </tr>
                                                             @endif
-                                                            @if(isset($responseData['responseId']))
+
+                                                            {{-- OpenAI 格式：object --}}
+                                                            @if(isset($responseData['object']))
+                                                                <tr>
+                                                                    <th>對象類型</th>
+                                                                    <td><code>{{ $responseData['object'] }}</code></td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- OpenAI 格式：id / Gemini 格式：responseId --}}
+                                                            @if(isset($responseData['id']))
+                                                                <tr>
+                                                                    <th>響應 ID</th>
+                                                                    <td><small><code>{{ $responseData['id'] }}</code></small></td>
+                                                                </tr>
+                                                            @elseif(isset($responseData['responseId']))
                                                                 <tr>
                                                                     <th>響應 ID</th>
                                                                     <td><small><code>{{ $responseData['responseId'] }}</code></small></td>
                                                                 </tr>
+                                                            @endif
+
+                                                            {{-- OpenAI 格式：created --}}
+                                                            @if(isset($responseData['created']))
+                                                                <tr>
+                                                                    <th>創建時間</th>
+                                                                    <td>
+                                                                        {{ date('Y-m-d H:i:s', $responseData['created']) }}
+                                                                        <small class="text-muted">(Unix: {{ $responseData['created'] }})</small>
+                                                                    </td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- Finish Reason --}}
+                                                            @if(isset($responseData['choices'][0]['finish_reason']))
+                                                                <tr>
+                                                                    <th>完成原因</th>
+                                                                    <td><code>{{ $responseData['choices'][0]['finish_reason'] }}</code></td>
+                                                                </tr>
+                                                            @endif
+                                                            @if(isset($responseData['choices'][0]['finishReason']))
+                                                                <tr>
+                                                                    <th>完成原因 (Gemini)</th>
+                                                                    <td><code>{{ $responseData['choices'][0]['finishReason'] }}</code></td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- Choice Index --}}
+                                                            @if(isset($responseData['choices'][0]['index']))
+                                                                <tr>
+                                                                    <th>Choice Index</th>
+                                                                    <td><code>{{ $responseData['choices'][0]['index'] }}</code></td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- Message Role --}}
+                                                            @if(isset($responseData['choices'][0]['message']['role']))
+                                                                <tr>
+                                                                    <th>角色</th>
+                                                                    <td><code>{{ $responseData['choices'][0]['message']['role'] }}</code></td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- OpenAI 格式：usage --}}
+                                                            @if(isset($responseData['usage']))
+                                                                <tr>
+                                                                    <th>Token 使用</th>
+                                                                    <td>
+                                                                        <strong>提示詞：</strong>{{ number_format($responseData['usage']['prompt_tokens'] ?? 0) }}<br>
+                                                                        <strong>響應：</strong>{{ number_format($responseData['usage']['completion_tokens'] ?? 0) }}<br>
+                                                                        <strong>總計：</strong>{{ number_format($responseData['usage']['total_tokens'] ?? 0) }}
+                                                                    </td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- Gemini 格式：usageMetadata --}}
+                                                            @if(isset($responseData['usageMetadata']))
+                                                                <tr>
+                                                                    <th>Token 使用 (Gemini)</th>
+                                                                    <td>
+                                                                        <strong>提示詞：</strong>{{ number_format($responseData['usageMetadata']['promptTokenCount'] ?? 0) }}<br>
+                                                                        <strong>候選：</strong>{{ number_format($responseData['usageMetadata']['candidatesTokenCount'] ?? 0) }}<br>
+                                                                        <strong>總計：</strong>{{ number_format($responseData['usageMetadata']['totalTokenCount'] ?? 0) }}
+                                                                        @if(isset($responseData['usageMetadata']['thoughtsTokenCount']))
+                                                                            <br><strong class="text-info">思考：</strong>{{ number_format($responseData['usageMetadata']['thoughtsTokenCount']) }}
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
+                                                            @endif
+
+                                                            {{-- Extra Content (thought_signature 已被過濾，不顯示) --}}
+                                                            @if(isset($responseData['choices'][0]['message']['extra_content']) && !empty($responseData['choices'][0]['message']['extra_content']))
+                                                                @php
+                                                                    $extraContent = $responseData['choices'][0]['message']['extra_content'];
+                                                                    // 移除 thought_signature
+                                                                    if (isset($extraContent['google']['thought_signature'])) {
+                                                                        unset($extraContent['google']['thought_signature']);
+                                                                    }
+                                                                    if (isset($extraContent['google']) && empty($extraContent['google'])) {
+                                                                        unset($extraContent['google']);
+                                                                    }
+                                                                @endphp
+                                                                @if(!empty($extraContent))
+                                                                    <tr>
+                                                                        <th>額外內容</th>
+                                                                        <td><pre class="mb-0" style="font-size: 0.8em;">{{ json_encode($extraContent, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre></td>
+                                                                    </tr>
+                                                                @endif
                                                             @endif
                                                         </tbody>
                                                     </table>

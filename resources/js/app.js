@@ -63,12 +63,30 @@ const fetchPersonOption = (id) => {
     }).catch(() => null);
 };
 
+/**
+ * 人物选择 Select2 初始化助手函数
+ * 专门用于人物搜索，显示完整的人物信息（ID、姓名、朝代、字、号、籍贯）
+ * 内部调用 window.initAjaxSelect 实现统一架构
+ *
+ * @param {jQuery} $el - jQuery 选择器对象
+ * @param {object} options - 额外配置选项
+ *
+ * @example
+ * // 基础用法
+ * window.initPersonSelect($('.js-person-select'));
+ *
+ * @example
+ * // 带初始值（通过 data-initial-id 属性）
+ * // <select class="person-select" data-initial-id="12345"></select>
+ * window.initPersonSelect($('.person-select'), {
+ *     placeholder: '輸入姓名或 ID 搜尋人物'
+ * });
+ */
 window.initPersonSelect = ($el, options = {}) => {
     const initialId = $el.data('initial-id');
-    $el.select2({
-        width: '100%',
-        theme: 'bootstrap4',
-        minimumInputLength: 1,
+
+    // 使用 initAjaxSelect 统一框架，传递人物特定配置
+    window.initAjaxSelect($el, 'person', {
         ajax: {
             url: '/api/name',
             dataType: 'json',
@@ -90,6 +108,7 @@ window.initPersonSelect = ($el, options = {}) => {
         ...options,
     });
 
+    // 异步加载初始值（人物数据需要格式化）
     if (initialId) {
         fetchPersonOption(initialId).then((opt) => {
             if (opt) {

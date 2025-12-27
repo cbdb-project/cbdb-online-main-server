@@ -265,4 +265,75 @@ class QueryPlaygroundController extends Controller {
             'model' => $result['model'] ?? null,
         ]);
     }
+
+    /**
+     * 顯示自然語言查詢日誌（僅管理員）
+     *
+     * @param Request $request
+     * @return \Illuminate\View\View
+     */
+    public function nlQueryLogs(Request $request) {
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Unauthorized. Admin access required.');
+        }
+
+        $query = DB::table('nl_query_logs')
+            ->leftJoin('users', 'nl_query_logs.user_id', '=', 'users.id')
+            ->select(
+                'nl_query_logs.*',
+                'users.name as user_name',
+                'users.email as user_email'
+            );
+
+        // 搜尋過濾
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('nl_query_logs.question', 'like', "%{$search}%")
+                    ->orWhere('nl_query_logs.generated_sql', 'like', "%{$search}%")
+                    ->orWhere('users.name', 'like', "%{$search}%")
+                    ->orWhere('users.email', 'like', "%{$search}%");
+            });
+        }
+
+        // 成功/失敗過濾
+        if ($request->filled('success')) {
+            $query->where('nl_query_logs.success', $request->input('success'));
+        }
+
+        // 用戶過濾
+        if ($request->filled('user_id')) {
+            $query->where('nl_query_logs.user_id', $request->input('user_id'));
+        }
+
+        // 排序
+        $query->orderBy('nl_query_logs.created_at', 'desc');
+
+        // 分頁
+        $logs = $query->paginate(20)->withQueryString();
+
+        // 獲取所有用戶列表用於篩選
+        $users = DB::table('users')
+            ->whereIn('id', function ($query) {
+                $query->select('user_id')
+                    ->from('nl_query_logs')
+                    ->whereNotNull('user_id')
+                    ->distinct();
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('query_playground.nl_query_logs', [
+            'page_title' => '自然語言查詢日誌',
+            'page_title_key' => 'NL Query Logs',
+            'page_url' => route('query-playground.nl-query-logs'),
+            'logs' => $logs,
+            'users' => $users,
+            'filters' => [
+                'search' => $request->input('search'),
+                'success' => $request->input('success'),
+                'user_id' => $request->input('user_id'),
+            ],
+        ]);
+    }
 }

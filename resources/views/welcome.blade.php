@@ -7,6 +7,10 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
+        <link rel="icon" href="/favicon.ico">
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
         <!-- Fonts -->
         <link href="https://fonts.googleapis.com/css?family=Raleway:100,600" rel="stylesheet" type="text/css">
 

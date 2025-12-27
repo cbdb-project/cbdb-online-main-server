@@ -8,6 +8,9 @@
 // Import AdminLTE v3 CSS from NPM
 import 'admin-lte/dist/css/adminlte.min.css';
 
+// Import custom CSS overrides
+import '../css/select2-overrides.css';
+
 // Import jQuery and expose globally before any plugins run
 import $ from './jquery-global';
 

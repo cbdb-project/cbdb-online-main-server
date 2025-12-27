@@ -10,3 +10,10 @@
 .select2-container--default .select2-selection--single .select2-selection__arrow {
     height: 36px;
 }
+
+/* Increase font size for nav-tabs badge counts in basic information pages */
+.nav-tabs .nav-link .badge {
+    font-size: 1.1em;
+    font-weight: 600;
+    padding: 0.3em 0.5em;
+}

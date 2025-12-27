@@ -81,18 +81,24 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <button class="btn btn-success" id="btnGenerate" disabled>
-                                <i class="fas fa-magic"></i> 生成 SQL
-                            </button>
+                            <div>
+                                <button class="btn btn-success" id="btnGenerate" disabled>
+                                    <i class="fas fa-magic"></i> 生成 SQL
+                                </button>
+                                <small class="text-muted ml-2">使用模型：<code>{{ $nl_model }}</code></small>
+                            </div>
                             <div id="nlLoadingIndicator" style="display:none;">
-                                <div class="spinner-border text-success spinner-border-sm" role="status"></div> 生成中...
+                                <div class="spinner-border text-success spinner-border-sm" role="status"></div> 生成中 ({{ $nl_model }})...
                             </div>
                         </div>
 
                         <!-- Generated SQL Display -->
                         <div id="generatedSqlContainer" style="display:none;">
                             <div class="alert alert-success">
-                                <h6><i class="fas fa-check-circle"></i> 生成的 SQL：</h6>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6><i class="fas fa-check-circle"></i> 生成的 SQL：</h6>
+                                    <small class="text-muted" id="generatedModel"></small>
+                                </div>
                                 <pre id="generatedSql" style="background: #f4f4f4; padding: 10px; border-radius: 4px; margin-top: 10px;"></pre>
                                 <div id="sqlExplanation" class="mt-2" style="font-size: 0.9em;"></div>
                             </div>
@@ -435,6 +441,12 @@ onViteReady(function() {
                         $('#sqlExplanation').html('<strong>說明：</strong>' + response.explanation);
                     } else {
                         $('#sqlExplanation').empty();
+                    }
+
+                    if (response.model) {
+                        $('#generatedModel').html('使用模型：<code>' + response.model + '</code>');
+                    } else {
+                        $('#generatedModel').empty();
                     }
 
                     $('#generatedSqlContainer').show();

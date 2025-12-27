@@ -35,6 +35,7 @@ class QueryPlaygroundController extends Controller {
             'page_description' => '本功能目前處於測試階段，請適度使用以維護系統穩定',
             'page_url' => route('query-playground.index'),
             'initial_sql' => $initialSql,
+            'nl_model' => config('services.gemini.model', 'gemini-3-flash-preview'),
         ]);
     }
 
@@ -261,6 +262,7 @@ class QueryPlaygroundController extends Controller {
             'success' => true,
             'sql' => $result['sql'],
             'explanation' => $result['explanation'],
+            'model' => $result['model'] ?? null,
         ]);
     }
 }

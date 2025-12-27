@@ -25,7 +25,7 @@ class NaturalLanguageQueryService {
      *
      * @param string $question 用户的自然语言问题
      * @param array|null $tableNames 限制使用的表名（可选）
-     * @return array ['success' => bool, 'sql' => string|null, 'error' => string|null, 'explanation' => string|null]
+     * @return array ['success' => bool, 'sql' => string|null, 'error' => string|null, 'explanation' => string|null, 'model' => string|null]
      */
     public function generateSQL(string $question, ?array $tableNames = null): array {
         if (empty($this->apiKey)) {
@@ -34,6 +34,7 @@ class NaturalLanguageQueryService {
                 'sql' => null,
                 'error' => 'Gemini API Key 未配置。请在 .env 文件中设置 GEMINI_API_KEY。',
                 'explanation' => null,
+                'model' => null,
             ];
         }
 
@@ -121,6 +122,7 @@ class NaturalLanguageQueryService {
                     'sql' => null,
                     'error' => "Gemini API 调用失败: {$errorMessage}",
                     'explanation' => null,
+                    'model' => $this->model,
                 ];
             }
 
@@ -128,6 +130,9 @@ class NaturalLanguageQueryService {
             $logData['llm_response'] = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
 
             $result = $this->parseOpenAIResponse($response->json());
+
+            // 添加模型信息
+            $result['model'] = $this->model;
 
             // 更新日志数据
             $logData['generated_sql'] = $result['sql'];
@@ -156,6 +161,7 @@ class NaturalLanguageQueryService {
                 'sql' => null,
                 'error' => '生成 SQL 时发生错误: ' . $e->getMessage(),
                 'explanation' => null,
+                'model' => $this->model,
             ];
         }
     }

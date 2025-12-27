@@ -76,7 +76,7 @@ class NaturalLanguageQueryService {
                     ],
                     'temperature' => 0.1,
                     'top_p' => 0.95,
-                    'max_tokens' => 8192,
+                    'max_completion_tokens' => 8192,
                     'response_format' => [
                         'type' => 'json_schema',
                         'json_schema' => [

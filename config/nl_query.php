@@ -14,7 +14,7 @@ return [
     // 定义哪些表应该直接包含数据而不仅是 schema
     'lookup_tables' => [
         'DYNASTIES' => [
-            'max_rows' => 50, // 最多包含的行数
+            'max_rows' => 100, // 最多包含的行数
             'display_columns' => ['c_dy', 'c_dy_chn', 'c_sort'], // 要显示的列
         ],
         'BIOG_ADDR_CODES' => [

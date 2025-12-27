@@ -715,7 +715,7 @@ async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
                 if (year === 0) continue;
 
                 try {
-                    const results = convertYear(year, { dynasty: dynastyCode });
+                    const results = convertYear(year, searchOptions);
 
                     for (const result of results) {
                         const titleToMatch = result.reign_title.replace(/\s*\([^)]*\)/, '').trim();
@@ -740,7 +740,7 @@ async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
             if (year === 0) continue;
 
             try {
-                const results = convertYear(year, { dynasty: dynastyCode });
+                const results = convertYear(year, searchOptions);
 
                 for (const result of results) {
                     const titleToMatch = result.reign_title.replace(/\s*\([^)]*\)/, '').trim();

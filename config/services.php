@@ -37,6 +37,8 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
+        'api_endpoint' => env('GEMINI_API_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
+        'model' => env('GEMINI_MODEL', 'gemini-3-flash-preview'),
     ],
 
 ];

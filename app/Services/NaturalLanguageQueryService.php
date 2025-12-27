@@ -10,11 +10,14 @@ use Illuminate\Support\Facades\Log;
 class NaturalLanguageQueryService {
     protected DatabaseSchemaService $schemaService;
     protected string $apiKey;
-    protected string $apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
+    protected string $apiEndpoint;
+    protected string $model;
 
     public function __construct(DatabaseSchemaService $schemaService) {
         $this->schemaService = $schemaService;
         $this->apiKey = config('services.gemini.api_key', '');
+        $this->apiEndpoint = config('services.gemini.api_endpoint', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+        $this->model = config('services.gemini.model', 'gemini-3-flash-preview');
     }
 
     /**
@@ -50,42 +53,54 @@ class NaturalLanguageQueryService {
         try {
             $schemaPrompt = $this->schemaService->generateSchemaPrompt($tableNames);
             $systemPrompt = $this->buildSystemPrompt($schemaPrompt);
-            $fullPrompt = $systemPrompt . "\n\n用户问题：{$question}";
 
             // 记录发送给 LLM 的提示词
-            $logData['llm_prompt'] = $fullPrompt;
+            $logData['llm_prompt'] = $systemPrompt . "\n\n用户问题：{$question}";
 
             $response = Http::timeout(30)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $this->apiKey,
                 ])
-                ->post($this->apiEndpoint . '?key=' . $this->apiKey, [
-                    'contents' => [
+                ->post($this->apiEndpoint, [
+                    'model' => $this->model,
+                    'messages' => [
                         [
-                            'parts' => [
-                                ['text' => $fullPrompt],
-                            ],
+                            'role' => 'system',
+                            'content' => $systemPrompt,
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $question,
                         ],
                     ],
-                    'generationConfig' => [
-                        'temperature' => 0.1,
-                        'topK' => 40,
-                        'topP' => 0.95,
-                        'maxOutputTokens' => 8192, // 增加输出 token 限制以支持复杂查询
-                        'responseMimeType' => 'application/json',
-                        'responseSchema' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'sql' => [
-                                    'type' => 'string',
-                                    'description' => 'The SQL SELECT query statement',
+                    'temperature' => 0.1,
+                    'top_p' => 0.95,
+                    'max_tokens' => 8192,
+                    'response_format' => [
+                        'type' => 'json_schema',
+                        'json_schema' => [
+                            'name' => 'sql_query_response',
+                            'strict' => true,
+                            'schema' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'sql' => [
+                                        'type' => ['string', 'null'],
+                                        'description' => 'The SQL SELECT query statement (null if error)',
+                                    ],
+                                    'explanation' => [
+                                        'type' => ['string', 'null'],
+                                        'description' => 'A brief explanation of what the query does (1-2 sentences in Traditional Chinese)',
+                                    ],
+                                    'error' => [
+                                        'type' => ['string', 'null'],
+                                        'description' => 'Error message explaining why SQL cannot be generated (null if successful)',
+                                    ],
                                 ],
-                                'explanation' => [
-                                    'type' => 'string',
-                                    'description' => 'A brief explanation of what the query does (1-2 sentences in Traditional Chinese)',
-                                ],
+                                'required' => ['sql', 'explanation', 'error'],
+                                'additionalProperties' => false,
                             ],
-                            'required' => ['sql', 'explanation'],
                         ],
                     ],
                 ]);
@@ -112,7 +127,7 @@ class NaturalLanguageQueryService {
             // 记录 LLM 响应
             $logData['llm_response'] = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
 
-            $result = $this->parseGeminiResponse($response->json());
+            $result = $this->parseOpenAIResponse($response->json());
 
             // 更新日志数据
             $logData['generated_sql'] = $result['sql'];
@@ -189,76 +204,117 @@ class NaturalLanguageQueryService {
 2. 不要使用 EXPLAIN、DESCRIBE、SHOW 等元查询
 3. 查询只能使用以下提供的表和字段
 4. 使用标准 SQL 语法（MySQL/MariaDB 兼容）
-5. 返回格式为 JSON，包含：
-   - sql: SQL 查询语句（纯文本，不需要代码块标记）
-   - explanation: 简短的查询解释（一到两句话，使用繁体中文）
+5. 返回格式为 JSON，包含以下字段：
+   - sql: SQL 查询语句（纯文本，不需要代码块标记）；如果无法生成则为 null
+   - explanation: 简短的查询解释（一到两句话，使用繁体中文）；如果无法生成则为 null
+   - error: 错误信息（繁体中文），说明为何无法生成 SQL；成功时为 null
+
+**何时返回 error（设置 sql 和 explanation 为 null）：**
+- 用户问题不清楚或过于模糊
+- 用户要求的表或字段不在提供的数据库结构中
+- 用户要求执行非 SELECT 操作（如修改、删除数据）
+- 用户问题无法用 SQL 查询表达
+- 用户问题涉及数据库元信息（如 SHOW、DESCRIBE）
 
 **可用的数据库表结构：**
 
 {$schemaPrompt}
 
-**示例：**
+**成功示例：**
 用户问题：显示所有朝代名称
 返回 JSON：
 {
   "sql": "SELECT c_dy FROM DYNASTIES",
-  "explanation": "此查询从 DYNASTIES 表中选择所有朝代名称字段。"
+  "explanation": "此查询从 DYNASTIES 表中选择所有朝代名称字段。",
+  "error": null
+}
+
+**错误示例：**
+用户问题：删除所有朝代
+返回 JSON：
+{
+  "sql": null,
+  "explanation": null,
+  "error": "無法執行此操作，系統僅支援查詢（SELECT）操作，不支援刪除（DELETE）操作。"
+}
+
+用户问题：查询用户表
+返回 JSON：
+{
+  "sql": null,
+  "explanation": null,
+  "error": "資料庫中沒有「用户表」，請檢查可用的表格清單並重新表述問題。"
 }
 PROMPT;
     }
 
     /**
-     * 解析 Gemini API 响应（使用 structured output）
+     * 解析 OpenAI 兼容 API 响应（使用 structured output）
      *
      * @param array $responseData
      * @return array
      */
-    protected function parseGeminiResponse(array $responseData): array {
+    protected function parseOpenAIResponse(array $responseData): array {
         try {
-            // 从 structured output 中获取 JSON 文本
-            $text = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            // 从 OpenAI 格式的响应中获取内容
+            $content = $responseData['choices'][0]['message']['content'] ?? null;
 
-            if (!$text) {
+            if (!$content) {
                 return [
                     'success' => false,
                     'sql' => null,
-                    'error' => 'Gemini API 返回的响应格式不正确',
+                    'error' => 'API 返回的响应格式不正确',
                     'explanation' => null,
                 ];
             }
 
             // 清理可能的控制字符，但保留换行符和制表符（JSON 中合法）
             // 移除其他控制字符（0x00-0x1F，除了 0x09 制表符、0x0A 换行、0x0D 回车）
-            $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $text);
+            $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $content);
 
             // 解析 JSON 响应，使用选项忽略 UTF-8 错误
-            $jsonData = json_decode($text, true, 512, JSON_INVALID_UTF8_IGNORE);
+            $jsonData = json_decode($content, true, 512, JSON_INVALID_UTF8_IGNORE);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::warning('Gemini API 返回的 JSON 解析失败', [
+                Log::warning('API 返回的 JSON 解析失败', [
                     'error' => json_last_error_msg(),
-                    'text' => mb_substr($text, 0, 500), // 只记录前 500 个字符
-                    'text_length' => strlen($text),
+                    'content' => mb_substr($content, 0, 500), // 只记录前 500 个字符
+                    'content_length' => strlen($content),
                 ]);
 
                 return [
                     'success' => false,
                     'sql' => null,
-                    'error' => 'Gemini API 返回的 JSON 格式不正确: ' . json_last_error_msg() . '。请尝试简化您的问题。',
+                    'error' => 'API 返回的 JSON 格式不正确: ' . json_last_error_msg() . '。请尝试简化您的问题。',
+                    'explanation' => null,
+                ];
+            }
+
+            // 检查 LLM 返回的 error 字段
+            if (!empty($jsonData['error'])) {
+                $llmError = trim($jsonData['error']);
+                Log::info('LLM 返回錯誤，無法生成 SQL', [
+                    'error' => $llmError,
+                ]);
+
+                return [
+                    'success' => false,
+                    'sql' => null,
+                    'error' => $llmError,
                     'explanation' => null,
                 ];
             }
 
             // 验证必需字段
             if (empty($jsonData['sql'])) {
-                Log::warning('Gemini API 返回的响应中缺少 SQL 字段', [
+                Log::warning('API 返回的响应中缺少 SQL 字段', [
                     'json_data' => $jsonData,
                 ]);
 
                 return [
                     'success' => false,
                     'sql' => null,
-                    'error' => 'Gemini API 返回的响应中缺少 SQL 字段。请尝试重新表述您的问题。',
+                    'error' => 'API 返回的响应中缺少 SQL 字段。请尝试重新表述您的问题。',
                     'explanation' => null,
                 ];
             }
@@ -274,7 +330,7 @@ PROMPT;
             ];
 
         } catch (\Exception $e) {
-            Log::error('解析 Gemini 响应时出错', [
+            Log::error('解析 API 响应时出错', [
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -282,7 +338,7 @@ PROMPT;
             return [
                 'success' => false,
                 'sql' => null,
-                'error' => '解析 Gemini 响应时出错: ' . $e->getMessage(),
+                'error' => '解析 API 响应时出错: ' . $e->getMessage(),
                 'explanation' => null,
             ];
         }

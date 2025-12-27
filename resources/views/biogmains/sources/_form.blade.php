@@ -61,29 +61,38 @@
     </div>
 
     <div class="form-group row">
+        <label class="col-sm-2 col-form-label">選項</label>
+        <div class="col-sm-10">
+            <div class="custom-control custom-checkbox">
+                <input type="hidden" name="c_main_source" value="0">
+                <input type="checkbox"
+                       class="custom-control-input"
+                       id="c_main_source"
+                       name="c_main_source"
+                       value="1"
+                       {{ ($isEdit && $row->c_main_source == 1) ? 'checked' : '' }}>
+                <label class="custom-control-label" for="c_main_source">主要出處</label>
+            </div>
+            <div class="custom-control custom-checkbox mt-2">
+                <input type="hidden" name="c_self_bio" value="0">
+                <input type="checkbox"
+                       class="custom-control-input"
+                       id="c_self_bio"
+                       name="c_self_bio"
+                       value="1"
+                       {{ ($isEdit && $row->c_self_bio == 1) ? 'checked' : '' }}>
+                <label class="custom-control-label" for="c_self_bio">本人傳記</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group row">
         <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
         <div class="col-sm-10">
             @php
                 $notes_value = $isEdit ? unionPKDef_decode_for_convert($row->c_notes) : '';
             @endphp
             <textarea class="form-control" name="c_notes" cols="30" rows="5">{{ $notes_value }}</textarea>
-        </div>
-    </div>
-
-    <div class="form-group row">
-        <label for="c_main_source" class="col-sm-2 col-form-label">是主要出處</label>
-        <div class="col-sm-4">
-            <select class="form-control select2" name="c_main_source">
-                <option value="0" {{ ($isEdit && $row->c_main_source == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_main_source == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
-        </div>
-        <label for="c_self_bio" class="col-sm-2 col-form-label">是本人傳記</label>
-        <div class="col-sm-4">
-            <select class="form-control select2" name="c_self_bio">
-                <option value="0" {{ ($isEdit && $row->c_self_bio == 0) ? 'selected' : '' }}>0-否</option>
-                <option value="1" {{ ($isEdit && $row->c_self_bio == 1) ? 'selected' : '' }}>1-是</option>
-            </select>
         </div>
     </div>
 

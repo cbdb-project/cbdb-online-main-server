@@ -347,16 +347,18 @@
     onViteReady(function() {
         $(".select2").select2();
         textperson_pair_first_load();
-        $(".biog").select2(options('biog'));
-        $(".c_kin_code").select2(options('kincode'));
         $(".c_kinship_pair").select2();
-        $(".c_assoc_kin_code").select2(options('kincode'));
         $(".c_assoc_kinship_pair").select2();
-        $(".c_assoc_code").select2(options('assoccode'));
-        $(".c_addr_id").select2(options('addr'));
-        $(".c_inst_code").select2(options('socialinstcode'));
-        $(".c_source").select2(options('text'));
         $(".c_assocship_pair").select2();
+
+        // 使用统一的 AJAX Select2 初始化助手函数
+        window.initAjaxSelect($(".biog"), 'biog');
+        window.initAjaxSelect($(".c_kin_code"), 'kincode');
+        window.initAjaxSelect($(".c_assoc_kin_code"), 'kincode');
+        window.initAjaxSelect($(".c_assoc_code"), 'assoccode');
+        window.initAjaxSelect($(".c_addr_id"), 'addr');
+        window.initAjaxSelect($(".c_inst_code"), 'socialinstcode');
+        window.initAjaxSelect($(".c_source"), 'text');
 
         if (window.initLunarValidation) {
             window.initLunarValidation();
@@ -378,58 +380,6 @@
         @if($isEdit)
             assocship_pair();
         @endif
-
-        function formatRepo (repo) {
-            if (repo.loading) {
-                return repo.text;
-            }
-
-            return "<div class='select2-result-repository clearfix'>" +
-                "<div class='select2-result-repository__meta'>" +
-                "<div class='select2-result-repository__title'>" +
-                repo.text +
-                "</div></div></div>";
-        }
-
-        function formatRepoSelection (repo) {
-            return repo.text || repo.text;
-        }
-
-        function options(model) {
-            return {
-                ajax: {
-                    url: "/api/select/search/"+model,
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) {
-                        return {
-                            q: params.term, // search term
-                            page: params.page,
-                        };
-                    },
-                    processResults: function (data, params) {
-                        // parse the results into the format expected by Select2
-                        // since we are using custom formatting functions we do not need to
-                        // alter the remote JSON data, except to indicate that infinite
-                        // scrolling can be used
-                        params.page = params.page || 1;
-
-                        return {
-                            results: data.data,
-                            pagination: {
-                                more: (params.page * 30) < data.total
-                            }
-                        };
-                    },
-                    cache: true
-                },
-                placeholder: '请搜索',
-                escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
-                minimumInputLength: 1,
-                templateResult: formatRepo,
-                templateSelection: formatRepoSelection
-            }
-        }
 
         function assocship_pair(){
             let c_assoc_code = $('.c_assoc_code').val();

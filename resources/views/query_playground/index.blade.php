@@ -11,23 +11,77 @@
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i> {{ $page_description }}。每頁限制 20 筆。
                 </div>
-                
-                <div class="form-group">
-                    <label for="sqlInput">SQL Query:</label>
-                    <textarea class="form-control" id="sqlInput" rows="5" style="font-family: monospace;">{{ $initial_sql ?? 'SELECT * FROM DYNASTIES' }}</textarea>
-                </div>
 
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <button class="btn btn-primary" id="btnRun">
-                            <i class="fas fa-play"></i> 執行查詢 (Run)
-                        </button>
-                        <button class="btn btn-default ml-2" id="btnShare" title="複製分享連結">
-                            <i class="fas fa-share-alt"></i> 複製連結
-                        </button>
+                <!-- Tab Navigation -->
+                <ul class="nav nav-tabs" id="queryTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="sql-tab" data-toggle="tab" href="#sqlPanel" role="tab">
+                            <i class="fas fa-code"></i> SQL 查詢
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="nl-tab" data-toggle="tab" href="#nlPanel" role="tab">
+                            <i class="fas fa-comment-dots"></i> 自然語言查詢
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content mt-3" id="queryTabContent">
+                    <!-- SQL Query Panel -->
+                    <div class="tab-pane fade show active" id="sqlPanel" role="tabpanel">
+                        <div class="form-group">
+                            <label for="sqlInput">SQL Query:</label>
+                            <textarea class="form-control" id="sqlInput" rows="5" style="font-family: monospace;">{{ $initial_sql ?? 'SELECT * FROM DYNASTIES' }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button class="btn btn-primary" id="btnRun">
+                                    <i class="fas fa-play"></i> 執行查詢 (Run)
+                                </button>
+                                <button class="btn btn-default ml-2" id="btnShare" title="複製分享連結">
+                                    <i class="fas fa-share-alt"></i> 複製連結
+                                </button>
+                            </div>
+                            <div id="loadingIndicator" style="display:none;">
+                                <div class="spinner-border text-primary spinner-border-sm" role="status"></div> 查詢中...
+                            </div>
+                        </div>
                     </div>
-                    <div id="loadingIndicator" style="display:none;">
-                        <div class="spinner-border text-primary spinner-border-sm" role="status"></div> 查詢中...
+
+                    <!-- Natural Language Query Panel -->
+                    <div class="tab-pane fade" id="nlPanel" role="tabpanel">
+                        <div class="form-group">
+                            <label for="nlInput">自然語言問題:</label>
+                            <textarea class="form-control" id="nlInput" rows="3" placeholder="例如：顯示所有朝代名稱"></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <button class="btn btn-success" id="btnGenerate">
+                                <i class="fas fa-magic"></i> 生成 SQL
+                            </button>
+                            <div id="nlLoadingIndicator" style="display:none;">
+                                <div class="spinner-border text-success spinner-border-sm" role="status"></div> 生成中...
+                            </div>
+                        </div>
+
+                        <!-- Generated SQL Display -->
+                        <div id="generatedSqlContainer" style="display:none;">
+                            <div class="alert alert-success">
+                                <h6><i class="fas fa-check-circle"></i> 生成的 SQL：</h6>
+                                <pre id="generatedSql" style="background: #f4f4f4; padding: 10px; border-radius: 4px; margin-top: 10px;"></pre>
+                                <div id="sqlExplanation" class="mt-2" style="font-size: 0.9em;"></div>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-primary" id="btnUseGenerated">
+                                    <i class="fas fa-arrow-right"></i> 使用此 SQL 並執行
+                                </button>
+                                <button class="btn btn-secondary" id="btnCopyGenerated">
+                                    <i class="fas fa-copy"></i> 複製到 SQL 查詢面板
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -62,6 +116,7 @@
 <script>
 onViteReady(function() {
     let currentPage = 1;
+    let generatedSqlText = '';
 
     // Check if initial SQL provided via URL param (already populated in UI by controller), maybe auto-run?
     // User didn't strictly ask for auto-run, but it's often expected. Let's stick to manual run for safety first.
@@ -184,7 +239,7 @@ onViteReady(function() {
     $('#btnShare').click(function() {
         const sql = $('#sqlInput').val();
          updateUrl(sql);
-        
+
         navigator.clipboard.writeText(window.location.href).then(function() {
             // Simple visual feedback
             const originalText = $('#btnShare').html();
@@ -196,6 +251,84 @@ onViteReady(function() {
             console.error('Could not copy text: ', err);
             alert('複製失敗，請手動複製網址列');
         });
+    });
+
+    // Natural Language Query handlers
+    $('#btnGenerate').click(function() {
+        const question = $('#nlInput').val().trim();
+        if (!question) {
+            alert('請輸入自然語言問題');
+            return;
+        }
+
+        $('#btnGenerate').prop('disabled', true);
+        $('#nlLoadingIndicator').show();
+        $('#generatedSqlContainer').hide();
+        $('#errorAlert').hide();
+
+        $.ajax({
+            url: "{{ route('query-playground.generate-from-nl', [], false) }}",
+            method: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                question: question
+            },
+            success: function(response) {
+                if (response.success && response.sql) {
+                    generatedSqlText = response.sql;
+                    $('#generatedSql').text(response.sql);
+
+                    if (response.explanation) {
+                        $('#sqlExplanation').html('<strong>說明：</strong>' + response.explanation);
+                    } else {
+                        $('#sqlExplanation').empty();
+                    }
+
+                    $('#generatedSqlContainer').show();
+                } else {
+                    const errorMsg = response.error || '生成 SQL 失敗';
+                    $('#errorAlert').html('<strong>錯誤：</strong>' + errorMsg).show();
+                }
+            },
+            error: function(xhr) {
+                let msg = '發生錯誤';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    msg = xhr.responseJSON.error;
+                }
+                $('#errorAlert').html('<strong>錯誤：</strong>' + msg).show();
+            },
+            complete: function() {
+                $('#btnGenerate').prop('disabled', false);
+                $('#nlLoadingIndicator').hide();
+            }
+        });
+    });
+
+    $('#btnUseGenerated').click(function() {
+        if (generatedSqlText) {
+            $('#sqlInput').val(generatedSqlText);
+            // Switch to SQL tab
+            $('#sql-tab').tab('show');
+            // Run the query
+            setTimeout(() => {
+                runQuery(1);
+            }, 300);
+        }
+    });
+
+    $('#btnCopyGenerated').click(function() {
+        if (generatedSqlText) {
+            $('#sqlInput').val(generatedSqlText);
+            // Switch to SQL tab
+            $('#sql-tab').tab('show');
+
+            // Visual feedback
+            const originalText = $(this).html();
+            $(this).html('<i class="fas fa-check"></i> 已複製');
+            setTimeout(() => {
+                $(this).html(originalText);
+            }, 2000);
+        }
     });
 });
 </script>

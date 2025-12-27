@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\NaturalLanguageQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -224,5 +225,42 @@ class QueryPlaygroundController extends Controller {
         $candidates = array_merge($candidates, $fallbackMatches[1] ?? []);
 
         return array_unique($candidates);
+    }
+
+    /**
+     * 使用自然语言生成 SQL 查询
+     *
+     * @param Request $request
+     * @param NaturalLanguageQueryService $nlqService
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function generateFromNL(Request $request, NaturalLanguageQueryService $nlqService) {
+        if (!Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        }
+
+        $request->validate([
+            'question' => 'required|string|max:1000',
+            'tables' => 'nullable|array',
+            'tables.*' => 'string',
+        ]);
+
+        $question = $request->input('question');
+        $tables = $request->input('tables');
+
+        $result = $nlqService->generateSQL($question, $tables);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'sql' => $result['sql'],
+            'explanation' => $result['explanation'],
+        ]);
     }
 }

@@ -143,6 +143,7 @@ Route::middleware('auth')->group(function () {
     // Query Playground
     Route::get('query-playground', 'QueryPlaygroundController@index')->name('query-playground.index');
     Route::post('query-playground/run', 'QueryPlaygroundController@run')->name('query-playground.run');
+    Route::post('query-playground/generate-from-nl', 'QueryPlaygroundController@generateFromNL')->name('query-playground.generate-from-nl');
 
     Route::post('admin/unidirectional-relationship-repair/assoc', 'UnidirectionalRelationshipRepairController@repairAssoc')->name('admin.unidirectional-relationship-repair.assoc');
 });

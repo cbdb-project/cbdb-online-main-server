@@ -2,7 +2,7 @@
     $currentRoute = request()->route()->getName();
 @endphp
 
-<div class="mb-4">
+<div class="mb-4 biogmain-navigation">
     <h3 class="text-center mb-3">{{ $basicinformation->c_name_chn.'（'.$basicinformation->c_name.'）- '.$basicinformation->c_personid }}</h3>
 
     <ul class="nav nav-tabs" style="flex-wrap: wrap;">

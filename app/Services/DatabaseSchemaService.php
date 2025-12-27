@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DatabaseSchemaService {
     /**
@@ -100,6 +101,7 @@ class DatabaseSchemaService {
      */
     public function generateSchemaPrompt(?array $tableNames = null): string {
         $schemaInfo = $this->getSchemaInfo($tableNames);
+        $lookupTablesConfig = config('nl_query.lookup_tables', []);
 
         $prompt = "以下是可用的数据库表结构信息：\n\n";
 
@@ -127,10 +129,70 @@ class DatabaseSchemaService {
                 $prompt .= "  - {$column['name']}: {$column['type']} {$nullable}{$comment}\n";
             }
 
+            // 如果是简单对照表，直接包含数据
+            if (isset($lookupTablesConfig[$tableName])) {
+                $tableData = $this->getLookupTableData(
+                    $tableName,
+                    $lookupTablesConfig[$tableName]['display_columns'] ?? null,
+                    $lookupTablesConfig[$tableName]['max_rows'] ?? 50
+                );
+
+                if (!empty($tableData)) {
+                    $prompt .= "\n数据（可直接使用，无需 JOIN）:\n";
+                    $prompt .= $this->formatTableData($tableData);
+                }
+            }
+
             $prompt .= "\n";
         }
 
         return $prompt;
+    }
+
+    /**
+     * 获取对照表的数据
+     *
+     * @param string $tableName
+     * @param array|null $columns
+     * @param int $maxRows
+     * @return array
+     */
+    protected function getLookupTableData(string $tableName, ?array $columns = null, int $maxRows = 50): array {
+        try {
+            $query = DB::table($tableName);
+
+            if ($columns) {
+                $query->select($columns);
+            }
+
+            return $query->limit($maxRows)->get()->toArray();
+        } catch (\Exception $e) {
+            Log::warning("获取对照表数据失败: {$tableName}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * 格式化表数据为文本
+     *
+     * @param array $data
+     * @return string
+     */
+    protected function formatTableData(array $data): string {
+        if (empty($data)) {
+            return '';
+        }
+
+        $formatted = '';
+        foreach ($data as $row) {
+            $row = (array) $row;
+            $formatted .= '  ' . json_encode($row, JSON_UNESCAPED_UNICODE) . "\n";
+        }
+
+        return $formatted;
     }
 
     /**

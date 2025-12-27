@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -32,10 +34,26 @@ class NaturalLanguageQueryService {
             ];
         }
 
+        $startTime = microtime(true);
+        $logData = [
+            'user_id' => Auth::id(),
+            'question' => $question,
+            'llm_prompt' => null,
+            'llm_response' => null,
+            'generated_sql' => null,
+            'explanation' => null,
+            'success' => false,
+            'error_message' => null,
+            'execution_time_ms' => null,
+        ];
+
         try {
             $schemaPrompt = $this->schemaService->generateSchemaPrompt($tableNames);
             $systemPrompt = $this->buildSystemPrompt($schemaPrompt);
             $fullPrompt = $systemPrompt . "\n\n用户问题：{$question}";
+
+            // 记录发送给 LLM 的提示词
+            $logData['llm_prompt'] = $fullPrompt;
 
             $response = Http::timeout(30)
                 ->withHeaders([
@@ -79,6 +97,10 @@ class NaturalLanguageQueryService {
                     'error' => $errorMessage,
                 ]);
 
+                $logData['error_message'] = "Gemini API 调用失败: {$errorMessage}";
+                $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                $this->saveLog($logData);
+
                 return [
                     'success' => false,
                     'sql' => null,
@@ -87,7 +109,20 @@ class NaturalLanguageQueryService {
                 ];
             }
 
+            // 记录 LLM 响应
+            $logData['llm_response'] = json_encode($response->json(), JSON_UNESCAPED_UNICODE);
+
             $result = $this->parseGeminiResponse($response->json());
+
+            // 更新日志数据
+            $logData['generated_sql'] = $result['sql'];
+            $logData['explanation'] = $result['explanation'];
+            $logData['success'] = $result['success'];
+            $logData['error_message'] = $result['error'];
+            $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+
+            // 保存日志
+            $this->saveLog($logData);
 
             return $result;
 
@@ -97,12 +132,45 @@ class NaturalLanguageQueryService {
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            $logData['error_message'] = '生成 SQL 时发生错误: ' . $e->getMessage();
+            $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+            $this->saveLog($logData);
+
             return [
                 'success' => false,
                 'sql' => null,
                 'error' => '生成 SQL 时发生错误: ' . $e->getMessage(),
                 'explanation' => null,
             ];
+        }
+    }
+
+    /**
+     * 保存查询日志
+     *
+     * @param array $logData
+     * @return void
+     */
+    protected function saveLog(array $logData): void {
+        try {
+            DB::table('nl_query_logs')->insert([
+                'user_id' => $logData['user_id'],
+                'question' => $logData['question'],
+                'generated_sql' => $logData['generated_sql'],
+                'explanation' => $logData['explanation'],
+                'llm_prompt' => $logData['llm_prompt'],
+                'llm_response' => $logData['llm_response'],
+                'success' => $logData['success'],
+                'error_message' => $logData['error_message'],
+                'execution_time_ms' => $logData['execution_time_ms'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Exception $e) {
+            // 日志记录失败不应该影响主流程
+            Log::warning('保存 NL 查询日志失败', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

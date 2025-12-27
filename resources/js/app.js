@@ -408,28 +408,31 @@ function initEraConversion() {
         }
 
         try {
-            // 嘗試從頁面獲取朝代信息以提高轉換精確度
+            // 獲取朝代信息
             const $dynastySelect = $('select[name="c_dy"]');
-            const dynastyCode = $dynastySelect.length ? parseInt($dynastySelect.val(), 10) : null;
+            const hasDynastyField = $dynastySelect.length > 0;
+            const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
 
-            // 調用 cn-era 進行轉換
             let results;
-            if (dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0) {
-                // 如果有朝代信息，使用朝代過濾
-                results = convertYear(year, { dynasty: dynastyCode });
 
-                // 如果指定朝代沒有結果，降級到 mainline 模式
-                if (!results || results.length === 0) {
-                    console.warn(`朝代 ${dynastyCode} 中沒有找到對應年號，嘗試使用主線朝代`);
-                    results = convertYear(year, { mode: 'mainline' });
+            // 如果頁面有朝代欄位，則檢查是否已選擇
+            if (hasDynastyField) {
+                if (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0) {
+                    alert('請先選擇朝代，才能進行年號轉換');
+                    return;
                 }
+                // 使用朝代過濾進行轉換
+                results = convertYear(year, { dynasty: dynastyCode });
             } else {
-                // 沒有朝代信息，使用主線朝代
+                // 頁面沒有朝代欄位，使用主線朝代模式
                 results = convertYear(year, { mode: 'mainline' });
             }
 
             if (!results || results.length === 0) {
-                alert(`無法找到公元 ${year} 年對應的年號`);
+                const message = hasDynastyField
+                    ? `在所選朝代中無法找到公元 ${year} 年對應的年號`
+                    : `無法找到公元 ${year} 年對應的年號`;
+                alert(message);
                 return;
             }
 
@@ -465,6 +468,94 @@ function initEraConversion() {
 
         } catch (error) {
             console.error('年號轉換錯誤:', error);
+            alert(`轉換失敗：${error.message}`);
+        }
+    });
+
+    // 監聽反向轉換按鈕點擊事件（年號 → 公元年份）
+    $(document).on('click', '.era-reverse-convert-btn', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+
+        // 找到對應的容器
+        const $container = $btn.closest('.d-flex').parent();
+        const $yearInput = $container.find('.era-year-input').first();
+
+        // 獲取目標字段名稱
+        const nhCodeName = $yearInput.data('nh-code-name');
+        const nhYearName = $yearInput.data('nh-year-name');
+
+        if (!nhCodeName || !nhYearName) {
+            console.error('找不到年號字段配置');
+            return;
+        }
+
+        // 獲取朝代信息
+        const $dynastySelect = $('select[name="c_dy"]');
+        const hasDynastyField = $dynastySelect.length > 0;
+        const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
+
+        // 如果頁面有朝代欄位，則檢查是否已選擇
+        if (hasDynastyField && (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0)) {
+            alert('請先選擇朝代，才能進行年號轉換');
+            return;
+        }
+
+        // 獲取年號和年數
+        const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
+        const nianhaoId = $nhSelect.length ? $nhSelect.val() : null;
+        const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
+        const nhYear = $nhYearInput.length ? parseInt($nhYearInput.val(), 10) : null;
+
+        if (!nianhaoId) {
+            alert('請先選擇年號');
+            return;
+        }
+
+        if (!nhYear || isNaN(nhYear) || nhYear <= 0) {
+            alert('請輸入有效的年號年數');
+            return;
+        }
+
+        try {
+            // 從年號選擇框的選中項獲取年號名稱
+            // Select2 選項格式："{id} {name} [{start}]~[{end}]"
+            // 例如："523 慶曆 [1041]~[1048]"
+            const fullText = $nhSelect.find('option:selected').text().trim();
+
+            if (!fullText) {
+                alert('無法獲取年號名稱');
+                return;
+            }
+
+            // 提取年號名稱：去掉 ID 和年份範圍
+            // 匹配模式：數字 + 空格 + 年號名稱 + 可選的年份範圍
+            const match = fullText.match(/^\d+\s+([^\[]+?)(?:\s+\[|$)/);
+            const nianhaoName = match ? match[1].trim() : fullText.split(' ')[1] || fullText;
+
+            if (!nianhaoName) {
+                alert('無法解析年號名稱');
+                return;
+            }
+
+            // 調用反向轉換函數
+            convertReignToYear(nianhaoName, nhYear, dynastyCode).then(result => {
+                if (result.success) {
+                    // 填充公元年份
+                    $yearInput.val(result.year);
+
+                    // 顯示成功提示
+                    showConversionSuccess($btn, `公元 ${result.year} 年`, '將年號轉換為公元年份');
+                } else {
+                    alert(result.message || '轉換失敗');
+                }
+            }).catch(error => {
+                console.error('年號反向轉換錯誤:', error);
+                alert(`轉換失敗：${error.message}`);
+            });
+
+        } catch (error) {
+            console.error('年號反向轉換錯誤:', error);
             alert(`轉換失敗：${error.message}`);
         }
     });
@@ -512,15 +603,189 @@ async function findNianhaoIdByName(reignTitle) {
     }
 }
 
+// 全局朝代範圍數據緩存
+let dynastyRangesCache = null;
+
+/**
+ * 獲取朝代年份範圍數據
+ * 從 API 動態加載並緩存
+ */
+async function getDynastyRanges() {
+    if (dynastyRangesCache) {
+        return dynastyRangesCache;
+    }
+
+    try {
+        const response = await axios.get('/api/select/dynasty');
+        const dynasties = response.data;
+
+        // 轉換為以朝代 ID 為鍵的對象
+        const ranges = {};
+        for (const dynasty of dynasties) {
+            const values = Object.values(dynasty);
+            // 假設格式為 [c_dy, ..., c_start, c_end, ...]
+            // 需要找到 c_dy, c_start, c_end 的位置
+            const dynastyId = dynasty.c_dy || values[0];
+            const start = dynasty.c_start;
+            const end = dynasty.c_end;
+
+            if (dynastyId && start !== undefined && end !== undefined) {
+                ranges[dynastyId] = { start, end };
+            }
+        }
+
+        dynastyRangesCache = ranges;
+        return ranges;
+    } catch (error) {
+        console.error('獲取朝代範圍數據失敗:', error);
+        // 返回默認範圍
+        return {};
+    }
+}
+
+/**
+ * 根據年號名稱、年數和朝代反向轉換為公元年份
+ * 使用二分搜索優化性能
+ * @param {string} reignTitle - 年號名稱
+ * @param {number} yearNum - 年號年數
+ * @param {number|null} dynastyCode - 朝代代碼（可選，null 表示不限朝代）
+ */
+async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
+    try {
+        // 特殊名稱映射（反向）
+        const specialNameMapping = {
+            '中華民國': '民國',
+        };
+
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
+
+        // 獲取朝代搜索範圍（從 API 動態加載）
+        const SEARCH_RANGES = await getDynastyRanges();
+
+        // 獲取指定朝代的範圍，或使用默認範圍
+        const range = (dynastyCode && SEARCH_RANGES[dynastyCode]) || { start: -200, end: 2020 };
+
+        // 決定搜索模式
+        const searchOptions = dynastyCode
+            ? { dynasty: dynastyCode }  // 指定朝代搜索
+            : { mode: 'all' };          // 全朝代搜索
+
+        // 使用二分搜索優化
+        // 先嘗試一個年份範圍內的採樣點
+        const samplePoints = [];
+        const step = Math.max(1, Math.floor((range.end - range.start) / 50)); // 採樣約50個點
+
+        for (let year = range.start; year <= range.end; year += step) {
+            if (year === 0) continue;
+            samplePoints.push(year);
+        }
+
+        // 在採樣點中尋找年號的大致範圍
+        let foundStart = null;
+        let foundEnd = null;
+
+        for (const year of samplePoints) {
+            try {
+                const results = convertYear(year, searchOptions);
+
+                for (const result of results) {
+                    const titleToMatch = result.reign_title.replace(/\s*\([^)]*\)/, '').trim();
+
+                    if (titleToMatch === searchTitle) {
+                        // 找到該年號，記錄範圍
+                        if (foundStart === null || year < foundStart) {
+                            foundStart = year - step;
+                        }
+                        if (foundEnd === null || year > foundEnd) {
+                            foundEnd = year + step;
+                        }
+                    }
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+
+        // 如果找到了年號的範圍，在該範圍內精確搜索
+        if (foundStart !== null) {
+            foundStart = Math.max(range.start, foundStart);
+            foundEnd = Math.min(range.end, foundEnd);
+
+            for (let year = foundStart; year <= foundEnd; year++) {
+                if (year === 0) continue;
+
+                try {
+                    const results = convertYear(year, searchOptions);
+
+                    for (const result of results) {
+                        const titleToMatch = result.reign_title.replace(/\s*\([^)]*\)/, '').trim();
+
+                        if (titleToMatch === searchTitle && result.year === yearNum) {
+                            return {
+                                success: true,
+                                year: year,
+                                dynastyName: result.dynasty_name,
+                                reignTitle: result.reign_title,
+                            };
+                        }
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+        }
+
+        // 如果沒有找到，回退到完整搜索（以防萬一）
+        for (let year = range.start; year <= range.end; year++) {
+            if (year === 0) continue;
+
+            try {
+                const results = convertYear(year, searchOptions);
+
+                for (const result of results) {
+                    const titleToMatch = result.reign_title.replace(/\s*\([^)]*\)/, '').trim();
+
+                    if (titleToMatch === searchTitle && result.year === yearNum) {
+                        return {
+                            success: true,
+                            year: year,
+                            dynastyName: result.dynasty_name,
+                            reignTitle: result.reign_title,
+                        };
+                    }
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+
+        const message = dynastyCode
+            ? `在指定朝代中找不到「${reignTitle} ${yearNum}年」的對應公元年份`
+            : `找不到「${reignTitle} ${yearNum}年」的對應公元年份`;
+
+        return {
+            success: false,
+            message: message,
+        };
+
+    } catch (error) {
+        console.error('反向轉換時發生錯誤:', error);
+        return {
+            success: false,
+            message: error.message || '轉換失敗',
+        };
+    }
+}
+
 /**
  * 顯示轉換成功的提示
  */
-function showConversionSuccess($btn, message) {
+function showConversionSuccess($btn, message, defaultTitle = null) {
     const $icon = $btn.find('i');
     const originalClass = $icon.attr('class');
     $icon.attr('class', 'fas fa-check text-success');
 
-    const originalTitle = $btn.attr('data-original-title') || $btn.attr('title');
+    const originalTitle = $btn.attr('data-original-title') || $btn.attr('title') || defaultTitle;
     $btn.attr('data-original-title', `轉換成功：${message}`)
         .tooltip('dispose')
         .tooltip()
@@ -528,7 +793,7 @@ function showConversionSuccess($btn, message) {
 
     setTimeout(() => {
         $icon.attr('class', originalClass);
-        $btn.attr('data-original-title', originalTitle || '將公元年份轉換為年號')
+        $btn.attr('data-original-title', originalTitle)
             .tooltip('dispose')
             .tooltip();
     }, 2000);

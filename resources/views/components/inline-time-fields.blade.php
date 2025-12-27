@@ -43,12 +43,20 @@
                    @if($yearRequired) required @endif
                    @foreach($yearAttributes as $attr => $value) {{ $attr }}="{{ $value }}" @endforeach>
         </div>
-        <button type="button"
-                class="btn btn-sm btn-outline-secondary era-convert-btn mr-3"
-                title="將公元年份轉換為年號"
-                data-toggle="tooltip">
-            <i class="fas fa-search"></i>
-        </button>
+        <div class="d-flex mr-3">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary era-convert-btn"
+                    title="將公元年份轉換為年號"
+                    data-toggle="tooltip">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary era-reverse-convert-btn ml-1"
+                    title="將年號轉換為公元年份"
+                    data-toggle="tooltip">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+        </div>
         <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 36ch; flex: 1 1 36ch;">
             <label class="mb-0 mr-2" for="{{ $nhCodeName }}">{{ $nhLabel }}</label>
             <div class="mr-2" style="min-width: 16ch; flex: 1 1 16ch;">

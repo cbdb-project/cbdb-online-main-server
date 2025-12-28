@@ -79,6 +79,7 @@ class UserProfileTest extends TestCase {
             'name' => 'New Name',
             'email' => 'new@example.com',
             'institution' => 'New Institute',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -104,6 +105,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
             'current_password' => 'oldpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
@@ -130,6 +132,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
         ]);
@@ -151,6 +154,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
             'current_password' => 'wrongpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
@@ -176,6 +180,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
             'current_password' => 'oldpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'differentpassword',
@@ -210,6 +215,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'existing@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertSessionHasErrors('email');
@@ -234,6 +240,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Updated Name',
             'email' => 'test@example.com',
             'institution' => 'Updated Institute',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -259,6 +266,7 @@ class UserProfileTest extends TestCase {
             'name' => '',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertSessionHasErrors('name');
@@ -278,6 +286,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => '',
             'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertSessionHasErrors('email');
@@ -297,6 +306,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => '',
+            'avatar' => 'avatar5.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -304,5 +314,130 @@ class UserProfileTest extends TestCase {
 
         $user->refresh();
         $this->assertNull($user->institution);
+    }
+
+    public function testUserCanUpdateAvatar() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar10.png',
+        ]);
+
+        $response->assertRedirect('/profile');
+        $response->assertSessionHas('success');
+
+        $user->refresh();
+        $this->assertEquals('avatar10.png', $user->avatar);
+    }
+
+    public function testAvatarIsRequired() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'institution' => 'Test Institute',
+            // avatar 字段缺失
+        ]);
+
+        $response->assertSessionHasErrors('avatar');
+    }
+
+    public function testInvalidAvatarIsRejected() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'institution' => 'Test Institute',
+            'avatar' => 'invalid-avatar.png',
+        ]);
+
+        $response->assertSessionHasErrors('avatar');
+
+        $user->refresh();
+        $this->assertEquals('avatar5.png', $user->avatar);
+    }
+
+    public function testAvatarMustBeInValidRange() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar5.png',
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+        ]);
+
+        // 測試 avatar19.png（超出範圍）
+        $response = $this->actingAs($user)->patch('/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar19.png',
+        ]);
+
+        $response->assertSessionHasErrors('avatar');
+
+        $user->refresh();
+        $this->assertEquals('avatar5.png', $user->avatar);
+    }
+
+    public function testAllValidAvatarsAreAccepted() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar1.png',
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+        ]);
+
+        // 測試所有 18 個有效頭像
+        for ($i = 1; $i <= 18; $i++) {
+            $avatarName = "avatar{$i}.png";
+
+            $response = $this->actingAs($user)->patch('/profile', [
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'institution' => 'Test Institute',
+                'avatar' => $avatarName,
+            ]);
+
+            $response->assertRedirect('/profile');
+            $response->assertSessionHas('success');
+
+            $user->refresh();
+            $this->assertEquals($avatarName, $user->avatar, "Failed to update to {$avatarName}");
+        }
     }
 }

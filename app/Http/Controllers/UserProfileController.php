@@ -49,6 +49,11 @@ class UserProfileController extends Controller {
                 Rule::unique('users')->ignore($user->id),
             ],
             'institution' => 'nullable|string|max:255',
+            'avatar' => [
+                'required',
+                'string',
+                Rule::in($this->getAvailableAvatars()),
+            ],
         ];
 
         // 只有當用戶填寫了新密碼時才驗證密碼
@@ -76,10 +81,25 @@ class UserProfileController extends Controller {
         $user->name = $validatedData['name'];
         $user->email = $validatedData['email'];
         $user->institution = $validatedData['institution'];
+        $user->avatar = $validatedData['avatar'];
 
         $user->save();
 
         return redirect()->route('profile.edit')
             ->with('success', '個人資料已成功更新');
+    }
+
+    /**
+     * 獲取所有可用的頭像列表
+     *
+     * @return array
+     */
+    private function getAvailableAvatars(): array {
+        $avatars = [];
+        for ($i = 1; $i <= 18; $i++) {
+            $avatars[] = "avatar{$i}.png";
+        }
+
+        return $avatars;
     }
 }

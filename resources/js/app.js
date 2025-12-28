@@ -715,57 +715,50 @@ async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
 
         const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
-        // 獲取年號數據
-        const response = await axios.get('/api/select/nianhao');
-        const nianhaoData = response.data;
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
 
         // 查找所有名稱匹配的年號
         const candidates = nianhaoData.filter(item => {
             return item.c_nianhao_chn === searchTitle;
         });
 
-        // 如果只有一個匹配，直接返回
-        if (candidates.length === 1) {
-            return candidates[0].c_nianhao_id;
-        }
-
-        // 如果有多個匹配，使用年份範圍精確匹配
-        if (candidates.length > 1) {
-            for (const item of candidates) {
-                // 驗證 c_str 字段存在且格式正確
-                if (!item.c_str) {
-                    console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 缺少 c_str 字段，跳過`);
-                    continue;
-                }
-
-                // 從 c_str 解析年份範圍 "[1234]~[5678]"
-                const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
-                if (!rangeMatch) {
-                    console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 的 c_str 格式錯誤: ${item.c_str}，跳過`);
-                    continue;
-                }
-
-                const firstYear = parseInt(rangeMatch[1], 10);
-                const lastYear = parseInt(rangeMatch[2], 10);
-
-                // 檢查公元年份是否在範圍內
-                if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
-                    // 額外驗證：計算的年數是否匹配
-                    const calculatedYearNum = gregorianYear - firstYear + 1;
-                    if (calculatedYearNum === yearNum) {
-                        return item.c_nianhao_id;
-                    }
-                }
-            }
-
-            // 如果精確匹配失敗，返回 null 而非自動選擇第一個
-            // 讓 fillEraFields 顯示錯誤訊息，或由上層邏輯顯示選擇對話框
-            console.error(`年號「${searchTitle}」有 ${candidates.length} 個記錄，但無法通過年份範圍精確匹配 (年份: ${gregorianYear}, 年數: ${yearNum})`);
-            console.error('候選記錄:', candidates.map(c => `ID=${c.c_nianhao_id}, 範圍=${c.c_str}`));
+        if (candidates.length === 0) {
             return null;
         }
 
-        // 沒有找到匹配的年號
+        // 無論單一或多個候選，都需驗證年份範圍
+        for (const item of candidates) {
+            // 驗證 c_str 字段存在且格式正確
+            if (!item.c_str) {
+                console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 缺少 c_str 字段，跳過`);
+                continue;
+            }
+
+            // 從 c_str 解析年份範圍 "[1234]~[5678]"
+            const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+            if (!rangeMatch) {
+                console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 的 c_str 格式錯誤: ${item.c_str}，跳過`);
+                continue;
+            }
+
+            const firstYear = parseInt(rangeMatch[1], 10);
+            const lastYear = parseInt(rangeMatch[2], 10);
+
+            // 檢查公元年份是否在範圍內
+            if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                // 額外驗證：計算的年數是否匹配
+                const calculatedYearNum = gregorianYear - firstYear + 1;
+                if (calculatedYearNum === yearNum) {
+                    return item.c_nianhao_id;
+                }
+            }
+        }
+
+        // 如果精確匹配失敗，返回 null 而非自動選擇第一個
+        // 讓 fillEraFields 顯示錯誤訊息，或由上層邏輯顯示選擇對話框
+        console.error(`年號「${searchTitle}」有 ${candidates.length} 個記錄，但無法通過年份範圍精確匹配 (年份: ${gregorianYear}, 年數: ${yearNum})`);
+        console.error('候選記錄:', candidates.map(c => `ID=${c.c_nianhao_id}, 範圍=${c.c_str}`));
         return null;
     } catch (error) {
         console.error('查找年號資料時發生錯誤:', error);
@@ -804,9 +797,8 @@ async function findNianhaoIdByNameFallback(reignTitle, gregorianYear, yearNum) {
 
         const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
-        // 獲取年號數據
-        const response = await axios.get('/api/select/nianhao');
-        const nianhaoData = response.data;
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
 
         // 查找所有名稱匹配的年號
         const candidates = nianhaoData.filter(item => {
@@ -898,9 +890,8 @@ async function findNianhaoIdByName(reignTitle) {
 
         const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
-        // 獲取年號數據
-        const response = await axios.get('/api/select/nianhao');
-        const nianhaoData = response.data;
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
 
         // 查找匹配的年號
         for (const item of nianhaoData) {
@@ -913,6 +904,28 @@ async function findNianhaoIdByName(reignTitle) {
         return null;
     } catch (error) {
         console.error('查找年號資料時發生錯誤:', error);
+        throw error;
+    }
+}
+
+// 全局年號數據緩存
+let nianhaoDataCache = null;
+
+/**
+ * 獲取年號數據（帶緩存）
+ * 避免多次轉換時重複請求 API
+ */
+async function getNianhaoData() {
+    if (nianhaoDataCache) {
+        return nianhaoDataCache;
+    }
+
+    try {
+        const response = await axios.get('/api/select/nianhao');
+        nianhaoDataCache = response.data;
+        return nianhaoDataCache;
+    } catch (error) {
+        console.error('獲取年號數據失敗:', error);
         throw error;
     }
 }
@@ -965,9 +978,8 @@ async function getDynastyRanges() {
  */
 async function convertNianhaoIdToYear(nianhaoId, yearNum) {
     try {
-        // 從 API 獲取年號資料
-        const response = await axios.get('/api/select/nianhao');
-        const nianhaoData = response.data;
+        // 從 API 獲取年號資料（使用緩存）
+        const nianhaoData = await getNianhaoData();
 
         // 根據 ID 查找年號記錄
         const nianhaoRecord = nianhaoData.find(item => String(item.c_nianhao_id) === String(nianhaoId));

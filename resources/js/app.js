@@ -438,11 +438,11 @@ function initEraConversion() {
             // 如果只有一個結果，直接使用
             if (results.length === 1) {
                 const eraResult = results[0];
-                await fillEraFields(eraResult, $container, nhCodeName, nhYearName, $btn);
+                await fillEraFields(eraResult, year, $container, nhCodeName, nhYearName, $btn);
             } else {
                 // 有多個結果，顯示選擇對話框
-                showEraSelectionDialog(results, async (selectedResult) => {
-                    await fillEraFields(selectedResult, $container, nhCodeName, nhYearName, $btn);
+                showEraSelectionDialog(results, year, async (selectedResult) => {
+                    await fillEraFields(selectedResult, year, $container, nhCodeName, nhYearName, $btn);
                 });
             }
 
@@ -487,28 +487,8 @@ function initEraConversion() {
         }
 
         try {
-            // 從年號選擇框的選中項獲取年號名稱
-            // Select2 選項格式："{id} {name} [{start}]~[{end}]"
-            // 例如："523 慶曆 [1041]~[1048]"
-            const fullText = $nhSelect.find('option:selected').text().trim();
-
-            if (!fullText) {
-                alert('無法獲取年號名稱');
-                return;
-            }
-
-            // 提取年號名稱：去掉 ID 和年份範圍
-            // 匹配模式：數字 + 空格 + 年號名稱 + 可選的年份範圍
-            const match = fullText.match(/^\d+\s+([^\[]+?)(?:\s+\[|$)/);
-            const nianhaoName = match ? match[1].trim() : fullText.split(' ')[1] || fullText;
-
-            if (!nianhaoName) {
-                alert('無法解析年號名稱');
-                return;
-            }
-
-            // 調用反向轉換函數（年號到西元年是確定性的，不需要朝代參數）
-            convertReignToYear(nianhaoName, nhYear, null).then(result => {
+            // 直接使用年號 ID 進行轉換（使用 code 而非字串）
+            convertNianhaoIdToYear(nianhaoId, nhYear).then(result => {
                 if (result.success) {
                     // 填充公元年份
                     $yearInput.val(result.year);
@@ -532,14 +512,17 @@ function initEraConversion() {
 
 /**
  * 填充年號欄位的輔助函數
+ * 使用公元年份和年份範圍精確匹配年號 ID，避免字串匹配的歧義
+ * @param {Object} eraResult - cn-era 返回的年號對象
+ * @param {number} gregorianYear - 公元年份（用於精確匹配年份範圍）
  */
-async function fillEraFields(eraResult, $container, nhCodeName, nhYearName, $btn) {
+async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, nhYearName, $btn) {
     const reignTitle = eraResult.reign_title;
     const yearNum = eraResult.year;
 
     try {
-        // 查找年號對應的 ID
-        const nianhaoId = await findNianhaoIdByName(reignTitle);
+        // 使用年號名稱和公元年份精確查找 ID
+        const nianhaoId = await findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum);
 
         if (nianhaoId) {
             // 填充年號選擇框
@@ -567,8 +550,11 @@ async function fillEraFields(eraResult, $container, nhCodeName, nhYearName, $btn
 
 /**
  * 顯示年號選擇對話框
+ * @param {Array} results - cn-era 返回的年號選項陣列
+ * @param {number} gregorianYear - 公元年份
+ * @param {Function} onSelect - 選擇回調函數
  */
-function showEraSelectionDialog(results, onSelect) {
+function showEraSelectionDialog(results, gregorianYear, onSelect) {
     // 創建對話框 HTML
     let optionsHtml = results.map((result, index) => {
         return `
@@ -635,7 +621,82 @@ function showEraSelectionDialog(results, onSelect) {
 }
 
 /**
+ * 根據年號名稱和公元年份精確查找年號 ID
+ * 使用年份範圍匹配，避免同名年號的歧義
+ * @param {string} reignTitle - 年號名稱
+ * @param {number} gregorianYear - 公元年份
+ * @param {number} yearNum - 年號年數（用於驗證）
+ */
+async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
+    try {
+        // 特殊 ID 映射：直接返回 CBDB 年號記錄 ID
+        const specialIdMapping = {
+            '至元 (世祖)': 623,
+            '至元 (順帝)': 635,
+        };
+
+        // 檢查是否有直接 ID 映射
+        if (specialIdMapping[reignTitle]) {
+            return specialIdMapping[reignTitle];
+        }
+
+        // 特殊名稱映射：名稱轉換
+        const specialNameMapping = {
+            '民國': '中華民國',
+        };
+
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
+
+        // 獲取年號數據
+        const response = await axios.get('/api/select/nianhao');
+        const nianhaoData = response.data;
+
+        // 查找所有名稱匹配的年號
+        const candidates = nianhaoData.filter(item => {
+            return item.c_nianhao_chn === searchTitle;
+        });
+
+        // 如果只有一個匹配，直接返回
+        if (candidates.length === 1) {
+            return candidates[0].c_nianhao_id;
+        }
+
+        // 如果有多個匹配，使用年份範圍精確匹配
+        if (candidates.length > 1) {
+            for (const item of candidates) {
+                // 從 c_str 解析年份範圍 "[1234]~[5678]"
+                const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+                if (rangeMatch) {
+                    const firstYear = parseInt(rangeMatch[1], 10);
+                    const lastYear = parseInt(rangeMatch[2], 10);
+
+                    // 檢查公元年份是否在範圍內
+                    if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                        // 額外驗證：計算的年數是否匹配
+                        const calculatedYearNum = gregorianYear - firstYear + 1;
+                        if (calculatedYearNum === yearNum) {
+                            return item.c_nianhao_id;
+                        }
+                    }
+                }
+            }
+
+            // 如果精確匹配失敗，返回第一個候選（向後兼容）
+            console.warn(`年號「${searchTitle}」有多個記錄，但無法通過年份範圍精確匹配`);
+            return candidates[0].c_nianhao_id;
+        }
+
+        // 沒有找到匹配的年號
+        return null;
+    } catch (error) {
+        console.error('查找年號資料時發生錯誤:', error);
+        throw error;
+    }
+}
+
+/**
  * 根據年號名稱查找對應的 NIANHAO_CODES ID
+ * @deprecated 建議使用 findNianhaoIdByNameAndYear 以避免同名年號的歧義
  */
 async function findNianhaoIdByName(reignTitle) {
     try {
@@ -717,11 +778,73 @@ async function getDynastyRanges() {
 }
 
 /**
+ * 根據年號 ID 和年數轉換為公元年份
+ * 直接使用資料庫的年號記錄進行計算，避免字串匹配的歧義
+ * @param {string|number} nianhaoId - 年號 ID (c_nianhao_id)
+ * @param {number} yearNum - 年號年數
+ */
+async function convertNianhaoIdToYear(nianhaoId, yearNum) {
+    try {
+        // 從 API 獲取年號資料
+        const response = await axios.get('/api/select/nianhao');
+        const nianhaoData = response.data;
+
+        // 根據 ID 查找年號記錄
+        const nianhaoRecord = nianhaoData.find(item => String(item.c_nianhao_id) === String(nianhaoId));
+
+        if (!nianhaoRecord) {
+            return {
+                success: false,
+                message: `找不到年號 ID：${nianhaoId}`,
+            };
+        }
+
+        // 從 c_str 字段解析年份範圍 "[1234]~[5678]"
+        const rangeMatch = nianhaoRecord.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+        if (!rangeMatch) {
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年份範圍格式錯誤`,
+            };
+        }
+
+        const firstYear = parseInt(rangeMatch[1], 10);
+        const lastYear = parseInt(rangeMatch[2], 10);
+        const duration = lastYear - firstYear + 1;
+
+        // 驗證年數是否在範圍內
+        if (yearNum < 1 || yearNum > duration) {
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間`,
+            };
+        }
+
+        // 計算公元年份
+        const year = firstYear + yearNum - 1;
+
+        return {
+            success: true,
+            year: year,
+            nianhaoName: nianhaoRecord.c_nianhao_chn,
+        };
+
+    } catch (error) {
+        console.error('年號 ID 轉換時發生錯誤:', error);
+        return {
+            success: false,
+            message: error.message || '轉換失敗',
+        };
+    }
+}
+
+/**
  * 根據年號名稱、年數和朝代反向轉換為公元年份
  * 使用二分搜索優化性能
  * @param {string} reignTitle - 年號名稱
  * @param {number} yearNum - 年號年數
  * @param {number|null} dynastyCode - 朝代代碼（可選，null 表示不限朝代）
+ * @deprecated 建議使用 convertNianhaoIdToYear 以避免字串匹配的歧義
  */
 async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
     try {

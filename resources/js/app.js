@@ -379,7 +379,7 @@ function initEraConversion() {
     $('[data-toggle="tooltip"]').tooltip();
 
     // 監聽轉換按鈕點擊事件
-    $(document).on('click', '.era-convert-btn', function(e) {
+    $(document).on('click', '.era-convert-btn', async function(e) {
         e.preventDefault();
         const $btn = $(this);
 
@@ -413,58 +413,38 @@ function initEraConversion() {
             const hasDynastyField = $dynastySelect.length > 0;
             const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
 
-            let results;
+            // 先獲取所有可能的年號結果
+            let allResults = convertYear(year, { mode: 'all' });
 
-            // 如果頁面有朝代欄位，則檢查是否已選擇
-            if (hasDynastyField) {
-                if (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0) {
-                    alert('請先選擇朝代，才能進行年號轉換');
-                    return;
-                }
-                // 使用朝代過濾進行轉換
-                results = convertYear(year, { dynasty: dynastyCode });
-            } else {
-                // 頁面沒有朝代欄位，使用主線朝代模式
-                results = convertYear(year, { mode: 'mainline' });
-            }
-
-            if (!results || results.length === 0) {
-                const message = hasDynastyField
-                    ? `在所選朝代中無法找到公元 ${year} 年對應的年號`
-                    : `無法找到公元 ${year} 年對應的年號`;
-                alert(message);
+            if (!allResults || allResults.length === 0) {
+                alert(`無法找到公元 ${year} 年對應的年號`);
                 return;
             }
 
-            // 使用第一個結果
-            const eraResult = results[0];
-            const reignTitle = eraResult.reign_title;
-            const yearNum = eraResult.year;
+            let results = allResults;
 
-            // 查找年號對應的 ID
-            findNianhaoIdByName(reignTitle).then(nianhaoId => {
-                if (nianhaoId) {
-                    // 填充年號選擇框
-                    const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
-                    if ($nhSelect.length) {
-                        $nhSelect.val(nianhaoId).trigger('change');
-                    }
+            // 如果有朝代信息且有多個結果，使用朝代作為 tie-breaker
+            if (hasDynastyField && dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0 && allResults.length > 1) {
+                // 嘗試用朝代過濾
+                const dynastyFilteredResults = allResults.filter(r => r.dynasty === dynastyCode);
 
-                    // 填充年號年數輸入框
-                    const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
-                    if ($nhYearInput.length) {
-                        $nhYearInput.val(yearNum);
-                    }
-
-                    // 顯示成功提示
-                    showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
-                } else {
-                    alert(`找到年號「${reignTitle}」，但在資料庫中未找到對應記錄\n轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+                // 只有當朝代過濾後有且只有一個結果時，才使用朝代過濾結果
+                if (dynastyFilteredResults.length === 1) {
+                    results = dynastyFilteredResults;
                 }
-            }).catch(error => {
-                console.error('查找年號 ID 時發生錯誤:', error);
-                alert('轉換失敗：無法查找年號資料');
-            });
+                // 如果朝代過濾後仍有多個結果或沒有結果，保持使用 allResults
+            }
+
+            // 如果只有一個結果，直接使用
+            if (results.length === 1) {
+                const eraResult = results[0];
+                await fillEraFields(eraResult, $container, nhCodeName, nhYearName, $btn);
+            } else {
+                // 有多個結果，顯示選擇對話框
+                showEraSelectionDialog(results, async (selectedResult) => {
+                    await fillEraFields(selectedResult, $container, nhCodeName, nhYearName, $btn);
+                });
+            }
 
         } catch (error) {
             console.error('年號轉換錯誤:', error);
@@ -558,6 +538,110 @@ function initEraConversion() {
             console.error('年號反向轉換錯誤:', error);
             alert(`轉換失敗：${error.message}`);
         }
+    });
+}
+
+/**
+ * 填充年號欄位的輔助函數
+ */
+async function fillEraFields(eraResult, $container, nhCodeName, nhYearName, $btn) {
+    const reignTitle = eraResult.reign_title;
+    const yearNum = eraResult.year;
+
+    try {
+        // 查找年號對應的 ID
+        const nianhaoId = await findNianhaoIdByName(reignTitle);
+
+        if (nianhaoId) {
+            // 填充年號選擇框
+            const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
+            if ($nhSelect.length) {
+                $nhSelect.val(nianhaoId).trigger('change');
+            }
+
+            // 填充年號年數輸入框
+            const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
+            if ($nhYearInput.length) {
+                $nhYearInput.val(yearNum);
+            }
+
+            // 顯示成功提示
+            showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+        } else {
+            alert(`找到年號「${reignTitle}」，但在資料庫中未找到對應記錄\n轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+        }
+    } catch (error) {
+        console.error('查找年號 ID 時發生錯誤:', error);
+        alert('轉換失敗：無法查找年號資料');
+    }
+}
+
+/**
+ * 顯示年號選擇對話框
+ */
+function showEraSelectionDialog(results, onSelect) {
+    // 創建對話框 HTML
+    let optionsHtml = results.map((result, index) => {
+        return `
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="eraOption" id="eraOption${index}" value="${index}" ${index === 0 ? 'checked' : ''}>
+                <label class="form-check-label" for="eraOption${index}">
+                    <strong>${result.dynasty_name}</strong> ${result.reign_title} ${result.year_num}
+                </label>
+            </div>
+        `;
+    }).join('');
+
+    const dialogHtml = `
+        <div class="modal fade" id="eraSelectionModal" tabindex="-1" role="dialog" aria-labelledby="eraSelectionModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="eraSelectionModalLabel">選擇年號</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p>找到多個符合的年號，請選擇：</p>
+                        ${optionsHtml}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" id="eraSelectionConfirm">確定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 移除已存在的對話框
+    $('#eraSelectionModal').remove();
+
+    // 添加對話框到頁面
+    $('body').append(dialogHtml);
+
+    // 顯示對話框
+    const $modal = $('#eraSelectionModal');
+    $modal.modal('show');
+
+    // 綁定確定按鈕事件
+    $('#eraSelectionConfirm').on('click', function() {
+        const selectedIndex = parseInt($('input[name="eraOption"]:checked').val(), 10);
+        const selectedResult = results[selectedIndex];
+
+        // 關閉對話框
+        $modal.modal('hide');
+
+        // 調用回調函數
+        if (onSelect && selectedResult) {
+            onSelect(selectedResult);
+        }
+    });
+
+    // 對話框關閉後移除
+    $modal.on('hidden.bs.modal', function() {
+        $(this).remove();
     });
 }
 

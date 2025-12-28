@@ -379,7 +379,7 @@ function initEraConversion() {
     $('[data-toggle="tooltip"]').tooltip();
 
     // 監聽轉換按鈕點擊事件
-    $(document).on('click', '.era-convert-btn', function(e) {
+    $(document).on('click', '.era-convert-btn', async function(e) {
         e.preventDefault();
         const $btn = $(this);
 
@@ -413,58 +413,72 @@ function initEraConversion() {
             const hasDynastyField = $dynastySelect.length > 0;
             const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
 
-            let results;
+            // 先獲取所有可能的年號結果
+            let allResults = convertYear(year, { mode: 'all' });
 
-            // 如果頁面有朝代欄位，則檢查是否已選擇
-            if (hasDynastyField) {
-                if (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0) {
-                    alert('請先選擇朝代，才能進行年號轉換');
-                    return;
-                }
-                // 使用朝代過濾進行轉換
-                results = convertYear(year, { dynasty: dynastyCode });
-            } else {
-                // 頁面沒有朝代欄位，使用主線朝代模式
-                results = convertYear(year, { mode: 'mainline' });
-            }
-
-            if (!results || results.length === 0) {
-                const message = hasDynastyField
-                    ? `在所選朝代中無法找到公元 ${year} 年對應的年號`
-                    : `無法找到公元 ${year} 年對應的年號`;
-                alert(message);
+            if (!allResults || allResults.length === 0) {
+                alert(`無法找到公元 ${year} 年對應的年號`);
                 return;
             }
 
-            // 使用第一個結果
-            const eraResult = results[0];
-            const reignTitle = eraResult.reign_title;
-            const yearNum = eraResult.year;
+            let results = allResults;
+            let shouldWarnDynastyMismatch = false;
 
-            // 查找年號對應的 ID
-            findNianhaoIdByName(reignTitle).then(nianhaoId => {
-                if (nianhaoId) {
-                    // 填充年號選擇框
-                    const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
-                    if ($nhSelect.length) {
-                        $nhSelect.val(nianhaoId).trigger('change');
+            // 如果有朝代信息，檢查朝代匹配
+            if (hasDynastyField && dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0) {
+                // 嘗試用朝代過濾
+                const dynastyFilteredResults = allResults.filter(r => r.dynasty === dynastyCode);
+
+                if (allResults.length > 1) {
+                    // 多個結果：使用朝代作為 tie-breaker
+                    if (dynastyFilteredResults.length === 0) {
+                        // 朝代過濾後沒有結果：警告用戶所選朝代沒有對應年號
+                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
+                        // 仍顯示所有結果供用戶參考，但標記為不匹配
+                        shouldWarnDynastyMismatch = true;
+                    } else if (dynastyFilteredResults.length === 1) {
+                        // 朝代過濾後只有一個結果：使用它
+                        results = dynastyFilteredResults;
+                    } else {
+                        // 朝代過濾後仍有多個結果：只顯示該朝代的選項
+                        results = dynastyFilteredResults;
                     }
-
-                    // 填充年號年數輸入框
-                    const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
-                    if ($nhYearInput.length) {
-                        $nhYearInput.val(yearNum);
+                } else if (allResults.length === 1) {
+                    // 單一結果：檢查朝代是否匹配
+                    if (dynastyFilteredResults.length === 0) {
+                        // 朝代不匹配：顯示確認對話框
+                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        const eraResult = allResults[0];
+                        const confirmed = confirm(
+                            `所選朝代「${dynastyName}」與查詢結果不符。\n\n` +
+                            `查詢結果：${eraResult.dynasty_name} ${eraResult.reign_title} ${eraResult.year_num}\n\n` +
+                            `是否使用此結果？`
+                        );
+                        if (!confirmed) {
+                            return; // 用戶取消，不進行轉換
+                        }
+                        // 用戶確認，繼續使用此結果
                     }
-
-                    // 顯示成功提示
-                    showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
-                } else {
-                    alert(`找到年號「${reignTitle}」，但在資料庫中未找到對應記錄\n轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+                    // 朝代匹配或用戶已確認，使用這個結果
                 }
-            }).catch(error => {
-                console.error('查找年號 ID 時發生錯誤:', error);
-                alert('轉換失敗：無法查找年號資料');
-            });
+            }
+
+            // 如果只有一個結果，直接使用
+            if (results.length === 1) {
+                const eraResult = results[0];
+                await fillEraFields(eraResult, year, $container, nhCodeName, nhYearName, $btn);
+            } else {
+                // 有多個結果，顯示選擇對話框
+                showEraSelectionDialog(
+                    results,
+                    year,
+                    shouldWarnDynastyMismatch,
+                    async (selectedResult) => {
+                        await fillEraFields(selectedResult, year, $container, nhCodeName, nhYearName, $btn);
+                    }
+                );
+            }
 
         } catch (error) {
             console.error('年號轉換錯誤:', error);
@@ -490,17 +504,6 @@ function initEraConversion() {
             return;
         }
 
-        // 獲取朝代信息
-        const $dynastySelect = $('select[name="c_dy"]');
-        const hasDynastyField = $dynastySelect.length > 0;
-        const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
-
-        // 如果頁面有朝代欄位，則檢查是否已選擇
-        if (hasDynastyField && (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0)) {
-            alert('請先選擇朝代，才能進行年號轉換');
-            return;
-        }
-
         // 獲取年號和年數
         const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
         const nianhaoId = $nhSelect.length ? $nhSelect.val() : null;
@@ -518,28 +521,8 @@ function initEraConversion() {
         }
 
         try {
-            // 從年號選擇框的選中項獲取年號名稱
-            // Select2 選項格式："{id} {name} [{start}]~[{end}]"
-            // 例如："523 慶曆 [1041]~[1048]"
-            const fullText = $nhSelect.find('option:selected').text().trim();
-
-            if (!fullText) {
-                alert('無法獲取年號名稱');
-                return;
-            }
-
-            // 提取年號名稱：去掉 ID 和年份範圍
-            // 匹配模式：數字 + 空格 + 年號名稱 + 可選的年份範圍
-            const match = fullText.match(/^\d+\s+([^\[]+?)(?:\s+\[|$)/);
-            const nianhaoName = match ? match[1].trim() : fullText.split(' ')[1] || fullText;
-
-            if (!nianhaoName) {
-                alert('無法解析年號名稱');
-                return;
-            }
-
-            // 調用反向轉換函數
-            convertReignToYear(nianhaoName, nhYear, dynastyCode).then(result => {
+            // 直接使用年號 ID 進行轉換（使用 code 而非字串）
+            convertNianhaoIdToYear(nianhaoId, nhYear).then(result => {
                 if (result.success) {
                     // 填充公元年份
                     $yearInput.val(result.year);
@@ -562,7 +545,330 @@ function initEraConversion() {
 }
 
 /**
+ * 填充年號欄位的輔助函數
+ * 使用公元年份和年份範圍精確匹配年號 ID，避免字串匹配的歧義
+ * @param {Object} eraResult - cn-era 返回的年號對象
+ * @param {number} gregorianYear - 公元年份（用於精確匹配年份範圍）
+ */
+async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, nhYearName, $btn) {
+    const reignTitle = eraResult.reign_title;
+    const yearNum = eraResult.year;
+
+    try {
+        // 使用年號名稱和公元年份精確查找 ID
+        let nianhaoId = await findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum);
+
+        // 如果精確匹配失敗，嘗試模糊匹配作為降級方案
+        if (!nianhaoId) {
+            console.warn(`精確匹配失敗，嘗試模糊匹配: ${reignTitle}`);
+            const fallbackResult = await findNianhaoIdByNameFallback(reignTitle, gregorianYear, yearNum);
+
+            if (fallbackResult.found) {
+                // 找到候選，詢問用戶是否使用
+                const confirmed = confirm(
+                    `年號「${reignTitle}」的資料庫記錄與 cn-era 數據存在差異。\n\n` +
+                    `cn-era: ${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num} (公元 ${gregorianYear})\n` +
+                    `資料庫: ${fallbackResult.dbInfo}\n\n` +
+                    `是否使用資料庫中的記錄？\n` +
+                    `（選擇「取消」將放棄轉換）`
+                );
+
+                if (confirmed) {
+                    nianhaoId = fallbackResult.id;
+                } else {
+                    return; // 用戶取消
+                }
+            } else {
+                // 完全找不到，提供手動選擇選項
+                alert(
+                    `找到年號「${reignTitle}」，但在資料庫中未找到對應記錄。\n\n` +
+                    `轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}\n\n` +
+                    `請手動從年號下拉框中選擇，或聯繫系統管理員更新數據。`
+                );
+                return;
+            }
+        }
+
+        // 填充年號選擇框
+        const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
+        if ($nhSelect.length) {
+            $nhSelect.val(nianhaoId).trigger('change');
+        }
+
+        // 填充年號年數輸入框
+        const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
+        if ($nhYearInput.length) {
+            $nhYearInput.val(yearNum);
+        }
+
+        // 顯示成功提示
+        showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+
+    } catch (error) {
+        console.error('查找年號 ID 時發生錯誤:', error);
+        alert('轉換失敗：無法查找年號資料');
+    }
+}
+
+/**
+ * 顯示年號選擇對話框
+ * @param {Array} results - cn-era 返回的年號選項陣列
+ * @param {number} gregorianYear - 公元年份
+ * @param {boolean} isDynastyMismatch - 是否為朝代不匹配的情況
+ * @param {Function} onSelect - 選擇回調函數
+ */
+function showEraSelectionDialog(results, gregorianYear, isDynastyMismatch, onSelect) {
+    // 創建對話框 HTML
+    let optionsHtml = results.map((result, index) => {
+        return `
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="eraOption" id="eraOption${index}" value="${index}" ${index === 0 ? 'checked' : ''}>
+                <label class="form-check-label" for="eraOption${index}">
+                    <strong>${result.dynasty_name}</strong> ${result.reign_title} ${result.year_num}
+                </label>
+            </div>
+        `;
+    }).join('');
+
+    // 根據是否朝代不匹配顯示不同的提示
+    const promptText = isDynastyMismatch
+        ? '<p class="text-warning"><i class="fas fa-exclamation-triangle"></i> 以下年號與所選朝代不符，請檢查朝代選擇或從中選擇：</p>'
+        : '<p>找到多個符合的年號，請選擇：</p>';
+
+    const dialogHtml = `
+        <div class="modal fade" id="eraSelectionModal" tabindex="-1" role="dialog" aria-labelledby="eraSelectionModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="eraSelectionModalLabel">選擇年號</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        ${promptText}
+                        ${optionsHtml}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" id="eraSelectionConfirm">確定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 移除已存在的對話框
+    $('#eraSelectionModal').remove();
+
+    // 添加對話框到頁面
+    $('body').append(dialogHtml);
+
+    // 顯示對話框
+    const $modal = $('#eraSelectionModal');
+    $modal.modal('show');
+
+    // 綁定確定按鈕事件
+    $('#eraSelectionConfirm').on('click', function() {
+        const selectedIndex = parseInt($('input[name="eraOption"]:checked').val(), 10);
+        const selectedResult = results[selectedIndex];
+
+        // 關閉對話框
+        $modal.modal('hide');
+
+        // 調用回調函數
+        if (onSelect && selectedResult) {
+            onSelect(selectedResult);
+        }
+    });
+
+    // 對話框關閉後移除
+    $modal.on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+/**
+ * 根據年號名稱和公元年份精確查找年號 ID
+ * 使用年份範圍匹配，避免同名年號的歧義
+ * @param {string} reignTitle - 年號名稱
+ * @param {number} gregorianYear - 公元年份
+ * @param {number} yearNum - 年號年數（用於驗證）
+ */
+async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
+    try {
+        // 特殊 ID 映射：直接返回 CBDB 年號記錄 ID
+        const specialIdMapping = {
+            '至元 (世祖)': 623,
+            '至元 (順帝)': 635,
+        };
+
+        // 檢查是否有直接 ID 映射
+        if (specialIdMapping[reignTitle]) {
+            return specialIdMapping[reignTitle];
+        }
+
+        // 特殊名稱映射：名稱轉換
+        const specialNameMapping = {
+            '民國': '中華民國',
+        };
+
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
+
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
+
+        // 查找所有名稱匹配的年號
+        const candidates = nianhaoData.filter(item => {
+            return item.c_nianhao_chn === searchTitle;
+        });
+
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        // 無論單一或多個候選，都需驗證年份範圍
+        for (const item of candidates) {
+            // 驗證 c_str 字段存在且格式正確
+            if (!item.c_str) {
+                console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 缺少 c_str 字段，跳過`);
+                continue;
+            }
+
+            // 從 c_str 解析年份範圍 "[1234]~[5678]"
+            const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+            if (!rangeMatch) {
+                console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 的 c_str 格式錯誤: ${item.c_str}，跳過`);
+                continue;
+            }
+
+            const firstYear = parseInt(rangeMatch[1], 10);
+            const lastYear = parseInt(rangeMatch[2], 10);
+
+            // 檢查公元年份是否在範圍內
+            if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                // 額外驗證：計算的年數是否匹配
+                const calculatedYearNum = gregorianYear - firstYear + 1;
+                if (calculatedYearNum === yearNum) {
+                    return item.c_nianhao_id;
+                }
+            }
+        }
+
+        // 如果精確匹配失敗，返回 null 而非自動選擇第一個
+        // 讓 fillEraFields 顯示錯誤訊息，或由上層邏輯顯示選擇對話框
+        console.error(`年號「${searchTitle}」有 ${candidates.length} 個記錄，但無法通過年份範圍精確匹配 (年份: ${gregorianYear}, 年數: ${yearNum})`);
+        console.error('候選記錄:', candidates.map(c => `ID=${c.c_nianhao_id}, 範圍=${c.c_str}`));
+        return null;
+    } catch (error) {
+        console.error('查找年號資料時發生錯誤:', error);
+        throw error;
+    }
+}
+
+/**
+ * 模糊匹配年號 ID（降級方案）
+ * 當精確匹配失敗時，使用名稱匹配並返回最接近的候選
+ * @param {string} reignTitle - 年號名稱
+ * @param {number} gregorianYear - 公元年份（用於顯示資訊）
+ * @param {number} yearNum - 年號年數（用於顯示資訊）
+ * @returns {Promise<{found: boolean, id: number|null, dbInfo: string}>}
+ */
+async function findNianhaoIdByNameFallback(reignTitle, gregorianYear, yearNum) {
+    try {
+        // 特殊 ID 映射
+        const specialIdMapping = {
+            '至元 (世祖)': 623,
+            '至元 (順帝)': 635,
+        };
+
+        if (specialIdMapping[reignTitle]) {
+            return {
+                found: true,
+                id: specialIdMapping[reignTitle],
+                dbInfo: `${reignTitle} (特殊映射)`
+            };
+        }
+
+        // 特殊名稱映射
+        const specialNameMapping = {
+            '民國': '中華民國',
+        };
+
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
+
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
+
+        // 查找所有名稱匹配的年號
+        const candidates = nianhaoData.filter(item => {
+            return item.c_nianhao_chn === searchTitle;
+        });
+
+        if (candidates.length === 0) {
+            return { found: false, id: null, dbInfo: '' };
+        }
+
+        // 如果只有一個候選，直接返回
+        if (candidates.length === 1) {
+            const item = candidates[0];
+            return {
+                found: true,
+                id: item.c_nianhao_id,
+                dbInfo: `${item.c_nianhao_chn} ${item.c_str}`
+            };
+        }
+
+        // 多個候選：找最接近的（年份範圍包含或最近的）
+        let bestMatch = null;
+        let minDistance = Infinity;
+
+        for (const item of candidates) {
+            // 驗證並解析範圍
+            if (!item.c_str) continue;
+            const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+            if (!rangeMatch) continue;
+
+            const firstYear = parseInt(rangeMatch[1], 10);
+            const lastYear = parseInt(rangeMatch[2], 10);
+
+            // 計算距離
+            let distance;
+            if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                // 在範圍內，距離為 0（最優）
+                distance = 0;
+            } else if (gregorianYear < firstYear) {
+                distance = firstYear - gregorianYear;
+            } else {
+                distance = gregorianYear - lastYear;
+            }
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestMatch = item;
+            }
+        }
+
+        if (bestMatch) {
+            return {
+                found: true,
+                id: bestMatch.c_nianhao_id,
+                dbInfo: `${bestMatch.c_nianhao_chn} ${bestMatch.c_str} (距離: ${minDistance === 0 ? '範圍內' : minDistance + '年'})`
+            };
+        }
+
+        // 找不到合適的候選
+        return { found: false, id: null, dbInfo: '' };
+
+    } catch (error) {
+        console.error('模糊匹配年號時發生錯誤:', error);
+        return { found: false, id: null, dbInfo: '' };
+    }
+}
+
+/**
  * 根據年號名稱查找對應的 NIANHAO_CODES ID
+ * @deprecated 建議使用 findNianhaoIdByNameAndYear 以避免同名年號的歧義
  */
 async function findNianhaoIdByName(reignTitle) {
     try {
@@ -584,9 +890,8 @@ async function findNianhaoIdByName(reignTitle) {
 
         const searchTitle = specialNameMapping[reignTitle] || reignTitle;
 
-        // 獲取年號數據
-        const response = await axios.get('/api/select/nianhao');
-        const nianhaoData = response.data;
+        // 獲取年號數據（使用緩存）
+        const nianhaoData = await getNianhaoData();
 
         // 查找匹配的年號
         for (const item of nianhaoData) {
@@ -599,6 +904,28 @@ async function findNianhaoIdByName(reignTitle) {
         return null;
     } catch (error) {
         console.error('查找年號資料時發生錯誤:', error);
+        throw error;
+    }
+}
+
+// 全局年號數據緩存
+let nianhaoDataCache = null;
+
+/**
+ * 獲取年號數據（帶緩存）
+ * 避免多次轉換時重複請求 API
+ */
+async function getNianhaoData() {
+    if (nianhaoDataCache) {
+        return nianhaoDataCache;
+    }
+
+    try {
+        const response = await axios.get('/api/select/nianhao');
+        nianhaoDataCache = response.data;
+        return nianhaoDataCache;
+    } catch (error) {
+        console.error('獲取年號數據失敗:', error);
         throw error;
     }
 }
@@ -644,11 +971,82 @@ async function getDynastyRanges() {
 }
 
 /**
+ * 根據年號 ID 和年數轉換為公元年份
+ * 直接使用資料庫的年號記錄進行計算，避免字串匹配的歧義
+ * @param {string|number} nianhaoId - 年號 ID (c_nianhao_id)
+ * @param {number} yearNum - 年號年數
+ */
+async function convertNianhaoIdToYear(nianhaoId, yearNum) {
+    try {
+        // 從 API 獲取年號資料（使用緩存）
+        const nianhaoData = await getNianhaoData();
+
+        // 根據 ID 查找年號記錄
+        const nianhaoRecord = nianhaoData.find(item => String(item.c_nianhao_id) === String(nianhaoId));
+
+        if (!nianhaoRecord) {
+            return {
+                success: false,
+                message: `找不到年號 ID：${nianhaoId}`,
+            };
+        }
+
+        // 驗證 c_str 字段是否存在
+        if (!nianhaoRecord.c_str) {
+            console.error(`年號記錄缺少 c_str 字段:`, nianhaoRecord);
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} (ID: ${nianhaoId}) 的資料不完整（缺少年份範圍）\n\n請聯繫系統管理員修復數據`,
+            };
+        }
+
+        // 從 c_str 字段解析年份範圍 "[1234]~[5678]"
+        const rangeMatch = nianhaoRecord.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+        if (!rangeMatch) {
+            console.error(`年號記錄的 c_str 格式錯誤:`, nianhaoRecord);
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} (ID: ${nianhaoId}) 的年份範圍格式錯誤\n格式: ${nianhaoRecord.c_str}\n\n請聯繫系統管理員修復數據`,
+            };
+        }
+
+        const firstYear = parseInt(rangeMatch[1], 10);
+        const lastYear = parseInt(rangeMatch[2], 10);
+        const duration = lastYear - firstYear + 1;
+
+        // 驗證年數是否在範圍內
+        if (yearNum < 1 || yearNum > duration) {
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間\n（年號範圍：公元 ${firstYear}-${lastYear}）`,
+            };
+        }
+
+        // 計算公元年份
+        const year = firstYear + yearNum - 1;
+
+        return {
+            success: true,
+            year: year,
+            nianhaoName: nianhaoRecord.c_nianhao_chn,
+        };
+
+    } catch (error) {
+        console.error('年號 ID 轉換時發生錯誤:', error);
+        return {
+            success: false,
+            message: error.message || '轉換失敗',
+        };
+    }
+}
+
+/**
  * 根據年號名稱、年數和朝代反向轉換為公元年份
  * 使用二分搜索優化性能
  * @param {string} reignTitle - 年號名稱
  * @param {number} yearNum - 年號年數
  * @param {number|null} dynastyCode - 朝代代碼（可選，null 表示不限朝代）
+ * @deprecated 建議使用 convertNianhaoIdToYear 以避免字串匹配的歧義
  */
 async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
     try {

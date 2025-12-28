@@ -73,6 +73,40 @@
                                    value="{{ old('institution', $user->institution) }}">
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label class="col-sm-2 control-label">頭像</label>
+                        <div class="col-sm-10">
+                            <!-- 當前頭像預覽 -->
+                            <div class="current-avatar-preview">
+                                <div class="preview-label">當前使用：</div>
+                                <div class="preview-container">
+                                    <img id="current-avatar-img" src="/images/avatar/{{ old('avatar', $user->avatar) }}" alt="當前頭像">
+                                    <div class="preview-name" id="current-avatar-name">{{ old('avatar', $user->avatar) }}</div>
+                                </div>
+                            </div>
+
+                            <!-- 選擇提示 -->
+                            <div class="avatar-selection-hint">
+                                <i class="fas fa-info-circle"></i>
+                                點擊下方頭像進行選擇，選擇後請點擊頁面底部的「儲存變更」按鈕以保存設定
+                            </div>
+
+                            <input type="hidden" name="avatar" id="avatar-input" value="{{ old('avatar', $user->avatar) }}">
+
+                            <!-- 頭像選擇網格 -->
+                            <div class="avatar-grid">
+                                @for ($i = 1; $i <= 18; $i++)
+                                    <div class="avatar-option {{ old('avatar', $user->avatar) === 'avatar' . $i . '.png' ? 'selected' : '' }}"
+                                         data-avatar="avatar{{ $i }}.png"
+                                         title="點擊選擇頭像 {{ $i }}">
+                                        <img src="/images/avatar/avatar{{ $i }}.png" alt="頭像 {{ $i }}">
+                                        <div class="avatar-number">{{ $i }}</div>
+                                    </div>
+                                @endfor
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -176,7 +210,278 @@
 
 @endsection
 
-@section('js')
+@push('styles')
+<style>
+/* 當前頭像預覽 */
+.current-avatar-preview {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 25px;
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 12px;
+    border: 1px solid #e3e6ea;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.preview-label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+}
+
+.preview-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.preview-container img {
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    border: 3px solid #28a745;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25);
+    object-fit: cover;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.preview-name {
+    font-size: 14px;
+    color: #5a6c7d;
+    font-weight: 500;
+    background: #f1f3f5;
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+/* 選擇提示 */
+.avatar-selection-hint {
+    background: linear-gradient(135deg, #e7f3ff 0%, #f0f7ff 100%);
+    border-left: 4px solid #007bff;
+    padding: 14px 18px;
+    margin-bottom: 25px;
+    border-radius: 8px;
+    color: #004085;
+    font-size: 13px;
+    line-height: 1.6;
+    box-shadow: 0 2px 6px rgba(0, 123, 255, 0.08);
+}
+
+.avatar-selection-hint i {
+    margin-right: 10px;
+    color: #007bff;
+}
+
+/* 頭像選擇網格 - 横向滾動 */
+.avatar-grid {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px 4px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 美化滾動條 */
+.avatar-grid::-webkit-scrollbar {
+    height: 8px;
+}
+
+.avatar-grid::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 10px;
+    margin: 0 4px;
+}
+
+.avatar-grid::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 10px;
+}
+
+.avatar-grid::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #0056b3, #004085);
+}
+
+.avatar-option {
+    position: relative;
+    cursor: pointer;
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+    border: 3px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.avatar-option img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.avatar-number {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 11px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+
+.avatar-option:hover {
+    border-color: #007bff;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 123, 255, 0.2);
+}
+
+.avatar-option:hover img {
+    transform: scale(1.1);
+}
+
+.avatar-option.selected {
+    border-color: #28a745;
+    border-width: 4px;
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+    transform: translateY(-2px);
+}
+
+.avatar-option.selected::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(40, 167, 69, 0.1);
+    pointer-events: none;
+}
+
+.avatar-option.selected::after {
+    content: '\2713';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.4);
+    animation: checkmark 0.3s ease;
+}
+
+@keyframes checkmark {
+    0% {
+        transform: scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) rotate(0deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+    .current-avatar-preview {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .preview-container img {
+        width: 80px;
+        height: 80px;
+    }
+
+    .avatar-option {
+        width: 90px;
+        height: 90px;
+        min-width: 90px;
+        min-height: 90px;
+    }
+}
+
+@media (max-width: 480px) {
+    .avatar-option {
+        width: 80px;
+        height: 80px;
+        min-width: 80px;
+        min-height: 80px;
+    }
+}
+</style>
+@endpush
+
+@push('scripts')
+<script>
+// 頭像選擇功能 - 等待 Vite 加載完成後初始化
+onViteReady(function() {
+    console.log('Initializing avatar selection...');
+
+    const avatarOptions = document.querySelectorAll('.avatar-option');
+    const avatarInput = document.getElementById('avatar-input');
+    const currentAvatarImg = document.getElementById('current-avatar-img');
+    const currentAvatarName = document.getElementById('current-avatar-name');
+
+    console.log('Avatar options found:', avatarOptions.length);
+    console.log('Avatar input:', avatarInput);
+    console.log('Current avatar img:', currentAvatarImg);
+
+    avatarOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            console.log('Avatar clicked:', this.getAttribute('data-avatar'));
+
+            // 移除所有選中狀態
+            avatarOptions.forEach(opt => opt.classList.remove('selected'));
+
+            // 添加選中狀態
+            this.classList.add('selected');
+
+            // 獲取選中的頭像名稱
+            const avatarName = this.getAttribute('data-avatar');
+
+            // 更新隱藏輸入框的值
+            avatarInput.value = avatarName;
+
+            // 更新預覽圖片
+            currentAvatarImg.src = '/images/avatar/' + avatarName;
+
+            // 更新預覽文件名
+            currentAvatarName.textContent = avatarName;
+
+            // 添加動畫效果
+            currentAvatarImg.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                currentAvatarImg.style.transform = 'scale(1)';
+            }, 200);
+        });
+    });
+
+    console.log('Avatar selection initialized successfully!');
+});
+</script>
+
 @if(Route::has('api-tokens.index'))
 <script>
 // 時區相關函數（動態取得，避免 Vite 模組尚未載入時抓不到）
@@ -532,4 +837,4 @@ if (window.onViteReady) {
 
 </script>
 @endif
-@endsection
+@endpush

@@ -470,17 +470,6 @@ function initEraConversion() {
             return;
         }
 
-        // 獲取朝代信息
-        const $dynastySelect = $('select[name="c_dy"]');
-        const hasDynastyField = $dynastySelect.length > 0;
-        const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
-
-        // 如果頁面有朝代欄位，則檢查是否已選擇
-        if (hasDynastyField && (!dynastyCode || isNaN(dynastyCode) || dynastyCode <= 0)) {
-            alert('請先選擇朝代，才能進行年號轉換');
-            return;
-        }
-
         // 獲取年號和年數
         const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
         const nianhaoId = $nhSelect.length ? $nhSelect.val() : null;
@@ -518,8 +507,8 @@ function initEraConversion() {
                 return;
             }
 
-            // 調用反向轉換函數
-            convertReignToYear(nianhaoName, nhYear, dynastyCode).then(result => {
+            // 調用反向轉換函數（年號到西元年是確定性的，不需要朝代參數）
+            convertReignToYear(nianhaoName, nhYear, null).then(result => {
                 if (result.success) {
                     // 填充公元年份
                     $yearInput.val(result.year);

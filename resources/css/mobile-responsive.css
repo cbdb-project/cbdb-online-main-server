@@ -22,35 +22,36 @@
         font-size: 0.875rem;
     }
 
-    /* 分页外层容器：确保不会超出视窗 */
-    .float-right {
+    /* 分页外层容器：只针对 .card-body 内包含分页的 .float-right */
+    /* 使用 :has() 精确定位，避免影响侧边栏和页眉的 .float-right */
+    .card-body > .float-right:has(nav),
+    .card-body > .float-right:has(.btn-group) {
         width: 100%;
         float: none !important;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        align-items: center;
         margin-top: 1rem;
     }
 
-    /* 针对游标分页的响应式处理 */
-    .float-right > div {
-        width: 100%;
-        flex-direction: column;
-        align-items: stretch !important;
+    /* 针对游标分页（包含 .btn-group）的特殊处理 */
+    .card-body > .float-right:has(.btn-group) {
+        gap: 0.5rem;
     }
 
-    .float-right .btn-group {
+    .card-body > .float-right .btn-group {
+        display: flex;
         flex-direction: column;
         width: 100%;
     }
 
-    .float-right .btn-group .btn {
+    .card-body > .float-right .btn-group .btn {
         border-radius: 0.25rem !important;
         margin-bottom: 0.25rem;
     }
 
-    .float-right .input-group {
+    .card-body > .float-right .input-group {
         width: 100% !important;
-        margin-top: 0.5rem;
     }
 }
 

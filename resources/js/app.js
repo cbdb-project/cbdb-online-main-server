@@ -422,17 +422,26 @@ function initEraConversion() {
             }
 
             let results = allResults;
+            let shouldWarnDynastyMismatch = false;
 
             // 如果有朝代信息且有多個結果，使用朝代作為 tie-breaker
             if (hasDynastyField && dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0 && allResults.length > 1) {
                 // 嘗試用朝代過濾
                 const dynastyFilteredResults = allResults.filter(r => r.dynasty === dynastyCode);
 
-                // 只有當朝代過濾後有且只有一個結果時，才使用朝代過濾結果
-                if (dynastyFilteredResults.length === 1) {
+                if (dynastyFilteredResults.length === 0) {
+                    // 朝代過濾後沒有結果：警告用戶所選朝代沒有對應年號
+                    const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                    alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
+                    // 仍顯示所有結果供用戶參考，但標記為不匹配
+                    shouldWarnDynastyMismatch = true;
+                } else if (dynastyFilteredResults.length === 1) {
+                    // 朝代過濾後只有一個結果：使用它
+                    results = dynastyFilteredResults;
+                } else {
+                    // 朝代過濾後仍有多個結果：只顯示該朝代的選項
                     results = dynastyFilteredResults;
                 }
-                // 如果朝代過濾後仍有多個結果或沒有結果，保持使用 allResults
             }
 
             // 如果只有一個結果，直接使用
@@ -441,9 +450,14 @@ function initEraConversion() {
                 await fillEraFields(eraResult, year, $container, nhCodeName, nhYearName, $btn);
             } else {
                 // 有多個結果，顯示選擇對話框
-                showEraSelectionDialog(results, year, async (selectedResult) => {
-                    await fillEraFields(selectedResult, year, $container, nhCodeName, nhYearName, $btn);
-                });
+                showEraSelectionDialog(
+                    results,
+                    year,
+                    shouldWarnDynastyMismatch,
+                    async (selectedResult) => {
+                        await fillEraFields(selectedResult, year, $container, nhCodeName, nhYearName, $btn);
+                    }
+                );
             }
 
         } catch (error) {
@@ -552,9 +566,10 @@ async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, n
  * 顯示年號選擇對話框
  * @param {Array} results - cn-era 返回的年號選項陣列
  * @param {number} gregorianYear - 公元年份
+ * @param {boolean} isDynastyMismatch - 是否為朝代不匹配的情況
  * @param {Function} onSelect - 選擇回調函數
  */
-function showEraSelectionDialog(results, gregorianYear, onSelect) {
+function showEraSelectionDialog(results, gregorianYear, isDynastyMismatch, onSelect) {
     // 創建對話框 HTML
     let optionsHtml = results.map((result, index) => {
         return `
@@ -567,6 +582,11 @@ function showEraSelectionDialog(results, gregorianYear, onSelect) {
         `;
     }).join('');
 
+    // 根據是否朝代不匹配顯示不同的提示
+    const promptText = isDynastyMismatch
+        ? '<p class="text-warning"><i class="fas fa-exclamation-triangle"></i> 以下年號與所選朝代不符，請檢查朝代選擇或從中選擇：</p>'
+        : '<p>找到多個符合的年號，請選擇：</p>';
+
     const dialogHtml = `
         <div class="modal fade" id="eraSelectionModal" tabindex="-1" role="dialog" aria-labelledby="eraSelectionModalLabel" aria-hidden="true">
             <div class="modal-dialog" role="document">
@@ -578,7 +598,7 @@ function showEraSelectionDialog(results, gregorianYear, onSelect) {
                         </button>
                     </div>
                     <div class="modal-body">
-                        <p>找到多個符合的年號，請選擇：</p>
+                        ${promptText}
                         ${optionsHtml}
                     </div>
                     <div class="modal-footer">
@@ -664,26 +684,37 @@ async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
         // 如果有多個匹配，使用年份範圍精確匹配
         if (candidates.length > 1) {
             for (const item of candidates) {
+                // 驗證 c_str 字段存在且格式正確
+                if (!item.c_str) {
+                    console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 缺少 c_str 字段，跳過`);
+                    continue;
+                }
+
                 // 從 c_str 解析年份範圍 "[1234]~[5678]"
                 const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
-                if (rangeMatch) {
-                    const firstYear = parseInt(rangeMatch[1], 10);
-                    const lastYear = parseInt(rangeMatch[2], 10);
+                if (!rangeMatch) {
+                    console.warn(`年號記錄 ${item.c_nianhao_chn} (ID: ${item.c_nianhao_id}) 的 c_str 格式錯誤: ${item.c_str}，跳過`);
+                    continue;
+                }
 
-                    // 檢查公元年份是否在範圍內
-                    if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
-                        // 額外驗證：計算的年數是否匹配
-                        const calculatedYearNum = gregorianYear - firstYear + 1;
-                        if (calculatedYearNum === yearNum) {
-                            return item.c_nianhao_id;
-                        }
+                const firstYear = parseInt(rangeMatch[1], 10);
+                const lastYear = parseInt(rangeMatch[2], 10);
+
+                // 檢查公元年份是否在範圍內
+                if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                    // 額外驗證：計算的年數是否匹配
+                    const calculatedYearNum = gregorianYear - firstYear + 1;
+                    if (calculatedYearNum === yearNum) {
+                        return item.c_nianhao_id;
                     }
                 }
             }
 
-            // 如果精確匹配失敗，返回第一個候選（向後兼容）
-            console.warn(`年號「${searchTitle}」有多個記錄，但無法通過年份範圍精確匹配`);
-            return candidates[0].c_nianhao_id;
+            // 如果精確匹配失敗，返回 null 而非自動選擇第一個
+            // 讓 fillEraFields 顯示錯誤訊息，或由上層邏輯顯示選擇對話框
+            console.error(`年號「${searchTitle}」有 ${candidates.length} 個記錄，但無法通過年份範圍精確匹配 (年份: ${gregorianYear}, 年數: ${yearNum})`);
+            console.error('候選記錄:', candidates.map(c => `ID=${c.c_nianhao_id}, 範圍=${c.c_str}`));
+            return null;
         }
 
         // 沒有找到匹配的年號
@@ -799,12 +830,22 @@ async function convertNianhaoIdToYear(nianhaoId, yearNum) {
             };
         }
 
+        // 驗證 c_str 字段是否存在
+        if (!nianhaoRecord.c_str) {
+            console.error(`年號記錄缺少 c_str 字段:`, nianhaoRecord);
+            return {
+                success: false,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} (ID: ${nianhaoId}) 的資料不完整（缺少年份範圍）\n\n請聯繫系統管理員修復數據`,
+            };
+        }
+
         // 從 c_str 字段解析年份範圍 "[1234]~[5678]"
         const rangeMatch = nianhaoRecord.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
         if (!rangeMatch) {
+            console.error(`年號記錄的 c_str 格式錯誤:`, nianhaoRecord);
             return {
                 success: false,
-                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年份範圍格式錯誤`,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} (ID: ${nianhaoId}) 的年份範圍格式錯誤\n格式: ${nianhaoRecord.c_str}\n\n請聯繫系統管理員修復數據`,
             };
         }
 
@@ -816,7 +857,7 @@ async function convertNianhaoIdToYear(nianhaoId, yearNum) {
         if (yearNum < 1 || yearNum > duration) {
             return {
                 success: false,
-                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間`,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間\n（年號範圍：公元 ${firstYear}-${lastYear}）`,
             };
         }
 

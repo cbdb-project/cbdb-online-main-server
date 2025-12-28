@@ -40,6 +40,9 @@
                                 <button class="btn btn-primary" id="btnRun">
                                     <i class="fas fa-play"></i> 執行查詢 (Run)
                                 </button>
+                                <button class="btn btn-secondary ml-2" id="btnFormat" title="格式化 SQL 查詢">
+                                    <i class="fas fa-magic"></i> 格式化
+                                </button>
                                 <button class="btn btn-default ml-2" id="btnShare" title="複製分享連結">
                                     <i class="fas fa-share-alt"></i> 複製連結
                                 </button>
@@ -391,6 +394,35 @@ onViteReady(function() {
             console.error('Could not copy text: ', err);
             alert('複製失敗，請手動複製網址列');
         });
+    });
+
+    $('#btnFormat').click(function() {
+        const sql = $('#sqlInput').val();
+        if (!sql.trim()) {
+            return;
+        }
+
+        try {
+            // 使用全局的 formatSql 函數（由 sqlFormatter.js 暴露）
+            const formatted = window.formatSql(sql, {
+                language: 'mysql',
+                tabWidth: 2,
+                keywordCase: 'upper',
+                indentStyle: 'standard'
+            });
+
+            $('#sqlInput').val(formatted);
+
+            // 視覺反饋
+            const originalText = $(this).html();
+            $(this).html('<i class="fas fa-check"></i> 已格式化');
+            setTimeout(() => {
+                $(this).html(originalText);
+            }, 2000);
+        } catch (error) {
+            console.error('SQL 格式化失敗:', error);
+            alert('SQL 格式化失敗，請檢查語法是否正確');
+        }
     });
 
     // Natural Language Query handlers

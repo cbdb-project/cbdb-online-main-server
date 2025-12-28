@@ -556,26 +556,54 @@ async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, n
 
     try {
         // 使用年號名稱和公元年份精確查找 ID
-        const nianhaoId = await findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum);
+        let nianhaoId = await findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum);
 
-        if (nianhaoId) {
-            // 填充年號選擇框
-            const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
-            if ($nhSelect.length) {
-                $nhSelect.val(nianhaoId).trigger('change');
+        // 如果精確匹配失敗，嘗試模糊匹配作為降級方案
+        if (!nianhaoId) {
+            console.warn(`精確匹配失敗，嘗試模糊匹配: ${reignTitle}`);
+            const fallbackResult = await findNianhaoIdByNameFallback(reignTitle, gregorianYear, yearNum);
+
+            if (fallbackResult.found) {
+                // 找到候選，詢問用戶是否使用
+                const confirmed = confirm(
+                    `年號「${reignTitle}」的資料庫記錄與 cn-era 數據存在差異。\n\n` +
+                    `cn-era: ${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num} (公元 ${gregorianYear})\n` +
+                    `資料庫: ${fallbackResult.dbInfo}\n\n` +
+                    `是否使用資料庫中的記錄？\n` +
+                    `（選擇「取消」將放棄轉換）`
+                );
+
+                if (confirmed) {
+                    nianhaoId = fallbackResult.id;
+                } else {
+                    return; // 用戶取消
+                }
+            } else {
+                // 完全找不到，提供手動選擇選項
+                alert(
+                    `找到年號「${reignTitle}」，但在資料庫中未找到對應記錄。\n\n` +
+                    `轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}\n\n` +
+                    `請手動從年號下拉框中選擇，或聯繫系統管理員更新數據。`
+                );
+                return;
             }
-
-            // 填充年號年數輸入框
-            const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
-            if ($nhYearInput.length) {
-                $nhYearInput.val(yearNum);
-            }
-
-            // 顯示成功提示
-            showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
-        } else {
-            alert(`找到年號「${reignTitle}」，但在資料庫中未找到對應記錄\n轉換結果：${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
         }
+
+        // 填充年號選擇框
+        const $nhSelect = $container.find(`select[name="${nhCodeName}"]`);
+        if ($nhSelect.length) {
+            $nhSelect.val(nianhaoId).trigger('change');
+        }
+
+        // 填充年號年數輸入框
+        const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
+        if ($nhYearInput.length) {
+            $nhYearInput.val(yearNum);
+        }
+
+        // 顯示成功提示
+        showConversionSuccess($btn, `${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num}`);
+
     } catch (error) {
         console.error('查找年號 ID 時發生錯誤:', error);
         alert('轉換失敗：無法查找年號資料');
@@ -742,6 +770,107 @@ async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
     } catch (error) {
         console.error('查找年號資料時發生錯誤:', error);
         throw error;
+    }
+}
+
+/**
+ * 模糊匹配年號 ID（降級方案）
+ * 當精確匹配失敗時，使用名稱匹配並返回最接近的候選
+ * @param {string} reignTitle - 年號名稱
+ * @param {number} gregorianYear - 公元年份（用於顯示資訊）
+ * @param {number} yearNum - 年號年數（用於顯示資訊）
+ * @returns {Promise<{found: boolean, id: number|null, dbInfo: string}>}
+ */
+async function findNianhaoIdByNameFallback(reignTitle, gregorianYear, yearNum) {
+    try {
+        // 特殊 ID 映射
+        const specialIdMapping = {
+            '至元 (世祖)': 623,
+            '至元 (順帝)': 635,
+        };
+
+        if (specialIdMapping[reignTitle]) {
+            return {
+                found: true,
+                id: specialIdMapping[reignTitle],
+                dbInfo: `${reignTitle} (特殊映射)`
+            };
+        }
+
+        // 特殊名稱映射
+        const specialNameMapping = {
+            '民國': '中華民國',
+        };
+
+        const searchTitle = specialNameMapping[reignTitle] || reignTitle;
+
+        // 獲取年號數據
+        const response = await axios.get('/api/select/nianhao');
+        const nianhaoData = response.data;
+
+        // 查找所有名稱匹配的年號
+        const candidates = nianhaoData.filter(item => {
+            return item.c_nianhao_chn === searchTitle;
+        });
+
+        if (candidates.length === 0) {
+            return { found: false, id: null, dbInfo: '' };
+        }
+
+        // 如果只有一個候選，直接返回
+        if (candidates.length === 1) {
+            const item = candidates[0];
+            return {
+                found: true,
+                id: item.c_nianhao_id,
+                dbInfo: `${item.c_nianhao_chn} ${item.c_str}`
+            };
+        }
+
+        // 多個候選：找最接近的（年份範圍包含或最近的）
+        let bestMatch = null;
+        let minDistance = Infinity;
+
+        for (const item of candidates) {
+            // 驗證並解析範圍
+            if (!item.c_str) continue;
+            const rangeMatch = item.c_str.match(/\[(-?\d+)\]~\[(-?\d+)\]/);
+            if (!rangeMatch) continue;
+
+            const firstYear = parseInt(rangeMatch[1], 10);
+            const lastYear = parseInt(rangeMatch[2], 10);
+
+            // 計算距離
+            let distance;
+            if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
+                // 在範圍內，距離為 0（最優）
+                distance = 0;
+            } else if (gregorianYear < firstYear) {
+                distance = firstYear - gregorianYear;
+            } else {
+                distance = gregorianYear - lastYear;
+            }
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestMatch = item;
+            }
+        }
+
+        if (bestMatch) {
+            return {
+                found: true,
+                id: bestMatch.c_nianhao_id,
+                dbInfo: `${bestMatch.c_nianhao_chn} ${bestMatch.c_str} (距離: ${minDistance === 0 ? '範圍內' : minDistance + '年'})`
+            };
+        }
+
+        // 找不到合適的候選
+        return { found: false, id: null, dbInfo: '' };
+
+    } catch (error) {
+        console.error('模糊匹配年號時發生錯誤:', error);
+        return { found: false, id: null, dbInfo: '' };
     }
 }
 

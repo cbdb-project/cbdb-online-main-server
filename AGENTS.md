@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 10.0（PHP 8.1+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
+- **技術棧**：Laravel 10.0（PHP 8.2+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性

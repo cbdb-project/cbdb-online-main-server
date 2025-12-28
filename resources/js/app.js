@@ -424,23 +424,43 @@ function initEraConversion() {
             let results = allResults;
             let shouldWarnDynastyMismatch = false;
 
-            // 如果有朝代信息且有多個結果，使用朝代作為 tie-breaker
-            if (hasDynastyField && dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0 && allResults.length > 1) {
+            // 如果有朝代信息，檢查朝代匹配
+            if (hasDynastyField && dynastyCode && !isNaN(dynastyCode) && dynastyCode > 0) {
                 // 嘗試用朝代過濾
                 const dynastyFilteredResults = allResults.filter(r => r.dynasty === dynastyCode);
 
-                if (dynastyFilteredResults.length === 0) {
-                    // 朝代過濾後沒有結果：警告用戶所選朝代沒有對應年號
-                    const dynastyName = $dynastySelect.find('option:selected').text().trim();
-                    alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
-                    // 仍顯示所有結果供用戶參考，但標記為不匹配
-                    shouldWarnDynastyMismatch = true;
-                } else if (dynastyFilteredResults.length === 1) {
-                    // 朝代過濾後只有一個結果：使用它
-                    results = dynastyFilteredResults;
-                } else {
-                    // 朝代過濾後仍有多個結果：只顯示該朝代的選項
-                    results = dynastyFilteredResults;
+                if (allResults.length > 1) {
+                    // 多個結果：使用朝代作為 tie-breaker
+                    if (dynastyFilteredResults.length === 0) {
+                        // 朝代過濾後沒有結果：警告用戶所選朝代沒有對應年號
+                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
+                        // 仍顯示所有結果供用戶參考，但標記為不匹配
+                        shouldWarnDynastyMismatch = true;
+                    } else if (dynastyFilteredResults.length === 1) {
+                        // 朝代過濾後只有一個結果：使用它
+                        results = dynastyFilteredResults;
+                    } else {
+                        // 朝代過濾後仍有多個結果：只顯示該朝代的選項
+                        results = dynastyFilteredResults;
+                    }
+                } else if (allResults.length === 1) {
+                    // 單一結果：檢查朝代是否匹配
+                    if (dynastyFilteredResults.length === 0) {
+                        // 朝代不匹配：顯示確認對話框
+                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        const eraResult = allResults[0];
+                        const confirmed = confirm(
+                            `所選朝代「${dynastyName}」與查詢結果不符。\n\n` +
+                            `查詢結果：${eraResult.dynasty_name} ${eraResult.reign_title} ${eraResult.year_num}\n\n` +
+                            `是否使用此結果？`
+                        );
+                        if (!confirmed) {
+                            return; // 用戶取消，不進行轉換
+                        }
+                        // 用戶確認，繼續使用此結果
+                    }
+                    // 朝代匹配或用戶已確認，使用這個結果
                 }
             }
 

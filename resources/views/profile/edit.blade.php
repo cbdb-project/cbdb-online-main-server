@@ -96,6 +96,14 @@
 
                             <!-- 頭像選擇網格 -->
                             <div class="avatar-grid">
+                                <!-- CBDB Logo 作為默認頭像 -->
+                                <div class="avatar-option {{ old('avatar', $user->avatar) === 'avatar0.png' ? 'selected' : '' }}"
+                                     data-avatar="avatar0.png"
+                                     title="點擊選擇 CBDB 默認頭像">
+                                    <img src="/images/avatar/avatar0.png" alt="CBDB 默認頭像">
+                                    <div class="avatar-number">默認</div>
+                                </div>
+
                                 @for ($i = 1; $i <= 18; $i++)
                                     <div class="avatar-option {{ old('avatar', $user->avatar) === 'avatar' . $i . '.png' ? 'selected' : '' }}"
                                          data-avatar="avatar{{ $i }}.png"
@@ -248,6 +256,23 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* CBDB Logo 特殊样式 - 使用 contain 保持完整显示，支持深色模式 */
+.preview-container img[src*="avatar0.png"] {
+    object-fit: contain;
+    padding: 8px;
+    box-sizing: border-box;  /* 确保 padding 不会增加元素总尺寸 */
+}
+
+/* 浅色模式：白色背景 */
+body:not(.dark-mode) .preview-container img[src*="avatar0.png"] {
+    background: #ffffff;
+}
+
+/* 深色模式：深灰色背景 */
+body.dark-mode .preview-container img[src*="avatar0.png"] {
+    background: #343a40;
+}
+
 .preview-name {
     font-size: 14px;
     color: #5a6c7d;
@@ -327,6 +352,23 @@
     object-fit: cover;
     display: block;
     transition: transform 0.3s ease;
+}
+
+/* CBDB Logo 在选择网格中的特殊样式，支持深色模式 */
+.avatar-option[data-avatar="avatar0.png"] img {
+    object-fit: contain;
+    padding: 10px;
+    box-sizing: border-box;  /* 确保 padding 不会增加元素总尺寸 */
+}
+
+/* 浅色模式：白色背景 */
+body:not(.dark-mode) .avatar-option[data-avatar="avatar0.png"] {
+    background: #ffffff;
+}
+
+/* 深色模式：深灰色背景 */
+body.dark-mode .avatar-option[data-avatar="avatar0.png"] {
+    background: #343a40;
 }
 
 .avatar-number {

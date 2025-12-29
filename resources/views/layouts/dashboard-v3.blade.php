@@ -37,6 +37,26 @@
 
     <!-- Custom styles (功能性样式，不包含 AdminLTE 主题覆盖) -->
     <style>
+        /* CBDB Logo 头像特殊样式 - 全局应用，支持深色模式 */
+        img[src*="avatar0.png"].user-image,
+        img[src*="avatar0.png"].img-circle {
+            object-fit: contain !important;
+            padding: 3px !important;
+            box-sizing: border-box !important;  /* 确保 padding 不会增加元素总尺寸 */
+        }
+
+        /* 浅色模式：白色背景 */
+        body:not(.dark-mode) img[src*="avatar0.png"].user-image,
+        body:not(.dark-mode) img[src*="avatar0.png"].img-circle {
+            background: #ffffff !important;
+        }
+
+        /* 深色模式：深灰色背景，与深色主题协调 */
+        body.dark-mode img[src*="avatar0.png"].user-image,
+        body.dark-mode img[src*="avatar0.png"].img-circle {
+            background: #343a40 !important;  /* AdminLTE 深色模式的标准深灰色 */
+        }
+
         /* 基础布局样式 */
         html, body {
             overscroll-behavior-x: none;

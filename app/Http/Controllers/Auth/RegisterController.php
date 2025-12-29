@@ -77,7 +77,7 @@ class RegisterController extends Controller {
             'name' => $data['name'],
             'email' => $data['email'],
             'institution' => $data['institution'],
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => Str::random(40),
             'settings' => [
                 'registration_ip' => $ip,

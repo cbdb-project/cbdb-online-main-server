@@ -2359,7 +2359,7 @@ CREATE TABLE `users` (
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `institution` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `avatar` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'avatar5.png',
+  `avatar` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'avatar0.png',
   `settings` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
   `confirmation_token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_active` smallint NOT NULL DEFAULT '0',

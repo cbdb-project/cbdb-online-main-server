@@ -95,7 +95,7 @@ class UserProfileController extends Controller {
      * @return array
      */
     private function getAvailableAvatars(): array {
-        $avatars = [];
+        $avatars = ['avatar0.png']; // CBDB 默認頭像
         for ($i = 1; $i <= 18; $i++) {
             $avatars[] = "avatar{$i}.png";
         }

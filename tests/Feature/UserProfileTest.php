@@ -27,7 +27,7 @@ class UserProfileTest extends TestCase {
             $table->string('password');
             $table->string('institution')->nullable();
             $table->json('settings')->nullable();
-            $table->string('avatar')->default('avatar5.png');
+            $table->string('avatar')->default('avatar0.png');
             $table->string('confirmation_token')->nullable();
             $table->smallInteger('is_active')->default(0);
             $table->smallInteger('is_admin')->default(0);
@@ -421,6 +421,20 @@ class UserProfileTest extends TestCase {
             'confirmation_token' => 'test-token',
             'is_active' => 1,
         ]);
+
+        // 測試 CBDB 默認頭像（avatar0.png）
+        $response = $this->actingAs($user)->patch('/profile', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'institution' => 'Test Institute',
+            'avatar' => 'avatar0.png',
+        ]);
+
+        $response->assertRedirect('/profile');
+        $response->assertSessionHas('success');
+
+        $user->refresh();
+        $this->assertEquals('avatar0.png', $user->avatar, 'Failed to update to avatar0.png');
 
         // 測試所有 18 個有效頭像
         for ($i = 1; $i <= 18; $i++) {

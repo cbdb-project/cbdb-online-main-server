@@ -93,6 +93,48 @@ class CodesController extends Controller {
             'c_admin_cat_trans',
             'c_notes',
         ],
+        'ADMIN_CAT_CODE_TYPE_REL' => [
+            'c_admin_cat_code',
+            'admin_cat_name',
+            'c_admin_cat_type_code',
+            'admin_cat_type_name',
+        ],
+        'APPOINTMENT_CODE_TYPE_REL' => [
+            'c_appt_code',
+            'appt_name',
+            'c_appt_type_code',
+            'appt_type_name',
+        ],
+        'ENTRY_CODE_TYPE_REL' => [
+            'c_entry_code',
+            'entry_name',
+            'c_entry_type',
+            'entry_type_name',
+        ],
+        'OFFICE_CODE_TYPE_REL' => [
+            'c_office_id',
+            'office_name',
+            'c_office_tree_id',
+            'office_type_name',
+        ],
+        'ASSOC_CODE_TYPE_REL' => [
+            'c_assoc_code',
+            'assoc_name',
+            'c_assoc_type_code',
+            'assoc_type_name',
+        ],
+        'STATUS_CODE_TYPE_REL' => [
+            'c_status_code',
+            'status_name',
+            'c_status_type_code',
+            'status_type_name',
+        ],
+        'TEXT_BIBLCAT_CODE_TYPE_REL' => [
+            'c_text_cat_code',
+            'text_cat_name',
+            'c_text_cat_type_id',
+            'text_cat_type_name',
+        ],
         'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end', 'c_sort'],
         'TEXT_INSTANCE_DATA' => [
             'c_textid',
@@ -121,6 +163,181 @@ class CodesController extends Controller {
         'APPOINTMENT_CODES' => ['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc'],
         'TEXT_CODES' => ['c_textid', 'c_title_chn', 'c_title'],
         'SOCIAL_INSTITUTION_CODES' => ['c_inst_name_code', 'c_inst_code', 'c_inst_type_code'],
+    ];
+    /**
+     * JOIN configurations for relationship tables.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    protected $tableJoinConfigurations = [
+        'ADMIN_CAT_CODE_TYPE_REL' => [
+            'base_table' => 'ADMIN_CAT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'ADMIN_CAT_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_admin_cat_code', '=', 'code.c_admin_cat_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'ADMIN_CAT_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_admin_cat_type_code', '=', 'type.c_admin_cat_type_code'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_admin_cat_code',
+                'code.c_admin_cat_hz as admin_cat_name',
+                'rel.c_admin_cat_type_code',
+                'type.c_admin_cat_type_hz as admin_cat_type_name',
+            ],
+        ],
+        'APPOINTMENT_CODE_TYPE_REL' => [
+            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'APPOINTMENT_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_appt_code', '=', 'code.c_appt_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'APPOINTMENT_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_appt_type_code', '=', 'type.c_appt_type_code'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_appt_code',
+                'code.c_appt_desc_chn as appt_name',
+                'rel.c_appt_type_code',
+                'type.c_appt_type_desc_chn as appt_type_name',
+            ],
+        ],
+        'ENTRY_CODE_TYPE_REL' => [
+            'base_table' => 'ENTRY_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'ENTRY_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_entry_code', '=', 'code.c_entry_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'ENTRY_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_entry_type', '=', 'type.c_entry_type'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_entry_code',
+                'code.c_entry_desc_chn as entry_name',
+                'rel.c_entry_type',
+                'type.c_entry_type_desc_chn as entry_type_name',
+            ],
+        ],
+        'OFFICE_CODE_TYPE_REL' => [
+            'base_table' => 'OFFICE_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'OFFICE_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_office_id', '=', 'code.c_office_id'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'OFFICE_TYPE_TREE',
+                    'alias' => 'type',
+                    'on' => ['rel.c_office_tree_id', '=', 'type.c_office_type_node_id'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_office_id',
+                'code.c_office_chn as office_name',
+                'rel.c_office_tree_id',
+                'type.c_office_type_desc_chn as office_type_name',
+            ],
+        ],
+        'ASSOC_CODE_TYPE_REL' => [
+            'base_table' => 'ASSOC_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'ASSOC_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_assoc_code', '=', 'code.c_assoc_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'ASSOC_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_assoc_type_code', '=', 'type.c_assoc_type_code'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_assoc_code',
+                'code.c_assoc_desc_chn as assoc_name',
+                'rel.c_assoc_type_code',
+                'type.c_assoc_type_desc_chn as assoc_type_name',
+            ],
+        ],
+        'STATUS_CODE_TYPE_REL' => [
+            'base_table' => 'STATUS_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'STATUS_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_status_code', '=', 'code.c_status_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'STATUS_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_status_type_code', '=', 'type.c_status_type_code'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_status_code',
+                'code.c_status_desc_chn as status_name',
+                'rel.c_status_type_code',
+                'type.c_status_type_chn as status_type_name',
+            ],
+        ],
+        'TEXT_BIBLCAT_CODE_TYPE_REL' => [
+            'base_table' => 'TEXT_BIBLCAT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'joins' => [
+                [
+                    'table' => 'TEXT_BIBLCAT_CODES',
+                    'alias' => 'code',
+                    'on' => ['rel.c_text_cat_code', '=', 'code.c_text_cat_code'],
+                    'type' => 'left',
+                ],
+                [
+                    'table' => 'TEXT_BIBLCAT_TYPES',
+                    'alias' => 'type',
+                    'on' => ['rel.c_text_cat_type_id', '=', 'type.c_text_cat_type_id'],
+                    'type' => 'left',
+                ],
+            ],
+            'select' => [
+                'rel.c_text_cat_code',
+                'code.c_text_cat_desc_chn as text_cat_name',
+                'rel.c_text_cat_type_id',
+                'type.c_text_cat_type_desc_chn as text_cat_type_name',
+            ],
+        ],
     ];
     /**
      * Explicit primary key definitions for code tables.
@@ -177,10 +394,17 @@ class CodesController extends Controller {
 
         try {
             $perPage = config('codes.per_page', 20);
-            $query = DB::table($table);
+            $upperTable = strtoupper($table);
+
+            // Check if this table needs JOIN
+            $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
+            if ($joinConfig) {
+                $query = $this->buildJoinQuery($joinConfig);
+            } else {
+                $query = DB::table($table);
+            }
 
             // 只在没有列配置时才查询样本行，避免不必要的数据库查询
-            $upperTable = strtoupper($table);
             $hasColumnConfig = isset($this->tableColumnOverrides[$upperTable]);
             $sampleRow = $hasColumnConfig ? null : (clone $query)->first();
 
@@ -192,13 +416,40 @@ class CodesController extends Controller {
             $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true);
 
             if ($search !== '' && !empty($searchableColumns)) {
-                $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination) {
+                $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
                     foreach ($searchableColumns as $column) {
+                        // 对于使用 JOIN 的表，需要将别名转换为原始表达式
+                        $searchColumn = $column;
+                        if ($joinConfig) {
+                            $baseAlias = $joinConfig['base_alias'];
+                            $selectList = $joinConfig['select'] ?? [];
+
+                            // 查找该列是否是别名，如果是，提取原始表达式
+                            $foundOriginalExpr = false;
+                            foreach ($selectList as $selectExpr) {
+                                if (strpos($selectExpr, ' as ' . $column) !== false) {
+                                    // 提取 "expression as alias" 中的 expression
+                                    $parts = explode(' as ', $selectExpr);
+                                    if (count($parts) === 2) {
+                                        $searchColumn = trim($parts[0]);
+                                        $foundOriginalExpr = true;
+
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // 如果不是别名且没有表前缀，添加基表别名
+                            if (!$foundOriginalExpr && !str_contains($column, '.')) {
+                                $searchColumn = $baseAlias . '.' . $column;
+                            }
+                        }
+
                         // 对于游标分页的大表，使用前缀搜索以利用索引
                         if ($useCursorPagination) {
-                            $subQuery->orWhere($column, 'like', $search . '%');
+                            $subQuery->orWhere($searchColumn, 'like', $search . '%');
                         } else {
-                            $subQuery->orWhere($column, 'like', '%' . $search . '%');
+                            $subQuery->orWhere($searchColumn, 'like', '%' . $search . '%');
                         }
                     }
                 });
@@ -219,6 +470,12 @@ class CodesController extends Controller {
             $keyColumns = $this->getKeyColumns($table);
             $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
+            // 标记哪些列是通过 JOIN 获得的别名列
+            $joinedColumns = [];
+            if ($joinConfig) {
+                $joinedColumns = $this->getJoinedColumnNames($joinConfig);
+            }
+
             return view('codes.show', [
                 'page_title' => $table,
                 'page_description' => '',
@@ -232,6 +489,7 @@ class CodesController extends Controller {
                 'isReadOnly' => $isReadOnly,
                 'keyColumns' => $keyColumns,
                 'copyrightNote' => $copyrightNote,
+                'joinedColumns' => $joinedColumns,
             ]);
         } catch (\PDOException $e) {
             flash('找不到该数据表', 'warning');
@@ -713,6 +971,12 @@ class CodesController extends Controller {
     protected function buildTableHead(string $table, $sampleRow): array {
         $upperTable = strtoupper($table);
         if (isset($this->tableColumnOverrides[$upperTable])) {
+            // 对于有 JOIN 配置的表，直接返回配置的列，因为它们包含别名列
+            if (isset($this->tableJoinConfigurations[$upperTable])) {
+                return $this->tableColumnOverrides[$upperTable];
+            }
+
+            // 对于没有 JOIN 的表，与 Schema 进行交集验证
             $availableColumns = Schema::getColumnListing($table);
             $overrideColumns = array_values(array_intersect($this->tableColumnOverrides[$upperTable], $availableColumns));
             if (!empty($overrideColumns)) {
@@ -1283,6 +1547,64 @@ class CodesController extends Controller {
     }
 
     /**
+     * Extract joined column names (aliases) from JOIN configuration.
+     *
+     * @param array $config
+     * @return array
+     */
+    protected function getJoinedColumnNames(array $config): array {
+        $joinedColumns = [];
+        $select = $config['select'] ?? [];
+
+        foreach ($select as $selectExpr) {
+            // 提取 "column as alias" 中的 alias
+            if (strpos($selectExpr, ' as ') !== false) {
+                $parts = explode(' as ', $selectExpr);
+                if (count($parts) === 2) {
+                    $joinedColumns[] = trim($parts[1]);
+                }
+            }
+        }
+
+        return $joinedColumns;
+    }
+
+    /**
+     * Build a JOIN query based on configuration.
+     *
+     * @param array $config
+     * @return \Illuminate\Database\Query\Builder
+     */
+    protected function buildJoinQuery(array $config) {
+        $baseTable = $config['base_table'];
+        $baseAlias = $config['base_alias'];
+        $joins = $config['joins'] ?? [];
+        $select = $config['select'] ?? [];
+
+        // Start query with base table alias
+        $query = DB::table($baseTable . ' as ' . $baseAlias);
+
+        // Apply JOINs
+        foreach ($joins as $join) {
+            $joinTable = $join['table'] . ' as ' . $join['alias'];
+            $joinType = $join['type'] ?? 'left';
+
+            if ($joinType === 'left') {
+                $query->leftJoin($joinTable, $join['on'][0], $join['on'][1], $join['on'][2]);
+            } elseif ($joinType === 'inner') {
+                $query->join($joinTable, $join['on'][0], $join['on'][1], $join['on'][2]);
+            }
+        }
+
+        // Apply SELECT if specified
+        if (!empty($select)) {
+            $query->select($select);
+        }
+
+        return $query;
+    }
+
+    /**
      * Show table with cursor-based pagination (for large tables).
      *
      * @param Request $request
@@ -1358,6 +1680,14 @@ class CodesController extends Controller {
         $keyColumns = $this->getKeyColumns($table);
         $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
+        // 标记哪些列是通过 JOIN 获得的别名列
+        $upperTable = strtoupper($table);
+        $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
+        $joinedColumns = [];
+        if ($joinConfig) {
+            $joinedColumns = $this->getJoinedColumnNames($joinConfig);
+        }
+
         return view('codes.show', [
             'page_title' => $table,
             'page_description' => '',
@@ -1371,6 +1701,7 @@ class CodesController extends Controller {
             'isReadOnly' => $isReadOnly,
             'keyColumns' => $keyColumns,
             'copyrightNote' => $copyrightNote,
+            'joinedColumns' => $joinedColumns,
             'useCursorPagination' => true,  // 标记使用游标分页
         ]);
     }

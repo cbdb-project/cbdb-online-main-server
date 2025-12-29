@@ -7,6 +7,7 @@
         $isReadOnly = $isReadOnly ?? false;
         $showActions = Auth::check() && !$isReadOnly;
         $keyColumns = $keyColumns ?? [];
+        $joinedColumns = $joinedColumns ?? [];
     @endphp
 
     <div class="card card-default">
@@ -42,7 +43,13 @@
                     <thead>
                     <tr>
                         @foreach ($thead as $item)
-                            <th>{{ $item }}</th>
+                            <th>
+                                @if(in_array($item, $joinedColumns))
+                                    ({{ $item }})
+                                @else
+                                    {{ $item }}
+                                @endif
+                            </th>
                         @endforeach
                         @if($showActions)
                             <th style="width: 120px">操作</th>

@@ -49,7 +49,7 @@ class LoginController extends Controller {
         }
 
         if ($this->attemptLogin($request)) {
-            flash('Login success', 'success');
+            flash('Login successful', 'success');
 
             return $this->sendLoginResponse($request);
         }

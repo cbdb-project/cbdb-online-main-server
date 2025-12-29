@@ -42,7 +42,7 @@ class AdminExplainSqlTest extends TestCase {
             'name' => 'Tester',
             'email' => uniqid().'@example.com',
             'password' => bcrypt('secret'),
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => Str::random(10),
         ]);
 

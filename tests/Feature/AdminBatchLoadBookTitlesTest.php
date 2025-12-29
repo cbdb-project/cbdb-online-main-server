@@ -79,7 +79,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'name' => 'Batch Admin',
             'email' => uniqid('admin', true).'@example.com',
             'password' => bcrypt('secret'),
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => Str::random(10),
         ]);
 

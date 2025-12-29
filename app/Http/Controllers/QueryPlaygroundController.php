@@ -6,6 +6,9 @@ use App\Services\NaturalLanguageQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use PhpMyAdmin\SqlParser\Components\Expression;
+use PhpMyAdmin\SqlParser\Parser;
+use PhpMyAdmin\SqlParser\Statements\SelectStatement;
 
 class QueryPlaygroundController extends Controller {
     public function __construct() {
@@ -153,79 +156,106 @@ class QueryPlaygroundController extends Controller {
     }
 
     /**
-     * Heuristic to extract table names from SQL queries.
-     * Supports FROM/JOIN clauses and comma-separated tables.
+     * Extract table names from SQL queries using AST parser.
+     * This correctly handles subqueries, quoted identifiers, and string literals.
      */
     protected function extractTableNames($sql) {
-        // 1. Remove strings and comments to avoid false positives
-        $sqlClean = preg_replace("/'[^']*'/", '', $sql);
-        $sqlClean = preg_replace('/"[^"]*"/', '', $sqlClean);
-        $sqlClean = preg_replace('/`[^`]*`/', '', $sqlClean); // We shouldn't remove backticks blindly as they contain validation targets, but we can treat them as delimiters.
-        // Actually, let's keep backticks but just strip the ticks later.
+        try {
+            // Parse the SQL using PhpMyAdmin SQL Parser
+            $parser = new Parser($sql);
 
-        // Better approach: Normalize whitespace
-        $sql = preg_replace('/\s+/', ' ', $sql);
+            $tables = [];
 
-        // 2. Find "FROM ... [WHERE|GROUP|ORDER|LIMIT|;]" blocks
-        // This is complex regex. Let's iterate through keywords.
-        // We look for patterns starting with FROM or JOIN, ending at the next reserved keyword.
-
-        // Keywords that end a FROM/JOIN clause
-        $stoppers = 'WHERE|GROUP|HAVING|ORDER|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|;|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|JOIN';
-
-        preg_match_all("/(?:FROM|JOIN)\s+(.*?)(?=(?:\s+(?:$stoppers))|$)/i", $sql, $matches);
-
-        $candidates = [];
-        foreach ($matches[1] as $block) {
-            // Block contains "table1, table2 alias, table3"
-            $parts = explode(',', $block);
-            foreach ($parts as $part) {
-                $part = trim($part);
-                if (empty($part)) {
-                    continue;
+            // Process all statements (usually just one SELECT)
+            foreach ($parser->statements as $statement) {
+                if ($statement instanceof SelectStatement) {
+                    $tables = array_merge($tables, $this->extractTablesFromSelectStatement($statement));
                 }
+            }
 
-                // Get the first word (table name) ignoring optional parenthesis for subqueries?
-                // Subqueries "(SELECT...)" break this.
-                // We should BLOCK subqueries in FROM check if they are not just aliased valid tables?
-                // No, "FROM (SELECT * FROM whitelisted)" is safe.
-                // "FROM (SELECT * FROM forbidden)" is unsafe.
-                // Our regex logic above will see "SELECT" as a table name if we are not careful?
-                // Wait, logic: "FROM (SELECT..." -> match block "(SELECT..."
-                // first word is "(".
+            // Check for parser errors
+            if (!empty($parser->errors)) {
+                // If parser fails, return empty array to trigger the "could not detect" error
+                return [];
+            }
 
-                // If it starts with (, it's a subquery. Recursion needed?
-                // For Playground MVP: simple table names only?
-                // Users might want complex queries.
+            return array_unique($tables);
+        } catch (\Exception $e) {
+            // If parsing fails entirely, return empty array
+            return [];
+        }
+    }
 
-                // Let's rely on checking ALL words found in the FROM/JOIN block.
-                // If any word looks like a table name (alphanumeric), check it against whitelist?
-                // No, aliases will flag false positives. "FROM allowed AS forbidden_name" -> Error.
+    /**
+     * Recursively extract table names from a SELECT statement and its subqueries.
+     */
+    protected function extractTablesFromSelectStatement(SelectStatement $statement) {
+        $tables = [];
 
-                // Keep it simple: Extract first token of each comma-segment.
-                // If token starts with (, ignore (it effectively recurses via the global regex search for FROM inside).
-
-                // Remove opening parenthesis
-                $part = ltrim($part, '(');
-
-                // Get first token
-                $token = preg_split('/\s+/', $part)[0] ?? '';
-
-                // Strip quotes/backticks
-                $token = trim($token, "`'\"");
-
-                if (!empty($token)) {
-                    $candidates[] = $token;
+        // Extract from FROM clause
+        if ($statement->from) {
+            foreach ($statement->from as $fromClause) {
+                // Check if this is a subquery (indicated by subquery property or expr starting with '(')
+                if ($fromClause->subquery || (is_string($fromClause->expr) && strpos($fromClause->expr, '(') === 0)) {
+                    // Extract subquery content from parentheses
+                    $subqueryContent = $fromClause->expr;
+                    if (is_string($subqueryContent) && preg_match('/^\((.*)\)$/s', $subqueryContent, $matches)) {
+                        // Parse the subquery
+                        $subqueryParser = new Parser($matches[1]);
+                        foreach ($subqueryParser->statements as $subStatement) {
+                            if ($subStatement instanceof SelectStatement) {
+                                $tables = array_merge($tables, $this->extractTablesFromSelectStatement($subStatement));
+                            }
+                        }
+                    }
+                } elseif ($fromClause->table) {
+                    // Regular table reference
+                    $tableName = $fromClause->table;
+                    if (is_string($tableName)) {
+                        $tableName = trim($tableName, '`\'"');
+                        if (!empty($tableName)) {
+                            $tables[] = $tableName;
+                        }
+                    }
                 }
             }
         }
 
-        // Also run a global simple match for standard "FROM table" just in case the block logic missed something
-        // due to nested parens structure.
-        preg_match_all('/(?:FROM|JOIN)\s+[`\'"]?([a-zA-Z0-9_]+)[`\'"]?/i', $sql, $fallbackMatches);
-        $candidates = array_merge($candidates, $fallbackMatches[1] ?? []);
+        // Extract from JOIN clauses
+        if ($statement->join) {
+            foreach ($statement->join as $joinClause) {
+                // JOIN clause expr is an Expression object
+                if ($joinClause->expr instanceof Expression) {
+                    $expression = $joinClause->expr;
 
-        return array_unique($candidates);
+                    // Check if this is a subquery
+                    if ($expression->subquery || (is_string($expression->expr) && strpos($expression->expr, '(') === 0)) {
+                        // Extract subquery content from parentheses
+                        $subqueryContent = $expression->expr;
+                        if (is_string($subqueryContent) && preg_match('/^\((.*)\)$/s', $subqueryContent, $matches)) {
+                            // Parse the subquery
+                            $subqueryParser = new Parser($matches[1]);
+                            foreach ($subqueryParser->statements as $subStatement) {
+                                if ($subStatement instanceof SelectStatement) {
+                                    $tables = array_merge($tables, $this->extractTablesFromSelectStatement($subStatement));
+                                }
+                            }
+                        }
+                    } elseif ($expression->table) {
+                        // Regular table reference
+                        $tableName = $expression->table;
+                        if (is_string($tableName)) {
+                            $tableName = trim($tableName, '`\'"');
+                            if (!empty($tableName)) {
+                                $tables[] = $tableName;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $tables;
     }
 
     /**

@@ -188,4 +188,121 @@ class QueryPlaygroundTest extends TestCase {
         ]);
         $response->assertStatus(422);
     }
+
+    /** @test */
+    public function it_allows_subqueries_with_whitelisted_tables() {
+        $this->be($this->adminUser);
+
+        // Simple subquery in FROM clause
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM (SELECT * FROM ALLOWED1) AS sub',
+        ]);
+        $this->assertNotEquals(403, $response->status(), 'Should allow subquery with whitelisted table');
+
+        // Subquery in JOIN clause (like user's example)
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT n.* FROM ALLOWED1 n JOIN (SELECT c_id, COUNT(*) AS cnt FROM ALLOWED2 GROUP BY c_id HAVING COUNT(*) > 1) t ON n.c_id = t.c_id',
+        ]);
+        $this->assertNotEquals(403, $response->status(), 'Should allow JOIN with subquery');
+    }
+
+    /** @test */
+    public function it_blocks_subqueries_with_non_whitelisted_tables() {
+        $this->be($this->adminUser);
+
+        // Subquery containing forbidden table
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM (SELECT * FROM users) AS sub',
+        ]);
+        $response->assertStatus(403);
+        $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
+    }
+
+    /** @test */
+    public function it_handles_nested_subqueries() {
+        $this->be($this->adminUser);
+
+        // Nested subqueries with whitelisted tables
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM (SELECT * FROM (SELECT * FROM ALLOWED1) AS inner_sub) AS outer_sub',
+        ]);
+        $this->assertNotEquals(403, $response->status(), 'Should allow nested subqueries with whitelisted tables');
+
+        // Nested subqueries with one forbidden table
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM (SELECT * FROM (SELECT * FROM users) AS inner_sub) AS outer_sub',
+        ]);
+        $response->assertStatus(403);
+        $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
+    }
+
+    /** @test */
+    public function it_handles_real_world_example_from_issue() {
+        $this->be($this->adminUser);
+
+        // Add NIAN_HAO to config for this test
+        Config::set('codes.tables.NIAN_HAO', 'Year Names Table');
+
+        // User's actual query that was failing
+        $sql = "SELECT n.*, t.cnt AS repeat_count
+                FROM NIAN_HAO n
+                JOIN (SELECT c_nianhao_chn, COUNT(*) AS cnt FROM NIAN_HAO GROUP BY c_nianhao_chn HAVING COUNT(*) > 1) t
+                ON n.c_nianhao_chn = t.c_nianhao_chn
+                ORDER BY n.c_nianhao_chn";
+
+        $response = $this->postJson(route('query-playground.run'), ['sql' => $sql]);
+
+        // Should not get 403 forbidden (table validation should pass)
+        // May get 500 if table doesn't exist in test DB, but that's okay
+        $this->assertNotEquals(403, $response->status(), 'Should allow the real-world subquery example');
+
+        // Verify it's not complaining about 'SELECT' being a table
+        if ($response->status() === 403) {
+            $error = $response->json()['error'] ?? '';
+            $this->assertStringNotContainsStringIgnoringCase('SELECT', $error, 'Should not identify SELECT as a table name');
+        }
+    }
+
+    /** @test */
+    public function it_blocks_double_quoted_identifier_bypass_attempt() {
+        $this->be($this->adminUser);
+
+        // Security test: Attempt to bypass whitelist using double-quoted identifiers
+        // In ANSI_QUOTES mode or PostgreSQL, "users" is an identifier, not a string
+        // The old regex-based implementation would strip this and allow the query
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM ALLOWED1 JOIN "users" u ON ALLOWED1.id = u.id',
+        ]);
+
+        // Should block access to 'users' table
+        $response->assertStatus(403);
+        $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
+    }
+
+    /** @test */
+    public function it_blocks_backtick_quoted_identifier() {
+        $this->be($this->adminUser);
+
+        // Test with MySQL backtick-quoted identifiers
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM ALLOWED1 JOIN `users` u ON ALLOWED1.id = u.id',
+        ]);
+
+        // Should block access to 'users' table
+        $response->assertStatus(403);
+        $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
+    }
+
+    /** @test */
+    public function it_allows_quoted_whitelisted_tables() {
+        $this->be($this->adminUser);
+
+        // Quoted identifiers should work fine for whitelisted tables
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM "ALLOWED1" JOIN `ALLOWED2` ON ALLOWED1.id = ALLOWED2.id',
+        ]);
+
+        // Should allow since both tables are whitelisted (regardless of quoting)
+        $this->assertNotEquals(403, $response->status(), 'Should allow quoted whitelisted table identifiers');
+    }
 }

@@ -32,7 +32,7 @@
 ## 技術環境
 
 ### 生產環境
-- **PHP**: 8.1+ (最低 8.1.0，建議 8.4)
+- **PHP**: 8.2+ (最低 8.2.0，建議 8.4)
 - **Laravel**: 10.0 (已從 8.x 升級，參見 [UPGRADE.md](./UPGRADE.md))
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
@@ -44,7 +44,7 @@
 - `resources/js/jquery-global.js` 將 jQuery 暴露到全局；Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現。
 - 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
 
-⚠️ **重要**：本專案現已升級到 Laravel 10.0 並要求 PHP 8.1+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。雖然 Laravel 10.0 官方僅測試到 PHP 8.2，但經測試表明 PHP 8.4 可正常運行。
+⚠️ **重要**：本專案現已升級到 Laravel 10.0 並要求 PHP 8.2+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。Laravel 10.0 官方支持 PHP 8.1-8.2，但本專案因依賴 `phpmyadmin/sql-parser` v6.0（要求 PHP 8.2+）而提升了最低版本要求。
 
 ### 數據庫兼容性原則
 ⚠️ **重要**：為保持未來遷移到其他數據庫實現的靈活性，請遵循以下原則：

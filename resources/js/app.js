@@ -1196,3 +1196,6 @@ function showConversionSuccess($btn, message, defaultTitle = null) {
             .tooltip();
     }, 2000);
 }
+
+// Import SQL Formatter utility
+import './utils/sqlFormatter';

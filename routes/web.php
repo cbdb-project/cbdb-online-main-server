@@ -118,6 +118,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('api-tokens/{tokenId}', 'ApiTokenController@destroy')->name('api-tokens.destroy');
     Route::delete('api-tokens', 'ApiTokenController@destroyAll')->name('api-tokens.destroy-all');
 
+    // 按入仕查詢
+    Route::get('search-by/entry', 'SearchByEntryController@index')->name('search-by.entry.index');
+    Route::get('search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('search-by.entry.types');
+    Route::get('search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('search-by.entry.codes');
+    Route::get('search-by/entry/search', 'SearchByEntryController@search')->name('search-by.entry.search');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

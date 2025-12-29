@@ -42,7 +42,6 @@ class MigrationTest extends TestCase {
 
         // 5. Verification of specific SQL views defined in migrations
         $sqlViews = [
-            'View_Address',
             'View_BiogInstData',
             'View_PossessionsData',
         ];

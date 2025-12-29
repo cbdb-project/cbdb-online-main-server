@@ -376,6 +376,39 @@ $(function() {
  * 初始化年號轉換功能
  */
 function initEraConversion() {
+    /**
+     * 使用兩階段查找策略尋找與 $container 相關的隱藏輸入
+     *
+     * 策略說明：
+     * 1. 優先在表單內查找第一個（按 DOM 順序）person-id-display-component
+     *    - 在標準佈局中，此組件總是位於表單最上方，早於所有年份輸入欄位
+     *    - 即使未來有多個組件，第一個通常是主要的人物資訊
+     * 2. 若表單內找不到，回退到全局第一個（向後相容）
+     *
+     * @param {jQuery} $form - 最近的表單容器
+     * @param {string} className - 要查找的 class 名稱（如 'dynasty_code'）
+     * @returns {jQuery} 找到的元素（可能為空）
+     */
+    function findRelatedHiddenInput($form, className) {
+        let $element = $();
+
+        // 階段 1：在表單內查找 person-id-display-component，然後在其中查找目標元素
+        if ($form.length > 0) {
+            const $componentsInForm = $form.find('.person-id-display-component');
+            if ($componentsInForm.length > 0) {
+                // 使用第一個（最接近表單頂部）組件
+                $element = $componentsInForm.first().find(`.${className}`);
+            }
+        }
+
+        // 階段 2：若表單內找不到組件，回退到全局查找第一個（向後相容）
+        if ($element.length === 0) {
+            $element = $(`.${className}`).first();
+        }
+
+        return $element;
+    }
+
     // 啟用 Bootstrap tooltip
     $('[data-toggle="tooltip"]').tooltip();
 
@@ -410,9 +443,39 @@ function initEraConversion() {
 
         try {
             // 獲取朝代信息
-            const $dynastySelect = $('select[name="c_dy"]');
-            const hasDynastyField = $dynastySelect.length > 0;
-            const dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
+            // 優先從 person-id-display 組件讀取朝代代碼（人物本身的朝代）
+            // 使用兩階段查找策略：表單內第一個組件 → 全局第一個
+            const $form = $container.closest('form');
+            const $dynastyCodeHidden = findRelatedHiddenInput($form, 'dynasty_code');
+
+            let dynastyCode = null;
+            let hasDynastyField = false;
+            let $dynastySelect = null;
+
+            if ($dynastyCodeHidden.length > 0 && $dynastyCodeHidden.val()) {
+                // 從 person-id-display 組件讀取
+                const parsedCode = parseInt($dynastyCodeHidden.val(), 10);
+                if (!isNaN(parsedCode) && parsedCode > 0) {
+                    dynastyCode = parsedCode;
+                    hasDynastyField = true;
+                } else {
+                    // dynasty_code 無效，回退到 select
+                    $dynastySelect = $form.length > 0 ? $form.find('select[name="c_dy"]') : $();
+                    if ($dynastySelect.length === 0) {
+                        $dynastySelect = $('select[name="c_dy"]');
+                    }
+                    hasDynastyField = $dynastySelect.length > 0;
+                    dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
+                }
+            } else {
+                // 回退到讀取 c_dy 選擇框（如果有的話）
+                $dynastySelect = $form.length > 0 ? $form.find('select[name="c_dy"]') : $();
+                if ($dynastySelect.length === 0) {
+                    $dynastySelect = $('select[name="c_dy"]');
+                }
+                hasDynastyField = $dynastySelect.length > 0;
+                dynastyCode = hasDynastyField ? parseInt($dynastySelect.val(), 10) : null;
+            }
 
             // 先獲取所有可能的年號結果
             let allResults = convertYear(year, { mode: 'all' });
@@ -434,7 +497,14 @@ function initEraConversion() {
                     // 多個結果：使用朝代作為 tie-breaker
                     if (dynastyFilteredResults.length === 0) {
                         // 朝代過濾後沒有結果：警告用戶所選朝代沒有對應年號
-                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        let dynastyName = '';
+                        if ($dynastySelect && $dynastySelect.length > 0) {
+                            dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        } else {
+                            // 從 person-id-display 組件讀取朝代名稱
+                            const $dynastyNameHidden = findRelatedHiddenInput($form, 'dynasty_name');
+                            dynastyName = $dynastyNameHidden.length > 0 ? $dynastyNameHidden.val() : '所選朝代';
+                        }
                         alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
                         // 仍顯示所有結果供用戶參考，但標記為不匹配
                         shouldWarnDynastyMismatch = true;
@@ -449,7 +519,14 @@ function initEraConversion() {
                     // 單一結果：檢查朝代是否匹配
                     if (dynastyFilteredResults.length === 0) {
                         // 朝代不匹配：顯示確認對話框
-                        const dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        let dynastyName = '';
+                        if ($dynastySelect && $dynastySelect.length > 0) {
+                            dynastyName = $dynastySelect.find('option:selected').text().trim();
+                        } else {
+                            // 從 person-id-display 組件讀取朝代名稱
+                            const $dynastyNameHidden = findRelatedHiddenInput($form, 'dynasty_name');
+                            dynastyName = $dynastyNameHidden.length > 0 ? $dynastyNameHidden.val() : '所選朝代';
+                        }
                         const eraResult = allResults[0];
                         const confirmed = confirm(
                             `所選朝代「${dynastyName}」與查詢結果不符。\n\n` +

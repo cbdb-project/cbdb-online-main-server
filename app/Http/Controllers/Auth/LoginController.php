@@ -73,4 +73,15 @@ class LoginController extends Controller {
         $user->settings = $settings;
         $user->save();
     }
+
+    /**
+     * Get the post-login redirect path.
+     *
+     * @return string
+     */
+    public function redirectPath() {
+        // 使用 intended() 方法，如果 session 中有原始 URL，則重定向到該 URL
+        // 否則重定向到默認的 /home
+        return redirect()->intended($this->redirectTo)->getTargetUrl();
+    }
 }

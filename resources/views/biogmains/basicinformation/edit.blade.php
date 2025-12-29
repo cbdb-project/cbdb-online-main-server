@@ -1,5 +1,12 @@
 @extends('layouts.dashboard-v3')
 
+@if(!($readonly ?? false))
+    @push('head')
+        {{-- 編輯頁面不應被搜索引擎索引 --}}
+        <meta name="robots" content="noindex, nofollow">
+    @endpush
+@endif
+
 @section('content')
     @php
         $readonly = $readonly ?? false;

@@ -287,6 +287,8 @@
             cursor: not-allowed;
         }
     </style>
+
+    @stack('head')
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
 <script>

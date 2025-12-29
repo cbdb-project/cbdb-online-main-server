@@ -202,6 +202,11 @@ class BasicInformationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit($id) {
+        // 未登錄或無權限的用戶重定向到只讀頁面
+        if (!Auth::check() || !Auth::user()->isActive()) {
+            return redirect()->route('basicinformation.show', $id);
+        }
+
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();

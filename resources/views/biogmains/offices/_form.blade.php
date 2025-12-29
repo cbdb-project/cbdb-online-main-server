@@ -15,12 +15,7 @@
     @endif
     {{ csrf_field() }}
 
-    <div class="form-group row">
-        <label for="person_id" class="col-sm-2 col-form-label">person id</label>
-        <div class="col-sm-10">
-            <input type="text" class="form-control person_id" value="{{ $id }}" disabled>
-        </div>
-    </div>
+    <x-forms.person-id-display :personId="$id" />
 
     @if($isEdit)
         <div class="form-group row">

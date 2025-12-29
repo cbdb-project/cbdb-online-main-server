@@ -15,13 +15,7 @@
                   method="post">
                 {{ method_field('PATCH') }}
                 {{ csrf_field() }}
-                <div class="form-group row">
-                    <label for="c_persionid" class="col-sm-2 col-form-label">person id</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="c_personid" class="form-control"
-                               value="{{ $basicinformation->c_personid }}" disabled>
-                    </div>
-                </div>
+                <x-forms.person-id-display :personId="$basicinformation->c_personid" />
                 <div class="form-group row">
                     <div class="col-sm-6">
                         <div class="form-group row">

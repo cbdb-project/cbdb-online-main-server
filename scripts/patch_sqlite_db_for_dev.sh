@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email" varchar(255) NOT NULL,
     "password" varchar(255) NOT NULL,
     "institution" varchar(255) DEFAULT NULL,
-    "avatar" varchar(255) NOT NULL DEFAULT 'avatar5.png',
+    "avatar" varchar(255) NOT NULL DEFAULT 'avatar0.png',
     "settings" TEXT,
     "confirmation_token" varchar(255) NOT NULL,
     "is_active" smallint NOT NULL DEFAULT '0',

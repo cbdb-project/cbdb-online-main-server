@@ -27,7 +27,7 @@ class ManageUserCommandTest extends TestCase {
             $table->string('password');
             $table->string('institution')->nullable();
             $table->json('settings')->nullable();
-            $table->string('avatar')->default('avatar5.png');
+            $table->string('avatar')->default('avatar0.png');
             $table->string('confirmation_token')->nullable();
             $table->smallInteger('is_active')->default(0);
             $table->smallInteger('is_admin')->default(0);

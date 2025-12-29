@@ -12,12 +12,7 @@
     @endif
     {{ csrf_field() }}
 
-    <div class="form-group row">
-        <label for="person_id" class="col-sm-2 col-form-label">person id</label>
-        <div class="col-sm-10">
-            <input type="text" class="form-control person_id" name="person_id" value="{{ $id }}" disabled>
-        </div>
-    </div>
+    <x-forms.person-id-display :personId="$id" />
 
     <div class="form-group row">
         <label for="c_sequence" class="col-sm-2 col-form-label">遷徙次序</label>

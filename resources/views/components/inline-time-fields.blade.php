@@ -78,7 +78,7 @@
             </div>
         @endif
         @if($showLunar)
-            <div class="d-flex align-items-center flex-wrap" style="min-width: 56ch; flex: 1 1 56ch;">
+            <div class="d-flex align-items-center flex-wrap" style="flex: 1 1 56ch;">
                 <div class="custom-control custom-checkbox mr-4">
                     <input type="hidden" name="{{ $intercalaryName }}" value="0">
                     <input type="checkbox"
@@ -109,9 +109,11 @@
                     <div class="invalid-feedback">請輸入 1-30 或留空</div>
                 </div>
                 <span class="mr-2">日</span>
-                <label class="mb-0 mr-2" for="{{ $dayGzName }}">{{ $dayGzLabel }}</label>
-                <div class="flex-grow-1" style="min-width: 12ch;">
-                    <select-vue element-id="{{ $dayGzName }}" name="{{ $dayGzName }}" model="ganzhi" id-key="c_ganzhi_code" selected="{{ $dayGzValue }}"></select-vue>
+                <div class="d-flex align-items-center" style="min-width: 0; flex: 1 1 auto;">
+                    <label class="mb-0 mr-2 text-nowrap" for="{{ $dayGzName }}">{{ $dayGzLabel }}</label>
+                    <div class="flex-grow-1" style="min-width: 12ch;">
+                        <select-vue element-id="{{ $dayGzName }}" name="{{ $dayGzName }}" model="ganzhi" id-key="c_ganzhi_code" selected="{{ $dayGzValue }}"></select-vue>
+                    </div>
                 </div>
             </div>
         @elseif($showLunarPlaceholder)

@@ -7,12 +7,14 @@
     // 查詢人物基本信息
     $person = null;
     $dynastyName = '';
+    $dynastyCode = '';
 
     if ($personId) {
         try {
             $person = \App\Models\BiogMain::with('simpleDynasty')->find($personId);
             if ($person && $person->simpleDynasty) {
                 $dynastyName = $person->simpleDynasty->c_dynasty_chn ?? $person->simpleDynasty->c_dynasty ?? '';
+                $dynastyCode = $person->simpleDynasty->c_dy ?? '';
             }
         } catch (\Exception $e) {
             // 在測試環境或資料庫連線失敗時，優雅降級
@@ -20,11 +22,12 @@
     }
 @endphp
 
-<div class="form-group row">
+<div class="form-group row person-id-display-component">
     <label for="person_id_display" class="col-sm-2 col-form-label">人物基本信息</label>
     <div class="col-sm-10">
         <input type="hidden" class="person_id" value="{{ $personId }}">
         <input type="hidden" class="dynasty_name" value="{{ $dynastyName }}">
+        <input type="hidden" class="dynasty_code" value="{{ $dynastyCode }}">
         <div class="card bg-light">
             <div class="card-body p-3">
                 <div class="row">

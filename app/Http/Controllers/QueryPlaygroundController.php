@@ -303,8 +303,8 @@ class QueryPlaygroundController extends Controller {
      * @return \Illuminate\View\View
      */
     public function nlQueryLogs(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            abort(403, 'Unauthorized. Admin access required.');
+        if (!Auth::user()->isSuperAdmin()) {
+            abort(403, 'Unauthorized. Super admin access required.');
         }
 
         $query = DB::table('nl_query_logs')

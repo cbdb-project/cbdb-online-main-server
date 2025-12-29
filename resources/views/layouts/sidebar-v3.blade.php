@@ -319,8 +319,35 @@
 
                 @if(Auth::check() and Auth::user()->isAdmin())
                     @php
+                        $expertPages = [
+                            'Query Playground',
+                        ];
+                        $expertMenuOpen = in_array($activePage, $expertPages, true);
+                    @endphp
+                    <li class="nav-item {{ $expertMenuOpen ? 'menu-open' : '' }}">
+                        <a href="{{ route('query-playground.index') }}" class="nav-link {{ $expertMenuOpen ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-flask"></i>
+                            <p>
+                                專家工具
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-terminal"></i>
+                                    <p>SQL 查詢練習場</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                @endif
+
+                @if(Auth::check() and Auth::user()->isSuperAdmin())
+                    @php
                         $adminPages = [
                             '用戶管理',
+                            'NL Query Logs',
                             'SQL 執行計畫',
                             '批次匯入書稿資料',
                             '批次匯入官職',
@@ -329,7 +356,6 @@
                             'CBDB 內部表維護',
                             '單向關係修復',
                             'MergePreview',
-                            'Query Playground',
                         ];
                         $adminMenuOpen = in_array($activePage, $adminPages, true);
                     @endphp
@@ -349,9 +375,9 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="{{ route('query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-terminal"></i>
-                                    <p>SQL 查詢練習場</p>
+                                <a href="{{ route('query-playground.nl-query-logs') }}" class="nav-link {{ $activePage == 'NL Query Logs' ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-comments"></i>
+                                    <p>自然語言查詢日誌</p>
                                 </a>
                             </li>
                             <li class="nav-item">

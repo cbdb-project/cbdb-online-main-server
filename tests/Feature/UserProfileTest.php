@@ -79,7 +79,7 @@ class UserProfileTest extends TestCase {
             'name' => 'New Name',
             'email' => 'new@example.com',
             'institution' => 'New Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -105,7 +105,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'current_password' => 'oldpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
@@ -132,7 +132,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
         ]);
@@ -154,7 +154,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'current_password' => 'wrongpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'newpassword',
@@ -180,7 +180,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'current_password' => 'oldpassword',
             'new_password' => 'newpassword',
             'new_password_confirmation' => 'differentpassword',
@@ -215,7 +215,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'existing@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertSessionHasErrors('email');
@@ -240,7 +240,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Updated Name',
             'email' => 'test@example.com',
             'institution' => 'Updated Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -266,7 +266,7 @@ class UserProfileTest extends TestCase {
             'name' => '',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertSessionHasErrors('name');
@@ -286,7 +286,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => '',
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertSessionHasErrors('email');
@@ -306,7 +306,7 @@ class UserProfileTest extends TestCase {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => '',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
         ]);
 
         $response->assertRedirect('/profile');
@@ -322,7 +322,7 @@ class UserProfileTest extends TestCase {
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => 'test-token',
             'is_active' => 1,
         ]);
@@ -347,7 +347,7 @@ class UserProfileTest extends TestCase {
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => 'test-token',
             'is_active' => 1,
         ]);
@@ -368,7 +368,7 @@ class UserProfileTest extends TestCase {
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => 'test-token',
             'is_active' => 1,
         ]);
@@ -383,7 +383,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('avatar');
 
         $user->refresh();
-        $this->assertEquals('avatar5.png', $user->avatar);
+        $this->assertEquals('avatar0.png', $user->avatar);
     }
 
     public function testAvatarMustBeInValidRange() {
@@ -392,7 +392,7 @@ class UserProfileTest extends TestCase {
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'institution' => 'Test Institute',
-            'avatar' => 'avatar5.png',
+            'avatar' => 'avatar0.png',
             'confirmation_token' => 'test-token',
             'is_active' => 1,
         ]);
@@ -408,7 +408,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('avatar');
 
         $user->refresh();
-        $this->assertEquals('avatar5.png', $user->avatar);
+        $this->assertEquals('avatar0.png', $user->avatar);
     }
 
     public function testAllValidAvatarsAreAccepted() {

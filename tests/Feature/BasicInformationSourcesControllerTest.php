@@ -64,7 +64,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $user = new User();
         $user->id = $id;
         $user->name = $name;
-        $user->avatar = 'avatar5.png';
+        $user->avatar = 'avatar0.png';
         $user->is_admin = User::ROLE_SUPER_ADMIN;
         $user->is_active = User::STATUS_ACTIVE;
 

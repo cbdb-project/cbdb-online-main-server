@@ -23,6 +23,8 @@
 <div class="form-group row">
     <label for="person_id_display" class="col-sm-2 col-form-label">人物基本信息</label>
     <div class="col-sm-10">
+        <input type="hidden" class="person_id" value="{{ $personId }}">
+        <input type="hidden" class="dynasty_name" value="{{ $dynastyName }}">
         <div class="card bg-light">
             <div class="card-body p-3">
                 <div class="row">

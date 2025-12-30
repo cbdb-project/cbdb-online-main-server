@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 此腳本用於補足 Laravel 運行所需的 8 個表結構，
+# 此腳本用於補足 Laravel 運行所需的 9 個表結構，
 # 這些表在 CBDB 官方發布的 77 表 SQLite 資料庫中並不存在。
 
 # 容器內或專案根目錄下的路徑
@@ -14,7 +14,7 @@ fi
 echo "🔍 檢查資料庫狀態..."
 
 # 需要檢查是否存在的目標表
-TARGET_TABLES=("CBDB__NAME_FTS" "CBDB__TRAD_SIMP_MAP" "migrations" "operations" "password_resets" "personal_access_tokens" "pinyin" "users")
+TARGET_TABLES=("CBDB__NAME_FTS" "CBDB__TRAD_SIMP_MAP" "migrations" "nl_query_logs" "operations" "password_resets" "personal_access_tokens" "pinyin" "users")
 EXISTING_TABLES=""
 
 for table in "${TARGET_TABLES[@]}"; do
@@ -30,7 +30,7 @@ if [ ! -z "$EXISTING_TABLES" ]; then
     exit 1
 fi
 
-echo "⏳ 正在為 $DB_FILE 補足 8 個表的 Schema..."
+echo "⏳ 正在為 $DB_FILE 補足 9 個表的 Schema..."
 
 sqlite3 "$DB_FILE" <<'EOF'
 CREATE TABLE IF NOT EXISTS "CBDB__NAME_FTS" (
@@ -56,6 +56,20 @@ CREATE TABLE IF NOT EXISTS "migrations" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "migration" varchar(255) NOT NULL,
     "batch" INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "nl_query_logs" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "user_id" INTEGER,
+    "question" TEXT NOT NULL,
+    "generated_sql" TEXT,
+    "explanation" TEXT,
+    "llm_prompt" TEXT,
+    "llm_response" TEXT,
+    "success" tinyint(1) NOT NULL DEFAULT '0',
+    "error_message" TEXT,
+    "execution_time_ms" INTEGER,
+    "created_at" TEXT NULL DEFAULT NULL,
+    "updated_at" TEXT NULL DEFAULT NULL
 );
 CREATE TABLE IF NOT EXISTS "operations" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,

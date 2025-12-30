@@ -1096,15 +1096,41 @@ class BiogMainRepository {
         #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
         #20240710提前做一次查詢，檢查資料庫是否有0筆資料或多筆資料。
         $kin_code_pair = KinshipCode::find($old_kin_code);
-        $sum = DB::table('KIN_DATA')
-        ->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair1]])
-        ->orWhere([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair2]])
-        ->get();
+        $sumQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+            $query->where('c_kin_id', $id)
+                ->where('c_personid', $old_kin_id)
+                ->where('c_autogen_notes', $c_autogen_notes)
+                ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+        });
+
+        if (!empty($kin_code_pair->c_kin_pair2)) {
+            $sumQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                $query->where('c_kin_id', $id)
+                    ->where('c_personid', $old_kin_id)
+                    ->where('c_autogen_notes', $c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+            });
+        }
+
+        $sum = $sumQuery->get();
         if (count($sum) == 1) {
-            DB::table('KIN_DATA')
-            ->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair1]])
-            ->orWhere([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes], ['c_kin_code', $kin_code_pair->c_kin_pair2]])
-            ->update($data);
+            $updateQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                $query->where('c_kin_id', $id)
+                    ->where('c_personid', $old_kin_id)
+                    ->where('c_autogen_notes', $c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+            });
+
+            if (!empty($kin_code_pair->c_kin_pair2)) {
+                $updateQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                    $query->where('c_kin_id', $id)
+                        ->where('c_personid', $old_kin_id)
+                        ->where('c_autogen_notes', $c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+                });
+            }
+
+            $updateQuery->update($data);
         } else {
             DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]])->update($data);
         }
@@ -1154,17 +1180,23 @@ class BiogMainRepository {
 
         (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', $id, $row);
 
-        $row2 = DB::table('KIN_DATA')->where([
-            ['c_kin_id',$row->c_personid],
-            ['c_personid', $row->c_kin_id],
-            ['c_autogen_notes', $row->c_autogen_notes],
-            ['c_kin_code', $kin_code_pair->c_kin_pair1],
-        ])->orWhere([
-            ['c_kin_id',$row->c_personid],
-            ['c_personid', $row->c_kin_id],
-            ['c_autogen_notes', $row->c_autogen_notes],
-            ['c_kin_code', $kin_code_pair->c_kin_pair2],
-        ])->first();
+        $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
+            $query->where('c_kin_id', $row->c_personid)
+                ->where('c_personid', $row->c_kin_id)
+                ->where('c_autogen_notes', $row->c_autogen_notes)
+                ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+        });
+
+        if (!empty($kin_code_pair->c_kin_pair2)) {
+            $row2Query->orWhere(function ($query) use ($row, $kin_code_pair) {
+                $query->where('c_kin_id', $row->c_personid)
+                    ->where('c_personid', $row->c_kin_id)
+                    ->where('c_autogen_notes', $row->c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+            });
+        }
+
+        $row2 = $row2Query->first();
 
         DB::table('KIN_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -1174,35 +1206,47 @@ class BiogMainRepository {
 
         //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
         if ($row2 !== null && is_null($row2->c_modified_date)) {
-            DB::table('KIN_DATA')->where([
-                ['c_kin_id',$row2->c_kin_id],
-                ['c_personid', $row2->c_personid],
-                ['c_source', $row2->c_source],
-                ['c_autogen_notes', $row2->c_autogen_notes],
-                ['c_kin_code', $kin_code_pair->c_kin_pair1],
-            ])->orWhere([
-                ['c_kin_id',$row2->c_kin_id],
-                ['c_personid', $row2->c_personid],
-                ['c_source', $row2->c_source],
-                ['c_autogen_notes', $row2->c_autogen_notes],
-                ['c_kin_code', $kin_code_pair->c_kin_pair2],
-            ])->delete();
+            $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
+                $query->where('c_kin_id', $row2->c_kin_id)
+                    ->where('c_personid', $row2->c_personid)
+                    ->where('c_source', $row2->c_source)
+                    ->where('c_autogen_notes', $row2->c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+            });
+
+            if (!empty($kin_code_pair->c_kin_pair2)) {
+                $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
+                    $query->where('c_kin_id', $row2->c_kin_id)
+                        ->where('c_personid', $row2->c_personid)
+                        ->where('c_source', $row2->c_source)
+                        ->where('c_autogen_notes', $row2->c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+                });
+            }
+
+            $deleteQuery->delete();
         } elseif ($row2 !== null) {
-            DB::table('KIN_DATA')->where([
-                ['c_kin_id',$row2->c_kin_id],
-                ['c_personid', $row2->c_personid],
-                ['c_source', $row2->c_source],
-                ['c_autogen_notes', $row2->c_autogen_notes],
-                ['c_kin_code', $kin_code_pair->c_kin_pair1],
-                ['c_modified_date', $row2->c_modified_date],
-            ])->orWhere([
-                ['c_kin_id',$row2->c_kin_id],
-                ['c_personid', $row2->c_personid],
-                ['c_source', $row2->c_source],
-                ['c_autogen_notes', $row2->c_autogen_notes],
-                ['c_kin_code', $kin_code_pair->c_kin_pair2],
-                ['c_modified_date', $row2->c_modified_date],
-            ])->delete();
+            $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
+                $query->where('c_kin_id', $row2->c_kin_id)
+                    ->where('c_personid', $row2->c_personid)
+                    ->where('c_source', $row2->c_source)
+                    ->where('c_autogen_notes', $row2->c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1)
+                    ->where('c_modified_date', $row2->c_modified_date);
+            });
+
+            if (!empty($kin_code_pair->c_kin_pair2)) {
+                $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
+                    $query->where('c_kin_id', $row2->c_kin_id)
+                        ->where('c_personid', $row2->c_personid)
+                        ->where('c_source', $row2->c_source)
+                        ->where('c_autogen_notes', $row2->c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2)
+                        ->where('c_modified_date', $row2->c_modified_date);
+                });
+            }
+
+            $deleteQuery->delete();
         }
     }
 

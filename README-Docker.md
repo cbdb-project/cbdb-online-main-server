@@ -145,7 +145,7 @@ http://localhost:8000
 獲取包含 77 個表格的 CBDB 官方最新 SQLite 資料庫（例如 `cbdb_20251223.db`）。將其重命名為 `database/database.sqlite3`。
 
 ### 2. 補足 Schema
-官方資料庫缺少 Laravel 運行所需的管理表和搜索優化表。在容器啟動後（或在宿主機通過 `sqlite3`），運行以下腳本補足這 8 個表的 schema：
+官方資料庫缺少 Laravel 運行所需的管理表和搜索優化表。在容器啟動後（或在宿主機通過 `sqlite3`），運行以下腳本補足這 9 個表的 schema：
 `CBDB__NAME_FTS`, `CBDB__TRAD_SIMP_MAP`, `migrations`, `operations`, `password_resets`, `personal_access_tokens`, `pinyin`, `users`
 
 ```bash
@@ -153,7 +153,7 @@ http://localhost:8000
 docker compose exec app bash scripts/patch_sqlite_db_for_dev.sh
 ```
 
-注意：如果 8 個表格中的任何一個已存在，腳本會報錯並停止執行。這時需要手工檢查資料庫檔案，刪除已存在的表格，再重新執行腳本。
+注意：如果 9 個表格中的任何一個已存在，腳本會報錯並停止執行。這時需要手工檢查資料庫檔案，刪除已存在的表格，再重新執行腳本。
 
 ### 3. 啟動並登錄管理員帳戶
 啟動 Docker (`docker compose up -d`)，訪問 `http://localhost:8000/`

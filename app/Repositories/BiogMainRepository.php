@@ -402,19 +402,20 @@ class BiogMainRepository {
                   ->where('A2.c_alt_name_type_code', '=', 5);
         });
 
-        $names = $names->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
-
-        $names = $names->orWhere('BIOG_MAIN.c_name', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_surname', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_mingzi', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_personid', $request->q)
-            #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
-            ->orWhere('BIOG_MAIN.c_name_proper', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_name_rm', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $request->q)
-            ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
+        $names = $names->where(function ($query) use ($request) {
+            $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%')
+                ->orWhere('BIOG_MAIN.c_name', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_surname', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_mingzi', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_personid', $request->q)
+                #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
+                ->orWhere('BIOG_MAIN.c_name_proper', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_name_rm', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $request->q)
+                ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
+        });
 
         // 使用 FIELD() 排序讓姓氏完全匹配的排在前面
         $driver = DB::connection()->getDriverName();
@@ -1695,8 +1696,10 @@ class BiogMainRepository {
             ['c_personid', '=', $old_assoc_id],
             ['c_text_title', '=', $old_c_text_title],
         ])
-        ->Where('c_assoc_code', '=', $old_c_assocship_pair1)
-        ->orWhere('c_assoc_code', '=', $old_c_assocship_pair2)
+        ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
+            $query->where('c_assoc_code', '=', $old_c_assocship_pair1)
+                ->orWhere('c_assoc_code', '=', $old_c_assocship_pair2);
+        })
         ->update($data);
 
         return $ori_data;

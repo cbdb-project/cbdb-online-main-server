@@ -1,10 +1,21 @@
 @extends('layouts.dashboard-v3')
 
+@if(!($readonly ?? false))
+    @push('head')
+        {{-- 編輯頁面不應被搜索引擎索引 --}}
+        <meta name="robots" content="noindex, nofollow">
+    @endpush
+@endif
+
 @section('content')
+    @php
+        $readonly = $readonly ?? false;
+        $disabled = $readonly ? 'disabled' : '';
+    @endphp
     @include('biogmains.banner')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">基本资料</h3>
+            <h3 class="card-title">{{ $readonly ? '基本资料（只读）' : '基本资料' }}</h3>
         </div>
 
         <div id='check_info' style='display:none;' class="alert alert-danger alert-dismissible">訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。</div>
@@ -22,7 +33,7 @@
                             <label for="c_surname_chn" class="col-sm-4 col-form-label">姓</label>
                             <div class="col-sm-8">
                                 <input type="text" name="c_surname_chn" class="form-control @error('c_surname_chn') is-invalid @enderror"
-                                       value="{{ old('c_surname_chn') ? old('c_surname_chn') : $basicinformation->c_surname_chn }}">
+                                       value="{{ old('c_surname_chn') ? old('c_surname_chn') : $basicinformation->c_surname_chn }}" {{ $disabled }}>
                                 @error('c_surname_chn')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -32,7 +43,7 @@
                             <label for="c_mingzi_chn" class="col-sm-4 col-form-label">名</label>
                             <div class="col-sm-8">
                                 <input type="text" name="c_mingzi_chn" class="form-control @error('c_mingzi_chn') is-invalid @enderror"
-                                       value="{{ old('c_mingzi_chn') ? old('c_mingzi_chn') : $basicinformation->c_mingzi_chn }}">
+                                       value="{{ old('c_mingzi_chn') ? old('c_mingzi_chn') : $basicinformation->c_mingzi_chn }}" {{ $disabled }}>
                                 @error('c_mingzi_chn')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -44,7 +55,7 @@
                             <label for="c_surname" class="col-sm-4 col-form-label">Xing</label>
                             <div class="col-sm-8">
                                 <input type="text" name="c_surname" class="form-control @error('c_surname') is-invalid @enderror"
-                                       value="{{ old('c_surname') ? old('c_surname') : $basicinformation->c_surname }}">
+                                       value="{{ old('c_surname') ? old('c_surname') : $basicinformation->c_surname }}" {{ $disabled }}>
                                 @error('c_surname')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -54,7 +65,7 @@
                             <label for="c_mingzi" class="col-sm-4 col-form-label">Ming</label>
                             <div class="col-sm-8">
                                 <input type="text" name="c_mingzi" class="form-control @error('c_mingzi') is-invalid @enderror"
-                                       value="{{ old('c_mingzi') ? old('c_mingzi') : $basicinformation->c_mingzi }}">
+                                       value="{{ old('c_mingzi') ? old('c_mingzi') : $basicinformation->c_mingzi }}" {{ $disabled }}>
                                 @error('c_mingzi')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -62,20 +73,22 @@
                         </div>
                     </div>
                 </div>
-                <div class="form-group row">
-                    <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
-                    <div class="col-sm-4">
-                        <button type="button" id="button_ajax_load" class="btn btn-info">生成拼音</button>
+                @if(!$readonly)
+                    <div class="form-group row">
+                        <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
+                        <div class="col-sm-4">
+                            <button type="button" id="button_ajax_load" class="btn btn-info">生成拼音</button>
+                        </div>
+                        <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
+                        <div class="col-sm-4">
+                        </div>
                     </div>
-                    <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
-                    <div class="col-sm-4">
-                    </div>
-                </div>
+                @endif
                 <div class="form-group row">
                     <label for="c_surname_proper" class="col-sm-2 col-form-label">外文姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_proper" class="form-control @error('c_surname_proper') is-invalid @enderror"
-                               value="{{ old('c_surname_proper') ? old('c_surname_proper') : $basicinformation->c_surname_proper }}">
+                               value="{{ old('c_surname_proper') ? old('c_surname_proper') : $basicinformation->c_surname_proper }}" {{ $disabled }}>
                         @error('c_surname_proper')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -83,7 +96,7 @@
                     <label for="c_mingzi_proper" class="col-sm-2 col-form-label">外文名</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_mingzi_proper" class="form-control @error('c_mingzi_proper') is-invalid @enderror"
-                               value="{{ old('c_mingzi_proper') ? old('c_mingzi_proper') : $basicinformation->c_mingzi_proper }}">
+                               value="{{ old('c_mingzi_proper') ? old('c_mingzi_proper') : $basicinformation->c_mingzi_proper }}" {{ $disabled }}>
                         @error('c_mingzi_proper')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -93,7 +106,7 @@
                     <label for="c_surname_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫姓</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_surname_rm" class="form-control @error('c_surname_rm') is-invalid @enderror"
-                               value="{{ old('c_surname_rm') ? old('c_surname_rm') : $basicinformation->c_surname_rm }}">
+                               value="{{ old('c_surname_rm') ? old('c_surname_rm') : $basicinformation->c_surname_rm }}" {{ $disabled }}>
                         @error('c_surname_rm')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -101,7 +114,7 @@
                     <label for="c_mingzi_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫名</label>
                     <div class="col-sm-4">
                         <input type="text" name="c_mingzi_rm" class="form-control @error('c_mingzi_rm') is-invalid @enderror"
-                               value="{{ old('c_mingzi_rm') ? old('c_mingzi_rm') : $basicinformation->c_mingzi_rm }}">
+                               value="{{ old('c_mingzi_rm') ? old('c_mingzi_rm') : $basicinformation->c_mingzi_rm }}" {{ $disabled }}>
                         @error('c_mingzi_rm')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -154,7 +167,7 @@
                 <div class="form-group row">
                     <label for="c_female" class="col-sm-2 col-form-label">性别（原female）</label>
                     <div class="col-sm-4">
-                        <select class="form-control select2" name="c_female">
+                        <select class="form-control select2" name="c_female" {{ $disabled }}>
                             <option value="0"></option>
                             <option value="0" {{ $basicinformation->c_female == 0? 'selected': '' }}>0-男
                             </option>
@@ -164,13 +177,13 @@
                     </div>
                     <label for="c_ethnicity_code" class="col-sm-2 col-form-label">種族/部族</label>
                     <div class="col-sm-4">
-                        <select-vue name="c_ethnicity_code" model="ethnicity" selected="{{ $basicinformation->c_ethnicity_code }}"></select-vue>
+                        <select-vue name="c_ethnicity_code" model="ethnicity" selected="{{ $basicinformation->c_ethnicity_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
                     <label for="c_dy" class="col-sm-2 col-form-label">朝代(dy)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_dy" model="dynasty" selected="{{ $basicinformation->c_dy }}"></select-vue>
+                        <select-vue name="c_dy" model="dynasty" selected="{{ $basicinformation->c_dy }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
 
@@ -195,6 +208,7 @@
                         :dayValue="$basicinformation->c_by_day"
                         dayGzName="c_by_day_gz"
                         :dayGzValue="$basicinformation->c_by_day_gz"
+                        :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
@@ -218,6 +232,7 @@
                         :dayValue="$basicinformation->c_dy_day"
                         dayGzName="c_dy_day_gz"
                         :dayGzValue="$basicinformation->c_dy_day_gz"
+                        :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
@@ -282,14 +297,14 @@
                     <label for="c_death_age" class="col-sm-2 col-form-label">享年(death_age)</label>
                     <div class="col-sm-4">
                         <input type="number" name="c_death_age" class="form-control @error('c_death_age') is-invalid @enderror"
-                               value="{{ $basicinformation->c_death_age }}">
+                               value="{{ $basicinformation->c_death_age }}" {{ $disabled }}>
                         @error('c_death_age')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
                     <label for="c_death_age_range" class="col-sm-2 col-form-label">范围(c_death_age_range)</label>
                     <div class="col-sm-4">
-                        <select class="form-control select2" name="c_death_age_range" id="c_death_age_range">
+                        <select class="form-control select2" name="c_death_age_range" id="c_death_age_range" {{ $disabled }}>
                             {{--<option value="null"></option>--}}
                             @foreach($yearRange as $item )
                                 @if($item->c_range_code === $basicinformation->c_death_age_range)
@@ -317,6 +332,7 @@
                         notesName="c_fl_ey_notes"
                         :notesValue="$basicinformation->c_fl_ey_notes"
                         notesLabel="在世始年註"
+                        :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
@@ -334,25 +350,26 @@
                         notesName="c_fl_ly_notes"
                         :notesValue="$basicinformation->c_fl_ly_notes"
                         notesLabel="在世終年註"
+                        :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
                     <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望(choronym_code)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_choronym_code" model="choronym" selected="{{ $basicinformation->c_choronym_code }}"></select-vue>
+                        <select-vue name="c_choronym_code" model="choronym" selected="{{ $basicinformation->c_choronym_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
                     <label for="c_household_status_code" class="col-sm-2 col-form-label">戶籍(c_household_status)</label>
                     <div class="col-sm-10">
-                        <select-vue name="c_household_status_code" model="household" selected="{{ $basicinformation->c_household_status_code }}"></select-vue>
+                        <select-vue name="c_household_status_code" model="household" selected="{{ $basicinformation->c_household_status_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
                     <label for="c_notes" class="col-sm-2 col-form-label">註</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
-                                  rows="5">{{ $basicinformation->c_notes }}</textarea>
+                                  rows="5" {{ $disabled }}>{{ $basicinformation->c_notes }}</textarea>
                     </div>
                 </div>
                 
@@ -363,53 +380,57 @@
                     :modifiedBy="$basicinformation->c_modified_by"
                     :modifiedDate="$basicinformation->c_modified_date"
                 />
+                @if(!$readonly)
+                    @auth
+                        @if(Auth::user()->isActive())
+                            <div class="form-group row">
+                                <div class="offset-sm-2 col-sm-10">
+                                    <button type="submit" class="btn btn-secondary" id="basic-info-submit">Submit</button>
+                                </div>
+                            </div>
+                        @endif
+                    @endauth
+                @endif
+
+            </form>
+            @if(!$readonly)
                 @auth
                     @if(Auth::user()->isActive())
-                        <div class="form-group row">
-                            <div class="offset-sm-2 col-sm-10">
-                                <button type="submit" class="btn btn-secondary" id="basic-info-submit">Submit</button>
-                            </div>
+                        <div class="btn-group float-right">
+                            <a href=""
+                               onclick="
+                                           let msg = '您真的确定要删除吗？\n\n请确认！';
+                                           if (confirm(msg)===true){
+                                           event.preventDefault();
+                                           document.getElementById('delete-form').submit();
+                                           }else{
+                                           return false;
+                                           }
+                                           "
+                               class="btn btn-danger">Delete</a>
+
                         </div>
                     @endif
                 @endauth
-
-            </form>
-            @auth
-                @if(Auth::user()->isActive())
-                    <div class="btn-group float-right">
-                        <a href=""
-                           onclick="
-                                       let msg = '您真的确定要删除吗？\n\n请确认！';
-                                       if (confirm(msg)===true){
-                                       event.preventDefault();
-                                       document.getElementById('delete-form').submit();
-                                       }else{
-                                       return false;
-                                       }
-                                       "
-                           class="btn btn-danger">Delete</a>
-
-                    </div>
-                @endif
-            @endauth
-            @auth
-                @if(Auth::user()->isActive())
-                    <div class="btn-group float-right">
-                        <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
-                    </div>
-                    <div class="btn-group float-right">
-                        <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Duplicate Basic Info</a>
-                    </div>
-                @endif
-            @endauth
-            @auth
-                @if(Auth::user()->isActive())
-                    <form id="delete-form" action="{{ route('basicinformation.destroy', ['basicinformation' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
-                        {{ method_field('DELETE') }}
-                        {{ csrf_field() }}
-                    </form>
-                @endif
-            @endauth
+                @auth
+                    @if(Auth::user()->isActive())
+                        <div class="btn-group float-right">
+                            <a href="../../basicinformation/{{$basicinformation->c_personid}}/Duplicate_Collateral_Info" class="btn btn-success" style="margin-right:40px;">Duplicate Collateral Info</a>
+                        </div>
+                        <div class="btn-group float-right">
+                            <a href="../../basicinformation/{{$basicinformation->c_personid}}/saveas" class="btn btn-success" style="margin-right:40px;">Duplicate Basic Info</a>
+                        </div>
+                    @endif
+                @endauth
+                @auth
+                    @if(Auth::user()->isActive())
+                        <form id="delete-form" action="{{ route('basicinformation.destroy', ['basicinformation' => $basicinformation->c_personid]) }}" method="POST" style="display: none;">
+                            {{ method_field('DELETE') }}
+                            {{ csrf_field() }}
+                        </form>
+                    @endif
+                @endauth
+            @endif
         </div>
     </div>
 @endsection

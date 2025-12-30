@@ -576,10 +576,27 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试编辑页面：/basicinformation/{id}/edit
+     * 测试只读页面：/basicinformation/{id}（未登录可訪問）
+     */
+    public function test_basicinformation_show_page_loads() {
+        $response = $this->get("/basicinformation/{$this->testPersonId}");
+        $response->assertStatus(200);
+    }
+
+    /**
+     * 测试编辑页面：/basicinformation/{id}/edit（未登录时重定向）
+     */
+    public function test_basicinformation_edit_page_redirects_when_not_authenticated() {
+        $response = $this->get("/basicinformation/{$this->testPersonId}/edit");
+        $response->assertStatus(302);
+        $response->assertRedirect("/basicinformation/{$this->testPersonId}");
+    }
+
+    /**
+     * 测试编辑页面：/basicinformation/{id}/edit（登录后可訪問）
      */
     public function test_basicinformation_edit_page_loads() {
-        $response = $this->get("/basicinformation/{$this->testPersonId}/edit");
+        $response = $this->actingAs($this->user)->get("/basicinformation/{$this->testPersonId}/edit");
         $response->assertStatus(200);
     }
 

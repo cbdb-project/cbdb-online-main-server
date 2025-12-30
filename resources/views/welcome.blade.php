@@ -228,8 +228,8 @@
                 const buildUrl = (term) => {
                     const isNumeric = /^\d+$/.test(term);
                     return isNumeric
-                        ? `/cbdbapi/person?id=${encodeURIComponent(term)}`
-                        : `/cbdbapi/person?name=${encodeURIComponent(term)}`;
+                        ? `/basicinformation/${encodeURIComponent(term)}`
+                        : `/basicinformation?q=${encodeURIComponent(term)}`;
                 };
 
                 const navigate = (term) => {

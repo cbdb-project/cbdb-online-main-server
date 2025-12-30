@@ -153,15 +153,46 @@ class BasicInformationController extends Controller {
      * Display the specified resource.
      *
      * @param  int $id
-     * @return \App\Models\BiogMain|BiogMainRepository|BiogMainRepository[]|\Illuminate\Database\Eloquent\Collection|\Illuminate\Database\Eloquent\Model|\Illuminate\Http\Response
+     * @return \Illuminate\Http\Response
      */
     public function show($id) {
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
-        $biogbasicinformation->kinship;
-        $biogbasicinformation->office;
+        $dynasties = $this->dynastyRepository->dynasties();
+        $nianhaos = $this->nianhaoRepository->nianhaos();
+        $yearRange = $this->yearRangeRepository->yearRange();
 
-        return $biogbasicinformation;
-        //        return view('biogmains.show', $result);
+        // 處理 basicinformation 可能為 null 或缺少字段的情況
+        $personLabel = $id;
+
+        try {
+            if ($biogbasicinformation) {
+                $nameChn = $biogbasicinformation->c_name_chn ?? '';
+                $name = $biogbasicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
+        return view('biogmains.basicinformation.edit', [
+            'basicinformation' => $biogbasicinformation,
+            'dynasties' => $dynasties,
+            'nianhaos' => $nianhaos,
+            'yearRange' => $yearRange,
+            'page_title' => '人物基本資料',
+            'page_description' => '基本信息表 基本资料（只读）',
+            'readonly' => true,
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.show', $id)],
+                ['label' => '查看', 'url' => '#'],
+            ],
+        ]);
     }
 
     /**
@@ -171,6 +202,11 @@ class BasicInformationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit($id) {
+        // 未登錄或無權限的用戶重定向到只讀頁面
+        if (!Auth::check() || !Auth::user()->isActive()) {
+            return redirect()->route('basicinformation.show', $id);
+        }
+
         $biogbasicinformation = $this->biogMainRepository->byPersonId($id);
         $dynasties = $this->dynastyRepository->dynasties();
         $nianhaos = $this->nianhaoRepository->nianhaos();

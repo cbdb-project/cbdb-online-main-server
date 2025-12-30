@@ -1,5 +1,5 @@
 <template>
-    <select class="form-control select2" :id="elementId" v-bind:name="name" v-model="selectedid">
+    <select class="form-control select2" :id="elementId" v-bind:name="name" v-model="selectedid" :disabled="disabled">
         <!--<option disabled value="">请选择</option>-->
         <option value="">请选择</option>
         <option v-for="item in data" v-bind:value="id(item)">{{ normalization(item) }}</option>
@@ -13,7 +13,7 @@
     const pendingRequests = {};
 
     export default {
-        props: ['name', 'model', 'selected', 'elementId', 'idKey'],
+        props: ['name', 'model', 'selected', 'elementId', 'idKey', 'disabled'],
         data() {
           return {
               data: {},

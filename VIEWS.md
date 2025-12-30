@@ -4,7 +4,6 @@
 
 | Key (`/view/{key}`) | View 名稱 | 顯示標題 | 概要 |
 | --- | --- | --- | --- |
-| `addresses` | `View_Address` | 地址層級檢視 | 採用資料庫 View_Address，呈現地址與最多五層隸屬關係及座標。 |
 | `altname-data` | `View_AltnameData` | 別名資料檢視 | 彙整 ALTNAME_DATA 及別名類型、來源文本資訊。 |
 | `assoc-data` | `View_AssociationData` | 社會關係資料檢視 | 展開 ASSOC_DATA 與親屬、機構、主題、地址等關聯資訊。 |
 | `biog-addr-data` | `View_BiogAddrData` | 人物地址資料檢視 | 人物地址與地址類型、年號、來源等明細。 |

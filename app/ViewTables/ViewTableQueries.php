@@ -32,49 +32,6 @@ class ViewTableQueries {
     }
 
     /**
-     * Build query for the address hierarchy view (View_Address).
-     */
-    public static function addressHierarchy(): Builder {
-        return DB::table('View_Address')
-            ->select([
-                'c_addr_id',
-                'c_name',
-                'c_name_chn',
-                'c_admin_type',
-                'x_coord',
-                'y_coord',
-                'c_firstyear',
-                'c_lastyear',
-                'belongs1_ID',
-                'belongs1_Name',
-                'belongs1_Type',
-                'belongs1_FirstYear',
-                'belongs1_LastYear',
-                'belongs2_ID',
-                'belongs2_Name',
-                'belongs2_Type',
-                'belongs2_FirstYear',
-                'belongs2_LastYear',
-                'belongs3_ID',
-                'belongs3_Name',
-                'belongs3_Type',
-                'belongs3_FirstYear',
-                'belongs3_LastYear',
-                'belongs4_ID',
-                'belongs4_Name',
-                'belongs4_Type',
-                'belongs4_FirstYear',
-                'belongs4_LastYear',
-                'belongs5_ID',
-                'belongs5_Name',
-                'belongs5_Type',
-                'belongs5_FirstYear',
-                'belongs5_LastYear',
-            ])
-            ->orderBy('c_addr_id');
-    }
-
-    /**
      * Build query for the Association Data view.
      */
     public static function associationData(): Builder {

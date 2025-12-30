@@ -201,12 +201,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route('view.show', 'addresses') }}" class="nav-link {{ $activePage == '地址層級檢視' ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-layer-group"></i>
-                                <p>地址層級檢視</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a href="{{ route('view.show', 'altname-data') }}" class="nav-link {{ $activePage == '別名資料檢視' ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-user-tag"></i>
                                 <p>別名資料檢視</p>

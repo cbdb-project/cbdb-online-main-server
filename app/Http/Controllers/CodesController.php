@@ -161,6 +161,16 @@ class CodesController extends Controller {
         ],
         'ALTNAME_CODES' => ['c_name_type_code', 'c_name_type_desc_chn', 'c_name_type_desc'],
         'APPOINTMENT_CODES' => ['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc'],
+        'ASSOC_CODES' => [
+            'c_assoc_code',
+            'c_assoc_pair',
+            'c_assoc_pair2',
+            'c_assoc_desc',
+            'c_assoc_desc_chn',
+            'c_assoc_role_type',
+            'c_sortorder',
+            'c_example',
+        ],
         'TEXT_CODES' => ['c_textid', 'c_title_chn', 'c_title'],
         'SOCIAL_INSTITUTION_CODES' => ['c_inst_name_code', 'c_inst_code', 'c_inst_type_code'],
     ];

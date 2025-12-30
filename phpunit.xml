@@ -17,6 +17,7 @@
     <env name="SESSION_DRIVER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SKIP_CSRF_TOKEN" value="true"/>
+    <env name="LOG_CHANNEL" value="errorlog"/>
   </php>
   <source>
     <include>

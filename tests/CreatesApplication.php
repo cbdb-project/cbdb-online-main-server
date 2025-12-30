@@ -18,6 +18,9 @@ trait CreatesApplication {
         // Force in-memory SQLite for all tests to avoid touching external databases.
         $app['config']->set('database.default', 'sqlite');
         $app['config']->set('database.connections.sqlite.database', ':memory:');
+        // Force non-file logging in tests to avoid permission issues.
+        $app['config']->set('logging.default', 'errorlog');
+        $app['config']->set('logging.channels.stack.channels', ['errorlog']);
         // Reset any pre-bootstrap connection that may have been opened by service providers.
         DB::purge('sqlite');
         DB::setDefaultConnection('sqlite');

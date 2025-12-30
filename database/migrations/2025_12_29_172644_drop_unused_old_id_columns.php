@@ -21,7 +21,7 @@ return new class () extends Migration {
         // Reason: SQLite rebuilds the entire table when executing ALTER TABLE DROP COLUMN,
         // which triggers complex foreign key constraint issues. This migration is designed
         // for production environment (MySQL/MariaDB) only.
-        if (config('database.default') === 'sqlite') {
+        if ($this->isSqliteConnection()) {
             return;
         }
 
@@ -82,7 +82,7 @@ return new class () extends Migration {
      */
     public function down(): void {
         // Skip this migration in SQLite environment
-        if (config('database.default') === 'sqlite') {
+        if ($this->isSqliteConnection()) {
             return;
         }
 
@@ -109,5 +109,9 @@ return new class () extends Migration {
             $table->integer('c_posting_id_old')->nullable()->after('c_posting_id');
             $table->index('c_posting_id_old', 'c_posting_id_old_POSTING_DATA_index');
         });
+    }
+
+    private function isSqliteConnection(): bool {
+        return Schema::getConnection()->getDriverName() === 'sqlite';
     }
 };

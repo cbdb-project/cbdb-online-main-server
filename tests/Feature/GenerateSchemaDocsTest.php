@@ -8,10 +8,14 @@ use Tests\TestCase;
 
 class GenerateSchemaDocsTest extends TestCase {
     protected string $tempOutputPath;
+    protected string $relativeOutputPath;
+    protected string $mysqlConnection;
 
     protected function setUp(): void {
         parent::setUp();
-        $this->tempOutputPath = base_path('tests/temp_schema_' . uniqid() . '.md');
+        $this->relativeOutputPath = 'tests/temp_schema_' . uniqid() . '.md';
+        $this->tempOutputPath = base_path($this->relativeOutputPath);
+        $this->mysqlConnection = 'missing_mysql';
 
         // 檢查 SQLite 是否可用
         if (!extension_loaded('pdo_sqlite')) {
@@ -30,7 +34,8 @@ class GenerateSchemaDocsTest extends TestCase {
     public function it_can_generate_sqlite_schema_documentation() {
         // 運行命令生成文檔
         Artisan::call('cbdb:generate-schema-docs', [
-            '--output' => basename($this->tempOutputPath),
+            '--output' => $this->relativeOutputPath,
+            '--mysql-connection' => $this->mysqlConnection,
         ]);
 
         // 驗證文件已生成
@@ -52,7 +57,8 @@ class GenerateSchemaDocsTest extends TestCase {
     /** @test */
     public function it_includes_table_columns_and_types() {
         Artisan::call('cbdb:generate-schema-docs', [
-            '--output' => basename($this->tempOutputPath),
+            '--output' => $this->relativeOutputPath,
+            '--mysql-connection' => $this->mysqlConnection,
         ]);
 
         $content = File::get($this->tempOutputPath);
@@ -66,7 +72,8 @@ class GenerateSchemaDocsTest extends TestCase {
     /** @test */
     public function it_marks_views_differently_from_tables() {
         Artisan::call('cbdb:generate-schema-docs', [
-            '--output' => basename($this->tempOutputPath),
+            '--output' => $this->relativeOutputPath,
+            '--mysql-connection' => $this->mysqlConnection,
         ]);
 
         $content = File::get($this->tempOutputPath);
@@ -80,7 +87,8 @@ class GenerateSchemaDocsTest extends TestCase {
     /** @test */
     public function it_shows_primary_keys() {
         Artisan::call('cbdb:generate-schema-docs', [
-            '--output' => basename($this->tempOutputPath),
+            '--output' => $this->relativeOutputPath,
+            '--mysql-connection' => $this->mysqlConnection,
         ]);
 
         $content = File::get($this->tempOutputPath);
@@ -96,6 +104,7 @@ class GenerateSchemaDocsTest extends TestCase {
         try {
             Artisan::call('cbdb:generate-schema-docs', [
                 '--output' => $customPath,
+                '--mysql-connection' => $this->mysqlConnection,
             ]);
 
             $this->assertFileExists(base_path($customPath));

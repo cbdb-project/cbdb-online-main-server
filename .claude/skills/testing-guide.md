@@ -12,6 +12,89 @@
 - **CSRF 中間件**：Feature 測試已停用 CSRF middleware
 - **測試隔離**：每個測試方法都應該獨立運行，不依賴其他測試
 
+### 環境配置故障排查
+
+#### SQLite 擴展缺失問題
+
+如果運行測試時遇到以下錯誤：
+
+```
+could not find driver (Connection: sqlite, SQL: ...)
+```
+
+或
+
+```
+PDOException: could not find driver
+```
+
+這表示 PHP 缺少 SQLite 擴展。根據環境不同，有以下解決方案：
+
+##### 方案 1：網絡環境下自動安裝（推薦）
+
+如果環境支持網絡訪問，Session Start Hook（`.claude/hooks/session-start.md`）會自動檢測並安裝缺失的擴展。重新啟動會話即可。
+
+##### 方案 2：網絡受限環境下手動安裝
+
+本專案在 `.claude/php-extensions/` 目錄中提供了預編譯的 SQLite 擴展文件（支援 x86_64 和 aarch64 架構），可在網絡受限環境下使用。
+
+**自動加載流程**：
+
+Session Start Hook 會在每次會話啟動時：
+1. 檢測當前系統架構（`uname -m`）
+2. 檢查 `pdo_sqlite` 擴展是否已加載
+3. 如果未加載且對應架構的擴展文件存在，自動軟鏈接到 PHP 擴展目錄
+4. 驗證擴展是否成功加載
+
+**手動驗證**：
+
+```bash
+# 檢查擴展文件是否存在
+ls -lh .claude/php-extensions/$(uname -m)/
+
+# 驗證擴展是否已加載
+php -m | grep -i sqlite
+
+# 應該看到：
+# pdo_sqlite
+# sqlite3
+```
+
+**獲取擴展文件**（如果目錄中沒有）：
+
+如果 `.claude/php-extensions/` 目錄中沒有對應架構的擴展文件，可以在有網絡連接的環境中獲取：
+
+```bash
+# 檢查當前 PHP 版本和架構
+php -v
+uname -m
+
+# x86_64 架構：下載並提取擴展
+wget https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php8.4/php8.4-sqlite3_8.4.15-1+ubuntu24.04.1+deb.sury.org+1_amd64.deb
+dpkg-deb -x php8.4-sqlite3_*.deb extracted/
+cp extracted/usr/lib/php/20240924/pdo_sqlite.so .claude/php-extensions/x86_64/
+cp extracted/usr/lib/php/20240924/sqlite3.so .claude/php-extensions/x86_64/
+
+# aarch64 架構：使用 arm64.deb 替代 amd64.deb
+```
+
+**版本兼容性注意事項**：
+
+- 擴展文件必須與當前 PHP 版本的 API 號匹配
+- 檢查 PHP API 版本：`php -i | grep "PHP Extension"`
+- 不同架構的擴展文件不可混用
+- 本專案預設為 PHP 8.4.x（API 版本 20240924）
+
+**常見錯誤**：
+
+| 錯誤信息 | 原因 | 解決方案 |
+|---------|------|---------|
+| `Extension version does not match` | 擴展文件的 PHP API 版本與當前 PHP 不匹配 | 檢查 `php -i \| grep "PHP Extension"`，下載對應版本的擴展 |
+| `Cannot load extension` | 架構不匹配或文件損壞 | 確認 `uname -m` 與擴展文件目錄一致，檢查文件完整性 |
+| `Permission denied` | 文件權限不足 | 執行 `chmod 644 .claude/php-extensions/x86_64/*.so` |
+
+詳細說明請參考 `.claude/php-extensions/README.md`。
+
 ### 運行測試
 
 ```bash

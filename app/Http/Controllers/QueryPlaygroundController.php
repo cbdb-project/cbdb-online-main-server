@@ -259,7 +259,77 @@ class QueryPlaygroundController extends Controller {
     }
 
     /**
-     * 使用自然语言生成 SQL 查询
+     * 使用自然语言生成 SQL 查询（SSE 流式响应）
+     *
+     * @param Request $request
+     * @param NaturalLanguageQueryService $nlqService
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function generateFromNLStream(Request $request, NaturalLanguageQueryService $nlqService) {
+        if (!Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        }
+
+        $request->validate([
+            'question' => 'required|string|max:1000',
+            'tables' => 'nullable|array',
+            'tables.*' => 'string',
+            'use_tools' => 'nullable|boolean',
+        ]);
+
+        $question = $request->input('question');
+        $tables = $request->input('tables');
+
+        $useTools = $request->boolean('use_tools', true);
+
+        return response()->stream(function () use ($question, $tables, $nlqService, $useTools) {
+            // 设置 SSE 头部
+            header('Content-Type: text/event-stream');
+            header('Cache-Control: no-cache');
+            header('X-Accel-Buffering: no'); // 禁用 nginx 缓冲
+
+            // 发送事件的辅助函数
+            $sendEvent = function ($event, $data) {
+                echo "event: {$event}\n";
+                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                ob_flush();
+                flush();
+            };
+
+            try {
+                // 调用服务并传入进度回调
+                $result = $nlqService->generateSQL($question, $tables, $sendEvent, $useTools);
+
+                // 发送最终结果
+                if ($result['success']) {
+                    $sendEvent('complete', [
+                        'success' => true,
+                        'sql' => $result['sql'],
+                        'explanation' => $result['explanation'],
+                        'model' => $result['model'] ?? null,
+                        'tool_calls' => $result['tool_calls'] ?? null,
+                    ]);
+                } else {
+                    $sendEvent('error', [
+                        'success' => false,
+                        'error' => $result['error'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $sendEvent('error', [
+                    'success' => false,
+                    'error' => '生成 SQL 时发生错误: ' . $e->getMessage(),
+                ]);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * 使用自然语言生成 SQL 查询（兼容旧版，非流式）
      *
      * @param Request $request
      * @param NaturalLanguageQueryService $nlqService
@@ -274,12 +344,14 @@ class QueryPlaygroundController extends Controller {
             'question' => 'required|string|max:1000',
             'tables' => 'nullable|array',
             'tables.*' => 'string',
+            'use_tools' => 'nullable|boolean',
         ]);
 
         $question = $request->input('question');
         $tables = $request->input('tables');
 
-        $result = $nlqService->generateSQL($question, $tables);
+        $useTools = $request->boolean('use_tools', true);
+        $result = $nlqService->generateSQL($question, $tables, null, $useTools);
 
         if (!$result['success']) {
             return response()->json([
@@ -293,6 +365,7 @@ class QueryPlaygroundController extends Controller {
             'sql' => $result['sql'],
             'explanation' => $result['explanation'],
             'model' => $result['model'] ?? null,
+            'tool_calls' => $result['tool_calls'] ?? null,
         ]);
     }
 

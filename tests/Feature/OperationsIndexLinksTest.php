@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Operation;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationsIndexLinksTest extends TestCase {
@@ -52,6 +53,7 @@ class OperationsIndexLinksTest extends TestCase {
         });
     }
 
+    #[Test]
     public function test_operations_index_generates_links_for_non_person_code_resources() {
         // 创建测试用户
         $user = User::create([
@@ -85,6 +87,7 @@ class OperationsIndexLinksTest extends TestCase {
         $response->assertSee('(本修改不涉及人物)');
     }
 
+    #[Test]
     public function test_code_resource_link_generation_logic() {
         // 测试 codes 表配置是否正确
         $codeTableKeys = array_keys(config('codes.tables', []));
@@ -109,6 +112,7 @@ class OperationsIndexLinksTest extends TestCase {
         $this->assertEquals('/codes/OFFICE_CODES/803819/edit', $expectedLink);
     }
 
+    #[Test]
     public function test_person_specific_link_priority_logic() {
         // 测试链接优先级逻辑：人物特定链接优先于代码表链接
 
@@ -147,6 +151,7 @@ class OperationsIndexLinksTest extends TestCase {
         $this->assertStringNotContainsString('/codes/ALTNAME_DATA/', $resourceLink);
     }
 
+    #[Test]
     public function test_operations_index_does_not_generate_links_for_deleted_operations() {
         // 创建测试用户
         $user = User::create([

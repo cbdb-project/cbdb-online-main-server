@@ -12,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CodesControllerTest extends TestCase {
@@ -98,6 +99,7 @@ class CodesControllerTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function testGuestCannotStoreRows() {
         $this->operationSpy->calls = [];
         $payload = [
@@ -113,6 +115,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testInactiveUserCannotStoreRows() {
         $this->operationSpy->calls = [];
         $inactiveUser = new User([
@@ -137,6 +140,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testActiveUserStoreRequiresPrimaryKeys() {
         $this->operationSpy->calls = [];
         $user = new User([
@@ -159,6 +163,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->fakeDb->tables['TEST_CODES']);
     }
 
+    #[Test]
     public function testActiveUserStoreLogsOperation() {
         $this->operationSpy->calls = [];
         $activeUser = new User([
@@ -190,6 +195,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame($expectedInsert['description'], $call['resource_data']['description']);
     }
 
+    #[Test]
     public function testStoreFillsCreateAuditFieldsWhenAvailable() {
         Carbon::setTestNow(Carbon::create(2025, 1, 15, 9, 30));
 
@@ -237,6 +243,7 @@ class CodesControllerTest extends TestCase {
         Carbon::setTestNow();
     }
 
+    #[Test]
     public function testCreateViewPlacesPrimaryKeyFirstWithDefaultValue() {
         $this->fakeDb->tables['TEXT_CODES'][] = [
             'c_textid' => 41,
@@ -273,6 +280,7 @@ class CodesControllerTest extends TestCase {
         $this->assertNotFalse(strpos($firstInputMarkup, 'value="42"'));
     }
 
+    #[Test]
     public function testSearchFiltersResults() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
@@ -290,6 +298,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testGuestViewDoesNotShowActions() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
@@ -305,6 +314,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testTextCodesUsesExplicitPrimaryKeyOverride() {
         DB::table('TEXT_CODES')->insert([
             [
@@ -341,6 +351,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testActiveUserCanSubmitCreateProposal() {
         $this->operationSpy->calls = [];
         $user = new User([
@@ -376,6 +387,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('Please review', $call['resource_data']['__proposal_meta']['comment']);
     }
 
+    #[Test]
     public function testDuplicateCreateProposalIsBlockedWhenPendingExists() {
         $this->operationSpy->calls = [];
         $user = new User([
@@ -420,6 +432,7 @@ class CodesControllerTest extends TestCase {
         $this->assertEmpty($this->operationSpy->calls);
     }
 
+    #[Test]
     public function testProposalOwnerCanViewEditFormForCreateProposal() {
         $user = new User([
             'name' => 'proposer',
@@ -483,6 +496,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('Proposal', $data['values']['description']);
     }
 
+    #[Test]
     public function testActiveUserCanSubmitUpdateProposal() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'UX', 'code_sub' => '02', 'description' => 'Original'],
@@ -519,6 +533,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame(['code_id', 'code_sub'], $call['resource_data']['__key_columns']);
     }
 
+    #[Test]
     public function testProposalOwnerCanCancelPendingProposal() {
         $user = new User([
             'name' => 'proposer',
@@ -567,6 +582,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame($user->id, $stored['__proposal_meta']['cancelled_by_id']);
     }
 
+    #[Test]
     public function testProposalOwnerUpdateResetsStatusToPending() {
         $user = new User([
             'name' => 'proposer',
@@ -627,6 +643,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('PX_._02', $row->resource_id);
     }
 
+    #[Test]
     public function testAuditFieldsAreReadonlyAndPrefilledOnEdit() {
         Carbon::setTestNow(Carbon::create(2024, 3, 22, 12));
 
@@ -689,6 +706,7 @@ class CodesControllerTest extends TestCase {
         Carbon::setTestNow();
     }
 
+    #[Test]
     public function testActiveUserUpdateLogsOperation() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Old'],
@@ -723,6 +741,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('Old', $call['ori']['description']);
     }
 
+    #[Test]
     public function testActiveUserDestroyLogsOperation() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'To delete'],
@@ -751,6 +770,7 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('To delete', $call['resource_data']['description']);
     }
 
+    #[Test]
     public function testUpdateGracefullyHandlesDuplicateKey() {
         $this->fakeDb->tables['TEST_CODES'][] = ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Old'];
         $this->fakeDb->setFailure('update', 'Duplicate entry #1062');

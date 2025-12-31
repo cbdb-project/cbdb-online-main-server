@@ -218,10 +218,11 @@ $activeAdmin = User::factory()->activeAdmin()->create();
 ```php
 use Tests\TestCase;
 use App\Models\User;
+use PHPUnit\Framework\Attributes\Test;
 
 class MyFeatureTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function only_active_admins_can_restore_operations()
     {
         // 創建活躍的專家用戶
@@ -234,7 +235,7 @@ class MyFeatureTest extends TestCase
         $response->assertSuccessful();
     }
 
-    /** @test */
+    #[Test]
     public function crowdsourcing_users_cannot_write_directly()
     {
         // 創建眾包用戶
@@ -365,7 +366,7 @@ if (Auth::user()->isAdmin()) {
 為系統管理員角色補充測試用例：
 
 ```php
-/** @test */
+#[Test]
 public function super_admin_can_manage_users()
 {
     $superAdmin = User::factory()->active()->superAdmin()->create();

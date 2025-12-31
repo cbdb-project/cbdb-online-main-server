@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ManageUserCommandTest extends TestCase {
@@ -41,6 +42,7 @@ class ManageUserCommandTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function testInteractiveUserCreationSetsStatusAndRole() {
         $this->artisan('cbdb:manage-user')
             ->expectsQuestion('請輸入用戶 Email', 'interactive@example.com')
@@ -59,6 +61,7 @@ class ManageUserCommandTest extends TestCase {
         $this->assertTrue(Hash::check('password123', $user->password));
     }
 
+    #[Test]
     public function testUserCreationWithOptionsDoesNotSkipStatusOrRole() {
         $this->artisan('cbdb:manage-user', [
             '--email' => 'options@example.com',

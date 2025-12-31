@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OfficePostingStoreTest extends TestCase {
@@ -91,6 +92,7 @@ class OfficePostingStoreTest extends TestCase {
         return new Request($payload);
     }
 
+    #[Test]
     public function testOfficeStoreCreatesPostingRecordsWithinTransaction(): void {
         $repository = new BiogMainRepository();
         $request = $this->makeRequest();
@@ -130,6 +132,7 @@ class OfficePostingStoreTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void {
         $repository = Mockery::mock(BiogMainRepository::class)->makePartial();
         $repository->shouldAllowMockingProtectedMethods();
@@ -156,6 +159,7 @@ class OfficePostingStoreTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testOfficeUpdateCreatesOperationLog(): void {
         $repo = new BiogMainRepository();
         $repo->officeStoreById($this->makeRequest([
@@ -187,6 +191,7 @@ class OfficePostingStoreTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testOfficeDeleteCreatesOperationLogAndCleansPostingTables(): void {
         $repo = new BiogMainRepository();
         $repo->officeStoreById($this->makeRequest([

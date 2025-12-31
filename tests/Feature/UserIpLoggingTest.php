@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class UserIpLoggingTest extends TestCase {
@@ -41,6 +42,7 @@ class UserIpLoggingTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function testRegistrationPersistsIpAddresses() {
         $response = $this->withServerVariables(['REMOTE_ADDR' => '123.45.67.89'])
             ->post('/register', [
@@ -63,6 +65,7 @@ class UserIpLoggingTest extends TestCase {
         $this->assertArrayNotHasKey('last_login_at', $settings);
     }
 
+    #[Test]
     public function testLoginUpdatesLastLoginIp() {
         $user = User::create([
             'name' => 'Login Tester',
@@ -92,6 +95,7 @@ class UserIpLoggingTest extends TestCase {
         $this->assertArrayNotHasKey('registration_at', $settings);
     }
 
+    #[Test]
     public function testLoginDoesNotBackfillRegistrationFields() {
         $user = User::create([
             'name' => 'No Registration Info',

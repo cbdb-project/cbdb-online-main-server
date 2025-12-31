@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -97,6 +98,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試所有姓名欄位都有值時的合併邏輯
      */
+    #[Test]
     public function testNameMergeWithAllFieldsFilled() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -161,6 +163,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試部分姓名欄位為空時的合併邏輯
      */
+    #[Test]
     public function testNameMergeWithPartialFields() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -213,6 +216,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試只有名沒有姓的情況
      */
+    #[Test]
     public function testNameMergeWithOnlyGivenName() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -261,6 +265,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試提交相同值時不產生變更（無操作記錄）
      */
+    #[Test]
     public function testNameMergeWithNoChanges() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -314,6 +319,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試外文姓名的名+姓順序（與中文相反）
      */
+    #[Test]
     public function testProperNameOrderIsGivenNameFirst() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -366,6 +372,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試空格處理（trim 功能）
      */
+    #[Test]
     public function testNameMergeTrimsWhitespace() {
         $user = $this->createActiveUser();
         $this->actingAs($user);
@@ -414,6 +421,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試未登入用戶無法更新
      */
+    #[Test]
     public function testGuestCannotUpdateNames() {
         \App\Models\BiogMain::create([
             'c_personid' => 2351,
@@ -456,6 +464,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     /**
      * 測試非活躍用戶無法更新
      */
+    #[Test]
     public function testInactiveUserCannotUpdateNames() {
         $user = User::create([
             'name' => 'Inactive User',

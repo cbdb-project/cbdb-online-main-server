@@ -2,11 +2,13 @@
 
 namespace Tests\Unit;
 
+use PHPUnit\Framework\Attributes\Test;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Tests\TestCase;
 
 class BladeSyntaxTest extends TestCase {
+    #[Test]
     public function test_blade_templates_do_not_use_php5_or_operator(): void {
         $viewsPath = base_path('resources/views');
         $violations = [];

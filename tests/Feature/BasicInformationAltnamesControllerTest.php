@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BasicInformationAltnamesControllerTest extends TestCase {
@@ -109,6 +110,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     /**
      * 測試當 ALTNAME_DATA 記錄不存在時返回 404
      */
+    #[Test]
     public function testEditReturns404WhenAltnameNotFound() {
         // 創建用戶
         $user = User::create([
@@ -135,6 +137,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     /**
      * 測試當 c_source 為 null 時不會發生 NPE
      */
+    #[Test]
     public function testEditHandlesNullCSource() {
         // 創建用戶
         $user = User::create([
@@ -171,6 +174,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     /**
      * 測試當 TextCode 不存在時不會發生 NPE
      */
+    #[Test]
     public function testEditHandlesNonExistentTextCode() {
         // 創建用戶
         $user = User::create([
@@ -207,6 +211,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     /**
      * 測試正常情況下能正確載入 TextCode 資訊
      */
+    #[Test]
     public function testEditLoadsTextCodeSuccessfully() {
         // 創建用戶
         $user = User::create([
@@ -250,6 +255,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     /**
      * 測試 c_source 為 0 時的處理
      */
+    #[Test]
     public function testEditHandlesZeroCSource() {
         // 創建用戶
         $user = User::create([

@@ -6,6 +6,7 @@ use App\Models\BiogMain;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -148,6 +149,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
 
     // ===== BiogMain 測試 =====
 
+    #[Test]
     public function test_creating_person_automatically_creates_index(): void {
         $person = BiogMain::create([
             'c_personid' => 1001,
@@ -175,6 +177,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertContains('軾', $searchTerms, '應包含末字');
     }
 
+    #[Test]
     public function test_updating_person_name_reindexes(): void {
         $person = BiogMain::create([
             'c_personid' => 1002,
@@ -204,6 +207,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertTrue($newTermExists, '新索引應該被創建');
     }
 
+    #[Test]
     public function test_updating_person_non_name_fields_does_not_reindex(): void {
         $person = BiogMain::create([
             'c_personid' => 1003,
@@ -225,6 +229,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertEquals($initialCount, $afterCount, '修改非姓名欄位不應該觸發重新索引');
     }
 
+    #[Test]
     public function test_deleting_person_removes_all_indexes(): void {
         $person = BiogMain::create([
             'c_personid' => 1004,
@@ -250,6 +255,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
 
     // ===== AltnameData 測試 =====
 
+    #[Test]
     public function test_creating_altname_automatically_creates_index(): void {
         $user = $this->createActiveExpert();
 
@@ -278,6 +284,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertTrue($indexExists, '新增別名後手動調用索引服務應該創建索引');
     }
 
+    #[Test]
     public function test_updating_altname_reindexes(): void {
         $user = $this->createActiveExpert();
 
@@ -321,6 +328,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertTrue($newExists, '新別名索引應該被創建');
     }
 
+    #[Test]
     public function test_deleting_altname_removes_index(): void {
         $user = $this->createActiveExpert();
 
@@ -373,6 +381,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
 
     // ===== 括號處理測試 =====
 
+    #[Test]
     public function test_person_with_parentheses_creates_correct_index(): void {
         $person = BiogMain::create([
             'c_personid' => 3001,
@@ -390,6 +399,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         $this->assertContains('白妻', $searchTerms, '應包含括號內容的後綴');
     }
 
+    #[Test]
     public function test_index_table_does_not_exist_gracefully_handles(): void {
         // 刪除索引表
         Schema::dropIfExists('CBDB__NAME_FTS');

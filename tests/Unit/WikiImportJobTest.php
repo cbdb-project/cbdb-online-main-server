@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Jobs\WikiImportJob;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class WikiImportJobTest extends TestCase {
@@ -57,6 +58,7 @@ class WikiImportJobTest extends TestCase {
     /**
      * 测试 WikiImportJob 基本功能
      */
+    #[Test]
     public function test_wiki_import_job_can_be_created() {
         $job = new WikiImportJob('test_task_123', 'http://example.com/data.json', 60795, '中文維基百科');
 
@@ -66,6 +68,7 @@ class WikiImportJobTest extends TestCase {
     /**
      * 测试记录数据准备功能（模拟）
      */
+    #[Test]
     public function test_record_data_preparation() {
         // 这里我们测试数据准备的逻辑，而不是实际的网络请求
         $testRecord = [
@@ -95,6 +98,7 @@ class WikiImportJobTest extends TestCase {
     /**
      * 测试不同数据源的记录处理
      */
+    #[Test]
     public function test_different_source_record_processing() {
         // 测试 Wikidata 记录
         $wikidataRecord = [
@@ -134,6 +138,7 @@ class WikiImportJobTest extends TestCase {
     /**
      * 测试无效记录的处理
      */
+    #[Test]
     public function test_invalid_record_handling() {
         $invalidRecord = [
             'cbdb_personid' => 0,  // 无效的 personid
@@ -147,6 +152,7 @@ class WikiImportJobTest extends TestCase {
     /**
      * 测试没有 wikipedia 字段的记录处理
      */
+    #[Test]
     public function test_record_without_wikipedia_field() {
         // 只有 Wikidata 信息，没有 Wikipedia 页面的记录
         $wikidataOnlyRecord = [

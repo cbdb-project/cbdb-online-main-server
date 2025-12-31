@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class UserProfileTest extends TestCase {
@@ -41,11 +42,13 @@ class UserProfileTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function testGuestCannotAccessProfile() {
         $response = $this->get('/profile');
         $response->assertRedirect('/login');
     }
 
+    #[Test]
     public function testAuthenticatedUserCanAccessProfile() {
         $user = User::create([
             'name' => 'Test User',
@@ -65,6 +68,7 @@ class UserProfileTest extends TestCase {
         $response->assertSee('Test Institute');
     }
 
+    #[Test]
     public function testUserCanUpdateBasicProfile() {
         $user = User::create([
             'name' => 'Old Name',
@@ -91,6 +95,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals('New Institute', $user->institution);
     }
 
+    #[Test]
     public function testUserCanChangePassword() {
         $user = User::create([
             'name' => 'Test User',
@@ -118,6 +123,7 @@ class UserProfileTest extends TestCase {
         $this->assertTrue(Hash::check('newpassword', $user->password));
     }
 
+    #[Test]
     public function testPasswordChangeRequiresCurrentPassword() {
         $user = User::create([
             'name' => 'Test User',
@@ -140,6 +146,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('current_password');
     }
 
+    #[Test]
     public function testPasswordChangeMustVerifyCurrentPassword() {
         $user = User::create([
             'name' => 'Test User',
@@ -166,6 +173,7 @@ class UserProfileTest extends TestCase {
         $this->assertTrue(Hash::check('oldpassword', $user->password));
     }
 
+    #[Test]
     public function testPasswordChangeMustBeConfirmed() {
         $user = User::create([
             'name' => 'Test User',
@@ -192,6 +200,7 @@ class UserProfileTest extends TestCase {
         $this->assertTrue(Hash::check('oldpassword', $user->password));
     }
 
+    #[Test]
     public function testEmailMustBeUnique() {
         $existingUser = User::create([
             'name' => 'Existing User',
@@ -224,6 +233,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals('test@example.com', $user->email);
     }
 
+    #[Test]
     public function testUserCanUpdateProfileWithoutChangingPassword() {
         $user = User::create([
             'name' => 'Test User',
@@ -252,6 +262,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals($originalPasswordHash, $user->password);
     }
 
+    #[Test]
     public function testNameIsRequired() {
         $user = User::create([
             'name' => 'Test User',
@@ -272,6 +283,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('name');
     }
 
+    #[Test]
     public function testEmailIsRequired() {
         $user = User::create([
             'name' => 'Test User',
@@ -292,6 +304,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('email');
     }
 
+    #[Test]
     public function testInstitutionIsOptional() {
         $user = User::create([
             'name' => 'Test User',
@@ -316,6 +329,7 @@ class UserProfileTest extends TestCase {
         $this->assertNull($user->institution);
     }
 
+    #[Test]
     public function testUserCanUpdateAvatar() {
         $user = User::create([
             'name' => 'Test User',
@@ -341,6 +355,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals('avatar10.png', $user->avatar);
     }
 
+    #[Test]
     public function testAvatarIsRequired() {
         $user = User::create([
             'name' => 'Test User',
@@ -362,6 +377,7 @@ class UserProfileTest extends TestCase {
         $response->assertSessionHasErrors('avatar');
     }
 
+    #[Test]
     public function testInvalidAvatarIsRejected() {
         $user = User::create([
             'name' => 'Test User',
@@ -386,6 +402,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals('avatar0.png', $user->avatar);
     }
 
+    #[Test]
     public function testAvatarMustBeInValidRange() {
         $user = User::create([
             'name' => 'Test User',
@@ -411,6 +428,7 @@ class UserProfileTest extends TestCase {
         $this->assertEquals('avatar0.png', $user->avatar);
     }
 
+    #[Test]
     public function testAllValidAvatarsAreAccepted() {
         $user = User::create([
             'name' => 'Test User',

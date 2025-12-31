@@ -7,6 +7,7 @@ use App\Services\NaturalLanguageQueryService;
 use App\Services\NlQueryToolsService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NaturalLanguageQueryServiceTest extends TestCase {
@@ -25,7 +26,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->service = new NaturalLanguageQueryService($this->schemaService, $this->toolsService);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_error_when_api_key_is_not_configured() {
         Config::set('services.gemini.api_key', '');
 
@@ -40,7 +41,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertStringContainsString('API Key', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_sql_successfully() {
         // Mock schema service
         $this->schemaService->method('generateSchemaPrompt')
@@ -78,7 +79,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertNull($result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_api_errors() {
         $this->schemaService->method('generateSchemaPrompt')
             ->willReturn('Mock schema info');
@@ -98,7 +99,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertStringContainsString('API', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_invalid_json_response() {
         $this->schemaService->method('generateSchemaPrompt')
             ->willReturn('Mock schema info');
@@ -124,7 +125,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertStringContainsString('JSON', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_missing_sql_field() {
         $this->schemaService->method('generateSchemaPrompt')
             ->willReturn('Mock schema info');
@@ -154,7 +155,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertStringContainsString('缺少 SQL 字段', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_llm_returned_error() {
         $this->schemaService->method('generateSchemaPrompt')
             ->willReturn('Mock schema info');

@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BasicInformationProposalTest extends TestCase {
@@ -146,6 +147,7 @@ class BasicInformationProposalTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function testProposalStoreRequiresAuthentication() {
         $response = $this->post(route('basicinformation.proposal.store', [
             'personid' => 1,
@@ -160,6 +162,7 @@ class BasicInformationProposalTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    #[Test]
     public function testProposalStoreRequiresActiveUser() {
         $user = $this->makeInactiveUser();
         $this->actingAs($user);
@@ -177,6 +180,7 @@ class BasicInformationProposalTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    #[Test]
     public function testProposalStoreCreatesNewProposal() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
@@ -219,6 +223,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
     }
 
+    #[Test]
     public function testProposalStoreRejectsDuplicateData() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -246,6 +251,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertStringContainsString('資料已存在', $flash[0]['message'] ?? '');
     }
 
+    #[Test]
     public function testProposalStoreDetectsConflictingProposal() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
@@ -284,6 +290,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertStringContainsString('已有其他新增提案', $flash[0]['message'] ?? '');
     }
 
+    #[Test]
     public function testProposalUpdateCreatesUpdateProposal() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -337,6 +344,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame('pending', $payload['__review_status']);
     }
 
+    #[Test]
     public function testProposalUpdateRejectsNoChanges() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -365,6 +373,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertStringContainsString('未偵測到任何修改', $flash[0]['message'] ?? '');
     }
 
+    #[Test]
     public function testApproveCreateProposalInsertsRow() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -424,6 +433,7 @@ class BasicInformationProposalTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testApproveUpdateProposalUpdatesRow() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -492,6 +502,7 @@ class BasicInformationProposalTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testRejectProposalUpdatesStatus() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -534,6 +545,7 @@ class BasicInformationProposalTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testApproveRequiresReviewerPermission() {
         $operation = new Operation();
         $operation->user_id = 100;
@@ -555,6 +567,7 @@ class BasicInformationProposalTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    #[Test]
     public function testApproveRejectsNonProposalOperation() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -578,6 +591,7 @@ class BasicInformationProposalTest extends TestCase {
         $response->assertStatus(404);
     }
 
+    #[Test]
     public function testApproveFailsWhenKeyColumnsMissing() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -604,6 +618,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertStringContainsString('提案缺少主鍵資訊', $flash[0]['message'] ?? '');
     }
 
+    #[Test]
     public function testApproveCreateFailsWhenRowAlreadyExists() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -643,6 +658,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame(1, Operation::count());
     }
 
+    #[Test]
     public function testApproveUpdateFailsWithoutOriginalData() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -686,6 +702,7 @@ class BasicInformationProposalTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testApproveUpdateRejectsPrimaryKeyChange() {
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 1,
@@ -731,6 +748,7 @@ class BasicInformationProposalTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testProposalStoreFailsWhenPrimaryKeyMissing() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
@@ -751,6 +769,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame(0, Operation::count());
     }
 
+    #[Test]
     public function testProposalUpdateFailsWhenRowMissing() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
@@ -773,6 +792,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame(0, Operation::count());
     }
 
+    #[Test]
     public function testUnknownResourceTypeReturnsNotFound() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
@@ -790,6 +810,7 @@ class BasicInformationProposalTest extends TestCase {
         $response->assertStatus(404);
     }
 
+    #[Test]
     public function testCompositeIdEncodesHyphenInResourceId() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);

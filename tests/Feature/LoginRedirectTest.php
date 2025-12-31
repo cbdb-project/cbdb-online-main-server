@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Auth\LoginController;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LoginRedirectTest extends TestCase {
     /**
      * 測試：redirectPath() 方法應該使用 intended URL
      */
+    #[Test]
     public function test_redirect_path_returns_intended_url() {
         $controller = new LoginController();
 
@@ -25,6 +27,7 @@ class LoginRedirectTest extends TestCase {
     /**
      * 測試：redirectPath() 方法在沒有 intended URL 時應返回默認值
      */
+    #[Test]
     public function test_redirect_path_returns_default_when_no_intended() {
         $controller = new LoginController();
 
@@ -41,6 +44,7 @@ class LoginRedirectTest extends TestCase {
     /**
      * 測試：驗證 LoginController 有 redirectPath 方法
      */
+    #[Test]
     public function test_login_controller_has_redirect_path_method() {
         $controller = new LoginController();
 
@@ -54,6 +58,7 @@ class LoginRedirectTest extends TestCase {
     /**
      * 測試：訪問受保護頁面時未登錄應重定向到登錄頁面
      */
+    #[Test]
     public function test_unauthenticated_access_redirects_to_login() {
         // 確保未登錄
         auth()->logout();

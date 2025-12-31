@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationsRestoreAuthorizeTest extends TestCase {
@@ -36,6 +37,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         }
     }
 
+    #[Test]
     public function testActiveAdminCanTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
@@ -50,6 +52,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertEquals($operation->resource, $this->repository->storeCalls[0][3]);
     }
 
+    #[Test]
     public function testRestoreUsesOriginalPersonIdWhenAvailable(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
@@ -63,6 +66,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertSame(456, $this->repository->storeCalls[0][1]);
     }
 
+    #[Test]
     public function testRegularUserCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 0]);
         $this->actingAs($user);
@@ -74,6 +78,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
+    #[Test]
     public function testBannedAdminCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 2]);
         $this->actingAs($user);
@@ -85,6 +90,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
+    #[Test]
     public function testInactiveUserCannotTriggerRestore(): void {
         $user = $this->makeUser(['is_active' => 0, 'is_admin' => 1]);
         $this->actingAs($user);
@@ -96,6 +102,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
+    #[Test]
     public function testAddressResourceRestoreIsRejected(): void {
         $user = $this->makeUser(['is_active' => 1, 'is_admin' => 1]);
         $this->actingAs($user);
@@ -107,6 +114,7 @@ class OperationsRestoreAuthorizeTest extends TestCase {
         $this->assertCount(0, $this->repository->storeCalls);
     }
 
+    #[Test]
     public function testGuestCannotTriggerRestore(): void {
         Auth::logout();
 

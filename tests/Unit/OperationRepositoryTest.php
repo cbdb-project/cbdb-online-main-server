@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Repositories\OperationRepository;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationRepositoryTest extends TestCase {
@@ -14,11 +15,13 @@ class OperationRepositoryTest extends TestCase {
         $this->repository = new OperationRepository();
     }
 
+    #[Test]
     public function testGetArrDiffReturnsNullWhenAfterDataIsNotArray() {
         $result = $this->repository->getArrDiff('not-an-array', ['field' => 'value'], []);
         $this->assertNull($result);
     }
 
+    #[Test]
     public function testGetArrDiffTreatsEquivalentNumericStringsAsEqual() {
         $after = ['c_fy_nh_code' => '652', 'c_dy' => '19'];
         $before = ['c_fy_nh_code' => 652, 'c_dy' => 19];
@@ -28,6 +31,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertNull($result, 'Type-only differences should be ignored.');
     }
 
+    #[Test]
     public function testGetArrDiffReportsDifferencesWithCurrentMatchFlags() {
         $after = ['field' => 'new'];
         $before = ['field' => 'old'];
@@ -47,6 +51,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertFalse($row['matches_before']);
     }
 
+    #[Test]
     public function testGetArrDiffMarksWhenCurrentMatchesBefore() {
         $after = ['field' => 'new'];
         $before = ['field' => 'old'];
@@ -59,6 +64,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertTrue($row['matches_before']);
     }
 
+    #[Test]
     public function testGetArrDiffUsesPlaceholderWhenCurrentIsMissing() {
         $after = ['field' => 'value'];
         $before = ['field' => null];
@@ -72,6 +78,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertSame('(未取得)', $row['current']);
     }
 
+    #[Test]
     public function testGetArrDiffIgnoresTokenFields() {
         $after = ['name' => 'after', '_token' => 'new-token'];
         $before = ['name' => 'before', '_token' => 'old-token'];
@@ -82,6 +89,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertSame('name', $diff['rows'][0]['field']);
     }
 
+    #[Test]
     public function testGetArrDiffFormatsNestedStructuresAsJson() {
         $after = ['payload' => ['a' => 2]];
         $before = ['payload' => ['a' => 1]];
@@ -95,6 +103,7 @@ class OperationRepositoryTest extends TestCase {
         $this->assertSame('{"a":3}', $row['current']);
     }
 
+    #[Test]
     public function testBuildPostedToAddrDiffProvidesKeyMetadataAndAddressMatrix() {
         $after = [
             ['c_personid' => 1, 'c_posting_id' => 10, 'c_office_id' => 20, 'c_addr_id' => 100],

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SearchByEntryControllerTest extends TestCase {
@@ -187,6 +188,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試主頁面是否正常顯示（需要登入）
      */
+    #[Test]
     public function test_index_requires_authentication(): void {
         $response = $this->get(route('search-by.entry.index'));
         $response->assertRedirect(route('login'));
@@ -195,6 +197,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試登入用戶可以訪問主頁面
      */
+    #[Test]
     public function test_authenticated_user_can_access_index(): void {
         $response = $this->actingAs($this->user)->get(route('search-by.entry.index'));
         $response->assertStatus(200);
@@ -204,6 +207,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試獲取入仕類型 API
      */
+    #[Test]
     public function test_can_get_entry_types(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('search-by.entry.types'));
@@ -232,6 +236,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試獲取入仕代碼 API（無類型過濾）
      */
+    #[Test]
     public function test_can_get_all_entry_codes(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('search-by.entry.codes'));
@@ -257,6 +262,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試根據類型獲取入仕代碼 API
      */
+    #[Test]
     public function test_can_get_entry_codes_by_type(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('search-by.entry.codes', ['type_id' => 'TYPE1']));
@@ -274,6 +280,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試搜索功能（基本搜索）
      */
+    #[Test]
     public function test_can_search_by_entry_codes(): void {
         $response = $this->actingAs($this->user)
             ->get(route('search-by.entry.search', [
@@ -292,6 +299,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試搜索功能（年份範圍過濾）
      */
+    #[Test]
     public function test_can_search_with_year_range(): void {
         $response = $this->actingAs($this->user)
             ->get(route('search-by.entry.search', [
@@ -310,6 +318,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試搜索功能（地址過濾）
      */
+    #[Test]
     public function test_can_search_with_address_filter(): void {
         $response = $this->actingAs($this->user)
             ->get(route('search-by.entry.search', [
@@ -326,6 +335,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試搜索驗證（entry_codes 必須為陣列）
      */
+    #[Test]
     public function test_search_validation_requires_entry_codes_as_array(): void {
         $response = $this->actingAs($this->user)
             ->get(route('search-by.entry.search', [
@@ -339,6 +349,7 @@ class SearchByEntryControllerTest extends TestCase {
     /**
      * 測試搜索驗證（年份必須為整數）
      */
+    #[Test]
     public function test_search_validation_requires_integer_years(): void {
         $response = $this->actingAs($this->user)
             ->get(route('search-by.entry.search', [

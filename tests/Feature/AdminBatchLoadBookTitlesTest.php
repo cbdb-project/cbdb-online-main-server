@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdminBatchLoadBookTitlesTest extends TestCase {
@@ -100,6 +101,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function test_non_admin_cannot_access_page(): void {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);
@@ -108,6 +110,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    #[Test]
     public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -116,6 +119,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $response->assertStatus(200)->assertSee('批次匯入書稿資料');
     }
 
+    #[Test]
     public function test_admin_can_upload_batch_entries(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -157,6 +161,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $followUp->assertSee('批次編號');
     }
 
+    #[Test]
     public function test_invalid_lines_are_reported(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -173,6 +178,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame(0, DB::table('TEXT_CODES')->count());
     }
 
+    #[Test]
     public function test_blank_source_is_rejected(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

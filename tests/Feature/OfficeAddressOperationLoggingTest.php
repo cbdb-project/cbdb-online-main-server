@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OfficeAddressOperationLoggingTest extends TestCase {
@@ -78,6 +79,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         Auth::guard()->setUser(new GenericUser(['id' => 1, 'name' => 'Testing Admin']));
     }
 
+    #[Test]
     public function testAddressChangeCreatesStructuredOperationRecord(): void {
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
             'c_personid' => 407841,
@@ -141,6 +143,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         ], $before);
     }
 
+    #[Test]
     public function testAddressChangeUpdatesAuditFields(): void {
         DB::table('POSTING_DATA')->insert([
             'c_personid' => 900001,
@@ -209,6 +212,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         $this->assertSame(45, $original['rows'][0]['c_addr_id']);
     }
 
+    #[Test]
     public function testOfficeUpdateDoesNotResetAddressTimestampsWhenUnchanged(): void {
         DB::table('POSTING_DATA')->insert([
             'c_personid' => 910002,
@@ -270,6 +274,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         $this->assertNotContains('POSTED_TO_ADDR_DATA', $operations);
     }
 
+    #[Test]
     public function testAddressChangeOnlyTouchesTargetOffice(): void {
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
             'c_personid' => 100000,
@@ -337,6 +342,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testAddressUpdateKeepsOtherOfficeRows(): void {
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
             'c_personid' => 200000,

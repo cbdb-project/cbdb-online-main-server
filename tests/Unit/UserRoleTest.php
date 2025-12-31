@@ -3,12 +3,14 @@
 namespace Tests\Unit;
 
 use App\Models\User;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class UserRoleTest extends TestCase {
     /**
      * 测试用户角色常量定义
      */
+    #[Test]
     public function testRoleConstants() {
         $this->assertSame(0, User::ROLE_REGULAR);
         $this->assertSame(1, User::ROLE_EXPERT);
@@ -19,6 +21,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试用户状态常量定义
      */
+    #[Test]
     public function testStatusConstants() {
         $this->assertSame(0, User::STATUS_INACTIVE);
         $this->assertSame(1, User::STATUS_ACTIVE);
@@ -28,6 +31,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isActive() 方法
      */
+    #[Test]
     public function testIsActive() {
         $user = new User();
 
@@ -44,6 +48,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isAdmin() 方法（专家或系统管理员）
      */
+    #[Test]
     public function testIsAdmin() {
         $user = new User();
 
@@ -63,6 +68,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isExpert() 方法
      */
+    #[Test]
     public function testIsExpert() {
         $user = new User();
 
@@ -79,6 +85,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isSuperAdmin() 方法
      */
+    #[Test]
     public function testIsSuperAdmin() {
         $user = new User();
 
@@ -92,6 +99,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isCrowdsourcingUser() 方法
      */
+    #[Test]
     public function testIsCrowdsourcingUser() {
         $user = new User();
 
@@ -105,6 +113,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 isRegularUser() 方法
      */
+    #[Test]
     public function testIsRegularUser() {
         $user = new User();
 
@@ -118,6 +127,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 canManageUsers() 方法
      */
+    #[Test]
     public function testCanManageUsers() {
         $user = new User();
 
@@ -150,6 +160,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 canRestoreOperations() 方法
      */
+    #[Test]
     public function testCanRestoreOperations() {
         $user = new User();
 
@@ -172,6 +183,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 canWriteDirectly() 方法
      */
+    #[Test]
     public function testCanWriteDirectly() {
         $user = new User();
 
@@ -199,6 +211,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 canRunBatchImport() 方法
      */
+    #[Test]
     public function testCanRunBatchImport() {
         $user = new User();
 
@@ -231,6 +244,7 @@ class UserRoleTest extends TestCase {
     /**
      * 测试 getRoleName() 方法
      */
+    #[Test]
     public function testGetRoleName() {
         $user = new User();
 

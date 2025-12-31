@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -562,6 +563,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试主页面：/basicinformation
      */
+    #[Test]
     public function test_basicinformation_index_page_loads() {
         $response = $this->get('/basicinformation');
         $response->assertStatus(200);
@@ -570,6 +572,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试创建页面：/basicinformation/create
      */
+    #[Test]
     public function test_basicinformation_create_page_loads() {
         $response = $this->get('/basicinformation/create');
         $response->assertStatus(200);
@@ -578,6 +581,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试只读页面：/basicinformation/{id}（未登录可訪問）
      */
+    #[Test]
     public function test_basicinformation_show_page_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}");
         $response->assertStatus(200);
@@ -586,6 +590,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试编辑页面：/basicinformation/{id}/edit（未登录时重定向）
      */
+    #[Test]
     public function test_basicinformation_edit_page_redirects_when_not_authenticated() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/edit");
         $response->assertStatus(302);
@@ -595,6 +600,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试编辑页面：/basicinformation/{id}/edit（登录后可訪問）
      */
+    #[Test]
     public function test_basicinformation_edit_page_loads() {
         $response = $this->actingAs($this->user)->get("/basicinformation/{$this->testPersonId}/edit");
         $response->assertStatus(200);
@@ -603,6 +609,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试地址子页面：/basicinformation/{id}/addresses
      */
+    #[Test]
     public function test_basicinformation_addresses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/addresses");
         $response->assertStatus(200);
@@ -611,6 +618,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试别名子页面：/basicinformation/{id}/altnames
      */
+    #[Test]
     public function test_basicinformation_altnames_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/altnames");
         $response->assertStatus(200);
@@ -619,6 +627,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试文本子页面：/basicinformation/{id}/texts
      */
+    #[Test]
     public function test_basicinformation_texts_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/texts");
         $response->assertStatus(200);
@@ -627,6 +636,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试官职子页面：/basicinformation/{id}/offices
      */
+    #[Test]
     public function test_basicinformation_offices_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
         $response->assertStatus(200);
@@ -635,6 +645,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试社会关系子页面：/basicinformation/{id}/assoc
      */
+    #[Test]
     public function test_basicinformation_assoc_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/assoc");
         $response->assertStatus(200);
@@ -643,6 +654,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试入词子页面：/basicinformation/{id}/entries
      */
+    #[Test]
     public function test_basicinformation_entries_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
         $response->assertStatus(200);
@@ -651,6 +663,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试事件子页面：/basicinformation/{id}/events
      */
+    #[Test]
     public function test_basicinformation_events_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/events");
         $response->assertStatus(200);
@@ -659,6 +672,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试亲属子页面：/basicinformation/{id}/kinship
      */
+    #[Test]
     public function test_basicinformation_kinship_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/kinship");
         $response->assertStatus(200);
@@ -667,6 +681,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试社会区分子页面：/basicinformation/{id}/statuses
      */
+    #[Test]
     public function test_basicinformation_statuses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/statuses");
         $response->assertStatus(200);
@@ -675,6 +690,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试财物子页面：/basicinformation/{id}/possession
      */
+    #[Test]
     public function test_basicinformation_possession_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/possession");
         $response->assertStatus(200);
@@ -683,6 +699,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试社会机构子页面：/basicinformation/{id}/socialinst
      */
+    #[Test]
     public function test_basicinformation_socialinst_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/socialinst");
         $response->assertStatus(200);
@@ -691,6 +708,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 测试出处子页面：/basicinformation/{id}/sources
      */
+    #[Test]
     public function test_basicinformation_sources_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/sources");
         $response->assertStatus(200);

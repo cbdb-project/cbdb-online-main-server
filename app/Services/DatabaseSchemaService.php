@@ -40,7 +40,7 @@ class DatabaseSchemaService {
      * @param string $tableName
      * @return array
      */
-    protected function getTableSchema(string $tableName): array {
+    public function getTableSchema(string $tableName): array {
         $cacheKey = "db_schema_{$tableName}";
 
         return Cache::remember($cacheKey, 3600, function () use ($tableName) {

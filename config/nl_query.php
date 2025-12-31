@@ -15,7 +15,7 @@ return [
     'lookup_tables' => [
         'DYNASTIES' => [
             'max_rows' => 100, // 最多包含的行数
-            'display_columns' => ['c_dy', 'c_dy_chn', 'c_sort'], // 要显示的列
+            'display_columns' => ['c_dy', 'c_dynasty_chn', 'c_sort'], // 要显示的列
         ],
         'BIOG_ADDR_CODES' => [
             'max_rows' => 100,

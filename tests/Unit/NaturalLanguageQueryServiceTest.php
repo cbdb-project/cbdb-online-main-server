@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\DatabaseSchemaService;
 use App\Services\NaturalLanguageQueryService;
+use App\Services\NlQueryToolsService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -11,6 +12,7 @@ use Tests\TestCase;
 class NaturalLanguageQueryServiceTest extends TestCase {
     protected NaturalLanguageQueryService $service;
     protected DatabaseSchemaService $schemaService;
+    protected NlQueryToolsService $toolsService;
 
     protected function setUp(): void {
         parent::setUp();
@@ -19,7 +21,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         Config::set('services.gemini.api_key', 'test-api-key');
 
         $this->schemaService = $this->createMock(DatabaseSchemaService::class);
-        $this->service = new NaturalLanguageQueryService($this->schemaService);
+        $this->toolsService = $this->createMock(NlQueryToolsService::class);
+        $this->service = new NaturalLanguageQueryService($this->schemaService, $this->toolsService);
     }
 
     /** @test */
@@ -28,7 +31,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
 
         // 重新创建服务以使用新的配置
         $schemaService = $this->createMock(DatabaseSchemaService::class);
-        $service = new NaturalLanguageQueryService($schemaService);
+        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $service = new NaturalLanguageQueryService($schemaService, $toolsService);
 
         $result = $service->generateSQL('test question');
 

@@ -180,14 +180,93 @@
                                             <!-- 解析並顯示關鍵信息 -->
                                             @php
                                                 $responseData = json_decode($log->llm_response, true);
+                                                $isRoundsFormat = isset($responseData['rounds']);
                                             @endphp
                                             @if($responseData)
                                                 <div class="mt-2">
                                                     <h6 class="text-muted">關鍵信息：</h6>
-                                                    <table class="table table-sm table-bordered">
-                                                        <tbody>
-                                                            {{-- OpenAI 格式：model --}}
-                                                            @if(isset($responseData['model']))
+
+                                                    @if($isRoundsFormat)
+                                                        {{-- 新格式：rounds 數組 --}}
+                                                        <div class="alert alert-info">
+                                                            <strong>總輪數：</strong>{{ $responseData['total_rounds'] ?? count($responseData['rounds']) }} 輪
+                                                        </div>
+
+                                                        @foreach($responseData['rounds'] ?? [] as $roundIndex => $round)
+                                                            <div class="card mb-2">
+                                                                <div class="card-header bg-light">
+                                                                    <strong>第 {{ $round['round'] ?? ($roundIndex + 1) }} 輪調用</strong>
+                                                                    @if(!empty($round['tool_calls_requested']))
+                                                                        <span class="badge badge-primary ml-2">請求了 {{ count($round['tool_calls_requested']) }} 個工具</span>
+                                                                    @endif
+                                                                </div>
+                                                                <div class="card-body p-2">
+                                                                    @php
+                                                                        $roundResponse = $round['llm_response'] ?? [];
+                                                                    @endphp
+
+                                                                    <table class="table table-sm table-bordered mb-0">
+                                                                        <tbody>
+                                                                            @if(isset($roundResponse['model']))
+                                                                                <tr>
+                                                                                    <th style="width: 150px;">模型</th>
+                                                                                    <td><code>{{ $roundResponse['model'] }}</code></td>
+                                                                                </tr>
+                                                                            @endif
+
+                                                                                    @if(isset($roundResponse['usage']))
+                                                                                        <tr>
+                                                                                            <th>Token 使用</th>
+                                                                                            <td>
+                                                                                                <strong>提示詞：</strong>{{ number_format($roundResponse['usage']['prompt_tokens'] ?? 0) }}<br>
+                                                                                                <strong>響應：</strong>{{ number_format($roundResponse['usage']['completion_tokens'] ?? 0) }}<br>
+                                                                                                <strong>總計：</strong>{{ number_format($roundResponse['usage']['total_tokens'] ?? 0) }}
+                                                                                                @if(isset($roundResponse['usage']['prompt_tokens_details']['cached_tokens']))
+                                                                                                    <br><strong class="text-info">快取：</strong>{{ number_format($roundResponse['usage']['prompt_tokens_details']['cached_tokens']) }}
+                                                                                                @endif
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    @endif
+
+                                                                            @if(isset($roundResponse['choices'][0]['finish_reason']))
+                                                                                <tr>
+                                                                                    <th>完成原因</th>
+                                                                                    <td><code>{{ $roundResponse['choices'][0]['finish_reason'] }}</code></td>
+                                                                                </tr>
+                                                                            @endif
+
+                                                                            @if(!empty($round['tool_results']))
+                                                                                <tr>
+                                                                                    <th>工具結果</th>
+                                                                                    <td>
+                                                                                        @foreach($round['tool_results'] as $toolResult)
+                                                                                            <div class="mb-1">
+                                                                                                <strong>{{ $toolResult['tool_name'] ?? '未知工具' }}</strong>
+                                                                                                @if($toolResult['result']['success'] ?? false)
+                                                                                                    <span class="badge badge-success">成功</span>
+                                                                                                    @if(isset($toolResult['result']['data']))
+                                                                                                        <small class="text-muted">({{ count($toolResult['result']['data']) }} 筆數據)</small>
+                                                                                                    @endif
+                                                                                                @else
+                                                                                                    <span class="badge badge-danger">失敗</span>
+                                                                                                    <small class="text-danger">{{ $toolResult['result']['error'] ?? '未知錯誤' }}</small>
+                                                                                                @endif
+                                                                                            </div>
+                                                                                        @endforeach
+                                                                                    </td>
+                                                                                </tr>
+                                                                            @endif
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    @else
+                                                        {{-- 舊格式：直接顯示原始響應信息 --}}
+                                                        <table class="table table-sm table-bordered">
+                                                            <tbody>
+                                                                {{-- OpenAI 格式：model --}}
+                                                                @if(isset($responseData['model']))
                                                                 <tr>
                                                                     <th style="width: 150px;">模型</th>
                                                                     <td><code>{{ $responseData['model'] }}</code></td>
@@ -272,6 +351,9 @@
                                                                         <strong>提示詞：</strong>{{ number_format($responseData['usage']['prompt_tokens'] ?? 0) }}<br>
                                                                         <strong>響應：</strong>{{ number_format($responseData['usage']['completion_tokens'] ?? 0) }}<br>
                                                                         <strong>總計：</strong>{{ number_format($responseData['usage']['total_tokens'] ?? 0) }}
+                                                                        @if(isset($responseData['usage']['prompt_tokens_details']['cached_tokens']))
+                                                                            <br><strong class="text-info">快取：</strong>{{ number_format($responseData['usage']['prompt_tokens_details']['cached_tokens']) }}
+                                                                        @endif
                                                                     </td>
                                                                 </tr>
                                                             @endif
@@ -312,6 +394,7 @@
                                                             @endif
                                                         </tbody>
                                                     </table>
+                                                    @endif {{-- 結束 @else (舊格式) --}}
                                                 </div>
                                             @endif
                                         </div>

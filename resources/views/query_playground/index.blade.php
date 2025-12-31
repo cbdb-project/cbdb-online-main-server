@@ -83,6 +83,16 @@
                             </div>
                         </div>
 
+                        <div class="form-group">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="useToolsCheckbox">
+                                <label class="custom-control-label" for="useToolsCheckbox">
+                                    工具使用（測試功能）
+                                </label>
+                            </div>
+                            <small class="text-muted">未勾選時將使用最初提示詞與單次調用流程（提示詞包含所有表格的所有欄位定義）。</small>
+                        </div>
+
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
                                 <button class="btn btn-success" id="btnGenerate" disabled>
@@ -92,6 +102,14 @@
                             </div>
                             <div id="nlLoadingIndicator" style="display:none;">
                                 <div class="spinner-border text-success spinner-border-sm" role="status"></div> 生成中 ({{ $nl_model }})...
+                            </div>
+                        </div>
+
+                        <!-- Tool Calls Process Display -->
+                        <div id="toolCallsContainer" style="display:none;">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-cogs"></i> LLM 工具調用過程：</h6>
+                                <div id="toolCallsContent" class="mt-2" style="font-size: 0.9em;"></div>
                             </div>
                         </div>
 
@@ -425,6 +443,92 @@ onViteReady(function() {
         }
     });
 
+    // Function to display tool calls in a user-friendly format
+    function displayToolCalls(toolCalls) {
+        let html = '<div class="timeline">';
+
+        // Step 1: First LLM call discovers need for tools
+        html += '<div class="time-label"><span class="bg-info">LLM 多步驟調用流程</span></div>';
+        html += '<div>';
+        html += '<i class="fas fa-robot bg-success"></i>';
+        html += '<div class="timeline-item">';
+        html += '<span class="time"><i class="far fa-clock"></i> 步驟 1</span>';
+        html += '<h3 class="timeline-header"><i class="fas fa-search"></i> 第一次 LLM 調用</h3>';
+        html += '<div class="timeline-body">';
+        html += '<p class="mb-1">LLM 分析問題後發現需要額外資訊，請求調用工具獲取表格樣例數據。</p>';
+        html += `<span class="badge badge-info">發現 ${toolCalls.length} 個工具調用需求</span>`;
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Step 2: Tool executions
+        toolCalls.forEach((call, index) => {
+            html += '<div>';
+            html += '<i class="fas fa-cog bg-primary"></i>';
+            html += '<div class="timeline-item">';
+            html += `<span class="time"><i class="far fa-clock"></i> 步驟 ${index + 2}</span>`;
+            html += `<h3 class="timeline-header"><i class="fas fa-tools"></i> 執行工具: <code>${call.tool_name}</code></h3>`;
+            html += '<div class="timeline-body">';
+
+            // Display arguments
+            html += '<p class="mb-1"><strong>調用參數：</strong></p>';
+            html += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em;">';
+            html += escapeHtml(JSON.stringify(call.arguments, null, 2));
+            html += '</pre>';
+
+            // Display result
+            html += '<p class="mt-2 mb-1"><strong>返回結果：</strong></p>';
+            if (call.result.success) {
+                const dataCount = call.result.data ? call.result.data.length : 0;
+                html += '<span class="badge badge-success">成功</span> ';
+                html += `<span class="text-muted">返回 ${dataCount} 筆數據</span>`;
+
+                // Show sample data (first 3 records)
+                if (call.result.data && call.result.data.length > 0) {
+                    html += '<div class="mt-2"><small class="text-muted">樣例數據（前 3 筆）：</small></div>';
+                    html += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
+                    const sampleData = call.result.data.slice(0, 3);
+                    html += escapeHtml(JSON.stringify(sampleData, null, 2));
+                    html += '</pre>';
+                }
+            } else {
+                html += '<span class="badge badge-danger">失敗</span> ';
+                html += `<span class="text-danger">${escapeHtml(call.result.error || '未知錯誤')}</span>`;
+            }
+
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        });
+
+        // Step 3: Final LLM call generates SQL
+        const finalStep = toolCalls.length + 2;
+        html += '<div>';
+        html += '<i class="fas fa-robot bg-success"></i>';
+        html += '<div class="timeline-item">';
+        html += `<span class="time"><i class="far fa-clock"></i> 步驟 ${finalStep}</span>`;
+        html += '<h3 class="timeline-header"><i class="fas fa-check-circle"></i> 最終 LLM 調用</h3>';
+        html += '<div class="timeline-body">';
+        html += '<p class="mb-1">LLM 基於工具返回的樣例數據和資料庫 schema，生成最終的 SQL 查詢語句。</p>';
+        html += '<span class="badge badge-success">SQL 生成完成</span>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        html += '<div><i class="far fa-clock bg-gray"></i></div>';
+        html += '</div>';
+
+        $('#toolCallsContent').html(html);
+        $('#toolCallsContainer').show();
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // Natural Language Query handlers
     // Enable/disable generate button based on consent checkbox
     $('#consentCheckbox').change(function() {
@@ -432,12 +536,261 @@ onViteReady(function() {
         $('#btnGenerate').prop('disabled', !isChecked);
     });
 
+    function syncTabWithHash() {
+        const hash = window.location.hash;
+        const $tab = $(`#queryTabs a[href="${hash}"]`);
+        if ($tab.length) {
+            $tab.tab('show');
+        }
+    }
+
+    $('#queryTabs a[data-toggle="tab"]').on('shown.bs.tab', function(event) {
+        const target = $(event.target).attr('href');
+        if (!target) {
+            return;
+        }
+
+        if (history && history.replaceState) {
+            history.replaceState(null, '', target);
+        } else {
+            window.location.hash = target;
+        }
+    });
+
+    syncTabWithHash();
+    window.addEventListener('hashchange', syncTabWithHash);
+
     // Reset consent checkbox when switching to NL tab
     $('#nl-tab').on('shown.bs.tab', function() {
         // Don't auto-reset checkbox - let user keep their choice during session
         // $('#consentCheckbox').prop('checked', false);
         // $('#btnGenerate').prop('disabled', true);
     });
+
+    // EventSource 实例（用于 SSE）
+    let eventSource = null;
+    let realtimeStepCounter = 0;
+    let realtimeToolResults = [];
+    let toolExecutionSteps = {};
+
+    // 初始化实时进度时间线
+    function initializeRealtimeTimeline() {
+        realtimeStepCounter = 0;
+        realtimeToolResults = [];
+        toolExecutionSteps = {};
+        let html = '<div class="timeline" id="realtimeTimeline">';
+        html += '<div class="time-label"><span class="bg-info">LLM 多步驟調用流程（實時）</span></div>';
+        html += '</div>';
+        $('#toolCallsContent').html(html);
+        $('#toolCallsContainer').show();
+    }
+
+    // 添加时间线步骤
+    function addTimelineStep(icon, bgClass, title, body) {
+        realtimeStepCounter++;
+        const $step = $('<div></div>');
+        $step.append(`<i class="${icon} ${bgClass}"></i>`);
+        const $item = $('<div class="timeline-item"></div>');
+        $item.append(`<span class="time"><i class="far fa-clock"></i> 步驟 ${realtimeStepCounter}</span>`);
+        $item.append(`<h3 class="timeline-header">${title}</h3>`);
+        $item.append(`<div class="timeline-body">${body}</div>`);
+        $step.append($item);
+
+        // 在结束标记之前插入
+        const $timeline = $('#realtimeTimeline');
+        const $endMarker = $timeline.find('.fa-clock.bg-gray').parent();
+        if ($endMarker.length > 0) {
+            $endMarker.before($step);
+        } else {
+            $timeline.append($step);
+        }
+
+        return $step;
+    }
+
+    // 完成时间线
+    function finalizeTimeline() {
+        $('#realtimeTimeline').append('<div><i class="far fa-clock bg-gray"></i></div>');
+    }
+
+    // 处理 SSE 事件
+    function handleSSEEvent(event, dataStr) {
+        try {
+            const data = JSON.parse(dataStr);
+            console.log('SSE Event:', event, data);
+
+            switch(event) {
+                case 'llm_call_complete':
+                    if (data.round === 1) {
+                        addTimelineStep(
+                            'fas fa-robot',
+                            'bg-success',
+                            '<i class="fas fa-search"></i> 第一次 LLM 調用',
+                            `<p class="mb-1">${data.message || 'LLM 分析問題完成'}</p>`
+                        );
+                    } else {
+                        const roundLabel = `第${data.round}次 LLM 調用`;
+                        addTimelineStep(
+                            'fas fa-robot',
+                            'bg-success',
+                            `<i class="fas fa-robot"></i> ${roundLabel}`,
+                            `<p class="mb-1">${data.message || 'LLM 基於工具結果繼續推理'}</p>`
+                        );
+                    }
+                    break;
+
+                case 'tool_calls_requested':
+                    const toolCount = data.tool_calls ? data.tool_calls.length : 0;
+                    let toolsHtml = `<p class="mb-1">${data.message || 'LLM 請求調用工具'}</p>`;
+                    toolsHtml += `<span class="badge badge-info">發現 ${toolCount} 個工具調用需求</span>`;
+                    if (data.tool_calls) {
+                        toolsHtml += '<ul class="mt-2 mb-0">';
+                        data.tool_calls.forEach(tc => {
+                            toolsHtml += `<li><code>${tc.name}</code>`;
+                            if (tc.arguments && tc.arguments.table_name) {
+                                toolsHtml += ` - 表格: ${tc.arguments.table_name}`;
+                            }
+                            toolsHtml += '</li>';
+                        });
+                        toolsHtml += '</ul>';
+                    }
+                    addTimelineStep(
+                        'fas fa-tools',
+                        'bg-warning',
+                        '<i class="fas fa-cog"></i> 工具調用請求',
+                        toolsHtml
+                    );
+                    break;
+
+                case 'tool_execution_start':
+                    const startArguments = data.arguments || {};
+                    let startHtml = '<p class="mb-1">準備執行工具調用。</p>';
+                    startHtml += '<p class="mb-1"><strong>調用參數：</strong></p>';
+                    startHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em;">';
+                    startHtml += escapeHtml(JSON.stringify(startArguments, null, 2));
+                    startHtml += '</pre>';
+                    const stepKey = data.tool_call_id || `${data.tool_name || 'tool'}-${data.tool_index || realtimeStepCounter + 1}`;
+                    toolExecutionSteps[stepKey] = addTimelineStep(
+                        'fas fa-cog',
+                        'bg-secondary',
+                        `<i class="fas fa-tools"></i> 開始執行工具: <code>${data.tool_name}</code>`,
+                        startHtml
+                    );
+                    break;
+
+                case 'tool_execution_complete':
+                    const toolArguments = data.arguments || (data.result ? data.result.arguments : null) || {};
+                    const toolResult = data.result || {};
+                    let toolHtml = `<p class="mb-1"><strong>調用參數：</strong></p>`;
+                    toolHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em;">';
+                    toolHtml += escapeHtml(JSON.stringify(toolArguments, null, 2));
+                    toolHtml += '</pre>';
+
+                    toolHtml += '<p class="mt-2 mb-1"><strong>返回結果：</strong></p>';
+                    if (data.success && toolResult.success) {
+                        const resultSchema = toolResult.schema || null;
+                        const resultData = toolResult.data || null;
+                        toolHtml += '<span class="badge badge-success">成功</span> ';
+                        if (resultSchema) {
+                            const columnCount = resultSchema.columns ? resultSchema.columns.length : 0;
+                            toolHtml += `<span class="text-muted">返回 ${columnCount} 個欄位</span>`;
+
+                            const schemaSample = resultSchema.columns ? resultSchema.columns.slice(0, 12) : resultSchema;
+                            toolHtml += '<div class="mt-2"><small class="text-muted">結構樣例（前 12 欄位）：</small></div>';
+                            toolHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
+                            toolHtml += escapeHtml(JSON.stringify(schemaSample, null, 2));
+                            toolHtml += '</pre>';
+                        } else {
+                            const dataCount = resultData ? resultData.length : 0;
+                            toolHtml += `<span class="text-muted">返回 ${dataCount} 筆數據</span>`;
+
+                            if (resultData && resultData.length > 0) {
+                                toolHtml += '<div class="mt-2"><small class="text-muted">樣例數據（前 3 筆）：</small></div>';
+                                toolHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
+                                const sampleData = resultData.slice(0, 3);
+                                toolHtml += escapeHtml(JSON.stringify(sampleData, null, 2));
+                                toolHtml += '</pre>';
+                            }
+                        }
+                    } else {
+                        toolHtml += '<span class="badge badge-danger">失敗</span> ';
+                        toolHtml += `<span class="text-danger">${escapeHtml(toolResult.error || '未知錯誤')}</span>`;
+                    }
+
+                    const completeKey = data.tool_call_id || `${data.tool_name || 'tool'}-${data.tool_index || realtimeStepCounter + 1}`;
+                    const $existingStep = toolExecutionSteps[completeKey];
+                    if ($existingStep && $existingStep.length) {
+                        $existingStep.children('i').attr('class', 'fas fa-cog bg-primary');
+                        $existingStep.find('.timeline-header').html(`<i class="fas fa-tools"></i> 執行工具: <code>${data.tool_name}</code>`);
+                        $existingStep.find('.timeline-body').html(toolHtml);
+                    } else {
+                        addTimelineStep(
+                            'fas fa-cog',
+                            'bg-primary',
+                            `<i class="fas fa-tools"></i> 執行工具: <code>${data.tool_name}</code>`,
+                            toolHtml
+                        );
+                    }
+
+                    // 保存工具结果
+                    realtimeToolResults.push(data);
+                    break;
+
+                case 'complete':
+                    addTimelineStep(
+                        'fas fa-check-circle',
+                        'bg-success',
+                        '<i class="fas fa-check-circle"></i> SQL 生成完成',
+                        '<p class="mb-1">已完成 SQL 生成，請查看結果區塊。</p>'
+                    );
+                    finalizeTimeline();
+                    if (data.success && data.sql) {
+                        generatedSqlText = data.sql;
+                        $('#generatedSql').text(data.sql);
+
+                        if (data.explanation) {
+                            $('#sqlExplanation').html('<strong>說明：</strong>' + data.explanation);
+                        } else {
+                            $('#sqlExplanation').empty();
+                        }
+
+                        if (data.model) {
+                            $('#generatedModel').html('使用模型：<code>' + data.model + '</code>');
+                        } else {
+                            $('#generatedModel').empty();
+                        }
+
+                        $('#generatedSqlContainer').show();
+                    } else {
+                        const errorMsg = data.error || '生成 SQL 失敗';
+                        $('#errorAlert').html('<strong>錯誤：</strong>' + errorMsg).show();
+                    }
+                    $('#btnGenerate').prop('disabled', false);
+                    $('#nlLoadingIndicator').hide();
+                    break;
+
+                case 'error':
+                    const isToolLimitError = (data.error || '').includes('工具調用次數超過上限');
+                    const errorHint = isToolLimitError
+                        ? '<p class="mb-0 text-muted">建議縮小查詢範圍或提供更明確的問題。</p>'
+                        : '';
+                    addTimelineStep(
+                        'fas fa-times-circle',
+                        'bg-danger',
+                        '<i class="fas fa-times-circle"></i> 生成失敗',
+                        `<p class="mb-1">${escapeHtml(data.error || '發生錯誤')}</p>${errorHint}`
+                    );
+                    finalizeTimeline();
+                    const errorMsg = data.error || '發生錯誤';
+                    $('#errorAlert').html('<strong>錯誤：</strong>' + errorMsg).show();
+                    $('#btnGenerate').prop('disabled', false);
+                    $('#nlLoadingIndicator').hide();
+                    break;
+            }
+        } catch (e) {
+            console.error('Error handling SSE event:', e);
+        }
+    }
 
     $('#btnGenerate').click(function() {
         const question = $('#nlInput').val().trim();
@@ -452,52 +805,91 @@ onViteReady(function() {
             return;
         }
 
+        // 关闭之前的 EventSource（如果存在）
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+
         $('#btnGenerate').prop('disabled', true);
         $('#nlLoadingIndicator').show();
         $('#generatedSqlContainer').hide();
+        $('#toolCallsContainer').hide();
         $('#errorAlert').hide();
 
-        $.ajax({
-            url: "{{ route('query-playground.generate-from-nl', [], false) }}",
+        // 初始化实时进度时间线
+        initializeRealtimeTimeline();
+
+        // 准备查询参数（使用 URLSearchParams）
+        const params = new URLSearchParams({
+            _token: $('meta[name="csrf-token"]').attr('content'),
+            question: question
+        });
+        params.append('use_tools', $('#useToolsCheckbox').is(':checked') ? '1' : '0');
+
+        // 创建 EventSource（使用 POST 模拟：通过带参数的 URL）
+        // 注意：浏览器原生 EventSource 不支持 POST，需要特殊处理
+        // 这里我们使用 fetch + ReadableStream 来实现
+        fetch("{{ route('query-playground.generate-from-nl-stream', [], false) }}", {
             method: 'POST',
-            data: {
-                _token: $('meta[name="csrf-token"]').attr('content'),
-                question: question
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                'Accept': 'text/event-stream'
             },
-            success: function(response) {
-                if (response.success && response.sql) {
-                    generatedSqlText = response.sql;
-                    $('#generatedSql').text(response.sql);
-
-                    if (response.explanation) {
-                        $('#sqlExplanation').html('<strong>說明：</strong>' + response.explanation);
-                    } else {
-                        $('#sqlExplanation').empty();
-                    }
-
-                    if (response.model) {
-                        $('#generatedModel').html('使用模型：<code>' + response.model + '</code>');
-                    } else {
-                        $('#generatedModel').empty();
-                    }
-
-                    $('#generatedSqlContainer').show();
-                } else {
-                    const errorMsg = response.error || '生成 SQL 失敗';
-                    $('#errorAlert').html('<strong>錯誤：</strong>' + errorMsg).show();
-                }
-            },
-            error: function(xhr) {
-                let msg = '發生錯誤';
-                if (xhr.responseJSON && xhr.responseJSON.error) {
-                    msg = xhr.responseJSON.error;
-                }
-                $('#errorAlert').html('<strong>錯誤：</strong>' + msg).show();
-            },
-            complete: function() {
-                $('#btnGenerate').prop('disabled', false);
-                $('#nlLoadingIndicator').hide();
+            body: params.toString()
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            function processStream() {
+                reader.read().then(({done, value}) => {
+                    if (done) {
+                        $('#btnGenerate').prop('disabled', false);
+                        $('#nlLoadingIndicator').hide();
+                        return;
+                    }
+
+                    buffer += decoder.decode(value, {stream: true});
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留不完整的行
+
+                    let currentEvent = null;
+                    let currentData = '';
+
+                    lines.forEach(line => {
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.substring(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            currentData = line.substring(6).trim();
+                        } else if (line === '' && currentEvent) {
+                            // 完整的事件消息
+                            handleSSEEvent(currentEvent, currentData);
+                            currentEvent = null;
+                            currentData = '';
+                        }
+                    });
+
+                    processStream();
+                }).catch(error => {
+                    console.error('Stream reading error:', error);
+                    $('#errorAlert').html('<strong>錯誤：</strong>連接中斷').show();
+                    $('#btnGenerate').prop('disabled', false);
+                    $('#nlLoadingIndicator').hide();
+                });
+            }
+
+            processStream();
+        }).catch(error => {
+            console.error('Fetch error:', error);
+            $('#errorAlert').html('<strong>錯誤：</strong>無法連接到服務器').show();
+            $('#btnGenerate').prop('disabled', false);
+            $('#nlLoadingIndicator').hide();
         });
     });
 

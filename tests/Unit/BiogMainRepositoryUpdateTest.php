@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Repositories\BiogMainRepository;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -22,6 +23,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：當基本資料欄位有實質變更時，應該被檢測到
      */
+    #[Test]
     public function testDetectsActualChangesInBasicFields() {
         $newData = [
             'c_name_chn' => '張三',
@@ -42,6 +44,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：當數值型字串與整數相等時，不應視為變更
      */
+    #[Test]
     public function testTreatsNumericStringsAsEqualToIntegers() {
         $newData = [
             'c_dy' => '19',
@@ -62,6 +65,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：當所有欄位都相同時，不應視為有變更
      */
+    #[Test]
     public function testNoChangesWhenAllFieldsIdentical() {
         $data = [
             'c_name_chn' => '張三',
@@ -78,6 +82,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：忽略的欄位（如 c_modified_by, c_modified_date）不應影響變更檢測
      */
+    #[Test]
     public function testIgnoresSpecifiedFields() {
         $newData = [
             'c_name_chn' => '張三',
@@ -100,6 +105,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：空值與 null 的處理
      */
+    #[Test]
     public function testHandlesNullAndEmptyValues() {
         $newData = [
             'c_name_chn' => '',
@@ -122,6 +128,7 @@ class BiogMainRepositoryUpdateTest extends TestCase {
     /**
      * 測試：當新增欄位（原始資料中不存在）時，應視為變更
      */
+    #[Test]
     public function testDetectsNewFields() {
         $newData = [
             'c_name_chn' => '張三',

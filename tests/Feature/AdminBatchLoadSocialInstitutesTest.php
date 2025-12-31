@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdminBatchLoadSocialInstitutesTest extends TestCase {
@@ -130,6 +131,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -138,6 +140,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
         $response->assertStatus(200)->assertSee('批次匯入社會機構');
     }
 
+    #[Test]
     public function test_admin_can_upload_new_institution(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -202,6 +205,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
             ->assertSee('是');
     }
 
+    #[Test]
     public function test_existing_name_reuses_code(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -246,6 +250,7 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
         $followUp->assertSee('否');
     }
 
+    #[Test]
     public function test_invalid_type_results_in_error(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

@@ -7,6 +7,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationsIndexDiffTest extends TestCase {
@@ -122,6 +123,7 @@ BLADE
         return $user;
     }
 
+    #[Test]
     public function test_operations_index_handles_missing_relation_records(): void {
         $this->actingAsAdmin();
 
@@ -144,6 +146,7 @@ BLADE
         $response->assertStatus(200)->assertSee('最近編輯列表');
     }
 
+    #[Test]
     public function test_operations_index_handles_empty_result_set(): void {
         $this->actingAsAdmin();
 

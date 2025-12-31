@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OptionalAuthenticationMiddlewareTest extends TestCase {
@@ -28,12 +29,14 @@ class OptionalAuthenticationMiddlewareTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function test_guest_without_token_can_pass(): void {
         $this->getJson('/testing/auth-optional')
             ->assertStatus(200)
             ->assertJson(['user_id' => null]);
     }
 
+    #[Test]
     public function test_request_with_valid_token_succeeds(): void {
         $user = User::factory()->create();
         $token = $user->createToken('test-token')->plainTextToken;
@@ -44,6 +47,7 @@ class OptionalAuthenticationMiddlewareTest extends TestCase {
             ->assertJson(['user_id' => $user->id]);
     }
 
+    #[Test]
     public function test_request_with_invalid_token_is_rejected(): void {
         $this->withHeader('Authorization', 'Bearer invalid-token')
             ->getJson('/testing/auth-optional')

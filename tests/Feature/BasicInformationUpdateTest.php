@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BasicInformationUpdateTest extends TestCase {
@@ -93,6 +94,7 @@ class BasicInformationUpdateTest extends TestCase {
     /**
      * 測試無修改時不寫入資料庫
      */
+    #[Test]
     public function testNoUpdateWhenNoChanges() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([
@@ -178,6 +180,7 @@ class BasicInformationUpdateTest extends TestCase {
     /**
      * 測試有修改時正常寫入
      */
+    #[Test]
     public function testUpdateWhenChangesExist() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([
@@ -273,6 +276,7 @@ class BasicInformationUpdateTest extends TestCase {
     /**
      * 測試 Laravel 框架欄位被正確過濾
      */
+    #[Test]
     public function testFrameworkFieldsAreFilteredCorrectly() {
         // 創建測試用戶（活躍且非眾包）
         $user = User::create([

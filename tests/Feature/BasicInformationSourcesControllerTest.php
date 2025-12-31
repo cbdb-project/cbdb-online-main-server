@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BasicInformationSourcesControllerTest extends TestCase {
@@ -71,6 +72,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function testSourceStoreWritesAuditFieldsAndOperations(): void {
         $repository = new BiogMainRepository();
         $request = new Request([
@@ -103,6 +105,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $this->assertSame(321, $payload['c_personid']);
     }
 
+    #[Test]
     public function testSourceUpdatePreservesCreationAndSetsModification(): void {
         $repository = new BiogMainRepository();
         $initialRequest = new Request([
@@ -153,6 +156,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $this->assertSame('updated note', $payload['c_notes']);
     }
 
+    #[Test]
     public function testEditViewDisplaysCreationAndModificationInfo(): void {
         $row = (object) [
             'c_personid' => 777,
@@ -181,6 +185,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $this->assertStringContainsString('Editor User/2024-02-03 08:30:00', $html);
     }
 
+    #[Test]
     public function testSourceDeleteRemovesRowAndStoresOriginal(): void {
         $repository = new BiogMainRepository();
         $request = new Request([

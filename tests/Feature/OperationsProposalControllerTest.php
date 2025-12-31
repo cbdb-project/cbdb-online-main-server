@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationsProposalControllerTest extends TestCase {
@@ -91,6 +92,7 @@ class OperationsProposalControllerTest extends TestCase {
         return $operation;
     }
 
+    #[Test]
     public function testApproveCreateProposalInsertsRow() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -140,6 +142,7 @@ class OperationsProposalControllerTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testApproveUpdateProposalUpdatesRow() {
         \DB::table('TEST_CODES')->insert([
             'code_id' => 'UP',
@@ -191,6 +194,7 @@ class OperationsProposalControllerTest extends TestCase {
         ]);
     }
 
+    #[Test]
     public function testRejectProposalUpdatesStatus() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);

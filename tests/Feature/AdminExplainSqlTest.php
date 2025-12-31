@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdminExplainSqlTest extends TestCase {
@@ -63,11 +64,13 @@ class AdminExplainSqlTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function test_guest_is_redirected_to_login(): void {
         $response = $this->get('/admin/explainsql');
         $response->assertStatus(302);
     }
 
+    #[Test]
     public function test_non_admin_is_forbidden(): void {
         $user = $this->makeUser(['is_admin' => 0]);
 
@@ -76,6 +79,7 @@ class AdminExplainSqlTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    #[Test]
     public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -84,6 +88,7 @@ class AdminExplainSqlTest extends TestCase {
         $response->assertStatus(200)->assertSee('SQL 語句');
     }
 
+    #[Test]
     public function test_admin_can_run_explain(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

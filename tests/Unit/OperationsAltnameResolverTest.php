@@ -7,6 +7,7 @@ use App\Repositories\OperationRepository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OperationsAltnameResolverTest extends TestCase {
@@ -38,6 +39,7 @@ class OperationsAltnameResolverTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function test_fetch_altname_current_row_handles_dash_in_resource_id(): void {
         $controller = new class (new OperationRepository()) extends OperationsController {
             public function resolveAltname(array $payload) {

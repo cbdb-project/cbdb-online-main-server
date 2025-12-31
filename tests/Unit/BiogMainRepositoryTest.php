@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Repositories\BiogMainRepository;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BiogMainRepositoryTest extends TestCase {
@@ -14,6 +15,7 @@ class BiogMainRepositoryTest extends TestCase {
         $this->repository = new TestableBiogMainRepository();
     }
 
+    #[Test]
     public function testHasMeaningfulChangesTreatsNumericStringsAsEqual() {
         $newData = ['c_fy_nh_code' => '652', 'c_dy' => '19'];
         $original = ['c_fy_nh_code' => 652, 'c_dy' => 19];
@@ -24,6 +26,7 @@ class BiogMainRepositoryTest extends TestCase {
         );
     }
 
+    #[Test]
     public function testHasMeaningfulChangesDetectsActualDifferences() {
         $newData = ['c_dy' => '20'];
         $original = ['c_dy' => 19];
@@ -34,6 +37,7 @@ class BiogMainRepositoryTest extends TestCase {
         );
     }
 
+    #[Test]
     public function testHasMeaningfulChangesTreatsMissingOriginalAsChange() {
         $newData = ['c_sequence' => '1'];
         $original = [];
@@ -41,6 +45,7 @@ class BiogMainRepositoryTest extends TestCase {
         $this->assertTrue($this->repository->callHasMeaningfulChanges($newData, $original));
     }
 
+    #[Test]
     public function testNormalizeSelectionListHandlesMinus999AndSorts() {
         $input = ['-999', 123, '456', 123];
         $expected = ['0', '123', '456'];
@@ -48,6 +53,7 @@ class BiogMainRepositoryTest extends TestCase {
         $this->assertSame($expected, $this->repository->callNormalizeSelectionList($input, -999));
     }
 
+    #[Test]
     public function testNormalizeSelectionListIgnoresEmptyValues() {
         $input = ['', null, '-999'];
         $expected = ['0'];
@@ -55,6 +61,7 @@ class BiogMainRepositoryTest extends TestCase {
         $this->assertSame($expected, $this->repository->callNormalizeSelectionList($input, -999));
     }
 
+    #[Test]
     public function testSelectionListHasChangesDetectsDifferences() {
         $this->assertTrue(
             $this->repository->callSelectionListHasChanges([1, 2], [1], null)

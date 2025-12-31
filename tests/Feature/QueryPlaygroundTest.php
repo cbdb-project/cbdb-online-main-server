@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Config;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class QueryPlaygroundTest extends TestCase {
@@ -20,6 +21,7 @@ class QueryPlaygroundTest extends TestCase {
             'ALLOWED1' => 'A1',
             'ALLOWED2' => 'A2',
         ]);
+        Config::set('services.gemini.api_key', 'test-api-key');
 
         // Create users if DB is available, otherwise mock Auth
         // Assuming In-Memory SQLite usually used in Laravel tests
@@ -43,21 +45,21 @@ class QueryPlaygroundTest extends TestCase {
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function guests_cannot_access_playground() {
         auth()->logout();
         $response = $this->get(route('query-playground.index'));
         $response->assertRedirect('login');
     }
 
-    /** @test */
+    #[Test]
     public function regular_users_cannot_access_playground() {
         $this->be($this->regularUser);
         $response = $this->get(route('query-playground.index'));
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function expert_users_can_access_playground() {
         $this->be($this->adminUser);
         $response = $this->get(route('query-playground.index'));
@@ -65,7 +67,7 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertSee('SQL 查詢練習場');
     }
 
-    /** @test */
+    #[Test]
     public function regular_users_cannot_run_queries() {
         $this->be($this->regularUser);
         $response = $this->postJson(route('query-playground.run'), [
@@ -74,7 +76,7 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_forbidden_keywords() {
         $this->be($this->adminUser);
 
@@ -88,7 +90,7 @@ class QueryPlaygroundTest extends TestCase {
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_non_whitelisted_tables() {
         $this->be($this->adminUser);
 
@@ -100,7 +102,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('is not allowed', $response->json()['error'] ?? '');
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_multiple_tables_correctly() {
         $this->be($this->adminUser);
 
@@ -131,7 +133,7 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_trailing_semicolon() {
         $this->be($this->adminUser);
 
@@ -143,7 +145,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertNotEquals(403, $response->status(), 'Should allow trailing semicolon');
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_multiple_statements() {
         $this->be($this->adminUser);
 
@@ -155,7 +157,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('Forbidden character detected', $response->json()['error'] ?? '');
     }
 
-    /** @test */
+    #[Test]
     public function guests_cannot_generate_from_nl() {
         auth()->logout();
         $response = $this->postJson(route('query-playground.generate-from-nl'), [
@@ -164,7 +166,7 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[Test]
     public function regular_users_cannot_generate_from_nl() {
         $this->be($this->regularUser);
         $response = $this->postJson(route('query-playground.generate-from-nl'), [
@@ -173,14 +175,14 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function it_requires_question_parameter() {
         $this->be($this->adminUser);
         $response = $this->postJson(route('query-playground.generate-from-nl'), []);
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_question_length() {
         $this->be($this->adminUser);
         $response = $this->postJson(route('query-playground.generate-from-nl'), [
@@ -189,7 +191,7 @@ class QueryPlaygroundTest extends TestCase {
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_subqueries_with_whitelisted_tables() {
         $this->be($this->adminUser);
 
@@ -206,7 +208,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertNotEquals(403, $response->status(), 'Should allow JOIN with subquery');
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_subqueries_with_non_whitelisted_tables() {
         $this->be($this->adminUser);
 
@@ -218,7 +220,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_nested_subqueries() {
         $this->be($this->adminUser);
 
@@ -236,7 +238,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_real_world_example_from_issue() {
         $this->be($this->adminUser);
 
@@ -263,7 +265,7 @@ class QueryPlaygroundTest extends TestCase {
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_double_quoted_identifier_bypass_attempt() {
         $this->be($this->adminUser);
 
@@ -279,7 +281,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
     }
 
-    /** @test */
+    #[Test]
     public function it_blocks_backtick_quoted_identifier() {
         $this->be($this->adminUser);
 
@@ -293,7 +295,7 @@ class QueryPlaygroundTest extends TestCase {
         $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_quoted_whitelisted_tables() {
         $this->be($this->adminUser);
 

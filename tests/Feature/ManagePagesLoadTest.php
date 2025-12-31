@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -121,6 +122,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试主页面：/manage（需要管理员权限）
      */
+    #[Test]
     public function test_manage_index_page_loads() {
         $response = $this->actingAs($this->adminUser)->get('/manage');
         $response->assertStatus(200);
@@ -129,6 +131,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试普通用户访问 /manage 会被重定向
      */
+    #[Test]
     public function test_manage_index_redirects_non_admin() {
         $response = $this->actingAs($this->regularUser)->get('/manage');
         $response->assertRedirect('/home');
@@ -137,6 +140,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试未认证用户访问 /manage 会被重定向到登录页
      */
+    #[Test]
     public function test_manage_index_requires_authentication() {
         $response = $this->get('/manage');
         $response->assertRedirect('/login');
@@ -145,6 +149,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试编辑页面加载：/manage/{id}/edit
      */
+    #[Test]
     public function test_manage_edit_page_loads() {
         $response = $this->actingAs($this->adminUser)
             ->get("/manage/{$this->regularUser->id}/edit");
@@ -158,6 +163,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试更新用户激活状态：PUT /manage/{id}
      */
+    #[Test]
     public function test_manage_update_active_status() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
@@ -175,6 +181,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试更新用户角色：PUT /manage/{id}
      */
+    #[Test]
     public function test_manage_update_user_role() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
@@ -192,6 +199,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试删除用户：PUT /manage/{id} with delete_user
      */
+    #[Test]
     public function test_manage_delete_user() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/{$this->regularUser->id}", [
@@ -212,6 +220,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试非管理员无法访问编辑页面
      */
+    #[Test]
     public function test_manage_edit_requires_admin() {
         $response = $this->actingAs($this->regularUser)
             ->get("/manage/{$this->adminUser->id}/edit");
@@ -222,6 +231,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试非管理员无法执行更新操作
      */
+    #[Test]
     public function test_manage_update_requires_admin() {
         $response = $this->actingAs($this->regularUser)
             ->put("/manage/{$this->adminUser->id}", [
@@ -235,6 +245,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试路由参数正确性
      */
+    #[Test]
     public function test_manage_edit_route_with_correct_parameters() {
         // 测试路由能正确生成 URL
         $url = route('manage.edit', $this->regularUser->id);
@@ -244,6 +255,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试更新不存在的用户
      */
+    #[Test]
     public function test_manage_update_nonexistent_user() {
         $response = $this->actingAs($this->adminUser)
             ->put("/manage/99999", [
@@ -257,6 +269,7 @@ class ManagePagesLoadTest extends TestCase {
     /**
      * 测试验证规则
      */
+    #[Test]
     public function test_manage_update_validation() {
         // 测试无效的 is_active 值
         $response = $this->actingAs($this->adminUser)

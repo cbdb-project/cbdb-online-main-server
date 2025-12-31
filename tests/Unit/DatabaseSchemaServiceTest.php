@@ -4,10 +4,11 @@ namespace Tests\Unit;
 
 use App\Services\DatabaseSchemaService;
 use Illuminate\Support\Facades\Config;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DatabaseSchemaServiceTest extends TestCase {
-    /** @test */
+    #[Test]
     public function it_filters_tables_by_whitelist() {
         // Mock config
         Config::set('codes.tables', [
@@ -30,7 +31,7 @@ class DatabaseSchemaServiceTest extends TestCase {
         $this->assertArrayNotHasKey('INVALID_TABLE', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_basic_schema_prompt_structure() {
         Config::set('codes.tables', [
             'DYNASTIES' => 'Dynasties Table',
@@ -56,7 +57,7 @@ class DatabaseSchemaServiceTest extends TestCase {
         $this->assertStringContainsString('主键', $prompt);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_clear_cache() {
         $service = new DatabaseSchemaService();
 

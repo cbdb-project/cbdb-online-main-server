@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class WikiMaintenanceControllerTest extends TestCase {
@@ -125,6 +126,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试未认证用户不能访问 Wiki 维护页面
      */
+    #[Test]
     public function test_unauthenticated_user_cannot_access_wiki_maintenance() {
         $response = $this->get('/admin/wiki-maintenance');
         $response->assertRedirect('/login');
@@ -133,6 +135,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试认证用户可以访问 Wiki 维护页面
      */
+    #[Test]
     public function test_authenticated_user_can_access_wiki_maintenance() {
         $this->actingAs($this->user);
 
@@ -145,6 +148,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试页面显示正确的数据源选项
      */
+    #[Test]
     public function test_wiki_maintenance_shows_correct_source_options() {
         $this->actingAs($this->user);
 
@@ -158,6 +162,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试删除全部记录功能需要有效的 source_id
      */
+    #[Test]
     public function test_delete_all_records_validation() {
         $this->actingAs($this->user);
 
@@ -172,6 +177,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试 URL 导入功能的输入验证
      */
+    #[Test]
     public function test_import_url_validation() {
         $this->actingAs($this->user);
 
@@ -202,6 +208,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试有效的 URL 导入请求返回正确响应
      */
+    #[Test]
     public function test_import_url_returns_success_response() {
         $this->actingAs($this->user);
 
@@ -225,6 +232,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     /**
      * 测试进度查询功能 - 测试不存在的任务返回404
      */
+    #[Test]
     public function test_get_import_progress_not_found() {
         $this->actingAs($this->user);
 

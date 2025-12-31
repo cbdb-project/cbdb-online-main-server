@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationTest extends TestCase {
     /**
      * Test that all migrations can run successfully on a clean SQLite database.
      */
+    #[Test]
     public function test_all_migrations_run_successfully_on_sqlite() {
         // 1. Verify environmental isolation BEFORE running migrations
         $driver = DB::getDriverName();

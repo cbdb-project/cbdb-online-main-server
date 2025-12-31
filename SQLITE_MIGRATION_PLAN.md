@@ -248,26 +248,19 @@ use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use App\Models\BiogMain;
+use PHPUnit\Framework\Attributes\Test;
 
 class DatabaseCompatibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * 测试数据库驱动是否为 SQLite
-     *
-     * @test
-     */
+    #[Test]
     public function it_uses_sqlite_for_testing()
     {
         $this->assertEquals('sqlite', DB::getDriverName());
     }
 
-    /**
-     * 测试外键约束是否启用
-     *
-     * @test
-     */
+    #[Test]
     public function it_has_foreign_key_constraints_enabled()
     {
         if (DB::getDriverName() === 'sqlite') {
@@ -278,11 +271,7 @@ class DatabaseCompatibilityTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /**
-     * 测试事务支持
-     *
-     * @test
-     */
+    #[Test]
     public function it_supports_transactions()
     {
         DB::beginTransaction();
@@ -300,11 +289,7 @@ class DatabaseCompatibilityTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'test@transaction.com']);
     }
 
-    /**
-     * 测试字符串拼接（|| 操作符）
-     *
-     * @test
-     */
+    #[Test]
     public function it_supports_string_concatenation()
     {
         $result = DB::select(DB::raw("SELECT 'Hello' || ' ' || 'World' as message"));

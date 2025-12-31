@@ -6,6 +6,7 @@ use App\Http\Controllers\MergePreviewController;
 use Carbon\Carbon;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Auth;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MergePreviewControllerTest extends TestCase {
@@ -24,6 +25,7 @@ class MergePreviewControllerTest extends TestCase {
         parent::tearDown();
     }
 
+    #[Test]
     public function testCalculateMergedPersonCombinesAttributesAndNotes() {
         $user = new GenericUser(['id' => 999, 'name' => 'MergeAdmin']);
         Auth::guard()->setUser($user);
@@ -71,6 +73,7 @@ class MergePreviewControllerTest extends TestCase {
         $this->assertArrayNotHasKey('c_personid', $updates);
     }
 
+    #[Test]
     public function testCalculateMergedPersonWithoutSecondaryReturnsEmpty() {
         $primary = ['exists' => true, 'attributes' => []];
         $secondary = ['exists' => false];
@@ -81,6 +84,7 @@ class MergePreviewControllerTest extends TestCase {
         $this->assertSame([], $result['updates']);
     }
 
+    #[Test]
     public function testShouldBlockMergeDetectsNameDifference() {
         $primary = ['exists' => true, 'name' => 'Zhang San', 'name_chn' => '張三'];
         $secondary = ['exists' => true, 'name' => 'Li Si', 'name_chn' => '李四'];
@@ -92,6 +96,7 @@ class MergePreviewControllerTest extends TestCase {
         $this->assertFalse($this->controller->callShouldBlockMerge($primary, $secondary));
     }
 
+    #[Test]
     public function testBuildSqlPreviewIncludesAutoArrangeStatements() {
         $result = [
             'values' => ['c_name' => 'Merged'],
@@ -126,6 +131,7 @@ class MergePreviewControllerTest extends TestCase {
         $this->assertTrue($hasMinUpdate, 'Auto arrange 段落應該將人物 ID 調整為較小值。');
     }
 
+    #[Test]
     public function testBuildSqlPreviewSkipsAutoArrangeWhenDisabled() {
         $statements = $this->controller->callBuildSqlPreview(300, 200, ['values' => [], 'updates' => [], 'merge_record' => null], false, null);
 

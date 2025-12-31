@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdminBatchLoadOfficesTest extends TestCase {
@@ -112,6 +113,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
         return $user;
     }
 
+    #[Test]
     public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -120,6 +122,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
         $response->assertStatus(200)->assertSee('批次匯入官職');
     }
 
+    #[Test]
     public function test_admin_can_upload_office(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
@@ -168,6 +171,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
             ->assertSee('4763');
     }
 
+    #[Test]
     public function test_unknown_type_is_rejected(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

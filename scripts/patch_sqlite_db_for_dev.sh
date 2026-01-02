@@ -3,8 +3,12 @@
 # 此腳本用於補足 Laravel 運行所需的 9 個表結構，
 # 這些表在 CBDB 官方發布的 77 表 SQLite 資料庫中並不存在。
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # 容器內或專案根目錄下的路徑
-DB_FILE="db-data/database.sqlite3"
+DB_FILE="$PROJECT_ROOT/db-data/database.sqlite3"
+MIGRATIONS_DIR="$PROJECT_ROOT/database/migrations"
 
 if [ ! -f "$DB_FILE" ]; then
     echo "❌ 錯誤: 找不到資料庫文件 $DB_FILE"
@@ -129,4 +133,30 @@ if [ $? -eq 0 ]; then
 else
     echo "❌ Schema 補足失敗。"
     exit 1
+fi
+
+if [ -d "$MIGRATIONS_DIR" ]; then
+    MIGRATION_SQL=""
+    for file in "$MIGRATIONS_DIR"/[0-9]*.php; do
+        if [ -f "$file" ]; then
+            base="$(basename "$file")"
+            name="${base%.php}"
+            MIGRATION_SQL+="INSERT INTO \"migrations\" (\"migration\", \"batch\") VALUES (\"$name\", 1);\n"
+        fi
+    done
+
+    if [ -n "$MIGRATION_SQL" ]; then
+        echo "⏳ 正在寫入 migrations 記錄..."
+        printf "%b" "$MIGRATION_SQL" | sqlite3 "$DB_FILE"
+        if [ $? -eq 0 ]; then
+            echo "✅ migrations 記錄寫入成功。"
+        else
+            echo "❌ migrations 記錄寫入失敗。"
+            exit 1
+        fi
+    else
+        echo "⚠️ 找不到 migrations 檔案，跳過寫入記錄。"
+    fi
+else
+    echo "⚠️ 找不到 migrations 目錄，跳過寫入記錄。"
 fi

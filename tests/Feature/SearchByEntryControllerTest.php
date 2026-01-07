@@ -3,26 +3,27 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SearchByEntryControllerTest extends TestCase {
-    use RefreshDatabase;
+    // NOTE: Avoid RefreshDatabase; full migrations on SQLite can fail due to
+    // foreign key mismatch constraints.
 
     protected $user;
 
     protected function setUp(): void {
         parent::setUp();
 
+        // 創建測試數據表
+        $this->createTestTables();
+
         // 創建測試用戶
         $this->user = User::factory()->create([
             'is_active' => 1,
         ]);
 
-        // 創建測試數據表
-        $this->createTestTables();
         $this->seedTestData();
     }
 
@@ -32,6 +33,22 @@ class SearchByEntryControllerTest extends TestCase {
     protected function createTestTables(): void {
         // 禁用外鍵約束檢查
         DB::statement('PRAGMA foreign_keys = OFF');
+
+        // users 表（User factory 需要的最小欄位）
+        DB::statement('
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                remember_token VARCHAR(100),
+                confirmation_token VARCHAR(255) NOT NULL,
+                is_active SMALLINT NOT NULL DEFAULT 0,
+                is_admin SMALLINT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL,
+                updated_at TIMESTAMP NULL
+            )
+        ');
 
         // ENTRY_TYPES 表
         DB::statement('
@@ -89,7 +106,27 @@ class SearchByEntryControllerTest extends TestCase {
                 c_personid INT NOT NULL PRIMARY KEY,
                 c_name VARCHAR(255),
                 c_name_chn VARCHAR(255),
-                c_index_year INT
+                c_dy VARCHAR(255),
+                c_index_year INT,
+                c_index_addr_id INT
+            )
+        ');
+
+        // DYNASTIES 表（供 leftJoin 使用）
+        DB::statement('
+            CREATE TABLE IF NOT EXISTS DYNASTIES (
+                c_dy VARCHAR(255) NOT NULL PRIMARY KEY,
+                c_dynasty VARCHAR(255),
+                c_dynasty_chn VARCHAR(255)
+            )
+        ');
+
+        // ADDR_CODES 表（供 leftJoin 使用）
+        DB::statement('
+            CREATE TABLE IF NOT EXISTS ADDR_CODES (
+                c_addr_id INT NOT NULL PRIMARY KEY,
+                c_name VARCHAR(255),
+                c_name_chn VARCHAR(255)
             )
         ');
     }
@@ -144,13 +181,44 @@ class SearchByEntryControllerTest extends TestCase {
                 'c_personid' => 1,
                 'c_name' => 'Test Person 1',
                 'c_name_chn' => '測試人物一',
+                'c_dy' => 'DY1',
                 'c_index_year' => 1000,
+                'c_index_addr_id' => 10,
             ],
             [
                 'c_personid' => 2,
                 'c_name' => 'Test Person 2',
                 'c_name_chn' => '測試人物二',
+                'c_dy' => 'DY2',
                 'c_index_year' => 1100,
+                'c_index_addr_id' => 20,
+            ],
+        ]);
+
+        // 插入朝代與地址數據（leftJoin 需要表存在）
+        DB::table('DYNASTIES')->insert([
+            [
+                'c_dy' => 'DY1',
+                'c_dynasty' => 'Dynasty 1',
+                'c_dynasty_chn' => '朝代一',
+            ],
+            [
+                'c_dy' => 'DY2',
+                'c_dynasty' => 'Dynasty 2',
+                'c_dynasty_chn' => '朝代二',
+            ],
+        ]);
+
+        DB::table('ADDR_CODES')->insert([
+            [
+                'c_addr_id' => 10,
+                'c_name' => 'Address 1',
+                'c_name_chn' => '地址一',
+            ],
+            [
+                'c_addr_id' => 20,
+                'c_name' => 'Address 2',
+                'c_name_chn' => '地址二',
             ],
         ]);
 

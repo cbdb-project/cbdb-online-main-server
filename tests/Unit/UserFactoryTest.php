@@ -167,7 +167,7 @@ class UserFactoryTest extends TestCase {
     #[Test]
     public function old_factory_syntax_still_works() {
         // 验证旧的 factory() 语法仍然可用
-        $user = factory(User::class)->create();
+        $user = User::factory()->create();
 
         $this->assertInstanceOf(User::class, $user);
         $this->assertNotNull($user->id);

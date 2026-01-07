@@ -4,13 +4,13 @@ namespace Tests\Unit;
 
 use App\Services\DatabaseSchemaService;
 use App\Services\NlQueryToolsService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class NlQueryToolsServiceTest extends TestCase {
-    use RefreshDatabase;
+    // NOTE: Do not use RefreshDatabase here; full migrations on SQLite
+    // can fail due to foreign key mismatch constraints.
 
     protected NlQueryToolsService $service;
 

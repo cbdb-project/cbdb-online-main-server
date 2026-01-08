@@ -1,3 +1,8 @@
+---
+name: 用戶管理操作
+description: 創建和更新用戶帳號的完整指南，包含 cbdb:manage-user 命令使用、User Factory 測試、角色權限管理
+---
+
 # 用戶管理指南
 
 ## 何時使用此技能

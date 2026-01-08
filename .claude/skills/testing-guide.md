@@ -1,3 +1,8 @@
+---
+name: PHPUnit 測試編寫
+description: PHPUnit 測試編寫的最佳實踐指南，重點介紹 In-Memory SQLite 測試模式、避免複雜數據庫依賴、常見測試場景範例
+---
+
 # PHPUnit 測試指南
 
 ## 何時使用此技能

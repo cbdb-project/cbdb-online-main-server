@@ -1,3 +1,8 @@
+---
+name: Laravel Migration 編寫
+description: 創建和修改數據庫結構的完整指南，涵蓋複合主鍵處理、索引策略、數據庫兼容性最佳實踐
+---
+
 # Laravel Migration 編寫指南
 
 ## 何時使用此技能

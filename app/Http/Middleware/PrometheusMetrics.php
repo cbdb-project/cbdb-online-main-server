@@ -29,19 +29,33 @@ class PrometheusMetrics {
         // 增加正在处理的请求计数
         $this->incrementInProgressRequests($request);
 
-        // 处理请求
-        $response = $next($request);
+        $response = null;
+        $exception = null;
 
-        // 计算请求耗时
-        $duration = microtime(true) - $startTime;
+        try {
+            // 处理请求
+            $response = $next($request);
 
-        // 减少正在处理的请求计数
-        $this->decrementInProgressRequests($request);
+            return $response;
+        } catch (\Throwable $e) {
+            $exception = $e;
 
-        // 记录 metrics
-        $this->recordMetrics($request, $response, $duration);
+            throw $e;
+        } finally {
+            // 计算请求耗时
+            $duration = microtime(true) - $startTime;
 
-        return $response;
+            // 减少正在处理的请求计数（确保即使发生异常也会执行）
+            $this->decrementInProgressRequests($request);
+
+            // 记录 metrics
+            if ($response !== null) {
+                $this->recordMetrics($request, $response, $duration);
+            } elseif ($exception !== null) {
+                // 对于未被捕获的异常，记录为 500 错误
+                $this->recordExceptionMetrics($request, $exception, $duration);
+            }
+        }
     }
 
     /**
@@ -113,6 +127,45 @@ class PrometheusMetrics {
             $labels = array_merge(
                 $this->getLabels($request),
                 ['status' => $response->getStatusCode()]
+            );
+
+            // 记录请求总数
+            $counter = $this->registry->getOrRegisterCounter(
+                config('prometheus.namespace', 'cbdb'),
+                'http_requests_total',
+                'Total number of HTTP requests',
+                ['method', 'path', 'status']
+            );
+            $counter->inc($labels);
+
+            // 记录请求延迟分布
+            $histogram = $this->registry->getOrRegisterHistogram(
+                config('prometheus.namespace', 'cbdb'),
+                'http_request_duration_seconds',
+                'HTTP request latency in seconds',
+                ['method', 'path', 'status'],
+                config('prometheus.http_metrics.latency_buckets')
+            );
+            $histogram->observe($duration, $labels);
+        } catch (\Exception $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * 记录异常情况的 metrics
+     */
+    protected function recordExceptionMetrics(Request $request, \Throwable $exception, float $duration): void {
+        try {
+            // 确定 HTTP 状态码
+            $statusCode = 500;
+            if (method_exists($exception, 'getStatusCode')) {
+                $statusCode = $exception->getStatusCode();
+            }
+
+            $labels = array_merge(
+                $this->getLabels($request),
+                ['status' => $statusCode]
             );
 
             // 记录请求总数

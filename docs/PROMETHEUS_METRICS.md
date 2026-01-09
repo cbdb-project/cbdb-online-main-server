@@ -77,10 +77,24 @@ PROMETHEUS_AUTH_PASSWORD=secret
 
 #### IP 白名單
 
-限制只有特定 IP 可以訪問 `/metrics` 端點：
+限制只有特定 IP 可以訪問 `/metrics` 端點。支援以下格式：
+
+- **精確匹配**: `10.0.0.1`
+- **CIDR IPv4**: `192.168.1.0/24`
+- **CIDR IPv6**: `2001:db8::/32`
+- **混合格式**: 可以同時使用多種格式，用逗號分隔
+
+範例：
 
 ```env
-PROMETHEUS_ALLOWED_IPS=10.0.0.1,10.0.0.2,192.168.1.0/24
+# 單一 IP
+PROMETHEUS_ALLOWED_IPS=10.0.0.1
+
+# CIDR 格式
+PROMETHEUS_ALLOWED_IPS=192.168.1.0/24
+
+# 混合多個格式
+PROMETHEUS_ALLOWED_IPS=10.0.0.1,192.168.1.0/24,2001:db8::/32
 ```
 
 #### HTTP 基本認證
@@ -188,6 +202,29 @@ sum by (path) (rate(cbdb_http_requests_total[5m]))
 - Memory 適配器：幾乎無影響
 - Redis 適配器：每個請求約增加 1-2ms 延遲
 - 如需完全停用：設定 `PROMETHEUS_ENABLED=false`
+
+### 可靠性與異常處理
+
+Metrics 收集系統經過強化設計，確保即使在異常情況下也能正確運作：
+
+#### 異常時的 Metrics 記錄
+
+- 使用 `try/finally` 結構確保即使請求處理過程中發生異常，仍能正確：
+  - 遞減 `http_requests_in_progress` gauge（避免計數器洩漏）
+  - 記錄錯誤請求的 metrics（包含狀態碼和延遲）
+- 未被捕獲的異常會被記錄為 500 錯誤
+- HTTP 異常（如 404、403）會正確記錄其狀態碼
+
+#### 錯誤隔離
+
+- Metrics 收集過程中的錯誤**不會影響**正常的 HTTP 請求處理
+- 所有 metrics 操作都包含異常捕獲，失敗時會通過 `report()` 記錄但不會中斷請求
+
+#### IP 白名單的容錯性
+
+- 支援 CIDR 格式（IPv4 和 IPv6）
+- 自動去除空格，容忍格式錯誤
+- 無效的 CIDR 格式會被安全忽略
 
 ## 擴展自定義 Metrics
 

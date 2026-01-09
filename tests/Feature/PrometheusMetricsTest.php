@@ -176,4 +176,82 @@ class PrometheusMetricsTest extends TestCase {
         // HTTP metrics 应该不存在
         $this->assertStringNotContainsString('http_requests_total', $content);
     }
+
+    #[Test]
+    public function metrics_endpoint_supports_cidr_ipv4_whitelist(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.metrics_endpoint.allowed_ips', ['192.168.1.0/24']);
+
+        // 从子网内的 IP 访问（应该允许）
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.100']);
+        $response->assertStatus(200);
+
+        // 从子网外的 IP 访问（应该拒绝）
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.2.100']);
+        $response->assertStatus(403);
+
+        // 边界测试：子网的第一个地址
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.0']);
+        $response->assertStatus(200);
+
+        // 边界测试：子网的最后一个地址
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.255']);
+        $response->assertStatus(200);
+    }
+
+    #[Test]
+    public function metrics_endpoint_supports_cidr_ipv6_whitelist(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.metrics_endpoint.allowed_ips', ['2001:db8::/32']);
+
+        // 从子网内的 IP 访问（应该允许）
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '2001:db8::1']);
+        $response->assertStatus(200);
+
+        // 从子网外的 IP 访问（应该拒绝）
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '2001:db9::1']);
+        $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function metrics_endpoint_supports_mixed_ip_formats(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.metrics_endpoint.allowed_ips', [
+            '10.0.0.1',              // 精确匹配
+            '192.168.1.0/24',        // CIDR IPv4
+            '2001:db8::/32',         // CIDR IPv6
+        ]);
+
+        // 精确匹配
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '10.0.0.1']);
+        $response->assertStatus(200);
+
+        // CIDR IPv4 匹配
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.50']);
+        $response->assertStatus(200);
+
+        // CIDR IPv6 匹配
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '2001:db8::100']);
+        $response->assertStatus(200);
+
+        // 不匹配任何规则
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '172.16.0.1']);
+        $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function metrics_endpoint_handles_whitespace_in_ip_list(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.metrics_endpoint.allowed_ips', [
+            ' 10.0.0.1 ',            // 带空格
+            '192.168.1.0/24 ',       // 尾部空格
+        ]);
+
+        // 应该正确去除空格并匹配
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '10.0.0.1']);
+        $response->assertStatus(200);
+
+        $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.1']);
+        $response->assertStatus(200);
+    }
 }

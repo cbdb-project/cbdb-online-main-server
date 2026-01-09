@@ -14,7 +14,8 @@
         "laravel/tinker": "^2.8",
         "laravel/ui": "^4.5",
         "nesbot/carbon": "^2.67 || ^3.0",
-        "phpmyadmin/sql-parser": "^6.0"
+        "phpmyadmin/sql-parser": "^6.0",
+        "promphp/prometheus_client_php": "^2.14"
     },
     "require-dev": {
         "spatie/laravel-ignition": "^2.0 || ^3.0",

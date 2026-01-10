@@ -21,6 +21,8 @@ class Kernel extends HttpKernel {
         // \App\Http\Middleware\EnableCrossRequestMiddleware::class,
         // 20200909建安新增
         \App\Http\Middleware\Cors::class,
+        // Prometheus metrics 收集
+        \App\Http\Middleware\PrometheusMetrics::class,
     ];
 
     /**

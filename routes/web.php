@@ -11,6 +11,8 @@
 |
 */
 
+// Prometheus metrics endpoint
+Route::get('metrics', 'MetricsController@index')->name('metrics');
 
 Route::get('/', 'WelcomeController@index');
 

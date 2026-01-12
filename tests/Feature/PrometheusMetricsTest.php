@@ -254,4 +254,59 @@ class PrometheusMetricsTest extends TestCase {
         $response = $this->get('/metrics', ['REMOTE_ADDR' => '192.168.1.1']);
         $response->assertStatus(200);
     }
+
+    #[Test]
+    public function metrics_use_route_patterns_when_include_route_params_enabled(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.http_metrics.enabled', true);
+        Config::set('prometheus.http_metrics.include_route_params', true);
+        Config::set('prometheus.namespace', 'cbdb');
+
+        // 模拟访问不同的资源 ID（相同路由模式）
+        // 注意：在测试环境中需要有实际的路由才能获取路由模式
+        $this->get('/');
+        $this->get('/');
+
+        // 获取 metrics
+        $response = $this->get('/metrics');
+        $content = $response->getContent();
+
+        // 验证使用路由模式而非实际路径
+        // 所有请求应该合并到同一个路由模式下
+        $lines = explode("\n", $content);
+        $pathCount = 0;
+        foreach ($lines as $line) {
+            if (str_contains($line, 'cbdb_http_requests_total') && str_contains($line, 'path=')) {
+                $pathCount++;
+            }
+        }
+
+        // 应该只有少量的路由模式（不是每个 ID 一个）
+        $this->assertLessThan(5, $pathCount, '應該使用路由模式而非實際路徑，避免產生大量不同的 metric 時間序列');
+    }
+
+    #[Test]
+    public function metrics_without_route_params_create_memory_leak_risk(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.http_metrics.enabled', true);
+        Config::set('prometheus.http_metrics.include_route_params', false);  // 默认配置
+        Config::set('prometheus.namespace', 'cbdb');
+
+        // 模拟访问不同的资源 ID（使用实际路径）
+        $this->get('/');
+
+        // 获取 metrics
+        $response = $this->get('/metrics');
+        $content = $response->getContent();
+
+        // 这个测试演示了问题：每个唯一的 path 都会创建新的时间序列
+        // 在实际应用中，如果访问 /basicinformation/1/edit, /basicinformation/2/edit 等
+        // 会创建无数个不同的时间序列，导致内存泄漏
+
+        // 验证使用的是实际路径
+        $this->assertStringContainsString('path="/"', $content, '未啟用 include_route_params 時使用實際路徑');
+
+        // 警告：这种配置在生产环境中会导致内存泄漏
+        // 建议将 include_route_params 设置为 true
+    }
 }

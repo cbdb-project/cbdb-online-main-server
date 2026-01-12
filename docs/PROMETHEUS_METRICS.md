@@ -37,6 +37,10 @@ PROMETHEUS_STORAGE_ADAPTER=memory
 # HTTP metrics 啟用/停用
 PROMETHEUS_HTTP_METRICS_ENABLED=true
 
+# ⚠️ 重要：必須設為 true 以防止內存泄漏！
+# 使用路由模式（如 /user/{id}）而非實際路徑（如 /user/123）
+PROMETHEUS_INCLUDE_ROUTE_PARAMS=true
+
 # /metrics 端點的 IP 白名單（逗號分隔，留空表示允許所有 IP）
 PROMETHEUS_ALLOWED_IPS=
 
@@ -126,6 +130,78 @@ curl -u prometheus:your-secure-password http://your-domain.com/metrics
 ],
 ```
 
+### 路由參數配置（重要：防止內存泄漏）
+
+**⚠️ 關鍵配置**：`include_route_params` 必須設置為 `true` 以防止內存泄漏！
+
+```env
+# 在 .env 中設置（預設已為 true）
+PROMETHEUS_INCLUDE_ROUTE_PARAMS=true
+```
+
+#### 為什麼這個配置如此重要？
+
+當 `include_route_params = false` 時：
+- ❌ 每個唯一的 URL 都會創建**獨立的 metric 時間序列**
+- ❌ 例如：`/basicinformation/1/edit`、`/basicinformation/2/edit`、`/basicinformation/3/edit` 等
+- ❌ 如果有 10,000 個不同的資源 ID，就會創建 10,000+ 個不同的時間序列
+- ❌ 每個時間序列包含 Counter、Histogram（14 個 bucket）、Gauge
+- ❌ **內存持續增長，最終導致 OOM (Out of Memory) 錯誤**
+
+當 `include_route_params = true` 時（**推薦**）：
+- ✅ 所有相同路由的請求會**合併到同一個時間序列**
+- ✅ 例如：所有 `/basicinformation/{personid}/edit` 請求共享同一個 metric
+- ✅ 內存占用固定且可預測
+- ✅ Metrics 數據更有意義（按路由聚合而非按個別資源）
+
+#### Metrics 路徑示例對比
+
+| include_route_params | 實際 URL | Metric 中的 path 標籤 | 內存影響 |
+|---------------------|---------|---------------------|---------|
+| `false` ❌ | `/basicinformation/1/edit` | `path="/basicinformation/1/edit"` | 每個 ID 創建新時間序列 |
+| `false` ❌ | `/basicinformation/2/edit` | `path="/basicinformation/2/edit"` | 無限增長 💥 |
+| `true` ✅ | `/basicinformation/1/edit` | `path="/basicinformation/{personid}/edit"` | 固定數量 |
+| `true` ✅ | `/basicinformation/2/edit` | `path="/basicinformation/{personid}/edit"` | 所有請求共享同一時間序列 |
+
+#### 內存泄漏影響評估
+
+假設網站有：
+- 10,000 個 person 記錄
+- 每個被訪問 1 次
+- 每個 URL 創建 3 種 metric（Counter + Histogram + Gauge）
+- Histogram 有 14 個 bucket
+
+**錯誤配置的內存占用**：
+```
+10,000 個唯一 URL × (1 Counter + 14 Histogram buckets + 1 Gauge)
+= 160,000+ 個內存對象
+≈ 數百 MB 甚至 GB 內存 💥
+```
+
+**正確配置的內存占用**：
+```
+固定數量的路由（例如 50 個） × (1 Counter + 14 Histogram buckets + 1 Gauge)
+= 800 個內存對象
+≈ 幾 MB 內存 ✅
+```
+
+#### 如何驗證配置是否正確
+
+訪問 `/metrics` 端點並檢查輸出：
+
+**❌ 錯誤（內存泄漏）**：
+```
+cbdb_http_requests_total{method="GET",path="/basicinformation/1/edit",status="200"} 1
+cbdb_http_requests_total{method="GET",path="/basicinformation/2/edit",status="200"} 1
+cbdb_http_requests_total{method="GET",path="/basicinformation/3/edit",status="200"} 1
+...（成千上萬行）
+```
+
+**✅ 正確（內存可控）**：
+```
+cbdb_http_requests_total{method="GET",path="/basicinformation/{personid}/edit",status="200"} 3
+```
+
 ### 延遲分布 Bucket
 
 可以自定義延遲直方圖的 bucket（單位：秒）：
@@ -184,6 +260,49 @@ sum by (path) (rate(cbdb_http_requests_total[5m]))
 ```
 
 ## 疑難排解
+
+### 內存不足錯誤（500 錯誤 / Memory Allocation Failed）
+
+**症狀**：
+- 應用程式頻繁返回 500 錯誤
+- 日誌顯示「Allowed memory size exhausted」或「Failed to allocate memory」
+- `/metrics` 端點返回非常大的響應（幾 MB 以上）
+
+**原因**：
+- `include_route_params` 配置為 `false`，導致每個唯一 URL 創建獨立的 metric 時間序列
+
+**解決方案**：
+1. 檢查配置：
+   ```bash
+   grep -r "include_route_params" config/prometheus.php
+   ```
+
+2. 確認 `.env` 中設置：
+   ```env
+   PROMETHEUS_INCLUDE_ROUTE_PARAMS=true
+   ```
+
+3. 清除現有 metrics（重啟應用或清除 Redis）：
+   ```bash
+   # 如果使用 Memory 適配器
+   php artisan optimize:clear
+
+   # 如果使用 Redis 適配器
+   redis-cli KEYS "PROMETHEUS_*" | xargs redis-cli DEL
+   ```
+
+4. 驗證修復：
+   ```bash
+   # 訪問幾個不同的資源頁面
+   curl http://your-domain.com/basicinformation/1/edit
+   curl http://your-domain.com/basicinformation/2/edit
+
+   # 檢查 metrics 是否合併到同一路由模式
+   curl http://your-domain.com/metrics | grep "basicinformation"
+
+   # 應該看到：path="/basicinformation/{personid}/edit"
+   # 而不是：path="/basicinformation/1/edit" 和 path="/basicinformation/2/edit"
+   ```
 
 ### Metrics 端點返回空白
 

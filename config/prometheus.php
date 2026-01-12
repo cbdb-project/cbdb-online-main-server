@@ -97,7 +97,11 @@ return [
         ],
 
         // 是否记录路由参数（如 /user/{id}）
-        'include_route_params' => false,
+        // 重要：必须设为 true 以避免内存泄漏！
+        // 当设为 false 时，每个唯一的 URL（如 /basicinformation/1/edit, /basicinformation/2/edit）
+        // 都会创建独立的 metric 时间序列，导致内存无限增长
+        // 当设为 true 时，所有请求会合并到路由模式（如 /basicinformation/{personid}/edit）
+        'include_route_params' => env('PROMETHEUS_INCLUDE_ROUTE_PARAMS', true),
     ],
 
     /*

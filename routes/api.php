@@ -20,11 +20,11 @@ Route::group([], function () {
 
 // Select APIs with optional authentication
 // Allows both authenticated users and guests to access
-// - Authenticated users: Rate limited per user (120 req/min)
-// - Guest users: Rate limited per IP address (120 req/min)
+// - Authenticated users: Rate limited per user (300 req/min)
+// - Guest users: Rate limited per IP address (300 req/min)
 Route::group([
     'prefix' => 'select',
-    'middleware' => ['auth.optional', 'throttle:120,1'],
+    'middleware' => ['auth.optional', 'throttle:300,1'],
 ], function () {
     Route::get('ethnicity', 'ApiController@ethnicity');
     Route::get('choronym', 'ApiController@choronym');

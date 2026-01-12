@@ -289,7 +289,7 @@ class PrometheusMetricsTest extends TestCase {
     public function metrics_without_route_params_create_memory_leak_risk(): void {
         Config::set('prometheus.enabled', true);
         Config::set('prometheus.http_metrics.enabled', true);
-        Config::set('prometheus.http_metrics.include_route_params', false);  // 默认配置
+        Config::set('prometheus.http_metrics.include_route_params', false);  // 错误配置
         Config::set('prometheus.namespace', 'cbdb');
 
         // 模拟访问不同的资源 ID（使用实际路径）
@@ -308,5 +308,74 @@ class PrometheusMetricsTest extends TestCase {
 
         // 警告：这种配置在生产环境中会导致内存泄漏
         // 建议将 include_route_params 设置为 true
+    }
+
+    #[Test]
+    public function gauge_does_not_include_path_label_to_avoid_mismatch(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.http_metrics.enabled', true);
+        Config::set('prometheus.http_metrics.include_route_params', true);
+        Config::set('prometheus.namespace', 'cbdb');
+
+        // 发起请求
+        $this->get('/');
+
+        // 获取 metrics
+        $response = $this->get('/metrics');
+        $content = $response->getContent();
+
+        // 验证 http_requests_in_progress 不包含 path 标签
+        // 只应该有 method 标签
+        $lines = explode("\n", $content);
+        foreach ($lines as $line) {
+            if (str_starts_with($line, 'cbdb_http_requests_in_progress{')) {
+                // 应该只包含 method 标签，不包含 path 标签
+                $this->assertStringContainsString('method=', $line, 'Gauge 應包含 method 標籤');
+                $this->assertStringNotContainsString('path=', $line, 'Gauge 不應包含 path 標籤（避免路由解析前後標籤不匹配）');
+            }
+        }
+
+        // 验证 counter 和 histogram 仍然包含 path 标签
+        $hasCounterWithPath = false;
+        $hasHistogramWithPath = false;
+        foreach ($lines as $line) {
+            if (str_contains($line, 'cbdb_http_requests_total{') && str_contains($line, 'path=')) {
+                $hasCounterWithPath = true;
+            }
+            if (str_contains($line, 'cbdb_http_request_duration_seconds_bucket{') && str_contains($line, 'path=')) {
+                $hasHistogramWithPath = true;
+            }
+        }
+
+        $this->assertTrue($hasCounterWithPath, 'Counter 應包含 path 標籤');
+        $this->assertTrue($hasHistogramWithPath, 'Histogram 應包含 path 標籤');
+    }
+
+    #[Test]
+    public function gauge_increments_and_decrements_correctly_without_path(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.http_metrics.enabled', true);
+        Config::set('prometheus.namespace', 'cbdb');
+
+        // 模拟多个请求完成（应该回到 0）
+        $this->get('/');
+        $this->get('/');
+
+        // 获取 metrics
+        $response = $this->get('/metrics');
+        $content = $response->getContent();
+
+        // 验证 gauge 正确归零（所有请求已完成）
+        $lines = explode("\n", $content);
+        foreach ($lines as $line) {
+            if (str_starts_with($line, 'cbdb_http_requests_in_progress{method="GET"}')) {
+                // 提取数值
+                $parts = explode(' ', $line);
+                $value = (int) end($parts);
+
+                // 应该是 0（所有请求已完成）或 1（如果 /metrics 请求本身正在处理）
+                $this->assertLessThanOrEqual(1, $value, 'Gauge 應該正確歸零或保持為 1（當前 /metrics 請求）');
+            }
+        }
     }
 }

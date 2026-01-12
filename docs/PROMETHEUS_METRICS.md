@@ -7,8 +7,11 @@
 本專案已整合 Prometheus metrics 收集功能，可以監控以下指標：
 
 - **HTTP 請求總數** (`cbdb_http_requests_total`): 按方法、路徑和狀態碼分類的請求計數
+  - 標籤：`method`, `path`（路由模式），`status`
 - **HTTP 請求延遲** (`cbdb_http_request_duration_seconds`): 請求處理時間的直方圖分佈
+  - 標籤：`method`, `path`（路由模式），`status`
 - **正在處理的請求數** (`cbdb_http_requests_in_progress`): 當前正在處理的併發請求數量
+  - 標籤：`method`（注意：不包含 `path`，避免路由解析時機不同導致的標籤不匹配問題）
 
 ## 快速開始
 
@@ -201,6 +204,60 @@ cbdb_http_requests_total{method="GET",path="/basicinformation/3/edit",status="20
 ```
 cbdb_http_requests_total{method="GET",path="/basicinformation/{personid}/edit",status="200"} 3
 ```
+
+---
+
+### 為什麼 `http_requests_in_progress` 不包含 `path` 標籤？
+
+**重要設計決策**：`http_requests_in_progress` Gauge 只使用 `method` 標籤，不使用 `path` 標籤。
+
+#### 問題根源：路由解析時機
+
+在 Laravel 的請求生命週期中，**路由解析**發生在 middleware stack 執行過程中：
+
+```php
+// Middleware 執行順序
+incrementInProgressRequests($request)    // ① 路由未解析，$request->route() = null
+    ↓
+$response = $next($request)              // ② 路由在這裡解析
+    ↓
+decrementInProgressRequests($request)    // ③ 路由已解析，$request->route() = Route 對象
+```
+
+#### 如果包含 `path` 標籤會發生什麼？
+
+當 `include_route_params = true` 時：
+
+| 階段 | 路由狀態 | `getPath()` 返回值 | Gauge 操作 |
+|-----|---------|------------------|-----------|
+| ① increment | 未解析 | `/basicinformation/123/edit`（實際路徑） | `Gauge["GET", "/basicinformation/123/edit"] +1` |
+| ③ decrement | 已解析 | `/basicinformation/{personid}/edit`（路由模式） | `Gauge["GET", "/basicinformation/{personid}/edit"] -1` |
+
+**結果**：
+- ❌ 實際路徑的 Gauge 永遠保持 `+1`（內存泄漏）
+- ❌ 路由模式的 Gauge 變成 `-N`（錯誤數值）
+- ❌ 監控數據完全不可用
+
+#### 解決方案：簡化 Gauge 標籤
+
+**只使用 `method` 標籤**：
+- ✅ increment 和 decrement 使用相同的標籤
+- ✅ 避免路由解析時機不同導致的不匹配
+- ✅ 符合 Prometheus 最佳實踐（高基數標籤不應用於 Gauge）
+- ✅ 內存占用最小且穩定
+
+**Counter 和 Histogram 仍然包含 `path` 標籤**：
+- ✅ 這些 metric 只在 `finally` block 中記錄（路由已解析）
+- ✅ 不存在標籤不匹配問題
+- ✅ 可以安全使用路由模式
+
+#### Metrics 標籤總結
+
+| Metric 名稱 | 類型 | 標籤 | 原因 |
+|------------|------|------|------|
+| `http_requests_in_progress` | Gauge | `method` | 避免路由解析前後標籤不匹配 |
+| `http_requests_total` | Counter | `method`, `path`, `status` | 只在 finally 中記錄，路由已解析 |
+| `http_request_duration_seconds` | Histogram | `method`, `path`, `status` | 只在 finally 中記錄，路由已解析 |
 
 ### 延遲分布 Bucket
 

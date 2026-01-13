@@ -84,6 +84,11 @@ class PrometheusMetrics {
 
     /**
      * 增加正在处理的请求计数
+     *
+     * 注意：此方法在路由解析之前调用，因此不包含 path 标签。
+     * 原因：如果包含 path 标签，在 increment 时路由未解析（使用实际路径），
+     * 在 decrement 时路由已解析（使用路由模式），会导致标签不匹配，
+     * 从而引发 gauge 泄漏和错误计数。
      */
     protected function incrementInProgressRequests(Request $request): void {
         try {
@@ -91,10 +96,10 @@ class PrometheusMetrics {
                 config('prometheus.namespace', 'cbdb'),
                 'http_requests_in_progress',
                 'Number of HTTP requests currently being processed',
-                ['method', 'path']
+                ['method']
             );
 
-            $gauge->inc($this->getLabels($request));
+            $gauge->inc(['method' => $request->method()]);
         } catch (\Exception $e) {
             // 忽略 metrics 收集错误，不影响正常请求
             report($e);
@@ -110,10 +115,10 @@ class PrometheusMetrics {
                 config('prometheus.namespace', 'cbdb'),
                 'http_requests_in_progress',
                 'Number of HTTP requests currently being processed',
-                ['method', 'path']
+                ['method']
             );
 
-            $gauge->dec($this->getLabels($request));
+            $gauge->dec(['method' => $request->method()]);
         } catch (\Exception $e) {
             report($e);
         }

@@ -182,17 +182,23 @@ class ApiController extends Controller {
             //進行查詢資訊的擴充
             $c_bibl_cat_code = $item['c_bibl_cat_code'];
             $x1 = DB::table('TEXT_BIBLCAT_CODE_TYPE_REL')->select('c_text_cat_type_id')->where('c_text_cat_code', $c_bibl_cat_code)->get();
+            $ans1 = [];
             foreach ($x1 as $object) {
                 $ans1[0] = $object->c_text_cat_type_id;
             }
-            for ($j = 0; $j <= 3; $j++) {
-                $x[$j] = $this->searchTextSub($ans1[$j]);
-                foreach ($x[$j] as $object) {
-                    $ans1[$j + 1] = $object->c_text_cat_type_parent_id;
-                    $ans2[$j + 1] = $object->c_text_cat_type_desc_chn;
+            //20260114增加判斷式，因為TEXT_BIBLCAT_CODE_TYPE_REL的c_text_cat_code沒有完整對應TEXT_CODES資料表的c_bibl_cat_code（可能為NULL或無對應記錄）
+            if (!empty($ans1[0])) {
+                for ($j = 0; $j <= 3; $j++) {
+                    $x[$j] = $this->searchTextSub($ans1[$j]);
+                    foreach ($x[$j] as $object) {
+                        $ans1[$j + 1] = $object->c_text_cat_type_parent_id;
+                        $ans2[$j + 1] = $object->c_text_cat_type_desc_chn;
+                    }
                 }
+                $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
+            } else {
+                $word = '';
             }
-            $word = $ans2[1]."/".$ans2[2]."/".$ans2[3];
             $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$item->c_period." ".$word;
         }
 

@@ -29,6 +29,14 @@ php artisan package:discover --ansi
 echo "重建前端静态资源..."
 npm install
 npm run prod
+if [ -d node_modules ]; then
+  echo "清理 node_modules..."
+  rm -rf node_modules
+fi
+if [ -d "$HOME/.npm" ]; then
+  echo "清理 npm cache..."
+  rm -rf "$HOME/.npm"
+fi
 
 # 5. 清除缓存
 echo "清除应用缓存..."

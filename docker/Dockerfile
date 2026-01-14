@@ -1,26 +1,17 @@
-# FrankenPHP Dockerfile for CBDB Online
-# 使用 FrankenPHP 替代传统的 PHP-FPM + Nginx 架构
+FROM dunglas/frankenphp:1-php8.4.15 AS build
 
-FROM dunglas/frankenphp:1-php8.4.15
+WORKDIR /build
 
-# 设置工作目录
-WORKDIR /app
-
-# 安装编译工具和依赖（用于编译 SQLite）
+# build deps only
 RUN apt-get update && apt-get install -y \
-    git \
-    zip \
-    unzip \
-    zip \
-    unzip \
-    wget \
-    tini \
     build-essential \
-    && apt-get clean \
+    wget \
+    git \
+    unzip \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 从官网下载并编译安装 SQLite3（避免 Ubuntu 24.04 LTS apt 版本的坑）
-# 使用 SQLite 3.45.0 或更新版本
+# build SQLite
 ENV SQLITE_VERSION=3450000
 ENV SQLITE_YEAR=2024
 RUN cd /tmp \
@@ -31,11 +22,33 @@ RUN cd /tmp \
     && make -j$(nproc) \
     && make install \
     && ldconfig \
-    && cd /tmp \
-    && rm -rf sqlite-autoconf-${SQLITE_VERSION}*
+    && rm -rf /tmp/sqlite-autoconf-${SQLITE_VERSION}*
 
-# 安装 PHP 扩展
-# FrankenPHP 使用 install-php-extensions 工具
+FROM dunglas/frankenphp:1-php8.4.15
+
+WORKDIR /app
+
+# runtime deps only
+RUN apt-get update && apt-get install -y \
+    tini \
+    zip \
+    unzip \
+    curl \
+    ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# copy sqlite runtime only
+COPY --from=build /usr/local/include/sqlite3.h /usr/local/include/
+COPY --from=build /usr/local/include/sqlite3ext.h /usr/local/include/
+COPY --from=build /usr/local/lib/pkgconfig/sqlite3.pc /usr/local/lib/pkgconfig/
+COPY --from=build /usr/local/lib/libsqlite3.so* /usr/local/lib/
+COPY --from=build /usr/local/bin/sqlite3 /usr/local/bin/
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+RUN ldconfig
+
+# PHP extensions
 RUN install-php-extensions \
     pdo_sqlite \
     pdo_mysql \
@@ -44,40 +57,26 @@ RUN install-php-extensions \
     exif \
     pcntl \
     bcmath \
-    opcache
+    opcache \
+    && rm -rf /usr/local/include/sqlite3*.h /usr/local/lib/pkgconfig/sqlite3.pc
 
-# Install Node.js and NPM
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest
-
-# 复制 Composer（FrankenPHP 镜像已包含 Composer，但我们确保使用最新版本）
+# composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# 复制应用代码
+# app code
 COPY . /app
 
-# 确保必要的目录存在并设置权限
+# permissions
 RUN mkdir -p storage/framework/{sessions,views,cache} \
-    && mkdir -p storage/logs \
-    && mkdir -p bootstrap/cache \
-    && mkdir -p database \
+    storage/logs bootstrap/cache database \
     && chown -R www-data:www-data storage bootstrap/cache database \
     && chmod -R 775 storage bootstrap/cache database
 
-# 复制 FrankenPHP 配置文件（Caddyfile）
+# caddy / entrypoint
 COPY docker/Caddyfile /etc/caddy/Caddyfile
-
-# 复制并设置启动脚本
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# 暴露端口
-# FrankenPHP 默认使用 80 (HTTP) 和 443 (HTTPS)
-EXPOSE 80
-EXPOSE 443
-EXPOSE 443/udp
+EXPOSE 80 443 443/udp
 
-# 使用自定义启动脚本
-# 使用自定义启动脚本 (Wrapped with tini for signal handling)
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

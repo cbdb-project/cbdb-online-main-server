@@ -18,6 +18,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\ExportMysqlToSqlite::class,
         \App\Console\Commands\RegenerateAddresses::class,
         \App\Console\Commands\ManageUser::class,
+        \App\Console\Commands\GenerateSchemaDocs::class,
     ];
 
     /**

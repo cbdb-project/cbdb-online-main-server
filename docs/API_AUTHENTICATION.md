@@ -184,28 +184,22 @@ axios.get(`${API_BASE_URL}/select/search/addr`, {
    - 每個用戶/應用應有獨立的 Token
    - 不要通過不安全的渠道（如電子郵件、即時消息）傳輸 Token
 
-## 受保護的 API 端點
+## 需認證或可選認證的 API 端點
 
 以下 API 端點需要認證：
 
 | 端點 | 方法 | 描述 |
 |------|------|------|
-| `/api/user` | GET | 獲取當前用戶信息 |
-| `/api/select/search/*` | GET | 所有選擇和搜索 API |
+| `/api/user` | GET | 獲取當前用戶信息（需認證） |
+| `/api/select/search/*` | GET | 所有選擇和搜索 API（可選認證） |
 
 ### 速率限制
 
-為了保護系統穩定性，API 請求受到速率限制：
+為了保護系統穩定性，API 請求仍保留全局速率限制：
 
-- **認證用戶**：120 請求/分鐘（以用戶 ID 或 Token 作為限流鍵值）
-- **未認證（訪客）請求**：120 請求/分鐘（以 IP 位址作為限流鍵值）
 - **總體限制**：600 請求/分鐘（全局）
 
-不論是認證用戶或訪客，超過各自或全局的限制時，服務器都會返回 `429 Too Many Requests` 錯誤。
-
-**注意**：認證用戶和訪客使用不同的限流鍵值，因此：
-- 同一 IP 的多個認證用戶，各自擁有獨立的 120 請求/分鐘配額
-- 未登錄的訪客請求，同一 IP 下所有請求共享 120 請求/分鐘配額
+超過全局限制時，服務器會返回 `429 Too Many Requests` 錯誤。
 
 ## 錯誤處理
 
@@ -247,7 +241,7 @@ Route::middleware('auth:sanctum')->get('/user', 'Api\UserController@show');
 
 Route::group([
     'prefix' => 'select',
-    'middleware' => ['auth:sanctum', 'throttle:120,1']
+    'middleware' => ['auth.optional']
 ], function () {
     // 所有 select 和 search API 端點
 });

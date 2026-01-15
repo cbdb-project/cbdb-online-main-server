@@ -59,6 +59,10 @@ class BiogMainRepository {
     public function byPersonId($id) {
         $basicinformation = BiogMain::withCount('sources', 'texts', 'biog_addresses', 'altnames', 'offices', 'entries', 'statuses', 'kinship', 'assoc', 'possession', 'inst', 'events')->find($id);
 
+        if (!$basicinformation) {
+            return null;
+        }
+
         //20201207新增index year推算欄位
         $c_index_year_type_code = $basicinformation->c_index_year_type_code;
         if (!empty($c_index_year_type_code)) {

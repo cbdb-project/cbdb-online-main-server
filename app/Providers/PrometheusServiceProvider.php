@@ -29,6 +29,10 @@ class PrometheusServiceProvider extends ServiceProvider {
      * 根据配置创建存储适配器
      */
     protected function createStorageAdapter() {
+        if ($this->app->environment('testing')) {
+            return new InMemory();
+        }
+
         $adapter = config('prometheus.storage_adapter', 'memory');
 
         return match ($adapter) {

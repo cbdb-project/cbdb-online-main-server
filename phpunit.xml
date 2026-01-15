@@ -18,6 +18,8 @@
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SKIP_CSRF_TOKEN" value="true"/>
     <env name="LOG_CHANNEL" value="errorlog"/>
+    <env name="PROMETHEUS_ENABLED" value="false"/>
+    <env name="PROMETHEUS_STORAGE_ADAPTER" value="memory"/>
   </php>
   <source>
     <include>

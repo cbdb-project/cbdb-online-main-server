@@ -438,9 +438,14 @@ class GenerateSchemaDocs extends Command {
             $mysqlCols = array_column($mysqlSchema[$table]['columns'], 'name');
             $sqliteCols = array_column($sqliteSchema[$table]['columns'], 'name');
 
-            $colDiff = array_diff($mysqlCols, $sqliteCols);
-            if (!empty($colDiff)) {
-                $tablesWithDiffs[$table] = $colDiff;
+            $mysqlOnly = array_values(array_diff($mysqlCols, $sqliteCols));
+            $sqliteOnly = array_values(array_diff($sqliteCols, $mysqlCols));
+
+            if (!empty($mysqlOnly) || !empty($sqliteOnly)) {
+                $tablesWithDiffs[$table] = [
+                    'mysql_only' => $mysqlOnly,
+                    'sqlite_only' => $sqliteOnly,
+                ];
             }
         }
 
@@ -448,8 +453,11 @@ class GenerateSchemaDocs extends Command {
             $markdown .= "### 列結構差異（MySQL vs SQLite）\n\n";
             foreach ($tablesWithDiffs as $table => $diffCols) {
                 $markdown .= "**{$table}**:\n";
-                foreach ($diffCols as $col) {
+                foreach ($diffCols['mysql_only'] as $col) {
                     $markdown .= "- MySQL 有但 SQLite 沒有: `{$col}`\n";
+                }
+                foreach ($diffCols['sqlite_only'] as $col) {
+                    $markdown .= "- SQLite 有但 MySQL 沒有: `{$col}`\n";
                 }
                 $markdown .= "\n";
             }

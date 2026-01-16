@@ -6,6 +6,7 @@ use App\Models\Pinyin;
 use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\VariantCharNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -232,7 +233,10 @@ class AdminBatchLoadBookTitlesController extends Controller {
      * Convert Chinese title to a space-separated pinyin string.
      */
     protected function buildPinyin(string $title): string {
-        $chars = preg_split('//u', $title, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        // 標準化異體字（僅用於拼音轉換，不修改原始標題）
+        $normalizedTitle = VariantCharNormalizer::normalize($title);
+
+        $chars = preg_split('//u', $normalizedTitle, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $syllables = [];
 
         foreach ($chars as $char) {
@@ -248,7 +252,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
         });
 
         if (empty($syllables)) {
-            return strtolower(trim(preg_replace('/\s+/u', ' ', $title)));
+            return strtolower(trim(preg_replace('/\s+/u', ' ', $normalizedTitle)));
         }
 
         return implode(' ', $syllables);

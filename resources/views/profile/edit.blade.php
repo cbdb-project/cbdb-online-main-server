@@ -668,7 +668,7 @@ function revokeToken(tokenId, tokenName) {
         return;
     }
 
-    axios.delete(`{{ route('api-tokens.destroy', '', false) }}/${tokenId}`)
+    axios.delete(`{{ route('api-tokens.destroy', ['tokenId' => '__TOKEN_ID__'], false) }}`.replace('__TOKEN_ID__', tokenId))
         .then(response => {
             showMessage('<i class="fa fa-check"></i> Token 已撤銷', 'success');
             loadTokens();

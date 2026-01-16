@@ -88,8 +88,16 @@ class ImportTradSimpMap extends Command {
 
         while (($line = fgets($handle)) !== false) {
             $lineNumber++;
+
+            // 移除行内注释（# 及之后的内容）
+            if (($commentPos = strpos($line, '#')) !== false) {
+                $line = substr($line, 0, $commentPos);
+            }
+
             $line = trim($line);
-            if ($line === '' || strpos($line, '#') === 0) {
+
+            // 跳过空行
+            if ($line === '') {
                 continue;
             }
 

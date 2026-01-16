@@ -31,6 +31,7 @@ use App\Repositories\Concerns\DetectsModelChanges;
 //修改結束
 
 //20210625建安修改
+use App\Services\VariantCharNormalizer;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -2075,7 +2076,9 @@ class BiogMainRepository {
 
         if ($c_surname_chn != '') {
             $c_mingzi_chn = str_replace($c_surname_chn, '', $name);
-            $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
+            // 標準化異體字（僅用於拼音轉換，不修改原始名字）
+            $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
+            $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
             $c_name = $c_surname.' '.$c_mingzi;
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
@@ -2084,7 +2087,9 @@ class BiogMainRepository {
             $data['c_name'] = $c_name;
         } else {
             $c_mingzi_chn = $name;
-            $c_mingzi = ucfirst(Pinyin::getPinyin($c_mingzi_chn)) ?? '';
+            // 標準化異體字（僅用於拼音轉換，不修改原始名字）
+            $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
+            $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
             $c_name = $c_surname.' '.$c_mingzi;
             $data['c_mingzi_chn'] = $c_mingzi_chn;
             $data['c_mingzi'] = $c_mingzi;

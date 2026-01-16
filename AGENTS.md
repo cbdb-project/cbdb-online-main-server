@@ -10,7 +10,12 @@
   - **兼容性目標**：代碼應能在標準 SQL 和通用的 MySQL/MariaDB/PostgreSQL 功能上運行
 - **內部輔助表**（`CBDB__` 前綴表示內部使用，不直接對終端用戶曝光）：
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
-  - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
+  - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射及異體字標準化，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
+- **拼音轉換與異體字處理**：
+  - 使用 `App\Models\Pinyin` 進行中文到拼音轉換
+  - 使用 `App\Services\VariantCharNormalizer` 在拼音轉換前標準化異體字（如「菴」→「庵」），確保拼音正確性
+  - 異體字標準化僅用於拼音生成，不修改原始數據（書名、人名等仍保留異體字）
+  - 目前使用內建的常用異體字映射（菴、攷、嶽、愼、註）
 - **日期/時間處理**：使用 Carbon 2.x。
   - **時區設定**：統一使用 GMT+8 時區（Asia/Shanghai）。
   - **CRITICAL 配置要求**：`.env` 中的 `DB_TIMEZONE` **必須**與 `config/app.php` 的 `timezone` 匹配！

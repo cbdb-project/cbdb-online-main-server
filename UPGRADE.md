@@ -1,6 +1,7 @@
 # Laravel 升級筆記
 
 ## 目錄
+- [Laravel 11.x → 12.x](#laravel-11x--12x-升級筆記)
 - [Laravel 10.x → 11.x](#laravel-10x--11x-升級筆記)
 - [Laravel 8.83 → 10.x](#laravel-883--10x-升級筆記)
 - [Laravel 8.0 → 8.83 + PHP 8.1](#laravel-80--883--php-81-升級筆記)
@@ -10,6 +11,273 @@
 - [Laravel 5.7 → 5.8](#laravel-57--58-升級筆記)
 - [Laravel 5.6 → 5.7](#laravel-56--57-升級筆記)
 - [Laravel 5.5 → 5.6](#laravel-55--56-升級筆記)
+
+---
+
+# Laravel 11.x → 12.x 升級筆記
+
+## 升級狀態
+✅ **已完成** - 2026-01-16
+
+## 升級路徑
+直接升級：Laravel 11.47.0 → 12.47.0
+
+## 環境需求
+- **PHP**：8.2+ （專案使用 8.2）
+- **MySQL**：5.7.7+ / MariaDB 10.3+
+- **Composer**：2.0+
+
+## 套件變更與版本
+
+### 主要框架升級
+- `laravel/framework`: `^11.0` → `^12.0` (11.47.0 → 12.47.0)
+- `nesbot/carbon`: `^2.67 || ^3.0` → `^3.0` (強制升級到 Carbon 3)
+- `laravel/sanctum`: `^4.0` → `^4.2.3`（維持 4.x）
+- `laravel/tinker`: `^2.8` → `^2.11.0`
+
+### 重要依賴更新
+- `symfony/console`: `7.4.1` → `7.4.3`
+- `symfony/http-kernel`: `7.4.2` → `7.4.3`
+- `symfony/translation`: `8.0.1` → `8.0.3`
+- `monolog/monolog`: `3.9.0` → `3.10.0`
+- `phpunit/phpunit`: `11.5.46` → `11.5.47`
+
+### Carbon 3.x 升級（重要）
+**變更**：Laravel 12 完全移除 Carbon 2.x 支持，強制升級到 Carbon 3.x
+
+**影響**：
+- Carbon 3.x 提供更好的性能和類型安全
+- 向後兼容性良好，大部分 API 保持一致
+- 少數已廢棄方法需要更新
+
+**本專案影響**：✅ 已升級到 Carbon 3.11.0，測試全部通過
+
+## Breaking Changes
+
+### 1. Carbon 3.x 必需 ✅ **已處理**
+**變更**：Laravel 12 要求 Carbon 3.x
+
+**影響**：
+- `formatLocalized()` 方法已移除 → 使用 `translatedFormat()`
+- 部分日期格式化行為略有變化
+
+**專案狀況**：
+- 已搜尋專案中的 Carbon 使用
+- 未發現使用已廢棄的方法
+- 時間處理邏輯正常運作
+
+**驗證**：
+```bash
+# 檢查 Carbon 使用
+grep -r "formatLocalized" app/ resources/  # 無匹配
+grep -r "->locale" app/ resources/          # 正常使用
+```
+
+### 2. UUID Trait 行為變更 ✅ **無影響**
+**變更**：`HasUuids` trait 現在預設生成 UUID v7（有序）
+
+**影響**：如果專案使用 `HasUuids` trait，生成的 UUID 格式會變更
+
+**專案狀況**：
+- 已檢查專案代碼
+- 未使用 `HasUuids` trait
+- 無需修改
+
+**驗證**：
+```bash
+grep -r "HasUuids" app/  # 無匹配
+```
+
+### 3. Image 驗證規則變更 ✅ **無影響**
+**變更**：`image` 驗證規則的預設行為有變更
+
+**專案狀況**：
+- 已檢查所有表單請求和控制器
+- 未使用 `image` 驗證規則
+- 無需修改
+
+**驗證**：
+```bash
+grep -r "'image'" app/Http/Requests/  # 無匹配
+grep -r '"image"' app/Http/Controllers/  # 無匹配
+```
+
+### 4. Route 參數驗證更嚴格 ✅ **已修復**
+**變更**：`route()` 函數對參數的驗證更加嚴格
+
+**影響**：使用空字符串或無效參數會拋出異常
+
+**本專案影響**：
+- 發現 `resources/views/profile/edit.blade.php:671` 使用問題模式
+- 已修復為使用佔位符替換方式
+
+**修復示例**：
+```php
+// ❌ Laravel 11（會在 12 中失敗）
+url: "{{ route('api-tokens.destroy', '', false) }}/${tokenId}"
+
+// ✅ Laravel 12
+url: "{{ route('api-tokens.destroy', ['tokenId' => '__TOKEN_ID__'], false) }}".replace('__TOKEN_ID__', tokenId)
+```
+
+## 升級步驟
+
+### 1. 更新 composer.json
+```bash
+# 更新依賴版本
+"require": {
+    "laravel/framework": "^12.0",
+    "nesbot/carbon": "^3.0"
+}
+```
+
+### 2. 執行 Composer 更新
+```bash
+composer update
+
+# 輸出：
+# Upgrading laravel/framework (v11.47.0 => v12.47.0)
+# Upgrading nesbot/carbon (2.67 => 3.11.0)
+# 共 16 個套件更新
+```
+
+### 3. 清除快取
+```bash
+php artisan optimize:clear
+
+# 清除：
+# - config cache
+# - application cache
+# - compiled views
+# - events cache
+# - routes cache
+```
+
+### 4. 執行測試
+```bash
+./vendor/bin/phpunit
+
+# 結果：
+# Tests: 372, Assertions: 1425
+# Time: 01:14.219, Memory: 94.50 MB
+# OK ✅
+```
+
+### 5. 編譯前端資源
+```bash
+npm install
+npm run prod
+
+# 輸出：
+# vite v7.3.0 building for production...
+# ✓ built in 3.79s
+```
+
+### 6. 代碼格式化
+```bash
+./vendor/bin/php-cs-fixer fix
+
+# Fixed 8 of 265 files ✅
+```
+
+## 升級後檢查清單
+
+- [x] composer.json 版本更新
+- [x] composer.lock 重新生成
+- [x] Route 參數問題修復
+- [x] 清理 bootstrap/cache 緩存
+- [x] 前端資源重新編譯
+- [x] 完整測試套件通過（372 tests, 1425 assertions）
+- [x] 代碼格式化檢查通過
+- [x] 文檔更新（UPGRADE.md）
+
+## 測試結果
+
+### 完整測試套件
+```
+PHPUnit 11.5.47 by Sebastian Bergmann and contributors.
+
+Tests: 372, Assertions: 1425
+Status: ✅ 全部通過
+Time: 01:14.219
+Memory: 94.50 MB
+```
+
+### 代碼格式化
+```
+PHP CS Fixer 3.92.5
+Fixed: 8 of 265 files
+Status: ✅ 通過
+```
+
+### 前端編譯
+```
+vite v7.3.0 building for production
+Status: ✅ 成功
+Build time: 3.79s
+```
+
+## 新特性與改進
+
+### 1. 性能提升
+- 框架啟動速度優化
+- 路由解析性能提升
+- 數據庫查詢優化
+
+### 2. 類型安全增強
+- 更嚴格的類型檢查
+- 改進的 IDE 自動補全
+- 更好的錯誤提示
+
+### 3. Carbon 3.x 優勢
+- 更好的性能
+- 改進的時區處理
+- 更一致的 API 設計
+
+### 4. UUID v7 支持
+- 更好的數據庫索引性能
+- 時間排序友好
+- 向後兼容 v4
+
+## 已知事項
+
+### Laravel 12 是維護版本
+Laravel 12 被定義為「維護版本」（maintenance release）：
+- ✅ 專注於依賴更新和質量改進
+- ✅ 幾乎零破壞性變更
+- ✅ 大多數應用可以無縫升級
+- ⚠️ 無重大新功能（新特性在 Laravel 13）
+
+### Carbon 2.x 不再支持
+- ❌ Carbon 2.x 完全移除支持
+- ✅ 必須升級到 Carbon 3.x
+- ✅ 向後兼容性良好
+
+### PHPUnit 11 持續使用
+- ✅ PHPUnit 維持在 11.x
+- ✅ 測試語法與 Laravel 11 相同
+- ✅ 無需修改測試代碼
+
+## 參考資源
+- [Laravel 12.x 官方升級指南](https://laravel.com/docs/12.x/upgrade)
+- [Laravel 12.x 發布說明](https://laravel.com/docs/12.x/releases)
+- [Carbon 3 變更日誌](https://carbon.nesbot.com/docs/#api-carbon-3)
+- [PHPUnit 11 文檔](https://docs.phpunit.de/en/11.0/)
+
+## 下一步升級計劃
+
+Laravel 12 為最新穩定版本：
+```
+當前：Laravel 12.47.0 + PHP 8.2 ✅
+  ├─ Carbon 3.11.0 ✅
+  ├─ PHPUnit 11.5.47 ✅
+  └─ 所有測試通過 ✅
+  ↓
+未來：Laravel 12.x → 13.x
+  ├─ 關注官方發布公告
+  ├─ 評估新特性需求
+  └─ 準備升級計劃
+```
 
 ---
 

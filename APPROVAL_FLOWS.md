@@ -6,7 +6,7 @@
 
 - 不想立即寫入資料庫，但需要記錄使用者的建議或修改草稿。
 - 透過既有 `operations` 表保存提案內容與審核狀態，避免修改 schema。
-- 管理員在 `/operations`、`/modified` 介面上即可看到提案紀錄，並後續實作核准／退回行為。
+- 管理員在 `/operations` 介面上即可看到提案紀錄，並後續實作核准／退回行為。
 
 ## 目前支援範圍
 
@@ -43,7 +43,7 @@
    - 回傳提示：「已提交提案，等待管理員審核」。
 - 提案送出後，使用者可於 `/operations?proposals_only=1` 檢視自己的提案，若狀態為 `pending` 或 `rejected`，介面會提供「修改提案」與「撤回提案」按鈕。
 
-## 審核流程（已實作於 `/operations`、`/modified`）
+## 審核流程（已實作於 `/operations`）
 
 - **核准**：
   - 進入操作紀錄頁面，管理員可見「核准」按鈕。
@@ -71,5 +71,5 @@
 - 其他模組若欲導入提案制，可：
   1. 新增對應的 `proposalStore`／`proposalUpdate` 動作或整合至既有 Controller。
   2. 重複利用 `recordProposalOperation()` 的概念，統一差異與審核欄位。
-  3. 在 `operations`、`modified` 頁面依 `op_type` 加上醒目標示，提供核准／退回按鈕。
+  3. 在 `operations` 頁面依 `op_type` 加上醒目標示，提供核准／退回按鈕。
 - 視需求補充通知機制（Mail、Slack 等），於提案或審核時提醒相關人員。

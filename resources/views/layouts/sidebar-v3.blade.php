@@ -72,13 +72,6 @@
                     </a>
                 </li>
 
-                <li class="nav-item">
-                    <a href="{{ route('modified.index') }}" class="nav-link {{ $activePage == 'Modified' ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-edit"></i>
-                        <p>最近修改記錄</p>
-                    </a>
-                </li>
-
                 @php
                     $codesPages = [
                         'Codes',

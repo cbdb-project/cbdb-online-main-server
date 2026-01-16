@@ -103,13 +103,6 @@ Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
 Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
 Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
 
-Route::resource('modified', 'ModifiedController', ['name' => [
-    'show' => 'modified.show',
-    'create' => 'modified.create',
-    'edit' => 'modified.edit',
-    'update' => 'modified.update',
-]]);
-
 Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
     Route::patch('profile', 'UserProfileController@update')->name('profile.update');

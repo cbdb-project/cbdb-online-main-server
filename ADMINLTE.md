@@ -32,7 +32,7 @@ Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案**已完全移除
 - 圖標：Font Awesome 4 `fa fa-dashboard` → Font Awesome 5 `fas fa-tachometer-alt`，`fa fa-minus` → `fas fa-minus`，`fa fa-plus` → `fas fa-plus`
 
 ## 測試/驗證建議
-- 必要頁面 smoke：`/codes`、`/operations`、`/modified`、`/view`、`/manage`、`/basicinformation/...`、`/crowdsourcing`、`/admin/*`、`/home`。
+- 必要頁面 smoke：`/codes`、`/operations`、`/view`、`/manage`、`/basicinformation/...`、`/crowdsourcing`、`/admin/*`、`/home`。
 - 確認導航收合、模態框、Select2、DataTables、響應式（桌機/行動）與 Bootstrap 4 表單驗證樣式。
 - 若有前端改動，使用 `npm run dev`（或 `npm run build`）重建 `public/build`。
 

@@ -152,5 +152,5 @@
   - `AdminBatchLoadBookTitlesTest`
   - `AdminBatchLoadSocialInstitutesTest`
   - `AdminBatchLoadOfficesTest`
-- `/operations`、`/modified` 也補充了回歸測試（`OperationsIndexDiffTest`、`ModifiedIndexDiffTest`），確保在缺少關聯資料或列表為空時頁面仍能正常渲染。
+- `/operations` 也補充了回歸測試（`OperationsIndexDiffTest`），確保在缺少關聯資料或列表為空時頁面仍能正常渲染。
 - 若日後新增其它批次工具，建議同步更新此文件並補測試。

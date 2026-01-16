@@ -171,7 +171,7 @@
 - 為防止搜索及 AI 爬蟲拖慢系統性能，目前本功能僅供登錄用戶使用。
 
 ### 提案功能
-- `/codes/*` 模組新增「提交提案」按鈕，可在新增／編輯時先送出提案而不直接寫入資料庫，系統會以 `op_type = 8/9` 於操作紀錄留下待審核紀錄，並於 `/operations`、`/modified` 提供管理員核准／退回按鈕。详情参阅[提案與審核流程参考文档](./APPROVAL_FLOWS.md)。
+- `/codes/*` 模組新增「提交提案」按鈕，可在新增／編輯時先送出提案而不直接寫入資料庫，系統會以 `op_type = 8/9` 於操作紀錄留下待審核紀錄，並於 `/operations` 提供管理員核准／退回按鈕。详情参阅[提案與審核流程参考文档](./APPROVAL_FLOWS.md)。
 - 提案流程新增提案者自助「修改／撤回」功能：待審核或退修的提案可重新編輯並自動重設狀態，若選擇撤回則標記 `cancelled` 並留存原因；列表篩選亦支援顯示「已撤回」。
 - `/operations?proposals_only=1` 篩選列新增「已撤回」選項，並於提案列出提案者／撤回者資訊與動作按鈕，提案者可直接從此頁修改或撤回自己的草稿。
 - 進一步實作人物信息相關提案[計畫档案](./BIOGMAIN_APPROVAL_FLOWS_PLAN.md)。
@@ -184,7 +184,7 @@
 - 管理员专用[Wiki 数据批量维护功能](./WIKI_TASK_MANAGEMENT.md)。
 
 ### 其他調整
-- ALTNAME_DATA 在 `/modified` 顯示現況時改以 log 中的主鍵（`c_personid`／`c_alt_name_type_code`／`c_alt_name_chn`）查詢，不再依賴 `resource_id` 裡的舊別名，避免別名更新或含 dash 時抓不到現況，並補上 `OperationsAltnameResolverTest` 覆蓋。
+- ALTNAME_DATA 在 `/operations` 顯示現況時改以 log 中的主鍵（`c_personid`／`c_alt_name_type_code`／`c_alt_name_chn`）查詢，不再依賴 `resource_id` 裡的舊別名，避免別名更新或含 dash 時抓不到現況，並補上 `OperationsAltnameResolverTest` 覆蓋。
 - Basicinformation → 任官（office）操作全面交易化：`BiogMainRepository::officeStoreById`／`officeUpdateById`／`officeDeleteById` 會鎖定職官、同步維護地址清單並一併寫入 Operations；`officeUpdateById` 僅在主表欄位有異動時才更新 timestamp，純地址調整會重建 `POSTED_TO_ADDR_DATA` 並留下前後 JSON。
 - Basicinformation 編輯頁面新增後端變更檢測：`BiogMainRepository::updateById()` 使用 `DetectsModelChanges` trait 的 `hasMeaningfulChanges()` 方法檢查資料是否有實質變更，若無變更則返回 `['no_changes' => true]` 並顯示「無實質更新，資料未變更」訊息；前端已有按鈕狀態管理（commit 18bc6d8f），後端檢測可防止繞過前端驗證的提交。新增 `BiogMainRepositoryUpdateTest` 單元測試驗證變更檢測邏輯，包括數值型字串與整數的等價比較、忽略指定欄位等情境。
   - [2025-11-29] - 修復基本資料編輯的變更檢測問題

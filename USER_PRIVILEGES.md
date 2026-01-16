@@ -19,7 +19,7 @@
 | 值 | 名稱 / 定位 | 常量定義 | 主要行為 |
 |----|-------------|---------|-----------|
 | `0` | 一般用戶 | `User::ROLE_REGULAR` | 只要 `is_active = 1` 即可直接對 `/basicinformation/*`、`/codes/*` 等模組進行新增 / 修改，Controller 會直接呼叫對應的 Repository → Model，寫入資料表並留下操作紀錄。 |
-| `1` | 專家用戶 | `User::ROLE_EXPERT` | 擁有一般用戶權限；另外可：<br>• 進入 `/manage` 調整帳號啟用 / 角色。<br>• 在 `/operations`、`/modified` 審核提案（核准 / 退修）、執行操作復原。<br>• 存取 `/merge-preview` 等管理工具。 |
+| `1` | 專家用戶 | `User::ROLE_EXPERT` | 擁有一般用戶權限；另外可：<br>• 進入 `/manage` 調整帳號啟用 / 角色。<br>• 在 `/operations` 審核提案（核准 / 退修）、執行操作復原。<br>• 存取 `/merge-preview` 等管理工具。 |
 | `2` | 眾包用戶 | `User::ROLE_CROWDSOURCING` | 前台頁面可編輯，但 Controller 會偵測 `is_admin == 2`，把提交內容轉成 `operations`（`crowdsourcing_status = 2`），等待專家審核後套用，並不直接寫主資料表。 |
 | `3` | 系統管理員 | `User::ROLE_SUPER_ADMIN` | **已在模型層面完全實現**。擁有與專家相同的基礎權限（透過 `isAdmin()` 方法識別），可用於區分更高階的管理功能。可透過 `cbdb:manage-user` 命令創建。 |
 
@@ -34,7 +34,6 @@
 | `/basicinformation` 新增 / 修改 | 直接寫入 `BIOG_MAIN` | 同一般用戶 | 建立眾包提案，`crowdsourcing_status = 2`，不直接寫表 | 同專家用戶 |
 | `/codes` 新增 / 修改 | 直接寫入各代碼表 | 同一般用戶，可額外審核提案 | 建立提案，交由專家審核 | 同專家用戶 |
 | `/operations` 審核提案、操作復原 | 無 | ✅（透過 `isAdmin()` 檢查） | 無 | ✅（透過 `isAdmin()` 檢查） |
-| `/modified` 審核提案 | 無 | ✅ | 無 | ✅ |
 | `/crowdsourcing` 審核（Confirm） | 無 | ✅ | 只能提交提案 | ✅ |
 | `/manage` 列表管理帳號 | 無 | ✅（透過 `canManageUsers()` 檢查） | 無 | ✅（透過 `canManageUsers()` 檢查） |
 | `/merge-preview` 等管理工具 | 無 | ✅ | 無 | ✅ |

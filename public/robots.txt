@@ -1,2 +1,8 @@
 User-agent: *
 Crawl-delay: 1
+
+disallow: /basicinformation
+disallow: /basicinformation/*
+disallow: /codes
+disallow: /codes/*
+disallow: /operations

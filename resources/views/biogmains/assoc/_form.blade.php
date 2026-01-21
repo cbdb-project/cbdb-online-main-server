@@ -1,15 +1,16 @@
 {{-- 共享表单组件 - Assoc --}}
 @php
     $isEdit = isset($row);
-    $formAction = $isEdit
-        ? route('basicinformation.assoc.update', ['basicinformation' => $id, 'assoc' => $row->c_personid.'-'.$row->c_assoc_code.'-'.$row->c_assoc_id.'-'.$row->c_kin_code.'-'.$row->c_kin_id.'-'.$row->c_assoc_kin_code.'-'.$row->c_assoc_kin_id.'-'.$row->c_text_title])
-        : route('basicinformation.assoc.store', ['basicinformation' => $id]);
 
-    // 处理编辑模式的数据
+    // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
     if ($isEdit) {
         $row->c_text_title = unionPKDef($row->c_text_title);
         $row->c_notes = unionPKDef($row->c_notes);
     }
+
+    $formAction = $isEdit
+        ? route('basicinformation.assoc.update', ['basicinformation' => $id, 'assoc' => $row->c_personid.'-'.$row->c_assoc_code.'-'.$row->c_assoc_id.'-'.$row->c_kin_code.'-'.$row->c_kin_id.'-'.$row->c_assoc_kin_code.'-'.$row->c_assoc_kin_id.'-'.$row->c_text_title])
+        : route('basicinformation.assoc.store', ['basicinformation' => $id]);
 @endphp
 
 <form action="{{ $formAction }}" method="post">

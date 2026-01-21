@@ -1,17 +1,18 @@
 {{-- 共享表单组件 - Sources --}}
 @php
     $isEdit = isset($row);
-    $formAction = $isEdit
-        ? route('basicinformation.sources.update', ['basicinformation' => $id, 'source' => $row->c_personid.'-'.$row->c_textid.'-'.$row->c_pages])
-        : route('basicinformation.sources.store', ['basicinformation' => $id]);
 
-    // 处理编辑模式的数据
+    // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
     if ($isEdit) {
         $row->c_notes = unionPKDef($row->c_notes);
         $row->c_pages = unionPKDef($row->c_pages);
         $wikiSourceIds = [60795, 68942, 68943];
         $isWikiSource = in_array($row->c_textid, $wikiSourceIds);
     }
+
+    $formAction = $isEdit
+        ? route('basicinformation.sources.update', ['basicinformation' => $id, 'source' => $row->c_personid.'-'.$row->c_textid.'-'.$row->c_pages])
+        : route('basicinformation.sources.store', ['basicinformation' => $id]);
 @endphp
 
 <form action="{{ $formAction }}" method="post">

@@ -323,10 +323,13 @@ class BasicInformationAltnamesController extends Controller {
 
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
-        $new_alt = $this->biogMainRepository->unionPKDef($new_alt);
+        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
+        // 只有 c_alt_name_chn 可能包含特殊字符，其他都是數字
+        $encoded_alt_name_chn = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
         //20210715新增錯別字過濾
-        $errWord = ['?', '', '�'];
-        $new_alt = str_replace($errWord, '', $new_alt);
+        $errWord = ['?', chr(239).chr(153).chr(152), chr(239).chr(191).chr(189)];
+        $encoded_alt_name_chn = str_replace($errWord, '', $encoded_alt_name_chn);
+        $new_alt = $id.'-'.$data['c_sequence'].'-'.$encoded_alt_name_chn.'-'.$data['c_alt_name_type_code'];
 
         return redirect()->route('basicinformation.altnames.edit', [
             'basicinformation' => $id,
@@ -397,12 +400,11 @@ class BasicInformationAltnamesController extends Controller {
             $addr_l = explode('_._', $alt);
         } else {
             // 使用 - 格式
-            $alt = str_replace("--", "-minus", $alt);
-            //聯合主鍵保留字弱點防禦函式，解析保留字。
-            $alt = $this->biogMainRepository->unionPKDef_decode($alt);
+            // 先用 - 分割，然後對每個部分調用 unionPKDef_decode
+            // （因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
             $addr_l = explode("-", $alt);
             foreach ($addr_l as $key => $value) {
-                $addr_l[$key] = str_replace("minus", "-", $value);
+                $addr_l[$key] = $this->biogMainRepository->unionPKDef_decode($value);
             }
         }
 

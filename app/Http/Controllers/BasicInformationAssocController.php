@@ -158,10 +158,11 @@ class BasicInformationAssocController extends Controller {
         //return $request;
         //修改結束
         $data = $this->biogMainRepository->assocStoreById($request, $id);
-        $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Store success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
-        $_id = $this->biogMainRepository->unionPKDef($_id);
+        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
+        // 只有 c_text_title 可能包含特殊字符，其他都是數字
+        $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$this->biogMainRepository->unionPKDef($data['c_text_title']);
 
         return redirect()->route('basicinformation.assoc.edit', [
             'basicinformation' => $id,
@@ -258,10 +259,11 @@ class BasicInformationAssocController extends Controller {
         //return $request;
         //修改結束
         $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
-        $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'];
         flash('Update success @ '.Carbon::now(), 'success');
         //20200709引用聯合主鍵保留字弱點防禦函式
-        $id_ = $this->biogMainRepository->unionPKDef($id_);
+        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
+        // 只有 c_text_title 可能包含特殊字符，其他都是數字
+        $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$this->biogMainRepository->unionPKDef($data['c_text_title']);
 
         return redirect()->route('basicinformation.assoc.edit', [
             'basicinformation' => $id,

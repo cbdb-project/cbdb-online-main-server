@@ -40,23 +40,12 @@ Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
 Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOfficesController@saveas');
 
-Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
-Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');
-Route::resource('basicinformation.texts', 'BasicInformationTextsController');
-Route::resource('basicinformation.offices', 'BasicInformationOfficesController');
-Route::resource('basicinformation.assoc', 'BasicInformationAssocController');
-Route::resource('basicinformation.entries', 'BasicInformationEntriesController');
-Route::resource('basicinformation.events', 'BasicInformationEventsController');
-Route::resource('basicinformation.kinship', 'BasicInformationKinshipController');
-Route::resource('basicinformation.statuses', 'BasicInformationStatusesController');
-Route::resource('basicinformation.possession', 'BasicInformationPossessionController');
-Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
-Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
-
 // ===================================================================
 // 查詢參數模式路由（推薦使用，與舊的 path-based 路由並存）
 // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
 // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+// 重要：這些路由必須放在對應的 resource 路由之前，否則會被 resource 的
+//       show 路由攔截（例如 /altnames/edit 會匹配 /altnames/{altname}）
 // ===================================================================
 
 // ALTNAME_DATA
@@ -98,6 +87,20 @@ Route::match(['put', 'patch'], 'basicinformation/{id}/assoc/update', 'BasicInfor
     ->name('basicinformation.assoc.update.query');
 Route::delete('basicinformation/{id}/assoc/delete', 'BasicInformationAssocController@destroyQuery')
     ->name('basicinformation.assoc.destroy.query');
+
+// 資源路由（放在查詢參數路由之後，作為後備）
+Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
+Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');
+Route::resource('basicinformation.texts', 'BasicInformationTextsController');
+Route::resource('basicinformation.offices', 'BasicInformationOfficesController');
+Route::resource('basicinformation.assoc', 'BasicInformationAssocController');
+Route::resource('basicinformation.entries', 'BasicInformationEntriesController');
+Route::resource('basicinformation.events', 'BasicInformationEventsController');
+Route::resource('basicinformation.kinship', 'BasicInformationKinshipController');
+Route::resource('basicinformation.statuses', 'BasicInformationStatusesController');
+Route::resource('basicinformation.possession', 'BasicInformationPossessionController');
+Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
+Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
 // BiogMain 提案路由
 Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')

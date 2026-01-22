@@ -467,14 +467,15 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
         ];
 
-        // c_sequence 可能為 null
+        // c_sequence 可能為 null，需要使用 whereNull
+        $query = DB::table('ALTNAME_DATA')->where($conditions);
         if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $conditions[] = ['c_sequence', '=', $pk['c_sequence']];
+            $query->where('c_sequence', '=', $pk['c_sequence']);
         } else {
-            $conditions[] = ['c_sequence', '=', null];
+            $query->whereNull('c_sequence');
         }
 
-        $row = DB::table('ALTNAME_DATA')->where($conditions)->first();
+        $row = $query->first();
 
         if (!$row) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
@@ -590,14 +591,16 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
         ];
 
+        // c_sequence 可能為 null，需要使用 whereNull
+        $queryBuilder = DB::table('ALTNAME_DATA')->where($conditions);
         if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $conditions[] = ['c_sequence', '=', $pk['c_sequence']];
+            $queryBuilder->where('c_sequence', '=', $pk['c_sequence']);
         } else {
-            $conditions[] = ['c_sequence', '=', null];
+            $queryBuilder->whereNull('c_sequence');
         }
 
         // 取得原始資料
-        $ori = DB::table('ALTNAME_DATA')->where($conditions)->first();
+        $ori = $queryBuilder->first();
         if (!$ori) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
@@ -607,8 +610,14 @@ class BasicInformationAltnamesController extends Controller {
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code']);
         $data = $this->toolsRepository->timestamp($data);
 
-        // 更新資料
-        DB::table('ALTNAME_DATA')->where($conditions)->update($data);
+        // 更新資料（需要重新構建 query builder，因為 $queryBuilder 已經被 first() 消耗）
+        $updateQuery = DB::table('ALTNAME_DATA')->where($conditions);
+        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
+            $updateQuery->where('c_sequence', '=', $pk['c_sequence']);
+        } else {
+            $updateQuery->whereNull('c_sequence');
+        }
+        $updateQuery->update($data);
 
         // 記錄操作（使用新的複合主鍵）
         $newPk = [
@@ -691,13 +700,15 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
         ];
 
+        // c_sequence 可能為 null，需要使用 whereNull
+        $query = DB::table('ALTNAME_DATA')->where($conditions);
         if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $conditions[] = ['c_sequence', '=', $pk['c_sequence']];
+            $query->where('c_sequence', '=', $pk['c_sequence']);
         } else {
-            $conditions[] = ['c_sequence', '=', null];
+            $query->whereNull('c_sequence');
         }
 
-        $row = DB::table('ALTNAME_DATA')->where($conditions)->first();
+        $row = $query->first();
         if (!$row) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
@@ -706,8 +717,14 @@ class BasicInformationAltnamesController extends Controller {
         $resourceId = $pk['c_personid'].'-'.($pk['c_sequence'] ?? 'NULL').'-'.$pk['c_alt_name_chn'].'-'.$pk['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $resourceId, $row);
 
-        // 刪除資料
-        DB::table('ALTNAME_DATA')->where($conditions)->delete();
+        // 刪除資料（需要重新構建 query builder）
+        $deleteQuery = DB::table('ALTNAME_DATA')->where($conditions);
+        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
+            $deleteQuery->where('c_sequence', '=', $pk['c_sequence']);
+        } else {
+            $deleteQuery->whereNull('c_sequence');
+        }
+        $deleteQuery->delete();
 
         // 清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {

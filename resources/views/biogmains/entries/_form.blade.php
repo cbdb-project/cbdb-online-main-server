@@ -40,8 +40,8 @@
             yearName="c_year"
             :yearValue="$isEdit ? $row->c_year : '0'"
             :yearRequired="!$isEdit"
-            nhCodeName="c_nianhao_id"
-            :nhCodeValue="$isEdit ? $row->c_nianhao_id : ''"
+            nhCodeName="c_entry_nh_id"
+            :nhCodeValue="$isEdit ? $row->c_entry_nh_id : ''"
             nhYearName="c_entry_nh_year"
             :nhYearValue="$isEdit ? $row->c_entry_nh_year : ''"
             rangeName="c_entry_range"
@@ -72,9 +72,9 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_parental_status" class="col-sm-2 col-form-label">父母狀態(c_parental_status)</label>
+        <label for="c_parental_status_code" class="col-sm-2 col-form-label">父母狀態(c_parental_status_code)</label>
         <div class="col-sm-10">
-            <select-vue name="c_parental_status" model="parentstatus" selected="{{ $isEdit ? $row->c_parental_status : '' }}"></select-vue>
+            <select-vue name="c_parental_status_code" model="parentstatus" selected="{{ $isEdit ? $row->c_parental_status_code : '' }}"></select-vue>
         </div>
     </div>
 

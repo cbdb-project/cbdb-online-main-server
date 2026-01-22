@@ -124,14 +124,19 @@ class BasicInformationSourcesController extends Controller {
         }
         $data = $this->biogMainRepository->sourceStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        //20200715引用聯合主鍵保留字弱點防禦函式
-        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
-        $_id = $data['c_personid']."-".$data['c_textid']."-".$this->biogMainRepository->unionPKDef($data['c_pages']);
 
-        return redirect()->route('basicinformation.sources.edit', [
-            'basicinformation' => $id,
-            'source' => $_id,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_pages' => $data['c_pages'] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.sources.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -210,14 +215,19 @@ class BasicInformationSourcesController extends Controller {
         }
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
-        //20200715引用聯合主鍵保留字弱點防禦函式
-        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
-        $id_ = $id."-".$data['c_textid']."-".$this->biogMainRepository->unionPKDef($data['c_pages']);
 
-        return redirect()->route('basicinformation.sources.edit', [
-            'basicinformation' => $id,
-            'source' => $id_,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_textid' => $data['c_textid'],
+            'c_pages' => $data['c_pages'] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.sources.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**

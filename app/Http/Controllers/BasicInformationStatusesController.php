@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -111,13 +112,20 @@ class BasicInformationStatusesController extends Controller {
             return redirect()->back();
         }
         $data = $this->biogMainRepository->statuseStoreById($request, $id);
-        $_id = $data['c_personid']."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.statuses.edit', [
-            'basicinformation' => $id,
-            'status' => $_id,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_sequence' => $data['c_sequence'],
+            'c_status_code' => $data['c_status_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.statuses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -190,13 +198,20 @@ class BasicInformationStatusesController extends Controller {
             return redirect()->back();
         }
         $data = $this->biogMainRepository->statuseUpdateById($request, $id_, $id);
-        $id_ = $id."-".$data['c_sequence']."-".$data['c_status_code'];
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.statuses.edit', [
-            'basicinformation' => $id,
-            'status' => $id_,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_status_code' => $data['c_status_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.statuses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -216,6 +231,146 @@ class BasicInformationStatusesController extends Controller {
             return redirect()->back();
         }
         $this->biogMainRepository->statuseDeleteById($id_, $id);
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.statuses.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯社會區分記錄
+     *
+     * URL 格式：/basicinformation/{id}/statuses/edit?c_personid=...&c_sequence=...&c_status_code=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 使用 Repository 查詢（格式：c_personid-c_sequence-c_status_code）
+        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
+        $res = $this->biogMainRepository->statuseById($id_);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.statuses.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '社會區分',
+            'page_description' => '基本信息表 社會區分',
+            'page_url' => '/basicinformation/'.$id.'/statuses',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '社會區分', 'url' => route('basicinformation.statuses.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新社會區分記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 構建舊格式 ID（格式：c_personid-c_sequence-c_status_code）
+        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
+
+        // 使用 Repository 更新
+        $data = $this->biogMainRepository->statuseUpdateById($request, $id_, $id);
+
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        // 重定向到新的查詢參數格式
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_status_code' => $data['c_status_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.statuses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除社會區分記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 構建舊格式 ID（格式：c_personid-c_sequence-c_status_code）
+        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
+
+        $this->biogMainRepository->statuseDeleteById($id_, $id);
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.statuses.index', ['basicinformation' => $id]);

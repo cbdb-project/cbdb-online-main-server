@@ -144,13 +144,20 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         flash('Store success @ '.Carbon::now(), 'success');
-        //20200709引用聯合主鍵保留字弱點防禦函式
-        $data['c_alt_name_chn'] = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
 
-        return redirect()->route('basicinformation.altnames.edit', [
-            'basicinformation' => $id,
-            'altname' => $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'],
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_sequence' => $data['c_sequence'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -323,19 +330,20 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         flash('Update success @ '.Carbon::now(), 'success');
-        //20200709引用聯合主鍵保留字弱點防禦函式
-        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
-        // 只有 c_alt_name_chn 可能包含特殊字符，其他都是數字
-        $encoded_alt_name_chn = $this->biogMainRepository->unionPKDef($data['c_alt_name_chn']);
-        //20210715新增錯別字過濾
-        $errWord = ['?', chr(239).chr(153).chr(152), chr(239).chr(191).chr(189)];
-        $encoded_alt_name_chn = str_replace($errWord, '', $encoded_alt_name_chn);
-        $new_alt = $id.'-'.$data['c_sequence'].'-'.$encoded_alt_name_chn.'-'.$data['c_alt_name_type_code'];
 
-        return redirect()->route('basicinformation.altnames.edit', [
-            'basicinformation' => $id,
-            'altname' => $new_alt,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**

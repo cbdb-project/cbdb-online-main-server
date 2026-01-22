@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -177,10 +178,25 @@ class BasicInformationEntriesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', $newKey, $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.entries.edit', [
-            'basicinformation' => $id,
-            'entry' => $newKey,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.entries.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -327,10 +343,25 @@ class BasicInformationEntriesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.entries.edit', [
-            'basicinformation' => $id,
-            'entry' => $newid,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.entries.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -382,6 +413,253 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->delete();
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯入仕記錄
+     *
+     * URL 格式：/basicinformation/{id}/entries/edit?c_personid=...&c_entry_code=...&...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 構建舊格式 ID（格式：c_personid-c_entry_code-c_sequence-...）
+        $id_ = implode('-', [
+            $pk['c_personid'] ?? '',
+            $pk['c_entry_code'] ?? '',
+            $pk['c_sequence'] ?? '',
+            $pk['c_kin_code'] ?? '',
+            $pk['c_assoc_code'] ?? '',
+            $pk['c_kin_id'] ?? '',
+            $pk['c_year'] ?? '',
+            $pk['c_assoc_id'] ?? '',
+            $pk['c_inst_code'] ?? '',
+            $pk['c_inst_name_code'] ?? '',
+        ]);
+
+        $res = $this->biogMainRepository->entryById($id_);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.entries.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '入仕',
+            'page_description' => '基本信息表 入仕',
+            'page_url' => '/basicinformation/'.$id.'/entries',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '入仕', 'url' => route('basicinformation.entries.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新入仕記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        $data = $request->all();
+        $data = Arr::except($data, ['_method', '_token'] + $schema);
+        $data = $this->toolsRepository->timestamp($data);
+
+        // 處理 -999 轉為 0
+        $data['c_entry_code'] = $data['c_entry_code'] == -999 ? '0' : $data['c_entry_code'];
+        $data['c_entry_addr_id'] = $data['c_entry_addr_id'] == -999 ? '0' : $data['c_entry_addr_id'];
+        $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
+        $data['c_assoc_code'] = $data['c_assoc_code'] == -999 ? '0' : $data['c_assoc_code'];
+        $data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
+        $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+
+        // 處理 c_inst_code 分割
+        $temp = explode("-", $data['c_inst_code']);
+        $c_inst_code = $temp[0];
+        if (!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        } else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if ($c_inst_name_code != '') {
+            $data['c_inst_code'] = $c_inst_code;
+            $data['c_inst_name_code'] = $c_inst_name_code;
+        }
+
+        // 取得原始資料
+        $ori = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_entry_code', '=', $pk['c_entry_code']],
+            ['c_sequence', '=', $pk['c_sequence']],
+            ['c_kin_code', '=', $pk['c_kin_code']],
+            ['c_assoc_code', '=', $pk['c_assoc_code']],
+            ['c_kin_id', '=', $pk['c_kin_id']],
+            ['c_year', '=', $pk['c_year']],
+            ['c_assoc_id', '=', $pk['c_assoc_id']],
+            ['c_inst_code', '=', $pk['c_inst_code']],
+            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+        ])->first();
+
+        // 更新
+        DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_entry_code', '=', $pk['c_entry_code']],
+            ['c_sequence', '=', $pk['c_sequence']],
+            ['c_kin_code', '=', $pk['c_kin_code']],
+            ['c_assoc_code', '=', $pk['c_assoc_code']],
+            ['c_kin_id', '=', $pk['c_kin_id']],
+            ['c_year', '=', $pk['c_year']],
+            ['c_assoc_id', '=', $pk['c_assoc_id']],
+            ['c_inst_code', '=', $pk['c_inst_code']],
+            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+        ])->update($data);
+
+        $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        // 重定向到新的查詢參數格式
+        $newPk = [
+            'c_personid' => $id,
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.entries.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除入仕記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 取得原始資料
+        $row = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_entry_code', '=', $pk['c_entry_code']],
+            ['c_sequence', '=', $pk['c_sequence']],
+            ['c_kin_code', '=', $pk['c_kin_code']],
+            ['c_assoc_code', '=', $pk['c_assoc_code']],
+            ['c_kin_id', '=', $pk['c_kin_id']],
+            ['c_year', '=', $pk['c_year']],
+            ['c_assoc_id', '=', $pk['c_assoc_id']],
+            ['c_inst_code', '=', $pk['c_inst_code']],
+            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+        ])->first();
+
+        $id_ = implode('-', [
+            $pk['c_personid'],
+            $pk['c_entry_code'],
+            $pk['c_sequence'],
+            $pk['c_kin_code'],
+            $pk['c_assoc_code'],
+            $pk['c_kin_id'],
+            $pk['c_year'],
+            $pk['c_assoc_id'],
+            $pk['c_inst_code'],
+            $pk['c_inst_name_code'],
+        ]);
+
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', $id_, $row);
+
+        DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_entry_code', '=', $pk['c_entry_code']],
+            ['c_sequence', '=', $pk['c_sequence']],
+            ['c_kin_code', '=', $pk['c_kin_code']],
+            ['c_assoc_code', '=', $pk['c_assoc_code']],
+            ['c_kin_id', '=', $pk['c_kin_id']],
+            ['c_year', '=', $pk['c_year']],
+            ['c_assoc_id', '=', $pk['c_assoc_id']],
+            ['c_inst_code', '=', $pk['c_inst_code']],
+            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+        ])->delete();
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);

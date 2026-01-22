@@ -152,10 +152,19 @@ class BasicInformationAddressesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.addresses.edit', [
-            'basicinformation' => $id,
-            'address' => $data['c_personid'].'-'.$data['c_addr_id'].'-'.$data['c_addr_type'].'-'.$data['c_sequence'],
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -333,10 +342,19 @@ class BasicInformationAddressesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.addresses.edit', [
-            'basicinformation' => $id,
-            'address' => $new_addr,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**

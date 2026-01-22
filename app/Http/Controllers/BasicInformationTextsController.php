@@ -139,10 +139,18 @@ class BasicInformationTextsController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.texts.edit', [
-            'basicinformation' => $id,
-            'text' => $data['c_personid'].'-'.$data['c_textid'].'-'.$data['c_role_id'],
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.texts.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -236,10 +244,18 @@ class BasicInformationTextsController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.texts.edit', [
-            'basicinformation' => $id,
-            'text' => $new_id_,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.texts.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**

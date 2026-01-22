@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -41,15 +45,23 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $instPk = [
+                                        'c_personid' => $value->pivot->c_personid,
+                                        'c_inst_code' => $value->pivot->c_inst_code,
+                                        'c_inst_name_code' => $value->pivot->c_inst_name_code,
+                                        'c_bi_role_code' => $value->pivot->c_bi_role_code,
+                                    ];
+                                    $instFormId = 'delete-form-' . $key;
+                                    @endphp
                                     <div class="btn-group">
-                                        @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code."-".$value->pivot->c_bi_role_code)
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.socialinst.edit', ['basicinformation' => $basicinformation->c_personid, 'socialinst' => $id_]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.socialinst.edit.query', ['id' => $basicinformation->c_personid], $instPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $id_ }}').submit();
+                                                       document.getElementById('{{ $instFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
@@ -57,7 +69,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $id_ }}" action="{{ route('basicinformation.socialinst.destroy', ['basicinformation' => $basicinformation->c_personid, 'socialinst' => $id_]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $instFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.socialinst.destroy.query', ['id' => $basicinformation->c_personid], $instPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

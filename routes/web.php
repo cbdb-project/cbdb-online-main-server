@@ -88,6 +88,54 @@ Route::match(['put', 'patch'], 'basicinformation/{id}/assoc/update', 'BasicInfor
 Route::delete('basicinformation/{id}/assoc/delete', 'BasicInformationAssocController@destroyQuery')
     ->name('basicinformation.assoc.destroy.query');
 
+// KIN_DATA
+Route::get('basicinformation/{id}/kinship/edit', 'BasicInformationKinshipController@editQuery')
+    ->name('basicinformation.kinship.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/kinship/update', 'BasicInformationKinshipController@updateQuery')
+    ->name('basicinformation.kinship.update.query');
+Route::delete('basicinformation/{id}/kinship/delete', 'BasicInformationKinshipController@destroyQuery')
+    ->name('basicinformation.kinship.destroy.query');
+
+// STATUS_DATA
+Route::get('basicinformation/{id}/statuses/edit', 'BasicInformationStatusesController@editQuery')
+    ->name('basicinformation.statuses.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/statuses/update', 'BasicInformationStatusesController@updateQuery')
+    ->name('basicinformation.statuses.update.query');
+Route::delete('basicinformation/{id}/statuses/delete', 'BasicInformationStatusesController@destroyQuery')
+    ->name('basicinformation.statuses.destroy.query');
+
+// ENTRY_DATA
+Route::get('basicinformation/{id}/entries/edit', 'BasicInformationEntriesController@editQuery')
+    ->name('basicinformation.entries.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/entries/update', 'BasicInformationEntriesController@updateQuery')
+    ->name('basicinformation.entries.update.query');
+Route::delete('basicinformation/{id}/entries/delete', 'BasicInformationEntriesController@destroyQuery')
+    ->name('basicinformation.entries.destroy.query');
+
+// EVENTS_DATA
+Route::get('basicinformation/{id}/events/edit', 'BasicInformationEventsController@editQuery')
+    ->name('basicinformation.events.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/events/update', 'BasicInformationEventsController@updateQuery')
+    ->name('basicinformation.events.update.query');
+Route::delete('basicinformation/{id}/events/delete', 'BasicInformationEventsController@destroyQuery')
+    ->name('basicinformation.events.destroy.query');
+
+// BIOG_INST_DATA
+Route::get('basicinformation/{id}/socialinst/edit', 'BasicInformationSocialInstController@editQuery')
+    ->name('basicinformation.socialinst.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/socialinst/update', 'BasicInformationSocialInstController@updateQuery')
+    ->name('basicinformation.socialinst.update.query');
+Route::delete('basicinformation/{id}/socialinst/delete', 'BasicInformationSocialInstController@destroyQuery')
+    ->name('basicinformation.socialinst.destroy.query');
+
+// POSTED_TO_OFFICE_DATA（官名）
+Route::get('basicinformation/{id}/offices/edit', 'BasicInformationOfficesController@editQuery')
+    ->name('basicinformation.offices.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/offices/update', 'BasicInformationOfficesController@updateQuery')
+    ->name('basicinformation.offices.update.query');
+Route::delete('basicinformation/{id}/offices/delete', 'BasicInformationOfficesController@destroyQuery')
+    ->name('basicinformation.offices.destroy.query');
+
 // 資源路由（放在查詢參數路由之後，作為後備）
 Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
 Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');

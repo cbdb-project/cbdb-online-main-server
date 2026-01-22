@@ -160,15 +160,25 @@ class BasicInformationAssocController extends Controller {
         //修改結束
         $data = $this->biogMainRepository->assocStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
-        //20200709引用聯合主鍵保留字弱點防禦函式
-        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
-        // 只有 c_text_title 可能包含特殊字符，其他都是數字
-        $_id = $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$this->biogMainRepository->unionPKDef($data['c_text_title']);
 
-        return redirect()->route('basicinformation.assoc.edit', [
-            'basicinformation' => $id,
-            'assoc' => $_id,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_kin_code' => $data['c_kin_code'] ?? '0',
+            'c_kin_id' => $data['c_kin_id'] ?? '0',
+            'c_assoc_kin_code' => $data['c_assoc_kin_code'] ?? '0',
+            'c_assoc_kin_id' => $data['c_assoc_kin_id'] ?? '0',
+            'c_text_title' => $data['c_text_title'] ?? '',
+            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.assoc.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -261,15 +271,25 @@ class BasicInformationAssocController extends Controller {
         //修改結束
         $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
-        //20200709引用聯合主鍵保留字弱點防禦函式
-        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
-        // 只有 c_text_title 可能包含特殊字符，其他都是數字
-        $id_ = $id."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$this->biogMainRepository->unionPKDef($data['c_text_title']);
 
-        return redirect()->route('basicinformation.assoc.edit', [
-            'basicinformation' => $id,
-            'assoc' => $id_,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_kin_code' => $data['c_kin_code'] ?? '0',
+            'c_kin_id' => $data['c_kin_id'] ?? '0',
+            'c_assoc_kin_code' => $data['c_assoc_kin_code'] ?? '0',
+            'c_assoc_kin_id' => $data['c_assoc_kin_id'] ?? '0',
+            'c_text_title' => $data['c_text_title'] ?? '',
+            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.assoc.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**

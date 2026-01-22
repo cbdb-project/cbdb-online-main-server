@@ -296,12 +296,13 @@ class BasicInformationTextsController extends Controller {
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
         // 驗證必填欄位
-        if (!isset($pk['c_personid']) || !isset($pk['c_text_id'])) {
-            abort(400, '缺少必要參數：c_personid 或 c_text_id');
+        if (!isset($pk['c_personid']) || !isset($pk['c_textid'])) {
+            abort(400, '缺少必要參數：c_personid 或 c_textid');
         }
 
-        // 構建舊格式 ID（用於 Repository）
-        $id_ = $pk['c_personid'].'-'.$pk['c_text_id'];
+        // 構建舊格式 ID（用於 Repository）- 格式：c_personid-c_textid-c_role_id
+        $c_role_id = $pk['c_role_id'] ?? 0;
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_role_id;
         $res = $this->biogMainRepository->textById($id_);
 
         // 處理 personLabel
@@ -367,19 +368,16 @@ class BasicInformationTextsController extends Controller {
 
         // 準備更新資料
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_text_id']);
+        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_textid', 'c_role_id']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 構建查詢條件（使用 BIOG_TEXT_DATA 表）
+        $c_role_id = $pk['c_role_id'] ?? 0;
         $conditions = [
             ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_text_id']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_role_id', '=', $c_role_id],
         ];
-
-        // 如果有 c_role_id
-        if ($request->has('c_role_id_original')) {
-            $conditions[] = ['c_role_id', '=', $request->input('c_role_id_original')];
-        }
 
         // 取得原始資料
         $ori = DB::table($this->table_name)->where($conditions)->first();
@@ -393,9 +391,10 @@ class BasicInformationTextsController extends Controller {
         // 記錄操作
         $newPk = [
             'c_personid' => $pk['c_personid'],
-            'c_text_id' => $data['c_textid'] ?? $pk['c_text_id'],
+            'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
+            'c_role_id' => $data['c_role_id'] ?? $c_role_id,
         ];
-        $resourceId = $newPk['c_personid'].'-'.$newPk['c_text_id'].'-'.($data['c_role_id'] ?? $ori->c_role_id);
+        $resourceId = $newPk['c_personid'].'-'.$newPk['c_textid'].'-'.$newPk['c_role_id'];
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $resourceId, $data, $ori);
 
         flash('Update success @ '.Carbon::now(), 'success');
@@ -432,9 +431,11 @@ class BasicInformationTextsController extends Controller {
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
         // 構建查詢條件
+        $c_role_id = $pk['c_role_id'] ?? 0;
         $conditions = [
             ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_text_id']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_role_id', '=', $c_role_id],
         ];
 
         $row = DB::table($this->table_name)->where($conditions)->first();
@@ -446,7 +447,7 @@ class BasicInformationTextsController extends Controller {
         DB::table($this->table_name)->where($conditions)->delete();
 
         // 記錄操作
-        $resourceId = $pk['c_personid'].'-'.$pk['c_text_id'];
+        $resourceId = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_role_id;
         $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $resourceId, $row);
 
         flash('Delete success @ '.Carbon::now(), 'success');

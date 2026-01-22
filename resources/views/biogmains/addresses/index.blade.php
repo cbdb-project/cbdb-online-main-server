@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -40,8 +44,16 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                        $addrPk = [
+                                            'c_personid' => $basicinformation->c_personid,
+                                            'c_addr_id' => $basicinformation->biog_addresses[$i]->c_addr_id,
+                                            'c_addr_type' => $basicinformation->biog_addresses[$i]->c_addr_type,
+                                            'c_sequence' => $basicinformation->biog_addresses[$i]->c_sequence,
+                                        ];
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.addresses.edit', ['basicinformation' => $basicinformation->c_personid, 'address' => $basicinformation->c_personid.'-'.$basicinformation->biog_addresses[$i]->c_addr_id.'-'.$basicinformation->biog_addresses[$i]->c_addr_type.'-'.$basicinformation->biog_addresses[$i]->c_sequence]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.addresses.edit.query', ['id' => $basicinformation->c_personid], $addrPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -53,7 +65,7 @@
                                                    }"
                                            class="btn btn-sm btn-danger">delete</a>
                                     </div>
-                                    <form id="delete-form-{{ $basicinformation->c_personid.'-'.$basicinformation->biog_addresses[$i]->c_addr_id.'-'.$basicinformation->biog_addresses[$i]->c_addr_type.'-'.$basicinformation->biog_addresses[$i]->c_sequence }}" action="{{ route('basicinformation.addresses.destroy', ['basicinformation' => $basicinformation->c_personid, 'address' => $basicinformation->c_personid.'-'.$basicinformation->biog_addresses[$i]->c_addr_id.'-'.$basicinformation->biog_addresses[$i]->c_addr_type.'-'.$basicinformation->biog_addresses[$i]->c_sequence]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $basicinformation->c_personid.'-'.$basicinformation->biog_addresses[$i]->c_addr_id.'-'.$basicinformation->biog_addresses[$i]->c_addr_type.'-'.$basicinformation->biog_addresses[$i]->c_sequence }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.addresses.destroy.query', ['id' => $basicinformation->c_personid], $addrPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

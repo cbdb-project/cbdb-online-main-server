@@ -34,13 +34,16 @@ class CompositePrimaryKey {
             'c_addr_type',
             'c_sequence',
         ],
+        // 注意：實際表名是 BIOG_TEXT_DATA
         'TEXT_DATA' => [
             'c_personid',
-            'c_text_id',
+            'c_textid',
+            'c_role_id',
         ],
         'BIOG_SOURCE_DATA' => [
             'c_personid',
-            'c_source_id',
+            'c_textid',
+            'c_pages',
         ],
         'POSTED_TO_OFFICE_DATA' => [
             'c_office_id',

@@ -262,13 +262,14 @@ class BasicInformationSourcesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
-        // 驗證必填欄位
-        if (!isset($pk['c_personid']) || !isset($pk['c_source_id'])) {
-            abort(400, '缺少必要參數：c_personid 或 c_source_id');
+        // 驗證必填欄位（c_pages 可能為空字串）
+        if (!isset($pk['c_personid']) || !isset($pk['c_textid'])) {
+            abort(400, '缺少必要參數：c_personid 或 c_textid');
         }
 
-        // 使用 Repository 查詢
-        $id_ = $pk['c_personid'].'-'.$pk['c_source_id'];
+        // 使用 Repository 查詢（格式：c_personid-c_textid-c_pages）
+        $c_pages = $pk['c_pages'] ?? '';
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
         $res = $this->biogMainRepository->sourceById($id, $id_);
 
         // 處理 personLabel
@@ -332,8 +333,9 @@ class BasicInformationSourcesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
-        // 構建舊格式 ID
-        $id_ = $pk['c_personid'].'-'.$pk['c_source_id'];
+        // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
+        $c_pages = $pk['c_pages'] ?? '';
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
@@ -343,7 +345,8 @@ class BasicInformationSourcesController extends Controller {
         // 重定向到新的查詢參數格式
         $newPk = [
             'c_personid' => $id,
-            'c_source_id' => $data['c_textid'],
+            'c_textid' => $data['c_textid'],
+            'c_pages' => $data['c_pages'] ?? '',
         ];
 
         return redirect(CompositePrimaryKey::buildUrl(
@@ -376,8 +379,9 @@ class BasicInformationSourcesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
-        // 構建舊格式 ID
-        $id_ = $pk['c_personid'].'-'.$pk['c_source_id'];
+        // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
+        $c_pages = $pk['c_pages'] ?? '';
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
 
         $this->biogMainRepository->sourceDeleteById($id, $id_);
 

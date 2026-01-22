@@ -382,6 +382,9 @@ class BasicInformationTextsController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位（c_role_id 為可選，預設為 0）
+        CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
+
         // 準備更新資料
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_textid', 'c_role_id']);
@@ -445,6 +448,9 @@ class BasicInformationTextsController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（c_role_id 為可選，預設為 0）
+        CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
 
         // 構建查詢條件
         $c_role_id = $pk['c_role_id'] ?? 0;

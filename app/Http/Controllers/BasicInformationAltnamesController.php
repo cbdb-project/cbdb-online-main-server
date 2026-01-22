@@ -263,9 +263,18 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 轉發到提案控制器
+            // 解析舊格式的複合主鍵，轉換為陣列
+            $addr_l = $this->parseAltnameId($alt);
+            $originalPk = [
+                'c_personid' => $addr_l[0],
+                'c_sequence' => $addr_l[1],
+                'c_alt_name_chn' => $addr_l[2],
+                'c_alt_name_type_code' => $addr_l[3],
+            ];
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
-                ->proposalUpdate($request, $id, 'altnames', $alt);
+                ->proposalUpdateWithPk($request, $id, 'altnames', $originalPk);
         }
 
         // 直接儲存需要額外權限檢查
@@ -568,12 +577,24 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 提案模式需要構建舊格式的 alt 參數
-            $pk = CompositePrimaryKey::fromRequest($request, CompositePrimaryKey::SCHEMAS['ALTNAME_DATA']);
-            $alt = $pk['c_personid'].'-'.($pk['c_sequence'] ?? 'NULL').'-'.$pk['c_alt_name_chn'].'-'.$pk['c_alt_name_type_code'];
+            // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+            $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
+            $originalPk = [];
+            foreach ($schema as $field) {
+                $value = $request->query($field);
+                if ($value !== null && $value !== '') {
+                    $originalPk[$field] = $value;
+                }
+            }
 
+            // 處理 c_sequence 可能為 'NULL' 的情況
+            if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] === 'NULL') {
+                $originalPk['c_sequence'] = null;
+            }
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
-                ->proposalUpdate($request, $id, 'altnames', $alt);
+                ->proposalUpdateWithPk($request, $id, 'altnames', $originalPk);
         }
 
         // 直接儲存需要額外權限檢查
@@ -583,26 +604,36 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串提取原始 PK（用於定位記錄）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
-
-        // 處理 c_sequence
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] === 'NULL') {
-            $pk['c_sequence'] = null;
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null && $value !== '') {
+                $originalPk[$field] = $value;
+            }
         }
 
-        // 構建查詢條件
+        // 驗證必填欄位（c_sequence 為可選）
+        CompositePrimaryKey::validateOrFail($originalPk, 'ALTNAME_DATA', ['c_sequence']);
+
+        // 處理 c_sequence
+        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] === 'NULL') {
+            $originalPk['c_sequence'] = null;
+        }
+
+        // 構建查詢條件（使用原始 PK）
         $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
-            ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
+            ['c_personid', '=', $originalPk['c_personid']],
+            ['c_alt_name_chn', '=', $originalPk['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $originalPk['c_alt_name_type_code']],
         ];
 
         // c_sequence 可能為 null，需要使用 whereNull
         $queryBuilder = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $queryBuilder->where('c_sequence', '=', $pk['c_sequence']);
+        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] !== null) {
+            $queryBuilder->where('c_sequence', '=', $originalPk['c_sequence']);
         } else {
             $queryBuilder->whereNull('c_sequence');
         }
@@ -613,15 +644,15 @@ class BasicInformationAltnamesController extends Controller {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 準備更新資料
+        // 準備更新資料（保留 PK 欄位，允許修改）
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 更新資料（需要重新構建 query builder，因為 $queryBuilder 已經被 first() 消耗）
         $updateQuery = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $updateQuery->where('c_sequence', '=', $pk['c_sequence']);
+        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] !== null) {
+            $updateQuery->where('c_sequence', '=', $originalPk['c_sequence']);
         } else {
             $updateQuery->whereNull('c_sequence');
         }
@@ -629,18 +660,22 @@ class BasicInformationAltnamesController extends Controller {
 
         // 記錄操作（使用新的複合主鍵）
         $newPk = [
-            'c_personid' => $pk['c_personid'],
-            'c_sequence' => $data['c_sequence'] ?? $pk['c_sequence'],
-            'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $pk['c_alt_name_chn'],
-            'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $pk['c_alt_name_type_code'],
+            'c_personid' => $data['c_personid'] ?? $originalPk['c_personid'],
+            'c_sequence' => $data['c_sequence'] ?? $originalPk['c_sequence'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
         ];
+        // 處理 c_sequence 為 null 的情況
+        if ($newPk['c_sequence'] == null) {
+            $newPk['c_sequence'] = null;
+        }
         $resourceId = $newPk['c_personid'].'-'.($newPk['c_sequence'] ?? 'NULL').'-'.$newPk['c_alt_name_chn'].'-'.$newPk['c_alt_name_type_code'];
         $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $resourceId, $data, $ori);
 
         // 更新索引
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
-            $nameChanged = ($ori->c_alt_name_chn ?? null) !== ($data['c_alt_name_chn'] ?? $pk['c_alt_name_chn']);
-            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== ($data['c_alt_name_type_code'] ?? $pk['c_alt_name_type_code']);
+            $nameChanged = ($ori->c_alt_name_chn ?? null) !== ($data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn']);
+            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== ($data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code']);
 
             if ($nameChanged || $typeChanged) {
                 if ($ori->c_alt_name_chn) {
@@ -651,11 +686,11 @@ class BasicInformationAltnamesController extends Controller {
                     );
                 }
 
-                $newAltNameChn = $data['c_alt_name_chn'] ?? $pk['c_alt_name_chn'];
+                $newAltNameChn = $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'];
                 if (!empty($newAltNameChn)) {
                     $this->nameSearchIndexService->indexAltname(
-                        $pk['c_personid'],
-                        $data['c_alt_name_type_code'] ?? $pk['c_alt_name_type_code'],
+                        $originalPk['c_personid'],
+                        $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
                         $newAltNameChn
                     );
                 }
@@ -695,6 +730,9 @@ class BasicInformationAltnamesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（c_sequence 為可選）
+        CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA', ['c_sequence']);
 
         // 處理 c_sequence
         if (isset($pk['c_sequence']) && $pk['c_sequence'] === 'NULL') {

@@ -432,6 +432,10 @@ class BasicInformationAssocController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['ASSOC_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位（ASSOC_DATA 有較多可選欄位）
+        $optional = ['c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
+
         // 構建舊格式 ID
         $id_ = $pk['c_personid']."-".
                ($pk['c_assoc_code'] ?? '0')."-".
@@ -489,6 +493,10 @@ class BasicInformationAssocController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['ASSOC_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（ASSOC_DATA 有較多可選欄位）
+        $optional = ['c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
 
         // 構建舊格式 ID
         $id_ = $pk['c_personid']."-".

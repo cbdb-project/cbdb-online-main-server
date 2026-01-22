@@ -480,6 +480,9 @@ class BasicInformationOfficesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
+
         // 構建舊格式 ID（格式：c_office_id-c_posting_id）
         $office = $pk['c_office_id'].'-'.$pk['c_posting_id'];
         $res = $this->biogMainRepository->officeById($office);
@@ -544,6 +547,9 @@ class BasicInformationOfficesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
 
         // 構建舊格式 ID（格式：c_office_id-c_posting_id）
         $id_ = $pk['c_office_id'].'-'.$pk['c_posting_id'];
@@ -611,6 +617,9 @@ class BasicInformationOfficesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
 
         // 構建舊格式 ID（格式：c_office_id-c_posting_id）
         $office = $pk['c_office_id'].'-'.$pk['c_posting_id'];

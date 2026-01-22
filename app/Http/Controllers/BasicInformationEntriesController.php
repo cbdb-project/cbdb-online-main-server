@@ -438,18 +438,21 @@ class BasicInformationEntriesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'ENTRY_DATA');
+
         // 構建舊格式 ID（格式：c_personid-c_entry_code-c_sequence-...）
         $id_ = implode('-', [
-            $pk['c_personid'] ?? '',
-            $pk['c_entry_code'] ?? '',
-            $pk['c_sequence'] ?? '',
-            $pk['c_kin_code'] ?? '',
-            $pk['c_assoc_code'] ?? '',
-            $pk['c_kin_id'] ?? '',
-            $pk['c_year'] ?? '',
-            $pk['c_assoc_id'] ?? '',
-            $pk['c_inst_code'] ?? '',
-            $pk['c_inst_name_code'] ?? '',
+            $pk['c_personid'],
+            $pk['c_entry_code'],
+            $pk['c_sequence'],
+            $pk['c_kin_code'],
+            $pk['c_assoc_code'],
+            $pk['c_kin_id'],
+            $pk['c_year'],
+            $pk['c_assoc_id'],
+            $pk['c_inst_code'],
+            $pk['c_inst_name_code'],
         ]);
 
         $res = $this->biogMainRepository->entryById($id_);
@@ -511,12 +514,22 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串提取原始 PK（用於定位記錄）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null && $value !== '') {
+                $originalPk[$field] = $value;
+            }
+        }
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($originalPk, 'ENTRY_DATA');
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token'] + $schema);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 處理 -999 轉為 0
@@ -542,32 +555,36 @@ class BasicInformationEntriesController extends Controller {
             $data['c_inst_name_code'] = $c_inst_name_code;
         }
 
-        // 取得原始資料
+        // 取得原始資料（使用原始 PK）
         $ori = DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_entry_code', '=', $pk['c_entry_code']],
-            ['c_sequence', '=', $pk['c_sequence']],
-            ['c_kin_code', '=', $pk['c_kin_code']],
-            ['c_assoc_code', '=', $pk['c_assoc_code']],
-            ['c_kin_id', '=', $pk['c_kin_id']],
-            ['c_year', '=', $pk['c_year']],
-            ['c_assoc_id', '=', $pk['c_assoc_id']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+            ['c_personid', '=', $originalPk['c_personid']],
+            ['c_entry_code', '=', $originalPk['c_entry_code']],
+            ['c_sequence', '=', $originalPk['c_sequence']],
+            ['c_kin_code', '=', $originalPk['c_kin_code']],
+            ['c_assoc_code', '=', $originalPk['c_assoc_code']],
+            ['c_kin_id', '=', $originalPk['c_kin_id']],
+            ['c_year', '=', $originalPk['c_year']],
+            ['c_assoc_id', '=', $originalPk['c_assoc_id']],
+            ['c_inst_code', '=', $originalPk['c_inst_code']],
+            ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
         ])->first();
 
-        // 更新
+        if (!$ori) {
+            abort(404, 'ENTRY_DATA 記錄不存在');
+        }
+
+        // 更新（使用原始 PK 定位）
         DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_entry_code', '=', $pk['c_entry_code']],
-            ['c_sequence', '=', $pk['c_sequence']],
-            ['c_kin_code', '=', $pk['c_kin_code']],
-            ['c_assoc_code', '=', $pk['c_assoc_code']],
-            ['c_kin_id', '=', $pk['c_kin_id']],
-            ['c_year', '=', $pk['c_year']],
-            ['c_assoc_id', '=', $pk['c_assoc_id']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
+            ['c_personid', '=', $originalPk['c_personid']],
+            ['c_entry_code', '=', $originalPk['c_entry_code']],
+            ['c_sequence', '=', $originalPk['c_sequence']],
+            ['c_kin_code', '=', $originalPk['c_kin_code']],
+            ['c_assoc_code', '=', $originalPk['c_assoc_code']],
+            ['c_kin_id', '=', $originalPk['c_kin_id']],
+            ['c_year', '=', $originalPk['c_year']],
+            ['c_assoc_id', '=', $originalPk['c_assoc_id']],
+            ['c_inst_code', '=', $originalPk['c_inst_code']],
+            ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
         ])->update($data);
 
         $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
@@ -617,6 +634,9 @@ class BasicInformationEntriesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['ENTRY_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'ENTRY_DATA');
 
         // 取得原始資料
         $row = DB::table('ENTRY_DATA')->where([

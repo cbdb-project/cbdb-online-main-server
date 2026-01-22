@@ -343,6 +343,9 @@ class BasicInformationSourcesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位（c_pages 為可選）
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
+
         // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
         $c_pages = $pk['c_pages'] ?? '';
         $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
@@ -388,6 +391,9 @@ class BasicInformationSourcesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（c_pages 為可選）
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
 
         // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
         $c_pages = $pk['c_pages'] ?? '';

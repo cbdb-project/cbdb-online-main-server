@@ -352,6 +352,9 @@ class BasicInformationSocialInstController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_INST_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_INST_DATA');
+
         // 使用 Repository 查詢（格式：c_personid-c_inst_code-c_inst_name_code-c_bi_role_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_inst_code'].'-'.$pk['c_inst_name_code'].'-'.$pk['c_bi_role_code'];
         $res = $this->biogMainRepository->socialInstById($id_);
@@ -413,12 +416,22 @@ class BasicInformationSocialInstController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串提取原始 PK（用於定位記錄）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_INST_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null && $value !== '') {
+                $originalPk[$field] = $value;
+            }
+        }
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($originalPk, 'BIOG_INST_DATA');
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token'] + $schema);
+        $data = Arr::except($data, ['_method', '_token']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 處理 c_inst_code 分割
@@ -436,20 +449,24 @@ class BasicInformationSocialInstController extends Controller {
             $data['c_inst_name_code'] = $c_inst_name_code;
         }
 
-        // 取得原始資料
+        // 取得原始資料（使用原始 PK）
         $ori = DB::table('BIOG_INST_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
-            ['c_bi_role_code', '=', $pk['c_bi_role_code']],
+            ['c_personid', '=', $originalPk['c_personid']],
+            ['c_inst_code', '=', $originalPk['c_inst_code']],
+            ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
+            ['c_bi_role_code', '=', $originalPk['c_bi_role_code']],
         ])->first();
 
-        // 更新
+        if (!$ori) {
+            abort(404, 'BIOG_INST_DATA 記錄不存在');
+        }
+
+        // 更新（使用原始 PK 定位）
         DB::table('BIOG_INST_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
-            ['c_bi_role_code', '=', $pk['c_bi_role_code']],
+            ['c_personid', '=', $originalPk['c_personid']],
+            ['c_inst_code', '=', $originalPk['c_inst_code']],
+            ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
+            ['c_bi_role_code', '=', $originalPk['c_bi_role_code']],
         ])->update($data);
 
         $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
@@ -493,6 +510,9 @@ class BasicInformationSocialInstController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_INST_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_INST_DATA');
 
         // 取得原始資料
         $row = DB::table('BIOG_INST_DATA')->where([

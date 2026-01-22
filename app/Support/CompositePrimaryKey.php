@@ -182,6 +182,51 @@ class CompositePrimaryKey {
     }
 
     /**
+     * 驗證並返回缺失的必填欄位
+     *
+     * @param array $pk 複合主鍵陣列
+     * @param string $table 資料表名稱
+     * @param array $optionalFields 可選欄位列表（允許為 null）
+     * @return array 缺失欄位列表，若驗證通過則為空陣列
+     */
+    public static function getMissingFields(array $pk, string $table, array $optionalFields = []): array {
+        $schema = self::getSchema($table);
+        if (!$schema) {
+            return ['__unknown_table__'];
+        }
+
+        $missing = [];
+        foreach ($schema as $field) {
+            // 檢查欄位是否為可選
+            if (in_array($field, $optionalFields)) {
+                continue;
+            }
+
+            // 必填欄位必須存在且不為空
+            if (!isset($pk[$field]) || $pk[$field] === '' || $pk[$field] === null) {
+                $missing[] = $field;
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * 驗證複合主鍵，失敗時拋出 HTTP 400 錯誤
+     *
+     * @param array $pk 複合主鍵陣列
+     * @param string $table 資料表名稱
+     * @param array $optionalFields 可選欄位列表（允許為 null）
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    public static function validateOrFail(array $pk, string $table, array $optionalFields = []): void {
+        $missing = self::getMissingFields($pk, $table, $optionalFields);
+        if (!empty($missing)) {
+            abort(400, '缺少必要的複合主鍵參數：' . implode(', ', $missing));
+        }
+    }
+
+    /**
      * 從資料庫記錄建立查詢參數陣列
      *
      * @param object|array $record 資料庫記錄（stdClass 或陣列）

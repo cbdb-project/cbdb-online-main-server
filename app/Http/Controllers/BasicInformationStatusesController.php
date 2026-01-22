@@ -256,6 +256,9 @@ class BasicInformationStatusesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'STATUS_DATA');
+
         // 使用 Repository 查詢（格式：c_personid-c_sequence-c_status_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
         $res = $this->biogMainRepository->statuseById($id_);
@@ -321,6 +324,9 @@ class BasicInformationStatusesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'STATUS_DATA');
+
         // 構建舊格式 ID（格式：c_personid-c_sequence-c_status_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
 
@@ -365,6 +371,9 @@ class BasicInformationStatusesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['STATUS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'STATUS_DATA');
 
         // 構建舊格式 ID（格式：c_personid-c_sequence-c_status_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];

@@ -254,6 +254,9 @@ class BasicInformationEventsController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
+
         // 使用 Repository 查詢（格式：c_personid-c_sequence）
         $id_ = $pk['c_personid'].'-'.$pk['c_sequence'];
         $res = $this->biogMainRepository->eventById($id_);
@@ -319,6 +322,9 @@ class BasicInformationEventsController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
+
         // 構建舊格式 ID（格式：c_sequence）
         $id_ = $pk['c_sequence'];
 
@@ -362,6 +368,9 @@ class BasicInformationEventsController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
 
         // 構建舊格式 ID（格式：c_sequence）
         $id_ = $pk['c_sequence'];

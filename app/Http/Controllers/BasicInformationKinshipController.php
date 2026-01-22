@@ -332,6 +332,9 @@ class BasicInformationKinshipController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['KIN_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'KIN_DATA');
+
         // 構建舊格式 ID（格式：c_personid-c_kin_id-c_kin_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_kin_id'].'-'.$pk['c_kin_code'];
 
@@ -382,6 +385,9 @@ class BasicInformationKinshipController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['KIN_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'KIN_DATA');
 
         // 構建舊格式 ID（格式：c_personid-c_kin_id-c_kin_code）
         $id_ = $pk['c_personid'].'-'.$pk['c_kin_id'].'-'.$pk['c_kin_code'];

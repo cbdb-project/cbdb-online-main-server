@@ -547,6 +547,9 @@ class BasicInformationAddressesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
+
         // 準備更新資料
         $data = $request->all();
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
@@ -613,6 +616,9 @@ class BasicInformationAddressesController extends Controller {
         // 從查詢參數提取複合主鍵
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
         // 構建查詢條件
         $conditions = [

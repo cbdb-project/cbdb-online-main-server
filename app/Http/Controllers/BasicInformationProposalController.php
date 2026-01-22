@@ -128,7 +128,9 @@ class BasicInformationProposalController extends Controller {
     }
 
     /**
-     * 提交修改提案（子資源）
+     * 提交修改提案（子資源）- 舊格式（使用編碼的複合主鍵字串）
+     *
+     * @deprecated 請使用 proposalUpdateWithPk() 方法，直接傳遞主鍵陣列
      */
     public function proposalUpdate(Request $request, $personid, $resourceType, $id) {
         $this->ensureCanPropose();
@@ -139,6 +141,40 @@ class BasicInformationProposalController extends Controller {
 
         // 解析複合主鍵
         $conditions = $this->parseCompositeId($id, $keyColumns);
+
+        return $this->doProposalUpdate($request, $personid, $resourceType, $conditions, $id);
+    }
+
+    /**
+     * 提交修改提案（子資源）- 新格式（直接使用主鍵陣列）
+     *
+     * @param Request $request HTTP 請求
+     * @param int $personid 人物 ID
+     * @param string $resourceType 資源類型
+     * @param array $originalPk 原始複合主鍵陣列（用於定位記錄）
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function proposalUpdateWithPk(Request $request, $personid, $resourceType, array $originalPk) {
+        $this->ensureCanPropose();
+
+        return $this->doProposalUpdate($request, $personid, $resourceType, $originalPk, null);
+    }
+
+    /**
+     * 執行修改提案的核心邏輯
+     *
+     * @param Request $request HTTP 請求
+     * @param int $personid 人物 ID
+     * @param string $resourceType 資源類型
+     * @param array $conditions 查詢條件（原始主鍵）
+     * @param string|null $legacyId 舊格式的編碼主鍵字串（用於重定向，若為 null 則使用查詢參數模式）
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    protected function doProposalUpdate(Request $request, $personid, $resourceType, array $conditions, $legacyId) {
+        $config = $this->getResourceConfig($resourceType);
+        $table = $config['table'];
+        $keyColumns = $config['key_columns'];
+
         $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
 
         if (!$originalRow) {
@@ -177,10 +213,24 @@ class BasicInformationProposalController extends Controller {
             flash('已提交修改提案，等待管理員審核 @ ' . Carbon::now(), 'info');
         }
 
-        return redirect()->route($config['route_prefix'] . '.edit', [
-            'basicinformation' => $personid,
-            Str::singular($resourceType) => $id,
-        ]);
+        // 根據是否有舊格式 ID 決定重定向方式
+        if ($legacyId !== null) {
+            // 舊格式：使用路徑參數
+            return redirect()->route($config['route_prefix'] . '.edit', [
+                'basicinformation' => $personid,
+                Str::singular($resourceType) => $legacyId,
+            ]);
+        } else {
+            // 新格式：使用查詢參數（重定向回原始記錄，使用原始 PK）
+            $queryParams = [];
+            foreach ($keyColumns as $column) {
+                $queryParams[$column] = $conditions[$column] ?? '';
+            }
+
+            return redirect()->route($config['route_prefix'] . '.edit.query', [
+                'id' => $personid,
+            ] + $queryParams);
+        }
     }
 
     /**

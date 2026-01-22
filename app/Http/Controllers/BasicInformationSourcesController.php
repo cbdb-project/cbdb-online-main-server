@@ -122,10 +122,10 @@ class BasicInformationSourcesController extends Controller {
             return redirect()->back();
         }
         $data = $this->biogMainRepository->sourceStoreById($request, $id);
-        $_id = $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'];
         flash('Store success @ '.Carbon::now(), 'success');
         //20200715引用聯合主鍵保留字弱點防禦函式
-        $_id = $this->biogMainRepository->unionPKDef($_id);
+        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
+        $_id = $data['c_personid']."-".$data['c_textid']."-".$this->biogMainRepository->unionPKDef($data['c_pages']);
 
         return redirect()->route('basicinformation.sources.edit', [
             'basicinformation' => $id,
@@ -208,10 +208,10 @@ class BasicInformationSourcesController extends Controller {
             return redirect()->back();
         }
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
-        $id_ = $id."-".$data['c_textid']."-".$data['c_pages'];
         flash('Update success @ '.Carbon::now(), 'success');
         //20200715引用聯合主鍵保留字弱點防禦函式
-        $id_ = $this->biogMainRepository->unionPKDef($id_);
+        // 對每個主鍵欄位分別編碼，然後用 - 連接（- 是分隔符，不應該被編碼）
+        $id_ = $id."-".$data['c_textid']."-".$this->biogMainRepository->unionPKDef($data['c_pages']);
 
         return redirect()->route('basicinformation.sources.edit', [
             'basicinformation' => $id,

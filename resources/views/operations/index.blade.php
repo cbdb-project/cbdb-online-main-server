@@ -57,8 +57,11 @@
                     @foreach($lists as $item)
 @php
 $rawResourceId = $item->resource_id;
+// 用於顯示：對整個字串編碼然後解碼（處理 Blade 模板衝突）
 $item->resource_id = unionPKDef($item->resource_id);
 $item->resource_data = unionPKDef($item->resource_data);
+// 用於構建 URL：對每個欄位值分別編碼，保留分隔符 -
+$encodedResourceIdForUrl = unionPKDef_for_url($rawResourceId);
 @endphp
                         <tr>
                             <td>
@@ -68,7 +71,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $resourceSpecificLink = null;
                                 $a = $item->resource;
                                 $id = $item->c_personid;
-                                $res_id = $item->resource_id;
+                                $res_id = $encodedResourceIdForUrl;
                                 if ((int) $id !== 0) {
                                     // 人物链接统一指向编辑页面
                                     $personLink = "/basicinformation/{$id}/edit";
@@ -103,7 +106,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                                 $resourceSpecificLink = "/basicinformation/{$id}/kinship/{$res_id}/edit";
                                                 break;
                                             case "ASSOC_DATA":
-                                                $res_id = str_replace("/", "(slash)", $res_id);
+                                                // $res_id 已經通過 unionPKDef_for_url() 對每個欄位值編碼，
+                                                // 包括斜線 / 已被編碼為 (slash)，不需要再額外處理
                                                 $resourceSpecificLink = "/basicinformation/{$id}/assoc/{$res_id}/edit";
                                                 break;
                                             case "POSSESSION_DATA":

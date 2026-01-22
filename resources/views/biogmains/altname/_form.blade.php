@@ -1,17 +1,20 @@
 {{-- 共享表单组件 - Alt Names --}}
 @php
     $isEdit = isset($row);
-    $formAction = $isEdit
-        ? route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt])
-        : route('basicinformation.altnames.store', ['basicinformation' => $id]);
 
-    // 处理编辑模式的数据
+    // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
     if ($isEdit) {
-        $alt = unionPKDef($alt);
+        // $alt 從 Controller 傳來時已經是編碼格式（如 12345-1-測試(slash)別名-1）
+        // 分隔符 - 不應該被編碼，所以不能對整個 $alt 調用 unionPKDef()
+        // 只需要對欄位值（用於顯示）進行編碼處理
         $row->c_alt_name_chn = unionPKDef($row->c_alt_name_chn);
         $row->c_alt_name = unionPKDef($row->c_alt_name);
         $row->c_notes = unionPKDef($row->c_notes);
     }
+
+    $formAction = $isEdit
+        ? route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt])
+        : route('basicinformation.altnames.store', ['basicinformation' => $id]);
 @endphp
 
 <form action="{{ $formAction }}" method="post">

@@ -1464,24 +1464,13 @@ class BiogMainRepository {
     }
 
     public function assocById($id) {
-        $id = str_replace("--", "-minus", $id);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id = $this->unionPKDef_decode($id);
+        //20200709聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $id);
+        // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus", "-", $value);
-        }
-        //20191028防止c_text_title欄位內含負號所做的字串重組
-        $new_c_text_title = '';
-        if (!empty($temp_l[8])) {
-            for ($i = 7; $i < count($temp_l); $i++) {
-                if (empty($new_c_text_title)) {
-                    $new_c_text_title .= $temp_l[$i];
-                } else {
-                    $new_c_text_title .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[7] = $new_c_text_title;
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
 
         $row = DB::table('ASSOC_DATA')->where([
@@ -1615,26 +1604,14 @@ class BiogMainRepository {
     }
 
     public function assocUpdateById(Request $request, $id, $c_personid) {
-        $id = str_replace("--", "-minus", $id);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id = $this->unionPKDef_decode($id);
+        //20200709聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $id);
+        // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus", "-", $value);
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        //20191028防止c_text_title欄位內含負號所做的字串重組
-        $new_c_text_title = '';
-        if (!empty($temp_l[8])) {
-            for ($i = 7; $i < count($temp_l); $i++) {
-                if (empty($new_c_text_title)) {
-                    $new_c_text_title .= $temp_l[$i];
-                } else {
-                    $new_c_text_title .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[7] = $new_c_text_title;
-        }
-        //end
 
         $row = DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -1748,24 +1725,13 @@ class BiogMainRepository {
     }
 
     public function assocDeleteById($id, $c_personid) {
-        $id = str_replace("--", "-minus", $id);
-        //20200709聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id = $this->unionPKDef_decode($id);
+        //20200709聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $id);
+        // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
-            $temp_l[$key] = str_replace("minus", "-", $value);
-        }
-        //20191028防止c_text_title欄位內含負號所做的字串重組
-        $new_c_text_title = '';
-        if (!empty($temp_l[8])) {
-            for ($i = 7; $i < count($temp_l); $i++) {
-                if (empty($new_c_text_title)) {
-                    $new_c_text_title .= $temp_l[$i];
-                } else {
-                    $new_c_text_title .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[7] = $new_c_text_title;
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
 
         $row = DB::table('ASSOC_DATA')->where([
@@ -1808,31 +1774,21 @@ class BiogMainRepository {
     }
 
     public function sourceById($id, $_id) {
-        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $_id = str_replace("--", "-minus", $_id);
-        $_id = $this->unionPKDef_decode($_id);
+        //20200715聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_textid-c_pages
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $_id);
-        //20200121防止c_pages欄位內含負號所做的字串重組
-        $new_c_pages = '';
-        if (!empty($temp_l[3])) {
-            for ($i = 2; $i < count($temp_l); $i++) {
-                if (empty($new_c_pages)) {
-                    $new_c_pages .= $temp_l[$i];
-                } else {
-                    $new_c_pages .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[2] = $new_c_pages;
+        // 對每個部分進行解碼
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        //20200121修改結束
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->first();
-        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $text_id]])->first();
         $text_str = null;
-        if ($row->c_textid || $row->c_textid === 0) {
+        if ($row && ($row->c_textid || $row->c_textid === 0)) {
             $text_ = TextCode::find($row->c_textid);
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
         }
@@ -1841,23 +1797,14 @@ class BiogMainRepository {
     }
 
     public function sourceUpdateById(Request $request, $id, $id_) {
-        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id_ = str_replace("--", "-minus", $id_);
-        $id_ = $this->unionPKDef_decode($id_);
+        //20200715聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_textid-c_pages
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $id_);
-        //20200121防止c_pages欄位內含負號所做的字串重組
-        $new_c_pages = '';
-        if (!empty($temp_l[3])) {
-            for ($i = 2; $i < count($temp_l); $i++) {
-                if (empty($new_c_pages)) {
-                    $new_c_pages .= $temp_l[$i];
-                } else {
-                    $new_c_pages .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[2] = $new_c_pages;
+        // 對每個部分進行解碼
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        //20200121修改結束
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -1866,6 +1813,8 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token']);
         $data['c_personid'] = $id;
+        // Select2 對 id=0 處理有問題，API 中 c_textid=0 會被轉換為 -999，需轉回 0
+        $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
         $c_modified_by = Auth::user()->name;
@@ -1886,6 +1835,8 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
+        // Select2 對 id=0 處理有問題，API 中 c_textid=0 會被轉換為 -999，需轉回 0
+        $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
         $c_created_by = Auth::user()->name;
@@ -1899,25 +1850,14 @@ class BiogMainRepository {
     }
 
     public function sourceDeleteById($id, $id_) {
-        //20200715聯合主鍵保留字弱點防禦函式，解析保留字。
-        $id_ = str_replace("--", "-minus", $id_);
-        $id_ = $this->unionPKDef_decode($id_);
+        //20200715聯合主鍵保留字弱點防禦函式
+        // 複合主鍵格式: c_personid-c_textid-c_pages
+        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
         $temp_l = explode("-", $id_);
-        //20200121防止c_pages欄位內含負號所做的字串重組
-        $new_c_pages = '';
-        if (!empty($temp_l[3])) {
-            for ($i = 2; $i < count($temp_l); $i++) {
-                if (empty($new_c_pages)) {
-                    $new_c_pages .= $temp_l[$i];
-                } else {
-                    $new_c_pages .= "-".$temp_l[$i];
-                }
-            }
-            $temp_l[2] = $new_c_pages;
+        // 對每個部分進行解碼
+        foreach ($temp_l as $key => $value) {
+            $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        //20200121修改結束
-        //$row = DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->first();
-        //DB::table('BIOG_SOURCE_DATA')->where([['c_personid', $id], ['c_textid', $id_]])->delete();
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_textid', '=', $temp_l[1]],
@@ -2042,6 +1982,12 @@ class BiogMainRepository {
         $key = str_replace("\\", "(backslash)", $key);
         $key = str_replace("{", "(brackets)", $key);
         $key = str_replace("}", "(brackets_r)", $key);
+        // URL 特殊字符處理：? 會被解析為查詢字符串開始，# 會被解析為錨點，& 會被解析為參數分隔符
+        $key = str_replace("?", "(question)", $key);
+        $key = str_replace("#", "(hash)", $key);
+        $key = str_replace("&", "(amp)", $key);
+        // 複合主鍵分隔符處理：- 是複合主鍵的分隔符，必須編碼以避免解析錯誤
+        $key = str_replace("-", "(minus)", $key);
         $result = $key;
 
         return $result;
@@ -2053,6 +1999,12 @@ class BiogMainRepository {
         $key = str_replace("(backslash)", "\\", $key);
         $key = str_replace("(brackets)", "{", $key);
         $key = str_replace("(brackets_r)", "}", $key);
+        // URL 特殊字符處理
+        $key = str_replace("(question)", "?", $key);
+        $key = str_replace("(hash)", "#", $key);
+        $key = str_replace("(amp)", "&", $key);
+        // 複合主鍵分隔符處理
+        $key = str_replace("(minus)", "-", $key);
         $result = $key;
 
         return $result;

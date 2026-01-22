@@ -53,6 +53,52 @@ Route::resource('basicinformation.possession', 'BasicInformationPossessionContro
 Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
 Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
 
+// ===================================================================
+// 查詢參數模式路由（推薦使用，與舊的 path-based 路由並存）
+// 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+// 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+// ===================================================================
+
+// ALTNAME_DATA
+Route::get('basicinformation/{id}/altnames/edit', 'BasicInformationAltnamesController@editQuery')
+    ->name('basicinformation.altnames.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/altnames/update', 'BasicInformationAltnamesController@updateQuery')
+    ->name('basicinformation.altnames.update.query');
+Route::delete('basicinformation/{id}/altnames/delete', 'BasicInformationAltnamesController@destroyQuery')
+    ->name('basicinformation.altnames.destroy.query');
+
+// BIOG_ADDR_DATA
+Route::get('basicinformation/{id}/addresses/edit', 'BasicInformationAddressesController@editQuery')
+    ->name('basicinformation.addresses.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/addresses/update', 'BasicInformationAddressesController@updateQuery')
+    ->name('basicinformation.addresses.update.query');
+Route::delete('basicinformation/{id}/addresses/delete', 'BasicInformationAddressesController@destroyQuery')
+    ->name('basicinformation.addresses.destroy.query');
+
+// TEXT_DATA
+Route::get('basicinformation/{id}/texts/edit', 'BasicInformationTextsController@editQuery')
+    ->name('basicinformation.texts.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/texts/update', 'BasicInformationTextsController@updateQuery')
+    ->name('basicinformation.texts.update.query');
+Route::delete('basicinformation/{id}/texts/delete', 'BasicInformationTextsController@destroyQuery')
+    ->name('basicinformation.texts.destroy.query');
+
+// BIOG_SOURCE_DATA
+Route::get('basicinformation/{id}/sources/edit', 'BasicInformationSourcesController@editQuery')
+    ->name('basicinformation.sources.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/sources/update', 'BasicInformationSourcesController@updateQuery')
+    ->name('basicinformation.sources.update.query');
+Route::delete('basicinformation/{id}/sources/delete', 'BasicInformationSourcesController@destroyQuery')
+    ->name('basicinformation.sources.destroy.query');
+
+// ASSOC_DATA
+Route::get('basicinformation/{id}/assoc/edit', 'BasicInformationAssocController@editQuery')
+    ->name('basicinformation.assoc.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/assoc/update', 'BasicInformationAssocController@updateQuery')
+    ->name('basicinformation.assoc.update.query');
+Route::delete('basicinformation/{id}/assoc/delete', 'BasicInformationAssocController@destroyQuery')
+    ->name('basicinformation.assoc.destroy.query');
+
 // BiogMain 提案路由
 Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')
     ->name('basicinformation.proposal.store');

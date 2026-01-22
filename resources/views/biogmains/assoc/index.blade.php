@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     @include('biogmains.defense')
@@ -51,9 +55,20 @@
                                 <td>
                                     <div class="btn-group">
                                     @php
-                                    $value->pivot->c_text_title = unionPKDef($value->pivot->c_text_title);
+                                    // 使用查詢參數模式，無需編碼 c_text_title
+                                    $assocPk = [
+                                        'c_personid' => $value->pivot->c_personid,
+                                        'c_assoc_code' => $value->pivot->c_assoc_code,
+                                        'c_assoc_id' => $value->pivot->c_assoc_id,
+                                        'c_kin_code' => $value->pivot->c_kin_code,
+                                        'c_kin_id' => $value->pivot->c_kin_id,
+                                        'c_assoc_kin_code' => $value->pivot->c_assoc_kin_code,
+                                        'c_assoc_kin_id' => $value->pivot->c_assoc_kin_id,
+                                        'c_text_title' => $value->pivot->c_text_title,
+                                        'c_assoc_first_year' => $value->pivot->c_assoc_first_year ?? '',
+                                    ];
                                     @endphp
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.assoc.edit', ['basicinformation' => $basicinformation->c_personid, 'assoc' => $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.assoc.edit.query', ['id' => $basicinformation->c_personid], $assocPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -67,7 +82,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title }}" action="{{ route('basicinformation.assoc.destroy', ['basicinformation' => $basicinformation->c_personid, 'assoc' => $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.$value->pivot->c_text_title]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_assoc_code.'-'.$value->pivot->c_assoc_id.'-'.$value->pivot->c_kin_code.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_assoc_kin_code.'-'.$value->pivot->c_assoc_kin_id.'-'.($value->pivot->c_text_title ?? '') }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.assoc.destroy.query', ['id' => $basicinformation->c_personid], $assocPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

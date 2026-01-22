@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     @include('biogmains.defense')
@@ -56,7 +60,7 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
                             @if(Auth::user()->isActive())
                         <td>
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.sources.edit', ['basicinformation' => $basicinformation->c_personid, 'source' => $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.$value->pivot->c_pages]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.sources.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_source_id' => $value->pivot->c_textid]) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -69,7 +73,7 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
                                            "
                                    class="btn btn-sm btn-danger">delete</a>
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.$value->pivot->c_pages }}" action="{{ route('basicinformation.sources.destroy', ['basicinformation' => $basicinformation->c_personid, 'source' => $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.$value->pivot->c_pages]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.$value->pivot->c_pages }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.sources.destroy.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_source_id' => $value->pivot->c_textid]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

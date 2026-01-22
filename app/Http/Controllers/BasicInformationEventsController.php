@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -113,10 +114,17 @@ class BasicInformationEventsController extends Controller {
         $_id = $this->biogMainRepository->eventStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.events.edit', [
-            'basicinformation' => $id,
-            'event' => $_id,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $_id,
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.events.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -191,10 +199,17 @@ class BasicInformationEventsController extends Controller {
         $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.events.edit', [
-            'basicinformation' => $id,
-            'event' => $_id,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $_id,
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.events.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -214,6 +229,154 @@ class BasicInformationEventsController extends Controller {
             return redirect()->back();
         }
         $this->biogMainRepository->eventDeleteById($id_, $id);
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.events.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯事件記錄
+     *
+     * URL 格式：/basicinformation/{id}/events/edit?c_personid=...&c_sequence=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
+
+        // 使用 Repository 查詢（格式：c_personid-c_sequence）
+        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'];
+        $res = $this->biogMainRepository->eventById($id_);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.events.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '事件',
+            'page_description' => '基本信息表 事件',
+            'page_url' => '/basicinformation/'.$id.'/events',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '事件', 'url' => route('basicinformation.events.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新事件記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
+
+        // 構建舊格式 ID（格式：c_sequence）
+        $id_ = $pk['c_sequence'];
+
+        // 使用 Repository 更新
+        $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
+
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        // 重定向到新的查詢參數格式
+        $newPk = [
+            'c_personid' => $id,
+            'c_sequence' => $_id,
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.events.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除事件記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
+
+        // 構建舊格式 ID（格式：c_sequence）
+        $id_ = $pk['c_sequence'];
+
+        $this->biogMainRepository->eventDeleteById($id_, $id);
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.events.index', ['basicinformation' => $id]);

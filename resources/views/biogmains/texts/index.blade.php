@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -37,8 +41,15 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                        $textPk = [
+                                            'c_personid' => $basicinformation->c_personid,
+                                            'c_textid' => $basicinformation->texts[$i]->pivot->c_textid,
+                                            'c_role_id' => $basicinformation->texts[$i]->pivot->c_role_id,
+                                        ];
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.texts.edit', ['basicinformation' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.texts.edit.query', ['id' => $basicinformation->c_personid], $textPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -52,7 +63,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id }}" action="{{ route('basicinformation.texts.destroy', ['basicinformation' => $basicinformation->c_personid, 'text' => $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $basicinformation->c_personid.'-'.$basicinformation->texts[$i]->pivot->c_textid.'-'.$basicinformation->texts[$i]->pivot->c_role_id }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.texts.destroy.query', ['id' => $basicinformation->c_personid], $textPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -138,10 +139,18 @@ class BasicInformationTextsController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.texts.edit', [
-            'basicinformation' => $id,
-            'text' => $data['c_personid'].'-'.$data['c_textid'].'-'.$data['c_role_id'],
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.texts.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -235,10 +244,18 @@ class BasicInformationTextsController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.texts.edit', [
-            'basicinformation' => $id,
-            'text' => $new_id_,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.texts.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -269,6 +286,192 @@ class BasicInformationTextsController extends Controller {
             ['c_role_id', '=', $temp_l[2]],
         ])->delete();
         $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯著述記錄
+     *
+     * URL 格式：/basicinformation/{id}/texts/edit?c_personid=...&c_text_id=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        if (!isset($pk['c_personid']) || !isset($pk['c_textid'])) {
+            abort(400, '缺少必要參數：c_personid 或 c_textid');
+        }
+
+        // 構建舊格式 ID（用於 Repository）- 格式：c_personid-c_textid-c_role_id
+        $c_role_id = $pk['c_role_id'] ?? 0;
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_role_id;
+        $res = $this->biogMainRepository->textById($id_);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.texts.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '著述',
+            'page_description' => '基本信息表 著述',
+            'page_url' => '/basicinformation/'.$id.'/texts',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '著述', 'url' => route('basicinformation.texts.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新著述記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（c_role_id 為可選，預設為 0）
+        CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
+
+        // 準備更新資料
+        $data = $request->all();
+        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_textid', 'c_role_id']);
+        $data = $this->toolsRepository->timestamp($data);
+
+        // 構建查詢條件（使用 BIOG_TEXT_DATA 表）
+        $c_role_id = $pk['c_role_id'] ?? 0;
+        $conditions = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_role_id', '=', $c_role_id],
+        ];
+
+        // 取得原始資料
+        $ori = DB::table($this->table_name)->where($conditions)->first();
+        if (!$ori) {
+            abort(404, 'BIOG_TEXT_DATA 記錄不存在');
+        }
+
+        // 更新資料
+        DB::table($this->table_name)->where($conditions)->update($data);
+
+        // 記錄操作
+        $newPk = [
+            'c_personid' => $pk['c_personid'],
+            'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
+            'c_role_id' => $data['c_role_id'] ?? $c_role_id,
+        ];
+        $resourceId = $newPk['c_personid'].'-'.$newPk['c_textid'].'-'.$newPk['c_role_id'];
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $resourceId, $data, $ori);
+
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        // 重定向到新的查詢參數格式
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.texts.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除著述記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位（c_role_id 為可選，預設為 0）
+        CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
+
+        // 構建查詢條件
+        $c_role_id = $pk['c_role_id'] ?? 0;
+        $conditions = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_role_id', '=', $c_role_id],
+        ];
+
+        $row = DB::table($this->table_name)->where($conditions)->first();
+        if (!$row) {
+            abort(404, 'BIOG_TEXT_DATA 記錄不存在');
+        }
+
+        // 刪除資料
+        DB::table($this->table_name)->where($conditions)->delete();
+
+        // 記錄操作
+        $resourceId = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_role_id;
+        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $resourceId, $row);
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);

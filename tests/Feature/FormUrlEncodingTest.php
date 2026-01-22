@@ -518,8 +518,8 @@ class FormUrlEncodingTest extends TestCase {
             ]);
 
         // 驗證 redirect 目標 URL 被正確編碼
-        // .//?- 經過 unionPKDef 編碼後會變成 .(slash)(slash)(question)-
-        // 在 URL 中 ( 和 ) 會被進一步編碼為 %28 和 %29
+        // 新的查詢參數模式使用 http_build_query() 自動處理 URL 編碼
+        // .//?- 會被編碼為標準 URL 編碼格式
         $response->assertRedirect();
 
         // 驗證數據已正確保存到數據庫
@@ -529,11 +529,14 @@ class FormUrlEncodingTest extends TestCase {
             'c_pages' => './/?-',
         ]);
 
-        // 驗證 redirect URL 包含正確編碼的路徑
+        // 驗證 redirect URL 使用新的查詢參數模式
         $redirectUrl = $response->headers->get('Location');
-        // URL 應該包含 (slash) 和 (question) 的 URL 編碼形式
-        $this->assertStringContainsString('%28slash%29', $redirectUrl);
-        $this->assertStringContainsString('%28question%29', $redirectUrl);
+        // 新模式使用 ?c_personid=...&c_textid=...&c_pages=... 格式
+        $this->assertStringContainsString('c_personid=', $redirectUrl);
+        $this->assertStringContainsString('c_textid=', $redirectUrl);
+        $this->assertStringContainsString('c_pages=', $redirectUrl);
+        // 特殊字符會被標準 URL 編碼（%2F = /, %3F = ?）
+        $this->assertMatchesRegularExpression('/c_pages=.*%2F.*%3F/', $redirectUrl);
     }
 
     /**
@@ -563,10 +566,14 @@ class FormUrlEncodingTest extends TestCase {
             'c_alt_name_chn' => './/?-',
         ]);
 
-        // 驗證 redirect URL 包含正確編碼的路徑
+        // 驗證 redirect URL 使用新的查詢參數模式
         $redirectUrl = $response->headers->get('Location');
-        $this->assertStringContainsString('%28slash%29', $redirectUrl);
-        $this->assertStringContainsString('%28question%29', $redirectUrl);
+        // 新模式使用 ?c_personid=...&c_sequence=...&c_alt_name_chn=... 格式
+        $this->assertStringContainsString('c_personid=', $redirectUrl);
+        $this->assertStringContainsString('c_sequence=', $redirectUrl);
+        $this->assertStringContainsString('c_alt_name_chn=', $redirectUrl);
+        // 特殊字符會被標準 URL 編碼（%2F = /, %3F = ?）
+        $this->assertMatchesRegularExpression('/c_alt_name_chn=.*%2F.*%3F/', $redirectUrl);
     }
 
     /**
@@ -645,9 +652,9 @@ class FormUrlEncodingTest extends TestCase {
     }
 
     /**
-     * 測試：sources store 功能正確編碼減號
+     * 測試：sources store 功能正確處理減號
      *
-     * 創建記錄後的 redirect URL 應該包含編碼後的減號 (minus)
+     * 新的查詢參數模式不需要特殊編碼減號，因為減號不會干擾查詢參數解析
      */
     #[Test]
     public function testSourcesStoreEncodesMinusSign(): void {
@@ -671,9 +678,13 @@ class FormUrlEncodingTest extends TestCase {
             'c_pages' => 'test-page',
         ]);
 
-        // 驗證 redirect URL 包含編碼後的減號
+        // 驗證 redirect URL 使用新的查詢參數模式
         $redirectUrl = $response->headers->get('Location');
-        $this->assertStringContainsString('%28minus%29', $redirectUrl);
+        // 新模式使用 ?c_personid=...&c_textid=...&c_pages=... 格式
+        $this->assertStringContainsString('c_personid=', $redirectUrl);
+        $this->assertStringContainsString('c_textid=', $redirectUrl);
+        // 減號在查詢參數中不需要特殊編碼，可以直接使用
+        $this->assertStringContainsString('c_pages=test-page', $redirectUrl);
     }
 
     /**

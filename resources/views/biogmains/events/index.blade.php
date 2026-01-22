@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -35,14 +39,21 @@
                         <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->c_event_name_chn }}</td>
                         <td>
+                            @php
+                            $eventPk = [
+                                'c_personid' => $basicinformation->c_personid,
+                                'c_sequence' => $value->pivot->c_sequence,
+                            ];
+                            $eventFormId = 'delete-form-' . $value->pivot->c_sequence;
+                            @endphp
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.events.edit', ['basicinformation' => $basicinformation->c_personid, 'event' => $value->pivot->c_sequence]) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.events.edit.query', ['id' => $basicinformation->c_personid], $eventPk) }}">edit</a>
                                 <a href=""
                                    onclick="
                                            let msg = '您真的确定要删除吗？\n\n请确认！';
                                            if (confirm(msg)===true){
                                                event.preventDefault();
-                                               document.getElementById('delete-form-{{ $value->pivot->c_sequence }}').submit();
+                                               document.getElementById('{{ $eventFormId }}').submit();
                                            }else{
                                                return false;
                                            }
@@ -50,7 +61,7 @@
                                    class="btn btn-sm btn-danger">delete</a>
 
                             </div>
-                            <form id="delete-form-{{ $value->pivot->c_sequence }}" action="{{ route('basicinformation.events.destroy', ['basicinformation' => $basicinformation->c_personid, 'event' => $value->pivot->c_sequence]) }}" method="POST" style="display: none;">
+                            <form id="{{ $eventFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.events.destroy.query', ['id' => $basicinformation->c_personid], $eventPk) }}" method="POST" style="display: none;">
                                 {{ method_field('DELETE') }}
                                 {{ csrf_field() }}
                             </form>

@@ -9,6 +9,7 @@ use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -151,10 +152,19 @@ class BasicInformationAddressesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'], $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.addresses.edit', [
-            'basicinformation' => $id,
-            'address' => $data['c_personid'].'-'.$data['c_addr_id'].'-'.$data['c_addr_type'].'-'.$data['c_sequence'],
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -332,10 +342,19 @@ class BasicInformationAddressesController extends Controller {
         $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.addresses.edit', [
-            'basicinformation' => $id,
-            'address' => $new_addr,
-        ]);
+        // 使用新的查詢參數模式重定向
+        $newPk = [
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -374,6 +393,253 @@ class BasicInformationAddressesController extends Controller {
         ])->delete();
 
         $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.addresses.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯地址記錄
+     *
+     * URL 格式：/basicinformation/{id}/addresses/edit?c_personid=...&c_addr_id=...&c_addr_type=...&c_sequence=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        $required = ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence'];
+        foreach ($required as $field) {
+            if (!isset($pk[$field]) || $pk[$field] === '') {
+                abort(400, "缺少必要參數：{$field}");
+            }
+        }
+
+        // 查詢資料
+        $row = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_addr_id', '=', $pk['c_addr_id']],
+            ['c_addr_type', '=', $pk['c_addr_type']],
+            ['c_sequence', '=', $pk['c_sequence']],
+        ])->first();
+
+        if (!$row) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
+        }
+
+        // 處理地址資訊
+        $addr_str = null;
+        $other_belongs_str = null;
+        if ($row->c_addr_id || $row->c_addr_id === 0) {
+            $item = AddrCode::find($row->c_addr_id);
+            if ($item) {
+                $belongs = "";
+                $originalText = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs)." ".$item->c_firstyear."~".$item->c_lastyear;
+
+                $add = [];
+                $dy = AddrBelong::where('c_addr_id', '=', $item->c_addr_id)->get();
+                if ($dy->isEmpty()) {
+                    $add[] = "";
+                } else {
+                    foreach ($dy as $d) {
+                        $dy2 = AddrCode::where('c_addr_id', '=', $d->c_belongs_to)->first();
+                        if ($dy2 && !$dy2->empty) {
+                            $add_str = "[[".$dy2->c_addr_id." ".$dy2->c_name_chn." ".$dy2->c_firstyear."~".$dy2->c_lastyear."]]";
+                            $add[] = $add_str;
+                        } else {
+                            $add[] = "";
+                        }
+                    }
+                }
+                $addr_str = trim($originalText." ".($add[0] ?? ''));
+
+                if (count($add) > 1) {
+                    for ($i = 1; $i < count($add); $i++) {
+                        if ($i > 1) {
+                            $other_belongs_str = $other_belongs_str."、".trim($add[$i]);
+                        } else {
+                            $other_belongs_str = $other_belongs_str.trim($add[$i]);
+                        }
+                    }
+                }
+            }
+        }
+
+        $text_str = null;
+        if (property_exists($row, 'c_source') && ($row->c_source || $row->c_source === 0)) {
+            $text_ = TextCode::find($row->c_source);
+            if ($text_) {
+                $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
+            }
+        }
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.addresses.edit', [
+            'id' => $id,
+            'row' => $row,
+            'pk' => $pk,
+            'addr_str' => $addr_str,
+            'text_str' => $text_str,
+            'page_title' => '地址',
+            'page_description' => '基本信息表 地址',
+            'page_url' => '/basicinformation/'.$id.'/addresses',
+            'archer' => '<li>編輯</li>',
+            'other_belongs_str' => $other_belongs_str,
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新地址記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
+
+        // 準備更新資料
+        $data = $request->all();
+        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
+        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
+        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
+        $data = $this->toolsRepository->timestamp($data);
+
+        // 構建查詢條件
+        $conditions = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_addr_id', '=', $pk['c_addr_id']],
+            ['c_addr_type', '=', $pk['c_addr_type']],
+            ['c_sequence', '=', $pk['c_sequence']],
+        ];
+
+        // 取得原始資料
+        $ori = DB::table('BIOG_ADDR_DATA')->where($conditions)->first();
+        if (!$ori) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
+        }
+
+        // 更新資料
+        DB::table('BIOG_ADDR_DATA')->where($conditions)->update($data);
+
+        // 記錄操作
+        $newPk = [
+            'c_personid' => $pk['c_personid'],
+            'c_addr_id' => $data['c_addr_id'] ?? $pk['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'] ?? $pk['c_addr_type'],
+            'c_sequence' => $data['c_sequence'] ?? $pk['c_sequence'],
+        ];
+        $resourceId = $newPk['c_personid'].'-'.$newPk['c_addr_id'].'-'.$newPk['c_addr_type'].'-'.$newPk['c_sequence'];
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $resourceId, $data, $ori);
+
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        // 重定向到新的查詢參數格式
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除地址記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
+
+        // 構建查詢條件
+        $conditions = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_addr_id', '=', $pk['c_addr_id']],
+            ['c_addr_type', '=', $pk['c_addr_type']],
+            ['c_sequence', '=', $pk['c_sequence']],
+        ];
+
+        $row = DB::table('BIOG_ADDR_DATA')->where($conditions)->first();
+        if (!$row) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
+        }
+
+        // 刪除資料
+        DB::table('BIOG_ADDR_DATA')->where($conditions)->delete();
+
+        // 記錄操作
+        $resourceId = $pk['c_personid'].'-'.$pk['c_addr_id'].'-'.$pk['c_addr_type'].'-'.$pk['c_sequence'];
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $resourceId, $row);
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.addresses.index', ['basicinformation' => $id]);

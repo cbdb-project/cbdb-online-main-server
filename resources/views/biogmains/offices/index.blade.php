@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -45,21 +49,28 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $officePk = [
+                                        'c_office_id' => $value->pivot->c_office_id,
+                                        'c_posting_id' => $value->pivot->c_posting_id,
+                                    ];
+                                    $officeFormId = 'delete-form-' . $value->pivot->c_office_id . '-' . $value->pivot->c_posting_id;
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.offices.edit', ['basicinformation' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.edit.query', ['id' => $basicinformation->c_personid], $officePk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $value->pivot->c_office_id."-".$value->pivot->c_posting_id }}').submit();
+                                                       document.getElementById('{{ $officeFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }"
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id }}" action="{{ route('basicinformation.offices.destroy', ['basicinformation' => $basicinformation->c_personid, 'office' => $value->pivot->c_office_id.'-'.$value->pivot->c_posting_id]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $officeFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.destroy.query', ['id' => $basicinformation->c_personid], $officePk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

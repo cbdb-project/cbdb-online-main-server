@@ -1,5 +1,7 @@
 {{-- 共享表单组件 - Alt Names --}}
 @php
+    use App\Support\CompositePrimaryKey;
+
     $isEdit = isset($row);
 
     // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
@@ -12,9 +14,20 @@
         $row->c_notes = unionPKDef($row->c_notes);
     }
 
-    $formAction = $isEdit
-        ? route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt])
-        : route('basicinformation.altnames.store', ['basicinformation' => $id]);
+    // 使用查詢參數模式（推薦）或舊的 path-based 模式（向後相容）
+    if ($isEdit && isset($pk)) {
+        // 查詢參數模式：從 $pk 陣列建立 URL
+        $formAction = CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.update.query',
+            ['id' => $id],
+            $pk
+        );
+    } elseif ($isEdit) {
+        // 舊的 path-based 模式（向後相容）
+        $formAction = route('basicinformation.altnames.update', ['basicinformation' => $id, 'altname' => $alt]);
+    } else {
+        $formAction = route('basicinformation.altnames.store', ['basicinformation' => $id]);
+    }
 @endphp
 
 <form action="{{ $formAction }}" method="post">

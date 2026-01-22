@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -37,22 +41,36 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $entryPk = [
+                                        'c_personid' => $value->pivot->c_personid,
+                                        'c_entry_code' => $value->pivot->c_entry_code,
+                                        'c_sequence' => $value->pivot->c_sequence,
+                                        'c_kin_code' => $value->pivot->c_kin_code,
+                                        'c_assoc_code' => $value->pivot->c_assoc_code,
+                                        'c_kin_id' => $value->pivot->c_kin_id,
+                                        'c_year' => $value->pivot->c_year,
+                                        'c_assoc_id' => $value->pivot->c_assoc_id,
+                                        'c_inst_code' => $value->pivot->c_inst_code,
+                                        'c_inst_name_code' => $value->pivot->c_inst_name_code,
+                                    ];
+                                    $entryFormId = 'delete-form-' . $key;
+                                    @endphp
                                     <div class="btn-group">
-                                        @php($id_ = $value->pivot->c_personid."-".$value->pivot->c_entry_code."-".$value->pivot->c_sequence."-".$value->pivot->c_kin_code."-".$value->pivot->c_assoc_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_year."-".$value->pivot->c_assoc_id."-".$value->pivot->c_inst_code."-".$value->pivot->c_inst_name_code)
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.entries.edit', ['basicinformation' => $basicinformation->c_personid, 'entry' => $id_]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.entries.edit.query', ['id' => $basicinformation->c_personid], $entryPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $id_ }}').submit();
+                                                       document.getElementById('{{ $entryFormId }}').submit();
                                                    }else{
                                                         return false;
                                                    }"
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $id_ }}" action="{{ route('basicinformation.entries.destroy', ['basicinformation' => $basicinformation->c_personid, 'entry' => $id_]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $entryFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.entries.destroy.query', ['id' => $basicinformation->c_personid], $entryPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

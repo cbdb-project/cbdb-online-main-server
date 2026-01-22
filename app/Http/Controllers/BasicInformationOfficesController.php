@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -146,10 +147,18 @@ class BasicInformationOfficesController extends Controller {
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.offices.edit', [
-            'basicinformation' => $id,
-            'office' => $_id,
-        ]);
+        // 解析主鍵
+        $pkParts = explode('-', $_id);
+        $newPk = [
+            'c_office_id' => $pkParts[0] ?? '',
+            'c_posting_id' => $pkParts[1] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.offices.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -250,10 +259,18 @@ class BasicInformationOfficesController extends Controller {
             flash('Update success @ '.Carbon::now(), 'success');
         }
 
-        return redirect()->route('basicinformation.offices.edit', [
-            'basicinformation' => $id,
-            'office' => $officeKey,
-        ]);
+        // 解析新的主鍵
+        $newPkParts = explode('-', $officeKey);
+        $newPk = [
+            'c_office_id' => $newPkParts[0] ?? '',
+            'c_posting_id' => $newPkParts[1] ?? '',
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.offices.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     //20190225新增另存功能
@@ -339,9 +356,18 @@ class BasicInformationOfficesController extends Controller {
                 );
             }
 
-            $_id = $data['c_office_id'] . '-' . $data['c_posting_id'];
+            $newPk = [
+                'c_office_id' => $data['c_office_id'],
+                'c_posting_id' => $data['c_posting_id'],
+            ];
 
-            return redirect()->route('basicinformation.offices.edit', ['basicinformation' => $id, 'office' => $_id]);
+            flash('Store success @ '.Carbon::now(), 'success');
+
+            return redirect(CompositePrimaryKey::buildUrl(
+                'basicinformation.offices.edit.query',
+                ['id' => $id],
+                $newPk
+            ));
         });
 
         //20251203遮除原本的資料另存程式，改用transaction程式碼。
@@ -432,5 +458,176 @@ class BasicInformationOfficesController extends Controller {
         }
 
         return $res;
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞複合主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯官名記錄
+     *
+     * URL 格式：/basicinformation/{id}/offices/edit?c_office_id=...&c_posting_id=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
+
+        // 構建舊格式 ID（格式：c_office_id-c_posting_id）
+        $office = $pk['c_office_id'].'-'.$pk['c_posting_id'];
+        $res = $this->biogMainRepository->officeById($office);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 忽略錯誤
+        }
+
+        return view('biogmains.offices.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '官名',
+            'page_description' => '基本信息表 官名',
+            'page_url' => '/basicinformation/'.$id.'/offices',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新官名記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
+
+        // 構建舊格式 ID（格式：c_office_id-c_posting_id）
+        $id_ = $pk['c_office_id'].'-'.$pk['c_posting_id'];
+
+        // 處理 c_inst_code
+        $temp = explode("-", $request->c_inst_code);
+        $c_inst_code = $temp[0];
+        if (!empty($temp[1])) {
+            $c_inst_name_code = $temp[1];
+        } else {
+            $c_inst_code = '0';
+            $c_inst_name_code = '0';
+        }
+
+        if ($c_inst_name_code != '') {
+            $request->c_inst_code = $c_inst_code;
+            $request->c_inst_name_code = $c_inst_name_code;
+            $request->merge(['c_inst_code' => $c_inst_code]);
+            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        }
+
+        $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        $officeKey = is_array($result) ? ($result['id'] ?? $id_) : $result;
+        $noChanges = is_array($result) && !empty($result['no_changes']);
+
+        if ($noChanges) {
+            flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
+        } else {
+            flash('Update success @ '.Carbon::now(), 'success');
+        }
+
+        // 解析新的主鍵
+        $newPkParts = explode('-', $officeKey);
+        $newPk = [
+            'c_office_id' => $newPkParts[0] ?? $pk['c_office_id'],
+            'c_posting_id' => $newPkParts[1] ?? $pk['c_posting_id'],
+        ];
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.offices.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除官名記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
+
+        // 構建舊格式 ID（格式：c_office_id-c_posting_id）
+        $office = $pk['c_office_id'].'-'.$pk['c_posting_id'];
+
+        $this->biogMainRepository->officeDeleteById($office, $id);
+
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.offices.index', ['basicinformation' => $id]);
     }
 }

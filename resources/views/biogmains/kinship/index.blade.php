@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -37,14 +41,22 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $kinPk = [
+                                        'c_personid' => $value->pivot->c_personid,
+                                        'c_kin_id' => $value->pivot->c_kin_id,
+                                        'c_kin_code' => $value->pivot->c_kin_code,
+                                    ];
+                                    $kinFormId = 'delete-form-' . $value->pivot->c_personid . '-' . $value->pivot->c_kin_id . '-' . $value->pivot->c_kin_code;
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.kinship.edit', ['basicinformation' => $basicinformation->c_personid, 'kinship' => $value->pivot->c_personid.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_kin_code]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.kinship.edit.query', ['id' => $basicinformation->c_personid], $kinPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_kin_id."-".$value->pivot->c_kin_code }}').submit();
+                                                       document.getElementById('{{ $kinFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
@@ -52,7 +64,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_kin_code }}" action="{{ route('basicinformation.kinship.destroy', ['basicinformation' => $basicinformation->c_personid, 'kinship' => $value->pivot->c_personid.'-'.$value->pivot->c_kin_id.'-'.$value->pivot->c_kin_code]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $kinFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.kinship.destroy.query', ['id' => $basicinformation->c_personid], $kinPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -43,14 +47,22 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $statusPk = [
+                                        'c_personid' => $value->pivot->c_personid,
+                                        'c_sequence' => $value->pivot->c_sequence,
+                                        'c_status_code' => $value->pivot->c_status_code,
+                                    ];
+                                    $statusFormId = 'delete-form-' . $value->pivot->c_personid . '-' . $value->pivot->c_sequence . '-' . $value->pivot->c_status_code;
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.statuses.edit', ['basicinformation' => $basicinformation->c_personid, 'status' => $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_status_code]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.statuses.edit.query', ['id' => $basicinformation->c_personid], $statusPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_sequence."-".$value->pivot->c_status_code }}').submit();
+                                                       document.getElementById('{{ $statusFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
@@ -58,7 +70,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_status_code }}" action="{{ route('basicinformation.statuses.destroy', ['basicinformation' => $basicinformation->c_personid, 'status' => $value->pivot->c_personid.'-'.$value->pivot->c_sequence.'-'.$value->pivot->c_status_code]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $statusFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.statuses.destroy.query', ['id' => $basicinformation->c_personid], $statusPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

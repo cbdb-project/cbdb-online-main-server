@@ -856,14 +856,14 @@
 | `c_assoc_id` | int(11) | NO | (NULL) |  |
 | `c_year` | smallint(6) | NO | (NULL) |  |
 | `c_age` | smallint(6) | YES | NULL |  |
-| `c_nianhao_id` | smallint(6) | YES | NULL |  |
+| `c_entry_nh_id` | smallint(6) | YES | NULL |  |
 | `c_entry_nh_year` | smallint(6) | YES | NULL |  |
 | `c_entry_range` | smallint(6) | YES | NULL |  |
 | `c_inst_code` | int(11) | NO | 0 |  |
 | `c_inst_name_code` | smallint(6) | NO | 0 |  |
 | `c_exam_field` | varchar(255) | YES | NULL |  |
 | `c_entry_addr_id` | int(11) | YES | NULL |  |
-| `c_parental_status` | smallint(6) | YES | NULL |  |
+| `c_parental_status_code` | smallint(6) | YES | NULL |  |
 | `c_attempt_count` | smallint(6) | YES | NULL |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
@@ -883,12 +883,12 @@
 - `c_kin_id_ENTRY_DATA_index`: (c_kin_id)
 - `c_assoc_code_ENTRY_DATA_index`: (c_assoc_code)
 - `c_assoc_id_ENTRY_DATA_index`: (c_assoc_id)
-- `c_nianhao_id_ENTRY_DATA_index`: (c_nianhao_id)
+- `c_entry_nh_id_ENTRY_DATA_index`: (c_entry_nh_id)
 - `c_inst_code_ENTRY_DATA_index`: (c_inst_code)
 - `c_inst_name_code_ENTRY_DATA_index`: (c_inst_name_code)
 - `c_entry_addr_id_ENTRY_DATA_index`: (c_entry_addr_id)
 - `c_entry_range`: (c_entry_range)
-- `c_parental_status`: (c_parental_status)
+- `c_parental_status_code_ENTRY_DATA_index`: (c_parental_status_code)
 - `c_source`: (c_source)
 
 ---
@@ -3096,14 +3096,14 @@
 | `c_assoc_id` | INTEGER | NO | (NULL) |  |
 | `c_year` | INTEGER | NO | (NULL) |  |
 | `c_age` | INTEGER | YES | NULL |  |
-| `c_nianhao_id` | INTEGER | YES | NULL |  |
+| `c_entry_nh_id` | INTEGER | YES | NULL |  |
 | `c_entry_nh_year` | INTEGER | YES | NULL |  |
 | `c_entry_range` | INTEGER | YES | NULL |  |
 | `c_inst_code` | INTEGER | NO | '0' |  |
 | `c_inst_name_code` | INTEGER | NO | '0' |  |
 | `c_exam_field` | varchar(255) | YES | NULL |  |
 | `c_entry_addr_id` | INTEGER | YES | NULL |  |
-| `c_parental_status` | INTEGER | YES | NULL |  |
+| `c_parental_status_code` | INTEGER | YES | NULL |  |
 | `c_attempt_count` | INTEGER | YES | NULL |  |
 | `c_source` | INTEGER | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |

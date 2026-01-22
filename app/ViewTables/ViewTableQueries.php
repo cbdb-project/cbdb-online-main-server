@@ -272,7 +272,7 @@ class ViewTableQueries {
                 'assoc_person.c_name as c_assoc_name',
                 'assoc_person.c_name_chn as c_assoc_name_chn',
                 'entry.c_age',
-                'entry.c_nianhao_id',
+                'entry.c_entry_nh_id',
                 'nh.c_nianhao_chn',
                 'nh.c_nianhao_pin',
                 'entry.c_entry_nh_year',
@@ -289,7 +289,7 @@ class ViewTableQueries {
                 'entry_addr.c_name_chn as c_entry_addr_chn',
                 'entry_addr.x_coord as c_entry_xcoord',
                 'entry_addr.y_coord as c_entry_ycoord',
-                'entry.c_parental_status',
+                'entry.c_parental_status_code',
                 'parental_codes.c_parental_status_desc',
                 'parental_codes.c_parental_status_desc_chn',
                 'entry.c_attempt_count',
@@ -306,8 +306,8 @@ class ViewTableQueries {
             ->leftJoin('BIOG_MAIN as assoc_person', 'assoc_person.c_personid', '=', 'entry.c_assoc_id')
             ->leftJoin('KINSHIP_CODES as kin_codes', 'kin_codes.c_kincode', '=', 'entry.c_kin_code')
             ->leftJoin('ASSOC_CODES as assoc_codes', 'assoc_codes.c_assoc_code', '=', 'entry.c_assoc_code')
-            ->leftJoin('PARENTAL_STATUS_CODES as parental_codes', 'parental_codes.c_parental_status_code', '=', 'entry.c_parental_status')
-            ->leftJoin('NIAN_HAO as nh', 'nh.c_nianhao_id', '=', 'entry.c_nianhao_id')
+            ->leftJoin('PARENTAL_STATUS_CODES as parental_codes', 'parental_codes.c_parental_status_code', '=', 'entry.c_parental_status_code')
+            ->leftJoin('NIAN_HAO as nh', 'nh.c_nianhao_id', '=', 'entry.c_entry_nh_id')
             ->leftJoin('YEAR_RANGE_CODES as range_codes', 'range_codes.c_range_code', '=', 'entry.c_entry_range')
             ->leftJoin('ADDR_CODES as entry_addr', 'entry_addr.c_addr_id', '=', 'entry.c_entry_addr_id')
             ->leftJoin('TEXT_CODES as text_codes', 'text_codes.c_textid', '=', 'entry.c_source')

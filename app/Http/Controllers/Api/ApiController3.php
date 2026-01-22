@@ -188,8 +188,8 @@ WHERE (((ADDR_CODES.x_coord)>=(ADDR_CODES_1.x_coord-0.03) And (ADDR_CODES.x_coor
             $data_val['Y'] = $AddrCode->y_coord;
             $BIOG_ADDR_DATA = DB::table('BIOG_ADDR_DATA')->where('c_addr_id', '=', $c_addr_id)->count('c_personid');
             $data_val['xy_count'] = $BIOG_ADDR_DATA; // 同一人物地點的人物數
-            if ($val->c_parental_status != null) {
-                $PARENTAL_STATUS_CODES = DB::table('PARENTAL_STATUS_CODES')->where('c_parental_status_code', '=', $val->c_parental_status)->first();
+            if ($val->c_parental_status_code != null) {
+                $PARENTAL_STATUS_CODES = DB::table('PARENTAL_STATUS_CODES')->where('c_parental_status_code', '=', $val->c_parental_status_code)->first();
                 $data_val['ParentState'] = $PARENTAL_STATUS_CODES->c_parental_status_desc;
                 $data_val['ParentStateChn'] = $PARENTAL_STATUS_CODES->c_parental_status_desc_chn;
             } else {

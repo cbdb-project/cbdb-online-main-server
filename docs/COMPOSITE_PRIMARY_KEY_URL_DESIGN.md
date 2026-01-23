@@ -316,22 +316,25 @@ class CompositePrimaryKey {
             'c_addr_type',
             'c_sequence'
         ],
-        'TEXT_DATA' => [
+        'BIOG_TEXT_DATA' => [
             'c_personid',
-            'c_text_id'
+            'c_textid',
+            'c_role_id'
         ],
         'BIOG_SOURCE_DATA' => [
             'c_personid',
-            'c_source_id'
+            'c_textid',
+            'c_pages'
         ],
         'POSTED_TO_OFFICE_DATA' => [
             'c_office_id',
             'c_posting_id'
         ],
         'POSTED_TO_ADDR_DATA' => [
-            'c_personid',
-            'c_posting_id',
-            'c_office_id'
+            'c_addr_id',
+            'c_office_id',
+            'c_posting_id'
+            // ⚠️ 注意：數據庫主鍵無 c_personid，與 POSTED_TO_OFFICE_DATA 共用編輯頁面
         ],
         'ASSOC_DATA' => [
             'c_personid',
@@ -351,24 +354,35 @@ class CompositePrimaryKey {
         ],
         'EVENTS_DATA' => [
             'c_personid',
-            'c_event_id'
+            'c_sequence'
+            // ⚠️ 注意：數據庫沒有定義 PRIMARY KEY！需手動添加
         ],
         'STATUS_DATA' => [
             'c_personid',
-            'c_status_id'
+            'c_sequence',
+            'c_status_code'
         ],
         'ENTRY_DATA' => [
             'c_personid',
-            'c_entry_id'
+            'c_entry_code',
+            'c_sequence',
+            'c_kin_code',
+            'c_assoc_code',
+            'c_kin_id',
+            'c_year',
+            'c_assoc_id',
+            'c_inst_code',
+            'c_inst_name_code'
         ],
         'POSSESSION_DATA' => [
-            'c_personid',
-            'c_possact_code',
-            'c_possobj_id'
+            'c_possession_record_id'
+            // ✅ 單一主鍵，不是複合主鍵
         ],
         'BIOG_INST_DATA' => [
             'c_personid',
-            'c_inst_id'
+            'c_inst_code',
+            'c_inst_name_code',
+            'c_bi_role_code'
         ],
         'OFFICE_CODE_TYPE_REL' => [
             'c_office_id',
@@ -980,24 +994,188 @@ Route::get('basicinformation/{id}/altnames/{pk}/edit', '...')->name('...legacy')
 - [RESTful API Design - Query Parameters](https://restfulapi.net/resource-naming/)
 - [URL Encoding (Percent Encoding)](https://en.wikipedia.org/wiki/Percent-encoding)
 
-### C. 影響的複合主鍵表完整清單
+### C. 13 個子頁面完整對比分析
 
+本節詳細對比所有複合主鍵表的數據庫定義與代碼實際使用情況。
+
+#### 對比總覽表
+
+| # | 表名 | 數據庫字段數 | 代碼字段數 | 狀態 |
+|---|------|------------|----------|------|
+| 1 | ALTNAME_DATA | 3 | 4 | ❌ **嚴重不匹配** |
+| 2 | BIOG_ADDR_DATA | 4 | 4 | ✅ 完全匹配 |
+| 3 | BIOG_TEXT_DATA | 3 | 3 | ⚠️ 順序不同 |
+| 4 | BIOG_SOURCE_DATA | 3 | 3 | ⚠️ 順序不同 + c_pages 風險 |
+| 5 | POSTED_TO_OFFICE_DATA | 2 | - | ✅ 使用 Repository |
+| 6 | POSTED_TO_ADDR_DATA | 3 | - | ⚠️ 數據庫無 c_personid |
+| 7 | ASSOC_DATA | 9 | 8 | ❌ 缺少 c_assoc_first_year |
+| 8 | KIN_DATA | 3 | 3 | ✅ 字段齊全 |
+| 9 | EVENTS_DATA | 0 | 2 | ❌ 數據庫缺失主鍵 |
+| 10 | STATUS_DATA | 3 | 3 | ✅ 完全匹配 |
+| 11 | ENTRY_DATA | 10 | 10 | ⚠️ 順序不同 |
+| 12 | POSSESSION_DATA | 1 | 1 | ✅ 單一主鍵 |
+| 13 | BIOG_INST_DATA | 4 | 4 (Store) / 2 (Delete) | ⚠️ Delete 有 bug |
+
+#### 詳細問題清單
+
+##### ❌ 1. ALTNAME_DATA - 嚴重不匹配
+
+**數據庫 PRIMARY KEY**（3 個字段）：
+```sql
+PRIMARY KEY (`c_alt_name_chn`, `c_alt_name_type_code`, `c_personid`)
 ```
-ALTNAME_DATA
-BIOG_ADDR_DATA
-TEXT_DATA
-BIOG_SOURCE_DATA
-POSTED_TO_OFFICE_DATA
-POSTED_TO_ADDR_DATA
-ASSOC_DATA
-KIN_DATA
-EVENTS_DATA
-STATUS_DATA
-ENTRY_DATA
-POSSESSION_DATA
-BIOG_INST_DATA
-OFFICE_CODE_TYPE_REL
+
+**代碼實際使用**（4 個字段）：
+```php
+// BasicInformationAltnamesController.php:134
+$resource_id = $data['c_personid'] . "-" .
+               $data['c_sequence'] . "-" .        // ❌ 數據庫主鍵無此字段！
+               $data['c_alt_name_chn'] . "-" .
+               $data['c_alt_name_type_code'];
 ```
+
+**問題**：
+- 代碼多使用了 `c_sequence` 字段，但數據庫主鍵中沒有
+- 數據庫主鍵無法保證 `(c_personid, c_sequence)` 的唯一性
+- 可能允許同一人有多個相同別名（只要 sequence 不同）
+
+**建議**：需要確認業務邏輯，決定是修改數據庫主鍵還是修改代碼。
+
+---
+
+##### ✅ 2. BIOG_ADDR_DATA - 完全正確
+
+**數據庫定義**：
+```sql
+PRIMARY KEY (`c_personid`, `c_addr_id`, `c_addr_type`, `c_sequence`)
+```
+
+**代碼使用**：
+```php
+$resource_id = $data['c_personid'] . "-" .
+               $data['c_addr_id'] . "-" .
+               $data['c_addr_type'] . "-" .
+               $data['c_sequence'];
+```
+
+✅ **完全匹配，無問題。**
+
+---
+
+##### ⚠️ 3. BIOG_TEXT_DATA - 順序不同
+
+**數據庫定義**：
+```sql
+PRIMARY KEY (`c_personid`, `c_role_id`, `c_textid`)
+```
+
+**代碼使用**：
+```php
+$resource_id = $data['c_personid'] . "-" .
+               $data['c_textid'] . "-" .      // ⚠️ 與數據庫順序不同
+               $data['c_role_id'];
+```
+
+⚠️ 字段齊全但順序不同（功能正常，但不一致）。
+
+---
+
+##### ⚠️ 4. BIOG_SOURCE_DATA - c_pages 可能含特殊字符
+
+**數據庫定義**：
+```sql
+PRIMARY KEY (`c_pages`, `c_personid`, `c_textid`)
+```
+
+**代碼使用**：
+```php
+// BasicInformationSourcesController.php:125
+$_id = $data['c_personid'] . "-" .
+       $data['c_textid'] . "-" .
+       $data['c_pages'];              // ⚠️ VARCHAR(255)，可能含 -
+```
+
+**問題**：
+- `c_pages` 是 VARCHAR 類型，可能包含 `-`、`/` 等特殊字符
+- 存在與 ASSOC_DATA `c_text_title` 類似的解析風險
+
+**測試重點**：需測試 `c_pages` 包含 `-` 的情況（如 "12-15"）。
+
+---
+
+##### ❌ 9. EVENTS_DATA - 數據庫缺失主鍵定義
+
+**數據庫定義**：
+```sql
+-- ❌ 完全沒有 PRIMARY KEY 定義！
+```
+
+**代碼使用**：
+```php
+// BiogMainRepository.php:1406
+$row = DB::table('EVENTS_DATA')
+    ->where('c_personid', $id_arr[0])
+    ->where('c_sequence', $id_arr[1])
+    ->first();
+```
+
+**嚴重問題**：
+- 數據庫表沒有 PRIMARY KEY，無法保證唯一性
+- 可能出現重複記錄
+- 查詢性能較差（無主鍵索引）
+
+**緊急建議**：
+```sql
+ALTER TABLE EVENTS_DATA
+ADD PRIMARY KEY (`c_personid`, `c_sequence`);
+```
+
+---
+
+##### ⚠️ 13. BIOG_INST_DATA - Delete 方法不完整
+
+**數據庫定義**：
+```sql
+PRIMARY KEY (`c_bi_role_code`, `c_inst_code`, `c_inst_name_code`, `c_personid`)
+```
+
+**Store 方法**（✅ 正確）：
+```php
+// BiogMainRepository.php:1391
+$newid = $data['c_personid'] . "-" .
+         $data['c_inst_code'] . "-" .
+         $data['c_inst_name_code'] . "-" .
+         $data['c_bi_role_code'];
+```
+
+**Delete 方法**（❌ 錯誤）：
+```php
+// BiogMainRepository.php:1399-1400
+$row = DB::table('BIOG_INST_DATA')
+    ->where('c_personid', $addr_l[0])
+    ->where('c_bi_role_code', $addr_l[1])  // ❌ 只用了 2 個字段！
+    ->first();
+```
+
+**問題**：Delete 只使用 2 個字段，如果一個人有多個相同 role 的機構記錄，可能刪錯。
+
+---
+
+#### 嚴重問題優先級總結
+
+**❌ 高優先級（數據完整性風險）**：
+1. **ALTNAME_DATA** - 字段數不匹配（DB 3個 vs 代碼 4個）
+2. **EVENTS_DATA** - 數據庫完全沒有主鍵定義
+3. **ASSOC_DATA** - 代碼缺少 `c_assoc_first_year` 字段（詳見附錄 D）
+
+**⚠️ 中優先級（代碼一致性問題）**：
+4. **BIOG_INST_DATA** - Delete 方法只用 2 個字段
+5. **BIOG_SOURCE_DATA** - `c_pages` 可能含特殊字符
+
+**⚠️ 低優先級（僅順序不同）**：
+6. **BIOG_TEXT_DATA**、**ENTRY_DATA** - 字段齊全但順序不同
+
+---
 
 ### D. ASSOC_DATA 特殊說明
 
@@ -1069,6 +1247,6 @@ $row = DB::table('ASSOC_DATA')->where([
 
 ---
 
-**文檔版本**：1.0
-**最後更新**：2026-01-22
+**文檔版本**：1.1
+**最後更新**：2026-01-23
 **維護者**：CBDB 開發團隊

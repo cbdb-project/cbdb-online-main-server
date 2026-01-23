@@ -3,11 +3,19 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 10.0（PHP 8.2+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
+- **技術棧**：Laravel 12.0（PHP 8.2+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
+  - **測試環境**：SQLite（PHPUnit 測試、CI/CD）
+  - **⭐ Migration 兼容性要求（核心規範）**：
+    - **所有 Migration 必須同時兼容 MySQL/MariaDB 和 SQLite**
+    - **使用 `is_mysql()` 和 `is_sqlite()` helper functions**（位於 `database/migrations/helpers.php`）
+    - **禁止直接使用 `DB::getDriverName()` 判斷數據庫類型**
+    - 優先使用 Laravel Schema Builder（自動兼容）
+    - 需要原始 SQL 時，使用 `is_sqlite()` 移除不支持的語法（COMMENT、ENGINE、USING BTREE 等）
+    - 詳細指南：`.claude/skills/migration-guide.md` 的「MySQL 與 SQLite 兼容性處理」章節
   - **重要原則**：避免使用特定數據庫專屬功能（如 MySQL 的 ngram parser、MariaDB 專屬插件），以保持未來遷移至其他數據庫實現的可能性
-  - **兼容性目標**：代碼應能在標準 SQL 和通用的 MySQL/MariaDB/PostgreSQL 功能上運行
+  - **兼容性目標**：代碼應能在標準 SQL 和通用的 MySQL/MariaDB/SQLite 功能上運行
 - **內部輔助表**（`CBDB__` 前綴表示內部使用，不直接對終端用戶曝光）：
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引，支援高效能後綴匹配查詢
   - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射及異體字標準化，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
@@ -222,7 +230,13 @@
    - 嚴禁在未授權情況下直接修改資料庫結構或大量資料。
    - 避免在 Controller 中直接寫 SQL；如需操作資料庫，優先利用 Repository。對於**單一主鍵**的表可以使用 Eloquent 模型，但對於**複合主鍵**的表（如 `ALTNAME_DATA`、`POSTED_TO_ADDR_DATA` 等）必須使用 Query Builder（`DB::table()`）而非 Eloquent 模型。
    - 所有新路由需通過授權檢查，避免只靠前端限制。
-  - 全站已完成 AdminLTE 3 升級，所有頁面使用 `layouts/dashboard-v3.blade.php` 佈局，透過 Vite 載入前端資源（入口位於 `resources/js/`）。請勿引入外部 CDN 的 jQuery/Bootstrap，以免與 Vite bundle 產生版本衝突。Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案已完全移除。
+   - 全站已完成 AdminLTE 3 升級，所有頁面使用 `layouts/dashboard-v3.blade.php` 佈局，透過 Vite 載入前端資源（入口位於 `resources/js/`）。請勿引入外部 CDN 的 jQuery/Bootstrap，以免與 Vite bundle 產生版本衝突。Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案已完全移除。
+   - **編寫 Migration 時的必要檢查**：
+     - ✅ 使用 `is_mysql()` 和 `is_sqlite()` 而非 `DB::getDriverName()`
+     - ✅ 優先使用 Laravel Schema Builder（自動兼容）
+     - ✅ 需要原始 SQL 時，使用 `is_sqlite()` 移除不支持的語法（COMMENT、ENGINE、USING BTREE 等）
+     - ✅ 使用 SQLite 連線執行 Migration 測試：`php artisan migrate:fresh --database=sqlite`（或先在 `.env` 設定 `DB_CONNECTION=sqlite` 後再執行 `php artisan migrate:fresh`），確保 SQLite 兼容
+     - ✅ 參考 `.claude/skills/migration-guide.md` 的兼容性章節
 5. **文檔更新建議**：
    - 有任何 UI／流程重大調整時，請同步更新 `README.md` 與 `CHANGELOG.md`。
    - 若整理出新的知識或踩坑，務必補充至 `AGENTS.md`，讓後續代理能快速掌握背景。
@@ -235,8 +249,14 @@
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
 - dashboard-v3 佈局改用 Vite 打包（`@vite` 載入），共用 `resources/js/jquery-global.js` 並內建 Bootstrap 4 bundle；不要再引用外部 CDN 的 jQuery/Bootstrap/Datatables 以免載入順序衝突。modal 關閉的焦點修復也在 Vite 入口內，全站共用。
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
-- **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
+- **PHPUnit 版本兼容性**：本專案依 `composer.lock` 使用 PHPUnit 11.x，撰寫測試時請依 11.x 的 API 與配置撰寫，並使用相容的斷言方法（如以 `assertStringContainsString` 取代舊版以字串為目標的 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
+- **Migration 數據庫兼容性陷阱**：
+  - ❌ 錯誤：使用 `DB::getDriverName() === 'sqlite'` 判斷數據庫類型
+  - ✅ 正確：使用 `is_sqlite()` 和 `is_mysql()` helper functions
+  - ❌ 錯誤：在原始 SQL 中直接使用 COMMENT、ENGINE、USING BTREE 等 MySQL 專屬語法
+  - ✅ 正確：使用 `is_sqlite()` 條件移除不支持的語法，或使用 Schema Builder
+  - 詳細說明：`database/migrations/helpers.php` 和 `.claude/skills/migration-guide.md`
 - **Eloquent 與複合主鍵的限制**：Laravel Eloquent ORM **官方不支持**複合主鍵（composite primary key）。雖然社群有第三方套件（如 `laravel-composite-primary-keys`）提供支援，但引入第三方包會增加維護上的不確定性（套件的長期維護狀態難以保證）。因此，本專案決定對於擁有複合主鍵的表（如 `ALTNAME_DATA` 使用 `c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`），直接使用 Query Builder（`DB::table()`）而非建立 Eloquent 模型。若需要類似 Observer 的副作用（如自動索引），應在 Repository 或 Service 層手動調用對應服務（如 `NameSearchIndexService`）。
 
   使用 Query Builder 的優勢：

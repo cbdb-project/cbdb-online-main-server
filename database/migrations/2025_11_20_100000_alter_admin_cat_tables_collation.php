@@ -12,7 +12,7 @@ class AlterAdminCatTablesCollation extends Migration {
      * @return void
      */
     public function up() {
-        if (DB::getDriverName() === 'sqlite') {
+        if (is_sqlite()) {
             return;
         }
 

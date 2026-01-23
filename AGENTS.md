@@ -3,7 +3,7 @@
 本文件彙整 AI 代理在此專案工作時必備的背景知識、流程與測試指引，請在開始作業前閱讀並依循。
 
 ## 專案速覽
-- **技術棧**：Laravel 10.0（PHP 8.2+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
+- **技術棧**：Laravel 12.0（PHP 8.2+，建議 8.4）、MariaDB 10.3.39、Blade、Vue 3。前端已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。所有頁面均透過 `layouts/dashboard-v3.blade.php` 佈局，使用 Vite 載入前端資源（`resources/js/jquery-global.js` 將 jQuery 暴露到全局，Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現）。
 - **數據庫環境**：
   - **生產環境**：MariaDB 10.3.39 (Debian)
   - **測試環境**：SQLite（PHPUnit 測試、CI/CD）
@@ -235,7 +235,7 @@
      - ✅ 使用 `is_mysql()` 和 `is_sqlite()` 而非 `DB::getDriverName()`
      - ✅ 優先使用 Laravel Schema Builder（自動兼容）
      - ✅ 需要原始 SQL 時，使用 `is_sqlite()` 移除不支持的語法（COMMENT、ENGINE、USING BTREE 等）
-     - ✅ 執行 `php artisan migrate:fresh` 測試（確保 SQLite 兼容）
+     - ✅ 使用 SQLite 連線執行 Migration 測試：`php artisan migrate:fresh --database=sqlite`（或先在 `.env` 設定 `DB_CONNECTION=sqlite` 後再執行 `php artisan migrate:fresh`），確保 SQLite 兼容
      - ✅ 參考 `.claude/skills/migration-guide.md` 的兼容性章節
 5. **文檔更新建議**：
    - 有任何 UI／流程重大調整時，請同步更新 `README.md` 與 `CHANGELOG.md`。
@@ -249,7 +249,7 @@
 - Vue/JS 變更未重新編譯會導致前端顯示舊版本，部署前請確認產物最新。
 - dashboard-v3 佈局改用 Vite 打包（`@vite` 載入），共用 `resources/js/jquery-global.js` 並內建 Bootstrap 4 bundle；不要再引用外部 CDN 的 jQuery/Bootstrap/Datatables 以免載入順序衝突。modal 關閉的焦點修復也在 Vite 入口內，全站共用。
 - **測試數據庫依賴陷阱**：避免依賴完整 MySQL schema 或複雜遷移文件，這會導致 CI 失敗和測試不穩定。
-- **PHPUnit 版本兼容性**：專案使用 PHPUnit 10.1，注意使用相容的斷言方法（如 `assertStringContainsString` 替代舊版 `assertContains`）。
+- **PHPUnit 版本兼容性**：本專案依 `composer.lock` 使用 PHPUnit 11.x，撰寫測試時請依 11.x 的 API 與配置撰寫，並使用相容的斷言方法（如以 `assertStringContainsString` 取代舊版以字串為目標的 `assertContains`）。
 - **用戶模型測試**：記得為 `users` 表的 `confirmation_token` 字段提供值，避免 NOT NULL 約束錯誤。
 - **Migration 數據庫兼容性陷阱**：
   - ❌ 錯誤：使用 `DB::getDriverName() === 'sqlite'` 判斷數據庫類型

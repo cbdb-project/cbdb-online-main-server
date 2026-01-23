@@ -108,7 +108,7 @@ class AddTimestampTemporaryColumns extends Migration {
      * @return void
      */
     protected function convertDates(string $table): void {
-        $isSqlite = DB::getDriverName() === 'sqlite';
+        $isSqlite = is_sqlite();
 
         // Update c_created_date_timestamp_temporary
         if (Schema::hasColumn($table, 'c_created_date')) {

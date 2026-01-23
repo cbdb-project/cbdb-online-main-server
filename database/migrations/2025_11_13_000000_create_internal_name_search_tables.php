@@ -43,7 +43,7 @@ class CreateInternalNameSearchTables extends Migration {
             ) ENGINE=InnoDB
         ";
 
-        if (DB::getDriverName() === 'sqlite') {
+        if (is_sqlite()) {
             // Remove COMMENT clauses
             $sql = preg_replace('/COMMENT\s+\'[^\']*\'/i', '', $sql);
             // Remove ENGINE clause

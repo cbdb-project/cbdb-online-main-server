@@ -16,12 +16,302 @@ description: 創建和修改數據庫結構的完整指南，涵蓋複合主鍵�
 - 使用標準 SQL 語法
 - 使用 B-Tree 索引（默認）
 - 保持數據庫無關性
+- **使用 `is_mysql()` 和 `is_sqlite()` 處理兼容性**
 
 ### ❌ 避免的事情
 - 數據庫專屬功能（ngram parser、專屬插件）
 - 供應商特定語法（REGEXP、優化器提示）
 - 直接執行原始 SQL（除非必要）
 - 修改基線 migration 文件
+- **直接使用 `DB::getDriverName()` 判斷數據庫類型**
+
+## MySQL 與 SQLite 兼容性處理
+
+### 為什麼需要兼容性？
+
+本專案在不同環境使用不同數據庫：
+- **生產環境**：MariaDB 10.3.39
+- **測試環境**：SQLite（PHPUnit 測試）
+- **CI/CD**：SQLite in-memory 數據庫
+
+所有 Migration 必須同時兼容 MySQL/MariaDB 和 SQLite，確保測試可靠性和開發一致性。
+
+### 使用 Helper Functions
+
+專案提供了標準的 helper functions（位於 `database/migrations/helpers.php`）：
+
+```php
+// ✅ 正確：使用 helper functions
+if (is_mysql()) {
+    // MySQL/MariaDB 特定操作
+}
+
+if (is_sqlite()) {
+    // SQLite 特定操作
+}
+
+// ✅ 正確：禁用/啟用外鍵檢查
+disable_foreign_keys();
+try {
+    // 你的操作
+} finally {
+    enable_foreign_keys();
+}
+
+// ✅ 正確：獲取當前時間戳 SQL
+$timestamp = get_current_timestamp_sql();
+
+// ❌ 錯誤：不要直接使用 DB::getDriverName()
+if (DB::getDriverName() === 'sqlite') {  // 不要這樣做！
+    // ...
+}
+```
+
+### 常見兼容性問題和解決方案
+
+#### 問題 1：COMMENT 注釋（SQLite 不支持）
+
+```php
+// ❌ 錯誤：直接使用 COMMENT
+DB::statement("
+    CREATE TABLE users (
+        id INT PRIMARY KEY COMMENT 'User ID'
+    )
+");
+
+// ✅ 正確：條件性移除 COMMENT
+public function up(): void {
+    $sql = "
+        CREATE TABLE users (
+            id INT PRIMARY KEY COMMENT 'User ID',
+            name VARCHAR(255) COMMENT 'User name'
+        )
+    ";
+
+    if (is_sqlite()) {
+        // 移除所有 COMMENT 子句
+        $sql = preg_replace('/COMMENT\s+\'[^\']*\'/i', '', $sql);
+    }
+
+    DB::statement($sql);
+}
+```
+
+#### 問題 2：ENGINE 和 ROW_FORMAT（SQLite 不支持）
+
+```php
+// ✅ 方式 1：條件性執行
+public function up(): void {
+    Schema::create('users', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+    });
+
+    // 僅在 MySQL 執行
+    if (is_mysql()) {
+        DB::statement("ALTER TABLE users ENGINE=InnoDB ROW_FORMAT=DYNAMIC");
+    }
+}
+
+// ✅ 方式 2：從 SQL 中移除
+public function up(): void {
+    $sql = "CREATE TABLE users (id INT) ENGINE=InnoDB ROW_FORMAT=DYNAMIC";
+
+    if (is_sqlite()) {
+        $sql = preg_replace('/ENGINE\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+        $sql = preg_replace('/ROW_FORMAT\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+    }
+
+    DB::statement($sql);
+}
+```
+
+#### 問題 3：索引類型提示（USING BTREE）
+
+```php
+// ✅ 正確：移除 SQLite 不支持的索引提示
+public function up(): void {
+    $sql = "
+        CREATE TABLE users (
+            id INT,
+            name VARCHAR(255),
+            KEY idx_name (name) USING BTREE
+        )
+    ";
+
+    if (is_sqlite()) {
+        // 移除 USING BTREE
+        $sql = preg_replace('/USING\s+BTREE/i', '', $sql);
+    }
+
+    DB::statement($sql);
+}
+
+// ✅ 更好：使用 Schema Builder（自動兼容）
+Schema::create('users', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->index('name');  // Laravel 自動處理兼容性
+});
+```
+
+#### 問題 4：外鍵約束檢查
+
+```php
+// ✅ 正確：使用 helper functions
+public function up(): void {
+    disable_foreign_keys();
+
+    try {
+        // 修改有外鍵約束的表
+        Schema::table('posts', function (Blueprint $table) {
+            $table->dropForeign(['user_id']);
+            $table->unsignedBigInteger('user_id')->change();
+            $table->foreign('user_id')->references('id')->on('users');
+        });
+    } finally {
+        enable_foreign_keys();
+    }
+}
+```
+
+#### 問題 5：VARBINARY 和特殊字符（處理 4 字節 UTF-8）
+
+```php
+// ✅ 正確：使用 VARBINARY 繞過 MySQL 8.0 的 utf8mb4 非 BMP 字符主鍵索引 bug
+public function up(): void {
+    $sql = "
+        CREATE TABLE CBDB__TRAD_SIMP_MAP (
+            trad_char VARBINARY(4) NOT NULL COMMENT '繁體字（UTF-8二進制）',
+            simp_char VARBINARY(4) NOT NULL COMMENT '簡體字（UTF-8二進制）',
+            PRIMARY KEY (trad_char)
+        ) ENGINE=InnoDB
+    ";
+
+    if (is_sqlite()) {
+        // 移除 COMMENT 和 ENGINE
+        $sql = preg_replace('/COMMENT\s+\'[^\']*\'/i', '', $sql);
+        $sql = preg_replace('/ENGINE\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+    }
+
+    DB::statement($sql);
+}
+```
+
+### 完整的兼容性 Migration 模板
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration {
+    /**
+     * Run the migrations.
+     */
+    public function up(): void {
+        // ========================================
+        // 方式 1：使用 Schema Builder（推薦）
+        // ========================================
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name', 255);
+            $table->string('email', 255)->unique();
+            $table->timestamps();
+
+            // Laravel 自動處理索引兼容性
+            $table->index('name');
+        });
+
+        // MySQL 特定的優化（可選）
+        if (is_mysql()) {
+            DB::statement("ALTER TABLE users ENGINE=InnoDB ROW_FORMAT=DYNAMIC");
+        }
+
+        // ========================================
+        // 方式 2：需要原始 SQL 時的兼容性處理
+        // ========================================
+        $sql = "
+            CREATE TABLE logs (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_created (created_at) USING BTREE
+            ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC
+        ";
+
+        if (is_sqlite()) {
+            // 移除 SQLite 不支持的語法
+            $sql = preg_replace('/COMMENT\s+\'[^\']*\'/i', '', $sql);
+            $sql = preg_replace('/ENGINE\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+            $sql = preg_replace('/ROW_FORMAT\s*=\s*[a-zA-Z0-9_]+/i', '', $sql);
+            $sql = preg_replace('/USING\s+BTREE/i', '', $sql);
+        }
+
+        DB::statement($sql);
+
+        // ========================================
+        // 方式 3：處理外鍵約束
+        // ========================================
+        disable_foreign_keys();
+
+        try {
+            Schema::create('posts', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('user_id');
+                $table->foreign('user_id')
+                      ->references('id')
+                      ->on('users')
+                      ->onDelete('cascade');
+            });
+        } finally {
+            enable_foreign_keys();
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void {
+        Schema::dropIfExists('posts');
+        Schema::dropIfExists('logs');
+        Schema::dropIfExists('users');
+    }
+};
+```
+
+### 測試兼容性
+
+```bash
+# 1. 在 SQLite 環境測試
+vendor/bin/phpunit
+
+# 2. 手動測試 migration（SQLite）
+php artisan migrate:fresh --database=sqlite
+
+# 3. 回滾測試
+php artisan migrate:rollback --database=sqlite
+```
+
+### 常見錯誤檢查清單
+
+在提交 Migration 之前，請確認：
+
+- [ ] 是否使用了 `is_mysql()` 和 `is_sqlite()` 而非 `DB::getDriverName()`？
+- [ ] 是否處理了 `COMMENT` 子句（SQLite 不支持）？
+- [ ] 是否處理了 `ENGINE` 和 `ROW_FORMAT`（SQLite 不支持）？
+- [ ] 是否處理了 `USING BTREE` 等索引提示（SQLite 不支持）？
+- [ ] 是否在測試環境（SQLite）運行過 `php artisan migrate`？
+- [ ] 是否所有測試通過（`vendor/bin/phpunit`）？
+
+### 參考資料
+
+- `database/migrations/helpers.php` - Helper functions 詳細文檔和使用示例
+- `database/migrations/2025_01_01_000000_import_cbdb_schema.php` - 複雜兼容性處理的實際範例
+- `database/migrations/2025_11_13_000000_create_internal_name_search_tables.php` - VARBINARY 處理範例
 
 ## 創建新 Migration
 

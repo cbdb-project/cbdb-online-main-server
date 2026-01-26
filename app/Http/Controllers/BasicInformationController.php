@@ -438,7 +438,12 @@ class BasicInformationController extends Controller {
             $assoc_data['c_tertiary_type_notes'] = null;
             $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$assoc_data['c_text_title'], $assoc_data);
+            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+            // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+            $assocFirstYearEncoded = str_replace('-', '(minus)', $assoc_data['c_assoc_first_year'] ?? '-9999');
+            // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
+            $textTitleEncoded = $this->biogMainRepository->unionPKDef($assoc_data['c_text_title']);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $assoc_data);
         }
 
         $assoc_pair = DB::table('ASSOC_DATA')->where([
@@ -456,7 +461,12 @@ class BasicInformationController extends Controller {
             $assoc_data['c_tertiary_type_notes'] = null;
             $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
-            $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$assoc_data['c_text_title'], $assoc_data);
+            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+            // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+            $assocFirstYearEncoded = str_replace('-', '(minus)', $assoc_data['c_assoc_first_year'] ?? '-9999');
+            // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
+            $textTitleEncoded = $this->biogMainRepository->unionPKDef($assoc_data['c_text_title']);
+            $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $assoc_data);
         }
 
         //社交機構

@@ -40,6 +40,7 @@ use Illuminate\Support\Arr;
 //20230628建安修改
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 //修改結束
 
@@ -1395,9 +1396,54 @@ class BiogMainRepository {
     }
 
     public function socialInstDeleteById($id, $c_personid) {
+        // 複合主鍵格式為 c_personid-c_inst_code-c_inst_name_code-c_bi_role_code（4 個欄位）
+        // 向後兼容：舊版操作記錄可能只有 2 個欄位（c_personid 和 c_bi_role_code）
         $addr_l = explode("-", $id);
-        $row = DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->first();
-        DB::table('BIOG_INST_DATA')->where('c_personid', $addr_l[0])->where('c_bi_role_code', $addr_l[1])->delete();
+
+        // 處理空字串為 null
+        foreach ($addr_l as $key => $value) {
+            if ($value === '') {
+                $addr_l[$key] = null;
+            }
+        }
+
+        $row = null;
+
+        // 如果有 4 個欄位，使用新格式查詢
+        if (count($addr_l) >= 4) {
+            $row = DB::table('BIOG_INST_DATA')
+                ->where('c_personid', $addr_l[0])
+                ->where('c_inst_code', $addr_l[1])
+                ->where('c_inst_name_code', $addr_l[2])
+                ->where('c_bi_role_code', $addr_l[3])
+                ->first();
+
+            if ($row) {
+                DB::table('BIOG_INST_DATA')
+                    ->where('c_personid', $addr_l[0])
+                    ->where('c_inst_code', $addr_l[1])
+                    ->where('c_inst_name_code', $addr_l[2])
+                    ->where('c_bi_role_code', $addr_l[3])
+                    ->delete();
+            }
+        }
+
+        // 如果新格式找不到，嘗試舊版 2-field 格式（c_personid 和 c_bi_role_code）
+        if (!$row && count($addr_l) >= 2) {
+            $row = DB::table('BIOG_INST_DATA')
+                ->where('c_personid', $addr_l[0])
+                ->where('c_bi_role_code', $addr_l[1])
+                ->first();
+
+            if ($row) {
+                DB::table('BIOG_INST_DATA')
+                    ->where('c_personid', $addr_l[0])
+                    ->where('c_bi_role_code', $addr_l[1])
+                    ->delete();
+            }
+        }
+
+        // 記錄操作（即使 $row 為 null 也記錄，以便追蹤失敗的刪除嘗試）
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $id, $row);
     }
 
@@ -1465,25 +1511,84 @@ class BiogMainRepository {
 
     public function assocById($id) {
         //20200709聯合主鍵保留字弱點防禦函式
-        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
-        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 修正：新增第 9 個欄位 c_assoc_first_year（數據庫 PRIMARY KEY 包含此欄位）
+
         $temp_l = explode("-", $id);
         // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
 
-        $row = DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_assoc_code', '=', $temp_l[1]],
-            ['c_assoc_id', '=', $temp_l[2]],
-            //20191028進行聯合主鍵的擴充修改
-            ['c_kin_code', '=', $temp_l[3]],
-            ['c_kin_id', '=', $temp_l[4]],
-            ['c_assoc_kin_code', '=', $temp_l[5]],
-            ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $temp_l[7]],
-        ])->first();
+        // 向後兼容邏輯：由於新舊格式在某些情況下無法通過 ID 結構區分
+        // （例如：舊 8-field 標題含 - vs 新 9-field 正年份，兩者都有 9 個段且都不含 (minus)）
+        // 因此使用數據庫查詢作為 fallback：
+        // 1. 先嘗試新 9-field 格式（最後一個元素為年份）
+        // 2. 如果查不到，再嘗試舊 8-field 格式（index 7 之後全部為 c_text_title，年份用默認值 -9999）
+
+        $row = null;
+
+        // 嘗試新 9-field 格式
+        if (count($temp_l) >= 9) {
+            $c_assoc_first_year_new = end($temp_l);
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title_new = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title_new = $temp_l[7] ?? '';
+            }
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_new],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_new],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_new;
+                $c_assoc_first_year = $c_assoc_first_year_new;
+            }
+        }
+
+        // 如果新格式找不到，嘗試舊 8-field 格式
+        if (!$row && count($temp_l) >= 8) {
+            $c_text_title_old = implode('-', array_slice($temp_l, 7));
+            $c_assoc_first_year_old = '-9999';
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_old],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_old],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_old;
+                $c_assoc_first_year = $c_assoc_first_year_old;
+            }
+        }
+
+        // 如果兩種格式都找不到，使用新格式的解析結果（讓後續代碼處理 null row）
+        if (!$row) {
+            $c_assoc_first_year = count($temp_l) > 8 ? end($temp_l) : ($temp_l[8] ?? '-9999');
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title = $temp_l[7] ?? '';
+            }
+        }
         $text_str = null;
         if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -1495,17 +1600,32 @@ class BiogMainRepository {
             $kin_code = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
         }
         //20210705新增，20210708[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係修改
+        // 修正：查詢配對記錄時需要包含 c_assoc_first_year，避免當存在相同 c_text_title 但不同 year 時返回錯誤的記錄
         $kinship_pair = null;
         if ($row->c_kin_id || $row->c_kin_id === 0) {
-            $k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_kin_code;
-            $text_ = KinshipCode::find($k_p_code);
-            $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $k_p_row = DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', $row->c_personid],
+                ['c_personid', $row->c_assoc_id],
+                ['c_text_title', $row->c_text_title],
+                ['c_assoc_first_year', $row->c_assoc_first_year],
+            ])->first();
+            if ($k_p_row) {
+                $text_ = KinshipCode::find($k_p_row->c_kin_code);
+                $kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         $assoc_kinship_pair = null;
         if ($row->c_assoc_kin_id || $row->c_assoc_kin_id === 0) {
-            $a_k_p_code = DB::table('ASSOC_DATA')->where([['c_assoc_id',$row->c_personid], ['c_personid', $row->c_assoc_id], ['c_text_title', $row->c_text_title]])->first()->c_assoc_kin_code;
-            $text_ = KinshipCode::find($a_k_p_code);
-            $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            $a_k_p_row = DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', $row->c_personid],
+                ['c_personid', $row->c_assoc_id],
+                ['c_text_title', $row->c_text_title],
+                ['c_assoc_first_year', $row->c_assoc_first_year],
+            ])->first();
+            if ($a_k_p_row) {
+                $text_ = KinshipCode::find($a_k_p_row->c_assoc_kin_code);
+                $assoc_kinship_pair = $text_->c_kincode." ".$text_->c_kinrel_chn." ".$text_->c_kinrel;
+            }
         }
         //新增結束
         $kin_id = null;
@@ -1605,25 +1725,79 @@ class BiogMainRepository {
 
     public function assocUpdateById(Request $request, $id, $c_personid) {
         //20200709聯合主鍵保留字弱點防禦函式
-        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
-        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 修正：新增第 9 個欄位 c_assoc_first_year（數據庫 PRIMARY KEY 包含此欄位）
+
         $temp_l = explode("-", $id);
         // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
 
-        $row = DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_assoc_code', '=', $temp_l[1]],
-            ['c_assoc_id', '=', $temp_l[2]],
-            //20191028進行聯合主鍵的擴充修改
-            ['c_kin_code', '=', $temp_l[3]],
-            ['c_kin_id', '=', $temp_l[4]],
-            ['c_assoc_kin_code', '=', $temp_l[5]],
-            ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $temp_l[7]],
-        ])->first();
+        // 向後兼容邏輯：使用數據庫查詢作為 fallback
+        $row = null;
+
+        // 嘗試新 9-field 格式
+        if (count($temp_l) >= 9) {
+            $c_assoc_first_year_new = end($temp_l);
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title_new = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title_new = $temp_l[7] ?? '';
+            }
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_new],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_new],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_new;
+                $c_assoc_first_year = $c_assoc_first_year_new;
+            }
+        }
+
+        // 如果新格式找不到，嘗試舊 8-field 格式
+        if (!$row && count($temp_l) >= 8) {
+            $c_text_title_old = implode('-', array_slice($temp_l, 7));
+            $c_assoc_first_year_old = '-9999';
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_old],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_old],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_old;
+                $c_assoc_first_year = $c_assoc_first_year_old;
+            }
+        }
+
+        // 如果兩種格式都找不到，使用新格式的解析結果
+        if (!$row) {
+            $c_assoc_first_year = count($temp_l) > 8 ? end($temp_l) : ($temp_l[8] ?? '-9999');
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title = $temp_l[7] ?? '';
+            }
+        }
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
@@ -1632,6 +1806,7 @@ class BiogMainRepository {
         $assoc_id = $data['c_assoc_id'];
         $old_assoc_id = $row->c_assoc_id;
         $old_c_text_title = $row->c_text_title;
+        $old_c_assoc_first_year = $row->c_assoc_first_year;
         //20210910增加$old_c_assocship_pair用來查詢對應的資料
         $old_c_assoc_code = $row->c_assoc_code;
         $old_c_assocship_pair = AssocCode::where('c_assoc_code', '=', $old_c_assoc_code)->first();
@@ -1645,6 +1820,10 @@ class BiogMainRepository {
         //20210204增加儲存c_inst_name_code
         //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
         //新增結束
+        #20260126「出處」缺省值製作，若「出處」為空，則自動填充為[n/a]，避免複合主鍵 ID 中出現 -- 導致解析問題。
+        if (empty($data['c_text_title'])) {
+            $data['c_text_title'] = '[n/a]';
+        }
         $data = (new ToolsRepository())->timestamp($data);
         DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
@@ -1655,11 +1834,17 @@ class BiogMainRepository {
             ['c_kin_id', '=', $temp_l[4]],
             ['c_assoc_kin_code', '=', $temp_l[5]],
             ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $temp_l[7]],
+            ['c_text_title', '=', $c_text_title],
+            ['c_assoc_first_year', '=', $c_assoc_first_year],
         ])->update($data);
         $ori_data = $data;
         $data['c_personid'] = $c_personid;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data, $row);
+        // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+        $assocFirstYearEncoded = str_replace('-', '(minus)', $data['c_assoc_first_year'] ?? '-9999');
+        // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
+        $textTitleEncoded = $this->unionPKDef($data['c_text_title']);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $data, $row);
         //20210702取得成對資料原本的c_kin_code
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
@@ -1673,10 +1858,12 @@ class BiogMainRepository {
         $data = Arr::except($data, ['c_assoc_id']);
         //20190118筆記 修改這邊的更新功能.
         //DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
+        // 修正：更新配對記錄時需要包含 c_assoc_first_year，避免當存在相同 c_text_title 但不同 year 時更新錯誤的記錄
         DB::table('ASSOC_DATA')->where([
             ['c_assoc_id', '=', $c_personid],
             ['c_personid', '=', $old_assoc_id],
             ['c_text_title', '=', $old_c_text_title],
+            ['c_assoc_first_year', '=', $old_c_assoc_first_year],
         ])
         ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
             $query->where('c_assoc_code', '=', $old_c_assocship_pair1)
@@ -1704,10 +1891,19 @@ class BiogMainRepository {
         if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
             $data['c_assoc_first_year'] = '-9999';
         }
+        #20260126「出處」缺省值製作，若「出處」為空，則自動填充為[n/a]，避免複合主鍵 ID 中出現 -- 導致解析問題。
+        if (empty($data['c_text_title'])) {
+            $data['c_text_title'] = '[n/a]';
+        }
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('ASSOC_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$data['c_text_title'], $data);
+        // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+        $assocFirstYearEncoded = str_replace('-', '(minus)', $data['c_assoc_first_year'] ?? '-9999');
+        // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
+        $textTitleEncoded = $this->unionPKDef($data['c_text_title']);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $data);
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;
@@ -1726,30 +1922,135 @@ class BiogMainRepository {
 
     public function assocDeleteById($id, $c_personid) {
         //20200709聯合主鍵保留字弱點防禦函式
-        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title
-        // 先分割，再對每個部分解碼（因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
+        // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 修正：新增第 9 個欄位 c_assoc_first_year（數據庫 PRIMARY KEY 包含此欄位）
+
         $temp_l = explode("-", $id);
         // 對每個部分進行解碼
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
 
-        $row = DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_assoc_code', '=', $temp_l[1]],
-            ['c_assoc_id', '=', $temp_l[2]],
-            //20191028進行聯合主鍵的擴充修改
-            ['c_kin_code', '=', $temp_l[3]],
-            ['c_kin_id', '=', $temp_l[4]],
-            ['c_assoc_kin_code', '=', $temp_l[5]],
-            ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $temp_l[7]],
-        ])->first();
-        $row2 = DB::table('ASSOC_DATA')->where([
-            ['c_personid',$row->c_assoc_id],
-            ['c_assoc_id', $row->c_personid],
-            ['c_source', $row->c_source],
-        ])->first();
+        // 向後兼容邏輯：使用數據庫查詢作為 fallback
+        $row = null;
+
+        // 嘗試新 9-field 格式
+        if (count($temp_l) >= 9) {
+            $c_assoc_first_year_new = end($temp_l);
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title_new = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title_new = $temp_l[7] ?? '';
+            }
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_new],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_new],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_new;
+                $c_assoc_first_year = $c_assoc_first_year_new;
+            }
+        }
+
+        // 如果新格式找不到，嘗試舊 8-field 格式
+        if (!$row && count($temp_l) >= 8) {
+            $c_text_title_old = implode('-', array_slice($temp_l, 7));
+            $c_assoc_first_year_old = '-9999';
+
+            $row = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title_old],
+                ['c_assoc_first_year', '=', $c_assoc_first_year_old],
+            ])->first();
+
+            if ($row) {
+                $c_text_title = $c_text_title_old;
+                $c_assoc_first_year = $c_assoc_first_year_old;
+            }
+        }
+
+        // 如果兩種格式都找不到，使用新格式的解析結果
+        if (!$row) {
+            $c_assoc_first_year = count($temp_l) > 8 ? end($temp_l) : ($temp_l[8] ?? '-9999');
+            $totalParts = count($temp_l);
+            if ($totalParts > 9) {
+                $c_text_title = implode('-', array_slice($temp_l, 7, $totalParts - 8));
+            } else {
+                $c_text_title = $temp_l[7] ?? '';
+            }
+        }
+        // 修正：查找配對記錄時使用多層次策略
+        // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
+        // 2. 否則使用 paired c_assoc_code 來精確匹配
+        // 3. 如果沒有配對映射且非 0,0 情況，為避免誤刪不嘗試反向刪除
+        $row2 = null;
+        $reverseDeleteSkipReason = null;
+
+        // 修正：必須檢查 $row 是否存在，記錄可能不存在（malformed ID 或已刪除）
+        if ($row) {
+            // 策略 1：如果 c_kin_id = 0 且 c_assoc_kin_id = 0，直接用這些值匹配反向記錄
+            // 注意：此策略僅處理對稱情況，若原記錄非 0,0，則依賴策略 2 的配對代碼
+            if ($row->c_kin_id == 0 && $row->c_assoc_kin_id == 0) {
+                $row2 = DB::table('ASSOC_DATA')->where([
+                    ['c_personid', $row->c_assoc_id],
+                    ['c_assoc_id', $row->c_personid],
+                    ['c_kin_id', 0],
+                    ['c_assoc_kin_id', 0],
+                    ['c_text_title', $row->c_text_title],
+                    ['c_assoc_first_year', $row->c_assoc_first_year],
+                ])->first();
+            }
+
+            // 策略 2：如果策略 1 沒找到，使用 paired c_assoc_code 匹配
+            if (!$row2) {
+                $assocCodePair = AssocCode::where('c_assoc_code', '=', $row->c_assoc_code)->first();
+                // 修正：AssocCode::first() 可能返回 null，需要先檢查
+                $assocPair1 = $assocCodePair?->c_assoc_pair;
+                $assocPair2 = $assocCodePair?->c_assoc_pair2;
+
+                // 只有在有配對代碼時才嘗試查找反向記錄
+                // 如果沒有配對映射，為避免誤刪錯誤的記錄，不執行反向刪除
+                if ($assocPair1 !== null || $assocPair2 !== null) {
+                    $row2Query = DB::table('ASSOC_DATA')->where([
+                        ['c_personid', $row->c_assoc_id],
+                        ['c_assoc_id', $row->c_personid],
+                        ['c_text_title', $row->c_text_title],
+                        ['c_assoc_first_year', $row->c_assoc_first_year],
+                    ]);
+                    $row2Query->where(function ($query) use ($assocPair1, $assocPair2) {
+                        if ($assocPair1 !== null) {
+                            $query->where('c_assoc_code', '=', $assocPair1);
+                        }
+                        if ($assocPair2 !== null) {
+                            $query->orWhere('c_assoc_code', '=', $assocPair2);
+                        }
+                    });
+                    $row2 = $row2Query->first();
+                } else {
+                    // 記錄跳過原因：沒有配對代碼且非 0,0 情況
+                    $reverseDeleteSkipReason = 'no_pair_mapping';
+                }
+            }
+        } else {
+            // 記錄跳過原因：原記錄不存在
+            $reverseDeleteSkipReason = 'source_record_not_found';
+        }
         DB::table('ASSOC_DATA')->where([
             ['c_personid', '=', $temp_l[0]],
             ['c_assoc_code', '=', $temp_l[1]],
@@ -1759,17 +2060,36 @@ class BiogMainRepository {
             ['c_kin_id', '=', $temp_l[4]],
             ['c_assoc_kin_code', '=', $temp_l[5]],
             ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $temp_l[7]],
+            ['c_text_title', '=', $c_text_title],
+            ['c_assoc_first_year', '=', $c_assoc_first_year],
         ])->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
 
         // 檢查$row2是否存在後再刪除反向關係
+        // 修正：使用完整主鍵欄位進行刪除，避免誤刪其他記錄
         if ($row2 !== null) {
             DB::table('ASSOC_DATA')->where([
-                ['c_personid',$row2->c_personid],
+                ['c_personid', $row2->c_personid],
                 ['c_assoc_id', $row2->c_assoc_id],
-                ['c_source', $row2->c_source],
+                ['c_assoc_code', $row2->c_assoc_code],
+                ['c_kin_code', $row2->c_kin_code],
+                ['c_kin_id', $row2->c_kin_id],
+                ['c_assoc_kin_code', $row2->c_assoc_kin_code],
+                ['c_assoc_kin_id', $row2->c_assoc_kin_id],
+                ['c_text_title', $row2->c_text_title],
+                ['c_assoc_first_year', $row2->c_assoc_first_year],
             ])->delete();
+        } elseif ($reverseDeleteSkipReason !== null) {
+            // 記錄跳過反向刪除的原因，便於審計和問題排查
+            Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
+                'reason' => $reverseDeleteSkipReason,
+                'forward_id' => $id,
+                'c_personid' => $temp_l[0] ?? null,
+                'c_assoc_id' => $temp_l[2] ?? null,
+                'c_assoc_code' => $temp_l[1] ?? null,
+                'c_kin_id' => $row?->c_kin_id,
+                'c_assoc_kin_id' => $row?->c_assoc_kin_id,
+            ]);
         }
     }
 

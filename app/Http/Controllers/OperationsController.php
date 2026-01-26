@@ -121,6 +121,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $addr_l = explode("-", $alt);
                             foreach ($addr_l as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $addr_l[$key] = str_replace("minus", "-", $value);
                             }
                         }
@@ -218,6 +220,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $entry_1 = explode("-", $alt);
                             foreach ($entry_1 as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $entry_1[$key] = str_replace("minus", "-", $value);
                             }
                         }
@@ -258,6 +262,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $status_1 = explode("-", $alt);
                             foreach ($status_1 as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $status_1[$key] = str_replace("minus", "-", $value);
                             }
                         }
@@ -283,6 +289,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $kin_1 = explode("-", $alt);
                             foreach ($kin_1 as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $kin_1[$key] = str_replace("minus", "-", $value);
                             }
                         }
@@ -301,39 +309,126 @@ class OperationsController extends Controller {
                         if (strpos($resource_id, '_._') !== false) {
                             // 使用 _._格式
                             $assoc_1 = explode('_._', $resource_id);
+                            $arr3 = DB::table('ASSOC_DATA')->where([
+                                ['c_personid', '=', $assoc_1[0]],
+                                ['c_assoc_code', '=', $assoc_1[1]],
+                                ['c_assoc_id', '=', $assoc_1[2]],
+                                ['c_kin_code', '=', $assoc_1[3]],
+                                ['c_kin_id', '=', $assoc_1[4]],
+                                ['c_assoc_kin_code', '=', $assoc_1[5]],
+                                ['c_assoc_kin_id', '=', $assoc_1[6]],
+                                ['c_text_title', '=', $assoc_1[7] ?? ''],
+                                ['c_assoc_first_year', '=', $assoc_1[8] ?? '-9999'],
+                            ])->first();
                         } else {
                             // 使用 - 格式
-                            $alt = str_replace("--", "-minus", $resource_id);
-                            //聯合主鍵保留字弱點防禦函式，解析保留字。
-                            $alt = $this->unionPKDef_decode($alt);
-                            $assoc_1 = explode("-", $alt);
-                            foreach ($assoc_1 as $key => $value) {
-                                $assoc_1[$key] = str_replace("minus", "-", $value);
-                            }
-                            //防止c_text_title欄位內含負號所做的字串重組
-                            $new_c_text_title = '';
-                            if (!empty($assoc_1[8])) {
-                                for ($i = 7; $i < count($assoc_1); $i++) {
-                                    if (empty($new_c_text_title)) {
-                                        $new_c_text_title .= $assoc_1[$i];
-                                    } else {
-                                        $new_c_text_title .= "-".$assoc_1[$i];
-                                    }
+                            // 策略：先嘗試新格式（不做 -- 替換），如果找不到再嘗試舊格式（做 -- 替換）
+                            // 這樣可以正確處理新格式中空 c_text_title 導致的 -- 情況
+
+                            // 輔助函數：解碼保留字（不包括 -- 和 minus）
+                            $decodeReserved = function ($str) {
+                                $str = str_replace("(slash)", "/", $str);
+                                $str = str_replace("(backslash)", "\\", $str);
+                                $str = str_replace("(brackets)", "{", $str);
+                                $str = str_replace("(brackets_r)", "}", $str);
+                                $str = str_replace("(question)", "?", $str);
+                                $str = str_replace("(hash)", "#", $str);
+                                $str = str_replace("(amp)", "&", $str);
+
+                                return $str;
+                            };
+
+                            // 輔助函數：解析 segments 中的 minus 編碼
+                            $decodeMinusInSegments = function ($segments) {
+                                foreach ($segments as $key => $value) {
+                                    // 注意：必須先處理 (minus) 再處理 minus，否則 (minus) 會變成 (-)
+                                    $value = str_replace("(minus)", "-", $value);  // 新版 (minus) 編碼
+                                    $value = str_replace("minus", "-", $value);  // 舊版 -- 格式的向後兼容
+                                    $segments[$key] = $value;
                                 }
-                                $assoc_1[7] = $new_c_text_title;
+
+                                return $segments;
+                            };
+
+                            $arr3 = null;
+
+                            // 第一次嘗試：新格式（不做 -- 替換，保留空欄位邊界）
+                            $alt_new = $decodeReserved($resource_id);
+                            $assoc_1_new = explode("-", $alt_new);
+                            $assoc_1_new = $decodeMinusInSegments($assoc_1_new);
+
+                            $totalParts = count($assoc_1_new);
+                            if ($totalParts >= 9) {
+                                $c_assoc_first_year_new = $assoc_1_new[$totalParts - 1];
+                                if ($totalParts > 9) {
+                                    $c_text_title_new = implode('-', array_slice($assoc_1_new, 7, $totalParts - 8));
+                                } else {
+                                    $c_text_title_new = $assoc_1_new[7] ?? '';
+                                }
+
+                                $arr3 = DB::table('ASSOC_DATA')->where([
+                                    ['c_personid', '=', $assoc_1_new[0]],
+                                    ['c_assoc_code', '=', $assoc_1_new[1]],
+                                    ['c_assoc_id', '=', $assoc_1_new[2]],
+                                    ['c_kin_code', '=', $assoc_1_new[3]],
+                                    ['c_kin_id', '=', $assoc_1_new[4]],
+                                    ['c_assoc_kin_code', '=', $assoc_1_new[5]],
+                                    ['c_assoc_kin_id', '=', $assoc_1_new[6]],
+                                    ['c_text_title', '=', $c_text_title_new],
+                                    ['c_assoc_first_year', '=', $c_assoc_first_year_new],
+                                ])->first();
                             }
-                            //end
+
+                            // 第二次嘗試：舊格式（做 -- 替換，用於向後兼容舊版 ID）
+                            if (!$arr3) {
+                                $alt_old = str_replace("--", "-minus", $resource_id);
+                                $alt_old = $decodeReserved($alt_old);
+                                $assoc_1_old = explode("-", $alt_old);
+                                $assoc_1_old = $decodeMinusInSegments($assoc_1_old);
+
+                                $totalPartsOld = count($assoc_1_old);
+
+                                // 嘗試新 9-field 格式（舊編碼）
+                                if ($totalPartsOld >= 9) {
+                                    $c_assoc_first_year_try = $assoc_1_old[$totalPartsOld - 1];
+                                    if ($totalPartsOld > 9) {
+                                        $c_text_title_try = implode('-', array_slice($assoc_1_old, 7, $totalPartsOld - 8));
+                                    } else {
+                                        $c_text_title_try = $assoc_1_old[7] ?? '';
+                                    }
+
+                                    $arr3 = DB::table('ASSOC_DATA')->where([
+                                        ['c_personid', '=', $assoc_1_old[0]],
+                                        ['c_assoc_code', '=', $assoc_1_old[1]],
+                                        ['c_assoc_id', '=', $assoc_1_old[2]],
+                                        ['c_kin_code', '=', $assoc_1_old[3]],
+                                        ['c_kin_id', '=', $assoc_1_old[4]],
+                                        ['c_assoc_kin_code', '=', $assoc_1_old[5]],
+                                        ['c_assoc_kin_id', '=', $assoc_1_old[6]],
+                                        ['c_text_title', '=', $c_text_title_try],
+                                        ['c_assoc_first_year', '=', $c_assoc_first_year_try],
+                                    ])->first();
+                                }
+
+                                // 嘗試舊 8-field 格式
+                                if (!$arr3 && $totalPartsOld >= 8) {
+                                    $c_text_title_old = implode('-', array_slice($assoc_1_old, 7));
+                                    $c_assoc_first_year_old = '-9999';
+
+                                    $arr3 = DB::table('ASSOC_DATA')->where([
+                                        ['c_personid', '=', $assoc_1_old[0]],
+                                        ['c_assoc_code', '=', $assoc_1_old[1]],
+                                        ['c_assoc_id', '=', $assoc_1_old[2]],
+                                        ['c_kin_code', '=', $assoc_1_old[3]],
+                                        ['c_kin_id', '=', $assoc_1_old[4]],
+                                        ['c_assoc_kin_code', '=', $assoc_1_old[5]],
+                                        ['c_assoc_kin_id', '=', $assoc_1_old[6]],
+                                        ['c_text_title', '=', $c_text_title_old],
+                                        ['c_assoc_first_year', '=', $c_assoc_first_year_old],
+                                    ])->first();
+                                }
+                            }
                         }
-                        $arr3 = DB::table('ASSOC_DATA')->where([
-                            ['c_personid', '=', $assoc_1[0]],
-                            ['c_assoc_code', '=', $assoc_1[1]],
-                            ['c_assoc_id', '=', $assoc_1[2]],
-                            ['c_kin_code', '=', $assoc_1[3]],
-                            ['c_kin_id', '=', $assoc_1[4]],
-                            ['c_assoc_kin_code', '=', $assoc_1[5]],
-                            ['c_assoc_kin_id', '=', $assoc_1[6]],
-                            ['c_text_title', '=', $assoc_1[7]],
-                        ])->first();
                         $arr3 = json_encode($arr3);
                         $arr3 = json_decode($arr3, true);
 
@@ -358,6 +453,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $inst_1 = explode("-", $alt);
                             foreach ($inst_1 as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $inst_1[$key] = str_replace("minus", "-", $value);
                             }
                             if ($inst_1[1] == '') {
@@ -390,6 +487,8 @@ class OperationsController extends Controller {
                             $alt = $this->unionPKDef_decode($alt);
                             $source_1 = explode("-", $alt);
                             foreach ($source_1 as $key => $value) {
+                                // 注意：必須先處理 (minus) 再處理 minus
+                                $value = str_replace("(minus)", "-", $value);
                                 $source_1[$key] = str_replace("minus", "-", $value);
                             }
                             //防止c_pages欄位內含負號所做的字串重組
@@ -685,7 +784,9 @@ class OperationsController extends Controller {
         $decoded = str_replace(['(brackets)(brackets)', '(brackets_r)(brackets_r)'], ['{ { ', '} } '], $decoded);
         $segments = explode('-', $decoded);
         foreach ($segments as $index => $segment) {
-            $segments[$index] = str_replace('minus', '-', $segment);
+            // 注意：必須先處理 (minus) 再處理 minus，否則 (minus) 會變成 (-)
+            $segment = str_replace('(minus)', '-', $segment);  // 新版 (minus) 編碼
+            $segments[$index] = str_replace('minus', '-', $segment);  // 舊版 -- 格式
         }
 
         return $segments;
@@ -738,9 +839,9 @@ class OperationsController extends Controller {
             'STATUS_DATA' => ['c_personid','c_sequence','c_status_code'],
             'KIN_DATA' => ['c_personid','c_kin_id','c_kin_code'],
             'POSSESSION_DATA' => ['c_possession_record_id'],
-            'BIOG_INST_DATA' => ['c_personid','c_inst_code','c_inst_name_code'],
+            'BIOG_INST_DATA' => ['c_personid','c_inst_code','c_inst_name_code','c_bi_role_code'],
             'EVENTS_DATA' => ['c_personid','c_sequence'],
-            'ASSOC_DATA' => ['c_personid','c_assoc_code','c_assoc_id','c_kin_code','c_kin_id','c_assoc_kin_code','c_assoc_kin_id','c_text_title'],
+            'ASSOC_DATA' => ['c_personid','c_assoc_code','c_assoc_id','c_kin_code','c_kin_id','c_assoc_kin_code','c_assoc_kin_id','c_text_title','c_assoc_first_year'],
         ];
 
         return $map[$resource] ?? [];
@@ -801,6 +902,12 @@ class OperationsController extends Controller {
         $key = str_replace("(backslash)", "\\", $key);
         $key = str_replace("(brackets)", "{", $key);
         $key = str_replace("(brackets_r)", "}", $key);
+        // URL 特殊字符處理
+        $key = str_replace("(question)", "?", $key);
+        $key = str_replace("(hash)", "#", $key);
+        $key = str_replace("(amp)", "&", $key);
+        // 複合主鍵分隔符處理
+        $key = str_replace("(minus)", "-", $key);
         $result = $key;
 
         return $result;

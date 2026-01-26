@@ -345,6 +345,10 @@ class BasicInformationAssocController extends Controller {
         }
 
         // 構建舊格式 ID（用於 Repository）
+        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
+        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
         $id_ = $pk['c_personid']."-".
                ($pk['c_assoc_code'] ?? '0')."-".
                ($pk['c_assoc_id'] ?? '0')."-".
@@ -352,7 +356,8 @@ class BasicInformationAssocController extends Controller {
                ($pk['c_kin_id'] ?? '0')."-".
                ($pk['c_assoc_kin_code'] ?? '0')."-".
                ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '');
+               ($pk['c_text_title'] ?? '')."-".
+               $assocFirstYearEncoded;
 
         $res = $this->biogMainRepository->assocById($id_);
 
@@ -437,6 +442,10 @@ class BasicInformationAssocController extends Controller {
         CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
 
         // 構建舊格式 ID
+        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
+        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
         $id_ = $pk['c_personid']."-".
                ($pk['c_assoc_code'] ?? '0')."-".
                ($pk['c_assoc_id'] ?? '0')."-".
@@ -444,7 +453,8 @@ class BasicInformationAssocController extends Controller {
                ($pk['c_kin_id'] ?? '0')."-".
                ($pk['c_assoc_kin_code'] ?? '0')."-".
                ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '');
+               ($pk['c_text_title'] ?? '')."-".
+               $assocFirstYearEncoded;
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
@@ -499,6 +509,10 @@ class BasicInformationAssocController extends Controller {
         CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
 
         // 構建舊格式 ID
+        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
+        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
+        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
+        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
         $id_ = $pk['c_personid']."-".
                ($pk['c_assoc_code'] ?? '0')."-".
                ($pk['c_assoc_id'] ?? '0')."-".
@@ -506,7 +520,8 @@ class BasicInformationAssocController extends Controller {
                ($pk['c_kin_id'] ?? '0')."-".
                ($pk['c_assoc_kin_code'] ?? '0')."-".
                ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '');
+               ($pk['c_text_title'] ?? '')."-".
+               $assocFirstYearEncoded;
 
         $this->biogMainRepository->assocDeleteById($id_, $id);
 

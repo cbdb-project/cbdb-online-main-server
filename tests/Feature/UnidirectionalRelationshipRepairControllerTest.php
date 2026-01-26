@@ -865,8 +865,9 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
         ]);
 
         // 使用 BiogMainRepository 刪除原始關係
+        // 資源 ID 格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
         $repository = app(\App\Repositories\BiogMainRepository::class);
-        $resourceId = "{$person1->c_personid}-4-{$person2->c_personid}-0-0-0-0-測試文獻";
+        $resourceId = "{$person1->c_personid}-4-{$person2->c_personid}-0-0-0-0-測試文獻-1000";
 
         $this->actingAs($this->adminUser);
 

@@ -1008,13 +1008,13 @@ Route::get('basicinformation/{id}/altnames/{pk}/edit', '...')->name('...legacy')
 | 4 | BIOG_SOURCE_DATA | 3 | 3 | ⚠️ 順序不同 + c_pages 風險 |
 | 5 | POSTED_TO_OFFICE_DATA | 2 | - | ✅ 使用 Repository |
 | 6 | POSTED_TO_ADDR_DATA | 3 | - | ⚠️ 數據庫無 c_personid |
-| 7 | ASSOC_DATA | 9 | 8 | ❌ 缺少 c_assoc_first_year |
+| 7 | ASSOC_DATA | 9 | 9 | ✅ 已修正（2026-01-26） |
 | 8 | KIN_DATA | 3 | 3 | ✅ 字段齊全 |
-| 9 | EVENTS_DATA | 0 | 2 | ❌ 數據庫缺失主鍵 |
+| 9 | EVENTS_DATA | 0 | 2 | ✅ 已修正（2026-01-26） |
 | 10 | STATUS_DATA | 3 | 3 | ✅ 完全匹配 |
 | 11 | ENTRY_DATA | 10 | 10 | ⚠️ 順序不同 |
 | 12 | POSSESSION_DATA | 1 | 1 | ✅ 單一主鍵 |
-| 13 | BIOG_INST_DATA | 4 | 4 (Store) / 2 (Delete) | ⚠️ Delete 有 bug |
+| 13 | BIOG_INST_DATA | 4 | 4 | ✅ 已修正（2026-01-26） |
 
 #### 詳細問題清單
 
@@ -1132,7 +1132,7 @@ ADD PRIMARY KEY (`c_personid`, `c_sequence`);
 
 ---
 
-##### ⚠️ 13. BIOG_INST_DATA - Delete 方法不完整
+##### ✅ 13. BIOG_INST_DATA - 已修正（2026-01-26）
 
 **數據庫定義**：
 ```sql
@@ -1148,16 +1148,19 @@ $newid = $data['c_personid'] . "-" .
          $data['c_bi_role_code'];
 ```
 
-**Delete 方法**（❌ 錯誤）：
+**Delete 方法**（✅ 已修正）：
 ```php
-// BiogMainRepository.php:1399-1400
+// BiogMainRepository.php - socialInstDeleteById()
+// 修正後使用完整的 4 個字段：
 $row = DB::table('BIOG_INST_DATA')
     ->where('c_personid', $addr_l[0])
-    ->where('c_bi_role_code', $addr_l[1])  // ❌ 只用了 2 個字段！
+    ->where('c_inst_code', $addr_l[1])
+    ->where('c_inst_name_code', $addr_l[2])
+    ->where('c_bi_role_code', $addr_l[3])
     ->first();
 ```
 
-**問題**：Delete 只使用 2 個字段，如果一個人有多個相同 role 的機構記錄，可能刪錯。
+**修正內容**：Delete 方法現在使用完整的 4 個字段，與 Store 方法保持一致。
 
 ---
 
@@ -1166,10 +1169,10 @@ $row = DB::table('BIOG_INST_DATA')
 **❌ 高優先級（數據完整性風險）**：
 1. **ALTNAME_DATA** - 字段數不匹配（DB 3個 vs 代碼 4個）
 2. **EVENTS_DATA** - 數據庫完全沒有主鍵定義
-3. **ASSOC_DATA** - 代碼缺少 `c_assoc_first_year` 字段（詳見附錄 D）
+3. ~~**ASSOC_DATA** - 代碼缺少 `c_assoc_first_year` 字段~~ ✅ 已修正（2026-01-26）
 
 **⚠️ 中優先級（代碼一致性問題）**：
-4. **BIOG_INST_DATA** - Delete 方法只用 2 個字段
+4. ~~**BIOG_INST_DATA** - Delete 方法只用 2 個字段~~ ✅ 已修正（2026-01-26）
 5. **BIOG_SOURCE_DATA** - `c_pages` 可能含特殊字符
 
 **⚠️ 低優先級（僅順序不同）**：
@@ -1179,7 +1182,7 @@ $row = DB::table('BIOG_INST_DATA')
 
 ### D. ASSOC_DATA 特殊說明
 
-**⚠️ 已知問題**：`ASSOC_DATA` 表的複合主鍵處理存在嚴重缺陷。
+**✅ 已修正（2026-01-26）**：`ASSOC_DATA` 表的複合主鍵處理問題已修正。
 
 **數據庫實際主鍵**（9 個字段）：
 ```sql
@@ -1196,9 +1199,10 @@ PRIMARY KEY (
 )
 ```
 
-**代碼中使用的字段**（僅 8 個）：
+**代碼中使用的字段**（✅ 已修正為 9 個）：
 ```php
-// BasicInformationAssocController.php:161
+// BiogMainRepository.php - assocById(), assocUpdateById(), assocDeleteById(), assocStoreById()
+// 修正後的複合主鍵格式：
 $_id = $data['c_personid']."-".
        $data['c_assoc_code']."-".
        $data['c_assoc_id']."-".
@@ -1206,38 +1210,31 @@ $_id = $data['c_personid']."-".
        $data['c_kin_id']."-".
        $data['c_assoc_kin_code']."-".
        $data['c_assoc_kin_id']."-".
-       $data['c_text_title'];
-// ❌ 缺少 c_assoc_first_year！
-
-// BiogMainRepository.php:1487
-$row = DB::table('ASSOC_DATA')->where([
-    // ... 8 個條件 ...
-])->first(); // ⚠️ 可能返回錯誤的記錄！
+       $data['c_text_title']."-".
+       $data['c_assoc_first_year'];  // ✅ 已加入第 9 個字段
 ```
 
-**潛在 Bug**：
-如果兩條記錄的前 8 個字段相同，但 `c_assoc_first_year` 不同：
-- URL 會指向相同的路徑
-- `first()` 會返回數據庫中遇到的第一條記錄
-- 用戶可能編輯到錯誤的記錄
+**已修正內容**（2026-01-26）：
+- `assocById()` - 增加 `c_assoc_first_year` 到 WHERE 條件
+- `assocUpdateById()` - 增加 `c_assoc_first_year` 到 WHERE 條件和操作記錄 ID
+- `assocDeleteById()` - 增加 `c_assoc_first_year` 到 WHERE 條件
+- `assocStoreById()` - 增加 `c_assoc_first_year` 到操作記錄 ID
 
-**額外複雜性**：`c_text_title` 字段可能包含負號
+**`c_text_title` 包含負號的處理**：
+修正後的代碼能正確處理 `c_text_title` 包含 `-` 的情況：
 ```php
-// BiogMainRepository.php:1476-1485
-// 如果 c_text_title = "論語-註釋"
-// URL: 12345-1-2-3-4-5-6-論語-註釋 (9 段)
-// 代碼會從 temp_l[7] 開始合併所有後續段
+// 由於 c_assoc_first_year 是年份數字，固定在最後一個位置
+// c_text_title 是從 index 7 到倒數第二個位置的所有部分（用 - 連接）
+$c_assoc_first_year = count($temp_l) > 8 ? end($temp_l) : ($temp_l[8] ?? '-9999');
+if (count($temp_l) > 9) {
+    $c_text_title = implode('-', array_slice($temp_l, 7, count($temp_l) - 8));
+} else {
+    $c_text_title = $temp_l[7] ?? '';
+}
 ```
 
-**建議修正措施**：
-1. **短期**：在 `assocStoreById` 和 `assocById` 中加入 `c_assoc_first_year` 字段
-2. **長期**：採用查詢參數模式，完全避免這類分隔符解析問題
-
-**測試重點**：
-在實施新方案時，務必測試以下情況：
-- `c_text_title` 包含負號（如「論語-註釋」）
-- `c_text_title` 包含多個負號（如「春秋-左傳-疏」）
-- 前 8 個字段相同但 `c_assoc_first_year` 不同的記錄
+**建議長期措施**：
+- 採用查詢參數模式（已在 Controller 中實現），完全避免分隔符解析問題
 
 ### E. 聯絡資訊
 
@@ -1247,6 +1244,16 @@ $row = DB::table('ASSOC_DATA')->where([
 
 ---
 
-**文檔版本**：1.1
-**最後更新**：2026-01-23
+**文檔版本**：1.2
+**最後更新**：2026-01-26
 **維護者**：CBDB 開發團隊
+
+### 版本歷史
+
+#### v1.2 (2026-01-26)
+- 修正 ASSOC_DATA：增加第 9 個欄位 `c_assoc_first_year` 到所有 Repository 方法
+- 修正 BIOG_INST_DATA：`socialInstDeleteById()` 現在使用完整的 4 個欄位
+- 更新對比總覽表和嚴重問題優先級總結
+
+#### v1.1 (2026-01-23)
+- 初始文檔

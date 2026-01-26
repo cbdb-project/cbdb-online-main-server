@@ -1456,7 +1456,11 @@ class BiogMainRepository {
             $text_str = $text_->c_textid." ".$text_->c_title." ".$text_->c_title_chn;
 
         }
-        $addr_ = DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->get();
+        $addr_ = DB::table('EVENTS_ADDR')
+            ->where('c_personid', $row->c_personid)
+            ->where('c_sequence', $row->c_sequence)
+            ->where('c_event_code', $row->c_event_code)
+            ->get();
         $addr_str = [];
         foreach ($addr_ as $key => $value) {
             $id_ = $value->c_addr_id == 0 ? -999 : $value->c_addr_id;
@@ -1475,12 +1479,24 @@ class BiogMainRepository {
     public function eventUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
         $data = $this->formatSelect($data);
-        $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
+
+        // 先獲取原始記錄，用於刪除舊的 EVENTS_ADDR
+        $ori = DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->first();
+
+        // 使用原始值刪除舊地址，再用新值插入新地址
+        // 這樣即使用戶修改了 c_sequence 或 c_event_code，也不會留下孤兒記錄
+        $this->updateAddrEvent(
+            $data['c_addr_id'],
+            $id,
+            $ori->c_sequence,
+            $ori->c_event_code,
+            $data['c_sequence'],
+            $data['c_event_code']
+        );
+
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data);
-        #20251208新增差異比對紀錄
-        $ori = DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->first();
         DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->update($data);
         (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data, $ori);
 
@@ -1491,8 +1507,7 @@ class BiogMainRepository {
         $data = $request->all();
         $data = $this->formatSelect($data);
         $data['c_personid'] = $id;
-        $data['c_event_record_id'] = DB::table('EVENTS_DATA')->max('c_event_record_id') + 1;
-        $this->insertAddrEvent($data['c_addr_id'], $data['c_event_record_id'], $id);
+        $this->insertAddrEvent($data['c_addr_id'], $id, $data['c_sequence'], $data['c_event_code']);
         $data = Arr::except($data, ['_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data, true);
@@ -1505,7 +1520,11 @@ class BiogMainRepository {
     public function eventDeleteById($id, $c_personid) {
         $row = DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->first();
         DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->delete();
-        DB::table('EVENTS_ADDR')->where('c_event_record_id', $row->c_event_record_id)->delete();
+        DB::table('EVENTS_ADDR')
+            ->where('c_personid', $row->c_personid)
+            ->where('c_sequence', $row->c_sequence)
+            ->where('c_event_code', $row->c_event_code)
+            ->delete();
         (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $id, $row);
     }
 
@@ -2272,13 +2291,50 @@ class BiogMainRepository {
         }
     }
 
-    protected function insertAddrEvent(array $c_addr_id, $c_event_record_id, $c_personid) {
-        DB::table('EVENTS_ADDR')->where('c_event_record_id', $c_event_record_id)->delete();
+    protected function insertAddrEvent(array $c_addr_id, $c_personid, $c_sequence, $c_event_code) {
+        DB::table('EVENTS_ADDR')
+            ->where('c_personid', $c_personid)
+            ->where('c_sequence', $c_sequence)
+            ->where('c_event_code', $c_event_code)
+            ->delete();
         foreach ($c_addr_id as $item) {
             DB::table('EVENTS_ADDR')->insert(
                 [
                     'c_personid' => $c_personid,
-                    'c_event_record_id' => $c_event_record_id,
+                    'c_sequence' => $c_sequence,
+                    'c_event_code' => $c_event_code,
+                    'c_addr_id' => $item == -999 ? 0 : $item,
+                ]
+            );
+        }
+    }
+
+    /**
+     * 更新事件地址：使用原始主鍵刪除舊記錄，使用新主鍵插入新記錄
+     * 這樣即使用戶修改了 c_sequence 或 c_event_code，也不會留下孤兒記錄
+     */
+    protected function updateAddrEvent(
+        array $c_addr_id,
+        $c_personid,
+        $old_sequence,
+        $old_event_code,
+        $new_sequence,
+        $new_event_code
+    ) {
+        // 使用原始值刪除舊的地址記錄
+        DB::table('EVENTS_ADDR')
+            ->where('c_personid', $c_personid)
+            ->where('c_sequence', $old_sequence)
+            ->where('c_event_code', $old_event_code)
+            ->delete();
+
+        // 使用新值插入新的地址記錄
+        foreach ($c_addr_id as $item) {
+            DB::table('EVENTS_ADDR')->insert(
+                [
+                    'c_personid' => $c_personid,
+                    'c_sequence' => $new_sequence,
+                    'c_event_code' => $new_event_code,
                     'c_addr_id' => $item == -999 ? 0 : $item,
                 ]
             );

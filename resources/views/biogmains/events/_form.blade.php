@@ -9,7 +9,6 @@
 <form action="{{ $formAction }}" method="post">
     @if($isEdit)
         {{ method_field('PATCH') }}
-        <input type="hidden" name="c_event_record_id" value="{{ $row->c_event_record_id }}">
     @endif
     {{ csrf_field() }}
 

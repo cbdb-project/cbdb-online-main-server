@@ -630,8 +630,9 @@ class ViewTableQueries {
                 DB::raw('gz.c_ganzhi_py as c_event_day_gz_py'),
             ])
             ->leftJoin('EVENTS_DATA as event_data', function ($join) {
-                $join->on('event_data.c_event_record_id', '=', 'ea.c_event_record_id')
-                    ->on('event_data.c_personid', '=', 'ea.c_personid');
+                $join->on('event_data.c_personid', '=', 'ea.c_personid')
+                    ->on('event_data.c_sequence', '=', 'ea.c_sequence')
+                    ->on('event_data.c_event_code', '=', 'ea.c_event_code');
             })
             ->leftJoin('EVENT_CODES as event_codes', 'event_codes.c_event_code', '=', 'event_data.c_event_code')
             ->join('BIOG_MAIN as person', 'person.c_personid', '=', 'ea.c_personid')

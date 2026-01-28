@@ -210,17 +210,29 @@ class PrometheusMetrics {
 
     /**
      * 获取路径（可选择包含路由参数）
+     *
+     * 注意：为避免 label cardinality 爆量（例如机器人扫描随机 URL），
+     * 当请求不匹配任何已定义路由时，统一归类为 __unknown__。
      */
     protected function getPath(Request $request): string {
+        $route = $request->route();
+
         if (config('prometheus.http_metrics.include_route_params', false)) {
             // 使用路由模式（如 /user/{id}）
-            $route = $request->route();
             if ($route) {
                 return '/' . ltrim($route->uri(), '/');
             }
+
+            // 未匹配任何路由，归类为 /__unknown__ 避免 cardinality 过高
+            return '/__unknown__';
         }
 
-        // 使用实际路径
-        return '/' . ltrim($request->path(), '/');
+        // 使用实际路径（但仍需处理未匹配路由的情况）
+        if ($route) {
+            return '/' . ltrim($request->path(), '/');
+        }
+
+        // 未匹配任何路由，归类为 /__unknown__
+        return '/__unknown__';
     }
 }

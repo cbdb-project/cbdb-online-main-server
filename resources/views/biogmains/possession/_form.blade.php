@@ -144,7 +144,7 @@
 
         // 使用统一的 AJAX Select2 初始化助手函数
         window.initAjaxSelect($(".c_source"), 'text');
-        window.initAjaxSelect($(".c_addr_id"), 'officeaddr');
+        window.initAjaxSelect($(".c_addr_id"), 'addr');
 
         function textperson_pair_first_load(){
             let person_id = $('.person_id').val();

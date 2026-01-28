@@ -111,13 +111,6 @@ class ApiController extends Controller {
         return $data;
     }
 
-    public function searchOfficeAddr(Request $request) {
-        $addrcodeRepository = new AddrCodeRepository();
-        $data = $addrcodeRepository->searchOfficeAddr($request);
-
-        return $data;
-    }
-
     public function range() {
         $yearrangeRepository = new YearRangeRepository();
 

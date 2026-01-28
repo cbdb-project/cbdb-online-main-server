@@ -122,16 +122,4 @@ class AddrCodeRepository {
 
         return $data;
     }
-
-    public function searchOfficeAddr(Request $request) {
-        $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate(20);
-        $data->appends(['q' => $request->q])->links();
-        foreach ($data as $item) {
-            $item['id'] = $item->c_addr_id == 0 ? -999 : $item->c_addr_id;
-            $belongs = $item->belongs1_ID." ".$item->belongs1_Name." ".$item->belongs2_ID." ".$item->belongs2_Name." ".$item->belongs3_ID." ".$item->belongs3_Name." ".$item->belongs4_ID." ".$item->belongs4_Name." ".$item->belongs5_ID." ".$item->belongs5_Name;
-            $item['text'] = $item->c_addr_id." ".$item->c_name." ".$item->c_name_chn." ".trim($belongs);
-        }
-
-        return $data;
-    }
 }

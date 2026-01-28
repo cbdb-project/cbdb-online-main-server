@@ -378,4 +378,29 @@ class PrometheusMetricsTest extends TestCase {
             }
         }
     }
+
+    #[Test]
+    public function unmatched_routes_are_recorded_as_unknown_to_prevent_cardinality_explosion(): void {
+        Config::set('prometheus.enabled', true);
+        Config::set('prometheus.http_metrics.enabled', true);
+        Config::set('prometheus.http_metrics.include_route_params', true);
+        Config::set('prometheus.namespace', 'cbdb');
+
+        // 访问一个不存在的随机路径（模拟机器人扫描）
+        $this->get('/random-bot-scan-path-12345');
+        $this->get('/wp-admin/login.php');
+        $this->get('/.env');
+
+        // 获取 metrics
+        $response = $this->get('/metrics');
+        $content = $response->getContent();
+
+        // 验证未匹配路由的请求被记录为 /__unknown__
+        $this->assertStringContainsString('path="/__unknown__"', $content, '未匹配路由的請求應該被記錄為 /__unknown__ 以避免 cardinality 過高');
+
+        // 验证不应该有实际的随机路径出现在 metrics 中
+        $this->assertStringNotContainsString('random-bot-scan-path', $content, '不應記錄隨機路徑');
+        $this->assertStringNotContainsString('wp-admin', $content, '不應記錄機器人掃描路徑');
+        $this->assertStringNotContainsString('.env', $content, '不應記錄敏感文件探測路徑');
+    }
 }

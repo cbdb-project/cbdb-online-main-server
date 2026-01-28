@@ -47,7 +47,6 @@ Route::group([
 
     // Search endpoints
     Route::get('search/addr', 'ApiController@searchAddr');
-    Route::get('search/officeaddr', 'ApiController@searchOfficeAddr');
     Route::get('search/text', 'ApiController@searchText');
     Route::get('search/textperson', 'ApiController@searchTextPerson');
     Route::get('search/textauthor', 'ApiController@searchTextAuthor');

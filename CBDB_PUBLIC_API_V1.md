@@ -65,7 +65,17 @@ GET /cbdbapi/person.php?id=1488                 # HTML 模式（無 o 參數）
 
 ### 別名與地址
 - `PersonAliases.Alias`：別名列表，每筆含 `AliasType`、`AliasTypeId`、`AliasName`。
-- `PersonAddresses.Address`：地址資訊，欄位含 `AddrTypeId`、`AddrType`、`AddrId`、`AddrName`、`belongs1_name`/`belongs1_id` 等。
+- `PersonAddresses.Address`：地址資訊（來源：BIOG_ADDR_DATA + ADDR_CODES 表），欄位含：
+  - `AddrTypeId`：地址類型代碼
+  - `AddrType`：地址類型名稱（中文）
+  - `AddrId`：地址 ID
+  - `AddrName`：地址名稱（中文，來源：ADDR_CODES 表）
+  - `MoveCount`：遷移順序
+  - `FirstYear`：起始年份
+  - `LastYear`：終止年份
+  - `Source`：來源文獻標題
+  - `Pages`：頁碼
+  - `Notes`：註記
 
 ### 科舉與任官
 - `PersonEntryInfo.Entry`：科舉資訊。若無資料為空字串。
@@ -132,6 +142,13 @@ GET /cbdbapi/person.php?id=1488                 # HTML 模式（無 o 參數）
 - `name` 查詢會優先以 BIOG_MAIN 的中文、英文與拼音欄位做全字比對，再依序比對 ALTNAME，若仍找不到才改用模糊查詢；命中後回傳第一筆結果。
 
 ## 版本更新記錄
+
+### 2026-01-28：地址欄位簡化
+- **移除地址層級欄位**：`PersonAddresses.Address` 不再包含 `belongs1_name`/`belongs1_id` 至 `belongs5_name`/`belongs5_id` 等層級欄位
+- **資料來源變更**：地址名稱（`AddrName`）現從 `ADDR_CODES` 表獲取，不再使用 `ADDRESSES` 派生表
+- **效能優化**：移除複雜的時間範圍匹配邏輯，大幅降低系統資源消耗
+- **HTML 界面改進**：地址 ID 現為可點擊鏈接，跳轉至 `/codes/ADDR_CODES?search={id}` 查看詳細資訊
+- **向後兼容說明**：若有依賴 `belongs*` 欄位的外部應用，需改為透過 `AddrId` 查詢 `ADDR_BELONGS_DATA` 表獲取層級關係
 
 ### 2025-11-08：Wikidata 格式支持
 - **ID 格式擴展**：支持 1-7 位數字，包含前置 0（如 `0001367`）

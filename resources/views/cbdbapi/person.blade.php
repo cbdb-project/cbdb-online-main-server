@@ -417,11 +417,15 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         var names = escapeHtml(info.ChName || '') + ' / ' + escapeHtml(info.EngName || '');
         html += line('中文名 / 英文名', names);
         html += line('指數年', isValidValue(info.IndexYear) ? escapeHtml(info.IndexYear) : '未詳');
-        var indexAddrParts = [];
+        var indexAddrHtml = '';
         if (info.IndexAddr) {
-            indexAddrParts.push(formatIdLabel(info.IndexAddr, info.IndexAddrId));
+            indexAddrHtml = escapeHtml(info.IndexAddr);
         }
-        html += line('指數地址', indexAddrParts.join(' '));
+        if (info.IndexAddrId) {
+            indexAddrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(info.IndexAddrId) + '" target="_blank" rel="noopener noreferrer">';
+            indexAddrHtml += '<span class="badge">ID: ' + escapeHtml(info.IndexAddrId) + '</span></a>';
+        }
+        html += line('指數地址', indexAddrHtml.trim() || '<span class="empty">（空）</span>');
 
         var birthParts = [];
         birthParts.push(formatIdLabel(info.DynastyBirth, info.DynastyBirthId));
@@ -520,32 +524,19 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
     }
 
     function buildAddressPath(item) {
-        var path = [];
-        // 先添加具体地点
+        if (!item.AddrName && !item.AddrId) {
+            return '';
+        }
+        var addr = '';
         if (item.AddrName) {
-            var addr = escapeHtml(item.AddrName);
-            if (item.AddrId) {
-                addr += ' <span class="badge">' + escapeHtml(item.AddrId) + '</span>';
-            }
-            path.push(addr);
+            addr = escapeHtml(item.AddrName);
         }
-        // 再添加上级地址，从 belongs1 到 belongs5（从小到大）
-        for (var i = 1; i <= 5; i++) {
-            var nameKey = 'belongs' + i + '_name';
-            var idKey = 'belongs' + i + '_id';
-            if (item[nameKey]) {
-                // 如果遇到 [未詳] 或 ID 为 0，停止渲染
-                if (item[nameKey] === '[未詳]' || item[idKey] === '0' || item[idKey] === 0) {
-                    break;
-                }
-                var label = escapeHtml(item[nameKey]);
-                if (item[idKey]) {
-                    label += ' <span class="badge">ID: ' + escapeHtml(item[idKey]) + '</span>';
-                }
-                path.push(label);
-            }
+        if (item.AddrId) {
+            var addrLink = '<a href="/codes/ADDR_CODES?search=' + encodeURIComponent(item.AddrId) + '" target="_blank" rel="noopener noreferrer">';
+            addrLink += '<span class="badge">' + escapeHtml(item.AddrId) + '</span></a>';
+            addr += ' ' + addrLink;
         }
-        return path.join(' → ');
+        return addr;
     }
 
     function renderAddresses(title, items) {
@@ -699,8 +690,13 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             details.push('終止年：' + endYearText);
 
             // 地點
-            if (item.AddrName) {
-                details.push('地點：<strong>' + escapeHtml(item.AddrName) + '</strong>');
+            if (item.AddrName || item.AddrId) {
+                var addrHtml = '地點：<strong>' + escapeHtml(item.AddrName || '') + '</strong>';
+                if (item.AddrId) {
+                    addrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(item.AddrId) + '" target="_blank" rel="noopener noreferrer">';
+                    addrHtml += '<span class="badge">' + escapeHtml(item.AddrId) + '</span></a>';
+                }
+                details.push(addrHtml);
             }
 
             // 出處

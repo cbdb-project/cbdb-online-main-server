@@ -554,16 +554,6 @@ SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        (SELECT c_addr_desc_chn FROM BIOG_ADDR_CODES WHERE c_addr_type = BIOG_ADDR_DATA.c_addr_type) AS AddrType,
        BIOG_ADDR_DATA.c_addr_id AS AddrId,
        (SELECT c_name_chn FROM ADDR_CODES WHERE c_addr_id = BIOG_ADDR_DATA.c_addr_id) AS AddrName,
-       ADDR.belongs1_Name AS belongs1_name,
-       ADDR.belongs1_Id AS belongs1_id,
-       ADDR.belongs2_Name AS belongs2_name,
-       ADDR.belongs2_Id AS belongs2_id,
-       ADDR.belongs3_Name AS belongs3_name,
-       ADDR.belongs3_Id AS belongs3_id,
-       ADDR.belongs4_Name AS belongs4_name,
-       ADDR.belongs4_Id AS belongs4_id,
-       ADDR.belongs5_Name AS belongs5_name,
-       ADDR.belongs5_Id AS belongs5_id,
        BIOG_ADDR_DATA.c_sequence AS MoveCount,
        BIOG_ADDR_DATA.c_firstyear AS FirstYear,
        BIOG_ADDR_DATA.c_lastyear AS LastYear,
@@ -571,36 +561,6 @@ SELECT BIOG_ADDR_DATA.c_addr_type AS AddrTypeId,
        BIOG_ADDR_DATA.c_pages AS Pages,
        BIOG_ADDR_DATA.c_notes AS Notes
 FROM BIOG_ADDR_DATA
-LEFT JOIN ADDRESSES AS ADDR
-     ON ADDR.c_addr_id = BIOG_ADDR_DATA.c_addr_id
-     AND (
-         BIOG_ADDR_DATA.c_firstyear IS NULL
-         OR ADDR.c_lastyear IS NULL
-         OR BIOG_ADDR_DATA.c_firstyear <= ADDR.c_lastyear
-     )
-     AND (
-         BIOG_ADDR_DATA.c_lastyear IS NULL
-         OR ADDR.c_firstyear IS NULL
-         OR BIOG_ADDR_DATA.c_lastyear >= ADDR.c_firstyear
-     )
-     AND NOT EXISTS (
-         SELECT 1 FROM ADDRESSES ADDR2
-         WHERE ADDR2.c_addr_id = ADDR.c_addr_id
-         AND (
-             BIOG_ADDR_DATA.c_firstyear IS NULL
-             OR ADDR2.c_lastyear IS NULL
-             OR BIOG_ADDR_DATA.c_firstyear <= ADDR2.c_lastyear
-         )
-         AND (
-             BIOG_ADDR_DATA.c_lastyear IS NULL
-             OR ADDR2.c_firstyear IS NULL
-             OR BIOG_ADDR_DATA.c_lastyear >= ADDR2.c_firstyear
-         )
-         AND (
-             ADDR2.c_firstyear < ADDR.c_firstyear
-             OR (ADDR2.c_firstyear = ADDR.c_firstyear AND ADDR2.c_lastyear < ADDR.c_lastyear)
-         )
-     )
 WHERE BIOG_ADDR_DATA.c_personid = ?
 SQL;
     }
@@ -635,7 +595,7 @@ SELECT POSTED_TO_OFFICE_DATA.c_office_id AS OfficeId,
               AND c_personid = POSTED_TO_OFFICE_DATA.c_personid
               AND c_office_id = POSTED_TO_OFFICE_DATA.c_office_id
             LIMIT 1) AS AddrId,
-       (SELECT c_name_chn FROM ADDRESSES
+       (SELECT c_name_chn FROM ADDR_CODES
             WHERE c_addr_id = (SELECT c_addr_id FROM POSTED_TO_ADDR_DATA
                                 WHERE c_posting_id = POSTED_TO_OFFICE_DATA.c_posting_id
                                   AND c_personid = POSTED_TO_OFFICE_DATA.c_personid

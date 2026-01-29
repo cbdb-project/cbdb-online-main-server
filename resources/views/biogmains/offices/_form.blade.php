@@ -66,6 +66,8 @@
     <div class="form-group row">
         <label for="c_addr" class="col-sm-2 col-form-label">地名</label>
         <div class="col-sm-10">
+            {{-- 隱藏欄位：當用戶清除所有地址時，標記為已清除（因為空的 multi-select 不會傳送欄位） --}}
+            <input type="hidden" name="c_addr_cleared" id="c_addr_cleared" value="0">
             <select class="form-control c_addr" name="c_addr[]" multiple="multiple">
                 @if($isEdit && isset($res['addr_str']))
                     @foreach($res['addr_str'] as $item)
@@ -228,6 +230,14 @@
             });
 
             $officeForm.on('submit', function () {
+                // 當地址欄位為空時，設置 c_addr_cleared 標記
+                // 這樣後端可以區分「用戶沒有修改地址」和「用戶清除了所有地址」
+                var addrVal = $('.c_addr').val();
+                if (!addrVal || addrVal.length === 0) {
+                    $('#c_addr_cleared').val('1');
+                } else {
+                    $('#c_addr_cleared').val('0');
+                }
                 pristineSnapshot = $officeForm.serialize();
                 $submitButton.prop('disabled', true);
             });

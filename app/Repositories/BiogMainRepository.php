@@ -582,7 +582,13 @@ class BiogMainRepository {
         $_postingid = $data['_postingid'];
         $_officeid = $data['_officeid']; //目前与officeid无关
 
-        $incomingAddr = array_key_exists('c_addr', $data) ? (array)$data['c_addr'] : null;
+        // 檢查地址欄位：
+        // - c_addr 存在時：使用傳入的值
+        // - c_addr 不存在但 c_addr_cleared == '1'：用戶清除了所有地址（視為空陣列）
+        // - 兩者都不存在：用戶沒有修改地址（視為 null）
+        $incomingAddr = array_key_exists('c_addr', $data)
+            ? (array)$data['c_addr']
+            : (($data['c_addr_cleared'] ?? '0') === '1' ? [] : null);
 
         $oriRecord = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
         $ori = $oriRecord ? json_decode(json_encode($oriRecord), true) : [];
@@ -593,10 +599,14 @@ class BiogMainRepository {
             ->pluck('c_addr_id');
 
         $existingAddresses = $addressCollection ? $addressCollection->all() : [];
+        // 地址變更檢測邏輯：
+        // - $incomingAddr === null: 用戶沒有修改地址（表單未傳送 c_addr）
+        // - $incomingAddr === []: 用戶明確清除所有地址（表單傳送空 c_addr）
+        // - $incomingAddr 有值: 用戶修改了地址列表
         $hasAddressChange = $incomingAddr !== null
             && $this->selectionListHasChanges($incomingAddr, $existingAddresses, -999);
 
-        $data = Arr::except($data, ['_method', '_token', 'c_addr', '_id', '_postingid', '_officeid']);
+        $data = Arr::except($data, ['_method', '_token', 'c_addr', 'c_addr_cleared', '_id', '_postingid', '_officeid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['c_office_id'] = $data['c_office_id'] == -999 ? '0' : $data['c_office_id'];
@@ -667,8 +677,16 @@ class BiogMainRepository {
 
                 //dd($previousOfficeId, $currentOfficeId, $beforeRows);
 
-                // 先計算最終要保留的地址列表（用於衝突檢測）
-                $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+                // 先計算最終要保留的地址列表（用於衝突檢測和後續操作）
+                // - $incomingAddr === null: 保留現有地址（用戶沒有修改）
+                // - $incomingAddr 有值（包含空陣列）: 使用用戶指定的地址列表
+                // 將 -999 正規化為 0（-999 是表單中「未選擇」的 sentinel 值，0 代表「未詳」地址）
+                $sourceAddresses = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+                $addressesForInsert = array_map(function ($v) {
+                    $v = (int) $v;
+
+                    return $v === -999 ? 0 : $v;
+                }, $sourceAddresses);
 
                 // 當 c_office_id 改變時，將現有地址記錄遷移到新的 office_id
                 // 使用 UPDATE 而非 DELETE，避免地址記錄丟失
@@ -677,7 +695,8 @@ class BiogMainRepository {
                     // POSTED_TO_ADDR_DATA 主鍵為 (c_addr_id, c_office_id, c_posting_id)
                     // 只檢查「將保留/新增」的地址，允許用戶通過移除衝突地址來解決問題
                     // 這裡額外加上 c_personid 條件是為了縮小查詢範圍，確保只檢查同一人的記錄
-                    $addressesToKeep = array_map('intval', $addressesForInsert);
+                    // $addressesForInsert 已正規化（-999 → 0）
+                    $addressesToKeep = $addressesForInsert;
                     if (!empty($addressesToKeep)) {
                         $conflictingRecords = DB::table('POSTED_TO_ADDR_DATA')
                             ->where('c_personid', $_id)
@@ -746,12 +765,13 @@ class BiogMainRepository {
 
                 //比對結束，新增後來新加的addr。
                 // 注意：使用 $currentOfficeId 確保新地址插入到正確的 office_id
+                // $addr_v 已經正規化（-999 → 0），直接使用即可
                 foreach ($newHave_diff as $addr_v) {
                     DB::table('POSTED_TO_ADDR_DATA')->insert([
                         'c_personid' => $_id,
                         'c_posting_id' => $_postingid,
                         'c_office_id' => $currentOfficeId,
-                        'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
+                        'c_addr_id' => $addr_v,
                         'c_created_by' => $c_created_by,
                         'c_created_date' => $c_created_date,
                         'c_modified_by' => $c_created_by,

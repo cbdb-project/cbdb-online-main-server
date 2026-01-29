@@ -544,4 +544,243 @@ class OfficeIdChangeAddressLossTest extends TestCase {
 
         $this->assertNull($removedAddress, '被用戶移除的地址 301 應該從舊的 office_id 下刪除');
     }
+
+    /**
+     * 測試：清除所有地址（不修改官名）
+     *
+     * 問題描述：
+     * 當用戶刪除所有地址時，HTML 多選框不會傳送 c_addr 參數，
+     * 導致 $incomingAddr 為 null，被誤判為「無修改」。
+     *
+     * 預期：用戶清除所有地址後，系統應該刪除所有地名記錄。
+     */
+    #[Test]
+    public function testClearingAllAddresses(): void {
+        $personId = 27711;
+        $postingId = 18539;
+        $officeId = 412;
+
+        // 創建 POSTING_DATA 記錄
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        // 創建任官記錄
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => $personId,
+            'c_office_id' => $officeId,
+            'c_posting_id' => $postingId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        // 創建多個地址記錄
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            [
+                'c_personid' => $personId,
+                'c_posting_id' => $postingId,
+                'c_office_id' => $officeId,
+                'c_addr_id' => 401,
+                'c_created_by' => 'Seeder',
+                'c_created_date' => '2023-01-01 00:00:00',
+            ],
+            [
+                'c_personid' => $personId,
+                'c_posting_id' => $postingId,
+                'c_office_id' => $officeId,
+                'c_addr_id' => 402,
+                'c_created_by' => 'Seeder',
+                'c_created_date' => '2023-01-01 00:00:00',
+            ],
+        ]);
+
+        // 驗證初始狀態
+        $initialCount = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $personId)
+            ->where('c_posting_id', $postingId)
+            ->count();
+        $this->assertEquals(2, $initialCount, '初始狀態應該有 2 條地名記錄');
+
+        // 用戶清除所有地址（使用 c_addr_cleared 標記，模擬實際 UI 行為）
+        // 當 HTML 多選框無選項時不會傳送 c_addr，但前端 JavaScript 會設置 c_addr_cleared='1'
+        $request = new Request([
+            '_id' => $personId,
+            '_postingid' => $postingId,
+            '_officeid' => $officeId,
+            'c_office_id' => $officeId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr_cleared' => '1',  // 前端設置的標記，表示用戶清除了所有地址
+            // 注意：沒有 c_addr 參數（模擬 HTML multi-select 空白時的行為）
+        ]);
+
+        $repository = new BiogMainRepository();
+        $result = $repository->officeUpdateById($request, $postingId, $personId);
+
+        // 應該不返回 "no_changes"
+        $this->assertFalse(
+            $result['no_changes'] ?? false,
+            '清除地址應該被視為有變更'
+        );
+
+        // 驗證：所有地址記錄應該被刪除
+        $finalCount = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $personId)
+            ->where('c_posting_id', $postingId)
+            ->count();
+        $this->assertEquals(0, $finalCount, '所有地名記錄應該被刪除');
+    }
+
+    /**
+     * 測試：-999 應該正規化為 0（「未詳」地址）
+     *
+     * 問題描述：
+     * -999 是表單中「未選擇」的 sentinel 值，代表「未詳」地址（c_addr_id = 0）。
+     * 衝突檢測和遷移邏輯應該將 -999 正規化為 0。
+     */
+    #[Test]
+    public function testNegative999ShouldBeNormalizedToZero(): void {
+        $personId = 27712;
+        $postingId = 18540;
+        $oldOfficeId = 412;
+        $newOfficeId = 950;
+
+        // 創建 POSTING_DATA 記錄
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        // 創建任官記錄
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => $personId,
+            'c_office_id' => $oldOfficeId,
+            'c_posting_id' => $postingId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        // 創建「未詳」地址記錄（c_addr_id = 0）
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_office_id' => $oldOfficeId,
+            'c_addr_id' => 0,  // 「未詳」地址
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        // 用戶修改官名，同時傳入 -999（代表「未詳」）
+        $request = new Request([
+            '_id' => $personId,
+            '_postingid' => $postingId,
+            '_officeid' => $oldOfficeId,
+            'c_office_id' => $newOfficeId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [-999],  // -999 應該等同於 0
+        ]);
+
+        $repository = new BiogMainRepository();
+        $repository->officeUpdateById($request, $postingId, $personId);
+
+        // 驗證：「未詳」地址記錄應該遷移到新的 office_id
+        $migratedAddress = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $personId)
+            ->where('c_posting_id', $postingId)
+            ->where('c_office_id', $newOfficeId)
+            ->where('c_addr_id', 0)  // 注意：是 0，不是 -999
+            ->first();
+
+        $this->assertNotNull($migratedAddress, '「未詳」地址（c_addr_id=0）應該成功遷移到新的 office_id');
+
+        // 驗證舊的 office_id 下沒有地址記錄
+        $oldCount = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $personId)
+            ->where('c_posting_id', $postingId)
+            ->where('c_office_id', $oldOfficeId)
+            ->count();
+
+        $this->assertEquals(0, $oldCount, '舊的 office_id 下不應該有地址記錄');
+    }
+
+    /**
+     * 測試：-999 衝突檢測應該正確比對 c_addr_id = 0
+     *
+     * 當目標 office_id 下已存在 c_addr_id = 0 的記錄，
+     * 而用戶傳入 -999（代表「未詳」），應該檢測到衝突。
+     */
+    #[Test]
+    public function testNegative999ConflictDetectionWithZero(): void {
+        $personId = 27713;
+        $postingId = 18541;
+        $oldOfficeId = 412;
+        $newOfficeId = 960;
+
+        // 創建 POSTING_DATA 記錄
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        // 創建任官記錄
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => $personId,
+            'c_office_id' => $oldOfficeId,
+            'c_posting_id' => $postingId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        // 創建源 office_id 的「未詳」地址記錄
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_office_id' => $oldOfficeId,
+            'c_addr_id' => 0,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-01-01 00:00:00',
+        ]);
+
+        // 目標 office_id 下已存在「未詳」地址記錄（c_addr_id = 0）
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $personId,
+            'c_posting_id' => $postingId,
+            'c_office_id' => $newOfficeId,
+            'c_addr_id' => 0,  // 衝突地址
+            'c_created_by' => 'Old Record',
+            'c_created_date' => '2022-01-01 00:00:00',
+        ]);
+
+        // 用戶修改官名，傳入 -999（代表「未詳」）
+        $request = new Request([
+            '_id' => $personId,
+            '_postingid' => $postingId,
+            '_officeid' => $oldOfficeId,
+            'c_office_id' => $newOfficeId,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [-999],  // -999 應該等同於 0，應該檢測到衝突
+        ]);
+
+        $repository = new BiogMainRepository();
+
+        // 應該拋出 ValidationException，因為 -999 正規化後為 0，與目標 office_id 下的記錄衝突
+        $this->expectException(ValidationException::class);
+
+        $repository->officeUpdateById($request, $postingId, $personId);
+    }
 }

@@ -41,6 +41,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 //修改結束
 
@@ -666,21 +667,63 @@ class BiogMainRepository {
 
                 //dd($previousOfficeId, $currentOfficeId, $beforeRows);
 
-                if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
-                    DB::table('POSTED_TO_ADDR_DATA')
-                        ->where('c_personid', $_id)
-                        ->where('c_posting_id', $_postingid)
-                        ->where('c_office_id', $previousOfficeId)
-            ->delete();
-                    //如果$previousOfficeId與$currentOfficeId不相等，而且$beforeRows有資料，就先將舊的POSTED_TO_ADDR_DATA刪除乾淨。
-                }
-
+                // 先計算最終要保留的地址列表（用於衝突檢測）
                 $addressesForInsert = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+
+                // 當 c_office_id 改變時，將現有地址記錄遷移到新的 office_id
+                // 使用 UPDATE 而非 DELETE，避免地址記錄丟失
+                if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
+                    // 檢查目標 office_id 下是否已存在「將保留的地址」記錄（主鍵衝突檢測）
+                    // POSTED_TO_ADDR_DATA 主鍵為 (c_addr_id, c_office_id, c_posting_id)
+                    // 只檢查「將保留/新增」的地址，允許用戶通過移除衝突地址來解決問題
+                    // 這裡額外加上 c_personid 條件是為了縮小查詢範圍，確保只檢查同一人的記錄
+                    $addressesToKeep = array_map('intval', $addressesForInsert);
+                    if (!empty($addressesToKeep)) {
+                        $conflictingRecords = DB::table('POSTED_TO_ADDR_DATA')
+                            ->where('c_personid', $_id)
+                            ->where('c_posting_id', $_postingid)
+                            ->where('c_office_id', $currentOfficeId)
+                            ->whereIn('c_addr_id', $addressesToKeep)
+                            ->count();
+
+                        if ($conflictingRecords > 0) {
+                            throw ValidationException::withMessages([
+                                'c_office_id' => "無法修改官名：目標官名（c_office_id={$currentOfficeId}）下已存在相同的地址記錄，" .
+                                    '可能會導致數據衝突。請先檢查並處理 POSTED_TO_ADDR_DATA 表中的異常數據。',
+                            ]);
+                        }
+                    }
+
+                    // 遷移地址記錄到新的 office_id（只遷移將保留的地址）
+                    // 將被移除的地址不需要遷移，會在後續的差異比對中被刪除
+                    if (!empty($addressesToKeep)) {
+                        DB::table('POSTED_TO_ADDR_DATA')
+                            ->where('c_personid', $_id)
+                            ->where('c_posting_id', $_postingid)
+                            ->where('c_office_id', $previousOfficeId)
+                            ->whereIn('c_addr_id', $addressesToKeep)
+                            ->update([
+                                'c_office_id' => $currentOfficeId,
+                                'c_modified_by' => $c_created_by,
+                                'c_modified_date' => $c_created_date,
+                            ]);
+                    }
+                    // 更新 beforeRows 中已遷移地址的 c_office_id 以反映遷移後的狀態
+                    $beforeRows = array_map(function ($row) use ($currentOfficeId, $addressesToKeep) {
+                        if (in_array($row['c_addr_id'], $addressesToKeep)) {
+                            $row['c_office_id'] = $currentOfficeId;
+                        }
+
+                        return $row;
+                    }, $beforeRows);
+                }
 
                 //比對修改前後的Addr陣列，刪除更新時被移除的addr。
                 $beforeAddressesForUpdate = [];
+                $beforeRowsByAddrId = [];  // 用於記錄每個地址的 office_id
                 foreach ($beforeRows as $addr_v) {
                     $beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
+                    $beforeRowsByAddrId[$addr_v['c_addr_id']] = $addr_v['c_office_id'];
                 }
                 //dd($beforeRows, $addressesForInsert);
                 //dd($beforeAddressesForUpdate, $addressesForInsert);
@@ -690,29 +733,30 @@ class BiogMainRepository {
                 //dd($newHave_diff);
 
                 //比對結束，刪除更新時被移除的addr。
+                // 使用 beforeRows 中記錄的 office_id，因為未遷移的地址仍在原 office_id 下
                 foreach ($oldHave_diff as $addr_v) {
+                    $addrOfficeId = $beforeRowsByAddrId[$addr_v] ?? $currentOfficeId;
                     DB::table('POSTED_TO_ADDR_DATA')
-                                ->where('c_personid', $_id)
-                                ->where('c_posting_id', $_postingid)
-                    ->where('c_office_id', $previousOfficeId)
-                    ->where('c_addr_id', $addr_v)
-                                ->delete();
+                        ->where('c_personid', $_id)
+                        ->where('c_posting_id', $_postingid)
+                        ->where('c_office_id', $addrOfficeId)
+                        ->where('c_addr_id', $addr_v)
+                        ->delete();
                 }
 
                 //比對結束，新增後來新加的addr。
+                // 注意：使用 $currentOfficeId 確保新地址插入到正確的 office_id
                 foreach ($newHave_diff as $addr_v) {
-                    DB::table('POSTED_TO_ADDR_DATA')->insert(
-                        [
-                                            'c_personid' => $_id,
-                                            'c_posting_id' => $_postingid,
-                                            'c_office_id' => $_officeid,
-                                            'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
-                                            'c_created_by' => $c_created_by,
-                                            'c_created_date' => $c_created_date,
-                                            'c_modified_by' => $c_created_by,
-                                            'c_modified_date' => $c_created_date,
-                        ]
-                    );
+                    DB::table('POSTED_TO_ADDR_DATA')->insert([
+                        'c_personid' => $_id,
+                        'c_posting_id' => $_postingid,
+                        'c_office_id' => $currentOfficeId,
+                        'c_addr_id' => $addr_v == -999 ? 0 : $addr_v,
+                        'c_created_by' => $c_created_by,
+                        'c_created_date' => $c_created_date,
+                        'c_modified_by' => $c_created_by,
+                        'c_modified_date' => $c_created_date,
+                    ]);
                 }
 
 

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BasicInformationOfficesController extends Controller {
     /**
@@ -247,9 +248,21 @@ class BasicInformationOfficesController extends Controller {
             $request->merge(['c_inst_code' => $c_inst_code]);
             $request->merge(['c_inst_name_code' => $c_inst_name_code]);
         }
+
         //return $request;
         //修改結束
-        $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        try {
+            $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        } catch (ValidationException $e) {
+            // 捕獲地址記錄衝突等驗證錯誤，顯示完整的錯誤消息列表
+            $errorMessages = $e->validator->errors()->all();
+            foreach ($errorMessages as $message) {
+                flash($message, 'error');
+            }
+
+            return redirect()->back()->withInput();
+        }
+
         $officeKey = is_array($result) ? ($result['id'] ?? $id_) : $result;
         $noChanges = is_array($result) && !empty($result['no_changes']);
 
@@ -571,7 +584,18 @@ class BasicInformationOfficesController extends Controller {
             $request->merge(['c_inst_name_code' => $c_inst_name_code]);
         }
 
-        $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        try {
+            $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);
+        } catch (ValidationException $e) {
+            // 捕獲地址記錄衝突等驗證錯誤，顯示完整的錯誤消息列表
+            $errorMessages = $e->validator->errors()->all();
+            foreach ($errorMessages as $message) {
+                flash($message, 'error');
+            }
+
+            return redirect()->back()->withInput();
+        }
+
         $officeKey = is_array($result) ? ($result['id'] ?? $id_) : $result;
         $noChanges = is_array($result) && !empty($result['no_changes']);
 

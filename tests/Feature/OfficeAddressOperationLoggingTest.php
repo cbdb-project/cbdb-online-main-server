@@ -114,7 +114,7 @@ class OfficeAddressOperationLoggingTest extends TestCase {
         $operation = DB::table('operations')->orderByDesc('id')->first();
         $this->assertNotNull($operation);
         $this->assertEquals('POSTED_TO_ADDR_DATA', $operation->resource);
-        $this->assertEquals('71313-312754', $operation->resource_id);
+        $this->assertEquals('c_office_id=71313&c_posting_id=312754', $operation->resource_id);
         $this->assertNotNull($operation->resource_original);
 
         $after = json_decode($operation->resource_data, true);

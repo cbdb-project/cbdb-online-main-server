@@ -13,6 +13,7 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\NameSearchIndexService;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -384,7 +385,12 @@ class BasicInformationController extends Controller {
             $addr_data = Arr::except($addr_data, ['_token']);
             $addr_data = $this->toolRepository->timestamp($addr_data, true); //建檔資訊
             DB::table('BIOG_ADDR_DATA')->insert($addr_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', $addr_data['c_personid']."-".$addr_data['c_addr_id']."-".$addr_data['c_addr_type']."-".$addr_data['c_sequence'], $addr_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $addr_data['c_personid'],
+                'c_addr_id' => $addr_data['c_addr_id'],
+                'c_addr_type' => $addr_data['c_addr_type'],
+                'c_sequence' => $addr_data['c_sequence'],
+            ]), $addr_data);
         }
 
         //出處
@@ -396,7 +402,11 @@ class BasicInformationController extends Controller {
             $source_data['c_personid'] = $new_id;
             $source_data = Arr::except($source_data, ['_token']);
             DB::table('BIOG_SOURCE_DATA')->insert($source_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', $source_data['c_personid']."-".$source_data['c_textid']."-".$source_data['c_pages'], $source_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $source_data['c_personid'],
+                'c_textid' => $source_data['c_textid'],
+                'c_pages' => $source_data['c_pages'],
+            ]), $source_data);
         }
 
         //親屬
@@ -408,7 +418,11 @@ class BasicInformationController extends Controller {
             $kin_data['c_personid'] = $new_id;
             $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
             DB::table('KIN_DATA')->insert($kin_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', $kin_data['c_personid']."-".$kin_data['c_kin_id']."-".$kin_data['c_kin_code'], $kin_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $kin_data['c_personid'],
+                'c_kin_id' => $kin_data['c_kin_id'],
+                'c_kin_code' => $kin_data['c_kin_code'],
+            ]), $kin_data);
         }
 
         $kin_pair = DB::table('KIN_DATA')->where([
@@ -420,7 +434,11 @@ class BasicInformationController extends Controller {
             $kin_data['c_kin_id'] = $new_id;
             $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
             DB::table('KIN_DATA')->insert($kin_data);
-            $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', $kin_data['c_personid']."-".$kin_data['c_kin_id']."-".$kin_data['c_kin_code'], $kin_data);
+            $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $kin_data['c_personid'],
+                'c_kin_id' => $kin_data['c_kin_id'],
+                'c_kin_code' => $kin_data['c_kin_code'],
+            ]), $kin_data);
         }
 
         //社會關係
@@ -438,12 +456,17 @@ class BasicInformationController extends Controller {
             $assoc_data['c_tertiary_type_notes'] = null;
             $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
-            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
-            // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-            $assocFirstYearEncoded = str_replace('-', '(minus)', $assoc_data['c_assoc_first_year'] ?? '-9999');
-            // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
-            $textTitleEncoded = $this->biogMainRepository->unionPKDef($assoc_data['c_text_title']);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $assoc_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $assoc_data['c_personid'],
+                'c_assoc_code' => $assoc_data['c_assoc_code'],
+                'c_assoc_id' => $assoc_data['c_assoc_id'],
+                'c_kin_code' => $assoc_data['c_kin_code'],
+                'c_kin_id' => $assoc_data['c_kin_id'],
+                'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+            ]), $assoc_data);
         }
 
         $assoc_pair = DB::table('ASSOC_DATA')->where([
@@ -461,12 +484,17 @@ class BasicInformationController extends Controller {
             $assoc_data['c_tertiary_type_notes'] = null;
             $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
             DB::table('ASSOC_DATA')->insert($assoc_data);
-            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
-            // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-            $assocFirstYearEncoded = str_replace('-', '(minus)', $assoc_data['c_assoc_first_year'] ?? '-9999');
-            // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
-            $textTitleEncoded = $this->biogMainRepository->unionPKDef($assoc_data['c_text_title']);
-            $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', $assoc_data['c_personid']."-".$assoc_data['c_assoc_code']."-".$assoc_data['c_assoc_id']."-".$assoc_data['c_kin_code']."-".$assoc_data['c_kin_id']."-".$assoc_data['c_assoc_kin_code']."-".$assoc_data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $assoc_data);
+            $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $assoc_data['c_personid'],
+                'c_assoc_code' => $assoc_data['c_assoc_code'],
+                'c_assoc_id' => $assoc_data['c_assoc_id'],
+                'c_kin_code' => $assoc_data['c_kin_code'],
+                'c_kin_id' => $assoc_data['c_kin_id'],
+                'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+            ]), $assoc_data);
         }
 
         //社交機構
@@ -479,7 +507,12 @@ class BasicInformationController extends Controller {
             $inst_data = Arr::except($inst_data, ['_token']);
             $inst_data = $this->toolRepository->timestamp($inst_data, true); //建檔資訊
             DB::table('BIOG_INST_DATA')->insert($inst_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', $inst_data['c_personid']."-".$inst_data['c_inst_code']."-".$inst_data['c_inst_name_code']."-".$inst_data['c_bi_role_code'], $inst_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $inst_data['c_personid'],
+                'c_inst_code' => $inst_data['c_inst_code'],
+                'c_inst_name_code' => $inst_data['c_inst_name_code'],
+                'c_bi_role_code' => $inst_data['c_bi_role_code'],
+            ]), $inst_data);
         }
 
         //社會區分
@@ -492,7 +525,11 @@ class BasicInformationController extends Controller {
             $status_data = Arr::except($status_data, ['_token']);
             $status_data = $this->toolRepository->timestamp($status_data, true); //建檔資訊
             DB::table('STATUS_DATA')->insert($status_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', $status_data['c_personid'].'-'.$status_data['c_sequence'].'-'.$status_data['c_status_code'], $status_data);
+            $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $status_data['c_personid'],
+                'c_sequence' => $status_data['c_sequence'],
+                'c_status_code' => $status_data['c_status_code'],
+            ]), $status_data);
         }
 
         //擴充結束

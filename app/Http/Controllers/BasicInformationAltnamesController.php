@@ -132,7 +132,12 @@ class BasicInformationAltnamesController extends Controller {
 
         // 使用 Query Builder 插入資料
         DB::table('ALTNAME_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', $data['c_personid']."-".$data['c_sequence']."-".$data['c_alt_name_chn']."-".$data['c_alt_name_type_code'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_sequence' => $data['c_sequence'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+        ]), $data);
 
         // 手動調用索引服務
         if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
@@ -306,11 +311,12 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->update($data);
 
-        if ($data['c_sequence'] == null) {
-            $data['c_sequence'] = 'NULL';
-        }
-        $new_alt = $id.'-'.$data['c_sequence'].'-'.$data['c_alt_name_chn'].'-'.$data['c_alt_name_type_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $new_alt, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+        ]), $data, $ori);
 
         // 手動調用索引服務
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -665,12 +671,7 @@ class BasicInformationAltnamesController extends Controller {
             'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
         ];
-        // 處理 c_sequence 為 null 的情況
-        if ($newPk['c_sequence'] == null) {
-            $newPk['c_sequence'] = null;
-        }
-        $resourceId = $newPk['c_personid'].'-'.($newPk['c_sequence'] ?? 'NULL').'-'.$newPk['c_alt_name_chn'].'-'.$newPk['c_alt_name_type_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', $resourceId, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
 
         // 更新索引
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -760,8 +761,7 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         // 記錄操作
-        $resourceId = $pk['c_personid'].'-'.($pk['c_sequence'] ?? 'NULL').'-'.$pk['c_alt_name_chn'].'-'.$pk['c_alt_name_type_code'];
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $resourceId, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         // 刪除資料（需要重新構建 query builder）
         $deleteQuery = DB::table('ALTNAME_DATA')->where($conditions);

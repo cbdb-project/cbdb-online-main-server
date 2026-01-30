@@ -99,7 +99,7 @@ class OfficePostingStoreTest extends TestCase {
 
         $response = $repository->officeStoreById($request, 123);
 
-        $this->assertSame('10-1', $response);
+        $this->assertSame('c_office_id=10&c_posting_id=1', $response);
 
         $this->assertDatabaseHas('POSTING_DATA', [
             'c_posting_id' => 1,
@@ -121,13 +121,13 @@ class OfficePostingStoreTest extends TestCase {
 
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_OFFICE_DATA',
-            'resource_id' => '10-1',
+            'resource_id' => 'c_office_id=10&c_posting_id=1',
             'op_type' => 1,
         ]);
 
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_ADDR_DATA',
-            'resource_id' => '10-1',
+            'resource_id' => 'c_office_id=10&c_posting_id=1',
             'op_type' => 1,
         ]);
     }
@@ -186,7 +186,7 @@ class OfficePostingStoreTest extends TestCase {
 
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_OFFICE_DATA',
-            'resource_id' => '20-1',
+            'resource_id' => 'c_office_id=20&c_posting_id=1',
             'op_type' => 3,
         ]);
     }
@@ -207,7 +207,7 @@ class OfficePostingStoreTest extends TestCase {
 
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_OFFICE_DATA',
-            'resource_id' => '30-1',
+            'resource_id' => 'c_office_id=30&c_posting_id=1',
             'op_type' => 4,
         ]);
     }

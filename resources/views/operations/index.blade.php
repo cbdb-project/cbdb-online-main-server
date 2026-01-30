@@ -60,8 +60,15 @@ use App\Support\CompositePrimaryKey;
                     @foreach($lists as $item)
 @php
 $rawResourceId = $item->resource_id;
-// 用於顯示：對整個字串編碼然後解碼（處理 Blade 模板衝突）
-$item->resource_id = unionPKDef($item->resource_id);
+// 用於顯示：偵測格式後轉換（處理 Blade 模板衝突）
+if (str_contains($rawResourceId ?? '', '=') && !str_contains($rawResourceId ?? '', '_._')) {
+    // 新格式（query-string）：解碼後以 - 分隔顯示值
+    parse_str($rawResourceId, $parsedQs);
+    $displayValues = implode('-', array_values($parsedQs));
+    $item->resource_id = str_replace(['{{', '}}'], ['{ {', '} }'], $displayValues);
+} else {
+    $item->resource_id = unionPKDef($item->resource_id);
+}
 $item->resource_data = unionPKDef($item->resource_data);
 @endphp
                         <tr>

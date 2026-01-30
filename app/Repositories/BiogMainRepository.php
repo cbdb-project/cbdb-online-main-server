@@ -32,6 +32,7 @@ use App\Repositories\Concerns\DetectsModelChanges;
 
 //20210625建安修改
 use App\Services\VariantCharNormalizer;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -639,7 +640,10 @@ class BiogMainRepository {
                     $c_personid,
                     3,
                     'POSTED_TO_OFFICE_DATA',
-                    $currentOfficeId.'-'.$_postingid,
+                    CompositePrimaryKey::buildStoredResourceId([
+                        'c_office_id' => $currentOfficeId,
+                        'c_posting_id' => $_postingid,
+                    ]),
                     $timestamped,
                     $ori
                 );
@@ -797,19 +801,29 @@ class BiogMainRepository {
                     })
                     ->all();
 
+                $addrResourceId = CompositePrimaryKey::buildStoredResourceId([
+                    'c_office_id' => $currentOfficeId,
+                    'c_posting_id' => $_postingid,
+                ]);
+
                 (new OperationRepository())->store(
                     Auth::id(),
                     $c_personid,
                     3,
                     'POSTED_TO_ADDR_DATA',
-                    $currentOfficeId.'-'.$_postingid,
+                    $addrResourceId,
                     ['rows' => $afterRows],
                     ['rows' => $beforeRows]
                 );
             }
 
+            $updateResourceId = CompositePrimaryKey::buildStoredResourceId([
+                'c_office_id' => $currentOfficeId,
+                'c_posting_id' => $_postingid,
+            ]);
+
             return [
-                'id' => $currentOfficeId.'-'.$_postingid,
+                'id' => $updateResourceId,
                 'no_changes' => false,
             ];
         });
@@ -849,7 +863,10 @@ class BiogMainRepository {
             $data = (new ToolsRepository())->timestamp($data, true);
             DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
 
-            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
+            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_office_id' => $data['c_office_id'],
+                'c_posting_id' => $data['c_posting_id'],
+            ]), $data);
 
             $addressRows = DB::table('POSTED_TO_ADDR_DATA')
                 ->where('c_personid', $id)
@@ -867,18 +884,23 @@ class BiogMainRepository {
                 ->values()
                 ->all();
 
+            $officeResourceId = CompositePrimaryKey::buildStoredResourceId([
+                'c_office_id' => $data['c_office_id'],
+                'c_posting_id' => $data['c_posting_id'],
+            ]);
+
             if (!empty($addressRows)) {
                 (new OperationRepository())->store(
                     Auth::id(),
                     $id,
                     1,
                     'POSTED_TO_ADDR_DATA',
-                    $data['c_office_id'] . '-' . $data['c_posting_id'],
+                    $officeResourceId,
                     ['rows' => $addressRows]
                 );
             }
 
-            return $data['c_office_id'] . '-' . $data['c_posting_id'];
+            return $officeResourceId;
         });
     }
 
@@ -895,7 +917,10 @@ class BiogMainRepository {
             DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
             DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
 
-            (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $id, $row);
+            (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_office_id' => $addr_l[0],
+                'c_posting_id' => $addr_l[1],
+            ]), $row);
         });
     }
 
@@ -1048,8 +1073,11 @@ class BiogMainRepository {
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->update($data);
-        $new_id = $c_personid."-".$data['c_sequence']."-".$data['c_status_code'];
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', $new_id, $data, $row);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $c_personid,
+            'c_sequence' => $data['c_sequence'],
+            'c_status_code' => $data['c_status_code'],
+        ]), $data, $row);
 
         return $data;
     }
@@ -1062,7 +1090,11 @@ class BiogMainRepository {
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('STATUS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', $data['c_personid'].'-'.$data['c_sequence'].'-'.$data['c_status_code'], $data);
+        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_sequence' => $data['c_sequence'],
+            'c_status_code' => $data['c_status_code'],
+        ]), $data);
 
         return $data;
     }
@@ -1083,7 +1115,11 @@ class BiogMainRepository {
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->delete();
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', $id, $row);
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $temp_l[0],
+            'c_sequence' => $temp_l[1],
+            'c_status_code' => $temp_l[2],
+        ]), $row);
     }
 
     public function kinshipById($id) {
@@ -1157,8 +1193,11 @@ class BiogMainRepository {
             ['c_kin_code', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
-        $new_id_ = $id."-".$data['c_kin_id']."-".$data['c_kin_code'];
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', $new_id_, $data, $row);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_kin_id' => $data['c_kin_id'],
+            'c_kin_code' => $data['c_kin_code'],
+        ]), $data, $row);
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $kin_id;
         $data = Arr::except($data, ['c_kin_id']);
@@ -1221,7 +1260,11 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', $data['c_personid']."-".$data['c_kin_id']."-".$data['c_kin_code'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_kin_code' => $data['c_kin_code'],
+        ]), $data);
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $data['c_kin_id'];
         $data['c_kin_id'] = $id;
@@ -1249,7 +1292,11 @@ class BiogMainRepository {
         $old_kin_code = $row->c_kin_code;
         $kin_code_pair = KinshipCode::find($old_kin_code);
 
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', $id, $row);
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $temp_l[0],
+            'c_kin_id' => $temp_l[1],
+            'c_kin_code' => $temp_l[2],
+        ]), $row);
 
         $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
             $query->where('c_kin_id', $row->c_personid)
@@ -1453,7 +1500,12 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data, true);
         $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
         //新增的聯合主鍵 //20211022修改增加c_inst_code與c_inst_name_code
-        $newid = $data['c_personid']."-".$data['c_inst_code']."-".$data['c_inst_name_code']."-".$data['c_bi_role_code'];
+        $newid = CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+            'c_bi_role_code' => $data['c_bi_role_code'],
+        ]);
         (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
 
         return $newid;
@@ -1508,7 +1560,15 @@ class BiogMainRepository {
         }
 
         // 記錄操作（即使 $row 為 null 也記錄，以便追蹤失敗的刪除嘗試）
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $id, $row);
+        $instResourceId = $row
+            ? CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $row->c_personid,
+                'c_inst_code' => $row->c_inst_code,
+                'c_inst_name_code' => $row->c_inst_name_code,
+                'c_bi_role_code' => $row->c_bi_role_code,
+            ])
+            : $id;
+        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $instResourceId, $row);
     }
 
     public function eventById($id) {
@@ -1587,9 +1647,11 @@ class BiogMainRepository {
         }
         $updateQuery->update($data);
 
-        // 新格式 resource_id：c_personid-c_sequence-c_event_code
-        $new_resource_id = $id . '-' . $data['c_sequence'] . '-' . $data['c_event_code'];
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $new_resource_id, $data, $ori);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_event_code' => $data['c_event_code'],
+        ]), $data, $ori);
 
         return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
@@ -1604,9 +1666,11 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('EVENTS_DATA')->insert($data);
 
-        // 新格式 resource_id：c_personid-c_sequence-c_event_code
-        $resource_id = $id . '-' . $data['c_sequence'] . '-' . $data['c_event_code'];
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $resource_id, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_sequence' => $data['c_sequence'],
+            'c_event_code' => $data['c_event_code'],
+        ]), $data);
 
         return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
@@ -1632,9 +1696,11 @@ class BiogMainRepository {
             ->where('c_event_code', $row->c_event_code)
             ->delete();
 
-        // 新格式 resource_id：c_personid-c_sequence-c_event_code
-        $resource_id = $c_personid . '-' . $row->c_sequence . '-' . $row->c_event_code;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $resource_id, $row);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $c_personid,
+            'c_sequence' => $row->c_sequence,
+            'c_event_code' => $row->c_event_code,
+        ]), $row);
     }
 
     public function assocById($id) {
@@ -1969,10 +2035,17 @@ class BiogMainRepository {
         $data['c_personid'] = $c_personid;
         // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
         // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $assocFirstYearEncoded = str_replace('-', '(minus)', $data['c_assoc_first_year'] ?? '-9999');
-        // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
-        $textTitleEncoded = $this->unionPKDef($data['c_text_title']);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $data, $row);
+        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+            'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+            'c_text_title' => $data['c_text_title'] ?? '',
+            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+        ]), $data, $row);
         //20210702取得成對資料原本的c_kin_code
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
@@ -2028,10 +2101,17 @@ class BiogMainRepository {
         $ori_Data = $data;
         // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
         // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $assocFirstYearEncoded = str_replace('-', '(minus)', $data['c_assoc_first_year'] ?? '-9999');
-        // 注意：c_text_title 可能包含 /（如 [n/a]），需要編碼為 (slash) 避免 URL 解析錯誤
-        $textTitleEncoded = $this->unionPKDef($data['c_text_title']);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', $data['c_personid']."-".$data['c_assoc_code']."-".$data['c_assoc_id']."-".$data['c_kin_code']."-".$data['c_kin_id']."-".$data['c_assoc_kin_code']."-".$data['c_assoc_kin_id']."-".$textTitleEncoded."-".$assocFirstYearEncoded, $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+            'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+            'c_text_title' => $data['c_text_title'] ?? '',
+            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+        ]), $data);
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;
@@ -2191,7 +2271,20 @@ class BiogMainRepository {
             ['c_text_title', '=', $c_text_title],
             ['c_assoc_first_year', '=', $c_assoc_first_year],
         ])->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $id, $row);
+        $assocResourceId = $row
+            ? CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $row->c_personid,
+                'c_assoc_code' => $row->c_assoc_code,
+                'c_assoc_id' => $row->c_assoc_id,
+                'c_kin_code' => $row->c_kin_code,
+                'c_kin_id' => $row->c_kin_id,
+                'c_assoc_kin_code' => $row->c_assoc_kin_code,
+                'c_assoc_kin_id' => $row->c_assoc_kin_id,
+                'c_text_title' => $row->c_text_title ?? '',
+                'c_assoc_first_year' => $row->c_assoc_first_year ?? '-9999',
+            ])
+            : $id;
+        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $assocResourceId, $row);
 
         // 檢查$row2是否存在後再刪除反向關係
         // 修正：使用完整主鍵欄位進行刪除，避免誤刪其他記錄
@@ -2274,7 +2367,11 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data, $row);
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_pages' => $data['c_pages'],
+        ]), $data, $row);
 
         return $data;
     }
@@ -2292,7 +2389,11 @@ class BiogMainRepository {
         $data['c_created_by'] = $c_created_by;
         $data['c_created_date'] = $c_created_date;
         DB::table('BIOG_SOURCE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', $data['c_personid']."-".$data['c_textid']."-".$data['c_pages'], $data);
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_pages' => $data['c_pages'],
+        ]), $data);
 
         return $data;
     }
@@ -2316,7 +2417,11 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->delete();
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', $id, $row);
+        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $temp_l[0],
+            'c_textid' => $temp_l[1],
+            'c_pages' => $temp_l[2],
+        ]), $row);
     }
 
     protected function addr_str($id) {

@@ -113,6 +113,32 @@ class CompositePrimaryKey {
     ];
 
     /**
+     * resource_id 的 schema 別名對應
+     *
+     * 某些資料表的 resource_id 刻意沿用其他表的格式（共用編輯頁面），
+     * 因此解析 resource_id 時需使用目標表的 schema 而非自身的。
+     *
+     * 例如：POSTED_TO_ADDR_DATA 的 resource_id 沿用 POSTED_TO_OFFICE_DATA
+     * 的 c_office_id + c_posting_id 格式，地址資料存放在 resource_data['rows'] 中。
+     */
+    private const RESOURCE_ID_SCHEMA_ALIAS = [
+        'POSTED_TO_ADDR_DATA' => 'POSTED_TO_OFFICE_DATA',
+    ];
+
+    /**
+     * 取得 resource_id 解析用的 schema 表名
+     *
+     * 若該表有別名對應（如 POSTED_TO_ADDR_DATA → POSTED_TO_OFFICE_DATA），
+     * 返回別名表名；否則返回原始表名。
+     *
+     * @param string $table 資料表名稱
+     * @return string 用於解析 resource_id 的 schema 表名
+     */
+    public static function getResourceIdSchemaTable(string $table): string {
+        return self::RESOURCE_ID_SCHEMA_ALIAS[strtoupper($table)] ?? $table;
+    }
+
+    /**
      * 從請求中提取複合主鍵欄位
      *
      * @param Request $request HTTP 請求
@@ -279,6 +305,32 @@ class CompositePrimaryKey {
     ];
 
     /**
+     * 將複合主鍵陣列編碼為可儲存在 resource_id 欄位的字串
+     *
+     * 使用 PHP 標準的 http_build_query() 產生查詢參數格式，
+     * 所有特殊字符（中文、負號、斜線等）自動 URL 編碼，
+     * 完全消除舊格式 `-` 分隔符的解析歧義。
+     *
+     * null 值會被轉為字串 'NULL'，因為 http_build_query() 會省略 null 欄位，
+     * 導致解析時缺少欄位。解析端已有 'NULL' → whereNull 的對應處理。
+     *
+     * 範例：
+     *   buildStoredResourceId(['c_personid' => 12345, 'c_sequence' => 1, 'c_alt_name_chn' => '張三'])
+     *   => 'c_personid=12345&c_sequence=1&c_alt_name_chn=%E5%BC%B5%E4%B8%89'
+     *
+     *   buildStoredResourceId(['c_personid' => 12345, 'c_sequence' => null, ...])
+     *   => 'c_personid=12345&c_sequence=NULL&...'
+     *
+     * @param array $pk 複合主鍵的具名欄位陣列
+     * @return string http_build_query 格式的字串
+     */
+    public static function buildStoredResourceId(array $pk): string {
+        $encoded = array_map(fn ($v) => $v === null ? 'NULL' : $v, $pk);
+
+        return http_build_query($encoded);
+    }
+
+    /**
      * 解析舊格式的複合主鍵字串（用於向後相容）
      *
      * @deprecated 僅用於過渡期向後相容，新代碼請使用 fromRequest()
@@ -336,9 +388,23 @@ class CompositePrimaryKey {
      * @return array|null 解析後的具名欄位陣列，解析失敗則返回 null
      */
     public static function parseStoredResourceId(string $resourceId, string $table): ?array {
-        $schema = self::getSchema($table);
+        // resource_id 可能使用別名表的 schema（如 POSTED_TO_ADDR_DATA → POSTED_TO_OFFICE_DATA）
+        $effectiveTable = self::getResourceIdSchemaTable($table);
+        $schema = self::getSchema($effectiveTable);
         if (!$schema) {
             return null;
+        }
+
+        // 格式 0：query-string 格式（新格式，由 buildStoredResourceId() 產生）
+        // 以 '=' 存在且不含 '_._' 作為判斷條件
+        // 額外驗證：解析後的 key 必須完整覆蓋所有 schema key，避免：
+        // 1. 舊格式欄位值含 '=' 被誤判為新格式
+        // 2. 部分 key 匹配導致 WHERE 條件不完整而查到錯誤資料列
+        if (str_contains($resourceId, '=') && !str_contains($resourceId, '_._')) {
+            parse_str($resourceId, $parsed);
+            if (!empty($parsed) && count(array_intersect($schema, array_keys($parsed))) === count($schema)) {
+                return array_intersect_key($parsed, array_flip($schema));
+            }
         }
 
         $expectedCount = count($schema);
@@ -451,13 +517,9 @@ class CompositePrimaryKey {
             return null;
         }
 
-        // 查詢用的 schema 名稱：POSTED_TO_ADDR_DATA 共用 POSTED_TO_OFFICE_DATA 的路由和 schema
-        $schemaTable = $upperResource;
-        if ($upperResource === 'POSTED_TO_ADDR_DATA') {
-            $schemaTable = 'POSTED_TO_OFFICE_DATA';
-        }
-
-        $pk = self::parseStoredResourceId($resourceId, $schemaTable);
+        // parseStoredResourceId() 內部已透過 getResourceIdSchemaTable() 處理別名對應
+        // （如 POSTED_TO_ADDR_DATA → POSTED_TO_OFFICE_DATA），直接傳入原始表名即可
+        $pk = self::parseStoredResourceId($resourceId, $upperResource);
         if ($pk === null) {
             return null;
         }

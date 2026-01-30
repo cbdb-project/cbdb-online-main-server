@@ -136,7 +136,11 @@ class BasicInformationTextsController extends Controller {
             return redirect()->back();
         }
         DB::table($this->table_name)->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ]), $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -240,8 +244,11 @@ class BasicInformationTextsController extends Controller {
             ['c_role_id', '=', $temp_l[2]],
         ])->update($data);
         $data['c_personid'] = $temp_l[0];
-        $new_id_ = $data['c_personid']."-".$data['c_textid']."-".$data['c_role_id'];
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $new_id_, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_textid' => $data['c_textid'],
+            'c_role_id' => $data['c_role_id'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -285,7 +292,11 @@ class BasicInformationTextsController extends Controller {
             ['c_textid', '=', $temp_l[1]],
             ['c_role_id', '=', $temp_l[2]],
         ])->delete();
-        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $id_, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $temp_l[0],
+            'c_textid' => $temp_l[1],
+            'c_role_id' => $temp_l[2],
+        ]), $row);
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
@@ -413,8 +424,7 @@ class BasicInformationTextsController extends Controller {
             'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
             'c_role_id' => $data['c_role_id'] ?? $c_role_id,
         ];
-        $resourceId = $newPk['c_personid'].'-'.$newPk['c_textid'].'-'.$newPk['c_role_id'];
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, $resourceId, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
 
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -469,8 +479,11 @@ class BasicInformationTextsController extends Controller {
         DB::table($this->table_name)->where($conditions)->delete();
 
         // 記錄操作
-        $resourceId = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_role_id;
-        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, $resourceId, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $pk['c_personid'],
+            'c_textid' => $pk['c_textid'],
+            'c_role_id' => $c_role_id,
+        ]), $row);
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

@@ -10,6 +10,7 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
@@ -161,7 +162,10 @@ class CrowdsourcingController extends Controller {
 
                     break;
                 case "OFFICE_CODE_TYPE_REL":
-                    $new_id = $data['c_office_id']."-".$data['c_office_tree_id'];
+                    $new_id = CompositePrimaryKey::buildStoredResourceId([
+                        'c_office_id' => $data['c_office_id'],
+                        'c_office_tree_id' => $data['c_office_tree_id'],
+                    ]);
                     $message = OfficeCodeTypeRel::create($data);
                     if ($message == true) {
                         DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);

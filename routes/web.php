@@ -128,6 +128,14 @@ Route::match(['put', 'patch'], 'basicinformation/{id}/socialinst/update', 'Basic
 Route::delete('basicinformation/{id}/socialinst/delete', 'BasicInformationSocialInstController@destroyQuery')
     ->name('basicinformation.socialinst.destroy.query');
 
+// POSSESSION_DATA
+Route::get('basicinformation/{id}/possession/edit', 'BasicInformationPossessionController@editQuery')
+    ->name('basicinformation.possession.edit.query');
+Route::match(['put', 'patch'], 'basicinformation/{id}/possession/update', 'BasicInformationPossessionController@updateQuery')
+    ->name('basicinformation.possession.update.query');
+Route::delete('basicinformation/{id}/possession/delete', 'BasicInformationPossessionController@destroyQuery')
+    ->name('basicinformation.possession.destroy.query');
+
 // POSTED_TO_OFFICE_DATA（官名）
 Route::get('basicinformation/{id}/offices/edit', 'BasicInformationOfficesController@editQuery')
     ->name('basicinformation.offices.edit.query');

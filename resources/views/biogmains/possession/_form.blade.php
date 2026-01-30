@@ -1,8 +1,10 @@
 {{-- 共享表单组件 - Possession --}}
 @php
+    use App\Support\CompositePrimaryKey;
+
     $isEdit = isset($row);
     $formAction = $isEdit
-        ? route('basicinformation.possession.update', ['basicinformation' => $id, 'possession' => $row->c_possession_record_id])
+        ? CompositePrimaryKey::buildUrl('basicinformation.possession.update.query', ['id' => $id], ['c_possession_record_id' => $row->c_possession_record_id])
         : route('basicinformation.possession.store', ['basicinformation' => $id]);
 @endphp
 

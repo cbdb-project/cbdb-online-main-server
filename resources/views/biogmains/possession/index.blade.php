@@ -1,5 +1,9 @@
 @extends('layouts.dashboard-v3')
 
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
+
 @section('content')
     @include('biogmains.banner')
     <div class="card card-default">
@@ -39,14 +43,20 @@
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>
+                                    @php
+                                    $possessionPk = [
+                                        'c_possession_record_id' => $value->pivot->c_possession_record_id,
+                                    ];
+                                    $possessionFormId = 'delete-form-' . $value->pivot->c_possession_record_id;
+                                    @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('basicinformation.possession.edit', ['basicinformation' => $basicinformation->c_personid, 'possession' => $value->pivot->c_possession_record_id]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.possession.edit.query', ['id' => $basicinformation->c_personid], $possessionPk) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
-                                                       document.getElementById('delete-form-{{ $value->pivot->c_possession_record_id }}').submit();
+                                                       document.getElementById('{{ $possessionFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
@@ -54,7 +64,7 @@
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_possession_record_id }}" action="{{ route('basicinformation.possession.destroy', ['basicinformation' => $basicinformation->c_personid, 'possession' => $value->pivot->c_possession_record_id]) }}" method="POST" style="display: none;">
+                                    <form id="{{ $possessionFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.possession.destroy.query', ['id' => $basicinformation->c_personid], $possessionPk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

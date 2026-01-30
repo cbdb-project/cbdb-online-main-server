@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -113,10 +114,11 @@ class BasicInformationPossessionController extends Controller {
         $_id = $this->biogMainRepository->possessionStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.possession.edit', [
-            'basicinformation' => $id,
-            'possession' => $_id,
-        ]);
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.possession.edit.query',
+            ['id' => $id],
+            ['c_possession_record_id' => $_id]
+        ));
 
     }
 
@@ -193,10 +195,11 @@ class BasicInformationPossessionController extends Controller {
         $this->biogMainRepository->possessionUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.possession.edit', [
-            'basicinformation' => $id,
-            'possession' => $id_,
-        ]);
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.possession.edit.query',
+            ['id' => $id],
+            ['c_possession_record_id' => $id_]
+        ));
     }
 
     /**
@@ -216,6 +219,142 @@ class BasicInformationPossessionController extends Controller {
             return redirect()->back();
         }
         $this->biogMainRepository->possessionDeleteById($id_, $id);
+        flash('Delete success @ '.Carbon::now(), 'success');
+
+        return redirect()->route('basicinformation.possession.index', ['basicinformation' => $id]);
+    }
+
+    // ===================================================================
+    // 查詢參數模式方法（推薦使用）
+    // 使用 HTTP 查詢參數傳遞主鍵，避免自定義編碼邏輯
+    // 參考：docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md
+    // ===================================================================
+
+    /**
+     * 查詢參數模式：編輯財產記錄
+     *
+     * URL 格式：/basicinformation/{id}/possession/edit?c_possession_record_id=...
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function editQuery(Request $request, $id) {
+        // 從查詢參數提取主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSSESSION_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSSESSION_DATA');
+
+        $id_ = $pk['c_possession_record_id'];
+        $res = $this->biogMainRepository->possessionById($id_);
+
+        // 處理 personLabel
+        $personLabel = $id;
+
+        try {
+            $basicinformation = $this->biogMainRepository->byPersonId($id);
+            if ($basicinformation) {
+                $nameChn = $basicinformation->c_name_chn ?? '';
+                $name = $basicinformation->c_name ?? '';
+                if ($nameChn || $name) {
+                    $personLabel .= ' - ' . $nameChn;
+                    if ($name) {
+                        $personLabel .= ' (' . $name . ')';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
+        }
+
+        return view('biogmains.possession.edit', [
+            'id' => $id,
+            'row' => $res['row'],
+            'res' => $res,
+            'pk' => $pk,
+            'page_title' => '財產',
+            'page_description' => '基本信息表 財產',
+            'page_url' => '/basicinformation/'.$id.'/possession',
+            'archer' => '<li>編輯</li>',
+            'breadcrumb_home' => '人物基本資料',
+            'breadcrumbs' => [
+                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => '编辑', 'url' => '#'],
+            ],
+        ]);
+    }
+
+    /**
+     * 查詢參數模式：更新財產記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function updateQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSSESSION_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSSESSION_DATA');
+
+        $id_ = $pk['c_possession_record_id'];
+        $this->biogMainRepository->possessionUpdateById($request, $id, $id_);
+
+        flash('Update success @ '.Carbon::now(), 'success');
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.possession.edit.query',
+            ['id' => $id],
+            ['c_possession_record_id' => $id_]
+        ));
+    }
+
+    /**
+     * 查詢參數模式：刪除財產記錄
+     *
+     * @param Request $request
+     * @param int $id 人物 ID
+     * @return \Illuminate\Http\Response
+     */
+    public function destroyQuery(Request $request, $id) {
+        if (!Auth::check()) {
+            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 從查詢參數提取主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['POSSESSION_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        // 驗證必填欄位
+        CompositePrimaryKey::validateOrFail($pk, 'POSSESSION_DATA');
+
+        $id_ = $pk['c_possession_record_id'];
+        $this->biogMainRepository->possessionDeleteById($id_, $id);
+
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.possession.index', ['basicinformation' => $id]);

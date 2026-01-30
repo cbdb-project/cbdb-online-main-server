@@ -819,7 +819,7 @@ class BiogMainRepository {
         return DB::transaction(function () use ($request, $id) {
             $payload = $request->all();
             $c_addr = $payload['c_addr'] ?? [];
-            $data = Arr::except($payload, ['_token', 'c_addr']);
+            $data = Arr::except($payload, ['_token', 'c_addr', 'c_addr_cleared']);
 
             $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
             $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);

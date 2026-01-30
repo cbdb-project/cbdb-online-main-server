@@ -96,7 +96,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
 
         $operation = DB::table('operations')->first();
         $this->assertSame('BIOG_SOURCE_DATA', $operation->resource);
-        $this->assertSame('321-500-p10', $operation->resource_id);
+        $this->assertSame('c_personid=321&c_textid=500&c_pages=p10', $operation->resource_id);
         $this->assertEquals(1, $operation->op_type);
         $this->assertNull($operation->resource_original);
 
@@ -139,7 +139,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
 
         $operation = DB::table('operations')->orderByDesc('id')->first();
         $this->assertSame('BIOG_SOURCE_DATA', $operation->resource);
-        $this->assertSame('654-501-p20', $operation->resource_id);
+        $this->assertSame('c_personid=654&c_textid=501&c_pages=p20', $operation->resource_id);
         $this->assertEquals(3, $operation->op_type);
         $this->assertNotNull($operation->resource_original);
 
@@ -207,7 +207,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $operation = DB::table('operations')->orderByDesc('id')->first();
         $this->assertSame('BIOG_SOURCE_DATA', $operation->resource);
         $this->assertSame(4, $operation->op_type);
-        $this->assertSame('654', $operation->resource_id);
+        $this->assertSame('c_personid=654&c_textid=501&c_pages=p20', $operation->resource_id);
         $this->assertNull($operation->resource_original);
 
         $payload = json_decode($operation->resource_data, true);

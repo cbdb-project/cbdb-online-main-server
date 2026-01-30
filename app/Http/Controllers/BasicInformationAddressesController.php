@@ -149,7 +149,12 @@ class BasicInformationAddressesController extends Controller {
         }
         $data = $this->toolsRepository->timestamp($data, true);
         DB::table('BIOG_ADDR_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'], $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ]), $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -338,8 +343,12 @@ class BasicInformationAddressesController extends Controller {
             ['c_sequence', '=', $addr_l[3]],
         ])->update($data);
         $data['c_personid'] = $addr_l[0];
-        $new_addr = $data['c_personid']."-".$data['c_addr_id']."-".$data['c_addr_type']."-".$data['c_sequence'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $new_addr, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_addr_id' => $data['c_addr_id'],
+            'c_addr_type' => $data['c_addr_type'],
+            'c_sequence' => $data['c_sequence'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -392,7 +401,12 @@ class BasicInformationAddressesController extends Controller {
             ['c_sequence', '=', $addr_l[3]],
         ])->delete();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $addr, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $addr_l[0],
+            'c_addr_id' => $addr_l[1],
+            'c_addr_type' => $addr_l[2],
+            'c_sequence' => $addr_l[3],
+        ]), $row);
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.addresses.index', ['basicinformation' => $id]);
@@ -581,8 +595,7 @@ class BasicInformationAddressesController extends Controller {
             'c_addr_type' => $data['c_addr_type'] ?? $pk['c_addr_type'],
             'c_sequence' => $data['c_sequence'] ?? $pk['c_sequence'],
         ];
-        $resourceId = $newPk['c_personid'].'-'.$newPk['c_addr_id'].'-'.$newPk['c_addr_type'].'-'.$newPk['c_sequence'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', $resourceId, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
 
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -637,8 +650,7 @@ class BasicInformationAddressesController extends Controller {
         DB::table('BIOG_ADDR_DATA')->where($conditions)->delete();
 
         // 記錄操作
-        $resourceId = $pk['c_personid'].'-'.$pk['c_addr_id'].'-'.$pk['c_addr_type'].'-'.$pk['c_sequence'];
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', $resourceId, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pinyin;
 use App\Repositories\OperationRepository;
+use App\Support\CompositePrimaryKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +89,10 @@ class AdminBatchLoadOfficesController extends Controller {
                     '',
                     1,
                     'OFFICE_CODE_TYPE_REL',
-                    $nextOfficeId . '-' . $row['type_id'],
+                    CompositePrimaryKey::buildStoredResourceId([
+                        'c_office_id' => $nextOfficeId,
+                        'c_office_tree_id' => $row['type_id'],
+                    ]),
                     $relationPayload
                 );
 

@@ -174,8 +174,18 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
         DB::table('ENTRY_DATA')->insert($data);
-        $newKey = $data['c_personid'].'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', $newKey, $data);
+        $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $data['c_personid'],
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ]), $data);
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -339,8 +349,18 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->update($data);
-        $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -400,7 +420,18 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->first();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', $id_, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $addr_a[0],
+            'c_entry_code' => $addr_a[1],
+            'c_sequence' => $addr_a[2],
+            'c_kin_code' => $addr_a[3],
+            'c_assoc_code' => $addr_a[4],
+            'c_kin_id' => $addr_a[5],
+            'c_year' => $addr_a[6],
+            'c_assoc_id' => $addr_a[7],
+            'c_inst_code' => $addr_a[8],
+            'c_inst_name_code' => $addr_a[9],
+        ]), $row);
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $addr_a[0]],
             ['c_entry_code', '=', $addr_a[1]],
@@ -587,8 +618,18 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
         ])->update($data);
 
-        $newid = $id.'-'.$data['c_entry_code'].'-'.$data['c_sequence'].'-'.$data['c_kin_code'].'-'.$data['c_assoc_code'].'-'.$data['c_kin_id'].'-'.$data['c_year'].'-'.$data['c_assoc_id'].'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', $newid, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_entry_code' => $data['c_entry_code'],
+            'c_sequence' => $data['c_sequence'],
+            'c_kin_code' => $data['c_kin_code'],
+            'c_assoc_code' => $data['c_assoc_code'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_year' => $data['c_year'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 重定向到新的查詢參數格式
@@ -652,20 +693,7 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $pk['c_inst_name_code']],
         ])->first();
 
-        $id_ = implode('-', [
-            $pk['c_personid'],
-            $pk['c_entry_code'],
-            $pk['c_sequence'],
-            $pk['c_kin_code'],
-            $pk['c_assoc_code'],
-            $pk['c_kin_id'],
-            $pk['c_year'],
-            $pk['c_assoc_id'],
-            $pk['c_inst_code'],
-            $pk['c_inst_name_code'],
-        ]);
-
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', $id_, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $pk['c_personid']],

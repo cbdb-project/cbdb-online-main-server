@@ -1,3 +1,6 @@
+@php
+use App\Support\CompositePrimaryKey;
+@endphp
 @extends('layouts.dashboard-v3')
 
 @section('content')
@@ -57,11 +60,16 @@
                     @foreach($lists as $item)
 @php
 $rawResourceId = $item->resource_id;
-// 用於顯示：對整個字串編碼然後解碼（處理 Blade 模板衝突）
-$item->resource_id = unionPKDef($item->resource_id);
+// 用於顯示：偵測格式後轉換（處理 Blade 模板衝突）
+if (str_contains($rawResourceId ?? '', '=') && !str_contains($rawResourceId ?? '', '_._')) {
+    // 新格式（query-string）：解碼後以 - 分隔顯示值
+    parse_str($rawResourceId, $parsedQs);
+    $displayValues = implode('-', array_values($parsedQs));
+    $item->resource_id = str_replace(['{{', '}}'], ['{ {', '} }'], $displayValues);
+} else {
+    $item->resource_id = unionPKDef($item->resource_id);
+}
 $item->resource_data = unionPKDef($item->resource_data);
-// 用於構建 URL：對每個欄位值分別編碼，保留分隔符 -
-$encodedResourceIdForUrl = unionPKDef_for_url($rawResourceId);
 @endphp
                         <tr>
                             <td>
@@ -71,57 +79,13 @@ $encodedResourceIdForUrl = unionPKDef_for_url($rawResourceId);
                                 $resourceSpecificLink = null;
                                 $a = $item->resource;
                                 $id = $item->c_personid;
-                                $res_id = $encodedResourceIdForUrl;
                                 if ((int) $id !== 0) {
                                     // 人物链接统一指向编辑页面
                                     $personLink = "/basicinformation/{$id}/edit";
 
-                                    // 根据资源类型生成特定的资源链接
+                                    // 根据资源类型生成查詢參數模式的編輯連結
                                     if ($item->op_type != 4) {
-                                        switch ($a) {
-                                            case "BIOG_ADDR_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/addresses/{$res_id}/edit";
-                                                break;
-                                            case "ALTNAME_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/altnames/{$res_id}/edit";
-                                                break;
-                                            case "TEXT_DATA":
-                                            case "BIOG_TEXT_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/texts/{$res_id}/edit";
-                                                break;
-                                            case "POSTED_TO_OFFICE_DATA":
-                                            case "POSTED_TO_ADDR_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/offices/{$res_id}/edit";
-                                                break;
-                                            case "ENTRY_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/entries/{$res_id}/edit";
-                                                break;
-                                            case "EVENTS_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/events/{$res_id}/edit";
-                                                break;
-                                            case "STATUS_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/statuses/{$res_id}/edit";
-                                                break;
-                                            case "KIN_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/kinship/{$res_id}/edit";
-                                                break;
-                                            case "ASSOC_DATA":
-                                                // $res_id 已經通過 unionPKDef_for_url() 對每個欄位值編碼，
-                                                // 包括斜線 / 已被編碼為 (slash)，不需要再額外處理
-                                                $resourceSpecificLink = "/basicinformation/{$id}/assoc/{$res_id}/edit";
-                                                break;
-                                            case "POSSESSION_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/possession/{$res_id}/edit";
-                                                break;
-                                            case "BIOG_INST_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/socialinst/{$res_id}/edit";
-                                                break;
-                                            case "BIOG_SOURCE_DATA":
-                                                $resourceSpecificLink = "/basicinformation/{$id}/sources/{$res_id}/edit";
-                                                break;
-                                            default:
-                                                $resourceSpecificLink = null;
-                                        }
+                                        $resourceSpecificLink = CompositePrimaryKey::buildResourceEditUrl($a, $rawResourceId, $id);
                                     }
                                 }
                                 $item->resource_id = unionPKDef_decode_for_convert($item->resource_id);

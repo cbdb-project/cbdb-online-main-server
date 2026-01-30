@@ -275,8 +275,12 @@ class BasicInformationSocialInstController extends Controller {
             ['c_inst_name_code', '=', $addr_l[2]],
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->update($data);
-        $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+            'c_bi_role_code' => $data['c_bi_role_code'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -320,7 +324,12 @@ class BasicInformationSocialInstController extends Controller {
             ['c_bi_role_code', '=', $addr_l[3]],
         ])->first();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', $id_, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $addr_l[0],
+            'c_inst_code' => $addr_l[1],
+            'c_inst_name_code' => $addr_l[2],
+            'c_bi_role_code' => $addr_l[3],
+        ]), $row);
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $addr_l[0]],
             ['c_inst_code', '=', $addr_l[1]],
@@ -469,8 +478,12 @@ class BasicInformationSocialInstController extends Controller {
             ['c_bi_role_code', '=', $originalPk['c_bi_role_code']],
         ])->update($data);
 
-        $newid = $id.'-'.$data['c_inst_code'].'-'.$data['c_inst_name_code'].'-'.$data['c_bi_role_code'];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', $newid, $data, $ori);
+        $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => $id,
+            'c_inst_code' => $data['c_inst_code'],
+            'c_inst_name_code' => $data['c_inst_name_code'],
+            'c_bi_role_code' => $data['c_bi_role_code'],
+        ]), $data, $ori);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 重定向到新的查詢參數格式
@@ -522,9 +535,7 @@ class BasicInformationSocialInstController extends Controller {
             ['c_bi_role_code', '=', $pk['c_bi_role_code']],
         ])->first();
 
-        $id_ = $pk['c_personid'].'-'.$pk['c_inst_code'].'-'.$pk['c_inst_name_code'].'-'.$pk['c_bi_role_code'];
-
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', $id_, $row);
+        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         DB::table('BIOG_INST_DATA')->where([
             ['c_personid', '=', $pk['c_personid']],

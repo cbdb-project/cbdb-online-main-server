@@ -34,8 +34,13 @@ class CompositePrimaryKey {
             'c_addr_type',
             'c_sequence',
         ],
-        // 注意：實際表名是 BIOG_TEXT_DATA
+        // 注意：實際表名是 BIOG_TEXT_DATA，此處同時提供兩個鍵名以便查詢
         'TEXT_DATA' => [
+            'c_personid',
+            'c_textid',
+            'c_role_id',
+        ],
+        'BIOG_TEXT_DATA' => [
             'c_personid',
             'c_textid',
             'c_role_id',
@@ -252,6 +257,28 @@ class CompositePrimaryKey {
     }
 
     /**
+     * 資源表名對應的查詢參數模式編輯路由名稱
+     *
+     * 用於 Operations 模組等需要根據資源表名生成編輯連結的場景。
+     */
+    public const EDIT_ROUTE_MAP = [
+        'ALTNAME_DATA' => 'basicinformation.altnames.edit.query',
+        'BIOG_ADDR_DATA' => 'basicinformation.addresses.edit.query',
+        'TEXT_DATA' => 'basicinformation.texts.edit.query',
+        'BIOG_TEXT_DATA' => 'basicinformation.texts.edit.query',
+        'BIOG_SOURCE_DATA' => 'basicinformation.sources.edit.query',
+        'POSTED_TO_OFFICE_DATA' => 'basicinformation.offices.edit.query',
+        'POSTED_TO_ADDR_DATA' => 'basicinformation.offices.edit.query',
+        'ASSOC_DATA' => 'basicinformation.assoc.edit.query',
+        'KIN_DATA' => 'basicinformation.kinship.edit.query',
+        'EVENTS_DATA' => 'basicinformation.events.edit.query',
+        'STATUS_DATA' => 'basicinformation.statuses.edit.query',
+        'ENTRY_DATA' => 'basicinformation.entries.edit.query',
+        'POSSESSION_DATA' => 'basicinformation.possession.edit.query',
+        'BIOG_INST_DATA' => 'basicinformation.socialinst.edit.query',
+    ];
+
+    /**
      * 解析舊格式的複合主鍵字串（用於向後相容）
      *
      * @deprecated 僅用於過渡期向後相容，新代碼請使用 fromRequest()
@@ -295,5 +322,146 @@ class CompositePrimaryKey {
         }
 
         return array_combine($schema, $parts);
+    }
+
+    /**
+     * 解析資料庫中儲存的 resource_id 字串為具名欄位陣列
+     *
+     * 支援兩種分隔符格式：
+     * - '_._' 分隔符（CodesController 使用）
+     * - '-' 分隔符（BasicInformation 系列 Controller 使用，欄位值中的特殊字符以 (minus)/(slash) 等編碼）
+     *
+     * @param string $resourceId 資料庫中儲存的 resource_id
+     * @param string $table 資料表名稱
+     * @return array|null 解析後的具名欄位陣列，解析失敗則返回 null
+     */
+    public static function parseStoredResourceId(string $resourceId, string $table): ?array {
+        $schema = self::getSchema($table);
+        if (!$schema) {
+            return null;
+        }
+
+        $expectedCount = count($schema);
+
+        // 格式 1：_._  分隔符（CodesController）
+        if (strpos($resourceId, '_._') !== false) {
+            $parts = explode('_._', $resourceId);
+            if (count($parts) >= $expectedCount) {
+                return array_combine($schema, array_slice($parts, 0, $expectedCount));
+            }
+
+            return null;
+        }
+
+        // 格式 2：- 分隔符，欄位值中的特殊字符以佔位符編碼
+        // 先解碼除 (minus) 以外的保留字
+        $decoded = str_replace(
+            ['(slash)', '(backslash)', '(brackets)', '(brackets_r)', '(question)', '(hash)', '(amp)'],
+            ['/', '\\', '{', '}', '?', '#', '&'],
+            $resourceId
+        );
+
+        // 以 - 分割，然後在每個欄位中還原 (minus)
+        $parts = explode('-', $decoded);
+        $parts = array_map(fn ($p) => str_replace('(minus)', '-', $p), $parts);
+
+        $result = self::combinePartsWithSchema($parts, $schema, $table);
+        if ($result !== null) {
+            return $result;
+        }
+
+        // 回退策略：嘗試舊格式（-- 代表欄位值中的負號）
+        $decoded2 = str_replace(
+            ['(slash)', '(backslash)', '(brackets)', '(brackets_r)', '(question)', '(hash)', '(amp)'],
+            ['/', '\\', '{', '}', '?', '#', '&'],
+            $resourceId
+        );
+        $decoded2 = str_replace('--', "\x00MINUS\x00", $decoded2);
+        $parts2 = explode('-', $decoded2);
+        $parts2 = array_map(function ($p) {
+            $p = str_replace("\x00MINUS\x00", '-', $p);
+            $p = str_replace('(minus)', '-', $p);
+
+            return $p;
+        }, $parts2);
+
+        return self::combinePartsWithSchema($parts2, $schema, $table);
+    }
+
+    /**
+     * 將分割後的欄位值陣列與 schema 定義合併為具名陣列
+     *
+     * @param array $parts 分割後的欄位值
+     * @param array $schema schema 欄位名稱
+     * @param string $table 資料表名稱（用於特殊處理）
+     * @return array|null 成功時返回具名陣列，失敗返回 null
+     */
+    private static function combinePartsWithSchema(array $parts, array $schema, string $table): ?array {
+        $expectedCount = count($schema);
+        $actualCount = count($parts);
+
+        if ($actualCount === $expectedCount) {
+            return array_combine($schema, $parts);
+        }
+
+        if ($actualCount > $expectedCount) {
+            $upperTable = strtoupper($table);
+
+            // ASSOC_DATA：c_text_title（倒數第 2 個欄位）可能含 -，c_assoc_first_year 固定在最後
+            if ($upperTable === 'ASSOC_DATA' && $expectedCount === 9) {
+                $lastPart = $parts[$actualCount - 1];
+                $firstSeven = array_slice($parts, 0, 7);
+                $textTitle = implode('-', array_slice($parts, 7, $actualCount - 8));
+                $combined = array_merge($firstSeven, [$textTitle, $lastPart]);
+                if (count($combined) === $expectedCount) {
+                    return array_combine($schema, $combined);
+                }
+            }
+
+            // BIOG_SOURCE_DATA：c_pages（最後一個欄位）可能含 -
+            if ($upperTable === 'BIOG_SOURCE_DATA' && $expectedCount === 3) {
+                $firstTwo = array_slice($parts, 0, 2);
+                $cPages = implode('-', array_slice($parts, 2));
+                $combined = array_merge($firstTwo, [$cPages]);
+
+                return array_combine($schema, $combined);
+            }
+
+            // 其他表不應有多餘的 parts，視為解析失敗
+            return null;
+        }
+
+        // actualCount < expectedCount：欄位不足，解析失敗
+        return null;
+    }
+
+    /**
+     * 根據資源表名和 resource_id 生成查詢參數模式的編輯頁面 URL
+     *
+     * @param string $resource 資源表名（如 'ALTNAME_DATA'）
+     * @param string $resourceId 資料庫中儲存的 resource_id
+     * @param int|string $personId 人物 ID（用於路由的 {id} 參數）
+     * @return string|null 成功時返回新格式 URL，無法解析時返回 null
+     */
+    public static function buildResourceEditUrl(string $resource, string $resourceId, $personId): ?string {
+        $upperResource = strtoupper($resource);
+
+        $routeName = self::EDIT_ROUTE_MAP[$upperResource] ?? null;
+        if (!$routeName) {
+            return null;
+        }
+
+        // 查詢用的 schema 名稱：POSTED_TO_ADDR_DATA 共用 POSTED_TO_OFFICE_DATA 的路由和 schema
+        $schemaTable = $upperResource;
+        if ($upperResource === 'POSTED_TO_ADDR_DATA') {
+            $schemaTable = 'POSTED_TO_OFFICE_DATA';
+        }
+
+        $pk = self::parseStoredResourceId($resourceId, $schemaTable);
+        if ($pk === null) {
+            return null;
+        }
+
+        return self::buildUrl($routeName, ['id' => $personId], $pk);
     }
 }

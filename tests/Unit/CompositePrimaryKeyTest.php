@@ -270,4 +270,243 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertNull($decoded);
     }
+
+    // === parseStoredResourceId 測試 ===
+
+    /** @test */
+    public function it_parses_simple_numeric_resource_id(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-100-2-1',
+            'BIOG_ADDR_DATA'
+        );
+
+        $this->assertEquals([
+            'c_personid' => '12345',
+            'c_addr_id' => '100',
+            'c_addr_type' => '2',
+            'c_sequence' => '1',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_parses_resource_id_with_encoded_slash(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-1-張(slash)三-10',
+            'ALTNAME_DATA'
+        );
+
+        $this->assertEquals([
+            'c_personid' => '12345',
+            'c_sequence' => '1',
+            'c_alt_name_chn' => '張/三',
+            'c_alt_name_type_code' => '10',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_parses_resource_id_with_minus_encoding(): void {
+        // 新格式：(minus) 編碼
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-1-67890-0-0-0-0-論語(slash)卷一-(minus)9999',
+            'ASSOC_DATA'
+        );
+
+        $this->assertNotNull($result);
+        $this->assertEquals('12345', $result['c_personid']);
+        $this->assertEquals('論語/卷一', $result['c_text_title']);
+        $this->assertEquals('-9999', $result['c_assoc_first_year']);
+    }
+
+    /** @test */
+    public function it_parses_assoc_resource_id_with_dash_in_text_title(): void {
+        // c_text_title 包含 -，以 (minus) 編碼
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-1-67890-0-0-0-0-論語(minus)註釋-(minus)9999',
+            'ASSOC_DATA'
+        );
+
+        $this->assertNotNull($result);
+        $this->assertEquals('論語-註釋', $result['c_text_title']);
+        $this->assertEquals('-9999', $result['c_assoc_first_year']);
+    }
+
+    /** @test */
+    public function it_parses_source_data_with_dash_in_pages(): void {
+        // c_pages 包含 -，以 (minus) 編碼
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-448-12(minus)15',
+            'BIOG_SOURCE_DATA'
+        );
+
+        $this->assertNotNull($result);
+        $this->assertEquals('12345', $result['c_personid']);
+        $this->assertEquals('448', $result['c_textid']);
+        $this->assertEquals('12-15', $result['c_pages']);
+    }
+
+    /** @test */
+    public function it_parses_underscore_dot_separator_format(): void {
+        // CodesController 使用的 _._ 分隔符格式
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345_._1_._張三_._10',
+            'ALTNAME_DATA'
+        );
+
+        $this->assertEquals([
+            'c_personid' => '12345',
+            'c_sequence' => '1',
+            'c_alt_name_chn' => '張三',
+            'c_alt_name_type_code' => '10',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_returns_null_for_unknown_table_in_parse(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId('12345', 'UNKNOWN_TABLE');
+
+        $this->assertNull($result);
+    }
+
+    /** @test */
+    public function it_returns_null_for_insufficient_parts(): void {
+        // ALTNAME_DATA 需要 4 個欄位，只提供 2 個
+        $result = CompositePrimaryKey::parseStoredResourceId('12345-1', 'ALTNAME_DATA');
+
+        $this->assertNull($result);
+    }
+
+    /** @test */
+    public function it_parses_posted_to_office_data(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '448-130',
+            'POSTED_TO_OFFICE_DATA'
+        );
+
+        $this->assertEquals([
+            'c_office_id' => '448',
+            'c_posting_id' => '130',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_parses_events_data_three_fields(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-0-50',
+            'EVENTS_DATA'
+        );
+
+        $this->assertEquals([
+            'c_personid' => '12345',
+            'c_sequence' => '0',
+            'c_event_code' => '50',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_parses_entry_data_ten_fields(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-36-1-0-0-0-1000-0-0-0',
+            'ENTRY_DATA'
+        );
+
+        $this->assertNotNull($result);
+        $this->assertCount(10, $result);
+        $this->assertEquals('12345', $result['c_personid']);
+        $this->assertEquals('36', $result['c_entry_code']);
+        $this->assertEquals('1000', $result['c_year']);
+    }
+
+    /** @test */
+    public function it_parses_biog_text_data_alias(): void {
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-448-1',
+            'BIOG_TEXT_DATA'
+        );
+
+        $this->assertEquals([
+            'c_personid' => '12345',
+            'c_textid' => '448',
+            'c_role_id' => '1',
+        ], $result);
+    }
+
+    /** @test */
+    public function it_parses_old_format_with_double_dash(): void {
+        // 舊格式：-- 代表欄位值中的 -
+        $result = CompositePrimaryKey::parseStoredResourceId(
+            '12345-1-張--三-10',
+            'ALTNAME_DATA'
+        );
+
+        $this->assertNotNull($result);
+        $this->assertEquals('張-三', $result['c_alt_name_chn']);
+    }
+
+    // === EDIT_ROUTE_MAP 測試 ===
+
+    /** @test */
+    public function edit_route_map_covers_all_resource_tables(): void {
+        $requiredTables = [
+            'ALTNAME_DATA',
+            'BIOG_ADDR_DATA',
+            'TEXT_DATA',
+            'BIOG_TEXT_DATA',
+            'BIOG_SOURCE_DATA',
+            'POSTED_TO_OFFICE_DATA',
+            'POSTED_TO_ADDR_DATA',
+            'ASSOC_DATA',
+            'KIN_DATA',
+            'EVENTS_DATA',
+            'STATUS_DATA',
+            'ENTRY_DATA',
+            'POSSESSION_DATA',
+            'BIOG_INST_DATA',
+        ];
+
+        foreach ($requiredTables as $table) {
+            $this->assertArrayHasKey(
+                $table,
+                CompositePrimaryKey::EDIT_ROUTE_MAP,
+                "EDIT_ROUTE_MAP should contain '{$table}'"
+            );
+        }
+    }
+
+    // === buildResourceEditUrl 測試 ===
+
+    /** @test */
+    public function it_returns_null_for_unknown_resource_type(): void {
+        $result = CompositePrimaryKey::buildResourceEditUrl('UNKNOWN_TABLE', '12345', 1);
+
+        $this->assertNull($result);
+    }
+
+    /** @test */
+    public function it_builds_edit_url_for_simple_resource(): void {
+        $url = CompositePrimaryKey::buildResourceEditUrl(
+            'POSTED_TO_OFFICE_DATA',
+            '448-130',
+            12345
+        );
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringContainsString('c_office_id=448', $url);
+        $this->assertStringContainsString('c_posting_id=130', $url);
+    }
+
+    /** @test */
+    public function it_builds_edit_url_for_addr_data_using_office_route(): void {
+        // POSTED_TO_ADDR_DATA 共用 offices 路由
+        $url = CompositePrimaryKey::buildResourceEditUrl(
+            'POSTED_TO_ADDR_DATA',
+            '448-130',
+            12345
+        );
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringContainsString('c_office_id=448', $url);
+        $this->assertStringContainsString('c_posting_id=130', $url);
+    }
 }

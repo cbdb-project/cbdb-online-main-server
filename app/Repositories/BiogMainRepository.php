@@ -1513,7 +1513,14 @@ class BiogMainRepository {
 
     public function eventById($id) {
         $id_arr = explode("-", $id);
-        $row = DB::table('EVENTS_DATA')->where('c_personid', $id_arr[0])->where('c_sequence', $id_arr[1])->first();
+        $query = DB::table('EVENTS_DATA')
+            ->where('c_personid', $id_arr[0])
+            ->where('c_sequence', $id_arr[1]);
+        // 新格式包含 c_event_code（第 3 個字段），舊格式僅 c_personid-c_sequence
+        if (isset($id_arr[2])) {
+            $query->where('c_event_code', $id_arr[2]);
+        }
+        $row = $query->first();
         $text_str = null;
         if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -1541,11 +1548,22 @@ class BiogMainRepository {
     }
 
     public function eventUpdateById(Request $request, $id, $id_) {
+        // $id = c_personid, $id_ = "c_sequence-c_event_code"（新格式）或 "c_sequence"（舊格式）
+        $parts = explode("-", (string) $id_);
+        $c_sequence = $parts[0];
+        $c_event_code = $parts[1] ?? null;
+
         $data = $request->all();
         $data = $this->formatSelect($data);
 
         // 先獲取原始記錄，用於刪除舊的 EVENTS_ADDR
-        $ori = DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->first();
+        $oriQuery = DB::table('EVENTS_DATA')
+            ->where('c_personid', $id)
+            ->where('c_sequence', $c_sequence);
+        if ($c_event_code !== null) {
+            $oriQuery->where('c_event_code', $c_event_code);
+        }
+        $ori = $oriQuery->first();
 
         // 使用原始值刪除舊地址，再用新值插入新地址
         // 這樣即使用戶修改了 c_sequence 或 c_event_code，也不會留下孤兒記錄
@@ -1561,10 +1579,19 @@ class BiogMainRepository {
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data);
-        DB::table('EVENTS_DATA')->where('c_personid', $id)->where('c_sequence', $id_)->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $id_, $data, $ori);
+        $updateQuery = DB::table('EVENTS_DATA')
+            ->where('c_personid', $id)
+            ->where('c_sequence', $c_sequence);
+        if ($c_event_code !== null) {
+            $updateQuery->where('c_event_code', $c_event_code);
+        }
+        $updateQuery->update($data);
 
-        return $data['c_sequence'];
+        // 新格式 resource_id：c_personid-c_sequence-c_event_code
+        $new_resource_id = $id . '-' . $data['c_sequence'] . '-' . $data['c_event_code'];
+        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', $new_resource_id, $data, $ori);
+
+        return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
 
     public function eventStoreById(Request $request, $id) {
@@ -1576,20 +1603,38 @@ class BiogMainRepository {
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('EVENTS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $data['c_sequence'], $data);
 
-        return $data['c_sequence'];
+        // 新格式 resource_id：c_personid-c_sequence-c_event_code
+        $resource_id = $id . '-' . $data['c_sequence'] . '-' . $data['c_event_code'];
+        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', $resource_id, $data);
+
+        return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
 
     public function eventDeleteById($id, $c_personid) {
-        $row = DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->first();
-        DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $id)->delete();
+        // $id = "c_sequence-c_event_code"（新格式）或 "c_sequence"（舊格式）
+        $parts = explode("-", (string) $id);
+        $c_sequence = $parts[0];
+        $c_event_code = $parts[1] ?? null;
+
+        $query = DB::table('EVENTS_DATA')
+            ->where('c_personid', $c_personid)
+            ->where('c_sequence', $c_sequence);
+        if ($c_event_code !== null) {
+            $query->where('c_event_code', $c_event_code);
+        }
+        $row = (clone $query)->first();
+        $query->delete();
+
         DB::table('EVENTS_ADDR')
             ->where('c_personid', $row->c_personid)
             ->where('c_sequence', $row->c_sequence)
             ->where('c_event_code', $row->c_event_code)
             ->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $id, $row);
+
+        // 新格式 resource_id：c_personid-c_sequence-c_event_code
+        $resource_id = $c_personid . '-' . $row->c_sequence . '-' . $row->c_event_code;
+        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', $resource_id, $row);
     }
 
     public function assocById($id) {

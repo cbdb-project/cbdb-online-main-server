@@ -1,9 +1,19 @@
 {{-- 共享表单组件 - Events --}}
 @php
     $isEdit = isset($row);
-    $formAction = $isEdit
-        ? route('basicinformation.events.update', ['basicinformation' => $id, 'event' => $row->c_sequence])
-        : route('basicinformation.events.store', ['basicinformation' => $id]);
+    if ($isEdit && isset($pk)) {
+        // 查詢參數模式：使用完整複合主鍵
+        $formAction = \App\Support\CompositePrimaryKey::buildUrl(
+            'basicinformation.events.update.query',
+            ['id' => $id],
+            $pk
+        );
+    } elseif ($isEdit) {
+        // 舊格式
+        $formAction = route('basicinformation.events.update', ['basicinformation' => $id, 'event' => $row->c_sequence]);
+    } else {
+        $formAction = route('basicinformation.events.store', ['basicinformation' => $id]);
+    }
 @endphp
 
 <form action="{{ $formAction }}" method="post">

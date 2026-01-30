@@ -43,8 +43,9 @@ use App\Support\CompositePrimaryKey;
                             $eventPk = [
                                 'c_personid' => $basicinformation->c_personid,
                                 'c_sequence' => $value->pivot->c_sequence,
+                                'c_event_code' => $value->pivot->c_event_code,
                             ];
-                            $eventFormId = 'delete-form-' . $value->pivot->c_sequence;
+                            $eventFormId = 'delete-form-' . $value->pivot->c_sequence . '-' . $value->pivot->c_event_code;
                             @endphp
                             <div class="btn-group">
                                 <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.events.edit.query', ['id' => $basicinformation->c_personid], $eventPk) }}">edit</a>

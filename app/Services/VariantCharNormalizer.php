@@ -34,6 +34,8 @@ class VariantCharNormalizer {
         '嶽' => '岳',  // yue
         '愼' => '慎',  // shen
         '註' => '注',  // zhu
+        '于' => '於',  // yu
+        '槀' => '稿',  // gao
     ];
 
     /**

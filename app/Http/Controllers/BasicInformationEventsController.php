@@ -111,13 +111,14 @@ class BasicInformationEventsController extends Controller {
 
             return redirect()->back();
         }
-        $_id = $this->biogMainRepository->eventStoreById($request, $id);
+        $result = $this->biogMainRepository->eventStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
         $newPk = [
             'c_personid' => $id,
-            'c_sequence' => $_id,
+            'c_sequence' => $result['c_sequence'],
+            'c_event_code' => $result['c_event_code'],
         ];
 
         return redirect(CompositePrimaryKey::buildUrl(
@@ -196,13 +197,14 @@ class BasicInformationEventsController extends Controller {
 
             return redirect()->back();
         }
-        $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
+        $result = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
         $newPk = [
             'c_personid' => $id,
-            'c_sequence' => $_id,
+            'c_sequence' => $result['c_sequence'],
+            'c_event_code' => $result['c_event_code'],
         ];
 
         return redirect(CompositePrimaryKey::buildUrl(
@@ -257,8 +259,8 @@ class BasicInformationEventsController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
 
-        // 使用 Repository 查詢（格式：c_personid-c_sequence）
-        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'];
+        // 使用 Repository 查詢（格式：c_personid-c_sequence-c_event_code）
+        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_event_code'];
         $res = $this->biogMainRepository->eventById($id_);
 
         // 處理 personLabel
@@ -325,18 +327,19 @@ class BasicInformationEventsController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
 
-        // 構建舊格式 ID（格式：c_sequence）
-        $id_ = $pk['c_sequence'];
+        // 構建 ID（格式：c_sequence-c_event_code）
+        $id_ = $pk['c_sequence'] . '-' . $pk['c_event_code'];
 
         // 使用 Repository 更新
-        $_id = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
+        $result = $this->biogMainRepository->eventUpdateById($request, $id, $id_);
 
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 重定向到新的查詢參數格式
         $newPk = [
             'c_personid' => $id,
-            'c_sequence' => $_id,
+            'c_sequence' => $result['c_sequence'],
+            'c_event_code' => $result['c_event_code'],
         ];
 
         return redirect(CompositePrimaryKey::buildUrl(
@@ -372,8 +375,8 @@ class BasicInformationEventsController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'EVENTS_DATA');
 
-        // 構建舊格式 ID（格式：c_sequence）
-        $id_ = $pk['c_sequence'];
+        // 構建 ID（格式：c_sequence-c_event_code）
+        $id_ = $pk['c_sequence'] . '-' . $pk['c_event_code'];
 
         $this->biogMainRepository->eventDeleteById($id_, $id);
 

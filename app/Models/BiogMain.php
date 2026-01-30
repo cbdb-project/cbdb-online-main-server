@@ -112,7 +112,7 @@ class BiogMain extends Model {
     }
 
     public function events() {
-        return $this->belongsToMany('App\Models\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence')->orderBy('c_sequence');
+        return $this->belongsToMany('App\Models\EventCode', 'EVENTS_DATA', 'c_personid', 'c_event_code')->withPivot('c_sequence', 'c_event_code')->orderBy('c_sequence');
     }
 
     public function kinship() {

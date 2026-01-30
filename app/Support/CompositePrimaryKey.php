@@ -50,9 +50,9 @@ class CompositePrimaryKey {
             'c_posting_id',
         ],
         'POSTED_TO_ADDR_DATA' => [
-            'c_personid',
-            'c_posting_id',
+            'c_addr_id',
             'c_office_id',
+            'c_posting_id',
         ],
         'ASSOC_DATA' => [
             'c_personid',
@@ -73,6 +73,7 @@ class CompositePrimaryKey {
         'EVENTS_DATA' => [
             'c_personid',
             'c_sequence',
+            'c_event_code',
         ],
         'STATUS_DATA' => [
             'c_personid',
@@ -92,7 +93,6 @@ class CompositePrimaryKey {
             'c_inst_name_code',
         ],
         'POSSESSION_DATA' => [
-            'c_personid',
             'c_possession_record_id',
         ],
         'BIOG_INST_DATA' => [

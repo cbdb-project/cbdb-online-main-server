@@ -244,7 +244,18 @@ class OperationsController extends Controller {
                         break;
                         //20251208新增事件差異比對紀錄
                     case "EVENTS_DATA":
-                        $arr3 = DB::table('EVENTS_DATA')->where('c_personid', $c_personid)->where('c_sequence', $resource_id)->first();
+                        // 支持新格式 "c_personid-c_sequence-c_event_code" 和舊格式 "c_sequence"
+                        $eventParts = explode('-', $resource_id);
+                        $eventQuery = DB::table('EVENTS_DATA')->where('c_personid', $c_personid);
+                        if (count($eventParts) >= 3) {
+                            // 新格式：resource_id = "c_personid-c_sequence-c_event_code"
+                            $eventQuery->where('c_sequence', $eventParts[1])
+                                       ->where('c_event_code', $eventParts[2]);
+                        } else {
+                            // 舊格式：resource_id = "c_sequence"
+                            $eventQuery->where('c_sequence', $resource_id);
+                        }
+                        $arr3 = $eventQuery->first();
                         $arr3 = json_encode($arr3);
                         $arr3 = json_decode($arr3, true);
 
@@ -840,7 +851,7 @@ class OperationsController extends Controller {
             'KIN_DATA' => ['c_personid','c_kin_id','c_kin_code'],
             'POSSESSION_DATA' => ['c_possession_record_id'],
             'BIOG_INST_DATA' => ['c_personid','c_inst_code','c_inst_name_code','c_bi_role_code'],
-            'EVENTS_DATA' => ['c_personid','c_sequence'],
+            'EVENTS_DATA' => ['c_personid','c_sequence','c_event_code'],
             'ASSOC_DATA' => ['c_personid','c_assoc_code','c_assoc_id','c_kin_code','c_kin_id','c_assoc_kin_code','c_assoc_kin_id','c_text_title','c_assoc_first_year'],
         ];
 

@@ -127,7 +127,8 @@ class ExportMysqlToSqlite extends Command {
         // 显示统计信息
         $this->displayStats();
 
-        return 0;
+        // 如果有错误，返回非零退出码
+        return $this->stats['errors'] > 0 ? 1 : 0;
     }
 
     /**

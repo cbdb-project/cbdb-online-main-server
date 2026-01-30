@@ -22,7 +22,8 @@ class ExportMysqlToSqlite extends Command {
                             {--limit-records= : 限制每张表导出的最大记录数}
                             {--chunk-size=5000 : 分块查询的大小（减少内存使用）}
                             {--min-free-space=1 : 最小可用磁盘空间（GB）}
-                            {--skip-space-check : 跳过磁盘空间检查}';
+                            {--skip-space-check : 跳过磁盘空间检查}
+                            {--append : 追加模式，将表添加到现有 SQLite 文件中（不删除现有文件）}';
 
     /**
      * The console command description.
@@ -126,7 +127,8 @@ class ExportMysqlToSqlite extends Command {
         // 显示统计信息
         $this->displayStats();
 
-        return 0;
+        // 如果有错误，返回非零退出码
+        return $this->stats['errors'] > 0 ? 1 : 0;
     }
 
     /**
@@ -221,6 +223,7 @@ class ExportMysqlToSqlite extends Command {
     protected function prepareSqliteDatabase() {
         $absolutePath = base_path($this->outputPath);
         $directory = dirname($absolutePath);
+        $isAppendMode = $this->option('append');
 
         // 确保目录存在
         if (!is_dir($directory)) {
@@ -231,19 +234,27 @@ class ExportMysqlToSqlite extends Command {
             }
         }
 
-        // 如果文件已存在，询问是否覆盖
+        // 如果文件已存在
         if (file_exists($absolutePath)) {
-            if (!$this->confirm(sprintf('文件 %s 已存在，是否覆盖？', $this->outputPath), false)) {
-                $this->info('操作已取消');
+            if ($isAppendMode) {
+                // 追加模式：保留现有文件
+                $this->info(sprintf('✓ 追加模式：使用现有 SQLite 文件: %s', $this->outputPath));
+            } else {
+                // 覆盖模式：询问是否覆盖
+                if (!$this->confirm(sprintf('文件 %s 已存在，是否覆盖？', $this->outputPath), false)) {
+                    $this->info('操作已取消');
 
-                return false;
+                    return false;
+                }
+
+                unlink($absolutePath);
+                // 创建空的 SQLite 数据库文件
+                touch($absolutePath);
             }
-
-            unlink($absolutePath);
+        } else {
+            // 文件不存在，创建新文件
+            touch($absolutePath);
         }
-
-        // 创建空的 SQLite 数据库文件
-        touch($absolutePath);
 
         // 配置临时的 SQLite 连接
         config([
@@ -257,7 +268,12 @@ class ExportMysqlToSqlite extends Command {
 
         try {
             DB::connection('sqlite_export')->getPdo();
-            $this->info(sprintf('✓ SQLite 数据库已创建: %s', $this->outputPath));
+
+            if ($isAppendMode && file_exists($absolutePath)) {
+                $this->info(sprintf('✓ SQLite 数据库已连接: %s', $this->outputPath));
+            } else {
+                $this->info(sprintf('✓ SQLite 数据库已创建: %s', $this->outputPath));
+            }
 
             return true;
         } catch (\Exception $e) {

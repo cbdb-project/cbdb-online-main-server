@@ -38,6 +38,8 @@ if [ -d "$HOME/.npm" ]; then
   rm -rf "$HOME/.npm"
 fi
 
+set +e
+
 # 5. 清除缓存
 echo "清除应用缓存..."
 php artisan cache:clear

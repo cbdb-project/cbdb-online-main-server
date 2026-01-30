@@ -29,6 +29,8 @@ class VariantCharNormalizerTest extends TestCase {
             ['嶽', '岳'],   // 周君嶽 -> 周君岳
             ['愼', '慎'],   // 四書愼獄 -> 四書慎獄
             ['註', '注'],   // 左氏補註 -> 左氏補注
+            ['于', '於'],   // 于謙 -> 於謙
+            ['槀', '稿'],   // 槀本 -> 稿本
         ];
 
         foreach ($testCases as [$variant, $standard]) {
@@ -47,6 +49,8 @@ class VariantCharNormalizerTest extends TestCase {
             ['周君嶽', '周君岳'],
             ['四書愼獄講義', '四書慎獄講義'],
             ['左氏補註', '左氏補注'],
+            ['于謙', '於謙'],
+            ['槀本', '稿本'],
             ['清輝堂詩: 一卷', '清輝堂詩: 一卷'],  // 沒有異體字，應保持不變
         ];
 

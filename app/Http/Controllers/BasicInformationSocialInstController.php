@@ -140,14 +140,13 @@ class BasicInformationSocialInstController extends Controller {
         $_id = $this->biogMainRepository->socialInstStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        // 從 $_id 解析複合主鍵（格式：c_personid-c_inst_code-c_inst_name_code-c_bi_role_code）
-        $parts = explode('-', $_id);
-        $newPk = [
-            'c_personid' => $parts[0] ?? $id,
-            'c_inst_code' => $parts[1] ?? $c_inst_code,
-            'c_inst_name_code' => $parts[2] ?? $c_inst_name_code,
-            'c_bi_role_code' => $parts[3] ?? $request->c_bi_role_code,
-        ];
+        // 解析複合主鍵（socialInstStoreById 返回查詢參數格式，如 c_personid=123&c_inst_code=456&...）
+        $newPk = CompositePrimaryKey::parseStoredResourceId($_id, 'BIOG_INST_DATA');
+        if ($newPk === null) {
+            \Log::error('socialInstStoreById 返回的 resource_id 無法解析', ['resource_id' => $_id]);
+
+            return redirect(route('basicinformation.socialinst.index', $id, false));
+        }
 
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.socialinst.edit.query',

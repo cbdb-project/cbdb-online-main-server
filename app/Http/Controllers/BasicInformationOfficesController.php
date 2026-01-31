@@ -148,12 +148,13 @@ class BasicInformationOfficesController extends Controller {
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
 
-        // 解析主鍵
-        $pkParts = explode('-', $_id);
-        $newPk = [
-            'c_office_id' => $pkParts[0] ?? '',
-            'c_posting_id' => $pkParts[1] ?? '',
-        ];
+        // 解析主鍵（officeStoreById 返回查詢參數格式，如 c_office_id=87473&c_posting_id=2104406）
+        $newPk = CompositePrimaryKey::parseStoredResourceId($_id, 'POSTED_TO_OFFICE_DATA');
+        if ($newPk === null) {
+            \Log::error('officeStoreById 返回的 resource_id 無法解析', ['resource_id' => $_id]);
+
+            return redirect(route('basicinformation.offices.index', $id, false));
+        }
 
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.offices.edit.query',
@@ -272,12 +273,13 @@ class BasicInformationOfficesController extends Controller {
             flash('Update success @ '.Carbon::now(), 'success');
         }
 
-        // 解析新的主鍵
-        $newPkParts = explode('-', $officeKey);
-        $newPk = [
-            'c_office_id' => $newPkParts[0] ?? '',
-            'c_posting_id' => $newPkParts[1] ?? '',
-        ];
+        // 解析新的主鍵（officeUpdateById 返回查詢參數格式，如 c_office_id=87473&c_posting_id=2104406）
+        $newPk = CompositePrimaryKey::parseStoredResourceId($officeKey, 'POSTED_TO_OFFICE_DATA');
+        if ($newPk === null) {
+            \Log::error('officeUpdateById 返回的 resource_id 無法解析', ['resource_id' => $officeKey]);
+
+            return redirect(route('basicinformation.offices.index', $id, false));
+        }
 
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.offices.edit.query',
@@ -605,12 +607,13 @@ class BasicInformationOfficesController extends Controller {
             flash('Update success @ '.Carbon::now(), 'success');
         }
 
-        // 解析新的主鍵
-        $newPkParts = explode('-', $officeKey);
-        $newPk = [
-            'c_office_id' => $newPkParts[0] ?? $pk['c_office_id'],
-            'c_posting_id' => $newPkParts[1] ?? $pk['c_posting_id'],
-        ];
+        // 解析新的主鍵（officeUpdateById 返回查詢參數格式，如 c_office_id=87473&c_posting_id=2104406）
+        $newPk = CompositePrimaryKey::parseStoredResourceId($officeKey, 'POSTED_TO_OFFICE_DATA');
+        if ($newPk === null) {
+            \Log::error('officeUpdateById 返回的 resource_id 無法解析', ['resource_id' => $officeKey]);
+
+            return redirect(route('basicinformation.offices.index', $id, false));
+        }
 
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.offices.edit.query',

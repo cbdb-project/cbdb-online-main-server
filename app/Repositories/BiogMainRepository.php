@@ -618,7 +618,10 @@ class BiogMainRepository {
 
         if (!$hasPostingChange && !$hasAddressChange) {
             return [
-                'id' => $_officeid."-".$_postingid,
+                'id' => CompositePrimaryKey::buildStoredResourceId([
+                    'c_office_id' => $_officeid,
+                    'c_posting_id' => $_postingid,
+                ]),
                 'no_changes' => true,
             ];
         }

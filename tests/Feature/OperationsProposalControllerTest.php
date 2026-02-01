@@ -187,6 +187,7 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertSame('approved', $payload['__review_status']);
         $this->assertSame(6, $payload['id']);
         $this->assertSame('6', $payload['__proposal_meta']['approved_resource_id'] ?? null);
+        $this->assertSame('6', $operation->resource_id);
     }
 
     #[Test]

@@ -65,7 +65,14 @@ class OperationsProposalController extends Controller {
         }
 
         $this->logFinalOperation($operation, $appliedRow, $original, $opType);
-        $this->updateProposalStatus($operation, 'approved', $comment, $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null, $keyColumns);
+        $this->updateProposalStatus(
+            $operation,
+            'approved',
+            $comment,
+            $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null,
+            $keyColumns,
+            $opType === Operation::TYPE_PROPOSAL_CREATE
+        );
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
 
@@ -294,7 +301,8 @@ class OperationsProposalController extends Controller {
         string $status,
         string $comment = null,
         ?array $appliedRow = null,
-        array $keyColumns = []
+        array $keyColumns = [],
+        bool $updateResourceId = false
     ): void {
         $payload = json_decode($proposal->resource_data, true) ?: [];
 
@@ -318,6 +326,9 @@ class OperationsProposalController extends Controller {
         }
 
         $proposal->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if ($status === 'approved' && $appliedRow !== null && $updateResourceId && !empty($keyColumns)) {
+            $proposal->resource_id = $this->buildCompositeId($keyColumns, $appliedRow);
+        }
         $proposal->save();
     }
 
@@ -340,6 +351,24 @@ class OperationsProposalController extends Controller {
         }
 
         $keyColumn = $keyColumns[0];
+        if (!array_key_exists($keyColumn, $data)) {
+            return $data;
+        }
+
+        $currentValue = $data[$keyColumn];
+        if ($currentValue === null || $currentValue === '') {
+            return $data;
+        }
+
+        if (!is_numeric($currentValue)) {
+            return $data;
+        }
+
+        $existing = DB::table($table)->where($keyColumn, $currentValue)->first();
+        if (!$existing) {
+            return $data;
+        }
+
         $nextValue = $this->guessNextNumericKeyValue($table, $keyColumn);
         if ($nextValue === null) {
             return $data;

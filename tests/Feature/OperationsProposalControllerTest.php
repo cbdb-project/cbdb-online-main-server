@@ -55,9 +55,16 @@ class OperationsProposalControllerTest extends TestCase {
             $table->string('code_sub');
             $table->string('description')->nullable();
         });
+
+        Schema::dropIfExists('TEST_SINGLE');
+        Schema::create('TEST_SINGLE', function (Blueprint $table) {
+            $table->integer('id');
+            $table->string('description')->nullable();
+        });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('TEST_SINGLE');
         Schema::dropIfExists('TEST_CODES');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
@@ -140,6 +147,46 @@ class OperationsProposalControllerTest extends TestCase {
             'resource' => 'TEST_CODES',
             'op_type' => Operation::TYPE_CREATE,
         ]);
+    }
+
+    #[Test]
+    public function testApproveCreateProposalReassignsSingleNumericKey() {
+        DB::table('TEST_SINGLE')->insert([
+            'id' => 5,
+            'description' => 'Existing',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'id' => 5,
+            'description' => 'Approved create',
+            '__key_columns' => ['id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s')],
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'TEST_SINGLE',
+            'resource_id' => '5',
+            'resource_data' => $resourceData,
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('TEST_SINGLE', [
+            'id' => 6,
+            'description' => 'Approved create',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame(6, $payload['id']);
+        $this->assertSame('6', $payload['__proposal_meta']['approved_resource_id'] ?? null);
     }
 
     #[Test]

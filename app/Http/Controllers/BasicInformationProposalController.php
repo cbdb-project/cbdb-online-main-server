@@ -400,6 +400,10 @@ class BasicInformationProposalController extends Controller {
      * 為了跨資料庫兼容性（SQLite/MySQL），採用在 PHP 端解析 JSON 的方式。
      */
     protected function hasActiveProposalConflict($table, $keyColumns, $data, $opType) {
+        if (count($keyColumns) === 1) {
+            return false;
+        }
+
         $resourceId = $this->buildCompositeId($keyColumns, $data);
 
         $operations = Operation::where('resource', $table)

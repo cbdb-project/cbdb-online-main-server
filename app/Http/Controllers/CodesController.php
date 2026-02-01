@@ -1349,6 +1349,10 @@ class CodesController extends Controller {
             return false;
         }
 
+        if (count($keyColumns) === 1) {
+            return false;
+        }
+
         $resourceId = $this->buildCompositeId($keyColumns, $row);
         if ($resourceId === '') {
             return false;

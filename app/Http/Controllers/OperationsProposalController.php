@@ -65,7 +65,14 @@ class OperationsProposalController extends Controller {
         }
 
         $this->logFinalOperation($operation, $appliedRow, $original, $opType);
-        $this->updateProposalStatus($operation, 'approved', $comment);
+        $this->updateProposalStatus(
+            $operation,
+            'approved',
+            $comment,
+            $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null,
+            $keyColumns,
+            $opType === Operation::TYPE_PROPOSAL_CREATE
+        );
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
 
@@ -119,6 +126,8 @@ class OperationsProposalController extends Controller {
     }
 
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
+        $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
+
         if (!$this->hasKeyValues($keyColumns, $data)) {
             throw new \RuntimeException('缺少主鍵欄位，無法新增資料。');
         }
@@ -287,7 +296,14 @@ class OperationsProposalController extends Controller {
         );
     }
 
-    protected function updateProposalStatus(Operation $proposal, string $status, string $comment = null): void {
+    protected function updateProposalStatus(
+        Operation $proposal,
+        string $status,
+        string $comment = null,
+        ?array $appliedRow = null,
+        array $keyColumns = [],
+        bool $updateResourceId = false
+    ): void {
         $payload = json_decode($proposal->resource_data, true) ?: [];
 
         $payload['__review_status'] = $status;
@@ -298,7 +314,21 @@ class OperationsProposalController extends Controller {
             $payload['__review_comment'] = $comment;
         }
 
+        if ($status === 'approved' && $appliedRow !== null && count($keyColumns) === 1) {
+            $keyColumn = $keyColumns[0];
+            if (array_key_exists($keyColumn, $appliedRow)) {
+                $payload[$keyColumn] = $appliedRow[$keyColumn];
+                $payload['__proposal_meta'] = is_array($payload['__proposal_meta'] ?? null)
+                    ? $payload['__proposal_meta']
+                    : [];
+                $payload['__proposal_meta']['approved_resource_id'] = (string) $appliedRow[$keyColumn];
+            }
+        }
+
         $proposal->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if ($status === 'approved' && $appliedRow !== null && $updateResourceId && !empty($keyColumns)) {
+            $proposal->resource_id = $this->buildCompositeId($keyColumns, $appliedRow);
+        }
         $proposal->save();
     }
 
@@ -313,6 +343,58 @@ class OperationsProposalController extends Controller {
         }
 
         return implode('_._', $parts);
+    }
+
+    protected function assignAutoKeyIfNeeded(string $table, array $keyColumns, array $data): array {
+        if (count($keyColumns) !== 1) {
+            return $data;
+        }
+
+        $keyColumn = $keyColumns[0];
+        if (!array_key_exists($keyColumn, $data)) {
+            return $data;
+        }
+
+        $currentValue = $data[$keyColumn];
+        if ($currentValue === null || $currentValue === '') {
+            return $data;
+        }
+
+        if (!is_numeric($currentValue)) {
+            return $data;
+        }
+
+        $existing = DB::table($table)->where($keyColumn, $currentValue)->first();
+        if (!$existing) {
+            return $data;
+        }
+
+        $nextValue = $this->guessNextNumericKeyValue($table, $keyColumn);
+        if ($nextValue === null) {
+            return $data;
+        }
+
+        $data[$keyColumn] = $nextValue;
+
+        return $data;
+    }
+
+    protected function guessNextNumericKeyValue(string $table, string $column): ?string {
+        try {
+            $max = DB::table($table)->max($column);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($max === null) {
+            return '1';
+        }
+
+        if (is_numeric($max)) {
+            return (string) ((int) $max + 1);
+        }
+
+        return null;
     }
 
     /**

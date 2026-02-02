@@ -756,16 +756,16 @@ class PostingAutofillService {
      *
      * @param int $year 年份
      * @return int|null 朝代代碼，如果年份不在任何已知朝代範圍內則返回 null
-     *                  如果年份匹配多個朝代：排除次要朝代後若剩唯一主要朝代則使用，否則返回 null
-     *                  如果年份只匹配一個朝代（即使是次要朝代）：使用該朝代
+     *                  如果年份匹配多個朝代：排除可排除朝代後若剩唯一朝代則使用，否則返回 null
+     *                  如果年份只匹配一個朝代（無論是否為可排除朝代）：使用該朝代
      */
     protected function getDynastyByYear(int $year): ?int {
         static $allDynastyRanges = null;
 
-        // 次要朝代：當有多個朝代匹配時，優先排除這些朝代
+        // 歧義時排除的朝代：當有多個朝代匹配時，優先排除這些朝代
         // 80=南明, 84=朝鮮, 85=大順, 86=大西
-        // 但如果次要朝代是唯一匹配項（無其他朝代），仍然使用它
-        $secondaryDynasties = [80, 84, 85, 86];
+        // 但如果這些朝代是唯一匹配項（無其他朝代），仍然使用它
+        $ambiguityExcludedDynasties = [80, 84, 85, 86];
 
         // 首次調用時從數據庫讀取所有朝代範圍
         if ($allDynastyRanges === null) {
@@ -796,28 +796,28 @@ class PostingAutofillService {
             }
         }
 
-        // 如果只匹配到一個朝代，直接返回（即使是次要朝代）
+        // 如果只匹配到一個朝代，直接返回（無論是否為可排除朝代）
         if (count($matchedDynasties) === 1) {
             return $matchedDynasties[0]['code'];
         }
 
-        // 如果匹配到多個朝代，嘗試排除次要朝代
+        // 如果匹配到多個朝代，嘗試排除可排除朝代以消除歧義
         if (count($matchedDynasties) > 1) {
-            // 過濾掉次要朝代
+            // 過濾掉可排除朝代
             $primaryDynasties = array_filter(
                 $matchedDynasties,
-                fn ($d) => !in_array($d['code'], $secondaryDynasties)
+                fn ($d) => !in_array($d['code'], $ambiguityExcludedDynasties)
             );
 
-            // 如果排除次要朝代後剩下唯一主要朝代，使用它
+            // 如果排除後剩下唯一朝代，使用它
             if (count($primaryDynasties) === 1) {
                 $selected = array_values($primaryDynasties)[0];
                 $excludedNames = array_map(
                     fn ($d) => "{$d['name']}({$d['code']})",
-                    array_filter($matchedDynasties, fn ($d) => in_array($d['code'], $secondaryDynasties))
+                    array_filter($matchedDynasties, fn ($d) => in_array($d['code'], $ambiguityExcludedDynasties))
                 );
 
-                Log::info('[AI Autofill] 年份屬於多個朝代，排除次要朝代後選擇主要朝代', [
+                Log::info('[AI Autofill] 年份屬於多個朝代，排除可排除朝代後選擇唯一朝代', [
                     'year' => $year,
                     'all_matched' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
                     'excluded' => $excludedNames,
@@ -827,8 +827,8 @@ class PostingAutofillService {
                 return $selected['code'];
             }
 
-            // 如果排除後仍有多個主要朝代，或全是次要朝代，fallback 到人物朝代
-            Log::info('[AI Autofill] 年份屬於多個朝代（無法確定唯一主要朝代），將使用人物朝代', [
+            // 如果排除後仍有多個朝代，或全是可排除朝代，fallback 到人物朝代
+            Log::info('[AI Autofill] 年份屬於多個朝代（排除後仍無法確定唯一朝代），將使用人物朝代', [
                 'year' => $year,
                 'matched_dynasties' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
                 'primary_dynasties_count' => count($primaryDynasties),

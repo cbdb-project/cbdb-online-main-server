@@ -189,9 +189,79 @@ class PostingAutofillService {
         // 取得任官年份（用於過濾地名）
         $postingYear = $aiData['c_firstyear'] ?? null;
 
+        // 智能朝代確定邏輯：優先使用任官時間來確定朝代
+        $effectiveDynasty = $personDynasty; // 默認使用人物朝代
+
+        // 如果AI生成了任官時間，嘗試使用任官時間確定朝代
+        $firstYear = $aiData['c_firstyear'] ?? null;
+        $lastYear = $aiData['c_lastyear'] ?? null;
+
+        if ($firstYear !== null || $lastYear !== null) {
+            $firstYearDynasty = $firstYear ? $this->getDynastyByYear($firstYear) : null;
+            $lastYearDynasty = $lastYear ? $this->getDynastyByYear($lastYear) : null;
+
+            // 情況1：只有 firstYear
+            if ($firstYear !== null && $lastYear === null) {
+                if ($firstYearDynasty !== null) {
+                    $effectiveDynasty = $firstYearDynasty;
+                }
+            }
+            // 情況2：只有 lastYear
+            elseif ($firstYear === null && $lastYear !== null) {
+                if ($lastYearDynasty !== null) {
+                    $effectiveDynasty = $lastYearDynasty;
+                }
+            }
+            // 情況3：兩者都有
+            elseif ($firstYear !== null && $lastYear !== null) {
+                // 如果兩個年份對應同一個朝代，使用該朝代
+                if ($firstYearDynasty !== null && $firstYearDynasty === $lastYearDynasty) {
+                    $effectiveDynasty = $firstYearDynasty;
+                }
+                // 如果兩個年份對應不同朝代，fallback 到人物朝代
+                // $effectiveDynasty 已經是 $personDynasty，不需要額外處理
+            }
+        }
+
+        Log::info('[AI Autofill] 朝代確定結果', [
+            'person_id' => $personId,
+            'person_dynasty' => $personDynasty,
+            'first_year' => $firstYear,
+            'last_year' => $lastYear,
+            'first_year_dynasty' => $firstYear ? $this->getDynastyByYear($firstYear) : null,
+            'last_year_dynasty' => $lastYear ? $this->getDynastyByYear($lastYear) : null,
+            'effective_dynasty' => $effectiveDynasty,
+        ]);
+
+        // 智能朝代填充：如果根據任官時間確定的朝代與人物朝代不同，或者有任官時間時，填充朝代欄位
+        if ($effectiveDynasty !== null && ($effectiveDynasty !== $personDynasty || ($firstYear !== null || $lastYear !== null))) {
+            // 查詢朝代名稱用於顯示
+            $dynastyInfo = DB::table('DYNASTIES')
+                ->where('c_dy', $effectiveDynasty)
+                ->first();
+
+            // 如果查詢失敗（幾乎不會發生，因為幾乎所有人都有朝代），使用 0（未詳）作為 fallback
+            $dynastyValue = $dynastyInfo ? $effectiveDynasty : 0;
+            $dynastyText = $dynastyInfo?->c_dynasty_chn ?? '未詳';
+
+            $matched['c_dy'] = [
+                'value' => $dynastyValue,
+                'text' => $dynastyText,
+                'reason' => '根據任官時間自動確定',
+            ];
+
+            Log::info('[AI Autofill] 填充朝代欄位', [
+                'person_dynasty' => $personDynasty,
+                'effective_dynasty' => $effectiveDynasty,
+                'dynasty_value' => $dynastyValue,
+                'dynasty_text' => $dynastyText,
+                'dynasties_query_success' => $dynastyInfo !== null,
+            ]);
+        }
+
         // 1. 官名匹配（posting_str）
         if (!empty($aiData['posting_str'])) {
-            $officeMatch = $this->fuzzyMatchOffice($aiData['posting_str'], $personDynasty);
+            $officeMatch = $this->fuzzyMatchOffice($aiData['posting_str'], $effectiveDynasty);
             if ($officeMatch) {
                 // 根據匹配類型決定是確認匹配還是建議
                 if ($officeMatch['match_type'] === 'exact') {
@@ -228,7 +298,7 @@ class PostingAutofillService {
             $parentName = $addrData['parent'] ?? null;
 
             if (!empty($searchName)) {
-                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $personDynasty, $parentName);
+                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $effectiveDynasty, $parentName);
 
                 if ($addrMatch) {
                     $inputLength = mb_strlen($searchName);
@@ -308,15 +378,15 @@ class PostingAutofillService {
                     Log::info("[AI Autofill] 查詢年號", [
                         'field' => $fieldName,
                         'name' => $value,
-                        'dynasty' => $personDynasty,
+                        'dynasty' => $effectiveDynasty,
                     ]);
 
                     $nianhaoQuery = DB::table('NIAN_HAO')
                         ->where('c_nianhao_chn', $value);
 
                     // 按朝代過濾（避免跨朝代的同名年號混淆）
-                    if ($personDynasty !== null) {
-                        $nianhaoQuery->where('c_dy', $personDynasty);
+                    if ($effectiveDynasty !== null) {
+                        $nianhaoQuery->where('c_dy', $effectiveDynasty);
                     }
 
                     $nianhaoId = $nianhaoQuery->value('c_nianhao_id');
@@ -324,7 +394,7 @@ class PostingAutofillService {
                     Log::info("[AI Autofill] 年號查詢結果（按朝代過濾）", [
                         'field' => $fieldName,
                         'name' => $value,
-                        'dynasty' => $personDynasty,
+                        'dynasty' => $effectiveDynasty,
                         'found_id' => $nianhaoId,
                     ]);
 
@@ -353,7 +423,7 @@ class PostingAutofillService {
                         Log::warning("[AI Autofill] 年號匹配失敗", [
                             'field' => $fieldName,
                             'name' => $value,
-                            'dynasty' => $personDynasty,
+                            'dynasty' => $effectiveDynasty,
                         ]);
 
                         $suggested[$fieldName] = [
@@ -653,23 +723,122 @@ class PostingAutofillService {
     }
 
     /**
-     * 獲取朝代的年份範圍
+     * 獲取朝代的年份範圍（從 DYNASTIES 表讀取，帶緩存）
      *
      * @param int $dynastyCode 朝代代碼
      * @return array|null ['start' => int, 'end' => int] 或 null（如果朝代未知）
      */
     protected function getDynastyYearRange(int $dynastyCode): ?array {
-        // 朝代代碼到年份範圍的映射
-        // 參考：NaturalLanguageQueryService 中的朝代代碼速查
-        $dynastyRanges = [
-            6 => ['start' => 618, 'end' => 907],    // 唐
-            15 => ['start' => 960, 'end' => 1279],   // 宋
-            18 => ['start' => 1271, 'end' => 1368],  // 元
-            19 => ['start' => 1368, 'end' => 1644],  // 明
-            20 => ['start' => 1644, 'end' => 1912],  // 清
-        ];
+        static $dynastyRangesCache = null;
 
-        return $dynastyRanges[$dynastyCode] ?? null;
+        // 首次調用時從數據庫讀取所有朝代範圍
+        if ($dynastyRangesCache === null) {
+            $dynastyRangesCache = [];
+            $dynasties = DB::table('DYNASTIES')
+                ->select('c_dy', 'c_start', 'c_end')
+                ->whereNotNull('c_start')
+                ->whereNotNull('c_end')
+                ->get();
+
+            foreach ($dynasties as $dynasty) {
+                $dynastyRangesCache[$dynasty->c_dy] = [
+                    'start' => $dynasty->c_start,
+                    'end' => $dynasty->c_end,
+                ];
+            }
+        }
+
+        return $dynastyRangesCache[$dynastyCode] ?? null;
+    }
+
+    /**
+     * 根據年份獲取朝代代碼
+     *
+     * @param int $year 年份
+     * @return int|null 朝代代碼，如果年份不在任何已知朝代範圍內則返回 null
+     *                  如果年份匹配多個朝代：排除可排除朝代後若剩唯一朝代則使用，否則返回 null
+     *                  如果年份只匹配一個朝代（無論是否為可排除朝代）：使用該朝代
+     */
+    protected function getDynastyByYear(int $year): ?int {
+        static $allDynastyRanges = null;
+
+        // 歧義時排除的朝代：當有多個朝代匹配時，優先排除這些朝代
+        // 80=南明, 84=朝鮮, 85=大順, 86=大西
+        // 但如果這些朝代是唯一匹配項（無其他朝代），仍然使用它
+        $ambiguityExcludedDynasties = [80, 84, 85, 86];
+
+        // 首次調用時從數據庫讀取所有朝代範圍
+        if ($allDynastyRanges === null) {
+            $allDynastyRanges = [];
+            $dynasties = DB::table('DYNASTIES')
+                ->select('c_dy', 'c_start', 'c_end', 'c_dynasty_chn')
+                ->whereNotNull('c_start')
+                ->whereNotNull('c_end')
+                ->orderBy('c_start')
+                ->get();
+
+            foreach ($dynasties as $dynasty) {
+                $allDynastyRanges[$dynasty->c_dy] = [
+                    'start' => $dynasty->c_start,
+                    'end' => $dynasty->c_end,
+                    'name' => $dynasty->c_dynasty_chn,
+                ];
+            }
+        }
+
+        $matchedDynasties = [];
+        foreach ($allDynastyRanges as $dynastyCode => $range) {
+            if ($year >= $range['start'] && $year <= $range['end']) {
+                $matchedDynasties[] = [
+                    'code' => $dynastyCode,
+                    'name' => $range['name'],
+                ];
+            }
+        }
+
+        // 如果只匹配到一個朝代，直接返回（無論是否為可排除朝代）
+        if (count($matchedDynasties) === 1) {
+            return $matchedDynasties[0]['code'];
+        }
+
+        // 如果匹配到多個朝代，嘗試排除可排除朝代以消除歧義
+        if (count($matchedDynasties) > 1) {
+            // 過濾掉可排除朝代
+            $primaryDynasties = array_filter(
+                $matchedDynasties,
+                fn ($d) => !in_array($d['code'], $ambiguityExcludedDynasties)
+            );
+
+            // 如果排除後剩下唯一朝代，使用它
+            if (count($primaryDynasties) === 1) {
+                $selected = array_values($primaryDynasties)[0];
+                $excludedNames = array_map(
+                    fn ($d) => "{$d['name']}({$d['code']})",
+                    array_filter($matchedDynasties, fn ($d) => in_array($d['code'], $ambiguityExcludedDynasties))
+                );
+
+                Log::info('[AI Autofill] 年份屬於多個朝代，排除可排除朝代後選擇唯一朝代', [
+                    'year' => $year,
+                    'all_matched' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
+                    'excluded' => $excludedNames,
+                    'selected_dynasty' => "{$selected['name']}({$selected['code']})",
+                ]);
+
+                return $selected['code'];
+            }
+
+            // 如果排除後仍有多個朝代，或全是可排除朝代，fallback 到人物朝代
+            Log::info('[AI Autofill] 年份屬於多個朝代（排除後仍無法確定唯一朝代），將使用人物朝代', [
+                'year' => $year,
+                'matched_dynasties' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
+                'primary_dynasties_count' => count($primaryDynasties),
+            ]);
+
+            return null;
+        }
+
+        // 沒有匹配到任何朝代
+        return null;
     }
 
     /**

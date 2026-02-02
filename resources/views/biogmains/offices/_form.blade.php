@@ -386,12 +386,15 @@
                             setTimeout(function() {
                                 applyAiSuggestions(aiSuggestions);
 
-                                // AI 填充完成後，自動填充朝代欄位（從人物基本信息）
-                                const dynastyCode = $('.dynasty_code').val();
-                                if (dynastyCode) {
-                                    const $dynastyField = $('[name="c_dy"]');
-                                    if ($dynastyField.length > 0 && !$dynastyField.val()) {
-                                        $dynastyField.val(dynastyCode).trigger('change');
+                                // AI 填充完成後，如果 AI 沒有返回朝代欄位，才使用人物的朝代自動填充
+                                const hasDynastyFromAi = aiSuggestions.matched_fields?.c_dy || aiSuggestions.suggested_fields?.c_dy;
+                                if (!hasDynastyFromAi) {
+                                    const dynastyCode = $('.dynasty_code').val();
+                                    if (dynastyCode) {
+                                        const $dynastyField = $('[name="c_dy"]');
+                                        if ($dynastyField.length > 0 && !$dynastyField.val()) {
+                                            $dynastyField.val(dynastyCode).trigger('change');
+                                        }
                                     }
                                 }
                             }, 500);

@@ -756,14 +756,15 @@ class PostingAutofillService {
      *
      * @param int $year 年份
      * @return int|null 朝代代碼，如果年份不在任何已知朝代範圍內則返回 null
-     *                  如果年份同時屬於多個朝代，排除次要朝代後若剩唯一則使用，否則返回 null
+     *                  如果年份匹配多個朝代：排除次要朝代後若剩唯一主要朝代則使用，否則返回 null
+     *                  如果年份只匹配一個朝代（即使是次要朝代）：使用該朝代
      */
     protected function getDynastyByYear(int $year): ?int {
         static $allDynastyRanges = null;
 
         // 次要朝代：當有多個朝代匹配時，優先排除這些朝代
         // 80=南明, 84=朝鮮, 85=大順, 86=大西
-        // 但如果只有這些朝代匹配（無其他主要朝代），仍然使用它們
+        // 但如果次要朝代是唯一匹配項（無其他朝代），仍然使用它
         $secondaryDynasties = [80, 84, 85, 86];
 
         // 首次調用時從數據庫讀取所有朝代範圍

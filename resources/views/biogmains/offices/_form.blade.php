@@ -293,9 +293,9 @@
         }
 
         // ===================================================================
-        // AI 智能填充功能（僅在新增模式）
+        // AI 智能填充功能（僅在新增模式且用戶有直接寫入權限時啟用）
         // ===================================================================
-        @if(!$isEdit && config('services.gemini.api_key'))
+        @if(!$isEdit && config('services.gemini.api_key') && auth()->user()->canWriteDirectly())
         (function() {
             // 環境變量控制：僅在開發模式下輸出調試日誌
             const DEBUG = {{ config('app.debug') ? 'true' : 'false' }};
@@ -551,7 +551,7 @@
                                             addAiClass($field, 'ai-matched');
                                         }
                                     }).fail(err => {
-                                        console.error(`❌ 獲取完整 ${searchModel} 信息失敗:`, err);
+                                        if (debugLog) console.error(`❌ 獲取完整 ${searchModel} 信息失敗:`, err);
                                         // Fallback: 使用簡單格式
                                         $field.empty();
                                         const option = new Option(fieldData.text, fieldData.value, true, true);
@@ -728,7 +728,7 @@
                                             addAiClass($field, 'ai-suggested');
                                         }
                                     }).fail(err => {
-                                        console.error(`❌ 獲取完整 ${model} 信息失敗:`, err);
+                                        if (debugLog) console.error(`❌ 獲取完整 ${model} 信息失敗:`, err);
                                         // Fallback: 使用簡單格式
                                         $field.empty();
                                         const option = new Option(fieldData.text, fieldData.value, true, true);

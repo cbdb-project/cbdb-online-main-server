@@ -225,22 +225,22 @@ class PostingAutofillService {
         if (!empty($aiData['addr_str']) && is_array($aiData['addr_str'])) {
             $addrData = $aiData['addr_str'];
             $searchName = $addrData['name'] ?? null;
+            $parentName = $addrData['parent'] ?? null;
 
             if (!empty($searchName)) {
-                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $personDynasty);
+                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $personDynasty, $parentName);
 
                 if ($addrMatch) {
                     $inputLength = mb_strlen($searchName);
                     $matchedLength = $addrMatch['matched_length'];
 
                     // 判斷是否需要建議（黃色）：
-                    // 1. 模糊匹配（前綴匹配）
+                    // 1. 模糊匹配（前綴匹配，或有歧義但上層匹配失敗）
                     // 2. 輸入包含上層信息但只匹配到下層（輸入長度 > 匹配長度）
-                    // 3. 有 parent 欄位（表示有上層地名信息）
+                    // 注意：match_type 已經考慮了上層匹配的情況，不需要再檢查 parent 欄位
                     $needsConfirmation = (
                         $addrMatch['match_type'] === 'fuzzy' ||
-                        $inputLength > $matchedLength ||
-                        !empty($addrData['parent'])
+                        $inputLength > $matchedLength
                     );
 
                     if ($needsConfirmation) {
@@ -488,9 +488,11 @@ class PostingAutofillService {
      *
      * @param string $addrName 地名
      * @param int|null $year 任官年份（用於過濾地名的有效時間範圍）
+     * @param int|null $dynastyCode 朝代代碼
+     * @param string|null $parentName 上層地名（用於消除同名地址的歧義）
      * @return array|null ['id' => int, 'text' => string, 'match_type' => 'exact'|'fuzzy', 'matched_length' => int]
      */
-    protected function fuzzyMatchAddress(string $addrName, ?int $year = null, ?int $dynastyCode = null): ?array {
+    protected function fuzzyMatchAddress(string $addrName, ?int $year = null, ?int $dynastyCode = null, ?string $parentName = null): ?array {
         // ========== 年份 Fallback 邏輯 ==========
         // 優先使用任官年份，如果為 null 則 fallback 到朝代年份範圍
         $effectiveYear = $year;
@@ -506,7 +508,14 @@ class PostingAutofillService {
         // 注意：使用 ADDR_CODES 表（與 Select2 API 一致）
         $query = DB::table('ADDR_CODES')
             ->select('c_addr_id as id', 'c_name_chn as text')
-            ->where('c_name_chn', '=', $addrName);
+            ->where('c_name_chn', '=', $addrName)
+            // AI 填充時過濾交通設施相關地名
+            ->where('c_name_chn', 'not like', '%驛')  // 驛：全部過濾
+            ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
+            ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
+            // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
+            // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
+            ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
         // 加入時間範圍過濾（如果有提供年份）
         if ($effectiveYear !== null) {
@@ -535,13 +544,66 @@ class PostingAutofillService {
         if ($results->count() > 0) {
             // 檢查是否有歧義（多個同名地址）
             $isAmbiguous = $results->count() > 1;
+            $parentMatched = false;  // 標記上層是否匹配成功
+
+            // 如果有歧義且提供了上層地名，嘗試使用上層地名消除歧義
+            if ($isAmbiguous && !empty($parentName)) {
+                // ✅ 優化：預加載所有候選地址的上層信息（避免 N+1 查詢）
+                $candidateIds = $results->pluck('id')->toArray();
+
+                // 一次性 JOIN 查詢所有上層信息
+                $parentMap = DB::table('ADDR_BELONGS_DATA as ab')
+                    ->join('ADDR_CODES as parent', 'ab.c_belongs_to', '=', 'parent.c_addr_id')
+                    ->whereIn('ab.c_addr_id', $candidateIds)
+                    ->select(
+                        'ab.c_addr_id as child_id',
+                        'parent.c_addr_id as parent_id',
+                        'parent.c_name_chn as parent_name'
+                    )
+                    ->get()
+                    ->groupBy('child_id'); // 按子地址 ID 分組
+
+                // 使用預加載的數據進行過濾（無額外查詢）
+                $filteredResults = $results->filter(function ($addr) use ($parentName, $parentMap) {
+                    // 從預加載的 map 中獲取上層信息（內存操作）
+                    $parents = $parentMap->get($addr->id);
+
+                    if (!$parents) {
+                        return false;
+                    }
+
+                    foreach ($parents as $parent) {
+                        // 上層地名使用雙向模糊匹配（A in B 或 B in A）
+                        // 例如：AI 提取 "杭州" ⇔ 數據庫 "杭州府"
+                        if (str_contains($parent->parent_name, $parentName) ||
+                            str_contains($parentName, $parent->parent_name)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+                // 如果過濾後有結果，使用過濾後的結果
+                if ($filteredResults->count() > 0) {
+                    $results = $filteredResults;
+                    $isAmbiguous = $results->count() > 1;
+                    $parentMatched = true;  // 標記上層匹配成功
+                }
+            }
 
             $result = $results->first();
+
+            // 判斷 match_type：
+            // 1. 無歧義 → exact（綠色）
+            // 2. 有歧義但上層匹配成功 → exact（綠色）
+            // 3. 有歧義且上層匹配失敗 → fuzzy（黃色）
+            $matchType = ($isAmbiguous && !$parentMatched) ? 'fuzzy' : 'exact';
 
             return [
                 'id' => $result->id,
                 'text' => $result->text,
-                'match_type' => $isAmbiguous ? 'fuzzy' : 'exact',  // 有歧義時標記為模糊匹配
+                'match_type' => $matchType,
                 'matched_length' => mb_strlen($result->text),
             ];
         }
@@ -549,7 +611,14 @@ class PostingAutofillService {
         // ========== Step 2: 前綴匹配 c_name_chn（模糊匹配） ==========
         $query = DB::table('ADDR_CODES')
             ->select('c_addr_id as id', 'c_name_chn as text')
-            ->where('c_name_chn', 'like', $addrName . '%');
+            ->where('c_name_chn', 'like', $addrName . '%')
+            // AI 填充時過濾交通設施相關地名
+            ->where('c_name_chn', 'not like', '%驛')  // 驛：全部過濾
+            ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
+            ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
+            // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
+            // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
+            ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
         if ($effectiveYear !== null) {
             $query->where(function ($q) use ($effectiveYear) {

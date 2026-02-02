@@ -19,7 +19,7 @@
     'dayValue' => '',
     'dayGzName' => null,
     'dayGzValue' => '',
-    'nhLabel' => '年号',
+    'nhLabel' => '年號',
     'rangeLabel' => '時限',
     'intercalaryLabel' => '閏月',
     'dayGzLabel' => '日(干支)',

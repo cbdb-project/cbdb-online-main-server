@@ -101,16 +101,24 @@ For each posting in `postings`, fill the following fields:
     - If only one level exists, set to `null`
 
   * **name** (string, required if addr_str is not null):
-    - The final (lowest-level) place name
+    - The final (lowest-level) place name **WITHOUT the administrative unit suffix**
     - Example: "福建泉州" → `"name": "泉州"`
+    - Example: "杭州新城縣" → `"name": "新城"`
+    - Example: "直隸涿州" → `"name": "涿州"`
 
   * **admin_type** (string or null):
     - The administrative unit type (州、府、縣、軍、監、路、省、道、郡、國, etc.)
-    - **Extraction logic:**
-      * For **3+ character names** like "新城縣": The last character is usually the admin unit
-        → Extract as: `"name": "新城", "admin_type": "縣"`
-      * For **2-character names** like "涿州" or "泉州": The last character may be part of the place name itself
-        → Keep the full name: `"name": "涿州", "admin_type": "州"` (or `"name": "泉州", "admin_type": "州"`)
+    - **CRITICAL EXTRACTION RULES (MUST FOLLOW):**
+      * For **3+ character names** ending with 縣/府/州/省/市/區/鎮/鄉/村:
+        → **ALWAYS** extract the admin suffix separately
+        → Example: "新城縣" → `"name": "新城", "admin_type": "縣"`
+        → Example: "保定府" → `"name": "保定", "admin_type": "府"`
+        → Example: "西安府" → `"name": "西安", "admin_type": "府"`
+      * For **2-character names** ending with 州/府:
+        → The last character is likely part of the place name itself
+        → Example: "涿州" → `"name": "涿州", "admin_type": "州"`
+        → Example: "泉州" → `"name": "泉州", "admin_type": "州"`
+        → Example: "杭州" → `"name": "杭州", "admin_type": "州"`
       * If admin unit cannot be determined, set to `null`
 
  **If no location is explicitly stated, return `null` for the entire addr_str.**

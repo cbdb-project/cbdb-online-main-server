@@ -1,0 +1,679 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class PostingAutofillService {
+    protected string $apiKey;
+    protected string $apiEndpoint;
+    protected string $model;
+    protected string $promptTemplate;
+
+    public function __construct() {
+        // 完全從 config 讀取，config 層會從 .env 讀取並提供 fallback
+        // 不在 Service 層 hard coding 任何默認值
+        $this->apiKey = config('services.gemini.api_key', '');
+        $this->apiEndpoint = config('services.gemini.api_endpoint');
+        $this->model = config('services.gemini.model');
+
+        // 讀取 prompt 模板（AI 任官信息提取 prompt）
+        $this->promptTemplate = resource_path('prompts/ai-posting-extraction-prompt.txt');
+    }
+
+    /**
+     * 從古籍文本提取任官信息並返回填充建議
+     *
+     * @param string $sourceText 原始文本
+     * @param int $personId 人物 ID（用於查詢候選出處）
+     * @return array ['success' => bool, 'data' => array, 'error' => string|null]
+     */
+    public function extractAndMatch(string $sourceText, int $personId): array {
+        if (empty($this->apiKey)) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'AI API 未配置，請聯繫管理員',
+            ];
+        }
+
+        try {
+            // 1. 調用 AI 提取結構化數據
+            $extractResult = $this->callAI($sourceText);
+
+            if (!$extractResult['success']) {
+                return $extractResult;
+            }
+
+            $aiData = $extractResult['data'];
+
+            // 2. 對每個欄位進行模糊匹配
+            $matchResult = $this->matchFields($aiData, $personId);
+
+            return [
+                'success' => true,
+                'data' => [
+                    'ai_extracted' => $aiData, // AI 原始提取結果
+                    'matched_fields' => $matchResult['matched'], // 成功匹配的欄位
+                    'suggested_fields' => $matchResult['suggested'], // 建議值（未匹配）
+                    'empty_fields' => $matchResult['empty'], // 未提取的欄位
+                    'statistics' => [
+                        'matched_count' => count($matchResult['matched']),
+                        'suggested_count' => count($matchResult['suggested']),
+                        'empty_count' => count($matchResult['empty']),
+                    ],
+                ],
+                'error' => null,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('AI 提取任官信息失敗', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => '處理失敗：' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * 調用 AI API 提取結構化數據
+     */
+    protected function callAI(string $sourceText): array {
+        // 讀取 prompt 模板
+        if (!file_exists($this->promptTemplate)) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'Prompt 模板檔案不存在',
+            ];
+        }
+
+        $promptContent = file_get_contents($this->promptTemplate);
+        $fullPrompt = $promptContent . "\n\n" . $sourceText;
+
+        // 調用 Gemini API
+        $response = Http::timeout(30)
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $this->apiKey,
+            ])
+            ->post($this->apiEndpoint, [
+                'model' => $this->model,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $fullPrompt,
+                    ],
+                ],
+                'temperature' => 0.1,
+                'response_format' => [
+                    'type' => 'json_schema',
+                    'json_schema' => [
+                        'name' => 'posting_extraction',
+                        'strict' => true,
+                        'schema' => $this->getJsonSchema(),
+                    ],
+                ],
+            ]);
+
+        if (!$response->successful()) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'AI API 調用失敗：' . $response->body(),
+            ];
+        }
+
+        $responseData = $response->json();
+        $content = $responseData['choices'][0]['message']['content'] ?? null;
+
+        if (!$content) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'AI 返回格式錯誤',
+            ];
+        }
+
+        $jsonData = json_decode($content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'JSON 解析失敗：' . json_last_error_msg(),
+            ];
+        }
+
+        // 提取第一筆任官記錄（通常一次只錄入一筆）
+        $postings = $jsonData['postings'] ?? [];
+
+        if (empty($postings)) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => '未能從文本中提取任官信息',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'data' => $postings[0], // 返回第一筆
+            'error' => null,
+        ];
+    }
+
+    /**
+     * 對 AI 提取的數據進行模糊匹配
+     */
+    protected function matchFields(array $aiData, int $personId): array {
+        $matched = [];
+        $suggested = [];
+        $empty = [];
+
+        // 取得人物的朝代代碼（用於過濾官名和年號）
+        $personDynasty = DB::table('BIOG_MAIN')
+            ->where('c_personid', $personId)
+            ->value('c_dy');
+
+        // 注意：朝代欄位已在前端頁面加載時自動填充（從 person-id-display 組件的 dynasty_code），
+        // 所以 AI 不需要再填充此欄位
+
+        // 取得任官年份（用於過濾地名）
+        $postingYear = $aiData['c_firstyear'] ?? null;
+
+        // 1. 官名匹配（posting_str）
+        if (!empty($aiData['posting_str'])) {
+            $officeMatch = $this->fuzzyMatchOffice($aiData['posting_str'], $personDynasty);
+            if ($officeMatch) {
+                // 根據匹配類型決定是確認匹配還是建議
+                if ($officeMatch['match_type'] === 'exact') {
+                    // 精確匹配 → 綠色（確認）
+                    $matched['c_office_id'] = [
+                        'value' => $officeMatch['id'],
+                        'text' => $officeMatch['text'],
+                        'ai_extracted' => $aiData['posting_str'],
+                    ];
+                } else {
+                    // 模糊匹配 → 黃色（建議）
+                    $suggested['c_office_id'] = [
+                        'value' => $officeMatch['id'],
+                        'text' => $officeMatch['text'],
+                        'ai_extracted' => $aiData['posting_str'],
+                        'search_query' => $aiData['posting_str'],
+                    ];
+                }
+            } else {
+                // 完全找不到 → 黃色（建議）
+                $suggested['c_office_id'] = [
+                    'ai_extracted' => $aiData['posting_str'],
+                    'search_query' => $aiData['posting_str'],
+                ];
+            }
+        } else {
+            $empty[] = 'c_office_id';
+        }
+
+        // 2. 地名匹配（addr_str）
+        if (!empty($aiData['addr_str']) && is_array($aiData['addr_str'])) {
+            $addrData = $aiData['addr_str'];
+            $searchName = $addrData['name'] ?? null;
+
+            if (!empty($searchName)) {
+                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $personDynasty);
+
+                if ($addrMatch) {
+                    $inputLength = mb_strlen($searchName);
+                    $matchedLength = $addrMatch['matched_length'];
+
+                    // 判斷是否需要建議（黃色）：
+                    // 1. 模糊匹配（前綴匹配）
+                    // 2. 輸入包含上層信息但只匹配到下層（輸入長度 > 匹配長度）
+                    // 3. 有 parent 欄位（表示有上層地名信息）
+                    $needsConfirmation = (
+                        $addrMatch['match_type'] === 'fuzzy' ||
+                        $inputLength > $matchedLength ||
+                        !empty($addrData['parent'])
+                    );
+
+                    if ($needsConfirmation) {
+                        // 需要確認 → 黃色（建議）
+                        $suggested['c_addr'] = [
+                            'value' => [$addrMatch['id']],
+                            'text' => [$addrMatch['text']],
+                            'ai_extracted' => $addrData['full_text'] ?? $searchName,
+                            'ai_structured' => $addrData, // 保留完整的結構化信息
+                            'search_query' => $searchName,
+                        ];
+                    } else {
+                        // 精確匹配且長度一致 → 綠色（確認）
+                        $matched['c_addr'] = [
+                            'value' => [$addrMatch['id']],
+                            'text' => [$addrMatch['text']],
+                            'ai_extracted' => $addrData['full_text'] ?? $searchName,
+                            'ai_structured' => $addrData, // 保留完整的結構化信息
+                        ];
+                    }
+                } else {
+                    // 完全找不到 → 黃色（建議）
+                    $suggested['c_addr'] = [
+                        'ai_extracted' => $addrData['full_text'] ?? $searchName,
+                        'ai_structured' => $addrData, // 保留完整的結構化信息
+                        'search_query' => $searchName,
+                    ];
+                }
+            } else {
+                $empty[] = 'c_addr';
+            }
+        } else {
+            $empty[] = 'c_addr';
+        }
+
+        // 3. 直接映射欄位（不需要模糊匹配）
+        $directMappings = [
+            'c_firstyear' => 'c_firstyear',
+            'c_fy_nh_code' => 'c_fy_nh_code',
+            'c_fy_nh_year' => 'c_fy_nh_year',
+            'c_fy_range' => 'c_fy_range',
+            'c_fy_intercalary' => 'c_fy_intercalary',
+            'c_fy_month' => 'c_fy_month',
+            'c_fy_day' => 'c_fy_day',
+            'c_fy_day_gz' => 'c_fy_day_gz',
+            'c_lastyear' => 'c_lastyear',
+            'c_ly_nh_code' => 'c_ly_nh_code',
+            'c_ly_nh_year' => 'c_ly_nh_year',
+            'c_ly_range' => 'c_ly_range',
+            'c_ly_intercalary' => 'c_ly_intercalary',
+            'c_ly_month' => 'c_ly_month',
+            'c_ly_day' => 'c_ly_day',
+            'c_ly_day_gz' => 'c_ly_day_gz',
+            'c_appt_code' => 'c_appt_code',
+            'c_assume_office_code' => 'c_assume_office_code',
+        ];
+
+        foreach ($directMappings as $fieldName => $aiKey) {
+            if (isset($aiData[$aiKey]) && $aiData[$aiKey] !== null) {
+                $value = $aiData[$aiKey];
+
+                // 特殊處理：年號欄位可能返回名稱而非 ID，需要轉換
+                if (in_array($fieldName, ['c_fy_nh_code', 'c_ly_nh_code']) && !is_numeric($value)) {
+                    // AI 返回的是年號名稱（如"雍正"），需要查詢 ID
+                    Log::info("[AI Autofill] 查詢年號", [
+                        'field' => $fieldName,
+                        'name' => $value,
+                        'dynasty' => $personDynasty,
+                    ]);
+
+                    $nianhaoQuery = DB::table('NIAN_HAO')
+                        ->where('c_nianhao_chn', $value);
+
+                    // 按朝代過濾（避免跨朝代的同名年號混淆）
+                    if ($personDynasty !== null) {
+                        $nianhaoQuery->where('c_dy', $personDynasty);
+                    }
+
+                    $nianhaoId = $nianhaoQuery->value('c_nianhao_id');
+
+                    Log::info("[AI Autofill] 年號查詢結果（按朝代過濾）", [
+                        'field' => $fieldName,
+                        'name' => $value,
+                        'dynasty' => $personDynasty,
+                        'found_id' => $nianhaoId,
+                    ]);
+
+                    // 如果沒找到，嘗試不限制朝代再查一次
+                    if (!$nianhaoId) {
+                        $nianhaoId = DB::table('NIAN_HAO')
+                            ->where('c_nianhao_chn', $value)
+                            ->value('c_nianhao_id');
+
+                        Log::info("[AI Autofill] 年號查詢結果（不限朝代）", [
+                            'field' => $fieldName,
+                            'name' => $value,
+                            'found_id' => $nianhaoId,
+                        ]);
+                    }
+
+                    if ($nianhaoId) {
+                        $value = $nianhaoId;
+                        Log::info("[AI Autofill] 年號匹配成功", [
+                            'field' => $fieldName,
+                            'name' => $aiData[$aiKey],
+                            'id' => $nianhaoId,
+                        ]);
+                    } else {
+                        // 找不到對應的年號，標記為建議而非確認
+                        Log::warning("[AI Autofill] 年號匹配失敗", [
+                            'field' => $fieldName,
+                            'name' => $value,
+                            'dynasty' => $personDynasty,
+                        ]);
+
+                        $suggested[$fieldName] = [
+                            'ai_extracted' => $value,
+                            'search_query' => $value,
+                        ];
+
+                        continue;
+                    }
+                }
+
+                $matched[$fieldName] = [
+                    'value' => $value,
+                    'text' => $value,
+                ];
+            } else {
+                $empty[] = $fieldName;
+            }
+        }
+
+        return [
+            'matched' => $matched,
+            'suggested' => $suggested,
+            'empty' => $empty,
+        ];
+    }
+
+    /**
+     * 模糊匹配官名
+     *
+     * @param string $officeName 官名
+     * @param int|null $dynastyCode 朝代代碼（用於過濾）
+     * @return array|null ['id' => int, 'text' => string, 'match_type' => 'exact'|'fuzzy']
+     */
+    protected function fuzzyMatchOffice(string $officeName, ?int $dynastyCode = null): ?array {
+        // ========== Step 1: 精確匹配 c_office_chn ==========
+        $query = DB::table('OFFICE_CODES')
+            ->select('c_office_id as id', 'c_office_chn as text')
+            ->where('c_office_chn', '=', $officeName);
+
+        if ($dynastyCode !== null) {
+            $query->where('c_dy', '=', $dynastyCode);
+        }
+
+        $result = $query->first();
+        if ($result) {
+            return [
+                'id' => $result->id,
+                'text' => $result->text,
+                'match_type' => 'exact',
+            ];
+        }
+
+        // ========== Step 2: 精確匹配 c_office_chn_alt（分號分割） ==========
+        // 使用 SQL 模式匹配來找到可能包含該官名的記錄
+        $query = DB::table('OFFICE_CODES')
+            ->select('c_office_id as id', 'c_office_chn as text', 'c_office_chn_alt')
+            ->whereNotNull('c_office_chn_alt')
+            ->where(function ($q) use ($officeName) {
+                $q->where('c_office_chn_alt', '=', $officeName)  // 完全相同
+                    ->orWhere('c_office_chn_alt', 'like', $officeName . ';%')  // 開頭
+                    ->orWhere('c_office_chn_alt', 'like', '%;' . $officeName)  // 結尾
+                    ->orWhere('c_office_chn_alt', 'like', '%;' . $officeName . ';%');  // 中間
+            });
+
+        if ($dynastyCode !== null) {
+            $query->where('c_dy', '=', $dynastyCode);
+        }
+
+        // 在 PHP 中驗證精確匹配（避免部分匹配的誤判）
+        $candidates = $query->get();
+        foreach ($candidates as $candidate) {
+            $alternatives = explode(';', $candidate->c_office_chn_alt);
+            foreach ($alternatives as $alt) {
+                if (trim($alt) === $officeName) {
+                    return [
+                        'id' => $candidate->id,
+                        'text' => $candidate->text,
+                        'match_type' => 'exact',
+                    ];
+                }
+            }
+        }
+
+        // ========== Step 3: 前綴匹配 c_office_chn（模糊匹配） ==========
+        $query = DB::table('OFFICE_CODES')
+            ->select('c_office_id as id', 'c_office_chn as text')
+            ->where('c_office_chn', 'like', $officeName . '%');
+
+        if ($dynastyCode !== null) {
+            $query->where('c_dy', '=', $dynastyCode);
+        }
+
+        $result = $query->first();
+        if ($result) {
+            return [
+                'id' => $result->id,
+                'text' => $result->text,
+                'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
+            ];
+        }
+
+        // ========== Step 4: 前綴匹配 c_office_chn_alt（模糊匹配） ==========
+        $query = DB::table('OFFICE_CODES')
+            ->select('c_office_id as id', 'c_office_chn as text', 'c_office_chn_alt')
+            ->whereNotNull('c_office_chn_alt');
+
+        if ($dynastyCode !== null) {
+            $query->where('c_dy', '=', $dynastyCode);
+        }
+
+        $candidates = $query->get();
+        foreach ($candidates as $candidate) {
+            $alternatives = explode(';', $candidate->c_office_chn_alt);
+            foreach ($alternatives as $alt) {
+                $trimmedAlt = trim($alt);
+                if (!empty($trimmedAlt) && str_starts_with($trimmedAlt, $officeName)) {
+                    return [
+                        'id' => $candidate->id,
+                        'text' => $candidate->text,
+                        'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 模糊匹配地名
+     *
+     * @param string $addrName 地名
+     * @param int|null $year 任官年份（用於過濾地名的有效時間範圍）
+     * @return array|null ['id' => int, 'text' => string, 'match_type' => 'exact'|'fuzzy', 'matched_length' => int]
+     */
+    protected function fuzzyMatchAddress(string $addrName, ?int $year = null, ?int $dynastyCode = null): ?array {
+        // ========== 年份 Fallback 邏輯 ==========
+        // 優先使用任官年份，如果為 null 則 fallback 到朝代年份範圍
+        $effectiveYear = $year;
+        if ($effectiveYear === null && $dynastyCode !== null) {
+            $dynastyRange = $this->getDynastyYearRange($dynastyCode);
+            if ($dynastyRange) {
+                // 使用朝代的中點年份作為過濾條件
+                $effectiveYear = (int)(($dynastyRange['start'] + $dynastyRange['end']) / 2);
+            }
+        }
+
+        // ========== Step 1: 精確匹配 c_name_chn ==========
+        // 注意：使用 ADDR_CODES 表（與 Select2 API 一致）
+        $query = DB::table('ADDR_CODES')
+            ->select('c_addr_id as id', 'c_name_chn as text')
+            ->where('c_name_chn', '=', $addrName);
+
+        // 加入時間範圍過濾（如果有提供年份）
+        if ($effectiveYear !== null) {
+            $query->where(function ($q) use ($effectiveYear) {
+                $q->where(function ($subQ) use ($effectiveYear) {
+                    // 地名有效期間包含任官年份（兩邊都有值）
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                })->orWhere(function ($subQ) {
+                    // 時間範圍為 NULL（代表不限時間）
+                    $subQ->whereNull('c_firstyear')
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    // 開放式結束（只有開始年份，沒有結束年份）
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    // 開放式開始（只有結束年份，沒有開始年份）
+                    $subQ->whereNull('c_firstyear')
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                });
+            });
+        }
+
+        $results = $query->get();
+        if ($results->count() > 0) {
+            // 檢查是否有歧義（多個同名地址）
+            $isAmbiguous = $results->count() > 1;
+
+            $result = $results->first();
+
+            return [
+                'id' => $result->id,
+                'text' => $result->text,
+                'match_type' => $isAmbiguous ? 'fuzzy' : 'exact',  // 有歧義時標記為模糊匹配
+                'matched_length' => mb_strlen($result->text),
+            ];
+        }
+
+        // ========== Step 2: 前綴匹配 c_name_chn（模糊匹配） ==========
+        $query = DB::table('ADDR_CODES')
+            ->select('c_addr_id as id', 'c_name_chn as text')
+            ->where('c_name_chn', 'like', $addrName . '%');
+
+        if ($effectiveYear !== null) {
+            $query->where(function ($q) use ($effectiveYear) {
+                $q->where(function ($subQ) use ($effectiveYear) {
+                    // 兩邊都有值且包含任官年份
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                })->orWhere(function ($subQ) {
+                    // 兩邊都為 NULL
+                    $subQ->whereNull('c_firstyear')
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    // 開放式結束（只有開始年份）
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    // 開放式開始（只有結束年份）
+                    $subQ->whereNull('c_firstyear')
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                });
+            });
+        }
+
+        $result = $query->first();
+
+        return $result ? [
+            'id' => $result->id,
+            'text' => $result->text,
+            'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
+            'matched_length' => mb_strlen($result->text),
+        ] : null;
+    }
+
+    /**
+     * 獲取朝代的年份範圍
+     *
+     * @param int $dynastyCode 朝代代碼
+     * @return array|null ['start' => int, 'end' => int] 或 null（如果朝代未知）
+     */
+    protected function getDynastyYearRange(int $dynastyCode): ?array {
+        // 朝代代碼到年份範圍的映射
+        // 參考：NaturalLanguageQueryService 中的朝代代碼速查
+        $dynastyRanges = [
+            6 => ['start' => 618, 'end' => 907],    // 唐
+            15 => ['start' => 960, 'end' => 1279],   // 宋
+            18 => ['start' => 1271, 'end' => 1368],  // 元
+            19 => ['start' => 1368, 'end' => 1644],  // 明
+            20 => ['start' => 1644, 'end' => 1912],  // 清
+        ];
+
+        return $dynastyRanges[$dynastyCode] ?? null;
+    }
+
+    /**
+     * 獲取 JSON Schema（用於 Structured Output）
+     */
+    protected function getJsonSchema(): array {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'postings' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'posting_str' => ['type' => 'string'],
+                            'addr_str' => [
+                                'type' => ['object', 'null'],
+                                'properties' => [
+                                    'full_text' => ['type' => 'string'],
+                                    'parent' => ['type' => ['string', 'null']],
+                                    'name' => ['type' => 'string'],
+                                    'admin_type' => ['type' => ['string', 'null']],
+                                ],
+                                'required' => ['full_text', 'parent', 'name', 'admin_type'],
+                                'additionalProperties' => false,
+                            ],
+                            'c_firstyear' => ['type' => ['integer', 'null']],
+                            'c_fy_nh_code' => ['type' => ['string', 'null']],
+                            'c_fy_nh_year' => ['type' => ['integer', 'null']],
+                            'c_fy_range' => ['type' => ['integer', 'null']],
+                            'c_fy_intercalary' => ['type' => ['boolean', 'null']],
+                            'c_fy_month' => ['type' => ['integer', 'null']],
+                            'c_fy_day' => ['type' => ['integer', 'null']],
+                            'c_fy_day_gz' => ['type' => ['string', 'null']],
+                            'c_lastyear' => ['type' => ['integer', 'null']],
+                            'c_ly_nh_code' => ['type' => ['string', 'null']],
+                            'c_ly_nh_year' => ['type' => ['integer', 'null']],
+                            'c_ly_range' => ['type' => ['integer', 'null']],
+                            'c_ly_intercalary' => ['type' => ['boolean', 'null']],
+                            'c_ly_month' => ['type' => ['integer', 'null']],
+                            'c_ly_day' => ['type' => ['integer', 'null']],
+                            'c_ly_day_gz' => ['type' => ['string', 'null']],
+                            'c_appt_code' => ['type' => ['integer', 'null']],
+                            'c_assume_office_code' => ['type' => ['integer', 'null']],
+                        ],
+                        'required' => [
+                            'posting_str',
+                            'addr_str',
+                            'c_firstyear',
+                            'c_fy_nh_code',
+                            'c_fy_nh_year',
+                            'c_fy_range',
+                            'c_fy_intercalary',
+                            'c_fy_month',
+                            'c_fy_day',
+                            'c_fy_day_gz',
+                            'c_lastyear',
+                            'c_ly_nh_code',
+                            'c_ly_nh_year',
+                            'c_ly_range',
+                            'c_ly_intercalary',
+                            'c_ly_month',
+                            'c_ly_day',
+                            'c_ly_day_gz',
+                            'c_appt_code',
+                            'c_assume_office_code',
+                        ],
+                        'additionalProperties' => false,
+                    ],
+                ],
+            ],
+            'required' => ['postings'],
+            'additionalProperties' => false,
+        ];
+    }
+}

@@ -253,5 +253,8 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/generate-from-nl-stream', 'QueryPlaygroundController@generateFromNLStream')->name('query-playground.generate-from-nl-stream');
     Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')->name('query-playground.nl-query-logs');
 
+    // AI 智能填充任官信息
+    Route::post('api/ai/posting/extract', 'AiPostingAutofillController@extract')->name('ai.posting.extract');
+
     Route::post('admin/unidirectional-relationship-repair/assoc', 'UnidirectionalRelationshipRepairController@repairAssoc')->name('admin.unidirectional-relationship-repair.assoc');
 });

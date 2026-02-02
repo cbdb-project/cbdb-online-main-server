@@ -26,6 +26,7 @@ select2(window, $);
 // Import custom CSS overrides (must come after Select2 CSS to properly override)
 import '../css/select2-overrides.css';
 import '../css/mobile-responsive.css';
+import '../css/ai-autofill.css';
 
 import { formatTimestamp, getUserOffsetMinutes, getUserTimeZone } from './utils/datetime';
 

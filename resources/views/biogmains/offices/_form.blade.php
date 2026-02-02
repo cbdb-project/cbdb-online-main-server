@@ -17,6 +17,42 @@
 
     <x-forms.person-id-display :personId="$id" />
 
+    {{-- AI 智能填充區塊（僅在新增模式且用戶有直接寫入權限時顯示） --}}
+    @if(!$isEdit && config('services.gemini.api_key') && auth()->user()->canWriteDirectly())
+        <div class="card card-info mb-3" id="ai-autofill-section">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-magic"></i> AI 智能填充
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="ai-source-text">原始文本（請粘貼包含任官記錄的文本）</label>
+                    <textarea class="form-control" id="ai-source-text" rows="4"
+                              placeholder="例如：雍正元年正月初三知涿州新城縣至於六月十五卒于任"></textarea>
+                    <small class="form-text text-muted">AI 將自動提取官名、地名、日期等信息並填充表單</small>
+                </div>
+                <button type="button" class="btn" id="btn-ai-autofill">
+                    <i class="fas fa-bolt"></i> AI 智能填充
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-clear-ai" style="display:none;">
+                    <i class="fas fa-eraser"></i> 清除 AI 建議
+                </button>
+                <span class="ml-3" id="ai-status"></span>
+            </div>
+        </div>
+
+        {{-- 填充結果摘要（成功後顯示） --}}
+        <div class="alert alert-success" id="ai-result-summary" style="display:none;">
+            <h5><i class="fas fa-check-circle"></i> AI 填充完成</h5>
+            <ul class="mb-2">
+                <li>✅ <strong id="matched-count">0</strong> 個欄位成功匹配</li>
+                <li>⚠️ <strong id="suggested-count">0</strong> 個欄位需要確認（黃色標記，請檢查後直接提交）</li>
+                <li>❌ <strong id="empty-count">0</strong> 個欄位無法提取</li>
+            </ul>
+        </div>
+    @endif
+
     @if($isEdit)
         <div class="form-group row">
             <label for="person_id" class="col-sm-2 col-form-label">posting_id</label>
@@ -256,6 +292,488 @@
             window.initLunarValidation();
         }
 
+        // ===================================================================
+        // AI 智能填充功能（僅在新增模式）
+        // ===================================================================
+        @if(!$isEdit && config('services.gemini.api_key'))
+        (function() {
+            const $aiSection = $('#ai-autofill-section');
+            const $aiSourceText = $('#ai-source-text');
+            const $btnAiAutofill = $('#btn-ai-autofill');
+            const $btnClearAi = $('#btn-clear-ai');
+            const $aiStatus = $('#ai-status');
+            const $aiResultSummary = $('#ai-result-summary');
+
+            let aiSuggestions = null; // 儲存 AI 建議結果
+
+            /**
+             * 給表單欄位添加 AI 樣式 class（支持普通欄位和 Select2）
+             * @param {jQuery} $field - jQuery 欄位元素
+             * @param {string} className - 要添加的 class 名稱（'ai-matched' 或 'ai-suggested'）
+             */
+            function addAiClass($field, className) {
+                // 1. 給原始欄位添加 class
+                $field.addClass(className);
+
+                // 2. 如果是 Select2 欄位，也要給 Select2 容器添加 class
+                if ($field.hasClass('select2-hidden-accessible')) {
+                    // 找到對應的 Select2 selection 元素
+                    const fieldId = $field.attr('id');
+                    if (fieldId) {
+                        // 使用 ID 找到對應的 Select2 容器
+                        const $select2Container = $field.next('.select2-container');
+                        if ($select2Container.length > 0) {
+                            $select2Container.find('.select2-selection').addClass(className);
+                        }
+                    } else {
+                        // 沒有 ID，使用相鄰元素查找
+                        $field.next('.select2-container').find('.select2-selection').addClass(className);
+                    }
+                }
+            }
+
+            /**
+             * 移除 AI 樣式 class（支持普通欄位和 Select2）
+             * @param {jQuery} $field - jQuery 欄位元素
+             */
+            function removeAiClasses($field) {
+                $field.removeClass('ai-matched ai-suggested');
+
+                // 如果是 Select2 欄位，也要移除 Select2 容器的 class
+                if ($field.hasClass('select2-hidden-accessible')) {
+                    $field.next('.select2-container').find('.select2-selection').removeClass('ai-matched ai-suggested');
+                }
+            }
+
+            // 點擊「AI 智能填充」按鈕
+            $btnAiAutofill.on('click', function() {
+                const sourceText = $aiSourceText.val().trim();
+
+                if (!sourceText) {
+                    alert('請先輸入原始文本');
+                    return;
+                }
+
+                // 顯示載入狀態
+                $btnAiAutofill.prop('disabled', true);
+                $aiStatus.html('<span class="text-info"><i class="fas fa-spinner fa-spin"></i> AI 處理中...</span>');
+
+                // 調用 API
+                $.ajax({
+                    url: '{{ route("ai.posting.extract", [], false) }}',
+                    method: 'POST',
+                    data: {
+                        source_text: sourceText,
+                        person_id: {{ $id }},
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            aiSuggestions = response.data;
+
+                            // 延遲填充，確保 Vue 組件已完全渲染
+                            setTimeout(function() {
+                                applyAiSuggestions(aiSuggestions);
+
+                                // AI 填充完成後，自動填充朝代欄位（從人物基本信息）
+                                const dynastyCode = $('.dynasty_code').val();
+                                if (dynastyCode) {
+                                    const $dynastyField = $('[name="c_dy"]');
+                                    if ($dynastyField.length > 0 && !$dynastyField.val()) {
+                                        $dynastyField.val(dynastyCode).trigger('change');
+                                    }
+                                }
+                            }, 500);
+
+                            // 顯示結果摘要
+                            $aiResultSummary.show();
+                            $('#matched-count').text(response.data.statistics.matched_count);
+                            $('#suggested-count').text(response.data.statistics.suggested_count);
+                            $('#empty-count').text(response.data.statistics.empty_count);
+
+                            $btnClearAi.show();
+                            $aiStatus.html('<span class="text-success"><i class="fas fa-check-circle"></i> 填充完成</span>');
+                        } else {
+                            $aiStatus.html('<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' + response.error + '</span>');
+                        }
+                    },
+                    error: function(xhr) {
+                        const errorMsg = xhr.responseJSON?.error || '請求失敗';
+                        $aiStatus.html('<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' + errorMsg + '</span>');
+                    },
+                    complete: function() {
+                        $btnAiAutofill.prop('disabled', false);
+                    }
+                });
+            });
+
+            // 應用 AI 建議到表單
+            function applyAiSuggestions(data) {
+                const matched = data.matched_fields;
+                const suggested = data.suggested_fields;
+
+                // 清除舊的標記
+                $('.ai-matched, .ai-suggested').each(function() {
+                    removeAiClasses($(this));
+                });
+                $('.ai-field-label').removeClass('ai-field-label');
+
+                // 1. 填充成功匹配的欄位（綠色）
+                for (const [fieldName, fieldData] of Object.entries(matched)) {
+                    // 嘗試多種選擇器（處理多選欄位的 name="field[]" 情況）
+                    let $field = $(`[name="${fieldName}"]`);
+                    if ($field.length === 0) {
+                        $field = $(`[name="${fieldName}[]"]`);
+                    }
+
+                    if ($field.length === 0) {
+                        // 嘗試其他選擇器
+                        $field = $(`#${fieldName}`);
+                        if ($field.length === 0) {
+                            continue;
+                        }
+                    }
+
+                    if ($field.is('select')) {
+                        // Select2 欄位或 Vue select 組件
+                        const isVueComponent = $field.closest('select-vue').length > 0 || $field.hasClass('select2');
+
+                        if (Array.isArray(fieldData.value)) {
+                            // 多選（如地址）- 需要獲取完整的格式化文本
+                            if (fieldName === 'c_addr') {
+                                // 對於地址欄位，調用 AJAX 獲取完整格式化數據
+                                $field.empty();
+                                const promises = fieldData.text.map((addrName, idx) => {
+                                    return $.ajax({
+                                        url: '/api/select/search/addr',
+                                        data: { q: addrName },
+                                        method: 'GET'
+                                    }).then(response => {
+                                        // 找到匹配的地址（優先完全匹配）
+                                        const items = response.data || [];
+                                        const exactMatch = items.find(item => item.id === fieldData.value[idx]);
+                                        return exactMatch || items[0];
+                                    });
+                                });
+
+                                Promise.all(promises).then(results => {
+                                    results.forEach((item) => {
+                                        if (item) {
+                                            const option = new Option(item.text, item.id, true, true);
+                                            $field.append(option);
+                                        }
+                                    });
+                                    $field.trigger('change');
+                                    addAiClass($field, 'ai-matched');
+                                }).catch(err => {
+                                    console.error(`❌ 獲取完整地址信息失敗:`, err);
+                                    // Fallback: 使用簡單格式
+                                    fieldData.value.forEach((val, idx) => {
+                                        const option = new Option(fieldData.text[idx], val, true, true);
+                                        $field.append(option);
+                                    });
+                                    $field.trigger('change');
+                                    addAiClass($field, 'ai-matched');
+                                });
+                            } else {
+                                // 其他多選欄位，直接填充
+                                $field.empty();
+                                fieldData.value.forEach((val, idx) => {
+                                    const option = new Option(fieldData.text[idx], val, true, true);
+                                    $field.append(option);
+                                });
+                                $field.trigger('change');
+                                addAiClass($field, 'ai-matched');
+                            }
+                        } else {
+                            // 單選（包括 Vue 組件和 AJAX Select2）
+                            // 對於 AJAX Select2，需要先創建 option 元素再設置 value
+                            if ($field.hasClass('select2-hidden-accessible')) {
+                                // 這是 Select2 欄位，可能需要獲取完整格式化數據
+                                const searchApiMap = {
+                                    'c_office_id': 'office',
+                                    'c_source': 'text',
+                                    'c_inst_code': 'socialinstcode'
+                                };
+                                const listApiMap = {
+                                    'c_appt_code': 'appttype',
+                                    'c_assume_office_code': 'assumeoffice',
+                                    'c_dy': 'dynasty',
+                                    'c_fy_nh_code': 'nianhao',
+                                    'c_ly_nh_code': 'nianhao',
+                                    'c_fy_range': 'range',
+                                    'c_ly_range': 'range',
+                                    'c_fy_day_gz': 'ganzhi',
+                                    'c_ly_day_gz': 'ganzhi'
+                                };
+
+                                const searchModel = searchApiMap[fieldName];
+                                const listModel = listApiMap[fieldName];
+
+                                if (searchModel) {
+                                    // 調用搜索 API 獲取完整格式化數據
+                                    $.ajax({
+                                        url: `/api/select/search/${searchModel}`,
+                                        data: { q: fieldData.text },
+                                        method: 'GET'
+                                    }).done(response => {
+                                        $field.empty();
+                                        const items = response.data || [];
+                                        const exactMatch = items.find(item => item.id === fieldData.value);
+                                        const item = exactMatch || items[0];
+                                        if (item) {
+                                            const option = new Option(item.text, item.id, true, true);
+                                            $field.append(option).trigger('change');
+                                            addAiClass($field, 'ai-matched');
+                                        }
+                                    }).fail(err => {
+                                        console.error(`❌ 獲取完整 ${searchModel} 信息失敗:`, err);
+                                        // Fallback: 使用簡單格式
+                                        $field.empty();
+                                        const option = new Option(fieldData.text, fieldData.value, true, true);
+                                        $field.append(option).trigger('change');
+                                        addAiClass($field, 'ai-matched');
+                                    });
+                                } else if (listModel) {
+                                    // Vue select-vue 組件：需要等待 Vue 加載完數據
+                                    // 嘗試設置 value，支持重試機制
+                                    let retryCount = 0;
+                                    const maxRetries = 30; // 最多重試 30 次（3 秒）
+
+                                    const trySetValue = () => {
+                                        // 檢查該 value 的 option 是否存在（排除空值的默認選項）
+                                        const $targetOption = $field.find(`option[value="${fieldData.value}"]`).filter(function() {
+                                            return $(this).val() !== '';
+                                        });
+                                        const optionExists = $targetOption.length > 0;
+
+                                        if (optionExists) {
+                                            // Option 存在，直接設置 value（不清空其他選項）
+                                            $field.val(fieldData.value).trigger('change');
+                                            addAiClass($field, 'ai-matched');
+                                        } else if (retryCount < maxRetries) {
+                                            // Option 不存在且未達重試上限，繼續等待
+                                            retryCount++;
+                                            setTimeout(trySetValue, 100);
+                                        } else {
+                                            // 達到重試上限，保留現有選項，不設置值
+                                            console.warn(`   ⚠️ 無法填充 Vue select 欄位 ${fieldName}：選項 ${fieldData.value} 不存在，保留現有選項`);
+                                            addAiClass($field, 'ai-suggested'); // 標記為建議，讓用戶知道需要確認
+                                        }
+                                    };
+
+                                    // 延遲執行，給 Vue 組件一些時間加載數據
+                                    setTimeout(trySetValue, 200);
+                                } else {
+                                    // 沒有對應的 API，使用簡單格式
+                                    $field.empty();
+                                    const option = new Option(fieldData.text, fieldData.value, true, true);
+                                    $field.append(option).trigger('change');
+                                    addAiClass($field, 'ai-matched');
+                                }
+                            } else {
+                                // 普通 select，直接設置 value
+                                $field.val(fieldData.value).trigger('change');
+                                addAiClass($field, 'ai-matched');
+                            }
+                        }
+                    } else {
+                        // 普通 input
+                        $field.val(fieldData.value);
+                        addAiClass($field, 'ai-matched');
+                    }
+
+                    // 標記 label
+                    $field.closest('.form-group').find('label').first().addClass('ai-field-label');
+                }
+
+                // 2. 顯示建議值（黃色）- 需要用戶確認
+                for (const [fieldName, fieldData] of Object.entries(suggested)) {
+                    // 嘗試多種選擇器
+                    let $field = $(`[name="${fieldName}"]`);
+                    if ($field.length === 0) {
+                        $field = $(`[name="${fieldName}[]"]`);
+                    }
+                    if ($field.length === 0) {
+                        continue;
+                    }
+
+                    if ($field.is('select')) {
+                        // 檢查欄位類型（AJAX Select2 vs Vue select-vue）
+                        const ajaxModelMap = {
+                            'c_office_id': 'office',
+                            'c_source': 'text',
+                            'c_inst_code': 'socialinstcode',
+                            'c_addr': 'addr'
+                        };
+                        const vueSelectModelMap = {
+                            'c_appt_code': 'appttype',
+                            'c_assume_office_code': 'assumeoffice',
+                            'c_dy': 'dynasty',
+                            'c_fy_nh_code': 'nianhao',
+                            'c_ly_nh_code': 'nianhao',
+                            'c_office_category_id': 'officecate'
+                        };
+                        const isAjaxSelect = ajaxModelMap[fieldName] !== undefined;
+                        const isVueSelect = vueSelectModelMap[fieldName] !== undefined;
+
+                        if (fieldData.value !== undefined && fieldData.text !== undefined) {
+                            // 情況 1: 模糊匹配找到結果（有 value 和 text）→ 填充實際值但標記黃色
+                            if (Array.isArray(fieldData.value)) {
+                                // 多選欄位（如地址）- 只有 AJAX Select2 需要清空
+                                if (isAjaxSelect) {
+                                    $field.empty();
+                                }
+
+                                if (fieldName === 'c_addr') {
+                                    // 調用 AJAX 獲取完整格式化數據
+                                    const promises = fieldData.text.map((addrName, idx) => {
+                                        return $.ajax({
+                                            url: '/api/select/search/addr',
+                                            data: { q: addrName },
+                                            method: 'GET'
+                                        }).then(response => {
+                                            const items = response.data || [];
+                                            const exactMatch = items.find(item => item.id === fieldData.value[idx]);
+                                            return exactMatch || items[0];
+                                        });
+                                    });
+
+                                    Promise.all(promises).then(results => {
+                                        results.forEach((item) => {
+                                            if (item) {
+                                                const option = new Option(item.text, item.id, true, true);
+                                                $field.append(option);
+                                            }
+                                        });
+                                        $field.trigger('change');
+                                        addAiClass($field, 'ai-suggested');
+                                    }).catch(err => {
+                                        console.error(`❌ 獲取完整地址信息失敗:`, err);
+                                        // Fallback: 使用簡單格式
+                                        fieldData.value.forEach((val, idx) => {
+                                            const option = new Option(fieldData.text[idx], val, true, true);
+                                            $field.append(option);
+                                        });
+                                        $field.trigger('change');
+                                        addAiClass($field, 'ai-suggested');
+                                    });
+                                } else {
+                                    fieldData.value.forEach((val, idx) => {
+                                        const option = new Option(fieldData.text[idx], val, true, true);
+                                        $field.append(option);
+                                    });
+                                    $field.trigger('change');
+                                    addAiClass($field, 'ai-suggested');
+                                }
+                            } else {
+                                // 單選欄位
+                                if (isAjaxSelect) {
+                                    // AJAX Select2：調用 AJAX 獲取完整格式化數據
+                                    const model = ajaxModelMap[fieldName];
+                                    $.ajax({
+                                        url: `/api/select/search/${model}`,
+                                        data: { q: fieldData.text },
+                                        method: 'GET'
+                                    }).done(response => {
+                                        $field.empty();
+                                        const items = response.data || [];
+                                        const exactMatch = items.find(item => item.id === fieldData.value);
+                                        const item = exactMatch || items[0];
+                                        if (item) {
+                                            const option = new Option(item.text, item.id, true, true);
+                                            $field.append(option).trigger('change');
+                                            addAiClass($field, 'ai-suggested');
+                                        }
+                                    }).fail(err => {
+                                        console.error(`❌ 獲取完整 ${model} 信息失敗:`, err);
+                                        // Fallback: 使用簡單格式
+                                        $field.empty();
+                                        const option = new Option(fieldData.text, fieldData.value, true, true);
+                                        $field.append(option).trigger('change');
+                                        addAiClass($field, 'ai-suggested');
+                                    });
+                                } else if (isVueSelect) {
+                                    // Vue select-vue：不清空選項，直接設置 value
+                                    $field.val(fieldData.value).trigger('change');
+                                    addAiClass($field, 'ai-suggested');
+                                } else {
+                                    // 其他類型：使用簡單格式
+                                    const option = new Option(fieldData.text, fieldData.value, true, true);
+                                    $field.append(option).trigger('change');
+                                    addAiClass($field, 'ai-suggested');
+                                }
+                            }
+                        } else {
+                            // 情況 2: 完全找不到匹配（只有 ai_extracted）→ 顯示提示需要搜索
+                            if (isAjaxSelect) {
+                                // AJAX Select2：可以添加提示選項
+                                $field.empty();
+                                const option = new Option(
+                                    `⚠️ AI 建議：${fieldData.ai_extracted}（請搜索確認）`,
+                                    '',
+                                    true,
+                                    true
+                                );
+                                $field.append(option).trigger('change');
+                                addAiClass($field, 'ai-suggested');
+                            } else if (isVueSelect) {
+                                // Vue select-vue：不修改，只添加樣式
+                                addAiClass($field, 'ai-suggested');
+                            } else {
+                                // 其他：添加提示選項
+                                const option = new Option(
+                                    `⚠️ AI 建議：${fieldData.ai_extracted}（請搜索確認）`,
+                                    '',
+                                    true,
+                                    true
+                                );
+                                $field.append(option).trigger('change');
+                                addAiClass($field, 'ai-suggested');
+                            }
+                        }
+                    } else {
+                        // 普通 input 欄位
+                        const displayValue = fieldData.value !== undefined ? fieldData.value : fieldData.ai_extracted;
+                        $field.val(displayValue);
+                        addAiClass($field, 'ai-suggested');
+                    }
+
+                    $field.closest('.form-group').find('label').first().addClass('ai-field-label');
+                }
+            }
+
+            // 清除 AI 建議
+            $btnClearAi.on('click', function() {
+                if (!confirm('確定要清除所有 AI 填充的內容嗎？')) {
+                    return;
+                }
+
+                // 清除標記和值
+                $('.ai-matched, .ai-suggested').each(function() {
+                    const $field = $(this);
+
+                    if ($field.is('select')) {
+                        $field.val(null).trigger('change');
+                    } else {
+                        $field.val('');
+                    }
+
+                    removeAiClasses($field);
+                });
+
+                $('.ai-field-label').removeClass('ai-field-label');
+                $aiResultSummary.hide();
+                $btnClearAi.hide();
+                $aiStatus.empty();
+                aiSuggestions = null;
+            });
+        })();
+        @endif
+        // ===================================================================
+        // End AI 智能填充功能
+        // ===================================================================
+
         function textperson_pair_first_load(){
             let person_id = $('.person_id').val();
             //console.log(person_id);
@@ -281,7 +799,6 @@
                 //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    console.log(item);
                     var textperson_text = item['text'];
                 }
                 //console.log(textperson_value);

@@ -348,6 +348,7 @@
             // 點擊「AI 智能填充」按鈕
             $btnAiAutofill.on('click', function() {
                 const sourceText = $aiSourceText.val().trim();
+                console.log('[AI Autofill] 按鈕點擊，原始文本:', sourceText);
 
                 if (!sourceText) {
                     alert('請先輸入原始文本');
@@ -368,8 +369,10 @@
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
+                        console.log('[AI Autofill] API 響應:', response);
                         if (response.success) {
                             aiSuggestions = response.data;
+                            console.log('[AI Autofill] 提取的數據:', aiSuggestions);
 
                             // 延遲填充，確保 Vue 組件已完全渲染
                             setTimeout(function() {
@@ -409,6 +412,10 @@
 
             // 應用 AI 建議到表單
             function applyAiSuggestions(data) {
+                console.log('[AI Autofill] 開始應用建議到表單');
+                console.log('[AI Autofill] matched_fields:', data.matched_fields);
+                console.log('[AI Autofill] suggested_fields:', data.suggested_fields);
+
                 const matched = data.matched_fields;
                 const suggested = data.suggested_fields;
 
@@ -420,6 +427,7 @@
 
                 // 1. 填充成功匹配的欄位（綠色）
                 for (const [fieldName, fieldData] of Object.entries(matched)) {
+                    console.log(`[AI Autofill] 處理 matched 欄位: ${fieldName}`, fieldData);
                     // 嘗試多種選擇器（處理多選欄位的 name="field[]" 情況）
                     let $field = $(`[name="${fieldName}"]`);
                     if ($field.length === 0) {
@@ -441,32 +449,40 @@
                         if (Array.isArray(fieldData.value)) {
                             // 多選（如地址）- 需要獲取完整的格式化文本
                             if (fieldName === 'c_addr') {
+                                console.log('[AI Autofill] 處理地址欄位 (matched):', fieldData);
                                 // 對於地址欄位，調用 AJAX 獲取完整格式化數據
                                 $field.empty();
                                 const promises = fieldData.text.map((addrName, idx) => {
+                                    console.log(`[AI Autofill] 搜索地址: ${addrName}, 目標ID: ${fieldData.value[idx]}`);
                                     return $.ajax({
                                         url: '/api/select/search/addr',
                                         data: { q: addrName },
                                         method: 'GET'
                                     }).then(response => {
+                                        console.log(`[AI Autofill] 地址搜索結果 (${addrName}):`, response.data);
                                         // 找到匹配的地址（優先完全匹配）
                                         const items = response.data || [];
                                         const exactMatch = items.find(item => item.id === fieldData.value[idx]);
+                                        console.log(`[AI Autofill] exactMatch (ID=${fieldData.value[idx]}):`, exactMatch);
+                                        console.log(`[AI Autofill] 使用結果:`, exactMatch || items[0]);
                                         return exactMatch || items[0];
                                     });
                                 });
 
                                 Promise.all(promises).then(results => {
+                                    console.log('[AI Autofill] 所有地址查詢完成:', results);
                                     results.forEach((item) => {
                                         if (item) {
                                             const option = new Option(item.text, item.id, true, true);
+                                            console.log('[AI Autofill] 添加地址選項:', { text: item.text, id: item.id });
                                             $field.append(option);
                                         }
                                     });
                                     $field.trigger('change');
                                     addAiClass($field, 'ai-matched');
+                                    console.log('[AI Autofill] 地址欄位填充完成 (matched)');
                                 }).catch(err => {
-                                    console.error(`❌ 獲取完整地址信息失敗:`, err);
+                                    console.error(`[AI Autofill] ❌ 獲取完整地址信息失敗:`, err);
                                     // Fallback: 使用簡單格式
                                     fieldData.value.forEach((val, idx) => {
                                         const option = new Option(fieldData.text[idx], val, true, true);
@@ -589,12 +605,22 @@
 
                 // 2. 顯示建議值（黃色）- 需要用戶確認
                 for (const [fieldName, fieldData] of Object.entries(suggested)) {
+                    console.log(`[AI Autofill] 處理 suggested 欄位: ${fieldName}`, fieldData);
+                if (fieldName === 'c_addr' && fieldData.ai_structured) {
+                    console.log(`[AI Autofill] ai_structured 詳細:`, {
+                        full_text: fieldData.ai_structured.full_text,
+                        parent: fieldData.ai_structured.parent,
+                        name: fieldData.ai_structured.name,
+                        admin_type: fieldData.ai_structured.admin_type
+                    });
+                }
                     // 嘗試多種選擇器
                     let $field = $(`[name="${fieldName}"]`);
                     if ($field.length === 0) {
                         $field = $(`[name="${fieldName}[]"]`);
                     }
                     if ($field.length === 0) {
+                        console.log(`[AI Autofill] 找不到欄位: ${fieldName}`);
                         continue;
                     }
 
@@ -626,30 +652,38 @@
                                 }
 
                                 if (fieldName === 'c_addr') {
+                                    console.log('[AI Autofill] 處理地址欄位 (suggested):', fieldData);
                                     // 調用 AJAX 獲取完整格式化數據
                                     const promises = fieldData.text.map((addrName, idx) => {
+                                        console.log(`[AI Autofill] 搜索地址 (suggested): ${addrName}, 目標ID: ${fieldData.value[idx]}`);
                                         return $.ajax({
                                             url: '/api/select/search/addr',
                                             data: { q: addrName },
                                             method: 'GET'
                                         }).then(response => {
+                                            console.log(`[AI Autofill] 地址搜索結果 (suggested, ${addrName}):`, response.data);
                                             const items = response.data || [];
                                             const exactMatch = items.find(item => item.id === fieldData.value[idx]);
+                                            console.log(`[AI Autofill] exactMatch (suggested, ID=${fieldData.value[idx]}):`, exactMatch);
+                                            console.log(`[AI Autofill] 使用結果 (suggested):`, exactMatch || items[0]);
                                             return exactMatch || items[0];
                                         });
                                     });
 
                                     Promise.all(promises).then(results => {
+                                        console.log('[AI Autofill] 所有地址查詢完成 (suggested):', results);
                                         results.forEach((item) => {
                                             if (item) {
                                                 const option = new Option(item.text, item.id, true, true);
+                                                console.log('[AI Autofill] 添加地址選項 (suggested):', { text: item.text, id: item.id });
                                                 $field.append(option);
                                             }
                                         });
                                         $field.trigger('change');
                                         addAiClass($field, 'ai-suggested');
+                                        console.log('[AI Autofill] 地址欄位填充完成 (suggested)');
                                     }).catch(err => {
-                                        console.error(`❌ 獲取完整地址信息失敗:`, err);
+                                        console.error(`[AI Autofill] ❌ 獲取完整地址信息失敗 (suggested):`, err);
                                         // Fallback: 使用簡單格式
                                         fieldData.value.forEach((val, idx) => {
                                             const option = new Option(fieldData.text[idx], val, true, true);

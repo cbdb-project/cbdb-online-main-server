@@ -1,0 +1,127 @@
+/**
+ * AI 智能填充功能樣式
+ * 用於標記 AI 填充的欄位狀態
+ */
+
+/* 成功匹配的欄位（綠色） */
+.ai-matched {
+    background-color: #d4edda !important; /* 淺綠色 */
+    border-color: #28a745 !important;
+}
+
+/* 需要確認的建議值（黃色） */
+.ai-suggested {
+    background-color: #fff3cd !important; /* 淺黃色 */
+    border-color: #ffc107 !important;
+}
+
+/* 確保 input 和 textarea 也顯示背景色 */
+input.ai-matched,
+textarea.ai-matched {
+    background-color: #d4edda !important; /* 淺綠色 */
+    border-color: #28a745 !important;
+}
+
+input.ai-suggested,
+textarea.ai-suggested {
+    background-color: #fff3cd !important; /* 淺黃色 */
+    border-color: #ffc107 !important;
+}
+
+/* AI 填充的欄位 label 標記 */
+.ai-field-label::after {
+    content: " 🤖";
+    font-size: 0.875rem;
+    margin-left: 4px;
+}
+
+/* Select2 下拉選擇器的特殊處理 */
+.select2-container--bootstrap4 .select2-selection--single.ai-matched,
+.select2-container--bootstrap4 .select2-selection--multiple.ai-matched {
+    background-color: #d4edda !important;
+    border-color: #28a745 !important;
+}
+
+.select2-container--bootstrap4 .select2-selection--single.ai-suggested,
+.select2-container--bootstrap4 .select2-selection--multiple.ai-suggested {
+    background-color: #fff3cd !important;
+    border-color: #ffc107 !important;
+}
+
+/* AI 填充區塊樣式 */
+#ai-autofill-section .card-header {
+    background-color: #2d8cc2; /* 明亮藍色 */
+    color: white;
+}
+
+/* AI 智能填充按鈕 - 明亮藍色 */
+#btn-ai-autofill {
+    background-color: #2d8cc2;
+    border: none;
+    color: white;
+    font-weight: 500;
+    padding: 10px 24px;
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(45, 140, 194, 0.3);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+#btn-ai-autofill:hover {
+    background-color: #2478ae;
+    box-shadow: 0 6px 20px rgba(45, 140, 194, 0.4);
+    transform: translateY(-2px);
+}
+
+#btn-ai-autofill:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(45, 140, 194, 0.3);
+}
+
+/* 按鈕發光效果（可選） */
+#btn-ai-autofill::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+#btn-ai-autofill:hover::before {
+    left: 100%;
+}
+
+#ai-result-summary {
+    border-left: 4px solid #28a745;
+}
+
+#ai-result-summary h5 {
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+#ai-result-summary ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+#ai-result-summary ul li {
+    padding: 4px 0;
+}
+
+/* 狀態圖標顏色 */
+#ai-status .text-info {
+    color: #17a2b8 !important;
+}
+
+#ai-status .text-success {
+    color: #28a745 !important;
+}
+
+#ai-status .text-danger {
+    color: #dc3545 !important;
+}

@@ -1,0 +1,294 @@
+You will be given a passage of traditional Classical Chinese text. Your task is to identify and extract all **posting information** (任官／除授／封贈等) mentioned in the text.
+
+**IMPORTANT**: All Chinese text in your response must be in **Traditional Chinese (正體中文/繁體中文)**. Convert simplified characters and variant forms to their standard traditional equivalents.
+
+You must follow the rules below and produce **only** a single JSON object as output — **no explanations, no commentary, no extra text**.
+
+---
+
+### 1. Overall JSON structure
+
+Return exactly one JSON object with the following structure:
+
+```json
+{
+  "postings": [
+    {
+      "posting_str": "",
+      "addr_str": {
+        "full_text": "",
+        "parent": null,
+        "name": "",
+        "admin_type": null
+      },
+      "c_firstyear": null,
+      "c_fy_nh_code": null,
+      "c_fy_nh_year": null,
+      "c_fy_range": null,
+      "c_fy_intercalary": null,
+      "c_fy_month": null,
+      "c_fy_day": null,
+      "c_fy_day_gz": null,
+      "c_lastyear": null,
+      "c_ly_nh_code": null,
+      "c_ly_nh_year": null,
+      "c_ly_range": null,
+      "c_ly_intercalary": null,
+      "c_ly_month": null,
+      "c_ly_day": null,
+      "c_ly_day_gz": null,
+      "c_appt_code": null,
+      "c_assume_office_code": null
+    }
+  ]
+}
+```
+
+**Global default rule:**
+
+* All keys listed above **must be present** in every posting object.
+* If a value is **not mentioned, unknown, or cannot be reliably inferred**, set it to **`null`**.
+* The only exception is:
+
+  * `posting_str` is **required** and must be a non-empty string for each posting.
+
+If **no posting information** can be extracted at all, return:
+
+```json
+{
+  "postings": []
+}
+```
+
+---
+
+### 2. Field definitions
+
+For each posting in `postings`, fill the following fields:
+
+1. **posting_str** (required)
+
+   * Type: string (never `null`)
+   * The official title in **traditional Chinese**.
+   * Normalize aberrant, abbreviated, or informal titles to the **standard official title** when possible.
+   * Do **not** include appointment markers like 守、權、試、兼、贈、封, etc.; those are encoded only in `c_appt_code`.
+   * Do **not** include any address information; those are encoded only in `addr_str`.
+
+2. **addr_str**
+
+ **Type:** `object` or `null`
+ **Definition:** The posting location information in Traditional Chinese, including hierarchical structure and administrative unit type.
+
+ **Object structure:**
+ ```json
+ {
+   "full_text": "福建泉州",
+   "parent": "福建",
+   "name": "泉州",
+   "admin_type": "州"
+ }
+ ```
+
+ **Field definitions:**
+
+  * **full_text** (string, required if addr_str is not null):
+    - The complete location text as written in the source
+    - Example: "福建泉州" → `"full_text": "福建泉州"`
+
+  * **parent** (string or null):
+    - The upper-level place name if hierarchical levels are present
+    - Example: "福建泉州" → `"parent": "福建"`
+    - If only one level exists, set to `null`
+
+  * **name** (string, required if addr_str is not null):
+    - The final (lowest-level) place name
+    - Example: "福建泉州" → `"name": "泉州"`
+
+  * **admin_type** (string or null):
+    - The administrative unit type (州、府、縣、軍、監、路、省、道、郡、國, etc.)
+    - **Extraction logic:**
+      * For **3+ character names** like "新城縣": The last character is usually the admin unit
+        → Extract as: `"name": "新城", "admin_type": "縣"`
+      * For **2-character names** like "涿州" or "泉州": The last character may be part of the place name itself
+        → Keep the full name: `"name": "涿州", "admin_type": "州"` (or `"name": "泉州", "admin_type": "州"`)
+      * If admin unit cannot be determined, set to `null`
+
+ **If no location is explicitly stated, return `null` for the entire addr_str.**
+
+
+3. **c_firstyear**
+
+   * Type: integer or `null`
+   * The **Western calendar year** (CE) of the posting, or the start year of this posting.
+   * If not inferable, set to `null`.
+
+4. **c_fy_nh_code**
+
+   * Type: string or `null`
+   * The **nianhao (年號)** of the posting year, or of the start year of this posting.
+   * Example: `"乾隆"`, `"嘉靖"`, `"雍正"`.
+   * If the nianhao is not given or not reliably inferable, set to `null`.
+
+5. **c_fy_nh_year**
+
+   * Type: integer or `null`
+   * The **year number within that nianhao** for the posting year, or the start year of this posting.
+   * Example: for 乾隆二十五年, `c_fy_nh_code = "乾隆"`, `c_fy_nh_year = 25`.
+   * If the nianhao year number is not given or not reliably inferable, set to `null`.
+
+6. **c_fy_range**
+
+   * Type: integer(c_range_code) or `null`
+   * The accuracy of the **first year** of the posting.
+   * If you can determine the relational accuracy (before / during / after / around), set to **one** of:
+
+   ```json
+   {"c_range_code": -1, "c_range": "before",  "c_range_chn": "之前", "c_approx": "-",       "c_approx_chn": "小於"}
+   {"c_range_code": 0,  "c_range": "during",  "c_range_chn": "之間", "c_approx": "=",       "c_approx_chn": "恰好"}
+   {"c_range_code": 1,  "c_range": "after",   "c_range_chn": "之後", "c_approx": "+",       "c_approx_chn": "大於"}
+   {"c_range_code": 2,  "c_range": "around",  "c_range_chn": "約",   "c_approx": "around",  "c_approx_chn": "約"}
+   ```
+
+   * If no such information is available, set `c_fy_range` to `null`.
+
+7. **c_fy_intercalary**
+
+   * Type: boolean or `null`
+   * Whether the **starting month** is intercalary (閏月).
+   * `true` if explicitly marked as 閏, `false` if explicitly non-intercalary, otherwise `null`.
+
+8. **c_fy_month**
+
+   * Type: integer or `null`
+   * The starting month number (1–12).
+   * If the text only gives a year but no month, set to `null`.
+
+9. **c_fy_day**
+
+   * Type: integer or `null`
+   * The starting day of the month (natural number).
+   * If day is not specified, set to `null`.
+
+10. **c_fy_day_gz**
+
+    * Type: string or `null`
+    * The sexagenary ganzhi (干支) of the **starting day**, if explicitly given (e.g., `"甲子"`, `"丙辰"`).
+    * Otherwise `null`.
+
+11. **c_lastyear**
+
+    * Type: integer or `null`
+    * The **last year** of this posting, in Western calendar (CE).
+    * If the end year is not available, set to `null`.
+
+12. **c_ly_nh_code**
+
+    * Type: string or `null`
+    * The **nianhao (年號)** of the last year of this posting.
+    * Example: `"雍正"`, `"乾隆"`.
+    * If the nianhao is not given or not reliably inferable, set to `null`.
+
+13. **c_ly_nh_year**
+
+    * Type: integer or `null`
+    * The **year number within that nianhao** for the last year of this posting.
+    * Example: for 雍正元年, `c_ly_nh_code = "雍正"`, `c_ly_nh_year = 1`.
+    * If the nianhao year number is not given or not reliably inferable, set to `null`.
+
+14. **c_ly_range**
+
+    * Type: integer(c_range_code) or `null`
+    * The accuracy of the **last year** of the posting. Use one of:
+
+    ```json
+    {"c_range_code": -1, "c_range": "before",  "c_range_chn": "之前", "c_approx": "-",       "c_approx_chn": "小於"}
+    {"c_range_code": 0,  "c_range": "during",  "c_range_chn": "之間", "c_approx": "=",       "c_approx_chn": "恰好"}
+    {"c_range_code": 1,  "c_range": "after",   "c_range_chn": "之後", "c_approx": "+",       "c_approx_chn": "大於"}
+    {"c_range_code": 2,  "c_range": "around",  "c_range_chn": "約",   "c_approx": "around",  "c_approx_chn": "約"}
+    ```
+
+    * If the end year is unknown or no relational information is given, set to `null`.
+
+15. **c_ly_intercalary**
+
+    * Type: boolean or `null`
+    * Whether the **last month** is an intercalary month (閏月).
+    * `true` if explicitly marked as 閏; `false` if explicitly non-intercalary; `null` if unknown or no month given.
+
+16. **c_ly_month**
+
+    * Type: integer or `null`
+    * The **last month** of this posting (1–12).
+    * If unknown, set to `null`.
+
+17. **c_ly_day**
+
+    * Type: integer or `null`
+    * The **last day** of this posting (natural number).
+    * If unknown, set to `null`.
+
+18. **c_ly_day_gz**
+
+    * Type: string or `null`
+    * The sexagenary ganzhi (干支) of the **last day**, if explicitly given.
+    * Otherwise, `null`.
+
+19. **c_appt_code**
+
+    * Type: integer or `null`
+    * The appointment type code, based on explicit markers in the text (權、行、守、試、攝、封、贈、追封、追贈、卒封、累封、襲封、署、判、兼、蔭襲, etc.).
+    * Use one of the following integer codes; if the type is not clear, set to `null` (not 0):
+
+    ```json
+    0  -> 未詳 / Unknown
+    1  -> 正授 / Regular Appointment
+    2  -> 權 / Provisional Appointment
+    3  -> 行 / Lower Acting Appointment
+    4  -> 守 / Higher Acting Appointment
+    5  -> 試 / Exceptional Acting Appointment
+    13 -> 攝 / Irregular Appointment
+    21 -> 封 / Enfoeffed As
+    22 -> 贈 / Granted The Nominal Title Of
+    27 -> 追封 / Posthumously Enfoeffed
+    28 -> 追贈 / Posthumously Granted The Nominal Title Of
+    29 -> 卒封 / Enfoeffed At Death As
+    30 -> 累封 / Further Enfoeffed As
+    31 -> 襲封 / Inherited Enfoeffement As
+    32 -> 署 / Acting (or deputy)
+    33 -> 判 / Rank Higher Than Position Expects
+    37 -> 兼 / Concurrent Appointment
+    41 -> 蔭襲
+    ```
+
+    * If the text **explicitly** marks a type but you cannot map it, set `c_appt_code` to `0`.
+    * If there is **no information at all** about type, set to `null`.
+
+20. **c_assume_office_code**
+
+    * Type: integer or `null`
+    * Whether this person actually assumed the office, if the text provides such information.
+    * Use one of:
+
+    ```json
+    0 -> 未詳 / Unknown
+    1 -> 赴任 / Assumed the office
+    2 -> 辭不就 / Declined the office
+    3 -> 未赴任而卒 / Died before assuming the office
+    4 -> 未赴任而改命 / Appointment changed before assuming the office
+    5 -> 未赴任 / Did not assume the office
+    ```
+
+    * If there is no information, set `c_assume_office_code` to `null`.
+
+---
+
+### 3. Additional rules
+
+* Extract **all distinct postings** in the passage. For promotions, transfers, or multiple appointments, create **one posting object per distinct position**.
+* When the passage describes cumulative promotions without dates, still record each posting with `posting_str` and `addr_str` (if any), and leave all unknown date-related or type-related fields as `null`.
+* Do **not** output any fields other than those specified.
+* The final answer must be **valid JSON** and must consist **only** of the JSON object described above (no leading/trailing characters, no comments, no formatting outside JSON).
+
+---
+
+Here is the text:

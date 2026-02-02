@@ -756,16 +756,21 @@ class PostingAutofillService {
      *
      * @param int $year 年份
      * @return int|null 朝代代碼，如果年份不在任何已知朝代範圍內則返回 null
-     *                  如果年份同時屬於多個朝代（邊界重叠），也返回 null（應使用人物朝代）
+     *                  如果年份同時屬於多個朝代，排除次要朝代後若剩唯一則使用，否則返回 null
      */
     protected function getDynastyByYear(int $year): ?int {
         static $allDynastyRanges = null;
+
+        // 次要朝代：當有多個朝代匹配時，優先排除這些朝代
+        // 80=南明, 84=朝鮮, 85=大順, 86=大西
+        // 但如果只有這些朝代匹配（無其他主要朝代），仍然使用它們
+        $secondaryDynasties = [80, 84, 85, 86];
 
         // 首次調用時從數據庫讀取所有朝代範圍
         if ($allDynastyRanges === null) {
             $allDynastyRanges = [];
             $dynasties = DB::table('DYNASTIES')
-                ->select('c_dy', 'c_start', 'c_end')
+                ->select('c_dy', 'c_start', 'c_end', 'c_dynasty_chn')
                 ->whereNotNull('c_start')
                 ->whereNotNull('c_end')
                 ->orderBy('c_start')
@@ -775,6 +780,7 @@ class PostingAutofillService {
                 $allDynastyRanges[$dynasty->c_dy] = [
                     'start' => $dynasty->c_start,
                     'end' => $dynasty->c_end,
+                    'name' => $dynasty->c_dynasty_chn,
                 ];
             }
         }
@@ -782,22 +788,52 @@ class PostingAutofillService {
         $matchedDynasties = [];
         foreach ($allDynastyRanges as $dynastyCode => $range) {
             if ($year >= $range['start'] && $year <= $range['end']) {
-                $matchedDynasties[] = $dynastyCode;
+                $matchedDynasties[] = [
+                    'code' => $dynastyCode,
+                    'name' => $range['name'],
+                ];
             }
         }
 
-        // 如果匹配到多個朝代（邊界重叠），返回 null，應使用人物朝代
-        if (count($matchedDynasties) > 1) {
-            Log::info('[AI Autofill] 年份屬於多個朝代（邊界重叠），將使用人物朝代', [
-                'year' => $year,
-                'matched_dynasties' => $matchedDynasties,
-            ]);
-            return null;
+        // 如果只匹配到一個朝代，直接返回（即使是次要朝代）
+        if (count($matchedDynasties) === 1) {
+            return $matchedDynasties[0]['code'];
         }
 
-        // 如果只匹配到一個朝代，返回該朝代
-        if (count($matchedDynasties) === 1) {
-            return $matchedDynasties[0];
+        // 如果匹配到多個朝代，嘗試排除次要朝代
+        if (count($matchedDynasties) > 1) {
+            // 過濾掉次要朝代
+            $primaryDynasties = array_filter(
+                $matchedDynasties,
+                fn ($d) => !in_array($d['code'], $secondaryDynasties)
+            );
+
+            // 如果排除次要朝代後剩下唯一主要朝代，使用它
+            if (count($primaryDynasties) === 1) {
+                $selected = array_values($primaryDynasties)[0];
+                $excludedNames = array_map(
+                    fn ($d) => "{$d['name']}({$d['code']})",
+                    array_filter($matchedDynasties, fn ($d) => in_array($d['code'], $secondaryDynasties))
+                );
+
+                Log::info('[AI Autofill] 年份屬於多個朝代，排除次要朝代後選擇主要朝代', [
+                    'year' => $year,
+                    'all_matched' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
+                    'excluded' => $excludedNames,
+                    'selected_dynasty' => "{$selected['name']}({$selected['code']})",
+                ]);
+
+                return $selected['code'];
+            }
+
+            // 如果排除後仍有多個主要朝代，或全是次要朝代，fallback 到人物朝代
+            Log::info('[AI Autofill] 年份屬於多個朝代（無法確定唯一主要朝代），將使用人物朝代', [
+                'year' => $year,
+                'matched_dynasties' => array_map(fn ($d) => "{$d['name']}({$d['code']})", $matchedDynasties),
+                'primary_dynasties_count' => count($primaryDynasties),
+            ]);
+
+            return null;
         }
 
         // 沒有匹配到任何朝代

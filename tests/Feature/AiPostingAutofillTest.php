@@ -395,7 +395,7 @@ class AiPostingAutofillTest extends TestCase {
     }
 
     /**
-     * 測試朝代邊界重叠處理：1368年同時屬於元和明
+     * 測試朝代邊界重叠處理：1368年同時屬於元和明，無法確定則 fallback
      */
     public function test_dynasty_boundary_overlap_fallback_to_person_dynasty() {
         $user = User::factory()->create([
@@ -404,7 +404,8 @@ class AiPostingAutofillTest extends TestCase {
         ]);
 
         // setUp 中已經插入了朝代數據，其中 1368 年同時屬於元（1271-1368）和明（1368-1644）
-        // 這將觸發邊界重叠檢測
+        // 新邏輯：當有多個朝代匹配時，排除次要朝代（南明、朝鮮、大順、大西）
+        // 元和明都是主要朝代，排除次要朝代後仍有兩個，所以 fallback 到人物朝代
 
         // Mock Gemini API 響應：1368年（邊界年份）
         Http::fake([
@@ -449,14 +450,14 @@ class AiPostingAutofillTest extends TestCase {
             'person_id' => 1,
         ]);
 
-        // 1368年同時屬於元和明，應該使用人物朝代（在此測試中為null）
-        // 不應該填充 c_dy 字段
+        // 1368年同時屬於元和明（都是主要朝代），無法確定，應該 fallback 到人物朝代
+        // 在此測試中人物朝代為 null，所以不應該填充 c_dy 字段
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
             ]);
 
-        // 驗證沒有填充朝代字段（因為邊界重叠導致 fallback）
+        // 驗證沒有填充朝代字段（因為無法確定唯一主要朝代）
         $data = $response->json('data');
         $this->assertArrayNotHasKey('c_dy', $data['matched_fields'] ?? []);
     }

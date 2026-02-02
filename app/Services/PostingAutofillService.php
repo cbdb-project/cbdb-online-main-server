@@ -514,7 +514,8 @@ class PostingAutofillService {
             ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
             ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
             // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
-            ->whereRaw('NOT (c_name_chn LIKE ? AND CHAR_LENGTH(c_name_chn) > 2)', ['%津']);
+            // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
+            ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
         // 加入時間範圍過濾（如果有提供年份）
         if ($effectiveYear !== null) {
@@ -616,7 +617,8 @@ class PostingAutofillService {
             ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
             ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
             // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
-            ->whereRaw('NOT (c_name_chn LIKE ? AND CHAR_LENGTH(c_name_chn) > 2)', ['%津']);
+            // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
+            ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
         if ($effectiveYear !== null) {
             $query->where(function ($q) use ($effectiveYear) {

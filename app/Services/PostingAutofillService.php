@@ -509,11 +509,12 @@ class PostingAutofillService {
         $query = DB::table('ADDR_CODES')
             ->select('c_addr_id as id', 'c_name_chn as text')
             ->where('c_name_chn', '=', $addrName)
-            // AI 填充時過濾交通設施相關地名（以「驛」、「津」、「渡」、「鋪」結尾的地名）
-            ->where('c_name_chn', 'not like', '%驛')
-            ->where('c_name_chn', 'not like', '%津')
-            ->where('c_name_chn', 'not like', '%渡')
-            ->where('c_name_chn', 'not like', '%鋪');
+            // AI 填充時過濾交通設施相關地名
+            ->where('c_name_chn', 'not like', '%驛')  // 驛：全部過濾
+            ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
+            ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
+            // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
+            ->whereRaw('NOT (c_name_chn LIKE ? AND CHAR_LENGTH(c_name_chn) > 2)', ['%津']);
 
         // 加入時間範圍過濾（如果有提供年份）
         if ($effectiveYear !== null) {
@@ -546,24 +547,36 @@ class PostingAutofillService {
 
             // 如果有歧義且提供了上層地名，嘗試使用上層地名消除歧義
             if ($isAmbiguous && !empty($parentName)) {
-                $filteredResults = $results->filter(function ($addr) use ($parentName) {
-                    // 查詢該地址的上層地址
-                    $parents = DB::table('ADDR_BELONGS_DATA')
-                        ->where('c_addr_id', $addr->id)
-                        ->get();
+                // ✅ 優化：預加載所有候選地址的上層信息（避免 N+1 查詢）
+                $candidateIds = $results->pluck('id')->toArray();
+
+                // 一次性 JOIN 查詢所有上層信息
+                $parentMap = DB::table('ADDR_BELONGS_DATA as ab')
+                    ->join('ADDR_CODES as parent', 'ab.c_belongs_to', '=', 'parent.c_addr_id')
+                    ->whereIn('ab.c_addr_id', $candidateIds)
+                    ->select(
+                        'ab.c_addr_id as child_id',
+                        'parent.c_addr_id as parent_id',
+                        'parent.c_name_chn as parent_name'
+                    )
+                    ->get()
+                    ->groupBy('child_id'); // 按子地址 ID 分組
+
+                // 使用預加載的數據進行過濾（無額外查詢）
+                $filteredResults = $results->filter(function ($addr) use ($parentName, $parentMap) {
+                    // 從預加載的 map 中獲取上層信息（內存操作）
+                    $parents = $parentMap->get($addr->id);
+
+                    if (!$parents) {
+                        return false;
+                    }
 
                     foreach ($parents as $parent) {
-                        $parentAddr = DB::table('ADDR_CODES')
-                            ->where('c_addr_id', $parent->c_belongs_to)
-                            ->first();
-
-                        if ($parentAddr) {
-                            // 上層地名使用雙向模糊匹配（A in B 或 B in A）
-                            // 例如：AI 提取 "杭州" ⇔ 數據庫 "杭州府"
-                            if (str_contains($parentAddr->c_name_chn, $parentName) ||
-                                str_contains($parentName, $parentAddr->c_name_chn)) {
-                                return true;
-                            }
+                        // 上層地名使用雙向模糊匹配（A in B 或 B in A）
+                        // 例如：AI 提取 "杭州" ⇔ 數據庫 "杭州府"
+                        if (str_contains($parent->parent_name, $parentName) ||
+                            str_contains($parentName, $parent->parent_name)) {
+                            return true;
                         }
                     }
 
@@ -598,11 +611,12 @@ class PostingAutofillService {
         $query = DB::table('ADDR_CODES')
             ->select('c_addr_id as id', 'c_name_chn as text')
             ->where('c_name_chn', 'like', $addrName . '%')
-            // AI 填充時過濾交通設施相關地名（以「驛」、「津」、「渡」、「鋪」結尾的地名）
-            ->where('c_name_chn', 'not like', '%驛')
-            ->where('c_name_chn', 'not like', '%津')
-            ->where('c_name_chn', 'not like', '%渡')
-            ->where('c_name_chn', 'not like', '%鋪');
+            // AI 填充時過濾交通設施相關地名
+            ->where('c_name_chn', 'not like', '%驛')  // 驛：全部過濾
+            ->where('c_name_chn', 'not like', '%渡')  // 渡：全部過濾
+            ->where('c_name_chn', 'not like', '%鋪')  // 鋪：全部過濾
+            // 津：只過濾 3 字以上（保留「延津」、「孟津」等 2 字地名）
+            ->whereRaw('NOT (c_name_chn LIKE ? AND CHAR_LENGTH(c_name_chn) > 2)', ['%津']);
 
         if ($effectiveYear !== null) {
             $query->where(function ($q) use ($effectiveYear) {

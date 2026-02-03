@@ -17,6 +17,7 @@ class RegenerateAddresses extends Command {
      * @var string
      */
     protected $signature = 'cbdb:regenerate-addresses-table
+                            {--database= : 指定数据库连接（如 mysql_migrate）}
                             {--verify : 验证特定示例案例（如 Jiangle 100149）}
                             {--dry-run : 仅模拟运行，不实际修改数据}';
 
@@ -43,6 +44,11 @@ class RegenerateAddresses extends Command {
      * @return int
      */
     public function handle() {
+        if ($database = $this->option('database')) {
+            DB::setDefaultConnection($database);
+            $this->info("使用数据库连接: {$database}");
+        }
+
         $this->info('==========================================================');
         $this->info('开始重建地址层级关系（保留间隙）...');
         $this->info('==========================================================');

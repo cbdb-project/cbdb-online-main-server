@@ -145,8 +145,18 @@ class BasicInformationOfficesController extends Controller {
         }
         //return $request;
         //修改結束
+
+        // 提取 AI 填充日誌 ID 並從 request 中移除（避免傳入資料庫操作）
+        $aiFillLogId = $request->input('ai_fill_log_id');
+        $request->request->remove('ai_fill_log_id');
+
         $_id = $this->biogMainRepository->officeStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
+
+        // 更新 AI 填充日誌（如果本次提交使用了 AI 填充）
+        if ($aiFillLogId) {
+            $this->updateAiFillLog($aiFillLogId, $request);
+        }
 
         // 解析主鍵（officeStoreById 返回查詢參數格式，如 c_office_id=87473&c_posting_id=2104406）
         $newPk = CompositePrimaryKey::parseStoredResourceId($_id, 'POSTED_TO_OFFICE_DATA');
@@ -656,5 +666,34 @@ class BasicInformationOfficesController extends Controller {
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.offices.index', ['basicinformation' => $id]);
+    }
+
+    /**
+     * 更新 AI 填充日誌，記錄用戶實際提交的數據
+     */
+    private function updateAiFillLog(int $logId, Request $request): void {
+        try {
+            $relevantFields = [
+                'c_office_id', 'c_addr', 'c_sequence', 'c_source', 'c_pages',
+                'c_firstyear', 'c_fy_nh_code', 'c_fy_nh_year', 'c_fy_range',
+                'c_fy_intercalary', 'c_fy_month', 'c_fy_day', 'c_fy_day_gz',
+                'c_lastyear', 'c_ly_nh_code', 'c_ly_nh_year', 'c_ly_range',
+                'c_ly_intercalary', 'c_ly_month', 'c_ly_day', 'c_ly_day_gz',
+                'c_appt_code', 'c_assume_office_code', 'c_dy',
+                'c_office_category_id', 'c_inst_code', 'c_notes',
+            ];
+            $submittedData = $request->only($relevantFields);
+
+            DB::table('ai_fill_logs')
+                ->where('id', $logId)
+                ->where('user_id', Auth::id())
+                ->update([
+                    'user_submitted' => json_encode($submittedData, JSON_UNESCAPED_UNICODE),
+                    'submitted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Exception $e) {
+            \Log::warning('[AI Fill Log] 更新用戶提交數據失敗: '.$e->getMessage());
+        }
     }
 }

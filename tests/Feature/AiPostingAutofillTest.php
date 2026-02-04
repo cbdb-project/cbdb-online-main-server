@@ -180,6 +180,7 @@ class AiPostingAutofillTest extends TestCase {
                     'statistics' => [
                         'matched_count',
                         'suggested_count',
+                        'not_found_count',
                         'empty_count',
                     ],
                 ],

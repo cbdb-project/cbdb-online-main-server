@@ -256,5 +256,8 @@ Route::middleware('auth')->group(function () {
     // AI 智能填充任官信息
     Route::post('api/ai/posting/extract', 'AiPostingAutofillController@extract')->name('ai.posting.extract');
 
+    // AI 填充日誌（管理員工具）
+    Route::get('admin/ai-fill-logs', 'AiFillLogController@index')->name('admin.ai-fill-logs');
+
     Route::post('admin/unidirectional-relationship-repair/assoc', 'UnidirectionalRelationshipRepairController@repairAssoc')->name('admin.unidirectional-relationship-repair.assoc');
 });

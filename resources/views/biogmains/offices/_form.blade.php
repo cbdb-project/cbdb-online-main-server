@@ -19,11 +19,26 @@
 
     {{-- AI 智能填充區塊（僅在新增模式且用戶有直接寫入權限時顯示） --}}
     @if(!$isEdit && config('services.gemini.api_key') && auth()->user()->canWriteDirectly())
+        <input type="hidden" name="ai_fill_log_id" id="ai-fill-log-id" value="">
         <div class="card card-info mb-3" id="ai-autofill-section">
-            <div class="card-header">
-                <h3 class="card-title">
+            <div class="card-header d-flex align-items-center">
+                <h3 class="card-title mb-0">
                     <i class="fas fa-magic"></i> AI 智能填充
                 </h3>
+                <a class="ml-3 text-white" style="font-size: 0.85em; opacity: 0.85; cursor: pointer;"
+                   data-toggle="collapse" href="#ai-privacy-notice" role="button" aria-expanded="false">
+                    <i class="fas fa-exclamation-triangle"></i> 重要提示：數據收集與第三方服務
+                </a>
+            </div>
+            <div class="collapse" id="ai-privacy-notice">
+                <div class="alert alert-warning mb-0 rounded-0 border-left-0 border-right-0" style="font-size: 0.9em;">
+                    <p class="mb-2">使用智能填充功能即表示您理解並同意：</p>
+                    <ul class="mb-0">
+                        <li>您輸入的原始文本及 AI 填充結果將被記錄用於研究與改進</li>
+                        <li>您的文本將發送至第三方 AI 服務（Google Gemini API、OpenAI API 等，恕不另行通知）進行處理</li>
+                        <li>AI 填充結果僅供參考，請務必核實後再提交</li>
+                    </ul>
+                </div>
             </div>
             <div class="card-body">
                 <div class="form-group">
@@ -47,7 +62,8 @@
             <h5><i class="fas fa-check-circle"></i> AI 填充完成</h5>
             <ul class="mb-2">
                 <li>✅ <strong id="matched-count">0</strong> 個欄位成功匹配</li>
-                <li>⚠️ <strong id="suggested-count">0</strong> 個欄位需要確認（黃色標記，請檢查後直接提交）</li>
+                <li id="suggested-line" style="display:none;">⚠️ <strong id="suggested-count">0</strong> 個欄位需要確認（黃色標記，請檢查後直接提交）</li>
+                <li id="not-found-line" style="display:none;">🔍 <strong id="not-found-count">0</strong> 個欄位需要手動搜尋（AI 已提取關鍵字但未找到匹配）</li>
                 <li>❌ <strong id="empty-count">0</strong> 個欄位無法提取</li>
             </ul>
         </div>
@@ -374,6 +390,8 @@
                     data: {
                         source_text: sourceText,
                         person_id: {{ $id }},
+                        route_name: '{{ Route::currentRouteName() ?? '' }}',
+                        route_url: window.location.pathname,
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
@@ -399,14 +417,32 @@
                                 }
                             }, 500);
 
-                            // 顯示結果摘要
+                            // 顯示結果摘要（先重置所有計數與可見性，避免前次殘留）
+                            var stats = response.data.statistics;
+                            $('#matched-count').text(stats.matched_count);
+                            $('#empty-count').text(stats.empty_count);
+                            $('#suggested-count').text(stats.suggested_count);
+                            $('#not-found-count').text(stats.not_found_count);
+
+                            if (stats.suggested_count > 0) {
+                                $('#suggested-line').show();
+                            } else {
+                                $('#suggested-line').hide();
+                            }
+                            if (stats.not_found_count > 0) {
+                                $('#not-found-line').show();
+                            } else {
+                                $('#not-found-line').hide();
+                            }
                             $aiResultSummary.show();
-                            $('#matched-count').text(response.data.statistics.matched_count);
-                            $('#suggested-count').text(response.data.statistics.suggested_count);
-                            $('#empty-count').text(response.data.statistics.empty_count);
 
                             $btnClearAi.show();
                             $aiStatus.html('<span class="text-success"><i class="fas fa-check-circle"></i> 填充完成</span>');
+
+                            // 儲存 AI 填充日誌 ID，用於表單提交時關聯
+                            if (response.ai_fill_log_id) {
+                                $('#ai-fill-log-id').val(response.ai_fill_log_id);
+                            }
                         } else {
                             $aiStatus.html('<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' + response.error + '</span>');
                         }
@@ -750,32 +786,9 @@
                                 }
                             }
                         } else {
-                            // 情況 2: 完全找不到匹配（只有 ai_extracted）→ 顯示提示需要搜索
-                            if (isAjaxSelect) {
-                                // AJAX Select2：可以添加提示選項
-                                $field.empty();
-                                const option = new Option(
-                                    `⚠️ AI 建議：${fieldData.ai_extracted}（請搜索確認）`,
-                                    '',
-                                    true,
-                                    true
-                                );
-                                $field.append(option).trigger('change');
-                                addAiClass($field, 'ai-suggested');
-                            } else if (isVueSelect) {
-                                // Vue select-vue：不修改，只添加樣式
-                                addAiClass($field, 'ai-suggested');
-                            } else {
-                                // 其他：添加提示選項
-                                const option = new Option(
-                                    `⚠️ AI 建議：${fieldData.ai_extracted}（請搜索確認）`,
-                                    '',
-                                    true,
-                                    true
-                                );
-                                $field.append(option).trigger('change');
-                                addAiClass($field, 'ai-suggested');
-                            }
+                            // 情況 2: 完全找不到匹配（只有 ai_extracted）→ 不修改欄位，跳過
+                            debugLog(`[AI Autofill] 欄位 ${fieldName} 未找到匹配，跳過填充`);
+                            continue;
                         }
                     } else {
                         // 普通 input 欄位

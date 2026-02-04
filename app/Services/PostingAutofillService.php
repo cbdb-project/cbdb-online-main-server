@@ -59,11 +59,7 @@ class PostingAutofillService {
                     'matched_fields' => $matchResult['matched'], // 成功匹配的欄位
                     'suggested_fields' => $matchResult['suggested'], // 建議值（未匹配）
                     'empty_fields' => $matchResult['empty'], // 未提取的欄位
-                    'statistics' => [
-                        'matched_count' => count($matchResult['matched']),
-                        'suggested_count' => count($matchResult['suggested']),
-                        'empty_count' => count($matchResult['empty']),
-                    ],
+                    'statistics' => $this->buildStatistics($matchResult),
                 ],
                 'error' => null,
             ];
@@ -80,6 +76,29 @@ class PostingAutofillService {
                 'error' => '處理失敗：' . $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * 建構統計信息，區分有值的建議和無匹配的建議
+     */
+    private function buildStatistics(array $matchResult): array {
+        $suggestedWithValue = 0;
+        $notFoundCount = 0;
+
+        foreach ($matchResult['suggested'] as $fieldData) {
+            if (isset($fieldData['value'])) {
+                $suggestedWithValue++;
+            } else {
+                $notFoundCount++;
+            }
+        }
+
+        return [
+            'matched_count' => count($matchResult['matched']),
+            'suggested_count' => $suggestedWithValue,
+            'not_found_count' => $notFoundCount,
+            'empty_count' => count($matchResult['empty']),
+        ];
     }
 
     /**
@@ -435,9 +454,15 @@ class PostingAutofillService {
                     }
                 }
 
+                // 年號欄位經過名稱→ID 轉換時，text 應保留原始中文名稱
+                $text = $value;
+                if (in_array($fieldName, ['c_fy_nh_code', 'c_ly_nh_code']) && $value !== $aiData[$aiKey]) {
+                    $text = $aiData[$aiKey];
+                }
+
                 $matched[$fieldName] = [
                     'value' => $value,
-                    'text' => $value,
+                    'text' => $text,
                 ];
             } else {
                 $empty[] = $fieldName;
@@ -547,6 +572,48 @@ class PostingAutofillService {
                         'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
                     ];
                 }
+            }
+        }
+
+        // ========== Step 5: 後綴匹配 c_office_chn（輸入可能包含地名前綴） ==========
+        // 例如「寧夏將軍」→ 匹配「將軍」（去除地名前綴後的官名）
+        if (mb_strlen($officeName) >= 2) {
+            $isSqlite = is_sqlite();
+
+            // LIKE '%' || col（SQLite）vs LIKE CONCAT('%', col)（MySQL）
+            $likeExpr = $isSqlite
+                ? "? LIKE '%' || c_office_chn"
+                : "? LIKE CONCAT('%', c_office_chn)";
+
+            // LENGTH() 在 SQLite 返回字節長度，CHAR_LENGTH() 在 MySQL 返回字符長度
+            $lenExpr = $isSqlite ? 'LENGTH(c_office_chn)' : 'CHAR_LENGTH(c_office_chn)';
+
+            // SQLite 的 LENGTH() 對 UTF-8 中文返回字節數（每字 3 bytes），需調整閾值
+            $minLen = $isSqlite ? 6 : 2; // 2 個中文字符 = 6 bytes in UTF-8
+            $maxLen = $isSqlite ? mb_strlen($officeName) * 3 : mb_strlen($officeName);
+
+            $query = DB::table('OFFICE_CODES')
+                ->select(
+                    'c_office_id as id',
+                    'c_office_chn as text',
+                    DB::raw("{$lenExpr} as name_len")
+                )
+                ->whereRaw($likeExpr, [$officeName])
+                ->where(DB::raw($lenExpr), '>=', $minLen)
+                ->where(DB::raw($lenExpr), '<', $maxLen);
+
+            if ($dynastyCode !== null) {
+                $query->where('c_dy', '=', $dynastyCode);
+            }
+
+            // 優先取最長的匹配（最具體的官名）
+            $result = $query->orderBy('name_len', 'desc')->first();
+            if ($result) {
+                return [
+                    'id' => $result->id,
+                    'text' => $result->text,
+                    'match_type' => 'fuzzy',
+                ];
             }
         }
 

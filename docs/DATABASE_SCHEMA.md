@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-01-16 18:43:08
+> 生成時間：2026-02-05 22:09:20
 
 ## 目錄
 
@@ -150,6 +150,38 @@
 **索引**:
 
 - `PRIMARY` (UNIQUE): (c_admin_cat_type_code)
+
+---
+
+### ai_fill_logs 
+
+**主鍵**: `id`
+
+| 列名 | 類型 | 可空 | 默認值 | 備註 |
+|------|------|------|--------|------|
+| `id` | bigint(20) unsigned | NO | (NULL) |  [AUTO_INCREMENT] |
+| `user_id` | bigint(20) unsigned | NO | (NULL) | 執行填充的用戶 ID |
+| `c_personid` | int(11) | NO | (NULL) | 目標人物 ID |
+| `route_name` | varchar(255) | NO | (NULL) | 路由名稱 |
+| `route_url` | varchar(500) | NO | (NULL) | 頁面 URL 路徑 |
+| `source_text` | text | NO | (NULL) | 用戶輸入的原始史料文本 |
+| `ai_raw` | longtext | YES | NULL | AI 原始 JSON 回應（匹配前） |
+| `ai_matched` | longtext | YES | NULL | AI 匹配後完整結果 JSON |
+| `user_submitted` | longtext | YES | NULL | 用戶實際提交的表單數據 JSON |
+| `success` | tinyint(1) | NO | 0 | AI 提取是否成功 |
+| `error_message` | varchar(500) | YES | NULL | 錯誤訊息 |
+| `execution_time_ms` | int(11) | YES | NULL | AI 處理耗時（毫秒） |
+| `submitted_at` | timestamp | YES | NULL | 用戶提交表單的時間 |
+| `created_at` | timestamp | YES | NULL |  |
+| `updated_at` | timestamp | YES | NULL |  |
+
+**索引**:
+
+- `PRIMARY` (UNIQUE): (id)
+- `ai_fill_logs_user_id_index`: (user_id)
+- `ai_fill_logs_c_personid_index`: (c_personid)
+- `ai_fill_logs_success_index`: (success)
+- `ai_fill_logs_created_at_index`: (created_at)
 
 ---
 
@@ -858,6 +890,7 @@
 | `c_age` | smallint(6) | YES | NULL |  |
 | `c_entry_nh_id` | smallint(6) | YES | NULL |  |
 | `c_entry_nh_year` | smallint(6) | YES | NULL |  |
+| `c_entry_dy` | smallint(6) | YES | NULL |  |
 | `c_entry_range` | smallint(6) | YES | NULL |  |
 | `c_inst_code` | int(11) | NO | 0 |  |
 | `c_inst_name_code` | smallint(6) | NO | 0 |  |
@@ -883,13 +916,14 @@
 - `c_kin_id_ENTRY_DATA_index`: (c_kin_id)
 - `c_assoc_code_ENTRY_DATA_index`: (c_assoc_code)
 - `c_assoc_id_ENTRY_DATA_index`: (c_assoc_id)
-- `c_entry_nh_id_ENTRY_DATA_index`: (c_entry_nh_id)
 - `c_inst_code_ENTRY_DATA_index`: (c_inst_code)
 - `c_inst_name_code_ENTRY_DATA_index`: (c_inst_name_code)
 - `c_entry_addr_id_ENTRY_DATA_index`: (c_entry_addr_id)
 - `c_entry_range`: (c_entry_range)
-- `c_parental_status_code_ENTRY_DATA_index`: (c_parental_status_code)
 - `c_source`: (c_source)
+- `c_entry_nh_id_ENTRY_DATA_index`: (c_entry_nh_id)
+- `c_parental_status_code_ENTRY_DATA_index`: (c_parental_status_code)
+- `c_entry_dy_ENTRY_DATA_index`: (c_entry_dy)
 
 ---
 
@@ -951,15 +985,15 @@
 
 ---
 
-### EVENTS_ADDR
+### EVENTS_ADDR 
 
-**主鍵**: `c_addr_id`, `c_personid`, `c_sequence`, `c_event_code`
+**主鍵**: `c_event_code`, `c_personid`, `c_sequence`, `c_addr_id`
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
+| `c_event_code` | int(11) | NO | 0 |  |
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_sequence` | smallint(6) | NO | 0 |  |
-| `c_event_code` | int(11) | NO | 0 |  |
 | `c_addr_id` | int(11) | NO | (NULL) |  |
 | `c_year` | smallint(6) | YES | NULL |  |
 | `c_nh_code` | smallint(6) | YES | NULL |  |
@@ -974,16 +1008,16 @@
 
 - `PRIMARY` (UNIQUE): (c_addr_id, c_personid, c_sequence, c_event_code)
 - `c_personid_EVENTS_ADDR_index`: (c_personid)
-- `c_sequence_EVENTS_ADDR_index`: (c_sequence)
-- `c_event_code_EVENTS_ADDR_index`: (c_event_code)
 - `c_addr_id_EVENTS_ADDR_index`: (c_addr_id)
 - `c_nh_code_EVENTS_ADDR_index`: (c_nh_code)
-- `c_day_ganzhi_EVENTS_ADDR_index`: (c_day_ganzhi)
-- `c_yr_range_EVENTS_ADDR_index`: (c_yr_range)
+- `c_day_ganzhi`: (c_day_ganzhi)
+- `c_yr_range`: (c_yr_range)
+- `c_sequence_EVENTS_ADDR_index`: (c_sequence)
+- `c_event_code_EVENTS_ADDR_index`: (c_event_code)
 
 ---
 
-### EVENTS_DATA
+### EVENTS_DATA 
 
 **主鍵**: `c_personid`, `c_sequence`, `c_event_code`
 
@@ -1018,9 +1052,9 @@
 - `c_event_code_EVENTS_DATA_index`: (c_event_code)
 - `c_nh_code_EVENTS_DATA_index`: (c_nh_code)
 - `c_addr_id_EVENTS_DATA_index`: (c_addr_id)
-- `c_day_ganzhi_EVENTS_DATA_index`: (c_day_ganzhi)
-- `c_source_EVENTS_DATA_index`: (c_source)
-- `c_yr_range_EVENTS_DATA_index`: (c_yr_range)
+- `c_day_ganzhi`: (c_day_ganzhi)
+- `c_source`: (c_source)
+- `c_yr_range`: (c_yr_range)
 
 ---
 
@@ -3116,9 +3150,11 @@
 | `c_modified_by` | varchar(255) | YES | NULL |  |
 | `c_created_date` | datetime | YES | (NULL) |  |
 | `c_modified_date` | datetime | YES | (NULL) |  |
+| `c_entry_dy` | INTEGER | YES | (NULL) |  |
 
 **索引**:
 
+- `c_entry_dy_ENTRY_DATA_index`: (c_entry_dy)
 - `sqlite_autoindex_ENTRY_DATA_1` (UNIQUE): (c_assoc_code, c_assoc_id, c_entry_code, c_inst_code, c_inst_name_code, c_kin_code, c_kin_id, c_personid, c_sequence, c_year)
 
 ---
@@ -3172,76 +3208,76 @@
 
 ---
 
-### EVENTS_ADDR
+### EVENTS_ADDR 
 
-**主鍵**: `c_addr_id`, `c_personid`, `c_sequence`, `c_event_code`
+**主鍵**: `c_personid`, `c_sequence`, `c_event_code`, `c_addr_id`
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_personid` | INTEGER | NO | (NULL) |  |
-| `c_sequence` | INTEGER | NO | 0 |  |
-| `c_event_code` | INTEGER | NO | 0 |  |
-| `c_addr_id` | INTEGER | NO | (NULL) |  |
-| `c_year` | INTEGER | YES | NULL |  |
-| `c_nh_code` | INTEGER | YES | NULL |  |
-| `c_nh_year` | INTEGER | YES | NULL |  |
-| `c_yr_range` | INTEGER | YES | NULL |  |
-| `c_intercalary` | INTEGER | YES | NULL |  |
-| `c_month` | INTEGER | YES | NULL |  |
-| `c_day` | INTEGER | YES | NULL |  |
-| `c_day_ganzhi` | INTEGER | YES | NULL |  |
+| `c_personid` | INT | NO | (NULL) |  |
+| `c_sequence` | SMALLINT | NO | 0 |  |
+| `c_event_code` | INT | NO | 0 |  |
+| `c_addr_id` | INT | NO | (NULL) |  |
+| `c_year` | SMALLINT | YES | NULL |  |
+| `c_nh_code` | SMALLINT | YES | NULL |  |
+| `c_nh_year` | SMALLINT | YES | NULL |  |
+| `c_yr_range` | SMALLINT | YES | NULL |  |
+| `c_intercalary` | SMALLINT | YES | NULL |  |
+| `c_month` | SMALLINT | YES | NULL |  |
+| `c_day` | SMALLINT | YES | NULL |  |
+| `c_day_ganzhi` | SMALLINT | YES | NULL |  |
 
 **索引**:
 
-- `sqlite_autoindex_EVENTS_ADDR_1` (UNIQUE): (c_addr_id, c_personid, c_sequence, c_event_code)
-- `c_personid_EVENTS_ADDR_index`: (c_personid)
-- `c_sequence_EVENTS_ADDR_index`: (c_sequence)
-- `c_event_code_EVENTS_ADDR_index`: (c_event_code)
-- `c_addr_id_EVENTS_ADDR_index`: (c_addr_id)
-- `c_nh_code_EVENTS_ADDR_index`: (c_nh_code)
-- `c_day_ganzhi_EVENTS_ADDR_index`: (c_day_ganzhi)
 - `c_yr_range_EVENTS_ADDR_index`: (c_yr_range)
+- `c_day_ganzhi_EVENTS_ADDR_index`: (c_day_ganzhi)
+- `c_nh_code_EVENTS_ADDR_index`: (c_nh_code)
+- `c_addr_id_EVENTS_ADDR_index`: (c_addr_id)
+- `c_event_code_EVENTS_ADDR_index`: (c_event_code)
+- `c_sequence_EVENTS_ADDR_index`: (c_sequence)
+- `c_personid_EVENTS_ADDR_index`: (c_personid)
+- `sqlite_autoindex_EVENTS_ADDR_1` (UNIQUE): (c_addr_id, c_personid, c_sequence, c_event_code)
 
 ---
 
-### EVENTS_DATA
+### EVENTS_DATA 
 
 **主鍵**: `c_personid`, `c_sequence`, `c_event_code`
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_personid` | INTEGER | NO | (NULL) |  |
-| `c_sequence` | INTEGER | NO | 0 |  |
-| `c_event_code` | INTEGER | NO | 0 |  |
-| `c_role` | varchar(255) | YES | NULL |  |
-| `c_year` | INTEGER | YES | NULL |  |
-| `c_nh_code` | INTEGER | YES | NULL |  |
-| `c_nh_year` | INTEGER | YES | NULL |  |
-| `c_yr_range` | INTEGER | YES | NULL |  |
-| `c_intercalary` | INTEGER | YES | NULL |  |
-| `c_month` | INTEGER | YES | NULL |  |
-| `c_day` | INTEGER | YES | NULL |  |
-| `c_day_ganzhi` | INTEGER | YES | NULL |  |
-| `c_addr_id` | INTEGER | YES | NULL |  |
-| `c_source` | INTEGER | YES | NULL |  |
-| `c_pages` | varchar(255) | YES | NULL |  |
-| `c_event` | longtext | YES | (NULL) |  |
-| `c_notes` | varchar(255) | YES | NULL |  |
-| `c_created_by` | varchar(255) | YES | NULL |  |
-| `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_created_date` | datetime | YES | (NULL) |  |
-| `c_modified_date` | datetime | YES | (NULL) |  |
+| `c_personid` | INT | NO | (NULL) |  |
+| `c_sequence` | SMALLINT | NO | 0 |  |
+| `c_event_code` | INT | NO | 0 |  |
+| `c_role` | VARCHAR(255) | YES | NULL |  |
+| `c_year` | SMALLINT | YES | NULL |  |
+| `c_nh_code` | SMALLINT | YES | NULL |  |
+| `c_nh_year` | SMALLINT | YES | NULL |  |
+| `c_yr_range` | SMALLINT | YES | NULL |  |
+| `c_intercalary` | SMALLINT | YES | NULL |  |
+| `c_month` | SMALLINT | YES | NULL |  |
+| `c_day` | SMALLINT | YES | NULL |  |
+| `c_day_ganzhi` | SMALLINT | YES | NULL |  |
+| `c_addr_id` | INT | YES | NULL |  |
+| `c_source` | INT | YES | NULL |  |
+| `c_pages` | VARCHAR(255) | YES | NULL |  |
+| `c_event` | TEXT | YES | NULL |  |
+| `c_notes` | VARCHAR(255) | YES | NULL |  |
+| `c_created_by` | VARCHAR(255) | YES | NULL |  |
+| `c_created_date` | VARCHAR(255) | YES | NULL |  |
+| `c_modified_by` | VARCHAR(255) | YES | NULL |  |
+| `c_modified_date` | VARCHAR(255) | YES | NULL |  |
 
 **索引**:
 
-- `sqlite_autoindex_EVENTS_DATA_1` (UNIQUE): (c_personid, c_sequence, c_event_code)
-- `c_personid_EVENTS_DATA_index`: (c_personid)
-- `c_event_code_EVENTS_DATA_index`: (c_event_code)
-- `c_nh_code_EVENTS_DATA_index`: (c_nh_code)
-- `c_addr_id_EVENTS_DATA_index`: (c_addr_id)
-- `c_day_ganzhi_EVENTS_DATA_index`: (c_day_ganzhi)
-- `c_source_EVENTS_DATA_index`: (c_source)
 - `c_yr_range_EVENTS_DATA_index`: (c_yr_range)
+- `c_source_EVENTS_DATA_index`: (c_source)
+- `c_day_ganzhi_EVENTS_DATA_index`: (c_day_ganzhi)
+- `c_addr_id_EVENTS_DATA_index`: (c_addr_id)
+- `c_nh_code_EVENTS_DATA_index`: (c_nh_code)
+- `c_event_code_EVENTS_DATA_index`: (c_event_code)
+- `c_personid_EVENTS_DATA_index`: (c_personid)
+- `sqlite_autoindex_EVENTS_DATA_1` (UNIQUE): (c_personid, c_sequence, c_event_code)
 
 ---
 
@@ -4234,6 +4270,37 @@
 | `c_range_chn` | varchar(255) | YES | NULL |  |
 | `c_approx` | varchar(255) | YES | NULL |  |
 | `c_approx_chn` | varchar(255) | YES | NULL |  |
+
+---
+
+### ai_fill_logs 
+
+**主鍵**: `id`
+
+| 列名 | 類型 | 可空 | 默認值 | 備註 |
+|------|------|------|--------|------|
+| `id` | INTEGER | NO | (NULL) |  |
+| `user_id` | INTEGER | NO | (NULL) |  |
+| `c_personid` | INTEGER | NO | (NULL) |  |
+| `route_name` | varchar | NO | (NULL) |  |
+| `route_url` | varchar | NO | (NULL) |  |
+| `source_text` | TEXT | NO | (NULL) |  |
+| `ai_raw` | TEXT | YES | (NULL) |  |
+| `ai_matched` | TEXT | YES | (NULL) |  |
+| `user_submitted` | TEXT | YES | (NULL) |  |
+| `success` | tinyint(1) | NO | '0' |  |
+| `error_message` | varchar | YES | (NULL) |  |
+| `execution_time_ms` | INTEGER | YES | (NULL) |  |
+| `submitted_at` | datetime | YES | (NULL) |  |
+| `created_at` | datetime | YES | (NULL) |  |
+| `updated_at` | datetime | YES | (NULL) |  |
+
+**索引**:
+
+- `ai_fill_logs_created_at_index`: (created_at)
+- `ai_fill_logs_success_index`: (success)
+- `ai_fill_logs_c_personid_index`: (c_personid)
+- `ai_fill_logs_user_id_index`: (user_id)
 
 ---
 

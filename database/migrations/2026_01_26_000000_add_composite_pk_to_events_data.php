@@ -17,50 +17,69 @@ return new class () extends Migration {
      * 5. 設置複合主鍵 (c_personid, c_sequence, c_event_code)
      */
     public function up(): void {
-        // 步驟 0：刪除 c_event_record_id 欄位（如果存在）
-        if (Schema::hasColumn('EVENTS_DATA', 'c_event_record_id')) {
-            if (is_mysql()) {
-                // MySQL：先刪除外鍵約束再刪除欄位
-                try {
-                    DB::statement('ALTER TABLE `EVENTS_DATA` DROP FOREIGN KEY `EVENTS_DATA_ibfk_4`');
-                } catch (\Exception $e) {
-                    // 外鍵可能不存在，忽略錯誤
-                }
+        $thrown = null;
 
-                try {
-                    DB::statement('ALTER TABLE `EVENTS_DATA` DROP INDEX `c_event_record_id_EVENTS_DATA_index`');
-                } catch (\Exception $e) {
-                    // 索引可能不存在，忽略錯誤
-                }
-                Schema::table('EVENTS_DATA', function (Blueprint $table) {
-                    $table->dropColumn('c_event_record_id');
-                });
+        try {
+            if (is_mysql()) {
+                $this->dropEventsDataForeignKeyIfExists('EVENTS_DATA_ibfk_3');
+                $this->dropEventsDataForeignKeyIfExists('EVENTS_DATA_ibfk_6');
             }
-            // SQLite：會在重建表時處理
+
+            // 步驟 0：刪除 c_event_record_id 欄位（如果存在）
+            if (Schema::hasColumn('EVENTS_DATA', 'c_event_record_id')) {
+                if (is_mysql()) {
+                    // MySQL：先刪除外鍵約束再刪除欄位
+                    try {
+                        DB::statement('ALTER TABLE `EVENTS_DATA` DROP FOREIGN KEY `EVENTS_DATA_ibfk_4`');
+                    } catch (\Exception $e) {
+                        // 外鍵可能不存在，忽略錯誤
+                    }
+
+                    try {
+                        DB::statement('ALTER TABLE `EVENTS_DATA` DROP INDEX `c_event_record_id_EVENTS_DATA_index`');
+                    } catch (\Exception $e) {
+                        // 索引可能不存在，忽略錯誤
+                    }
+                    Schema::table('EVENTS_DATA', function (Blueprint $table) {
+                        $table->dropColumn('c_event_record_id');
+                    });
+                }
+                // SQLite：會在重建表時處理
+            }
+
+            // 步驟 1：更新 c_personid 和 c_event_code 的 NULL 值為 0
+            DB::table('EVENTS_DATA')
+                ->whereNull('c_personid')
+                ->update(['c_personid' => 0]);
+
+            DB::table('EVENTS_DATA')
+                ->whereNull('c_event_code')
+                ->update(['c_event_code' => 0]);
+
+            // 步驟 2：為相同 c_personid 的記錄分配遞增的 c_sequence
+            $this->assignSequenceNumbers();
+
+            // 步驟 3：添加複合主鍵（需要根據數據庫類型處理）
+            if (is_mysql()) {
+                // MySQL：修改欄位為 NOT NULL（含 DEFAULT 0）並添加主鍵
+                DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_personid` INT NOT NULL');
+                DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_sequence` SMALLINT NOT NULL DEFAULT 0');
+                DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_event_code` INT NOT NULL DEFAULT 0');
+                DB::statement('ALTER TABLE `EVENTS_DATA` ADD PRIMARY KEY (`c_personid`, `c_sequence`, `c_event_code`)');
+            } else {
+                // SQLite：需要重建表（SQLite 不支持 ALTER TABLE ADD PRIMARY KEY）
+                $this->rebuildTableForSqlite();
+            }
+        } catch (\Throwable $e) {
+            $thrown = $e;
+        } finally {
+            if (is_mysql()) {
+                $this->ensureEventsDataForeignKeys($thrown !== null);
+            }
         }
 
-        // 步驟 1：更新 c_personid 和 c_event_code 的 NULL 值為 0
-        DB::table('EVENTS_DATA')
-            ->whereNull('c_personid')
-            ->update(['c_personid' => 0]);
-
-        DB::table('EVENTS_DATA')
-            ->whereNull('c_event_code')
-            ->update(['c_event_code' => 0]);
-
-        // 步驟 2：為相同 c_personid 的記錄分配遞增的 c_sequence
-        $this->assignSequenceNumbers();
-
-        // 步驟 3：添加複合主鍵（需要根據數據庫類型處理）
-        if (is_mysql()) {
-            // MySQL：修改欄位為 NOT NULL（含 DEFAULT 0）並添加主鍵
-            DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_personid` INT NOT NULL');
-            DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_sequence` SMALLINT NOT NULL DEFAULT 0');
-            DB::statement('ALTER TABLE `EVENTS_DATA` MODIFY `c_event_code` INT NOT NULL DEFAULT 0');
-            DB::statement('ALTER TABLE `EVENTS_DATA` ADD PRIMARY KEY (`c_personid`, `c_sequence`, `c_event_code`)');
-        } else {
-            // SQLite：需要重建表（SQLite 不支持 ALTER TABLE ADD PRIMARY KEY）
-            $this->rebuildTableForSqlite();
+        if ($thrown !== null) {
+            throw $thrown;
         }
     }
 
@@ -311,6 +330,67 @@ return new class () extends Migration {
             DB::statement('CREATE INDEX c_yr_range_EVENTS_DATA_index ON EVENTS_DATA (c_yr_range)');
         } finally {
             enable_foreign_keys();
+        }
+    }
+
+    private function eventsDataForeignKeyExists(string $constraintName): bool {
+        $row = DB::selectOne(
+            '
+                SELECT COUNT(*) AS count
+                FROM information_schema.table_constraints
+                WHERE constraint_schema = DATABASE()
+                  AND table_name = ?
+                  AND constraint_name = ?
+                  AND constraint_type = "FOREIGN KEY"
+            ',
+            ['EVENTS_DATA', $constraintName],
+        );
+
+        return $row !== null && (int) $row->count > 0;
+    }
+
+    private function dropEventsDataForeignKeyIfExists(string $constraintName): void {
+        if (!$this->eventsDataForeignKeyExists($constraintName)) {
+            return;
+        }
+
+        DB::statement(sprintf('ALTER TABLE `EVENTS_DATA` DROP FOREIGN KEY `%s`', $constraintName));
+    }
+
+    private function ensureEventsDataForeignKeys(bool $bestEffort): void {
+        $operations = [
+            'EVENTS_DATA_ibfk_3' => '
+                ALTER TABLE EVENTS_DATA
+                ADD CONSTRAINT EVENTS_DATA_ibfk_3
+                FOREIGN KEY (c_event_code)
+                REFERENCES EVENT_CODES(c_event_code)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
+            ',
+            'EVENTS_DATA_ibfk_6' => '
+                ALTER TABLE EVENTS_DATA
+                ADD CONSTRAINT EVENTS_DATA_ibfk_6
+                FOREIGN KEY (c_personid)
+                REFERENCES BIOG_MAIN(c_personid)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
+            ',
+        ];
+
+        foreach ($operations as $name => $sql) {
+            if ($this->eventsDataForeignKeyExists($name)) {
+                continue;
+            }
+
+            if ($bestEffort) {
+                try {
+                    DB::statement($sql);
+                } catch (\Throwable $e) {
+                    // best-effort restore to avoid masking the original failure
+                }
+            } else {
+                DB::statement($sql);
+            }
         }
     }
 };

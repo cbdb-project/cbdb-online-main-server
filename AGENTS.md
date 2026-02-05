@@ -256,6 +256,8 @@
   - ✅ 正確：使用 `is_sqlite()` 和 `is_mysql()` helper functions
   - ❌ 錯誤：在原始 SQL 中直接使用 COMMENT、ENGINE、USING BTREE 等 MySQL 專屬語法
   - ✅ 正確：使用 `is_sqlite()` 條件移除不支持的語法，或使用 Schema Builder
+  - ❌ 錯誤：調整主鍵/索引/欄位時未先移除既有外鍵（MySQL 會報錯導致 migrate 失敗；MariaDB 視版本與設定可能不同）
+  - ✅ 正確：先 drop 外鍵再修改結構，完成後再加回外鍵
   - 詳細說明：`database/migrations/helpers.php` 和 `.claude/skills/migration-guide.md`
 - **Eloquent 與複合主鍵的限制**：Laravel Eloquent ORM **官方不支持**複合主鍵（composite primary key）。雖然社群有第三方套件（如 `laravel-composite-primary-keys`）提供支援，但引入第三方包會增加維護上的不確定性（套件的長期維護狀態難以保證）。因此，本專案決定對於擁有複合主鍵的表（如 `ALTNAME_DATA` 使用 `c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`），直接使用 Query Builder（`DB::table()`）而非建立 Eloquent 模型。若需要類似 Observer 的副作用（如自動索引），應在 Repository 或 Service 層手動調用對應服務（如 `NameSearchIndexService`）。
 

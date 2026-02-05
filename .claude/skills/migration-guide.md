@@ -157,6 +157,8 @@ Schema::create('users', function (Blueprint $table) {
 
 #### 問題 4：外鍵約束檢查
 
+補充：在 MySQL 中，調整主鍵/索引/欄位前若未先移除相關外鍵，常會直接報錯導致 migrate 失敗；MariaDB 在某些版本或設定下可能不一定，但行為差異不應依賴。
+
 ```php
 // ✅ 正確：使用 helper functions
 public function up(): void {

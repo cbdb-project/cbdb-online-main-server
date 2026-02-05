@@ -17,6 +17,11 @@ return new class () extends Migration {
      * 5. 設置複合主鍵 (c_personid, c_sequence, c_event_code)
      */
     public function up(): void {
+        if (is_mysql()) {
+            DB::statement('ALTER TABLE EVENTS_DATA DROP FOREIGN KEY EVENTS_DATA_ibfk_3');
+            DB::statement('ALTER TABLE EVENTS_DATA DROP FOREIGN KEY EVENTS_DATA_ibfk_6');
+        }
+
         // 步驟 0：刪除 c_event_record_id 欄位（如果存在）
         if (Schema::hasColumn('EVENTS_DATA', 'c_event_record_id')) {
             if (is_mysql()) {
@@ -61,6 +66,25 @@ return new class () extends Migration {
         } else {
             // SQLite：需要重建表（SQLite 不支持 ALTER TABLE ADD PRIMARY KEY）
             $this->rebuildTableForSqlite();
+        }
+
+        if (is_mysql()) {
+            DB::statement('
+                ALTER TABLE EVENTS_DATA
+                ADD CONSTRAINT EVENTS_DATA_ibfk_3
+                FOREIGN KEY (c_event_code)
+                REFERENCES EVENT_CODES(c_event_code)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
+            ');
+            DB::statement('
+                ALTER TABLE EVENTS_DATA
+                ADD CONSTRAINT EVENTS_DATA_ibfk_6
+                FOREIGN KEY (c_personid)
+                REFERENCES BIOG_MAIN(c_personid)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
+            ');
         }
     }
 

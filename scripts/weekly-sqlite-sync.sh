@@ -21,6 +21,22 @@
 
 set -e
 
+# 確保 HOME 環境變量已設置（cron 環境可能缺少）
+if [ -z "$HOME" ]; then
+    if command -v getent &> /dev/null; then
+        export HOME=$(getent passwd "$(id -un)" | cut -d: -f6)
+    else
+        # macOS 或其他無 getent 的系統
+        export HOME=$(eval echo "~$(id -un)")
+    fi
+fi
+
+# 僅在無法讀取系統級 git 配置時才跳過（避免影響 LFS 等系統配置）
+if [ -f /etc/gitconfig ] && [ ! -r /etc/gitconfig ]; then
+    export GIT_CONFIG_NOSYSTEM=1
+    echo "注意: /etc/gitconfig 無法讀取，已設置 GIT_CONFIG_NOSYSTEM=1"
+fi
+
 # 前置檢查：確認必要工具已安裝
 check_requirements() {
     local missing=()
@@ -48,8 +64,20 @@ check_requirements() {
     # 檢查 gh CLI 是否已登入
     if ! gh auth status &> /dev/null; then
         echo "錯誤: gh CLI 尚未登入，請先執行 'gh auth login'"
+        echo "提示: 若在 cron 環境執行，請確保 GH_TOKEN 環境變量已設置"
         exit 1
     fi
+}
+
+# 顯示環境資訊（便於除錯）
+show_environment() {
+    echo "環境資訊:"
+    echo "  - USER: $(whoami)"
+    echo "  - HOME: $HOME"
+    if [ -n "$GIT_CONFIG_NOSYSTEM" ]; then
+        echo "  - GIT_CONFIG_NOSYSTEM: $GIT_CONFIG_NOSYSTEM"
+    fi
+    echo ""
 }
 
 check_requirements
@@ -82,6 +110,8 @@ echo "CBDB SQLite 每週同步"
 echo "================================================"
 echo "時間: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
+
+show_environment
 
 # Step 1: 執行匯出腳本
 echo "[1/5] 執行 SQLite 匯出腳本..."
@@ -121,6 +151,14 @@ cd cbdb_sqlite
 
 # 確保 LFS 已初始化
 git lfs install
+
+# 設置 git 用戶資訊（僅在未配置或為空時設置，避免覆蓋手動執行者的配置）
+if [ -z "$(git config --get user.name)" ]; then
+    git config user.name "sudoghut"
+fi
+if [ -z "$(git config --get user.email)" ]; then
+    git config user.email "sudospace@gmail.com"
+fi
 
 # 複製新檔案
 cp "${WORK_DIR}/latest.7z" ./latest.7z

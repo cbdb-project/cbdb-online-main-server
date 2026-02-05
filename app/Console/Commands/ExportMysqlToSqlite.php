@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use PDO;
 
 class ExportMysqlToSqlite extends Command {
     /**
@@ -21,6 +22,7 @@ class ExportMysqlToSqlite extends Command {
                             {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}
                             {--limit-records= : 限制每张表导出的最大记录数}
                             {--chunk-size=5000 : 分块查询的大小（减少内存使用）}
+                            {--skip-row-count : 跳过每张表的 COUNT(*) 统计}
                             {--min-free-space=1 : 最小可用磁盘空间（GB）}
                             {--skip-space-check : 跳过磁盘空间检查}
                             {--append : 追加模式，将表添加到现有 SQLite 文件中（不删除现有文件）}';
@@ -147,7 +149,9 @@ class ExportMysqlToSqlite extends Command {
             }
 
             // 测试连接
-            DB::connection($this->sourceConnection)->getPdo();
+            $pdo = DB::connection($this->sourceConnection)->getPdo();
+            // 使用 unbuffered query，降低内存峰值
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
 
             $this->info(sprintf('✓ 源数据库连接正常 (%s)', $this->sourceConnection));
 
@@ -347,9 +351,12 @@ class ExportMysqlToSqlite extends Command {
 
         // 2. 导出数据（如果不是 schema-only 模式且不是视图）
         if (!$isView && !$this->option('schema-only')) {
-            $rowCount = $this->getTableRowCount($tableName);
+            $rowCount = null;
+            if (!$this->option('skip-row-count')) {
+                $rowCount = $this->getTableRowCount($tableName);
+            }
             $limit = $this->getRecordLimit();
-            if ($limit !== null) {
+            if ($limit !== null && $rowCount !== null) {
                 $rowCount = min($rowCount, $limit);
             }
             $this->exportTableData($tableName, $rowCount, $limit);
@@ -766,18 +773,22 @@ class ExportMysqlToSqlite extends Command {
         $hasPrimaryKey = $metadata['has_primary_key'] ?? true;
         $insertBatchSize = $this->getSqliteInsertBatchSize();
         $chunkSize = (int) $this->option('chunk-size');
+        $indexInfo = null;
 
         // 禁用外键约束
         DB::connection('sqlite_export')->statement('PRAGMA foreign_keys = OFF');
 
         $dataBar = null;
-        if ($rowCount > 0) {
+        if ($rowCount !== null && $rowCount > 0) {
             $this->output->newLine();
             $dataBar = $this->output->createProgressBar($rowCount);
             $dataBar->setBarCharacter('▓');
             $dataBar->setEmptyBarCharacter('░');
             $dataBar->setFormat('  %current%/%max% 行 (%percent:3s%%)');
             $dataBar->start();
+        } else {
+            $this->output->newLine();
+            $this->info('  统计行数已跳过，使用不定长度导出模式。');
         }
 
         if ($limit === null) {
@@ -871,7 +882,43 @@ class ExportMysqlToSqlite extends Command {
                     foreach ($compositePrimaryKey as $pkColumn) {
                         $query->orderBy($pkColumn);
                     }
-                    $query->chunk($chunkSize, $chunkCallback);
+                    if ($indexInfo === null) {
+                        $indexInfo = $this->getTableIndexInfo($tableName);
+                    }
+                    if (!$this->hasLeadingIndexColumns($indexInfo, $compositePrimaryKey)) {
+                        $this->warn(sprintf(
+                            '⚠ 表 %s 對排序欄位 (%s) 沒有對應索引，可能會造成 filesort/臨時表',
+                            $tableName,
+                            implode(', ', $compositePrimaryKey)
+                        ));
+                    }
+                    foreach ($query->cursor() as $row) {
+                        // 检查是否达到限制
+                        if ($limit !== null && $processedRows >= $limit) {
+                            break;
+                        }
+
+                        $buffer[] = (array) $row;
+                        $processedRows++;
+
+                        // 当缓冲区达到批次大小时，写入 SQLite
+                        if (count($buffer) >= $insertBatchSize) {
+                            $count = count($buffer);
+                            $this->insertRowsIntoSqlite($tableName, $buffer);
+                            $this->stats['rows'] += $count;
+
+                            if ($dataBar) {
+                                $dataBar->advance($count);
+                            }
+
+                            $buffer = [];
+
+                            // 定期释放内存
+                            if ($processedRows % 10000 === 0) {
+                                gc_collect_cycles();
+                            }
+                        }
+                    }
                 } else {
                     // 備用路徑（理論上不應該到達這裡）
                     if (!$chunkColumn) {
@@ -886,6 +933,16 @@ class ExportMysqlToSqlite extends Command {
                         $chunkColumn = $columns[0];
                     }
 
+                    if ($indexInfo === null) {
+                        $indexInfo = $this->getTableIndexInfo($tableName);
+                    }
+                    if (!$this->hasLeadingIndexColumns($indexInfo, [$chunkColumn])) {
+                        $this->warn(sprintf(
+                            '⚠ 表 %s 對排序欄位 (%s) 沒有對應索引，可能會造成 filesort/臨時表',
+                            $tableName,
+                            $chunkColumn
+                        ));
+                    }
                     $query->orderBy($chunkColumn)->chunk($chunkSize, $chunkCallback);
                 }
             }
@@ -945,6 +1002,65 @@ class ExportMysqlToSqlite extends Command {
     }
 
     /**
+     * 取得 MySQL 索引資訊（以索引名稱分組的欄位序列）
+     *
+     * @return array<string, array<int, string>>
+     */
+    protected function getTableIndexInfo($tableName) {
+        try {
+            $rows = DB::connection($this->sourceConnection)
+                ->select(sprintf('SHOW INDEX FROM `%s`', str_replace('`', '``', $tableName)));
+        } catch (\Exception $e) {
+            $this->warn(sprintf('⚠ 无法读取表 %s 的索引信息: %s', $tableName, $e->getMessage()));
+
+            return [];
+        }
+
+        $indexes = [];
+
+        foreach ($rows as $row) {
+            $keyName = $row->Key_name ?? null;
+            $seq = isset($row->Seq_in_index) ? (int) $row->Seq_in_index : null;
+            $column = $row->Column_name ?? null;
+
+            if ($keyName === null || $seq === null || $column === null) {
+                continue;
+            }
+
+            $indexes[$keyName][$seq] = $column;
+        }
+
+        foreach ($indexes as $key => $columns) {
+            ksort($columns);
+            $indexes[$key] = array_values($columns);
+        }
+
+        return $indexes;
+    }
+
+    /**
+     * 檢查是否存在以指定欄位序列為前綴的索引
+     *
+     * @param array<string, array<int, string>> $indexes
+     * @param array<int, string> $columns
+     * @return bool
+     */
+    protected function hasLeadingIndexColumns(array $indexes, array $columns) {
+        if (empty($indexes) || empty($columns)) {
+            return false;
+        }
+
+        foreach ($indexes as $indexColumns) {
+            $slice = array_slice($indexColumns, 0, count($columns));
+            if ($slice === $columns) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * 计算数据表的总行数
      */
     protected function getTableRowCount($tableName) {
@@ -964,7 +1080,7 @@ class ExportMysqlToSqlite extends Command {
      * 但保守使用 400 以避免觸發 "too many terms" 錯誤。
      */
     protected function getSqliteInsertBatchSize() {
-        return 400;
+        return 100;
     }
 
     /**

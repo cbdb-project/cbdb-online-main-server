@@ -140,6 +140,8 @@ for TABLE in "${TABLES[@]}"; do
             --output="$OUTPUT_FILE" \
             --tables="$TABLE" \
             --source="$SOURCE_DB" \
+            --chunk-size=1000 \
+            --skip-row-count \
             --skip-space-check \
             --no-interaction; then
             echo "  ✓ 成功"
@@ -154,6 +156,8 @@ for TABLE in "${TABLES[@]}"; do
             --output="$OUTPUT_FILE" \
             --tables="$TABLE" \
             --source="$SOURCE_DB" \
+            --chunk-size=1000 \
+            --skip-row-count \
             --skip-space-check \
             --append \
             --no-interaction; then

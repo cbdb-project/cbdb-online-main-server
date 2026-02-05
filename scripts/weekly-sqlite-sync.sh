@@ -143,11 +143,20 @@ FILE_SIZE=$(ls -lh "${WORK_DIR}/latest.7z" | awk '{print $5}')
 echo "壓縮完成，檔案大小: $FILE_SIZE"
 
 # Step 4: 克隆倉庫並更新
+# 注意：使用 git clone 而非 gh repo clone，因為 snap 版的 gh 在沙箱中無法正常調用系統 git
 echo ""
 echo "[4/5] 克隆 $GITHUB_REPO 並更新..."
 cd "$TEMP_DIR"
-gh repo clone "$GITHUB_REPO" -- --depth=1
+git clone --depth=1 "https://github.com/${GITHUB_REPO}.git"
 cd cbdb_sqlite
+
+# 設置推送認證（使用 gh auth token）
+GH_TOKEN=$(gh auth token 2>/dev/null)
+if [ -n "$GH_TOKEN" ]; then
+    git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPO}.git"
+else
+    echo "警告: 無法取得 GitHub token，推送可能會失敗"
+fi
 
 # 確保 LFS 已初始化
 git lfs install

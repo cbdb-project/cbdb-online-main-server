@@ -12,7 +12,6 @@ namespace App\Repositories;
 use App\Models\AddrBelong;
 use App\Models\AddrCode;
 use App\Models\AddressCode;
-use App\Models\Dynasty;
 use Illuminate\Http\Request;
 
 /**
@@ -91,30 +90,27 @@ class AddrCodeRepository {
         // 根據朝代起止年過濾地址：地址的 c_firstyear~c_lastyear 必須與朝代起止年有交集
         // 若用戶輸入純數字（以 ID 搜尋），則不加朝代限制
         $isNumericSearch = ctype_digit((string) $request->q);
-        if ($request->dy && !$isNumericSearch) {
-            $dynasty = Dynasty::find($request->dy);
-            if ($dynasty && $dynasty->c_start !== null && $dynasty->c_end !== null) {
-                $dyStart = $dynasty->c_start;
-                $dyEnd = $dynasty->c_end;
-                $query->where(function ($q) use ($dyStart, $dyEnd) {
-                    $q->where(function ($inner) use ($dyStart, $dyEnd) {
-                        // 時間交集條件：addr.firstyear <= dy.end AND addr.lastyear >= dy.start
-                        $inner->where('c_firstyear', '<=', $dyEnd)
-                            ->where('c_lastyear', '>=', $dyStart);
-                    })
-                    // 年份為 NULL 或 0 的地址不過濾（無法判斷時期）
-                    ->orWhereNull('c_firstyear')
-                    ->orWhereNull('c_lastyear')
-                    ->orWhere('c_firstyear', 0)
-                    ->orWhere('c_lastyear', 0)
-                    // 「未詳」地址始終顯示
-                    ->orWhere('c_addr_id', 0);
-                });
-            }
+        $dyStart = is_numeric($request->dy_start) ? (int) $request->dy_start : null;
+        $dyEnd = is_numeric($request->dy_end) ? (int) $request->dy_end : null;
+        if ($dyStart !== null && $dyEnd !== null && !$isNumericSearch) {
+            $query->where(function ($q) use ($dyStart, $dyEnd) {
+                $q->where(function ($inner) use ($dyStart, $dyEnd) {
+                    // 時間交集條件：addr.firstyear <= dy.end AND addr.lastyear >= dy.start
+                    $inner->where('c_firstyear', '<=', $dyEnd)
+                        ->where('c_lastyear', '>=', $dyStart);
+                })
+                // 年份為 NULL 或 0 的地址不過濾（無法判斷時期）
+                ->orWhereNull('c_firstyear')
+                ->orWhereNull('c_lastyear')
+                ->orWhere('c_firstyear', 0)
+                ->orWhere('c_lastyear', 0)
+                // 「未詳」地址始終顯示
+                ->orWhere('c_addr_id', 0);
+            });
         }
 
         $data = $query->paginate(20);
-        $data->appends(['q' => $request->q, 'dy' => $request->dy])->links();
+        $data->appends(['q' => $request->q, 'dy_start' => $request->dy_start, 'dy_end' => $request->dy_end])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_addr_id;
             if ($item['id'] === 0) {

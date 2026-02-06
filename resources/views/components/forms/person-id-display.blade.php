@@ -33,6 +33,8 @@
         <input type="hidden" class="person_id" value="{{ $personId }}">
         <input type="hidden" class="dynasty_name" value="{{ $dynastyName }}">
         <input type="hidden" class="dynasty_code" value="{{ $dynastyCode }}">
+        <input type="hidden" class="dynasty_start" value="{{ $dynastyStart }}">
+        <input type="hidden" class="dynasty_end" value="{{ $dynastyEnd }}">
         <div class="card bg-light">
             <div class="card-body p-3">
                 <div class="row">

@@ -164,7 +164,8 @@
                     return {
                         q: params.term,
                         page: params.page || 1,
-                        dy: $('.dynasty_code').val() || '',
+                        dy_start: $('.dynasty_start').val() || '',
+                        dy_end: $('.dynasty_end').val() || '',
                     };
                 }
             }

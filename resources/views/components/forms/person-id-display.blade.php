@@ -8,13 +8,18 @@
     $person = null;
     $dynastyName = '';
     $dynastyCode = '';
+    $dynastyStart = null;
+    $dynastyEnd = null;
 
     if ($personId) {
         try {
             $person = \App\Models\BiogMain::with('simpleDynasty')->find($personId);
             if ($person && $person->simpleDynasty) {
-                $dynastyName = $person->simpleDynasty->c_dynasty_chn ?? $person->simpleDynasty->c_dynasty ?? '';
-                $dynastyCode = $person->simpleDynasty->c_dy ?? '';
+                $dynasty = $person->simpleDynasty;
+                $dynastyName = $dynasty->c_dynasty_chn ?? $dynasty->c_dynasty ?? '';
+                $dynastyCode = $dynasty->c_dy ?? '';
+                $dynastyStart = $dynasty->c_start;
+                $dynastyEnd = $dynasty->c_end;
             }
         } catch (\Exception $e) {
             // 在測試環境或資料庫連線失敗時，優雅降級
@@ -42,7 +47,7 @@
                         </div>
                         <div class="col-md-4">
                             <strong>朝代：</strong>
-                            <span>{{ $dynastyName ?: '—' }}</span>
+                            <span>{{ $dynastyName ?: '—' }}@if($dynastyStart !== null || $dynastyEnd !== null)（{{ $dynastyStart }}–{{ $dynastyEnd }}）@endif</span>
                         </div>
                     @endif
                 </div>

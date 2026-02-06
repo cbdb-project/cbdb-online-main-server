@@ -159,7 +159,17 @@
         textperson_pair_first_load();
 
         // 使用统一的 AJAX Select2 初始化助手函数
-        window.initAjaxSelect($(".c_addr_id"), 'addr');
+        window.initAjaxSelect($(".c_addr_id"), 'addr', {
+            ajax: {
+                data: function (params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1,
+                        dy: $('.dynasty_code').val() || '',
+                    };
+                }
+            }
+        });
         window.initAjaxSelect($(".c_source"), 'text');
 
         if (window.initLunarValidation) {

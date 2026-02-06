@@ -345,7 +345,17 @@
         window.initAjaxSelect($(".c_kin_code"), 'kincode');
         window.initAjaxSelect($(".c_assoc_kin_code"), 'kincode');
         window.initAjaxSelect($(".c_assoc_code"), 'assoccode');
-        window.initAjaxSelect($(".c_addr_id"), 'addr');
+        window.initAjaxSelect($(".c_addr_id"), 'addr', {
+            ajax: {
+                data: function (params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1,
+                        dy: $('.dynasty_code').val() || '',
+                    };
+                }
+            }
+        });
         window.initAjaxSelect($(".c_inst_code"), 'socialinstcode');
         window.initAjaxSelect($(".c_source"), 'text');
 

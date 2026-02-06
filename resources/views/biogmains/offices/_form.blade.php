@@ -302,7 +302,17 @@
         window.initAjaxSelect($(".c_office_id"), 'office');
         window.initAjaxSelect($(".c_source"), 'text');
         window.initAjaxSelect($(".c_inst_code"), 'socialinstcode');
-        window.initAjaxSelect($(".c_addr"), 'addr');
+        window.initAjaxSelect($(".c_addr"), 'addr', {
+            ajax: {
+                data: function (params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1,
+                        dy: $('.dynasty_code').val() || '',
+                    };
+                }
+            }
+        });
 
         if (window.initLunarValidation) {
             window.initLunarValidation();

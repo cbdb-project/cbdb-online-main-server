@@ -146,7 +146,17 @@
 
         // 使用统一的 AJAX Select2 初始化助手函数
         window.initAjaxSelect($(".c_source"), 'text');
-        window.initAjaxSelect($(".c_addr_id"), 'addr');
+        window.initAjaxSelect($(".c_addr_id"), 'addr', {
+            ajax: {
+                data: function (params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1,
+                        dy: $('.dynasty_code').val() || '',
+                    };
+                }
+            }
+        });
 
         function textperson_pair_first_load(){
             let person_id = $('.person_id').val();

@@ -20,6 +20,8 @@ class NianHaoRepository {
                 'c_nianhao_id' => $item->c_nianhao_id,
                 'c_nianhao_chn' => $item->c_nianhao_chn,
                 'c_str' => "[".$item->c_firstyear."]~[".$item->c_lastyear."]",
+                'c_firstyear' => $item->c_firstyear,
+                'c_lastyear' => $item->c_lastyear,
             ];
         });
     }

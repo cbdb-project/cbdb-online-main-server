@@ -2,7 +2,7 @@
     <select class="form-control select2" :id="elementId" v-bind:name="name" v-model="selectedid" :disabled="disabled">
         <!--<option disabled value="">请选择</option>-->
         <option value="">请选择</option>
-        <option v-for="item in data" v-bind:value="id(item)">{{ normalization(item) }}</option>
+        <option v-for="(item, index) in displayData" :key="id(item) ?? index" v-bind:value="id(item)">{{ normalization(item) }}</option>
     </select>
 </template>
 
@@ -12,18 +12,76 @@
     // 正在进行的请求 - 避免并发重复请求
     const pendingRequests = {};
 
+    // 不參與顯示的欄位（僅供過濾用）
+    const hiddenFields = {
+        nianhao: ['c_firstyear', 'c_lastyear'],
+    };
+
     export default {
         props: ['name', 'model', 'selected', 'elementId', 'idKey', 'disabled'],
         data() {
           return {
               data: {},
               selectedid: this.selected,
+              dynastyStart: null,
+              dynastyEnd: null,
           }
+        },
+        computed: {
+            displayData() {
+                if (this.model !== 'nianhao' || !Array.isArray(this.data) || this.data.length === 0) {
+                    return this.data;
+                }
+                if (this.dynastyStart === null || this.dynastyEnd === null) {
+                    return this.data;
+                }
+
+                const dyStart = this.dynastyStart;
+                const dyEnd = this.dynastyEnd;
+
+                // 判斷年號是否與朝代時間有交集（未詳視同匹配，排在前面）
+                const isMatch = (item) => {
+                    const fy = item.c_firstyear;
+                    const ly = item.c_lastyear;
+                    if (!fy || !ly || fy === 0 || ly === 0) return true;
+                    return fy <= dyEnd && ly >= dyStart;
+                };
+
+                // 排序：匹配＋未詳在前，不匹配在後，各組內保持原始順序
+                const matching = [];
+                const rest = [];
+                this.data.forEach(item => {
+                    (isMatch(item) ? matching : rest).push(item);
+                });
+
+                // Fallback：若無任何有明確年份的匹配，不排序
+                if (!matching.some(item => item.c_firstyear && item.c_lastyear && item.c_firstyear !== 0 && item.c_lastyear !== 0)) {
+                    return this.data;
+                }
+
+                return [...matching, ...rest];
+            }
         },
         created() {
             this.getData();
         },
+        mounted() {
+            this.readDynastyYears();
+        },
         methods: {
+            readDynastyYears() {
+                if (this.model !== 'nianhao') return;
+                const startEl = document.querySelector('.dynasty_start');
+                const endEl = document.querySelector('.dynasty_end');
+                if (startEl && startEl.value && endEl && endEl.value) {
+                    const start = parseInt(startEl.value);
+                    const end = parseInt(endEl.value);
+                    if (!isNaN(start) && !isNaN(end)) {
+                        this.dynastyStart = start;
+                        this.dynastyEnd = end;
+                    }
+                }
+            },
             async getData() {
                 const model = this.model;
 
@@ -66,8 +124,10 @@
                 }
             },
             normalization(item) {
+                const hidden = hiddenFields[this.model] || [];
                 let str = '';
                 for (let key in item) {
+                    if (hidden.includes(key)) continue;
                     str += item[key]+' ';
                 }
                 return str.trim();

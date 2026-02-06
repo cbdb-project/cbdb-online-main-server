@@ -36,7 +36,7 @@ class BiogMain extends Model {
     }
 
     public function simpleDynasty() {
-        return $this->belongsTo('App\Models\Dynasty', 'c_dy', 'c_dy')->select(['c_dy','c_dynasty','c_dynasty_chn']);
+        return $this->belongsTo('App\Models\Dynasty', 'c_dy', 'c_dy')->select(['c_dy','c_dynasty','c_dynasty_chn','c_start','c_end']);
     }
 
     public function birthYearNH() {

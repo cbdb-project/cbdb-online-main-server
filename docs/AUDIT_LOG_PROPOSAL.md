@@ -68,7 +68,18 @@ This design choice is intentional to avoid full-database audit coupling.
   - If `operations` exists for the change, reuse its ID.
   - If not (scripts, migrations, fixes), generate a new `operation_id`.
   - Treat `operation_id` as a request/command-level UUID, not a foreign key.
+- `operation_id` SHOULD be globally unique and sortable when possible (e.g. ULID), but no specific format is enforced at the schema level.
+- **Timestamp semantics**:
+  - `occurred_at` represents when the business-level data change actually happened.
+  - `created_at` represents when the audit record was persisted.
+  - In normal request flows, these two timestamps are expected to be identical.
+  - Divergence is allowed only for controlled backfill or delayed-write scenarios.
+- **Operation semantics**:
+  - `operation` reflects data-layer facts only (`INSERT`, `UPDATE`, `DELETE`).
+  - Application-level intent semantics (e.g. PUT vs PATCH) MUST NOT be encoded here.
 - **Append-only rule**: `audit_log` is append-only. Any `UPDATE` or `DELETE` on `audit_log` is a bug and should be treated as such.
+
+The audit log intentionally does not enforce referential integrity against business tables or the `operations` table.
 
 ## Proposed Schema (Compatible with MySQL/MariaDB and SQLite)
 
@@ -114,6 +125,9 @@ Recommendation:
 Example:
 - `row_pk = {"c_personid":123, "c_sequence":1}`
 - `row_pk_text = "c_personid=123&c_sequence=1"`
+Escaping example:
+- `row_pk = {"code":"A&B=1"}`
+- `row_pk_text = "code=A%26B%3D1"`
 
 ## Write Location (Implementation Guideline)
 Audit logs should be written at the Repository/Service layer within the same database transaction as the data change. This avoids divergence between row data and audit log entries.

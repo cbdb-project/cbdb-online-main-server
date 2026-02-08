@@ -202,14 +202,14 @@ class OperationsController extends Controller {
         //20190531這邊要取得table名稱, 規劃建置switch case來處理各種儲存
         $id = $request['id'];
         DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1]);
-        $data = DB::table('operations')->where('id', $id)->get();
-        $data = json_decode($data, true);
-        $data = $data[0]['resource_data'];
-        $data = json_decode($data, true);
+        $operationRow = DB::table('operations')->where('id', $id)->first();
+        $resourceData = $operationRow ? $operationRow->resource_data : null;
+        $data = $resourceData ? json_decode($resourceData, true) : [];
         $new_id = BiogMain::max('c_personid') + 1;
         $data['c_personid'] = $new_id;
+        $actorId = $operationRow ? (string) $operationRow->user_id : '';
         $message = null;
-        DB::transaction(function () use (&$message, $data) {
+        DB::transaction(function () use (&$message, $data, $actorId) {
             $message = BiogMain::create($data);
 
             (new \App\Services\AuditLogService())->write(
@@ -219,7 +219,7 @@ class OperationsController extends Controller {
                 null,
                 $message->toArray(),
                 'api',
-                (string) $data['c_personid']
+                $actorId
             );
         });
         $message = $message ? '200' : '500';

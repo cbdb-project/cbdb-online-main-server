@@ -344,8 +344,8 @@ sudo chown caddy laravel.log
 ### 前置安裝（Ubuntu）
 
 ```bash
-# 安裝 7z 壓縮工具
-sudo apt-get install p7zip-full
+# 安裝 zip 壓縮工具
+sudo apt-get install zip
 
 # 安裝 Git LFS（目標倉庫使用 LFS 存儲大檔案）
 sudo apt-get install git-lfs
@@ -401,10 +401,11 @@ bash scripts/export-daily-sqlite.sh
 
 `weekly-sqlite-sync.sh` 執行以下步驟：
 
-1. **前置檢查**：確認 `7z`、`gh`、`git-lfs` 已安裝且 `gh` 已登入
-2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_daily_YYYYMMDD.sqlite3`
-3. **壓縮檔案**：複製為 `latest.db` 並壓縮為 `latest.7z`（最大壓縮率）
-4. **推送到 GitHub**：克隆目標倉庫、替換檔案、提交並推送
-5. **清理**：刪除所有臨時檔案（包括原始 SQLite 匯出檔）
+1. **前置檢查**：確認 `zip`、`gh`、`git-lfs` 已安裝且 `gh` 已登入
+2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_daily_YYYYMMDD.sqlite3` 與 `cbdb_daily_YYYYMMDD.json`
+3. **壓縮檔案**：複製為 `latest.db` 並壓縮為 `latest.zip`（最大壓縮率）
+4. **整理 metadata**：將 `cbdb_daily_YYYYMMDD.json` 存為 `metadata/YYYY-MM/YYYY-MM-DD.json`，並以 `latest.json` 符號連結指向最新檔案
+5. **推送到 GitHub**：克隆目標倉庫、替換檔案、提交並推送
+6. **清理**：刪除所有臨時檔案（包括原始 SQLite 匯出檔與 metadata）
 
 **智能跳過**：如果壓縮檔內容與遠端相同，腳本會跳過推送，避免產生無意義的 commit。

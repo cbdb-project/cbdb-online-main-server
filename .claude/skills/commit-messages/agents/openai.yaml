@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Messages"
+  short_description: "Write consistent commit messages"
+  default_prompt: "Write clear, traditional-Chinese commit messages for this project."

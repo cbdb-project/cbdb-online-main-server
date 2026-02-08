@@ -51,6 +51,22 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
    - cover basic insert/update/delete flows for at least one composite key table
 6. **(Optional) Capture semantic snapshots** for selected reference fields where historical human-readable meaning is required.
 
+## Progress Tracker
+- [x] Create migration for `audit_log` (`database/migrations/2026_02_08_000000_create_audit_log_table.php`)
+- [x] Add AuditLog service (create + tests)
+- [x] Integrate `BIOG_MAIN` repository writes
+- [ ] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
+- [ ] Integrate remaining `/basicinformation` tables
+- [ ] Ensure transactional writes for audit + data changes
+- [ ] Add SQLite migration coverage in tests
+
+## Planned Touchpoints
+- `app/Services/AuditLogService.php`
+- `app/Support/CompositePrimaryKey.php` (RFC 3986 encoding for `row_pk_text`)
+- `app/Repositories/*` for `/basicinformation` writes
+- `tests/Feature/*` or `tests/Unit/*` for audit log coverage
+- `docs/AUDIT_LOG_PROPOSAL.md` progress updates
+
 ## Audit Semantics Boundary
 The `audit_log` table records factual row-level changes of business tables at the time they occur (field values before/after).
 
@@ -131,6 +147,9 @@ Escaping example:
 
 ## Write Location (Implementation Guideline)
 Audit logs should be written at the Repository/Service layer within the same database transaction as the data change. This avoids divergence between row data and audit log entries.
+
+Note (current implementation):
+- `BIOG_MAIN` inserts are currently performed in `BasicInformationController` (including `saveas` and `Duplicate_Collateral_Info`) and in `Api\OperationsController@storeProcess`. Audit log writes have been added on these paths and are executed in the same transaction as the data write.
 
 ## Non-Goals (for this initial proposal)
 - No JSON indexes or additional search columns (to avoid premature redundancy).

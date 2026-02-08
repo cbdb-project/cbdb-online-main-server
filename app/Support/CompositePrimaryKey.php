@@ -22,6 +22,9 @@ class CompositePrimaryKey {
      * 參考：database/migrations/2025_01_01_* baseline migrations
      */
     public const SCHEMAS = [
+        'BIOG_MAIN' => [
+            'c_personid',
+        ],
         'ALTNAME_DATA' => [
             'c_personid',
             'c_sequence',

@@ -208,8 +208,21 @@ class OperationsController extends Controller {
         $data = json_decode($data, true);
         $new_id = BiogMain::max('c_personid') + 1;
         $data['c_personid'] = $new_id;
-        $message = BiogMain::create($data);
-        $message ? $message = '200' : $message = '500';
+        $message = null;
+        DB::transaction(function () use (&$message, $data) {
+            $message = BiogMain::create($data);
+
+            (new \App\Services\AuditLogService())->write(
+                'BIOG_MAIN',
+                'INSERT',
+                ['c_personid' => $data['c_personid']],
+                null,
+                $message->toArray(),
+                'api',
+                (string) $data['c_personid']
+            );
+        });
+        $message = $message ? '200' : '500';
 
         return $message;
     }

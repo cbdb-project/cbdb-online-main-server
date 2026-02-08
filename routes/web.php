@@ -258,6 +258,7 @@ Route::middleware('auth')->group(function () {
 
     // AI 填充日誌（管理員工具）
     Route::get('admin/ai-fill-logs', 'AiFillLogController@index')->name('admin.ai-fill-logs');
+    Route::get('admin/audit-logs', 'AdminAuditLogController@index')->name('admin.audit-logs');
 
     Route::post('admin/unidirectional-relationship-repair/assoc', 'UnidirectionalRelationshipRepairController@repairAssoc')->name('admin.unidirectional-relationship-repair.assoc');
 });

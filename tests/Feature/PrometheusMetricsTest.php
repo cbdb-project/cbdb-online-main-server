@@ -7,6 +7,14 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PrometheusMetricsTest extends TestCase {
+    protected function setUp(): void {
+        parent::setUp();
+
+        // Ensure defaults are consistent across local/CI environments.
+        Config::set('prometheus.metrics_endpoint.auth_enabled', false);
+        Config::set('prometheus.metrics_endpoint.allowed_ips', []);
+    }
+
     #[Test]
     public function metrics_endpoint_returns_prometheus_format(): void {
         // 启用 Prometheus metrics
@@ -367,8 +375,10 @@ class PrometheusMetricsTest extends TestCase {
 
         // 验证 gauge 正确归零（所有请求已完成）
         $lines = explode("\n", $content);
+        $foundGauge = false;
         foreach ($lines as $line) {
             if (str_starts_with($line, 'cbdb_http_requests_in_progress{method="GET"}')) {
+                $foundGauge = true;
                 // 提取数值
                 $parts = explode(' ', $line);
                 $value = (int) end($parts);
@@ -377,6 +387,8 @@ class PrometheusMetricsTest extends TestCase {
                 $this->assertLessThanOrEqual(1, $value, 'Gauge 應該正確歸零或保持為 1（當前 /metrics 請求）');
             }
         }
+
+        $this->assertTrue($foundGauge, '應該輸出 http_requests_in_progress gauge');
     }
 
     #[Test]

@@ -28,7 +28,7 @@
 * [檢視表總覽](./VIEWS.md)
 * [Wiki 导入任务管理](./WIKI_TASK_MANAGEMENT.md)
 * [姓名搜索索引管理](./NAME_SEARCH_COMMANDS.md)
-* [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到公開倉庫
+* [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到 HuggingFace
 
 ## 技術環境
 
@@ -334,12 +334,12 @@ sudo chown caddy laravel.log
 
 ## SQLite 每週同步
 
-本專案提供自動化腳本，將生產環境的數據庫匯出為 SQLite 格式，並同步到公開倉庫 [cbdb-project/cbdb_sqlite](https://github.com/cbdb-project/cbdb_sqlite) 供研究者下載使用。
+本專案提供自動化腳本，將生產環境的數據庫匯出為 SQLite 格式，並同步到 HuggingFace 公開數據集 [cbdb/cbdb-sqlite](https://huggingface.co/datasets/cbdb/cbdb-sqlite) 供研究者下載使用。
 
 ### 腳本位置
 
 - **匯出腳本**：`scripts/export-daily-sqlite.sh` - 將 MySQL/MariaDB 表格匯出為 SQLite
-- **同步腳本**：`scripts/weekly-sqlite-sync.sh` - 匯出、壓縮並推送到 GitHub
+- **同步腳本**：`scripts/weekly-sqlite-sync.sh` - 匯出、壓縮並上傳到 HuggingFace
 
 ### 前置安裝（Ubuntu）
 
@@ -347,35 +347,32 @@ sudo chown caddy laravel.log
 # 安裝 zip 壓縮工具
 sudo apt-get install zip
 
-# 安裝 Git LFS（目標倉庫使用 LFS 存儲大檔案）
-sudo apt-get install git-lfs
-git lfs install
-
-# 安裝 GitHub CLI
-# 參考：https://cli.github.com/manual/installation
+# 安裝 hf CLI
+sudo apt-get install -y pipx
+pipx install huggingface-hub
+pipx ensurepath
 ```
 
-### GitHub 認證設定
+### HuggingFace 認證設定
 
-腳本使用 `gh` CLI 進行 GitHub 操作，需要先完成認證：
+腳本支持兩種認證方式（二擇一）：
 
 ```bash
-# 方式一：互動式登入（適合本地測試）
-gh auth login
+# 方式一：hf auth login（推薦，token 安全存儲於 ~/.cache/huggingface/）
+hf auth login
 
-# 方式二：使用 Personal Access Token（推薦用於服務器）
-echo "ghp_xxxxxxxxxxxx" | gh auth login --with-token
+# 方式二：HF_TOKEN 環境變數
+export HF_TOKEN=hf_你的token
 
-# 驗證登入狀態
-gh auth status
+# 驗證認證狀態
+hf auth status
 ```
 
-**Personal Access Token 設定**：
-1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate new token
-3. 勾選 `repo` 權限（需要推送到倉庫）
-4. 設定有效期（可選 "No expiration" 用於自動化任務）
-5. 複製 token 並在服務器上執行認證
+**Access Token 設定**：
+1. 前往 https://huggingface.co/settings/tokens
+2. Create new token → 選擇 Fine-grained
+3. 勾選 Repositories → Write 權限
+4. 複製 token 並在服務器上執行認證
 
 ### Cron 定時任務
 
@@ -393,7 +390,7 @@ crontab -e
 # 執行完整同步流程
 bash scripts/weekly-sqlite-sync.sh
 
-# 僅匯出 SQLite（不推送）
+# 僅匯出 SQLite（不上傳）
 bash scripts/export-daily-sqlite.sh
 ```
 
@@ -401,11 +398,8 @@ bash scripts/export-daily-sqlite.sh
 
 `weekly-sqlite-sync.sh` 執行以下步驟：
 
-1. **前置檢查**：確認 `zip`、`gh`、`git-lfs` 已安裝且 `gh` 已登入
+1. **前置檢查**：確認 `zip`、`hf` 已安裝且 HuggingFace 認證有效
 2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_daily_YYYYMMDD.sqlite3` 與 `cbdb_daily_YYYYMMDD.json`
 3. **壓縮檔案**：複製為 `latest.db` 並壓縮為 `latest.zip`（最大壓縮率）
-4. **整理 metadata**：將 `cbdb_daily_YYYYMMDD.json` 存為 `metadata/YYYY-MM/YYYY-MM-DD.json`，並以 `latest.json` 符號連結指向最新檔案
-5. **推送到 GitHub**：克隆目標倉庫、替換檔案、提交並推送
-6. **清理**：刪除所有臨時檔案（包括原始 SQLite 匯出檔與 metadata）
-
-**智能跳過**：如果壓縮檔內容與遠端相同，腳本會跳過推送，避免產生無意義的 commit。
+4. **上傳到 HuggingFace**：將 `latest.zip`、`metadata/YYYY-MM/YYYY-MM-DD.json` 及 `latest.json`（metadata 副本）以單一 commit 上傳至數據集倉庫
+5. **清理**：刪除所有臨時檔案（包括原始 SQLite 匯出檔與 metadata）

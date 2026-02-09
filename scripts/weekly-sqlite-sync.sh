@@ -4,11 +4,11 @@
 #
 # 功能：
 #   1. 執行 export-daily-sqlite.sh 匯出資料庫
-#   2. 重新命名為 latest.db 並壓縮為 latest.7z
+#   2. 重新命名為 latest.db 並壓縮為 latest.zip
 #   3. 推送到 cbdb-project/cbdb_sqlite 倉庫
 #
 # 前置要求：
-#   - p7zip-full (7z 命令)
+#   - zip (zip 命令)
 #   - git-lfs
 #   - gh CLI 已登入
 #
@@ -41,8 +41,8 @@ fi
 check_requirements() {
     local missing=()
 
-    if ! command -v 7z &> /dev/null; then
-        missing+=("7z (請安裝 p7zip-full: sudo apt-get install p7zip-full)")
+    if ! command -v zip &> /dev/null; then
+        missing+=("zip (請安裝: sudo apt-get install zip)")
     fi
 
     if ! command -v gh &> /dev/null; then
@@ -94,11 +94,15 @@ cleanup() {
     echo "清理暫存檔案..."
     rm -rf "$TEMP_DIR"
     rm -f "${WORK_DIR}/latest.db"
-    rm -f "${WORK_DIR}/latest.7z"
+    rm -f "${WORK_DIR}/latest.zip"
     # 刪除當天產生的原始 sqlite 匯出檔
     if [ -n "$SQLITE_FILE" ] && [ -f "$SQLITE_FILE" ]; then
         echo "刪除原始匯出檔: $SQLITE_FILE"
         rm -f "$SQLITE_FILE"
+    fi
+    if [ -n "$META_FILE" ] && [ -f "$META_FILE" ]; then
+        echo "刪除原始 metadata: $META_FILE"
+        rm -f "$META_FILE"
     fi
 }
 trap cleanup EXIT
@@ -133,13 +137,13 @@ echo ""
 echo "[2/5] 複製並重新命名為 latest.db..."
 cp "$SQLITE_FILE" "${WORK_DIR}/latest.db"
 
-# Step 3: 壓縮為 7z
+# Step 3: 壓縮為 zip
 echo ""
-echo "[3/5] 壓縮為 latest.7z..."
-rm -f "${WORK_DIR}/latest.7z"
-7z a -mx=9 "${WORK_DIR}/latest.7z" "${WORK_DIR}/latest.db"
+echo "[3/5] 壓縮為 latest.zip..."
+rm -f "${WORK_DIR}/latest.zip"
+zip -9 "${WORK_DIR}/latest.zip" "${WORK_DIR}/latest.db" > /dev/null
 
-FILE_SIZE=$(ls -lh "${WORK_DIR}/latest.7z" | awk '{print $5}')
+FILE_SIZE=$(ls -lh "${WORK_DIR}/latest.zip" | awk '{print $5}')
 echo "壓縮完成，檔案大小: $FILE_SIZE"
 
 # Step 4: 克隆倉庫並更新
@@ -170,19 +174,31 @@ if [ -z "$(git config --get user.email)" ]; then
 fi
 
 # 複製新檔案
-cp "${WORK_DIR}/latest.7z" ./latest.7z
+META_FILE="${WORK_DIR}/cbdb_daily_${DATE_SUFFIX}.json"
+if [ ! -f "$META_FILE" ]; then
+    echo "錯誤: 找不到 metadata 檔案 $META_FILE"
+    exit 1
+fi
+
+META_DATE="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}-${DATE_SUFFIX:6:2}"
+META_MONTH="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}"
+cp "${WORK_DIR}/latest.zip" ./latest.zip
+mkdir -p "metadata/${META_MONTH}"
+META_PATH="metadata/${META_MONTH}/${META_DATE}.json"
+cp "$META_FILE" "${META_PATH}"
+ln -sfn "${META_PATH}" latest.json
 
 # Step 5: 提交並推送
 echo ""
 echo "[5/5] 提交並推送..."
-git add latest.7z
+git add latest.zip latest.json "${META_PATH}"
 
 # 檢查是否有變更需要提交
 if git diff --cached --quiet; then
     echo "檔案內容無變更，跳過推送"
     SYNC_STATUS="無變更"
 else
-    git commit -m "Update latest.7z ($(date '+%Y-%m-%d'))"
+    git commit -m "Update latest.zip ($(date '+%Y-%m-%d'))"
     git push origin master
     SYNC_STATUS="已推送"
 fi

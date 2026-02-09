@@ -2,6 +2,7 @@
 #
 # 將指定的數據庫表格逐個導出到 SQLite 文件
 # 輸出文件名：db-data/cbdb_daily_YYYYMMDD.sqlite3
+# 對應 metadata：db-data/cbdb_daily_YYYYMMDD.json
 #
 # 使用方式：
 #   ./scripts/export-daily-sqlite.sh
@@ -23,6 +24,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-db-data}"
 SOURCE_DB="${SOURCE_DB:-mysql}"
 DATE_SUFFIX=$(date +%Y%m%d)
 OUTPUT_FILE="${OUTPUT_DIR}/cbdb_daily_${DATE_SUFFIX}.sqlite3"
+OUTPUT_META_FILE="${OUTPUT_DIR}/cbdb_daily_${DATE_SUFFIX}.json"
 
 # 要導出的表格列表
 TABLES=(
@@ -113,6 +115,10 @@ if [ -f "$OUTPUT_FILE" ]; then
     echo "移除現有文件: $OUTPUT_FILE"
     rm -f "$OUTPUT_FILE"
 fi
+if [ -f "$OUTPUT_META_FILE" ]; then
+    echo "移除現有 metadata: $OUTPUT_META_FILE"
+    rm -f "$OUTPUT_META_FILE"
+fi
 
 echo "================================================"
 echo "CBDB 每日 SQLite 導出"
@@ -196,6 +202,28 @@ echo "================================================"
 # 如果有失敗，返回非零退出碼
 if [ $FAILED -gt 0 ]; then
     exit 1
+fi
+
+# 產生 metadata
+if [ -f "$OUTPUT_FILE" ]; then
+    if command -v sha256sum &> /dev/null; then
+        SHA256_SUM=$(sha256sum "$OUTPUT_FILE" | awk '{print $1}')
+    elif command -v shasum &> /dev/null; then
+        SHA256_SUM=$(shasum -a 256 "$OUTPUT_FILE" | awk '{print $1}')
+    else
+        echo "錯誤: 找不到 sha256sum 或 shasum，無法產生 metadata"
+        exit 1
+    fi
+
+    GENERATED_AT_UTC=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    cat > "$OUTPUT_META_FILE" <<EOF
+{
+  "sha256": "${SHA256_SUM}",
+  "generated_at_utc": "${GENERATED_AT_UTC}",
+  "format": "sqlite3"
+}
+EOF
+    echo "metadata: $OUTPUT_META_FILE"
 fi
 
 exit 0

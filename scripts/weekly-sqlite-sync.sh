@@ -10,13 +10,15 @@
 # 前置要求：
 #   - zip (zip 命令)
 #   - hf CLI (pipx install huggingface-hub)
-#   - HF_TOKEN 環境變數已設定（HuggingFace Access Token）
+#   - HuggingFace 認證（二擇一）：
+#     1. hf auth login（推薦，token 存於 ~/.cache/huggingface/）
+#     2. HF_TOKEN 環境變數
 #
 # 使用方式：
-#   HF_TOKEN=hf_xxx ./scripts/weekly-sqlite-sync.sh
+#   ./scripts/weekly-sqlite-sync.sh
 #
 # Cron 設定範例（每週日凌晨 3 點）：
-#   0 3 * * 0 HF_TOKEN=hf_xxx /path/to/scripts/weekly-sqlite-sync.sh >> /var/log/cbdb-sqlite-sync.log 2>&1
+#   0 3 * * 0 /path/to/scripts/weekly-sqlite-sync.sh >> /var/log/cbdb-sqlite-sync.log 2>&1
 #
 
 set -e
@@ -51,11 +53,12 @@ check_requirements() {
         exit 1
     fi
 
-    # 檢查 HF_TOKEN 是否已設定
-    if [ -z "$HF_TOKEN" ]; then
-        echo "錯誤: HF_TOKEN 環境變數未設定"
-        echo "請先設定 HuggingFace Access Token："
-        echo "  export HF_TOKEN=hf_你的token"
+    # 檢查 HuggingFace 認證（支持 hf auth login 或 HF_TOKEN 環境變數）
+    if [ -z "$HF_TOKEN" ] && ! hf auth status &> /dev/null; then
+        echo "錯誤: 未找到 HuggingFace 認證"
+        echo "請使用以下任一方式設定："
+        echo "  1. hf auth login（推薦，token 安全存儲於 ~/.cache/huggingface/）"
+        echo "  2. export HF_TOKEN=hf_你的token"
         echo ""
         echo "Token 可在此建立: https://huggingface.co/settings/tokens"
         echo "需要的權限: Repositories → Write"
@@ -68,7 +71,11 @@ show_environment() {
     echo "環境資訊:"
     echo "  - USER: $(whoami)"
     echo "  - HOME: $HOME"
-    echo "  - HF_TOKEN: (已設定)"
+    if [ -n "$HF_TOKEN" ]; then
+        echo "  - HF 認證: HF_TOKEN 環境變數"
+    else
+        echo "  - HF 認證: hf auth login"
+    fi
     echo ""
 }
 
@@ -79,13 +86,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORK_DIR="${PROJECT_ROOT}/db-data"
 HF_DATASET_REPO="cbdb/cbdb-sqlite"
+HF_STAGE_DIR=$(mktemp -d)
 
 # 清理函數
 cleanup() {
     echo "清理暫存檔案..."
+    if [ -n "$HF_STAGE_DIR" ] && [ -d "$HF_STAGE_DIR" ]; then
+        rm -rf "$HF_STAGE_DIR"
+    fi
     rm -f "${WORK_DIR}/latest.db"
     rm -f "${WORK_DIR}/latest.zip"
-    rm -f "${WORK_DIR}/latest.json"
     # 刪除當天產生的原始 sqlite 匯出檔
     if [ -n "$SQLITE_FILE" ] && [ -f "$SQLITE_FILE" ]; then
         echo "刪除原始匯出檔: $SQLITE_FILE"
@@ -147,25 +157,21 @@ META_DATE="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}-${DATE_SUFFIX:6:2}"
 META_MONTH="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}"
 META_PATH="metadata/${META_MONTH}/${META_DATE}.json"
 
-# hf CLI 會自動讀取 HF_TOKEN 環境變數，不需要 --token 參數
-# 避免 token 出現在 process list 中
-
-# 準備上傳檔案清單（latest.zip 必須，metadata 可選）
-UPLOAD_ARGS=("${WORK_DIR}/latest.zip" "latest.zip")
+# 準備暫存目錄，模擬 repo 內的檔案結構
+cp "${WORK_DIR}/latest.zip" "${HF_STAGE_DIR}/latest.zip"
 
 if [ -f "$META_FILE" ]; then
-    # 複製一份作為 latest.json（HuggingFace 不支援 symlink）
-    cp "$META_FILE" "${WORK_DIR}/latest.json"
-    UPLOAD_ARGS+=("$META_FILE" "$META_PATH")
-    UPLOAD_ARGS+=("${WORK_DIR}/latest.json" "latest.json")
+    mkdir -p "${HF_STAGE_DIR}/metadata/${META_MONTH}"
+    cp "$META_FILE" "${HF_STAGE_DIR}/${META_PATH}"
+    cp "$META_FILE" "${HF_STAGE_DIR}/latest.json"
     echo "上傳 latest.zip、${META_PATH}、latest.json..."
 else
     echo "警告: 找不到 metadata 檔案 $META_FILE，僅上傳 latest.zip"
 fi
 
-# 單次上傳所有檔案（同一個 commit）
+# 上傳整個目錄（所有檔案在同一個 commit）
 hf upload "$HF_DATASET_REPO" \
-    "${UPLOAD_ARGS[@]}" \
+    "$HF_STAGE_DIR" . \
     --repo-type dataset \
     --commit-message "Update CBDB SQLite (${META_DATE})"
 
@@ -180,71 +186,3 @@ echo "狀態: $SYNC_STATUS"
 echo "檔案大小: $FILE_SIZE"
 echo "時間: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "================================================"
-
-# ==============================================================================
-# [暫時停用] GitHub 同步
-# 未來可能用於同步其他內容，保留以下代碼供參考
-# ==============================================================================
-#
-# # --- GitHub 前置要求 ---
-# # - git-lfs
-# # - gh CLI 已登入
-#
-# # 僅在無法讀取系統級 git 配置時才跳過（避免影響 LFS 等系統配置）
-# # if [ -f /etc/gitconfig ] && [ ! -r /etc/gitconfig ]; then
-# #     export GIT_CONFIG_NOSYSTEM=1
-# #     echo "注意: /etc/gitconfig 無法讀取，已設置 GIT_CONFIG_NOSYSTEM=1"
-# # fi
-#
-# # --- GitHub 工具檢查 ---
-# # if ! command -v gh &> /dev/null; then
-# #     missing+=("gh (請安裝 GitHub CLI: https://cli.github.com/)")
-# # fi
-# # if ! command -v git-lfs &> /dev/null; then
-# #     missing+=("git-lfs (請安裝: sudo apt-get install git-lfs)")
-# # fi
-# # if ! gh auth status &> /dev/null; then
-# #     echo "錯誤: gh CLI 尚未登入，請先執行 'gh auth login'"
-# #     echo "提示: 若在 cron 環境執行，請確保 GH_TOKEN 環境變量已設置"
-# #     exit 1
-# # fi
-#
-# # --- GitHub 同步邏輯 ---
-# # GITHUB_REPO="cbdb-project/cbdb_sqlite"
-# # TEMP_DIR=$(mktemp -d)
-# #
-# # cd "$TEMP_DIR"
-# # git clone --depth=1 "https://github.com/${GITHUB_REPO}.git"
-# # cd cbdb_sqlite
-# #
-# # GH_TOKEN=$(gh auth token 2>/dev/null)
-# # if [ -n "$GH_TOKEN" ]; then
-# #     git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPO}.git"
-# # else
-# #     echo "警告: 無法取得 GitHub token，推送可能會失敗"
-# # fi
-# #
-# # git lfs install
-# #
-# # if [ -z "$(git config --get user.name)" ]; then
-# #     git config user.name "sudoghut"
-# # fi
-# # if [ -z "$(git config --get user.email)" ]; then
-# #     git config user.email "sudospace@gmail.com"
-# # fi
-# #
-# # cp "${WORK_DIR}/latest.zip" ./latest.zip
-# # mkdir -p "metadata/${META_MONTH}"
-# # cp "$META_FILE" "${META_PATH}"
-# # ln -sfn "${META_PATH}" latest.json
-# #
-# # git add latest.zip latest.json "${META_PATH}"
-# #
-# # if git diff --cached --quiet; then
-# #     echo "檔案內容無變更，跳過推送"
-# # else
-# #     git commit -m "Update latest.zip ($(date '+%Y-%m-%d'))"
-# #     git push origin master
-# # fi
-# #
-# # rm -rf "$TEMP_DIR"

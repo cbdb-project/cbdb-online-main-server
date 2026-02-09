@@ -348,3 +348,20 @@ if (!function_exists('is_sqlite')) {
         return DB::getDriverName() === 'sqlite';
     }
 }
+
+if (!function_exists('column_comment')) {
+    /**
+     * Apply column comment only for MySQL/MariaDB (SQLite ignores comments).
+     *
+     * @param \Illuminate\Database\Schema\ColumnDefinition $column
+     * @param string $comment
+     * @return \Illuminate\Database\Schema\ColumnDefinition
+     */
+    function column_comment($column, string $comment) {
+        if (is_mysql()) {
+            $column->comment($comment);
+        }
+
+        return $column;
+    }
+}

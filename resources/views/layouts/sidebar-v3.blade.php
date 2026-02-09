@@ -336,6 +336,7 @@
                             '用戶管理',
                             'NL Query Logs',
                             'AI 填充日誌',
+                            '審計日誌',
                             'SQL 執行計畫',
                             '批次匯入書稿資料',
                             '批次匯入官職',
@@ -372,6 +373,12 @@
                                 <a href="{{ route('admin.ai-fill-logs') }}" class="nav-link {{ $activePage == 'AI 填充日誌' ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-robot"></i>
                                     <p>AI 填充日誌</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('admin.audit-logs') }}" class="nav-link {{ $activePage == '審計日誌' ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-clipboard-check"></i>
+                                    <p>審計日誌</p>
                                 </a>
                             </li>
                             <li class="nav-item">

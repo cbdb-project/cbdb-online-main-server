@@ -31,6 +31,7 @@ use App\Repositories\Concerns\DetectsModelChanges;
 //修改結束
 
 //20210625建安修改
+use App\Services\AuditLogService;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -250,8 +251,23 @@ class BiogMainRepository {
         if (Auth::user()->isCrowdsourcingUser()) {
             (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
         } else {
-            $biogbasicinformation->update($data);
-            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
+            DB::transaction(function () use ($data, $id, $biogbasicinformation, $ori) {
+                $biogbasicinformation->update($data);
+                $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
+
+                $newData = $biogbasicinformation->fresh()->toArray();
+
+                (new AuditLogService())->write(
+                    'BIOG_MAIN',
+                    'UPDATE',
+                    ['c_personid' => $biogbasicinformation->c_personid],
+                    $ori,
+                    $newData,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            });
         }
         //20190531修改結束
 

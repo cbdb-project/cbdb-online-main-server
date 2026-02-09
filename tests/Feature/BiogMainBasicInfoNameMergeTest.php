@@ -48,6 +48,23 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
             $table->timestamps();
         });
 
+        // 創建 audit_log 表（供審計記錄寫入）
+        Schema::dropIfExists('audit_log');
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+
         Schema::dropIfExists('BIOG_MAIN');
         Schema::create('BIOG_MAIN', function (Blueprint $table) {
             $table->integer('c_personid')->primary();
@@ -91,6 +108,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
     protected function tearDown(): void {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('users');
         parent::tearDown();
     }

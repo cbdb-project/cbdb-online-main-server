@@ -12,6 +12,7 @@ use App\Repositories\NianHaoRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
+use App\Services\AuditLogService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -152,8 +153,22 @@ class BasicInformationController extends Controller {
             //20230628觸發「自動生成」功能
             $data = $this->biogMainRepository->auto_pinyin($data);
             //增加完成
-            $flight = BiogMain::create($data);
-            $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
+            $flight = null;
+            DB::transaction(function () use (&$flight, $data) {
+                $flight = BiogMain::create($data);
+                $operation = $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
+
+                (new AuditLogService())->write(
+                    'BIOG_MAIN',
+                    'INSERT',
+                    ['c_personid' => $data['c_personid']],
+                    null,
+                    $flight->toArray(),
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            });
 
             if (Schema::hasTable('CBDB__NAME_FTS')) {
                 $this->nameSearchIndexService->reindexPerson($flight);
@@ -339,8 +354,22 @@ class BasicInformationController extends Controller {
         $data['c_personid'] = $new_id;
         $data = $this->toolRepository->timestamp($data, true); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
-        $flight = BiogMain::create($data);
-        $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+        $flight = null;
+        DB::transaction(function () use (&$flight, $data, $new_id) {
+            $flight = BiogMain::create($data);
+            $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+
+            (new AuditLogService())->write(
+                'BIOG_MAIN',
+                'INSERT',
+                ['c_personid' => $new_id],
+                null,
+                $flight->toArray(),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         if (Schema::hasTable('CBDB__NAME_FTS')) {
             $this->nameSearchIndexService->reindexPerson($flight);
@@ -367,8 +396,22 @@ class BasicInformationController extends Controller {
         $data['c_personid'] = $new_id;
         $data = $this->toolRepository->timestamp($data, true); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
-        $flight = BiogMain::create($data);
-        $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+        $flight = null;
+        DB::transaction(function () use (&$flight, $data, $new_id) {
+            $flight = BiogMain::create($data);
+            $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
+
+            (new AuditLogService())->write(
+                'BIOG_MAIN',
+                'INSERT',
+                ['c_personid' => $new_id],
+                null,
+                $flight->toArray(),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         if (Schema::hasTable('CBDB__NAME_FTS')) {
             $this->nameSearchIndexService->reindexPerson($flight);

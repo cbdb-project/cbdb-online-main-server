@@ -1051,20 +1051,34 @@ class BiogMainRepository {
             $auditLog = new AuditLogService();
             $addr_l = explode('-', $id);
             $row = DB::table('POSTED_TO_OFFICE_DATA')
-                ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
+                ->where([
+                    ['c_office_id', '=', $addr_l[0]],
+                    ['c_posting_id', '=', $addr_l[1]],
+                    ['c_personid', '=', $c_personid],
+                ])
                 ->first();
+
+            if (!$row) {
+                return;
+            }
 
             $addrRows = DB::table('POSTED_TO_ADDR_DATA')
                 ->where('c_office_id', $addr_l[0])
                 ->where('c_posting_id', $addr_l[1])
+                ->where('c_personid', $c_personid)
                 ->get();
 
             DB::table('POSTED_TO_OFFICE_DATA')
-                ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
+                ->where([
+                    ['c_office_id', '=', $addr_l[0]],
+                    ['c_posting_id', '=', $addr_l[1]],
+                    ['c_personid', '=', $c_personid],
+                ])
                 ->delete();
             DB::table('POSTED_TO_ADDR_DATA')
                 ->where('c_office_id', $addr_l[0])
                 ->where('c_posting_id', $row->c_posting_id)
+                ->where('c_personid', $c_personid)
                 ->delete();
             DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
 

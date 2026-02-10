@@ -56,6 +56,7 @@ class BasicInformationController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
+        $this->middleware('auth')->except(['index', 'show', 'edit']);
     }
 
     private function normalizePersonId($id): int {

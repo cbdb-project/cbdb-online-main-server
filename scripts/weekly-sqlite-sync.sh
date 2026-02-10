@@ -54,9 +54,25 @@ check_requirements() {
     fi
 
     # 檢查 HuggingFace 認證（支持 hf auth login 或 HF_TOKEN 環境變數）
-    # 使用 hf auth whoami 驗證認證有效性（會檢查 HF_TOKEN 或 ~/.cache/huggingface/token）
-    if ! hf auth whoami &> /dev/null; then
-        echo "錯誤: HuggingFace 認證失敗或 token 無效"
+    # 嘗試驗證認證有效性（支持不同版本的 hf CLI）
+    local auth_ok=false
+
+    # 方法 1: hf auth whoami（新版本標準命令）
+    if hf auth whoami &> /dev/null; then
+        auth_ok=true
+    # 方法 2: hf whoami（部分版本使用此命令）
+    elif hf whoami &> /dev/null; then
+        auth_ok=true
+    # 方法 3: 檢查 token 檔案或環境變數（fallback，無法驗證有效性）
+    elif [ -n "$HF_TOKEN" ] || [ -f "$HOME/.cache/huggingface/token" ]; then
+        echo "警告: 無法驗證 HuggingFace token 有效性（whoami 命令不可用）"
+        echo "將在 hf upload 時進行實際驗證"
+        echo ""
+        auth_ok=true
+    fi
+
+    if [ "$auth_ok" = false ]; then
+        echo "錯誤: 未找到 HuggingFace 認證"
         echo ""
         echo "請使用以下任一方式設定："
         echo "  1. hf auth login（推薦）"
@@ -64,11 +80,6 @@ check_requirements() {
         echo ""
         echo "Token 可在此建立: https://huggingface.co/settings/tokens"
         echo "需要的權限: Repositories → Write"
-        echo ""
-        echo "如果已設定 token，請確認："
-        echo "  - Token 未過期"
-        echo "  - Token 具有 'write' 權限"
-        echo "  - 網路連線正常"
         exit 1
     fi
 }

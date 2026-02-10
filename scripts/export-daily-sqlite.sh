@@ -23,8 +23,13 @@ cd "$PROJECT_ROOT"
 OUTPUT_DIR="${OUTPUT_DIR:-db-data}"
 SOURCE_DB="${SOURCE_DB:-mysql}"
 DATE_SUFFIX=$(date +%Y%m%d)
-OUTPUT_FILE="${OUTPUT_DIR}/cbdb_daily_${DATE_SUFFIX}.sqlite3"
-OUTPUT_META_FILE="${OUTPUT_DIR}/cbdb_daily_${DATE_SUFFIX}.json"
+OUTPUT_FILE="${OUTPUT_DIR}/cbdb_${DATE_SUFFIX}.sqlite3"
+OUTPUT_META_FILE="${OUTPUT_DIR}/cbdb_${DATE_SUFFIX}.json"
+HF_BASE_URL="https://huggingface.co/datasets/cbdb/cbdb-sqlite/blob/main"
+HF_MONTH="cbdb_${DATE_SUFFIX:0:6}"
+HF_DATE="cbdb_${DATE_SUFFIX}"
+HF_ZIP_NAME="cbdb_${DATE_SUFFIX}.zip"
+HF_PATH="history/${HF_MONTH}/${HF_ZIP_NAME}"
 
 # 要導出的表格列表
 TABLES=(
@@ -218,9 +223,12 @@ if [ -f "$OUTPUT_FILE" ]; then
     GENERATED_AT_UTC=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
     cat > "$OUTPUT_META_FILE" <<EOF
 {
+  "sqlite_filename": "cbdb_${DATE_SUFFIX}.sqlite3",
   "sha256": "${SHA256_SUM}",
   "generated_at_utc": "${GENERATED_AT_UTC}",
-  "format": "sqlite3"
+  "format": "sqlite3",
+  "huggingface_path": "${HF_PATH}",
+  "huggingface_url": "${HF_BASE_URL}/${HF_PATH}"
 }
 EOF
     echo "metadata: $OUTPUT_META_FILE"

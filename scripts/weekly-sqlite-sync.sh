@@ -85,6 +85,7 @@ check_requirements
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORK_DIR="${PROJECT_ROOT}/db-data"
+PUBLIC_DIR="${PROJECT_ROOT}/public"
 HF_DATASET_REPO="cbdb/cbdb-sqlite"
 HF_STAGE_DIR=$(mktemp -d)
 
@@ -100,6 +101,10 @@ cleanup() {
     if [ -n "$SQLITE_FILE" ] && [ -f "$SQLITE_FILE" ]; then
         echo "刪除原始匯出檔: $SQLITE_FILE"
         rm -f "$SQLITE_FILE"
+    fi
+    if [ -n "$ZIP_FILE" ] && [ -f "$ZIP_FILE" ]; then
+        echo "刪除原始 zip: $ZIP_FILE"
+        rm -f "$ZIP_FILE"
     fi
     if [ -n "$META_FILE" ] && [ -f "$META_FILE" ]; then
         echo "刪除原始 metadata: $META_FILE"
@@ -124,7 +129,12 @@ bash scripts/export-daily-sqlite.sh
 
 # 找到今天產生的檔案
 DATE_SUFFIX=$(date +%Y%m%d)
-SQLITE_FILE="${WORK_DIR}/cbdb_daily_${DATE_SUFFIX}.sqlite3"
+SQLITE_FILE="${WORK_DIR}/cbdb_${DATE_SUFFIX}.sqlite3"
+ZIP_FILE="${WORK_DIR}/cbdb_${DATE_SUFFIX}.zip"
+ZIP_NAME="cbdb_${DATE_SUFFIX}.zip"
+HF_MONTH="cbdb_${DATE_SUFFIX:0:6}"
+HF_DATE="cbdb_${DATE_SUFFIX}"
+HF_ZIP_PATH="history/${HF_MONTH}/${ZIP_NAME}"
 
 if [ ! -f "$SQLITE_FILE" ]; then
     echo "錯誤: 找不到匯出檔案 $SQLITE_FILE"
@@ -135,38 +145,43 @@ echo "匯出檔案: $SQLITE_FILE"
 
 # Step 2: 複製並重新命名
 echo ""
-echo "[2/4] 複製並重新命名為 latest.db..."
-cp "$SQLITE_FILE" "${WORK_DIR}/latest.db"
+echo "[2/4] 準備打包來源..."
 
-# Step 3: 壓縮為 zip
+# Step 3: 壓縮為 zip（含 metadata）
 echo ""
-echo "[3/4] 壓縮為 latest.zip..."
-rm -f "${WORK_DIR}/latest.zip"
-zip -9 "${WORK_DIR}/latest.zip" "${WORK_DIR}/latest.db" > /dev/null
+echo "[3/4] 壓縮為 ${ZIP_NAME}..."
+rm -f "$ZIP_FILE"
+META_FILE="${WORK_DIR}/cbdb_${DATE_SUFFIX}.json"
+if [ -f "$META_FILE" ]; then
+    zip -9 "$ZIP_FILE" "$SQLITE_FILE" "$META_FILE" > /dev/null
+else
+    zip -9 "$ZIP_FILE" "$SQLITE_FILE" > /dev/null
+fi
 
-FILE_SIZE=$(ls -lh "${WORK_DIR}/latest.zip" | awk '{print $5}')
+FILE_SIZE=$(ls -lh "$ZIP_FILE" | awk '{print $5}')
 echo "壓縮完成，檔案大小: $FILE_SIZE"
 
 # Step 4: 上傳到 HuggingFace
 echo ""
 echo "[4/4] 上傳到 HuggingFace ${HF_DATASET_REPO}..."
 
-# 上傳 latest.zip
-META_FILE="${WORK_DIR}/cbdb_daily_${DATE_SUFFIX}.json"
+# 上傳 zip 與 metadata
 META_DATE="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}-${DATE_SUFFIX:6:2}"
 META_MONTH="${DATE_SUFFIX:0:4}-${DATE_SUFFIX:4:2}"
 META_PATH="metadata/${META_MONTH}/${META_DATE}.json"
 
 # 準備暫存目錄，模擬 repo 內的檔案結構
-cp "${WORK_DIR}/latest.zip" "${HF_STAGE_DIR}/latest.zip"
+mkdir -p "${HF_STAGE_DIR}/history/${HF_MONTH}"
+cp "$ZIP_FILE" "${HF_STAGE_DIR}/${HF_ZIP_PATH}"
+cp "$ZIP_FILE" "${HF_STAGE_DIR}/latest.zip"
 
 if [ -f "$META_FILE" ]; then
     mkdir -p "${HF_STAGE_DIR}/metadata/${META_MONTH}"
     cp "$META_FILE" "${HF_STAGE_DIR}/${META_PATH}"
     cp "$META_FILE" "${HF_STAGE_DIR}/latest.json"
-    echo "上傳 latest.zip、${META_PATH}、latest.json..."
+    echo "上傳 ${HF_ZIP_PATH}、latest.zip、${META_PATH}、latest.json..."
 else
-    echo "警告: 找不到 metadata 檔案 $META_FILE，僅上傳 latest.zip"
+    echo "警告: 找不到 metadata 檔案 $META_FILE，僅上傳 ${HF_ZIP_PATH} 與 latest.zip"
 fi
 
 # 上傳整個目錄（所有檔案在同一個 commit）
@@ -176,6 +191,11 @@ hf upload "$HF_DATASET_REPO" \
     --commit-message "Update CBDB SQLite (${META_DATE})"
 
 SYNC_STATUS="已上傳"
+
+echo ""
+echo "將 latest.zip 複製到 public 目錄..."
+mkdir -p "$PUBLIC_DIR"
+cp "$ZIP_FILE" "${PUBLIC_DIR}/latest.zip"
 
 echo ""
 echo "================================================"

@@ -176,6 +176,11 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
 
         // 外文羅馬字轉寫姓名 = 外文羅馬字轉寫名 + ' ' + 外文羅馬字轉寫姓
         $this->assertSame('Bái Lǐ', $person->c_name_rm);
+
+        $this->assertLatestAuditLogForPerson(2345, [
+            'c_name_chn' => '李白',
+            'c_name' => 'Li Bai',
+        ]);
     }
 
     /**
@@ -305,6 +310,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
 
         // 記錄提交前的操作記錄數量
         $operationCountBefore = DB::table('operations')->count();
+        $auditLogCountBefore = DB::table('audit_log')->count();
 
         // 提交相同的值，應該檢測到無變更
         $response = $this->patch('/basicinformation/2348', [
@@ -332,6 +338,10 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         // 驗證沒有產生新的操作記錄（因為資料未變更）
         $operationCountAfter = DB::table('operations')->count();
         $this->assertSame($operationCountBefore, $operationCountAfter, '提交相同值時不應產生操作記錄');
+
+        // 驗證沒有產生新的 audit_log 記錄（因為資料未變更）
+        $auditLogCountAfter = DB::table('audit_log')->count();
+        $this->assertSame($auditLogCountBefore, $auditLogCountAfter, '提交相同值時不應產生審計記錄');
     }
 
     /**
@@ -385,6 +395,20 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
         // 外文：名+姓（與中文相反）
         $this->assertSame('Jane Doe', $person->c_name_proper);
         $this->assertSame('Sān Zhāng', $person->c_name_rm);
+    }
+
+    private function assertLatestAuditLogForPerson(int $personId, array $expectedNewData): void {
+        $row = DB::table('audit_log')->orderByDesc('id')->first();
+        $this->assertNotNull($row);
+        $this->assertSame('BIOG_MAIN', $row->table_name);
+        $this->assertSame('UPDATE', $row->operation);
+        $this->assertSame("c_personid={$personId}", $row->row_pk_text);
+        $this->assertSame(['c_personid' => $personId], json_decode($row->row_pk, true));
+
+        $newData = json_decode($row->new_data, true);
+        foreach ($expectedNewData as $key => $value) {
+            $this->assertSame($value, $newData[$key] ?? null);
+        }
     }
 
     /**

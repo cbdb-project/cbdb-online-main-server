@@ -9,6 +9,32 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AuditLogService {
+    public function write(
+        string $table,
+        string $operation,
+        array $rowPk,
+        ?array $oldData,
+        ?array $newData,
+        ?string $actorType = null,
+        ?string $actorId = null,
+        ?string $operationId = null,
+        ?Carbon $occurredAt = null,
+        ?Carbon $createdAt = null
+    ): void {
+        $this->logChange(
+            $table,
+            $operation,
+            $rowPk,
+            $oldData,
+            $newData,
+            $operationId,
+            $actorType,
+            $actorId,
+            $occurredAt,
+            $createdAt
+        );
+    }
+
     public function logChange(
         string $table,
         string $operation,
@@ -35,10 +61,10 @@ class AuditLogService {
             'actor_type' => $resolvedActorType,
             'actor_id' => $resolvedActorId,
             'operation_id' => $operationId,
-            'row_pk' => $rowPk,
+            'row_pk' => $this->encodeJson($rowPk),
             'row_pk_text' => $this->buildRowPkText($table, $rowPk),
-            'old_data' => $oldData,
-            'new_data' => $newData,
+            'old_data' => $this->encodeJson($oldData),
+            'new_data' => $this->encodeJson($newData),
         ]);
     }
 
@@ -84,5 +110,13 @@ class AuditLogService {
         }
 
         return json_decode(json_encode($row), true) ?: [];
+    }
+
+    private function encodeJson(?array $value): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

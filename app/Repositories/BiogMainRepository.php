@@ -1055,14 +1055,17 @@ class BiogMainRepository {
                 ->first();
 
             $addrRows = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $c_personid)
+                ->where('c_office_id', $addr_l[0])
                 ->where('c_posting_id', $addr_l[1])
                 ->get();
 
             DB::table('POSTED_TO_OFFICE_DATA')
                 ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
                 ->delete();
-            DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+            DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_office_id', $addr_l[0])
+                ->where('c_posting_id', $row->c_posting_id)
+                ->delete();
             DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
 
             $officeOperation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([

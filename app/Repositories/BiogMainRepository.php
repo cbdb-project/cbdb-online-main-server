@@ -643,6 +643,7 @@ class BiogMainRepository {
         }
 
         return DB::transaction(function () use ($data, $ori, $c_personid, $_officeid, $_postingid, $hasPostingChange, $hasAddressChange, $incomingAddr, $_id, $existingAddresses) {
+            $auditLog = new AuditLogService();
             $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
             $currentOfficeId = $previousOfficeId;
             if ($hasPostingChange) {
@@ -654,7 +655,7 @@ class BiogMainRepository {
 
                 $currentOfficeId = (int) ($timestamped['c_office_id'] ?? $currentOfficeId);
 
-                (new OperationRepository())->store(
+                $officeOperation = (new OperationRepository())->store(
                     Auth::id(),
                     $c_personid,
                     3,
@@ -665,6 +666,21 @@ class BiogMainRepository {
                     ]),
                     $timestamped,
                     $ori
+                );
+
+                $updatedOfficeRow = DB::table('POSTED_TO_OFFICE_DATA')
+                    ->where([['c_office_id' , '=', $currentOfficeId], ['c_posting_id' , '=', $_postingid]])
+                    ->first();
+                $updatedOfficeData = $auditLog->normalizeRow($updatedOfficeRow);
+                $officeRowPk = $auditLog->buildRowPkFromData('POSTED_TO_OFFICE_DATA', $updatedOfficeData);
+
+                $auditLog->logChange(
+                    'POSTED_TO_OFFICE_DATA',
+                    'UPDATE',
+                    $officeRowPk,
+                    $ori,
+                    $updatedOfficeData,
+                    $officeOperation ? (string) $officeOperation->id : null
                 );
             }
 
@@ -682,7 +698,13 @@ class BiogMainRepository {
                     ['c_posting_id', '=', $_postingid],
                 ])->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
 
+            $addrBeforeAuditRows = [];
             if ($shouldUpdateAddress) {
+                $addrBeforeAuditRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->get();
+
                 $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $_id)
                     ->where('c_posting_id', $_postingid)
@@ -825,7 +847,7 @@ class BiogMainRepository {
                     'c_posting_id' => $_postingid,
                 ]);
 
-                (new OperationRepository())->store(
+                $addrOperation = (new OperationRepository())->store(
                     Auth::id(),
                     $c_personid,
                     3,
@@ -834,6 +856,69 @@ class BiogMainRepository {
                     ['rows' => $afterRows],
                     ['rows' => $beforeRows]
                 );
+
+                $addrAfterAuditRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->get();
+
+                $beforeMap = [];
+                foreach ($addrBeforeAuditRows as $row) {
+                    $rowData = $auditLog->normalizeRow($row);
+                    $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
+                    $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
+                    $beforeMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
+                }
+
+                $afterMap = [];
+                foreach ($addrAfterAuditRows as $row) {
+                    $rowData = $auditLog->normalizeRow($row);
+                    $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
+                    $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
+                    $afterMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
+                }
+
+                $addrOperationId = $addrOperation ? (string) $addrOperation->id : null;
+                $allKeys = array_unique(array_merge(array_keys($beforeMap), array_keys($afterMap)));
+                foreach ($allKeys as $key) {
+                    $beforeEntry = $beforeMap[$key] ?? null;
+                    $afterEntry = $afterMap[$key] ?? null;
+
+                    if ($beforeEntry && !$afterEntry) {
+                        $auditLog->logChange(
+                            'POSTED_TO_ADDR_DATA',
+                            'DELETE',
+                            $beforeEntry['pk'],
+                            $beforeEntry['row'],
+                            null,
+                            $addrOperationId
+                        );
+                        continue;
+                    }
+
+                    if (!$beforeEntry && $afterEntry) {
+                        $auditLog->logChange(
+                            'POSTED_TO_ADDR_DATA',
+                            'INSERT',
+                            $afterEntry['pk'],
+                            null,
+                            $afterEntry['row'],
+                            $addrOperationId
+                        );
+                        continue;
+                    }
+
+                    if ($beforeEntry && $afterEntry && $beforeEntry['row'] != $afterEntry['row']) {
+                        $auditLog->logChange(
+                            'POSTED_TO_ADDR_DATA',
+                            'UPDATE',
+                            $afterEntry['pk'],
+                            $beforeEntry['row'],
+                            $afterEntry['row'],
+                            $addrOperationId
+                        );
+                    }
+                }
             }
 
             $updateResourceId = CompositePrimaryKey::buildStoredResourceId([
@@ -850,6 +935,7 @@ class BiogMainRepository {
 
     public function officeStoreById(Request $request, $id) {
         return DB::transaction(function () use ($request, $id) {
+            $auditLog = new AuditLogService();
             $payload = $request->all();
             $c_addr = $payload['c_addr'] ?? [];
             $data = Arr::except($payload, ['_token', 'c_addr', 'c_addr_cleared', 'ai_fill_log_id']);
@@ -882,10 +968,25 @@ class BiogMainRepository {
             $data = (new ToolsRepository())->timestamp($data, true);
             DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
 
-            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            $officeOperation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_office_id' => $data['c_office_id'],
                 'c_posting_id' => $data['c_posting_id'],
             ]), $data);
+
+            $officeRow = DB::table('POSTED_TO_OFFICE_DATA')->where([
+                ['c_office_id', '=', $data['c_office_id']],
+                ['c_posting_id', '=', $data['c_posting_id']],
+            ])->first();
+            $officeRowData = $auditLog->normalizeRow($officeRow);
+            $officeRowPk = $auditLog->buildRowPkFromData('POSTED_TO_OFFICE_DATA', $officeRowData);
+            $auditLog->logChange(
+                'POSTED_TO_OFFICE_DATA',
+                'INSERT',
+                $officeRowPk,
+                null,
+                $officeRowData,
+                $officeOperation ? (string) $officeOperation->id : null
+            );
 
             $addressRows = DB::table('POSTED_TO_ADDR_DATA')
                 ->where('c_personid', $id)
@@ -909,7 +1010,7 @@ class BiogMainRepository {
             ]);
 
             if (!empty($addressRows)) {
-                (new OperationRepository())->store(
+                $addrOperation = (new OperationRepository())->store(
                     Auth::id(),
                     $id,
                     1,
@@ -917,6 +1018,26 @@ class BiogMainRepository {
                     $officeResourceId,
                     ['rows' => $addressRows]
                 );
+
+                $addrAuditRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $id)
+                    ->where('c_posting_id', $data['c_posting_id'])
+                    ->where('c_office_id', $data['c_office_id'])
+                    ->get();
+
+                $addrOperationId = $addrOperation ? (string) $addrOperation->id : null;
+                foreach ($addrAuditRows as $row) {
+                    $rowData = $auditLog->normalizeRow($row);
+                    $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
+                    $auditLog->logChange(
+                        'POSTED_TO_ADDR_DATA',
+                        'INSERT',
+                        $rowPk,
+                        null,
+                        $rowData,
+                        $addrOperationId
+                    );
+                }
             }
 
             return $officeResourceId;
@@ -925,10 +1046,16 @@ class BiogMainRepository {
 
     public function officeDeleteById($id, $c_personid) {
         DB::transaction(function () use ($id, $c_personid) {
+            $auditLog = new AuditLogService();
             $addr_l = explode('-', $id);
             $row = DB::table('POSTED_TO_OFFICE_DATA')
                 ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
                 ->first();
+
+            $addrRows = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $c_personid)
+                ->where('c_posting_id', $addr_l[1])
+                ->get();
 
             DB::table('POSTED_TO_OFFICE_DATA')
                 ->where([['c_office_id' , '=', $addr_l[0]], ['c_posting_id' , '=', $addr_l[1]]])
@@ -936,10 +1063,35 @@ class BiogMainRepository {
             DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
             DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
 
-            (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            $officeOperation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_office_id' => $addr_l[0],
                 'c_posting_id' => $addr_l[1],
             ]), $row);
+
+            $officeRowData = $auditLog->normalizeRow($row);
+            $officeRowPk = $auditLog->buildRowPkFromData('POSTED_TO_OFFICE_DATA', $officeRowData);
+            $operationId = $officeOperation ? (string) $officeOperation->id : null;
+            $auditLog->logChange(
+                'POSTED_TO_OFFICE_DATA',
+                'DELETE',
+                $officeRowPk,
+                $officeRowData,
+                null,
+                $operationId
+            );
+
+            foreach ($addrRows as $addrRow) {
+                $addrRowData = $auditLog->normalizeRow($addrRow);
+                $addrRowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $addrRowData);
+                $auditLog->logChange(
+                    'POSTED_TO_ADDR_DATA',
+                    'DELETE',
+                    $addrRowPk,
+                    $addrRowData,
+                    null,
+                    $operationId
+                );
+            }
         });
     }
 

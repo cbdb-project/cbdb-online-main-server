@@ -893,6 +893,7 @@ class BiogMainRepository {
                             null,
                             $addrOperationId
                         );
+
                         continue;
                     }
 
@@ -905,6 +906,7 @@ class BiogMainRepository {
                             $afterEntry['row'],
                             $addrOperationId
                         );
+
                         continue;
                     }
 

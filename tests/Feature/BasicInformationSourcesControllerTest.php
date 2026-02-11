@@ -58,7 +58,29 @@ class BasicInformationSourcesControllerTest extends TestCase {
             $table->tinyInteger('rate')->default(0);
         });
 
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+
         Auth::guard()->setUser($this->makeUser(9, 'Creator User'));
+    }
+
+    protected function tearDown(): void {
+        Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('operations');
+        Schema::dropIfExists('BIOG_SOURCE_DATA');
+        parent::tearDown();
     }
 
     protected function makeUser(int $id, string $name): User {

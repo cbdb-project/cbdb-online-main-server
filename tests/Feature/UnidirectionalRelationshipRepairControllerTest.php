@@ -67,6 +67,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
     protected function tearDown(): void {
         // 按照依赖关系顺序删除表（先删除有外键约束的表）
         Schema::dropIfExists('operations');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('ASSOC_CODES');
@@ -167,6 +168,22 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             $table->text('resource_original')->nullable();
             $table->smallInteger('crowdsourcing_status')->default(0);
             $table->timestamps();
+        });
+
+        // 创建 audit_log 表（供审计记录写入）
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
         });
 
         // 创建 ASSOC_DATA 表（简化版，包含外键约束）
@@ -938,6 +955,143 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             'c_personid' => $person2->c_personid,
             'c_kin_id' => $person1->c_personid,
             'c_kin_code' => 303,
+        ]);
+    }
+
+    #[Test]
+    public function kinship_store_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $request = new \Illuminate\Http\Request([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_kinship_pair' => 303,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像測試',
+        ]);
+
+        $repository->kinshipStoreById($request, $person1->c_personid);
+
+        $this->assertSame(2, DB::table('audit_log')
+            ->where('table_name', 'KIN_DATA')
+            ->where('operation', 'INSERT')
+            ->count());
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'INSERT',
+            'row_pk_text' => "c_personid={$person1->c_personid}&c_kin_id={$person2->c_personid}&c_kin_code=2",
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'INSERT',
+            'row_pk_text' => "c_personid={$person2->c_personid}&c_kin_id={$person1->c_personid}&c_kin_code=303",
+        ]);
+    }
+
+    #[Test]
+    public function kinship_update_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像更新測試',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像更新測試',
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $request = new \Illuminate\Http\Request([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 3,
+            'c_kinship_pair' => 301,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像更新測試',
+        ]);
+
+        $repository->kinshipUpdateById($request, $person1->c_personid, "{$person1->c_personid}-{$person2->c_personid}-2");
+
+        $this->assertSame(2, DB::table('audit_log')
+            ->where('table_name', 'KIN_DATA')
+            ->where('operation', 'UPDATE')
+            ->count());
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'UPDATE',
+            'row_pk_text' => "c_personid={$person1->c_personid}&c_kin_id={$person2->c_personid}&c_kin_code=3",
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'UPDATE',
+            'row_pk_text' => "c_personid={$person2->c_personid}&c_kin_id={$person1->c_personid}&c_kin_code=301",
+        ]);
+    }
+
+    #[Test]
+    public function kinship_delete_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+        DB::table('KINSHIP_CODES')->where('c_kincode', 303)->update([
+            'c_kin_pair1' => 2,
+        ]);
+
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像刪除測試',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+            'c_source' => 100,
+            'c_autogen_notes' => '鏡像刪除測試',
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $repository->kinshipDeleteById("{$person1->c_personid}-{$person2->c_personid}-2", null);
+
+        $this->assertSame(2, DB::table('audit_log')
+            ->where('table_name', 'KIN_DATA')
+            ->where('operation', 'DELETE')
+            ->count());
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'DELETE',
+            'row_pk_text' => "c_personid={$person1->c_personid}&c_kin_id={$person2->c_personid}&c_kin_code=2",
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'KIN_DATA',
+            'operation' => 'DELETE',
+            'row_pk_text' => "c_personid={$person2->c_personid}&c_kin_id={$person1->c_personid}&c_kin_code=303",
         ]);
     }
 }

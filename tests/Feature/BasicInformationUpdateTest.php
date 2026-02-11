@@ -158,6 +158,7 @@ class BasicInformationUpdateTest extends TestCase {
             ->value('c_modified_date');
 
         $operationsCountBefore = DB::table('operations')->count();
+        $auditLogCountBefore = DB::table('audit_log')->count();
 
         // 創建 Request 對象並直接調用 Repository
         $request = new Request([
@@ -193,6 +194,10 @@ class BasicInformationUpdateTest extends TestCase {
         // 驗證 operations 表未新增記錄
         $operationsCountAfter = DB::table('operations')->count();
         $this->assertEquals($operationsCountBefore, $operationsCountAfter);
+
+        // 驗證 audit_log 未新增記錄
+        $auditLogCountAfter = DB::table('audit_log')->count();
+        $this->assertSame($auditLogCountBefore, $auditLogCountAfter);
     }
 
     /**
@@ -263,8 +268,18 @@ class BasicInformationUpdateTest extends TestCase {
         $repository = new BiogMainRepository();
         $result = $repository->updateById($request, $personId);
 
-        // 驗證返回有變更標記
         $this->assertFalse($result['no_changes']);
+
+        $this->assertSame(1, DB::table('audit_log')->count());
+        $row = DB::table('audit_log')->first();
+        $this->assertNotNull($row);
+        $this->assertSame('BIOG_MAIN', $row->table_name);
+        $this->assertSame('UPDATE', $row->operation);
+        $this->assertSame("c_personid={$personId}", $row->row_pk_text);
+        $this->assertSame(['c_personid' => $personId], json_decode($row->row_pk, true));
+        $newData = json_decode($row->new_data, true);
+        $this->assertSame('李四', $newData['c_name_chn']);
+        $this->assertSame('Li Si', $newData['c_name']);
 
         // 驗證資料庫已更新
         $updatedNotes = DB::table('BIOG_MAIN')

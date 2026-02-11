@@ -53,9 +53,9 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
 
 ## Progress Tracker
 - [x] Create migration for `audit_log` (`database/migrations/2026_02_08_000000_create_audit_log_table.php`)
-- [x] Add AuditLog service (create + tests)
-- [x] Integrate `BIOG_MAIN` repository writes
-- [ ] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
+- [x] Add AuditLog service (create)
+- [ ] Integrate `BIOG_MAIN` repository writes
+- [x] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
 - [ ] Integrate remaining `/basicinformation` tables
 - [ ] Ensure transactional writes for audit + data changes
 - [ ] Add SQLite migration coverage in tests

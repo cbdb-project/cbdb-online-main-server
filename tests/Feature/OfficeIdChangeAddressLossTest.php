@@ -100,6 +100,21 @@ class OfficeIdChangeAddressLossTest extends TestCase {
             $table->tinyInteger('rate')->default(0);
         });
 
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+
         Auth::guard()->setUser(new GenericUser(['id' => 1, 'name' => 'Testing Admin']));
     }
 

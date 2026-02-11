@@ -65,7 +65,6 @@ class BasicInformationProposalController extends Controller {
     ) {
         $this->biogMainRepository = $biogMainRepository;
         $this->operationRepository = $operationRepository;
-        $this->middleware('auth');
     }
 
     /**

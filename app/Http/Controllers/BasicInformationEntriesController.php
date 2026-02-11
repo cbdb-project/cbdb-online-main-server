@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -174,7 +175,7 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
         DB::table('ENTRY_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_entry_code' => $data['c_entry_code'],
             'c_sequence' => $data['c_sequence'],
@@ -186,6 +187,27 @@ class BasicInformationEntriesController extends Controller {
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
         ]), $data);
+        (new AuditLogService())->write(
+            'ENTRY_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_entry_code' => $data['c_entry_code'],
+                'c_sequence' => $data['c_sequence'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_year' => $data['c_year'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_inst_code' => $data['c_inst_code'],
+                'c_inst_name_code' => $data['c_inst_name_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -349,7 +371,7 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->update($data);
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_entry_code' => $data['c_entry_code'],
             'c_sequence' => $data['c_sequence'],
@@ -361,6 +383,27 @@ class BasicInformationEntriesController extends Controller {
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
         ]), $data, $ori);
+        (new AuditLogService())->write(
+            'ENTRY_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $id,
+                'c_entry_code' => $data['c_entry_code'],
+                'c_sequence' => $data['c_sequence'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_year' => $data['c_year'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_inst_code' => $data['c_inst_code'],
+                'c_inst_name_code' => $data['c_inst_name_code'],
+            ],
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -420,7 +463,7 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->first();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $addr_a[0],
             'c_entry_code' => $addr_a[1],
             'c_sequence' => $addr_a[2],
@@ -444,6 +487,27 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->delete();
+        (new AuditLogService())->write(
+            'ENTRY_DATA',
+            'DELETE',
+            [
+                'c_personid' => $addr_a[0],
+                'c_entry_code' => $addr_a[1],
+                'c_sequence' => $addr_a[2],
+                'c_kin_code' => $addr_a[3],
+                'c_assoc_code' => $addr_a[4],
+                'c_kin_id' => $addr_a[5],
+                'c_year' => $addr_a[6],
+                'c_assoc_id' => $addr_a[7],
+                'c_inst_code' => $addr_a[8],
+                'c_inst_name_code' => $addr_a[9],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);
@@ -618,7 +682,7 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
         ])->update($data);
 
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_entry_code' => $data['c_entry_code'],
             'c_sequence' => $data['c_sequence'],
@@ -630,6 +694,27 @@ class BasicInformationEntriesController extends Controller {
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
         ]), $data, $ori);
+        (new AuditLogService())->write(
+            'ENTRY_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $id,
+                'c_entry_code' => $data['c_entry_code'],
+                'c_sequence' => $data['c_sequence'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_year' => $data['c_year'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_inst_code' => $data['c_inst_code'],
+                'c_inst_name_code' => $data['c_inst_name_code'],
+            ],
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 重定向到新的查詢參數格式
@@ -693,7 +778,7 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $pk['c_inst_name_code']],
         ])->first();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         DB::table('ENTRY_DATA')->where([
             ['c_personid', '=', $pk['c_personid']],
@@ -707,6 +792,16 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $pk['c_inst_code']],
             ['c_inst_name_code', '=', $pk['c_inst_name_code']],
         ])->delete();
+        (new AuditLogService())->write(
+            'ENTRY_DATA',
+            'DELETE',
+            $pk,
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

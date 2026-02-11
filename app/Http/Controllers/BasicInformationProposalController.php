@@ -72,6 +72,10 @@ class BasicInformationProposalController extends Controller {
      * 提交新增提案（子資源）
      */
     public function proposalStore(Request $request, $personid, $resourceType) {
+        if (!Auth::check()) {
+            abort(403);
+        }
+
         $this->ensureCanPropose();
 
         $config = $this->getResourceConfig($resourceType);
@@ -134,6 +138,10 @@ class BasicInformationProposalController extends Controller {
      * @deprecated 請使用 proposalUpdateWithPk() 方法，直接傳遞主鍵陣列
      */
     public function proposalUpdate(Request $request, $personid, $resourceType, $id) {
+        if (!Auth::check()) {
+            abort(403);
+        }
+
         $this->ensureCanPropose();
 
         $config = $this->getResourceConfig($resourceType);

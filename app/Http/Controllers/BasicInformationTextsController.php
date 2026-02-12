@@ -188,9 +188,6 @@ class BasicInformationTextsController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id) {
-        //
-    }
 
     /**
      * Show the form for editing the specified resource.
@@ -310,50 +307,6 @@ class BasicInformationTextsController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_) {
-        if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        $temp_l = explode("-", $id_);
-        $row = DB::table($this->table_name)->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]],
-        ])->first();
-        DB::table($this->table_name)->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]],
-        ])->delete();
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $temp_l[0],
-            'c_textid' => $temp_l[1],
-            'c_role_id' => $temp_l[2],
-        ]), $row);
-        (new AuditLogService())->write(
-            $this->table_name,
-            'DELETE',
-            [
-                'c_personid' => $temp_l[0],
-                'c_textid' => $temp_l[1],
-                'c_role_id' => $temp_l[2],
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-        flash('Delete success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
-    }
 
     // ===================================================================
     // 查詢參數模式方法（推薦使用）

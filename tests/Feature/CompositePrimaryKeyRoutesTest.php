@@ -150,23 +150,33 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
     }
 
     /**
-     * 測試舊的 resource 路由仍然存在（向後兼容）
+     * 測試新路由策略：保留 edit/update，移除舊 destroy resource 路由
      */
     #[Test]
-    public function legacy_resource_routes_still_exist(): void {
-        $resourceRoutes = [
+    public function resource_routes_follow_new_destroy_policy(): void {
+        $keptResourceRoutes = [
             'basicinformation.offices.edit',
             'basicinformation.offices.update',
-            'basicinformation.offices.destroy',
             'basicinformation.altnames.edit',
             'basicinformation.altnames.update',
+        ];
+
+        foreach ($keptResourceRoutes as $routeName) {
+            $this->assertTrue(
+                \Illuminate\Support\Facades\Route::has($routeName),
+                "Route '{$routeName}' should be defined"
+            );
+        }
+
+        $removedDestroyRoutes = [
+            'basicinformation.offices.destroy',
             'basicinformation.altnames.destroy',
         ];
 
-        foreach ($resourceRoutes as $routeName) {
-            $this->assertTrue(
+        foreach ($removedDestroyRoutes as $routeName) {
+            $this->assertFalse(
                 \Illuminate\Support\Facades\Route::has($routeName),
-                "Legacy route '{$routeName}' should still be defined for backwards compatibility"
+                "Legacy route '{$routeName}' should be removed"
             );
         }
     }

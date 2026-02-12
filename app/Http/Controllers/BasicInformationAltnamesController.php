@@ -197,9 +197,6 @@ class BasicInformationAltnamesController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id) {
-
-    }
 
     /**
      * Show the form for editing the specified resource.
@@ -408,63 +405,6 @@ class BasicInformationAltnamesController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $alt) {
-        if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        $addr_l = $this->parseAltnameId($alt);
-
-        $row = DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
-        ])->first();
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
-
-        // 使用 Query Builder 刪除資料
-        DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
-        ])->delete();
-        (new AuditLogService())->write(
-            'ALTNAME_DATA',
-            'DELETE',
-            [
-                'c_personid' => $addr_l[0],
-                'c_sequence' => $addr_l[1],
-                'c_alt_name_chn' => $addr_l[2],
-                'c_alt_name_type_code' => $addr_l[3],
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-
-        // 手動調用索引服務清理索引
-        if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {
-            $this->nameSearchIndexService->removeAltname(
-                $row->c_personid,
-                $row->c_alt_name_type_code,
-                $row->c_alt_name_chn
-            );
-        }
-
-        flash('Delete success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.altnames.index', ['basicinformation' => $id]);
-    }
 
     /**
      * 解析別名複合主鍵 ID

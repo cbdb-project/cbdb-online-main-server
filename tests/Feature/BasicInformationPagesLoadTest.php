@@ -576,7 +576,8 @@ class BasicInformationPagesLoadTest extends TestCase {
     #[Test]
     public function test_basicinformation_create_page_loads() {
         $response = $this->get('/basicinformation/create');
-        $response->assertStatus(200);
+        $response->assertStatus(302);
+        $response->assertRedirect('/login');
     }
 
     /**

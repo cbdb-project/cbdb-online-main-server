@@ -627,6 +627,21 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
+     * 測試別名編輯頁（query 模式）未登入可訪問
+     */
+    #[Test]
+    public function test_basicinformation_altnames_edit_query_loads_without_authentication() {
+        $response = $this->get(route('basicinformation.altnames.edit.query', [
+            'id' => $this->testPersonId,
+            'c_personid' => $this->testPersonId,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '测试别名',
+            'c_alt_name_type_code' => 1,
+        ]));
+        $response->assertStatus(200);
+    }
+
+    /**
      * 测试文本子页面：/basicinformation/{id}/texts
      */
     #[Test]

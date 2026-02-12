@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-02-05 22:09:20
+> 生成時間：2026-02-13 02:42:56
 
 ## 目錄
 
@@ -87,7 +87,7 @@
 | `c_firstyear` | smallint(6) | YES | NULL |  |
 | `c_lastyear` | smallint(6) | YES | NULL |  |
 | `c_admin_type` | varchar(255) | YES | NULL |  |
-| `c_admin_cat_code` | int(11) | NO | 0 |  |
+| `c_admin_cat_code` | smallint(6) | NO | 0 |  |
 | `x_coord` | double | YES | NULL |  |
 | `y_coord` | double | YES | NULL |  |
 | `CHGIS_PT_ID` | int(11) | YES | NULL |  |
@@ -108,7 +108,7 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_admin_cat_code` | int(11) | NO | (NULL) |  |
+| `c_admin_cat_code` | smallint(6) | NO | (NULL) |  |
 | `c_admin_cat_py` | varchar(255) | YES | NULL |  |
 | `c_admin_cat_hz` | varchar(255) | YES | NULL |  |
 | `c_admin_cat_trans` | varchar(255) | YES | NULL |  |
@@ -341,9 +341,9 @@
 | `c_tertiary_personid` | int(11) | YES | NULL |  |
 | `c_tertiary_type_notes` | longtext | YES | NULL |  |
 | `c_assoc_count` | smallint(6) | NO | 1 |  |
-| `c_sequence` | int(11) | YES | 0 |  |
-| `c_assoc_first_year` | int(11) | NO | -9999 |  |
-| `c_assoc_last_year` | int(11) | YES | NULL |  |
+| `c_sequence` | smallint(6) | YES | NULL |  |
+| `c_assoc_first_year` | smallint(6) | NO | (NULL) |  |
+| `c_assoc_last_year` | smallint(6) | YES | NULL |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
@@ -354,10 +354,10 @@
 | `c_assoc_ly_nh_year` | smallint(6) | YES | NULL |  |
 | `c_assoc_ly_range` | smallint(6) | YES | NULL |  |
 | `c_addr_id` | int(11) | YES | NULL |  |
-| `c_litgenre_code` | int(11) | YES | NULL |  |
-| `c_occasion_code` | int(11) | YES | NULL |  |
-| `c_topic_code` | int(11) | YES | NULL |  |
-| `c_inst_code` | int(11) | YES | 0 |  |
+| `c_litgenre_code` | smallint(6) | YES | NULL |  |
+| `c_occasion_code` | smallint(6) | YES | NULL |  |
+| `c_topic_code` | smallint(6) | YES | NULL |  |
+| `c_inst_code` | smallint(6) | YES | NULL |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
 | `c_text_title` | varchar(255) | NO | '' |  |
 | `c_assoc_claimer_id` | int(11) | YES | NULL |  |
@@ -439,6 +439,31 @@
 
 ---
 
+### audit_log 
+
+**主鍵**: `id`
+
+| 列名 | 類型 | 可空 | 默認值 | 備註 |
+|------|------|------|--------|------|
+| `id` | bigint(20) unsigned | NO | (NULL) |  [AUTO_INCREMENT] |
+| `occurred_at` | datetime | NO | (NULL) | When the operation actually occurred |
+| `created_at` | datetime | NO | (NULL) | When the audit log was written |
+| `table_name` | varchar(64) | NO | (NULL) | Target business table |
+| `operation` | varchar(16) | NO | (NULL) | INSERT/UPDATE/DELETE |
+| `actor_type` | varchar(32) | NO | (NULL) | user/system/job/api_key |
+| `actor_id` | varchar(128) | NO | (NULL) | Actor identifier in business layer |
+| `operation_id` | char(26) | NO | (NULL) | Unique identifier of the operation |
+| `row_pk` | longtext | NO | (NULL) | Primary key (supports composite key) |
+| `row_pk_text` | varchar(512) | NO | (NULL) | Stable serialized primary key |
+| `old_data` | longtext | YES | NULL | Full row before change |
+| `new_data` | longtext | YES | NULL | Full row after change |
+
+**索引**:
+
+- `PRIMARY` (UNIQUE): (id)
+
+---
+
 ### BIOG_ADDR_CODES 
 
 **主鍵**: `c_addr_type`
@@ -449,8 +474,8 @@
 | `c_addr_desc` | varchar(255) | YES | NULL |  |
 | `c_addr_desc_chn` | varchar(255) | YES | NULL |  |
 | `c_addr_note` | varchar(255) | YES | NULL |  |
-| `c_index_addr_rank` | int(6) | YES | NULL |  |
-| `c_index_addr_default_rank` | int(6) | YES | NULL |  |
+| `c_index_addr_rank` | smallint(6) | NO | (NULL) |  |
+| `c_index_addr_default_rank` | smallint(6) | NO | (NULL) |  |
 
 **索引**:
 
@@ -467,9 +492,9 @@
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_addr_id` | int(11) | NO | 0 |  |
 | `c_addr_type` | smallint(6) | NO | (NULL) |  |
-| `c_sequence` | int(11) | NO | (NULL) |  |
-| `c_firstyear` | int(11) | YES | NULL |  |
-| `c_lastyear` | int(11) | YES | NULL |  |
+| `c_sequence` | smallint(6) | NO | (NULL) |  |
+| `c_firstyear` | smallint(6) | YES | NULL |  |
+| `c_lastyear` | smallint(6) | YES | NULL |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
@@ -537,7 +562,7 @@
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_code` | int(11) | NO | (NULL) |  |
+| `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_bi_role_code` | smallint(6) | NO | (NULL) |  |
 | `c_bi_begin_year` | smallint(6) | YES | NULL |  |
 | `c_bi_by_nh_code` | smallint(6) | YES | NULL |  |
@@ -580,12 +605,12 @@
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_name` | varchar(255) | YES | NULL |  |
 | `c_name_chn` | varchar(255) | YES | NULL |  |
-| `c_index_year` | int(11) | YES | NULL |  |
+| `c_index_year` | smallint(6) | YES | NULL |  |
 | `c_index_year_type_code` | varchar(255) | YES | NULL |  |
 | `c_index_year_source_id` | int(11) | YES | NULL |  |
 | `c_female` | smallint(6) | YES | NULL |  |
 | `c_index_addr_id` | int(11) | YES | 0 |  |
-| `c_index_addr_type_code` | int(6) | YES | NULL |  |
+| `c_index_addr_type_code` | smallint(6) | YES | NULL |  |
 | `c_ethnicity_code` | smallint(6) | YES | NULL |  |
 | `c_household_status_code` | smallint(6) | YES | NULL |  |
 | `c_tribe` | varchar(255) | YES | NULL |  |
@@ -892,7 +917,7 @@
 | `c_entry_nh_year` | smallint(6) | YES | NULL |  |
 | `c_entry_dy` | smallint(6) | YES | NULL |  |
 | `c_entry_range` | smallint(6) | YES | NULL |  |
-| `c_inst_code` | int(11) | NO | 0 |  |
+| `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_name_code` | smallint(6) | NO | 0 |  |
 | `c_exam_field` | varchar(255) | YES | NULL |  |
 | `c_entry_addr_id` | int(11) | YES | NULL |  |
@@ -937,8 +962,8 @@
 | `c_entry_type_desc` | varchar(255) | NO | '' |  |
 | `c_entry_type_desc_chn` | varchar(255) | NO | '' |  |
 | `c_entry_type_parent_id` | varchar(255) | YES | NULL |  |
-| `c_entry_type_level` | double | YES | NULL |  |
-| `c_entry_type_sortorder` | double | YES | NULL |  |
+| `c_entry_type_level` | smallint(6) | YES | NULL |  |
+| `c_entry_type_sortorder` | smallint(6) | YES | NULL |  |
 
 **索引**:
 
@@ -954,9 +979,9 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_ethnicity_code` | smallint(6) | NO | (NULL) |  |
-| `c_group_code` | int(11) | YES | NULL |  |
-| `c_subgroup_code` | int(11) | YES | NULL |  |
-| `c_altname_code` | int(11) | YES | NULL |  |
+| `c_group_code` | smallint(6) | NO | (NULL) |  |
+| `c_subgroup_code` | smallint(6) | NO | (NULL) |  |
+| `c_altname_code` | smallint(6) | NO | (NULL) |  |
 | `c_name_chn` | varchar(255) | YES | NULL |  |
 | `c_name` | varchar(255) | YES | NULL |  |
 | `c_ethno_legal_cat` | varchar(255) | YES | NULL |  |
@@ -991,7 +1016,7 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_event_code` | int(11) | NO | 0 |  |
+| `c_event_code` | smallint(6) | NO | 0 |  |
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_sequence` | smallint(6) | NO | 0 |  |
 | `c_addr_id` | int(11) | NO | (NULL) |  |
@@ -1025,7 +1050,7 @@
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_sequence` | smallint(6) | NO | 0 |  |
-| `c_event_code` | int(11) | NO | 0 |  |
+| `c_event_code` | smallint(6) | NO | 0 |  |
 | `c_role` | varchar(255) | YES | NULL |  |
 | `c_year` | smallint(6) | YES | NULL |  |
 | `c_nh_code` | smallint(6) | YES | NULL |  |
@@ -1064,7 +1089,7 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_event_code` | int(11) | NO | (NULL) |  |
+| `c_event_code` | smallint(6) | NO | (NULL) |  |
 | `c_event_name_chn` | varchar(255) | YES | NULL |  |
 | `c_event_name` | varchar(255) | YES | NULL |  |
 | `c_fy_yr` | smallint(6) | YES | NULL |  |
@@ -1304,10 +1329,10 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_lit_genre_code` | int(11) | NO | (NULL) |  |
+| `c_lit_genre_code` | smallint(6) | NO | (NULL) |  |
 | `c_lit_genre_desc` | varchar(255) | NO | '' |  |
 | `c_lit_genre_desc_chn` | varchar(255) | NO | '' |  |
-| `c_sortorder` | int(11) | NO | 0 |  |
+| `c_sortorder` | smallint(6) | YES | NULL |  |
 
 **索引**:
 
@@ -1429,10 +1454,10 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_occasion_code` | int(11) | NO | (NULL) |  |
+| `c_occasion_code` | smallint(6) | NO | (NULL) |  |
 | `c_occasion_desc` | varchar(255) | YES | NULL |  |
 | `c_occasion_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_sortorder` | int(11) | YES | NULL |  |
+| `c_sortorder` | smallint(6) | NO | (NULL) |  |
 
 **索引**:
 
@@ -1670,7 +1695,7 @@
 |------|------|------|--------|------|
 | `c_personid` | int(11) | YES | NULL |  |
 | `c_possession_record_id` | int(11) | NO | (NULL) |  |
-| `c_sequence` | int(11) | YES | NULL |  |
+| `c_sequence` | smallint(6) | YES | NULL |  |
 | `c_possession_act_code` | smallint(6) | YES | NULL |  |
 | `c_possession_desc` | varchar(255) | YES | NULL |  |
 | `c_possession_desc_chn` | varchar(255) | YES | NULL |  |
@@ -1749,7 +1774,7 @@
 | `c_ly_range` | smallint(6) | YES | NULL |  |
 | `c_appt_type_code` | smallint(6) | YES | NULL |  |
 | `c_assume_office_code` | smallint(6) | YES | NULL |  |
-| `c_inst_code` | int(11) | YES | 0 |  |
+| `c_inst_code` | smallint(6) | YES | NULL |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
@@ -1761,7 +1786,7 @@
 | `c_ly_intercalary` | smallint(6) | YES | NULL |  |
 | `c_ly_month` | smallint(6) | YES | NULL |  |
 | `c_fy_day` | smallint(6) | YES | NULL |  |
-| `c_ly_day` | int(11) | YES | NULL |  |
+| `c_ly_day` | smallint(6) | YES | NULL |  |
 | `c_fy_day_gz` | smallint(6) | YES | NULL |  |
 | `c_ly_day_gz` | smallint(6) | YES | NULL |  |
 | `c_dy` | smallint(6) | YES | NULL |  |
@@ -1821,13 +1846,13 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_topic_code` | int(11) | NO | (NULL) |  |
+| `c_topic_code` | smallint(6) | NO | (NULL) |  |
 | `c_topic_desc` | varchar(255) | YES | NULL |  |
 | `c_topic_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_topic_type_code` | int(11) | YES | NULL |  |
+| `c_topic_type_code` | smallint(6) | YES | NULL |  |
 | `c_topic_type_desc` | varchar(255) | YES | NULL |  |
 | `c_topic_type_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_sortorder` | int(11) | YES | NULL |  |
+| `c_sortorder` | smallint(6) | YES | NULL |  |
 
 **索引**:
 
@@ -1844,7 +1869,7 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_code` | int(11) | NO | (NULL) |  |
+| `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_addr_type_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_addr_begin_year` | smallint(6) | YES | NULL |  |
 | `c_inst_addr_end_year` | smallint(6) | YES | NULL |  |
@@ -1923,7 +1948,7 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_code` | int(11) | NO | (NULL) |  |
+| `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_type_code` | smallint(6) | YES | NULL |  |
 | `c_inst_begin_year` | smallint(6) | YES | NULL |  |
 | `c_by_nianhao_code` | smallint(6) | YES | NULL |  |
@@ -2034,7 +2059,7 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
-| `c_sequence` | int(11) | NO | (NULL) |  |
+| `c_sequence` | smallint(6) | NO | (NULL) |  |
 | `c_status_code` | smallint(6) | NO | (NULL) |  |
 | `c_firstyear` | smallint(6) | YES | NULL |  |
 | `c_fy_nh_code` | smallint(6) | YES | NULL |  |
@@ -2226,8 +2251,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_textid` | int(11) | NO | (NULL) |  |
-| `c_text_edition_id` | int(11) | NO | (NULL) |  |
-| `c_text_instance_id` | int(11) | NO | (NULL) |  |
+| `c_text_edition_id` | smallint(6) | NO | (NULL) |  |
+| `c_text_instance_id` | smallint(6) | NO | (NULL) |  |
 | `c_instance_title_chn` | varchar(255) | YES | NULL |  |
 | `c_instance_title` | varchar(255) | YES | NULL |  |
 | `c_instance_title_trans` | varchar(255) | YES | NULL |  |
@@ -2245,7 +2270,7 @@
 | `c_pub_notes` | varchar(255) | YES | NULL |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
-| `c_extant` | int(11) | YES | NULL |  |
+| `c_extant` | smallint(6) | YES | NULL |  |
 | `c_url_api` | varchar(255) | YES | NULL |  |
 | `c_url_homepage` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
@@ -2344,7 +2369,7 @@
 | `c_name` | varchar(255) | YES | NULL |  |
 | `c_name_chn` | varchar(255) | YES | NULL |  |
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_code` | int(11) | NO | (NULL) |  |
+| `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_name_hz` | varchar(255) | YES | NULL |  |
 | `c_inst_name_py` | varchar(255) | YES | NULL |  |
 | `c_bi_role_code` | smallint(6) | NO | (NULL) |  |
@@ -2384,7 +2409,7 @@
 |------|------|------|--------|------|
 | `c_personid` | int(11) | YES | NULL |  |
 | `c_possession_record_id` | int(11) | NO | (NULL) |  |
-| `c_sequence` | int(11) | YES | NULL |  |
+| `c_sequence` | smallint(6) | YES | NULL |  |
 | `c_possession_act_code` | smallint(6) | YES | NULL |  |
 | `c_possession_act_desc` | varchar(255) | YES | NULL |  |
 | `c_possession_act_desc_chn` | varchar(255) | YES | NULL |  |
@@ -4301,6 +4326,27 @@
 - `ai_fill_logs_success_index`: (success)
 - `ai_fill_logs_c_personid_index`: (c_personid)
 - `ai_fill_logs_user_id_index`: (user_id)
+
+---
+
+### audit_log 
+
+**主鍵**: `id`
+
+| 列名 | 類型 | 可空 | 默認值 | 備註 |
+|------|------|------|--------|------|
+| `id` | INTEGER | NO | (NULL) |  |
+| `occurred_at` | datetime | NO | (NULL) |  |
+| `created_at` | datetime | NO | (NULL) |  |
+| `table_name` | varchar | NO | (NULL) |  |
+| `operation` | varchar | NO | (NULL) |  |
+| `actor_type` | varchar | NO | (NULL) |  |
+| `actor_id` | varchar | NO | (NULL) |  |
+| `operation_id` | varchar | NO | (NULL) |  |
+| `row_pk` | TEXT | NO | (NULL) |  |
+| `row_pk_text` | varchar | NO | (NULL) |  |
+| `old_data` | TEXT | YES | (NULL) |  |
+| `new_data` | TEXT | YES | (NULL) |  |
 
 ---
 

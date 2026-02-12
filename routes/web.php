@@ -145,18 +145,18 @@ Route::delete('basicinformation/{id}/offices/delete', 'BasicInformationOfficesCo
     ->name('basicinformation.offices.destroy.query');
 
 // 資源路由（放在查詢參數路由之後，作為後備）
-Route::resource('basicinformation.addresses', 'BasicInformationAddressesController');
-Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController');
-Route::resource('basicinformation.texts', 'BasicInformationTextsController');
-Route::resource('basicinformation.offices', 'BasicInformationOfficesController');
-Route::resource('basicinformation.assoc', 'BasicInformationAssocController');
-Route::resource('basicinformation.entries', 'BasicInformationEntriesController');
-Route::resource('basicinformation.events', 'BasicInformationEventsController');
-Route::resource('basicinformation.kinship', 'BasicInformationKinshipController');
-Route::resource('basicinformation.statuses', 'BasicInformationStatusesController');
-Route::resource('basicinformation.possession', 'BasicInformationPossessionController');
-Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController');
-Route::resource('basicinformation.sources', 'BasicInformationSourcesController');
+Route::resource('basicinformation.addresses', 'BasicInformationAddressesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.texts', 'BasicInformationTextsController')->except(['show', 'destroy']);
+Route::resource('basicinformation.offices', 'BasicInformationOfficesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.assoc', 'BasicInformationAssocController')->except(['show', 'destroy']);
+Route::resource('basicinformation.entries', 'BasicInformationEntriesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.events', 'BasicInformationEventsController')->except(['show', 'destroy']);
+Route::resource('basicinformation.kinship', 'BasicInformationKinshipController')->except(['show', 'destroy']);
+Route::resource('basicinformation.statuses', 'BasicInformationStatusesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.possession', 'BasicInformationPossessionController')->except(['show', 'destroy']);
+Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController')->except(['show', 'destroy']);
+Route::resource('basicinformation.sources', 'BasicInformationSourcesController')->except(['show', 'destroy']);
 
 // BiogMain 提案路由
 Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')

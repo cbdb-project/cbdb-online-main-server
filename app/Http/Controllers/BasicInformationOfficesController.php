@@ -175,16 +175,6 @@ class BasicInformationOfficesController extends Controller {
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id) {
-        //
-    }
-
-    /**
      * Show the form for editing the specified resource.
      *
      * @param  int  $id
@@ -451,21 +441,6 @@ class BasicInformationOfficesController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $office) {
-        if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        $this->biogMainRepository->officeDeleteById($office, $id);
-        flash('Delete success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.offices.index', ['basicinformation' => $id]);
-    }
 
     /**
      * @param array $array

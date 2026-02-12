@@ -157,16 +157,6 @@ class BasicInformationSocialInstController extends Controller {
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id) {
-        //
-    }
-
-    /**
      * Show the form for editing the specified resource.
      *
      * @param  int  $id
@@ -304,42 +294,6 @@ class BasicInformationSocialInstController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_) {
-        if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        //建安修改20191113
-        //$this->biogMainRepository->socialInstDeleteById($id_, $id);
-        $addr_l = explode("-", $id_);
-        $row = DB::table('BIOG_INST_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_inst_code', '=', $addr_l[1]],
-            ['c_inst_name_code', '=', $addr_l[2]],
-            ['c_bi_role_code', '=', $addr_l[3]],
-        ])->first();
-
-        $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $addr_l[0],
-            'c_inst_code' => $addr_l[1],
-            'c_inst_name_code' => $addr_l[2],
-            'c_bi_role_code' => $addr_l[3],
-        ]), $row);
-        DB::table('BIOG_INST_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_inst_code', '=', $addr_l[1]],
-            ['c_inst_name_code', '=', $addr_l[2]],
-            ['c_bi_role_code', '=', $addr_l[3]],
-        ])->delete();
-        flash('Delete success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.socialinst.index', ['basicinformation' => $id]);
-    }
 
     // ===================================================================
     // 查詢參數模式方法（推薦使用）

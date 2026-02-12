@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BiogMain;
 use App\Models\User;
+use App\Support\CompositePrimaryKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
@@ -385,8 +386,19 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         );
 
         // 刪除別名（生產路由），並讓控制器負責清理索引
+        $deleteUrl = CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.destroy.query',
+            ['id' => 2003],
+            [
+                'c_personid' => 2003,
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '太白',
+                'c_alt_name_type_code' => 4,
+            ]
+        );
+
         $this->actingAs($user)
-            ->delete('/basicinformation/2003/altnames/2003-1-太白-4')
+            ->delete($deleteUrl)
             ->assertStatus(302);
 
         // 檢查別名索引已刪除

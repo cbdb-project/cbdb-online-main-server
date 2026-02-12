@@ -233,16 +233,6 @@ class BasicInformationEntriesController extends Controller {
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id) {
-        //
-    }
-
-    /**
      * Show the form for editing the specified resource.
      *
      * @param  int  $id
@@ -434,85 +424,6 @@ class BasicInformationEntriesController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id, $id_) {
-        if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        //建安修改20191112
-        //$this->biogMainRepository->entryDeleteById($id_, $id);
-        $id_ = str_replace("--", "-minus", $id_);
-        $addr_a = explode("-", $id_);
-        foreach ($addr_a as $key => $value) {
-            $addr_a[$key] = str_replace("minus", "-", $value);
-        }
-        $row = DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $addr_a[0]],
-            ['c_entry_code', '=', $addr_a[1]],
-            ['c_sequence', '=', $addr_a[2]],
-            ['c_kin_code', '=', $addr_a[3]],
-            ['c_assoc_code', '=', $addr_a[4]],
-            ['c_kin_id', '=', $addr_a[5]],
-            ['c_year', '=', $addr_a[6]],
-            ['c_assoc_id', '=', $addr_a[7]],
-            ['c_inst_code', '=', $addr_a[8]],
-            ['c_inst_name_code', '=', $addr_a[9]],
-        ])->first();
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $addr_a[0],
-            'c_entry_code' => $addr_a[1],
-            'c_sequence' => $addr_a[2],
-            'c_kin_code' => $addr_a[3],
-            'c_assoc_code' => $addr_a[4],
-            'c_kin_id' => $addr_a[5],
-            'c_year' => $addr_a[6],
-            'c_assoc_id' => $addr_a[7],
-            'c_inst_code' => $addr_a[8],
-            'c_inst_name_code' => $addr_a[9],
-        ]), $row);
-        DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $addr_a[0]],
-            ['c_entry_code', '=', $addr_a[1]],
-            ['c_sequence', '=', $addr_a[2]],
-            ['c_kin_code', '=', $addr_a[3]],
-            ['c_assoc_code', '=', $addr_a[4]],
-            ['c_kin_id', '=', $addr_a[5]],
-            ['c_year', '=', $addr_a[6]],
-            ['c_assoc_id', '=', $addr_a[7]],
-            ['c_inst_code', '=', $addr_a[8]],
-            ['c_inst_name_code', '=', $addr_a[9]],
-        ])->delete();
-        (new AuditLogService())->write(
-            'ENTRY_DATA',
-            'DELETE',
-            [
-                'c_personid' => $addr_a[0],
-                'c_entry_code' => $addr_a[1],
-                'c_sequence' => $addr_a[2],
-                'c_kin_code' => $addr_a[3],
-                'c_assoc_code' => $addr_a[4],
-                'c_kin_id' => $addr_a[5],
-                'c_year' => $addr_a[6],
-                'c_assoc_id' => $addr_a[7],
-                'c_inst_code' => $addr_a[8],
-                'c_inst_name_code' => $addr_a[9],
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-        flash('Delete success @ '.Carbon::now(), 'success');
-
-        return redirect()->route('basicinformation.entries.index', ['basicinformation' => $id]);
-    }
 
     // ===================================================================
     // 查詢參數模式方法（推薦使用）

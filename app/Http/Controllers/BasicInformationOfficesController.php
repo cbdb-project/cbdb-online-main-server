@@ -32,15 +32,6 @@ class BasicInformationOfficesController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
         $this->middleware('auth')->except(['index', 'show', 'edit', 'editQuery']);
-        $this->middleware(function ($request, $next) {
-            if (!Auth::check() || !Auth::user()->isActive()) {
-                $personId = $request->route('basicinformation') ?? $request->route('id');
-
-                return redirect()->route('basicinformation.show', $personId);
-            }
-
-            return $next($request);
-        })->only(['edit', 'editQuery']);
     }
 
     /**

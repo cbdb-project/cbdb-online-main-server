@@ -21,6 +21,8 @@ class BasicInformationPagesLoadTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
+        $this->withoutMiddleware(\App\Http\Middleware\PrometheusMetrics::class);
+
         // 使用 in-memory SQLite 数据库
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -590,13 +592,12 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试编辑页面：/basicinformation/{id}/edit（未登录时重定向）
+     * 测试编辑页面：/basicinformation/{id}/edit（未登录可訪問）
      */
     #[Test]
-    public function test_basicinformation_edit_page_redirects_when_not_authenticated() {
+    public function test_basicinformation_edit_page_loads_without_authentication() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/edit");
-        $response->assertStatus(302);
-        $response->assertRedirect("/basicinformation/{$this->testPersonId}");
+        $response->assertStatus(200);
     }
 
     /**
@@ -623,6 +624,21 @@ class BasicInformationPagesLoadTest extends TestCase {
     #[Test]
     public function test_basicinformation_altnames_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/altnames");
+        $response->assertStatus(200);
+    }
+
+    /**
+     * 測試別名編輯頁（query 模式）未登入可訪問
+     */
+    #[Test]
+    public function test_basicinformation_altnames_edit_query_loads_without_authentication() {
+        $response = $this->get(route('basicinformation.altnames.edit.query', [
+            'id' => $this->testPersonId,
+            'c_personid' => $this->testPersonId,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '测试别名',
+            'c_alt_name_type_code' => 1,
+        ]));
         $response->assertStatus(200);
     }
 
@@ -686,6 +702,20 @@ class BasicInformationPagesLoadTest extends TestCase {
     #[Test]
     public function test_basicinformation_statuses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/statuses");
+        $response->assertStatus(200);
+    }
+
+    /**
+     * 測試社會區分編輯頁（query 模式）未登入可訪問
+     */
+    #[Test]
+    public function test_basicinformation_statuses_edit_query_loads_without_authentication() {
+        $response = $this->get(route('basicinformation.statuses.edit.query', [
+            'id' => $this->testPersonId,
+            'c_personid' => $this->testPersonId,
+            'c_sequence' => 1,
+            'c_status_code' => 1,
+        ]));
         $response->assertStatus(200);
     }
 

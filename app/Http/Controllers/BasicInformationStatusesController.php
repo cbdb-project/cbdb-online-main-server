@@ -7,6 +7,7 @@ use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class BasicInformationStatusesController extends Controller {
     /**
@@ -21,15 +22,6 @@ class BasicInformationStatusesController extends Controller {
     public function __construct(BiogMainRepository $biogMainRepository) {
         $this->biogMainRepository = $biogMainRepository;
         $this->middleware('auth')->except(['index', 'show', 'edit', 'editQuery']);
-        $this->middleware(function ($request, $next) {
-            if (!Auth::check() || !Auth::user()->isActive()) {
-                $personId = $request->route('basicinformation') ?? $request->route('id');
-
-                return redirect()->route('basicinformation.show', $personId);
-            }
-
-            return $next($request);
-        })->only(['edit', 'editQuery']);
     }
 
     /**
@@ -269,9 +261,49 @@ class BasicInformationStatusesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'STATUS_DATA');
 
-        // 使用 Repository 查詢（格式：c_personid-c_sequence-c_status_code）
-        $id_ = $pk['c_personid'].'-'.$pk['c_sequence'].'-'.$pk['c_status_code'];
-        $res = $this->biogMainRepository->statuseById($id_);
+        $row = DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_sequence', '=', $pk['c_sequence']],
+            ['c_status_code', '=', $pk['c_status_code']],
+        ])->first();
+
+        if (!$row) {
+            abort(404, 'STATUS_DATA 記錄不存在');
+        }
+
+        // 填補在測試或精簡 schema 中可能缺少的欄位
+        foreach ([
+            'c_supplement', 'c_firstyear', 'c_fy_nh_code', 'c_fy_nh_year', 'c_fy_range',
+            'c_lastyear', 'c_ly_nh_code', 'c_ly_nh_year', 'c_ly_range',
+            'c_source', 'c_pages', 'c_notes',
+            'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date',
+        ] as $column) {
+            if (!property_exists($row, $column)) {
+                $row->{$column} = null;
+            }
+        }
+
+        $text_str = null;
+        if (($row->c_source ?? null) || $row->c_source === 0) {
+            $text = DB::table('TEXT_CODES')->where('c_textid', $row->c_source)->first();
+            if ($text) {
+                $text_str = trim(($text->c_textid ?? '').' '.($text->c_title ?? '').' '.($text->c_title_chn ?? ''));
+            }
+        }
+
+        $statuse_str = null;
+        if (($row->c_status_code ?? null) || $row->c_status_code === 0) {
+            $status = DB::table('STATUS_CODES')->where('c_status_code', $row->c_status_code)->first();
+            if ($status) {
+                $statuse_str = trim(($status->c_status_code ?? '').' '.($status->c_status_desc_chn ?? '').' '.($status->c_status_desc ?? ''));
+            }
+        }
+
+        $res = [
+            'row' => $row,
+            'text_str' => $text_str,
+            'statuse_str' => $statuse_str,
+        ];
 
         // 處理 personLabel
         $personLabel = $id;

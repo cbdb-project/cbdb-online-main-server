@@ -4,7 +4,7 @@
 #
 # 功能：
 #   1. 執行 export-daily-sqlite.sh 匯出資料庫
-#   2. 重新命名為 latest.db 並壓縮為 latest.zip
+#   2. 壓縮為 cbdb_YYYYMMDD.zip（zip 內為平面檔名）
 #   3. 上傳到 HuggingFace datasets/cbdb/cbdb-sqlite
 #
 # 前置要求：
@@ -171,9 +171,9 @@ echo "[3/4] 壓縮為 ${ZIP_NAME}..."
 rm -f "$ZIP_FILE"
 META_FILE="${WORK_DIR}/cbdb_${DATE_SUFFIX}.json"
 if [ -f "$META_FILE" ]; then
-    zip -9 "$ZIP_FILE" "$SQLITE_FILE" "$META_FILE" > /dev/null
+    zip -j -9 "$ZIP_FILE" "$SQLITE_FILE" "$META_FILE" > /dev/null
 else
-    zip -9 "$ZIP_FILE" "$SQLITE_FILE" > /dev/null
+    zip -j -9 "$ZIP_FILE" "$SQLITE_FILE" > /dev/null
 fi
 
 FILE_SIZE=$(ls -lh "$ZIP_FILE" | awk '{print $5}')

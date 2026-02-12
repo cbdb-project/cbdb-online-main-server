@@ -336,6 +336,10 @@ sudo chown caddy laravel.log
 
 本專案提供自動化腳本，將生產環境的數據庫匯出為 SQLite 格式，並同步到 HuggingFace 公開數據集 [cbdb/cbdb-sqlite](https://huggingface.co/datasets/cbdb/cbdb-sqlite) 供研究者下載使用。
 
+最新下載入口：
+- `https://huggingface.co/datasets/cbdb/cbdb-sqlite/resolve/main/latest.zip`
+- `https://input.cbdb.fas.harvard.edu/latest.zip`
+
 ### 腳本位置
 
 - **匯出腳本**：`scripts/export-daily-sqlite.sh` - 將 MySQL/MariaDB 表格匯出為 SQLite
@@ -399,7 +403,7 @@ bash scripts/export-daily-sqlite.sh
 `weekly-sqlite-sync.sh` 執行以下步驟：
 
 1. **前置檢查**：確認 `zip`、`hf` 已安裝且 HuggingFace 認證有效
-2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_daily_YYYYMMDD.sqlite3` 與 `cbdb_daily_YYYYMMDD.json`
-3. **壓縮檔案**：複製為 `latest.db` 並壓縮為 `latest.zip`（最大壓縮率）
-4. **上傳到 HuggingFace**：將 `latest.zip`、`metadata/YYYY-MM/YYYY-MM-DD.json` 及 `latest.json`（metadata 副本）以單一 commit 上傳至數據集倉庫
+2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_YYYYMMDD.sqlite3` 與 `cbdb_YYYYMMDD.json`
+3. **壓縮檔案**：產生 `cbdb_YYYYMMDD.zip`（zip 內使用平面檔名，不包含絕對路徑）
+4. **上傳到 HuggingFace**：將 `history/cbdb_YYYYMM/cbdb_YYYYMMDD.zip`、`latest.zip`、`metadata/YYYY-MM/YYYY-MM-DD.json` 及 `latest.json`（metadata 副本）以單一 commit 上傳至數據集倉庫
 5. **清理**：刪除所有臨時檔案（包括原始 SQLite 匯出檔與 metadata）

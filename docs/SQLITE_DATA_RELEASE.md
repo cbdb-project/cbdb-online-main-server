@@ -39,7 +39,8 @@ Metadata 內容包含：
 
 ### 最新下載入口
 
-- `https://huggingface.co/datasets/cbdb/cbdb-sqlite/blob/main/latest.zip`
+- `https://huggingface.co/datasets/cbdb/cbdb-sqlite/resolve/main/latest.zip`
+- `https://input.cbdb.fas.harvard.edu/latest.zip`
 
 ## 釋出步驟
 
@@ -52,7 +53,7 @@ Metadata 內容包含：
 2. 腳本流程包含：
 
 - 先執行 `scripts/export-daily-sqlite.sh` 匯出資料與 metadata。
-- 產生 `cbdb_YYYYMMDD.zip`（內含 `cbdb_YYYYMMDD.sqlite3` 與當日 metadata）。
+- 產生 `cbdb_YYYYMMDD.zip`（內含 `cbdb_YYYYMMDD.sqlite3` 與當日 metadata，且 zip 內不包含多層目錄）。
 - 上傳至 HuggingFace 指定路徑。
 - 在 HuggingFace 根目錄更新 `latest.zip` 與 `latest.json`。
 - 將當日 zip 複製為 `public/latest.zip`。

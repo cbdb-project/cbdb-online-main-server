@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\CompositePrimaryKey;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -653,9 +654,19 @@ class FormUrlEncodingTest extends TestCase {
         ]);
 
         // 刪除記錄 - 使用編碼後的 URL
-        // .//?- 編碼後變成 .(slash)(slash)(question)(minus)
+        // 查詢參數模式由 Laravel 原生 URL 編碼處理特殊字元
+        $deleteUrl = CompositePrimaryKey::buildUrl(
+            'basicinformation.sources.destroy.query',
+            ['id' => $this->testPersonId],
+            [
+                'c_personid' => $this->testPersonId,
+                'c_textid' => 100,
+                'c_pages' => './/?-',
+            ]
+        );
+
         $response = $this->actingAs($this->user)
-            ->delete("/basicinformation/{$this->testPersonId}/sources/{$this->testPersonId}-100-.(slash)(slash)(question)(minus)");
+            ->delete($deleteUrl);
 
         $response->assertRedirect();
 

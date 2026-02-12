@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class BasicInformationSourcesController extends Controller {
     /**
@@ -270,7 +273,8 @@ class BasicInformationSourcesController extends Controller {
 
         // 使用 Repository 查詢（格式：c_personid-c_textid-c_pages）
         $c_pages = $pk['c_pages'] ?? '';
-        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
+        $encodedPages = $this->biogMainRepository->unionPKDef($c_pages);
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$encodedPages;
         $res = $this->biogMainRepository->sourceById($id, $id_);
 
         // 處理 personLabel
@@ -339,7 +343,8 @@ class BasicInformationSourcesController extends Controller {
 
         // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
         $c_pages = $pk['c_pages'] ?? '';
-        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
+        $encodedPages = $this->biogMainRepository->unionPKDef($c_pages);
+        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$encodedPages;
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
@@ -386,11 +391,50 @@ class BasicInformationSourcesController extends Controller {
         // 驗證必填欄位（c_pages 為可選）
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
 
-        // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
-        $c_pages = $pk['c_pages'] ?? '';
-        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$c_pages;
+        $cPages = $pk['c_pages'] ?? '';
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_pages', '=', $cPages],
+        ])->first();
 
-        $this->biogMainRepository->sourceDeleteById($id, $id_);
+        if (!$row) {
+            abort(404, 'BIOG_SOURCE_DATA 記錄不存在');
+        }
+
+        DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_textid', '=', $pk['c_textid']],
+            ['c_pages', '=', $cPages],
+        ])->delete();
+
+        $operation = (new OperationRepository())->store(
+            Auth::id(),
+            $id,
+            4,
+            'BIOG_SOURCE_DATA',
+            CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $pk['c_personid'],
+                'c_textid' => $pk['c_textid'],
+                'c_pages' => $cPages,
+            ]),
+            $row
+        );
+
+        (new AuditLogService())->write(
+            'BIOG_SOURCE_DATA',
+            'DELETE',
+            [
+                'c_personid' => $pk['c_personid'],
+                'c_textid' => $pk['c_textid'],
+                'c_pages' => $cPages,
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\CompositePrimaryKey;
 use App\Models\User;
+use App\Support\CompositePrimaryKey;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

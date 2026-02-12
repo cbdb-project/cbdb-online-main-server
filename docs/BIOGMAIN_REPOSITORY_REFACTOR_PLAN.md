@@ -1,91 +1,112 @@
 # BiogMainRepository Refactor Plan
 
 ## Goal
-Reduce complexity in `BiogMainRepository` without breaking existing transactional behavior or repository-level data flow. This plan focuses on reorganizing responsibilities around business workflows (not one table = one repository).
+在不改變既有行為的前提下，逐步降低 `BiogMainRepository`（目前約 3182 行）複雜度，並把邏輯按「業務流程」拆分，而非按資料表拆分。
 
-## Non-Goals
-- No behavior changes in this phase.
-- No schema changes.
-- No API contract changes.
-- No UI changes.
+## Scope and Non-Goals
+- 本計畫以重構為主，不做功能擴充。
+- 不變更資料庫 schema。
+- 不變更既有路由與 API 合約。
+- 不變更使用者可見 UI 行為。
 
-## Why Not One Table = One Repository
-The current codebase uses **transactional business flows** that span multiple tables (e.g. office/posting + address + posting meta). Splitting by table risks:
-- breaking transaction boundaries,
-- scattering cross-table invariants,
-- making audit/operation logging inconsistent.
+## Current State Snapshot (2026-02-12)
+- `BiogMainRepository` 仍為單一大型類別，包含 Basic Info / Office / Relations / Events / Sources 等多模組方法。
+- `officeStoreById`、`officeUpdateById`、`officeDeleteById` 仍在 `BiogMainRepository`，但已具備：
+  - 單一交易中同步 `POSTING_DATA`、`POSTED_TO_OFFICE_DATA`、`POSTED_TO_ADDR_DATA`
+  - `operations` 寫入（含 `POSTED_TO_ADDR_DATA` 的 `rows` before/after）
+  - `audit_log` 寫入
+  - `resource_id` 使用 `c_office_id=...&c_posting_id=...` 格式
+- 控制器仍直接依賴 `BiogMainRepository`（`BasicInformationOfficesController`），且 `saveas()` 內仍有一段與 repository 重複的寫入流程。
+- 既有測試已覆蓋 Office 核心流程（`OfficePostingStoreTest`、`OfficeAddressOperationLoggingTest`、`OfficeIdChangeAddressLossTest`），可作為重構安全網。
 
-Therefore, the recommended split is **workflow/domain-based**, not table-based.
+## Why Workflow-Based Split (Not Table-Based)
+Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽核一致性。若按「一表一 repository」拆分，會把同一交易流程拆散，風險高。  
+因此維持「一個 workflow 一個 entry point」原則。
 
-## Target Split (Workflow-Based)
-These are the recommended modules and their ownership boundaries:
+## Target Architecture
+命名比照現有 repository 風格（功能導向、簡潔命名）：
 
-1. **Basic Info**
-   - `BIOG_MAIN`, `ALTNAME_DATA`, `BIOG_TEXT_DATA`, `BIOG_SOURCE_DATA`
-   - CRUD for main biographical data and sub-entities
+1. `OfficePostingRepository`
+2. `RelationshipRepository`
+3. `EventStatusRepository`
+4. `EntryRepository`
+5. `PossessionRepository`
+6. `SocialInstitutionRepository`
+7. `BiogSourceRepository`（或 `SourceRepository`，避免與其他 source 模組混淆）
 
-2. **Office / Posting**
-   - `POSTED_TO_OFFICE_DATA`, `POSTED_TO_ADDR_DATA`, `POSTING_DATA`
-   - Store/update/delete office posting and its address collection
-   - Maintains shared resource_id behavior for `POSTED_TO_ADDR_DATA`
+`BiogMainRepository` 保留「人物自身」相關職責，不另拆 `BasicInfoRepository`：
+- `BIOG_MAIN` 主記錄讀寫
+- 以人物為中心的聚合查詢（`byPersonId`、`byIdWith*`）
+- 人名與拼音相關邏輯（例如 `namesByQuery`、`auto_pinyin`）
 
-3. **Relationships**
-   - `ASSOC_DATA`, `KIN_DATA`
-   - Association and kinship flows
+過渡期由 `BiogMainRepository` 作 façade，逐步轉呼叫新 repository，避免一次性改動大量 controller/test。
 
-4. **Events / Status**
-   - `EVENTS_DATA`, `STATUS_DATA`
-   - Event and status flows
+## Refactor Phases (Updated)
 
-5. **Other Modules**
-   - `ENTRY_DATA`, `POSSESSION_DATA`, `BIOG_INST_DATA`
+### Phase A — Baseline Lock (Must Do First)
+- 固定 Office 流程回歸測試作為守門：
+  - `tests/Feature/OfficePostingStoreTest.php`
+  - `tests/Feature/OfficeAddressOperationLoggingTest.php`
+  - `tests/Feature/OfficeIdChangeAddressLossTest.php`
+- 以 `rg` 建立方法呼叫清單（特別是 `office*ById`）並記錄遷移範圍。
 
-Each module should expose **workflow-level methods**, not low-level table CRUD.
+**Acceptance**
+- 上述測試在重構前全綠，作為 baseline。
 
-## Transaction Boundaries (Must Preserve)
-- Office posting flows must remain in a **single transaction** across `POSTING_DATA`, `POSTED_TO_OFFICE_DATA`, `POSTED_TO_ADDR_DATA`.
-- Audit and operations records must be written in the **same transaction** as data changes.
+### Phase B — Office Workflow Internal Extraction (No External Behavior Change)
+- 新增 `OfficePostingRepository`，搬移：
+  - `officeStoreById`
+  - `officeUpdateById`
+  - `officeDeleteById`
+  - `insertAddr` / `updateAddr` 等 Office 專用 helper
+- `BiogMainRepository` 保留同名 public 方法，僅轉呼叫新 repository。
+- 保持以下行為完全一致：
+  - 回傳 `resource_id` 字串格式
+  - `ValidationException` 拋出時機
+  - `operations` 與 `audit_log` 內容結構
+  - 交易邊界（單一 `DB::transaction`）
 
-## Phase Plan
+**Acceptance**
+- Phase A 三個測試維持全綠。
+- `BasicInformationOfficesController` 不需改動即可通過既有流程。
 
-### Phase 0 — Preparation (No Behavior Change)
-- Create new repository/service classes for each workflow module.
-- Add thin delegators in `BiogMainRepository` to forward calls.
-- Keep method signatures stable.
+### Phase C — Remove Duplicate Office Write Logic from Controller
+- 將 `BasicInformationOfficesController::saveas()` 的交易寫入流程收斂到 Office workflow repository（新增 `officeCloneById` 之類方法）。
+- 移除 controller 內重複 `insertAddr` 寫法，避免雙實作漂移。
 
-### Phase 1 — Office/Posting Extraction
-- Move `officeStoreById`, `officeUpdateById`, `officeDeleteById` into a dedicated module.
-- Ensure transaction boundary stays in the new module.
-- Keep `BiogMainRepository` methods as wrappers (deprecated comments).
+**Acceptance**
+- `saveas()` 行為與既有 UI 流程一致。
+- 新增/補強對 `saveas` 的 Feature 測試（至少涵蓋新增 posting + address + operation）。
 
-### Phase 2 — Other Modules Extraction
-- Move each workflow in small batches (one module at a time).
-- Update all call sites to use new module classes.
+### Phase D — Extract Remaining Workflows (One Module at a Time)
+- 依風險與耦合度分批搬移：
+  1. Status + Event
+  2. Assoc + Kinship
+  3. Entry + Possession + SocialInst + Source
+- 每批均採「先搬內部、後替換呼叫點」策略，避免大爆炸。
 
-### Phase 3 — Cleanup
-- Remove deprecated methods in `BiogMainRepository`.
-- Update documentation and architecture notes.
+**Acceptance**
+- 每批搬移後，受影響測試與 smoke test 維持綠燈。
 
-## Risk & Mitigation
-- **Risk**: accidental transaction split
-  - **Mitigation**: enforce transactional entry points in new module classes
-- **Risk**: inconsistent operation/audit logging
-  - **Mitigation**: logging remains within workflow modules
-- **Risk**: unknown call sites
-  - **Mitigation**: search for method usage and update one module at a time
+### Phase E — Final Cleanup
+- 移除 `BiogMainRepository` 中已完全轉移的方法與過渡註記。
+- 更新架構文檔（本檔、必要時補 `AGENTS.md` / `CHANGELOG.md`）。
 
-## Suggested Class Names
-- `BiogBasicInfoRepository`
-- `PostingRepository`
-- `RelationshipRepository`
-- `EventStatusRepository`
-- `EntryRepository`
-- `PossessionRepository`
-- `InstitutionRepository`
+## Risks and Mitigations (Reality-Based)
+- 風險：交易被拆開，導致三表資料不一致  
+  對策：workflow 類別只暴露交易入口，不暴露碎片化寫入 API。
+- 風險：`operations.resource_id` 或 `resource_data` 格式漂移，影響復原/審計  
+  對策：沿用既有 helper（`CompositePrimaryKey`）與既有測試斷言。
+- 風險：控制器仍有重複寫入邏輯，重構後兩邊行為分叉  
+  對策：優先完成 Phase C，確保 Office 寫入單一實作來源。
 
 ## Tracking
-This plan is informational only. No code changes are made on this branch.
+- 本檔為實施計畫文件，可隨重構進度更新。
+- 每完成一個 phase，請在 PR 描述附上：
+  - 受影響方法清單
+  - 新增/調整測試清單
+  - 與 baseline 的差異說明（應為「無行為差異」或明確列出差異）
 
 ## Version
-- Version: 0.1
-- Date: 2026-02-10
+- Version: 0.2
+- Date: 2026-02-12

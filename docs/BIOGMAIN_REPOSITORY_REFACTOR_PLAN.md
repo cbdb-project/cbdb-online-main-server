@@ -53,6 +53,19 @@ Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽�
 **Acceptance**
 - 上述測試在重構前全綠，作為 baseline。
 
+**Execution Record (Completed, 2026-02-12)**
+- 測試命令：
+  - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php`
+- 結果：
+  - `OK (17 tests, 59 assertions)`
+- `office*ById` 直接呼叫點（遷移影響面）：
+  - `app/Http/Controllers/BasicInformationOfficesController.php`
+  - `tests/Feature/OfficePostingStoreTest.php`
+  - `tests/Feature/OfficeAddressOperationLoggingTest.php`
+  - `tests/Feature/OfficeIdChangeAddressLossTest.php`
+- `office*ById` 定義位置（待 Phase B 搬移）：
+  - `app/Repositories/BiogMainRepository.php`
+
 ### Phase B — Office Workflow Internal Extraction (No External Behavior Change)
 - 新增 `OfficePostingRepository`，搬移：
   - `officeStoreById`

@@ -41,6 +41,7 @@ class AssocDataDeleteTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('ASSOC_CODES');
@@ -113,6 +114,22 @@ class AssocDataDeleteTest extends TestCase {
             $table->json('resource_original')->nullable();
             $table->smallInteger('crowdsourcing_status')->default(0);
             $table->timestamps();
+        });
+
+        // audit_log 表（供 audit 記錄寫入）
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->id();
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 26);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->text('old_data')->nullable();
+            $table->text('new_data')->nullable();
         });
     }
 

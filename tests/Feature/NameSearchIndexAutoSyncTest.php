@@ -68,6 +68,22 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             $table->timestamps();
         });
 
+        // audit_log 表（供審計記錄寫入）
+        Schema::create('audit_log', function ($table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+
         // BIOG_MAIN 表
         Schema::create('BIOG_MAIN', function ($table) {
             $table->integer('c_personid')->primary();
@@ -131,6 +147,18 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             ['c_name_type_code' => 4, 'c_name_type_desc' => 'zi', 'c_name_type_desc_chn' => '字'],
             ['c_name_type_code' => 5, 'c_name_type_desc' => 'hao', 'c_name_type_desc_chn' => '號'],
         ]);
+    }
+
+    protected function tearDown(): void {
+        Schema::dropIfExists('ALTNAME_CODES');
+        Schema::dropIfExists('CBDB__TRAD_SIMP_MAP');
+        Schema::dropIfExists('CBDB__NAME_FTS');
+        Schema::dropIfExists('ALTNAME_DATA');
+        Schema::dropIfExists('BIOG_MAIN');
+        Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('operations');
+        Schema::dropIfExists('users');
+        parent::tearDown();
     }
 
     protected function createActiveExpert(): User {

@@ -54,11 +54,23 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
 ## Progress Tracker
 - [x] Create migration for `audit_log` (`database/migrations/2026_02_08_000000_create_audit_log_table.php`)
 - [x] Add AuditLog service (create)
-- [ ] Integrate `BIOG_MAIN` repository writes
+- [~] Integrate `BIOG_MAIN` writes (currently split across `BiogMainRepository` and controller/API paths)
 - [x] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
-- [ ] Integrate remaining `/basicinformation` tables
-- [ ] Ensure transactional writes for audit + data changes
-- [ ] Add SQLite migration coverage in tests
+- [~] Integrate remaining `/basicinformation` tables (core CRUD paths mostly covered, but quality gaps remain in some legacy flows)
+- [~] Ensure transactional writes for audit + data changes (partially done; several controller paths still write without single transaction boundary)
+- [~] Add SQLite migration/test coverage in tests (multiple feature tests now create `audit_log`; assertion coverage for audit behavior is still incomplete)
+
+## Known Issues (Current Branch)
+- **Transaction consistency gaps**:
+  - Multiple controller write paths still execute `data write -> operations write -> audit_log write` without wrapping all steps in one DB transaction.
+  - A partial failure can leave data/operations/audit out of sync.
+- **ALTNAME delete predicate risk**:
+  - Some delete paths use `LIKE` matching for `c_alt_name_chn`, which can affect multiple rows.
+  - Current audit logging on these paths records only one row snapshot, so audit may be incomplete if multiple rows are deleted.
+- **Test coverage gaps**:
+  - Several feature tests were updated to create `audit_log` schema only, but do not yet assert audit payload correctness (row count, operation type, PK serialization, before/after snapshot).
+- **Progress semantics caveat**:
+  - "Integrated" currently means "hooks added on major CRUD paths", not "fully transactional and fully asserted across all legacy entry points".
 
 ## Planned Touchpoints
 - `app/Services/AuditLogService.php`
@@ -149,7 +161,10 @@ Escaping example:
 Audit logs should be written at the Repository/Service layer within the same database transaction as the data change. This avoids divergence between row data and audit log entries.
 
 Note (current implementation):
-- `BIOG_MAIN` inserts are currently performed in `BasicInformationController` (including `saveas` and `Duplicate_Collateral_Info`) and in `Api\OperationsController@storeProcess`. Audit log writes have been added on these paths and are executed in the same transaction as the data write.
+- `BIOG_MAIN` writes are currently split between `BiogMainRepository` and controller/API paths (`BasicInformationController`, `Api\OperationsController@storeProcess`).
+- `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes are integrated in transaction-based repository flows.
+- Remaining `/basicinformation` target tables (`ALTNAME_DATA`, `BIOG_ADDR_DATA`, `BIOG_TEXT_DATA`, `ENTRY_DATA`, plus `STATUS_DATA`, `KIN_DATA`, `POSSESSION_DATA`, `BIOG_INST_DATA`, `EVENTS_DATA`, `ASSOC_DATA`, `BIOG_SOURCE_DATA`) now emit row-level audit logs on CRUD paths.
+- Some legacy write paths are still controller-centric and should be gradually refactored toward repository/service-level transactional writes.
 
 ## Non-Goals (for this initial proposal)
 - No JSON indexes or additional search columns (to avoid premature redundancy).
@@ -163,5 +178,5 @@ If history lookup becomes too slow or volume grows:
 - Consider partitioning in MariaDB for very large volumes.
 
 ## Version
-- Version: 0.2
-- Date: 2026-02-07
+- Version: 0.3
+- Date: 2026-02-11

@@ -6,6 +6,7 @@ use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\AuditLogService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -142,12 +143,27 @@ class BasicInformationAltnamesController extends Controller {
 
         // 使用 Query Builder 插入資料
         DB::table('ALTNAME_DATA')->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_sequence' => $data['c_sequence'],
             'c_alt_name_chn' => $data['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'],
         ]), $data);
+        (new AuditLogService())->write(
+            'ALTNAME_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_sequence' => $data['c_sequence'],
+                'c_alt_name_chn' => $data['c_alt_name_chn'],
+                'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         // 手動調用索引服務
         if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
@@ -321,12 +337,27 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->update($data);
 
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_sequence' => $data['c_sequence'],
             'c_alt_name_chn' => $data['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'],
         ]), $data, $ori);
+        (new AuditLogService())->write(
+            'ALTNAME_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $id,
+                'c_sequence' => $data['c_sequence'],
+                'c_alt_name_chn' => $data['c_alt_name_chn'],
+                'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+            ],
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         // 手動調用索引服務
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -396,7 +427,7 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->first();
 
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', $alt, $row);
 
         // 使用 Query Builder 刪除資料
         DB::table('ALTNAME_DATA')->where([
@@ -405,6 +436,21 @@ class BasicInformationAltnamesController extends Controller {
             ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
             ['c_alt_name_type_code', '=', $addr_l[3]],
         ])->delete();
+        (new AuditLogService())->write(
+            'ALTNAME_DATA',
+            'DELETE',
+            [
+                'c_personid' => $addr_l[0],
+                'c_sequence' => $addr_l[1],
+                'c_alt_name_chn' => $addr_l[2],
+                'c_alt_name_type_code' => $addr_l[3],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         // 手動調用索引服務清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {
@@ -681,7 +727,17 @@ class BasicInformationAltnamesController extends Controller {
             'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
         ];
-        $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+        (new AuditLogService())->write(
+            'ALTNAME_DATA',
+            'UPDATE',
+            $newPk,
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         // 更新索引
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -771,7 +827,7 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         // 記錄操作
-        $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
 
         // 刪除資料（需要重新構建 query builder）
         $deleteQuery = DB::table('ALTNAME_DATA')->where($conditions);
@@ -781,6 +837,16 @@ class BasicInformationAltnamesController extends Controller {
             $deleteQuery->whereNull('c_sequence');
         }
         $deleteQuery->delete();
+        (new AuditLogService())->write(
+            'ALTNAME_DATA',
+            'DELETE',
+            $pk,
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         // 清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {

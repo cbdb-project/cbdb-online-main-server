@@ -177,6 +177,22 @@ class FormUrlEncodingTest extends TestCase {
             $table->timestamps();
         });
 
+        // 創建 audit_log 表（供審計記錄寫入）
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->id();
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 26);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->text('old_data')->nullable();
+            $table->text('new_data')->nullable();
+        });
+
         // 注意：ASSOC_DATA 相關表不需要創建，因為我們只測試編解碼邏輯
         // 完整的 ASSOC_DATA 編輯頁面依賴太多外部表（SOCIAL_INSTITUTION_CODES、ADDR_CODES 等）
         // 無法在 in-memory SQLite 中輕鬆測試

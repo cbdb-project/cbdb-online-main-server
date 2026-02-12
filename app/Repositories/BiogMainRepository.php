@@ -1263,11 +1263,25 @@ class BiogMainRepository {
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $c_personid,
             'c_sequence' => $data['c_sequence'],
             'c_status_code' => $data['c_status_code'],
         ]), $data, $row);
+        (new AuditLogService())->write(
+            'STATUS_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_sequence' => $data['c_sequence'],
+                'c_status_code' => $data['c_status_code'],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $data;
     }
@@ -1280,11 +1294,25 @@ class BiogMainRepository {
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('STATUS_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_sequence' => $data['c_sequence'],
             'c_status_code' => $data['c_status_code'],
         ]), $data);
+        (new AuditLogService())->write(
+            'STATUS_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_sequence' => $data['c_sequence'],
+                'c_status_code' => $data['c_status_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $data;
     }
@@ -1305,11 +1333,25 @@ class BiogMainRepository {
             ['c_sequence', '=', $temp_l[1]],
             ['c_status_code', '=', $temp_l[2]],
         ])->delete();
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $temp_l[0],
             'c_sequence' => $temp_l[1],
             'c_status_code' => $temp_l[2],
         ]), $row);
+        (new AuditLogService())->write(
+            'STATUS_DATA',
+            'DELETE',
+            [
+                'c_personid' => $temp_l[0],
+                'c_sequence' => $temp_l[1],
+                'c_status_code' => $temp_l[2],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
     }
 
     public function kinshipById($id) {
@@ -1354,6 +1396,7 @@ class BiogMainRepository {
     }
 
     public function kinshipUpdateById(Request $request, $id, $id_) {
+        $auditLog = new AuditLogService();
         $id_ = str_replace("--", "-minus", $id_);
         $temp_l = explode("-", $id_);
         foreach ($temp_l as $key => $value) {
@@ -1383,11 +1426,26 @@ class BiogMainRepository {
             ['c_kin_code', '=', $temp_l[2]],
         ])->update($data);
         $ori_data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_kin_id' => $data['c_kin_id'],
             'c_kin_code' => $data['c_kin_code'],
         ]), $data, $row);
+        $operationId = $operation ? (string) $operation->id : null;
+        $auditLog->write(
+            'KIN_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_kin_code' => $data['c_kin_code'],
+            ],
+            $auditLog->normalizeRow($row),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operationId
+        );
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $kin_id;
         $data = Arr::except($data, ['c_kin_id']);
@@ -1430,9 +1488,28 @@ class BiogMainRepository {
                 });
             }
 
+            $mirroredRows = (clone $updateQuery)->get();
             $updateQuery->update($data);
         } else {
-            DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]])->update($data);
+            $updateQuery = DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]]);
+            $mirroredRows = (clone $updateQuery)->get();
+            $updateQuery->update($data);
+        }
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+            $newMirroredData = array_merge($oldMirroredData, $data);
+
+            $auditLog->write(
+                'KIN_DATA',
+                'UPDATE',
+                $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData),
+                $oldMirroredData,
+                $newMirroredData,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
         }
         $ori_data['err'] = count($sum) ?? 0;
 
@@ -1440,6 +1517,7 @@ class BiogMainRepository {
     }
 
     public function kinshipStoreById(Request $request, $id) {
+        $auditLog = new AuditLogService();
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
         $data = Arr::except($data, ['_token', 'c_kinship_pair']);
@@ -1450,21 +1528,51 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('KIN_DATA')->insert($data);
         $ori_Data = $data;
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_kin_id' => $data['c_kin_id'],
             'c_kin_code' => $data['c_kin_code'],
         ]), $data);
+        $operationId = $operation ? (string) $operation->id : null;
+        $auditLog->write(
+            'KIN_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_kin_code' => $data['c_kin_code'],
+            ],
+            null,
+            $ori_Data,
+            'user',
+            (string) Auth::id(),
+            $operationId
+        );
         $data['c_kin_code'] = $kin_pair;
         $data['c_personid'] = $data['c_kin_id'];
         $data['c_kin_id'] = $id;
         DB::table('KIN_DATA')->insert($data);
+        $auditLog->write(
+            'KIN_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_kin_code' => $data['c_kin_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operationId
+        );
 
         //return $tts;
         return $ori_Data;
     }
 
     public function kinshipDeleteById($id, $id_) {
+        $auditLog = new AuditLogService();
         $operationRepository = new OperationRepository();
         $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
@@ -1482,11 +1590,26 @@ class BiogMainRepository {
         $old_kin_code = $row->c_kin_code;
         $kin_code_pair = KinshipCode::find($old_kin_code);
 
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $temp_l[0],
             'c_kin_id' => $temp_l[1],
             'c_kin_code' => $temp_l[2],
         ]), $row);
+        $operationId = $operation ? (string) $operation->id : null;
+        $auditLog->write(
+            'KIN_DATA',
+            'DELETE',
+            [
+                'c_personid' => $temp_l[0],
+                'c_kin_id' => $temp_l[1],
+                'c_kin_code' => $temp_l[2],
+            ],
+            $auditLog->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operationId
+        );
 
         $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
             $query->where('c_kin_id', $row->c_personid)
@@ -1532,6 +1655,7 @@ class BiogMainRepository {
                 });
             }
 
+            $mirroredRows = (clone $deleteQuery)->get();
             $deleteQuery->delete();
         } elseif ($row2 !== null) {
             $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
@@ -1554,7 +1678,24 @@ class BiogMainRepository {
                 });
             }
 
+            $mirroredRows = (clone $deleteQuery)->get();
             $deleteQuery->delete();
+        } else {
+            $mirroredRows = collect();
+        }
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            $auditLog->write(
+                'KIN_DATA',
+                'DELETE',
+                $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData),
+                $mirroredRowData,
+                null,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
         }
     }
 
@@ -1587,7 +1728,17 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data);
         $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->first();
         DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
+        (new AuditLogService())->write(
+            'POSSESSION_DATA',
+            'UPDATE',
+            ['c_possession_record_id' => $id_],
+            (new AuditLogService())->normalizeRow($ori),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
     }
 
     public function possessionStoreById(Request $request, $id) {
@@ -1606,7 +1757,17 @@ class BiogMainRepository {
         //移動到這裡
         $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
         //修改結束
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+        (new AuditLogService())->write(
+            'POSSESSION_DATA',
+            'INSERT',
+            ['c_possession_record_id' => $data['c_possession_record_id']],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $data['c_possession_record_id'];
     }
@@ -1615,7 +1776,17 @@ class BiogMainRepository {
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
         DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
         DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $row->c_possession_record_id)->delete();
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
+        (new AuditLogService())->write(
+            'POSSESSION_DATA',
+            'DELETE',
+            ['c_possession_record_id' => $id],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
     }
 
     public function socialInstById($id) {
@@ -1696,7 +1867,22 @@ class BiogMainRepository {
             'c_inst_name_code' => $data['c_inst_name_code'],
             'c_bi_role_code' => $data['c_bi_role_code'],
         ]);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
+        (new AuditLogService())->write(
+            'BIOG_INST_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_inst_code' => $data['c_inst_code'],
+                'c_inst_name_code' => $data['c_inst_name_code'],
+                'c_bi_role_code' => $data['c_bi_role_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $newid;
     }
@@ -1758,7 +1944,24 @@ class BiogMainRepository {
                 'c_bi_role_code' => $row->c_bi_role_code,
             ])
             : $id;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $instResourceId, $row);
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $instResourceId, $row);
+        if ($row) {
+            (new AuditLogService())->write(
+                'BIOG_INST_DATA',
+                'DELETE',
+                [
+                    'c_personid' => $row->c_personid,
+                    'c_inst_code' => $row->c_inst_code,
+                    'c_inst_name_code' => $row->c_inst_name_code,
+                    'c_bi_role_code' => $row->c_bi_role_code,
+                ],
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        }
     }
 
     public function eventById($id) {
@@ -1837,11 +2040,25 @@ class BiogMainRepository {
         }
         $updateQuery->update($data);
 
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_sequence' => $data['c_sequence'],
             'c_event_code' => $data['c_event_code'],
         ]), $data, $ori);
+        (new AuditLogService())->write(
+            'EVENTS_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $id,
+                'c_sequence' => $data['c_sequence'],
+                'c_event_code' => $data['c_event_code'],
+            ],
+            (new AuditLogService())->normalizeRow($ori),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
@@ -1856,11 +2073,25 @@ class BiogMainRepository {
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('EVENTS_DATA')->insert($data);
 
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_sequence' => $data['c_sequence'],
             'c_event_code' => $data['c_event_code'],
         ]), $data);
+        (new AuditLogService())->write(
+            'EVENTS_DATA',
+            'INSERT',
+            [
+                'c_personid' => $id,
+                'c_sequence' => $data['c_sequence'],
+                'c_event_code' => $data['c_event_code'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return ['c_sequence' => $data['c_sequence'], 'c_event_code' => $data['c_event_code']];
     }
@@ -1886,11 +2117,25 @@ class BiogMainRepository {
             ->where('c_event_code', $row->c_event_code)
             ->delete();
 
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'EVENTS_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $c_personid,
             'c_sequence' => $row->c_sequence,
             'c_event_code' => $row->c_event_code,
         ]), $row);
+        (new AuditLogService())->write(
+            'EVENTS_DATA',
+            'DELETE',
+            [
+                'c_personid' => $c_personid,
+                'c_sequence' => $row->c_sequence,
+                'c_event_code' => $row->c_event_code,
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
     }
 
     public function assocById($id) {
@@ -2225,7 +2470,7 @@ class BiogMainRepository {
         $data['c_personid'] = $c_personid;
         // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
         // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_assoc_code' => $data['c_assoc_code'],
             'c_assoc_id' => $data['c_assoc_id'],
@@ -2236,6 +2481,26 @@ class BiogMainRepository {
             'c_text_title' => $data['c_text_title'] ?? '',
             'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
         ]), $data, $row);
+        (new AuditLogService())->write(
+            'ASSOC_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+                'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+                'c_text_title' => $data['c_text_title'] ?? '',
+                'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         //20210702取得成對資料原本的c_kin_code
         $data['c_kin_code'] = $kin_pair;
         $data['c_assoc_kin_code'] = $assoc_kin_pair;
@@ -2291,7 +2556,7 @@ class BiogMainRepository {
         $ori_Data = $data;
         // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
         // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_assoc_code' => $data['c_assoc_code'],
             'c_assoc_id' => $data['c_assoc_id'],
@@ -2302,6 +2567,26 @@ class BiogMainRepository {
             'c_text_title' => $data['c_text_title'] ?? '',
             'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
         ]), $data);
+        (new AuditLogService())->write(
+            'ASSOC_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+                'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+                'c_text_title' => $data['c_text_title'] ?? '',
+                'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         $data['c_assoc_code'] = $assoc_pair;
         $data['c_personid'] = $data['c_assoc_id'];
         $data['c_assoc_id'] = $id;
@@ -2474,7 +2759,29 @@ class BiogMainRepository {
                 'c_assoc_first_year' => $row->c_assoc_first_year ?? '-9999',
             ])
             : $id;
-        (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $assocResourceId, $row);
+        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $assocResourceId, $row);
+        if ($row) {
+            (new AuditLogService())->write(
+                'ASSOC_DATA',
+                'DELETE',
+                [
+                    'c_personid' => $row->c_personid,
+                    'c_assoc_code' => $row->c_assoc_code,
+                    'c_assoc_id' => $row->c_assoc_id,
+                    'c_kin_code' => $row->c_kin_code,
+                    'c_kin_id' => $row->c_kin_id,
+                    'c_assoc_kin_code' => $row->c_assoc_kin_code,
+                    'c_assoc_kin_id' => $row->c_assoc_kin_id,
+                    'c_text_title' => $row->c_text_title ?? '',
+                    'c_assoc_first_year' => $row->c_assoc_first_year ?? '-9999',
+                ],
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        }
 
         // 檢查$row2是否存在後再刪除反向關係
         // 修正：使用完整主鍵欄位進行刪除，避免誤刪其他記錄
@@ -2557,11 +2864,25 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->update($data);
-        (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_textid' => $data['c_textid'],
             'c_pages' => $data['c_pages'],
         ]), $data, $row);
+        (new AuditLogService())->write(
+            'BIOG_SOURCE_DATA',
+            'UPDATE',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_textid' => $data['c_textid'],
+                'c_pages' => $data['c_pages'],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $data;
     }
@@ -2579,11 +2900,25 @@ class BiogMainRepository {
         $data['c_created_by'] = $c_created_by;
         $data['c_created_date'] = $c_created_date;
         DB::table('BIOG_SOURCE_DATA')->insert($data);
-        (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_textid' => $data['c_textid'],
             'c_pages' => $data['c_pages'],
         ]), $data);
+        (new AuditLogService())->write(
+            'BIOG_SOURCE_DATA',
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_textid' => $data['c_textid'],
+                'c_pages' => $data['c_pages'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         return $data;
     }
@@ -2607,11 +2942,25 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->delete();
-        (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+        $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $temp_l[0],
             'c_textid' => $temp_l[1],
             'c_pages' => $temp_l[2],
         ]), $row);
+        (new AuditLogService())->write(
+            'BIOG_SOURCE_DATA',
+            'DELETE',
+            [
+                'c_personid' => $temp_l[0],
+                'c_textid' => $temp_l[1],
+                'c_pages' => $temp_l[2],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
     }
 
     protected function addr_str($id) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -146,11 +147,25 @@ class BasicInformationTextsController extends Controller {
             return redirect()->back();
         }
         DB::table($this->table_name)->insert($data);
-        $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_textid' => $data['c_textid'],
             'c_role_id' => $data['c_role_id'],
         ]), $data);
+        (new AuditLogService())->write(
+            $this->table_name,
+            'INSERT',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_textid' => $data['c_textid'],
+                'c_role_id' => $data['c_role_id'],
+            ],
+            null,
+            $data,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -254,11 +269,25 @@ class BasicInformationTextsController extends Controller {
             ['c_role_id', '=', $temp_l[2]],
         ])->update($data);
         $data['c_personid'] = $temp_l[0];
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_textid' => $data['c_textid'],
             'c_role_id' => $data['c_role_id'],
         ]), $data, $ori);
+        (new AuditLogService())->write(
+            $this->table_name,
+            'UPDATE',
+            [
+                'c_personid' => $data['c_personid'],
+                'c_textid' => $data['c_textid'],
+                'c_role_id' => $data['c_role_id'],
+            ],
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -302,11 +331,25 @@ class BasicInformationTextsController extends Controller {
             ['c_textid', '=', $temp_l[1]],
             ['c_role_id', '=', $temp_l[2]],
         ])->delete();
-        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $temp_l[0],
             'c_textid' => $temp_l[1],
             'c_role_id' => $temp_l[2],
         ]), $row);
+        (new AuditLogService())->write(
+            $this->table_name,
+            'DELETE',
+            [
+                'c_personid' => $temp_l[0],
+                'c_textid' => $temp_l[1],
+                'c_role_id' => $temp_l[2],
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.texts.index', ['basicinformation' => $id]);
@@ -434,7 +477,17 @@ class BasicInformationTextsController extends Controller {
             'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
             'c_role_id' => $data['c_role_id'] ?? $c_role_id,
         ];
-        $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+        (new AuditLogService())->write(
+            $this->table_name,
+            'UPDATE',
+            $newPk,
+            (new AuditLogService())->normalizeRow($ori),
+            array_merge((new AuditLogService())->normalizeRow($ori), $data),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -489,11 +542,25 @@ class BasicInformationTextsController extends Controller {
         DB::table($this->table_name)->where($conditions)->delete();
 
         // 記錄操作
-        $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
+        $operation = $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $pk['c_personid'],
             'c_textid' => $pk['c_textid'],
             'c_role_id' => $c_role_id,
         ]), $row);
+        (new AuditLogService())->write(
+            $this->table_name,
+            'DELETE',
+            [
+                'c_personid' => $pk['c_personid'],
+                'c_textid' => $pk['c_textid'],
+                'c_role_id' => $c_role_id,
+            ],
+            (new AuditLogService())->normalizeRow($row),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

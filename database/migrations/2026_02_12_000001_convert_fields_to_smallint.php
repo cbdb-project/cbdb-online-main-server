@@ -7,12 +7,14 @@ require_once __DIR__ . '/helpers.php';
 
 return new class () extends Migration {
     /**
-     * 將 42 個欄位從 INT/DOUBLE 轉換為 SMALLINT (修正版)
+     * 將欄位從 INT/DOUBLE 轉換為 SMALLINT (修正版)
      *
      * 修正內容:
      * 1. ✅ 完整的 FK 刪除 (涵蓋 parent 和 child 欄位)
      * 2. ✅ 保留 CASCADE 行為 (ON DELETE/UPDATE)
      * 3. ✅ SQLite 兼容性 (使用 is_sqlite() 判斷)
+     * 4. ✅ FK 恢復使用明確清單，確保重跑時也能正確恢復
+     * 5. ✅ 涵蓋 ADMIN_CAT_CODE_TYPE_REL.c_admin_cat_code
      */
     public function up(): void {
         // SQLite: 測試環境使用 in-memory 資料庫，每次重建，跳過此 migration
@@ -23,61 +25,41 @@ return new class () extends Migration {
         // MySQL/MariaDB: 執行完整的修改流程
         if (is_mysql()) {
             // 1. 移除相關的外鍵約束
-            $foreignKeys = $this->dropForeignKeys();
+            $this->dropForeignKeys();
 
             // 2. 修改欄位型別
             $this->modifyColumnTypes();
 
             // 3. 重新建立外鍵約束 (包含 CASCADE 行為)
-            $this->restoreForeignKeys($foreignKeys);
+            $this->restoreForeignKeys();
         }
     }
 
     /**
      * 移除相關的外鍵約束 (涵蓋 parent 和 child 欄位)
      */
-    private function dropForeignKeys(): array {
-        $foreignKeys = [];
-
-        // 查詢所有需要處理的外鍵 (包含 CASCADE 行為)
-        // 使用 JOIN 取得 UPDATE_RULE 和 DELETE_RULE
+    private function dropForeignKeys(): void {
+        // 查詢所有需要處理的外鍵
         $constraints = DB::select("
             SELECT
                 kcu.TABLE_NAME,
-                kcu.COLUMN_NAME,
-                kcu.CONSTRAINT_NAME,
-                kcu.REFERENCED_TABLE_NAME,
-                kcu.REFERENCED_COLUMN_NAME,
-                rc.UPDATE_RULE,
-                rc.DELETE_RULE
+                kcu.CONSTRAINT_NAME
             FROM information_schema.KEY_COLUMN_USAGE kcu
-            JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
-                ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
-                AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
             WHERE kcu.TABLE_SCHEMA = DATABASE()
             AND kcu.CONSTRAINT_NAME != 'PRIMARY'
             AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
             AND (
                 -- ===== Child FK: 修改的是外鍵欄位 =====
-                -- ADDR_CODES
                 (kcu.TABLE_NAME = 'ADDR_CODES' AND kcu.COLUMN_NAME = 'c_admin_cat_code')
-                -- ASSOC_DATA
+                OR (kcu.TABLE_NAME = 'ADMIN_CAT_CODE_TYPE_REL' AND kcu.COLUMN_NAME = 'c_admin_cat_code')
                 OR (kcu.TABLE_NAME = 'ASSOC_DATA' AND kcu.COLUMN_NAME IN ('c_inst_code', 'c_litgenre_code', 'c_occasion_code', 'c_topic_code'))
-                -- BIOG_ADDR_DATA
                 OR (kcu.TABLE_NAME = 'BIOG_ADDR_DATA' AND kcu.COLUMN_NAME IN ('c_firstyear', 'c_lastyear'))
-                -- BIOG_INST_DATA
                 OR (kcu.TABLE_NAME = 'BIOG_INST_DATA' AND kcu.COLUMN_NAME = 'c_inst_code')
-                -- ENTRY_DATA
                 OR (kcu.TABLE_NAME = 'ENTRY_DATA' AND kcu.COLUMN_NAME = 'c_inst_code')
-                -- EVENTS_ADDR
                 OR (kcu.TABLE_NAME = 'EVENTS_ADDR' AND kcu.COLUMN_NAME = 'c_event_code')
-                -- EVENTS_DATA
                 OR (kcu.TABLE_NAME = 'EVENTS_DATA' AND kcu.COLUMN_NAME = 'c_event_code')
-                -- POSTED_TO_OFFICE_DATA
                 OR (kcu.TABLE_NAME = 'POSTED_TO_OFFICE_DATA' AND kcu.COLUMN_NAME = 'c_inst_code')
-                -- SOCIAL_INSTITUTION_ADDR
                 OR (kcu.TABLE_NAME = 'SOCIAL_INSTITUTION_ADDR' AND kcu.COLUMN_NAME = 'c_inst_code')
-                -- TEXT_INSTANCE_DATA
                 OR (kcu.TABLE_NAME = 'TEXT_INSTANCE_DATA' AND kcu.COLUMN_NAME IN ('c_extant', 'c_text_edition_id', 'c_text_instance_id'))
 
                 -- ===== Parent FK: 修改的是被引用欄位 =====
@@ -102,13 +84,9 @@ return new class () extends Migration {
             )
         ");
 
-        // 移除外鍵並記錄以便稍後恢復
         foreach ($constraints as $constraint) {
-            $foreignKeys[] = $constraint;
             DB::statement("ALTER TABLE `{$constraint->TABLE_NAME}` DROP FOREIGN KEY `{$constraint->CONSTRAINT_NAME}`");
         }
-
-        return $foreignKeys;
     }
 
     /**
@@ -120,6 +98,9 @@ return new class () extends Migration {
 
         // ADMIN_CAT_CODES
         DB::statement("ALTER TABLE `ADMIN_CAT_CODES` MODIFY COLUMN `c_admin_cat_code` SMALLINT NOT NULL");
+
+        // ADMIN_CAT_CODE_TYPE_REL
+        DB::statement("ALTER TABLE `ADMIN_CAT_CODE_TYPE_REL` MODIFY COLUMN `c_admin_cat_code` SMALLINT NOT NULL");
 
         // ASSOC_DATA
         DB::statement("ALTER TABLE `ASSOC_DATA` MODIFY COLUMN `c_assoc_first_year` SMALLINT NOT NULL DEFAULT -9999");
@@ -198,27 +179,50 @@ return new class () extends Migration {
 
         // TEXT_INSTANCE_DATA
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_extant` SMALLINT");
+        DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_pub_year` SMALLINT");
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_text_edition_id` SMALLINT NOT NULL");
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_text_instance_id` SMALLINT NOT NULL");
     }
 
     /**
-     * 重新建立外鍵約束 (包含 CASCADE 行為)
+     * 重新建立外鍵約束 (使用明確清單，確保重跑時也能正確恢復)
+     *
+     * 不依賴 dropForeignKeys() 的動態結果，而是使用完整的預期 FK 清單。
+     * 每個 FK 先檢查是否已存在，避免重複建立。
      */
-    private function restoreForeignKeys(array $foreignKeys): void {
-        foreach ($foreignKeys as $fk) {
-            // 建構 ON DELETE 和 ON UPDATE 子句
-            $onDelete = $fk->DELETE_RULE ? "ON DELETE {$fk->DELETE_RULE}" : '';
-            $onUpdate = $fk->UPDATE_RULE ? "ON UPDATE {$fk->UPDATE_RULE}" : '';
+    private function restoreForeignKeys(): void {
+        $expectedFKs = [
+            ['table' => 'ADDR_CODES',             'column' => 'c_admin_cat_code', 'name' => 'fk_addr_codes_admin_cat_code',   'ref_table' => 'ADMIN_CAT_CODES',         'ref_column' => 'c_admin_cat_code'],
+            ['table' => 'ADMIN_CAT_CODE_TYPE_REL', 'column' => 'c_admin_cat_code', 'name' => 'fk_admin_cat_code',              'ref_table' => 'ADMIN_CAT_CODES',         'ref_column' => 'c_admin_cat_code'],
+            ['table' => 'ASSOC_DATA',              'column' => 'c_inst_code',      'name' => 'ASSOC_DATA_ibfk_3',              'ref_table' => 'SOCIAL_INSTITUTION_CODES', 'ref_column' => 'c_inst_code'],
+            ['table' => 'ASSOC_DATA',              'column' => 'c_litgenre_code',  'name' => 'ASSOC_DATA_ibfk_6',              'ref_table' => 'LITERARYGENRE_CODES',      'ref_column' => 'c_lit_genre_code'],
+            ['table' => 'ASSOC_DATA',              'column' => 'c_occasion_code',  'name' => 'ASSOC_DATA_ibfk_7',              'ref_table' => 'OCCASION_CODES',           'ref_column' => 'c_occasion_code'],
+            ['table' => 'ASSOC_DATA',              'column' => 'c_topic_code',     'name' => 'ASSOC_DATA_ibfk_11',             'ref_table' => 'SCHOLARLYTOPIC_CODES',     'ref_column' => 'c_topic_code'],
+            ['table' => 'BIOG_INST_DATA',          'column' => 'c_inst_code',      'name' => 'BIOG_INST_DATA_ibfk_7',          'ref_table' => 'SOCIAL_INSTITUTION_CODES', 'ref_column' => 'c_inst_code'],
+            ['table' => 'ENTRY_DATA',              'column' => 'c_inst_code',      'name' => 'ENTRY_DATA_ibfk_6',              'ref_table' => 'SOCIAL_INSTITUTION_CODES', 'ref_column' => 'c_inst_code'],
+            ['table' => 'EVENTS_DATA',             'column' => 'c_event_code',     'name' => 'EVENTS_DATA_ibfk_3',             'ref_table' => 'EVENT_CODES',              'ref_column' => 'c_event_code'],
+            ['table' => 'POSTED_TO_OFFICE_DATA',   'column' => 'c_inst_code',      'name' => 'POSTED_TO_OFFICE_DATA_ibfk_8',   'ref_table' => 'SOCIAL_INSTITUTION_CODES', 'ref_column' => 'c_inst_code'],
+            ['table' => 'SOCIAL_INSTITUTION_ADDR', 'column' => 'c_inst_code',      'name' => 'SOCIAL_INSTITUTION_ADDR_ibfk_3', 'ref_table' => 'SOCIAL_INSTITUTION_CODES', 'ref_column' => 'c_inst_code'],
+        ];
 
-            DB::statement("
-                ALTER TABLE `{$fk->TABLE_NAME}`
-                ADD CONSTRAINT `{$fk->CONSTRAINT_NAME}`
-                FOREIGN KEY (`{$fk->COLUMN_NAME}`)
-                REFERENCES `{$fk->REFERENCED_TABLE_NAME}` (`{$fk->REFERENCED_COLUMN_NAME}`)
-                {$onDelete}
-                {$onUpdate}
-            ");
+        foreach ($expectedFKs as $fk) {
+            $exists = DB::select("
+                SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+                WHERE CONSTRAINT_SCHEMA = DATABASE()
+                AND CONSTRAINT_NAME = ?
+                AND TABLE_NAME = ?
+            ", [$fk['name'], $fk['table']]);
+
+            if (empty($exists)) {
+                DB::statement("
+                    ALTER TABLE `{$fk['table']}`
+                    ADD CONSTRAINT `{$fk['name']}`
+                    FOREIGN KEY (`{$fk['column']}`)
+                    REFERENCES `{$fk['ref_table']}` (`{$fk['ref_column']}`)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE
+                ");
+            }
         }
     }
 
@@ -234,13 +238,13 @@ return new class () extends Migration {
         // MySQL/MariaDB: 執行回滾
         if (is_mysql()) {
             // 移除外鍵
-            $foreignKeys = $this->dropForeignKeys();
+            $this->dropForeignKeys();
 
             // 恢復原始型別
             $this->restoreOriginalTypes();
 
             // 恢復外鍵
-            $this->restoreForeignKeys($foreignKeys);
+            $this->restoreForeignKeys();
         }
     }
 
@@ -253,6 +257,9 @@ return new class () extends Migration {
 
         // ADMIN_CAT_CODES
         DB::statement("ALTER TABLE `ADMIN_CAT_CODES` MODIFY COLUMN `c_admin_cat_code` INT(11) NOT NULL");
+
+        // ADMIN_CAT_CODE_TYPE_REL
+        DB::statement("ALTER TABLE `ADMIN_CAT_CODE_TYPE_REL` MODIFY COLUMN `c_admin_cat_code` INT(11) NOT NULL");
 
         // ASSOC_DATA
         DB::statement("ALTER TABLE `ASSOC_DATA` MODIFY COLUMN `c_assoc_first_year` INT(11) NOT NULL DEFAULT -9999");
@@ -331,6 +338,7 @@ return new class () extends Migration {
 
         // TEXT_INSTANCE_DATA
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_extant` INT(11)");
+        DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_pub_year` VARCHAR(255)");
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_text_edition_id` INT(11) NOT NULL");
         DB::statement("ALTER TABLE `TEXT_INSTANCE_DATA` MODIFY COLUMN `c_text_instance_id` INT(11) NOT NULL");
     }

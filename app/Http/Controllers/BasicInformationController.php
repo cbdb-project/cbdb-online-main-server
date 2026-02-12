@@ -243,11 +243,6 @@ class BasicInformationController extends Controller {
     public function edit($id) {
         $personId = $this->normalizePersonId($id);
 
-        // 未登錄或無權限的用戶重定向到只讀頁面
-        if (!Auth::check() || !Auth::user()->isActive()) {
-            return redirect()->route('basicinformation.show', $personId);
-        }
-
         $biogbasicinformation = $this->biogMainRepository->byPersonId($personId);
 
         if (!$biogbasicinformation) {

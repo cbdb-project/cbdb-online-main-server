@@ -85,7 +85,7 @@ class BasicInformationOfficesSaveAsTest extends TestCase {
             'c_personid' => 999,
         ]);
 
-        $user = new class implements Authenticatable {
+        $user = new class () implements Authenticatable {
             public $id = 1;
             public $name = 'Testing Admin';
 
@@ -113,7 +113,8 @@ class BasicInformationOfficesSaveAsTest extends TestCase {
                 return null;
             }
 
-            public function setRememberToken($value): void {}
+            public function setRememberToken($value): void {
+            }
 
             public function getRememberTokenName() {
                 return 'remember_token';

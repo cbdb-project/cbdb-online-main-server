@@ -4,10 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
-use App\Models\BiogMain;
-use App\Repositories\BiogMainRepository;
-use App\Repositories\OperationRepository;
-use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -72,7 +68,7 @@ class BiogMainProposalTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
         });
-        
+
         // audit_log 表
         Schema::create('audit_log', function (Blueprint $table) {
             $table->bigIncrements('id');
@@ -154,7 +150,7 @@ class BiogMainProposalTest extends TestCase {
         $this->assertSame('Proposed notes', $payload['c_notes']);
         $this->assertSame('pending', $payload['__review_status']);
         $this->assertSame('修改個人簡介', $payload['__proposal_meta']['comment']);
-        
+
         // 驗證數據庫原始資料未變更
         $this->assertSame('Original notes', DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_notes'));
     }
@@ -198,7 +194,7 @@ class BiogMainProposalTest extends TestCase {
         ]);
 
         $response->assertRedirect();
-        
+
         $this->assertDatabaseHas('BIOG_MAIN', [
             'c_personid' => $personId,
             'c_notes' => 'New notes',
@@ -207,7 +203,7 @@ class BiogMainProposalTest extends TestCase {
         $operation->refresh();
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('approved', $payload['__review_status']);
-        
+
         // 驗證審計日誌
         $this->assertDatabaseHas('audit_log', [
             'table_name' => 'BIOG_MAIN',

@@ -230,14 +230,15 @@ class BiogMainRepository {
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
 
+        // 提取註解與動作，並從更新數據中移除，避免 SQL unknown column 錯誤
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode', 'action', '__proposal_comment']));
+
         $biogbasicinformation = BiogMain::find($id);
         $ori = $biogbasicinformation->toArray();
 
-        // 移除 Laravel 框架欄位，避免誤判為有變更
-        $dataForComparison = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode']));
-
         // 檢查是否有實質變更
-        $hasChanges = $this->hasMeaningfulChanges($dataForComparison, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
+        $hasChanges = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
 
         if (!$hasChanges) {
             return [
@@ -247,13 +248,19 @@ class BiogMainRepository {
 
         $data = (new ToolsRepository())->timestamp($data);
 
+        // 準備要存入 operations 表的數據，如果有的話加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
-            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori, 2);
+            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $operationData, $ori, 2);
         } else {
-            DB::transaction(function () use ($data, $id, $biogbasicinformation, $ori) {
+            DB::transaction(function () use ($data, $operationData, $id, $biogbasicinformation, $ori) {
                 $biogbasicinformation->update($data);
-                $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $data, $ori);
+                $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $operationData, $ori);
 
                 $newData = $biogbasicinformation->fresh()->toArray();
 

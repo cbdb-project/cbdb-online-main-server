@@ -317,17 +317,46 @@ class BasicInformationAddressesController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 解析舊格式的複合主鍵，轉換為陣列
+            $addr_l = explode("-", str_replace("--", "-minus", $addr));
+            $originalPk = [
+                'c_personid' => str_replace("minus", "-", $addr_l[0]),
+                'c_addr_id' => str_replace("minus", "-", $addr_l[1]),
+                'c_addr_type' => str_replace("minus", "-", $addr_l[2]),
+                'c_sequence' => str_replace("minus", "-", $addr_l[3]),
+            ];
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'addresses', $originalPk);
+        }
+
+        // 直接儲存需要額外權限檢查
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
 
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
 
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         $addr = str_replace("--", "-minus", $addr);
         $addr_l = explode("-", $addr);
@@ -350,12 +379,19 @@ class BasicInformationAddressesController extends Controller {
             ['c_sequence', '=', $addr_l[3]],
         ])->update($data);
         $data['c_personid'] = $addr_l[0];
+
+        // 準備要存入 operations 表的數據，加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
         $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_addr_id' => $data['c_addr_id'],
             'c_addr_type' => $data['c_addr_type'],
             'c_sequence' => $data['c_sequence'],
-        ]), $data, $ori);
+        ]), $operationData, $ori);
         (new AuditLogService())->write(
             'BIOG_ADDR_DATA',
             'UPDATE',
@@ -534,24 +570,41 @@ class BasicInformationAddressesController extends Controller {
 
             return redirect()->back();
         }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，請聯繫管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        if ($action === 'proposal') {
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'addresses', $pk);
+        }
+
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
-        $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
-
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
         // 準備更新資料
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
-        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 構建查詢條件
@@ -578,7 +631,14 @@ class BasicInformationAddressesController extends Controller {
             'c_addr_type' => $data['c_addr_type'] ?? $pk['c_addr_type'],
             'c_sequence' => $data['c_sequence'] ?? $pk['c_sequence'],
         ];
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+
+        // 準備存入 operations 的數據，加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
         (new AuditLogService())->write(
             'BIOG_ADDR_DATA',
             'UPDATE',

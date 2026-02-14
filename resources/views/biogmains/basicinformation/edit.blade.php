@@ -383,10 +383,10 @@
 
                 @if(!$readonly)
                     <div class="form-group row">
-                        <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
+                        <label for="__proposal_comment" class="col-sm-2 col-form-label">修改說明 / 提案理由</label>
                         <div class="col-sm-10">
-                            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="提交提案時請簡述修改原因或補充說明" {{ $disabled }}></textarea>
-                            <small class="text-muted">僅在提交提案時需要填寫，直接儲存時可略過</small>
+                            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）" {{ $disabled }}></textarea>
+                            <small class="text-muted">此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。</small>
                         </div>
                     </div>
                 @endif

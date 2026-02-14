@@ -485,7 +485,13 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 pieces.push(sourceLabel);
             }
             if (item.Pages) {
-                pieces.push('頁 ' + escapeHtml(item.Pages));
+                if (item.UrlApi) {
+                    var urlPart = encodeURIComponent(item.Pages);
+                    var fullUrl = item.UrlApi + urlPart + (item.UrlApiCoda || '');
+                    pieces.push('頁 <a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.Pages) + '</a>');
+                } else {
+                    pieces.push('頁 ' + escapeHtml(item.Pages));
+                }
             }
             itemHtml += (pieces.length ? pieces.join('，') : '<span class="empty">（空）</span>');
             if (item.Notes) {

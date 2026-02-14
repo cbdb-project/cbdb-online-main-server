@@ -144,7 +144,12 @@ Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽�
   - `EVENTS_DATA` 相關方法（含 `EVENTS_ADDR` 輔助方法）遷移至 `app/Repositories/EventStatusRepository.php`
   - `BiogMainRepository` 已完成 Status 與 Event 相關公開方法的委派呼叫
 - 驗證結果：
-  - 由於環境缺乏 PHP 執行環境，本地僅完成靜態檢查與代碼結構調整，需待 CI 或其他平台驗證
+  - `./vendor/bin/phpunit tests/Feature/EventStatusWriteActionsTest.php`
+  - `OK (6 tests, 35 assertions)`
+  - `./vendor/bin/phpunit --filter "CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
+  - `OK (27 tests, 106 assertions)`（另有既有 PHPUnit deprecations）
+  - `./vendor/bin/phpunit --filter "EventStatusWriteActionsTest|CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
+  - `OK (33 tests, 141 assertions)`（另有既有 PHPUnit deprecations）
 
 ## Version
 - Version: 0.5

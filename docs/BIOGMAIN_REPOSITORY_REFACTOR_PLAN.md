@@ -138,6 +138,19 @@ Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽�
   - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php tests/Feature/BasicInformationOfficesSaveAsTest.php`
   - `OK (18 tests, 66 assertions)`
 
+### Execution Record (In Progress, 2026-02-14)
+- Phase D 第一階段完成：
+  - `STATUS_DATA` 相關方法遷移至 `app/Repositories/EventStatusRepository.php`
+  - `EVENTS_DATA` 相關方法（含 `EVENTS_ADDR` 輔助方法）遷移至 `app/Repositories/EventStatusRepository.php`
+  - `BiogMainRepository` 已完成 Status 與 Event 相關公開方法的委派呼叫
+- 驗證結果：
+  - `./vendor/bin/phpunit tests/Feature/EventStatusWriteActionsTest.php`
+  - `OK (6 tests, 35 assertions)`
+  - `./vendor/bin/phpunit --filter "CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
+  - `OK (27 tests, 106 assertions)`（另有既有 PHPUnit deprecations）
+  - `./vendor/bin/phpunit --filter "EventStatusWriteActionsTest|CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
+  - `OK (33 tests, 141 assertions)`（另有既有 PHPUnit deprecations）
+
 ## Version
-- Version: 0.4
-- Date: 2026-02-13
+- Version: 0.5
+- Date: 2026-02-14

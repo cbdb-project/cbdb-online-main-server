@@ -304,6 +304,15 @@ class BasicInformationController extends Controller {
             return redirect()->back();
         }
 
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 基本資料表只有 c_personid 一個主鍵
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'biogmain', ['c_personid' => $id]);
+        }
+
         $result = $this->biogMainRepository->updateById($request, $id);
 
         // 檢查是否有實質變更

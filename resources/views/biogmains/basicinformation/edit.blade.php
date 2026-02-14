@@ -380,12 +380,30 @@
                     :modifiedBy="$basicinformation->c_modified_by"
                     :modifiedDate="$basicinformation->c_modified_date"
                 />
+
+                @if(!$readonly)
+                    <div class="form-group row">
+                        <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
+                        <div class="col-sm-10">
+                            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="提交提案時請簡述修改原因或補充說明" {{ $disabled }}></textarea>
+                            <small class="text-muted">僅在提交提案時需要填寫，直接儲存時可略過</small>
+                        </div>
+                    </div>
+                @endif
+
                 @if(!$readonly)
                     @auth
                         @if(Auth::user()->isActive())
                             <div class="form-group row">
                                 <div class="offset-sm-2 col-sm-10">
-                                    <button type="submit" class="btn btn-secondary" id="basic-info-submit">Submit</button>
+                                    @if(Auth::user()->canWriteDirectly())
+                                        <button type="submit" name="action" value="save" class="btn btn-primary" id="basic-info-submit">
+                                            <i class="fa fa-save"></i> 直接儲存
+                                        </button>
+                                    @endif
+                                    <button type="submit" name="action" value="proposal" class="btn btn-info">
+                                        <i class="fa fa-paper-plane"></i> 提交提案
+                                    </button>
                                 </div>
                             </div>
                         @endif

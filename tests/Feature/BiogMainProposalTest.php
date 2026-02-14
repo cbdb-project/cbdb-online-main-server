@@ -1,0 +1,217 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Operation;
+use App\Models\User;
+use App\Models\BiogMain;
+use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class BiogMainProposalTest extends TestCase {
+    protected function setUp(): void {
+        parent::setUp();
+
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        DB::purge('sqlite');
+        DB::setDefaultConnection('sqlite');
+        DB::reconnect('sqlite');
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('name')->nullable();
+            $table->string('email')->unique();
+            $table->string('password')->nullable();
+            $table->string('confirmation_token')->nullable();
+            $table->boolean('is_active')->default(0);
+            $table->boolean('is_admin')->default(0);
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('operations', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('user_id')->nullable();
+            $table->integer('c_personid')->default(0);
+            $table->integer('op_type');
+            $table->string('resource');
+            $table->string('resource_id')->nullable();
+            $table->longText('resource_data')->nullable();
+            $table->longText('resource_original')->nullable();
+            $table->integer('crowdsourcing_status')->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('BIOG_MAIN', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->string('c_name_chn')->nullable();
+            $table->string('c_name')->nullable();
+            $table->string('c_surname_chn')->nullable();
+            $table->string('c_surname')->nullable();
+            $table->string('c_mingzi_chn')->nullable();
+            $table->string('c_mingzi')->nullable();
+            $table->string('c_name_proper')->nullable();
+            $table->string('c_name_rm')->nullable();
+            $table->string('c_surname_proper')->nullable();
+            $table->string('c_mingzi_proper')->nullable();
+            $table->string('c_surname_rm')->nullable();
+            $table->string('c_mingzi_rm')->nullable();
+            $table->text('c_notes')->nullable();
+            $table->integer('c_female')->default(0);
+            $table->integer('c_by_intercalary')->default(0);
+            $table->integer('c_dy_intercalary')->default(0);
+            $table->string('c_created_by')->nullable();
+            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->timestamp('c_modified_date')->nullable();
+        });
+        
+        // audit_log 表
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->char('operation_id', 26);
+            $table->json('row_pk');
+            $table->string('row_pk_text', 512);
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+    }
+
+    protected function tearDown(): void {
+        Schema::dropIfExists('BIOG_MAIN');
+        Schema::dropIfExists('operations');
+        Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('users');
+        parent::tearDown();
+    }
+
+    protected function makeActiveUser(): User {
+        return User::create([
+            'name' => 'activeuser',
+            'email' => 'active@example.com',
+            'is_active' => 1,
+            'is_admin' => 0,
+        ]);
+    }
+
+    protected function makeAdmin(): User {
+        return User::create([
+            'name' => 'admin',
+            'email' => 'admin@example.com',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+    }
+
+    #[Test]
+    public function testBiogMainUpdateWithProposalActionCreatesProposal() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $personId = 1;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '張三',
+            'c_notes' => 'Original notes',
+        ]);
+
+        $response = $this->patch(route('basicinformation.update', $personId), [
+            'action' => 'proposal',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '三',
+            'c_notes' => 'Proposed notes',
+            '__proposal_comment' => '修改個人簡介',
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', $personId));
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('已提交修改提案', $flash[0]['message'] ?? '');
+
+        $this->assertDatabaseHas('operations', [
+            'user_id' => $user->id,
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => (string)$personId,
+        ]);
+
+        $operation = Operation::where('resource', 'BIOG_MAIN')->first();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('Proposed notes', $payload['c_notes']);
+        $this->assertSame('pending', $payload['__review_status']);
+        $this->assertSame('修改個人簡介', $payload['__proposal_meta']['comment']);
+        
+        // 驗證數據庫原始資料未變更
+        $this->assertSame('Original notes', DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_notes'));
+    }
+
+    #[Test]
+    public function testApproveBiogMainProposalUpdatesTable() {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $personId = 2;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '李四',
+            'c_notes' => 'Old notes',
+        ]);
+
+        $resourceData = [
+            'c_personid' => $personId,
+            'c_name_chn' => '李四',
+            'c_notes' => 'New notes',
+            '__key_columns' => ['c_personid'],
+            '__review_status' => 'pending',
+        ];
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => (string)$personId,
+            'resource_data' => json_encode($resourceData),
+            'resource_original' => json_encode([
+                'c_personid' => $personId,
+                'c_name_chn' => '李四',
+                'c_notes' => 'Old notes',
+            ]),
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'Approve biog main update',
+        ]);
+
+        $response->assertRedirect();
+        
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => $personId,
+            'c_notes' => 'New notes',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        
+        // 驗證審計日誌
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'BIOG_MAIN',
+            'operation' => 'UPDATE',
+        ]);
+    }
+}

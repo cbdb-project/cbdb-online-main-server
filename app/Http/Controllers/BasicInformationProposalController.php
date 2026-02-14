@@ -21,6 +21,13 @@ class BasicInformationProposalController extends Controller {
      * 定義每個資源類型的表名、主鍵、控制器等信息
      */
     protected $resourceConfigs = [
+        'biogmain' => [
+            'table' => 'BIOG_MAIN',
+            'key_columns' => ['c_personid'],
+            'controller' => 'BasicInformationController',
+            'route_prefix' => 'basicinformation',
+            'display_name' => '基本資料',
+        ],
         'altnames' => [
             'table' => 'ALTNAME_DATA',
             'key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
@@ -219,6 +226,13 @@ class BasicInformationProposalController extends Controller {
 
         if ($operation) {
             flash('已提交修改提案，等待管理員審核 @ ' . Carbon::now(), 'info');
+        }
+
+        // 針對 biogmain (基本資料) 的特殊處理，不使用查詢參數模式
+        if ($resourceType === 'biogmain') {
+            return redirect()->route('basicinformation.edit', [
+                'basicinformation' => $personid,
+            ]);
         }
 
         // 根據是否有舊格式 ID 決定重定向方式

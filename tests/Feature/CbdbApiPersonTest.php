@@ -70,6 +70,8 @@ class CbdbApiPersonTest extends TestCase {
             $table->integer('c_source')->nullable();
             $table->string('c_pages')->nullable();
             $table->text('c_notes')->nullable();
+            $table->string('c_url_api')->nullable();
+            $table->string('c_url_api_coda')->nullable();
         });
 
         Schema::create('BIOG_SOURCE_DATA', function (Blueprint $table) {
@@ -495,6 +497,48 @@ class CbdbApiPersonTest extends TestCase {
             ]);
     }
 
+    #[Test]
+    public function test_sources_include_url_api_fields(): void {
+        $this->seedPersonFixture();
+
+        $response = $this->getJson('/cbdbapi/person.php?id=1001&o=json');
+
+        $response->assertStatus(200);
+        $data = $response->json();
+        $sources = data_get($data, 'Package.PersonAuthority.PersonInfo.Person.PersonSources.Source', []);
+
+        $this->assertNotEmpty($sources);
+        $this->assertSame('https://example.com/page/', $sources[0]['UrlApi']);
+        $this->assertSame('?view=full', $sources[0]['UrlApiCoda']);
+    }
+
+    #[Test]
+    public function test_sources_without_url_api_return_empty_string(): void {
+        $this->seedPersonFixture();
+
+        // Insert a second TEXT_CODES without c_url_api
+        \DB::table('TEXT_CODES')->insert([
+            'c_textid' => 3002,
+            'c_title_chn' => '新唐書',
+        ]);
+        \DB::table('BIOG_SOURCE_DATA')->insert([
+            'c_personid' => 1001,
+            'c_textid' => 3002,
+            'c_pages' => '55',
+        ]);
+
+        $response = $this->getJson('/cbdbapi/person.php?id=1001&o=json');
+
+        $response->assertStatus(200);
+        $data = $response->json();
+        $sources = data_get($data, 'Package.PersonAuthority.PersonInfo.Person.PersonSources.Source', []);
+
+        $noUrlSource = collect($sources)->firstWhere('SourceId', '3002');
+        $this->assertNotNull($noUrlSource);
+        $this->assertSame('', $noUrlSource['UrlApi']);
+        $this->assertSame('', $noUrlSource['UrlApiCoda']);
+    }
+
     protected function seedPersonFixture(): void {
         \DB::table('BIOG_MAIN')->insert([
             'c_personid' => 1001,
@@ -519,6 +563,8 @@ class CbdbApiPersonTest extends TestCase {
         \DB::table('TEXT_CODES')->insert([
             'c_textid' => 3001,
             'c_title_chn' => '舊唐書',
+            'c_url_api' => 'https://example.com/page/',
+            'c_url_api_coda' => '?view=full',
         ]);
 
         \DB::table('BIOG_SOURCE_DATA')->insert([

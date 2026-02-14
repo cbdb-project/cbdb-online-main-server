@@ -521,7 +521,9 @@ SQL;
 SELECT (SELECT c_title_chn FROM TEXT_CODES WHERE c_textid = BIOG_SOURCE_DATA.c_textid) AS Source,
        c_textid AS SourceId,
        c_pages AS Pages,
-       c_notes AS Notes
+       c_notes AS Notes,
+       (SELECT c_url_api FROM TEXT_CODES WHERE c_textid = BIOG_SOURCE_DATA.c_textid) AS UrlApi,
+       (SELECT c_url_api_coda FROM TEXT_CODES WHERE c_textid = BIOG_SOURCE_DATA.c_textid) AS UrlApiCoda
 FROM BIOG_SOURCE_DATA
 WHERE c_personid = ?
 SQL;

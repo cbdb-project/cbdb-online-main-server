@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OfficePostingRepository;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -150,7 +151,8 @@ class OfficePostingStoreTest extends TestCase {
 
     #[Test]
     public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void {
-        $repository = Mockery::mock(BiogMainRepository::class)->makePartial();
+        /** @var OfficePostingRepository&\Mockery\MockInterface $repository */
+        $repository = Mockery::mock(OfficePostingRepository::class)->makePartial();
         $repository->shouldAllowMockingProtectedMethods();
         $repository->shouldReceive('insertAddr')->andThrow(new \RuntimeException('addr failure'));
 

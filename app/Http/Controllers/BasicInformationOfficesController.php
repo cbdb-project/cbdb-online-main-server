@@ -301,90 +301,28 @@ class BasicInformationOfficesController extends Controller {
             return redirect()->back();
         }
 
-        //20251203遮除原本的資料另存程式，改用transaction程式碼
-        //dd($cpk);
-        return DB::transaction(function () use ($id, $cpk) {
-            $request = $this->biogMainRepository->officeById($cpk);
-            //dd($request);
-            $payload = json_encode($request['row']);
-            $payload = json_decode($payload, true);
-            $c_addr_ori = $request['addr_str'] ?? [];
-            $c_addr = [];
-            $sum = count($c_addr_ori);
-            for ($i = 0;$i < $sum;$i++) {
-                array_push($c_addr, $c_addr_ori[$i][0]);
-            }
-            $data = Arr::except($payload, ['_token', 'c_addr']);
-            $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-            $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+        $officeResourceId = $this->biogMainRepository->officeCloneById($id, $cpk);
 
-            $lastPostingId = DB::table('POSTING_DATA')
-                ->lockForUpdate()
-                ->orderByDesc('c_posting_id')
-                ->value('c_posting_id');
-            $data['c_posting_id'] = ((int) $lastPostingId) + 1;
-            $data['c_personid'] = $id;
+        if ($officeResourceId === null) {
+            flash('資料不存在，另存失敗 @ '.Carbon::now(), 'error');
 
-            //移除原資料的更新資訊，將操作另存的使用者與當下時間紀錄為c_created_by與c_created_date。
-            $c_created_by = Auth::user()->name;
-            $c_created_date = Carbon::now();
-            $data['c_modified_by'] = $data['c_modified_date'] = '';
-            $data['c_created_by'] = $c_created_by;
-            $data['c_created_date'] = $c_created_date;
+            return redirect()->route('basicinformation.offices.index', ['basicinformation' => $id]);
+        }
 
-            DB::table('POSTING_DATA')->insert([
-                'c_personid' => $data['c_personid'],
-                'c_posting_id' => $data['c_posting_id'],
-                'c_created_by' => $data['c_created_by'],
-                'c_created_date' => $data['c_created_date'],
-            ]);
+        $newPk = CompositePrimaryKey::parseStoredResourceId($officeResourceId, 'POSTED_TO_OFFICE_DATA');
+        if ($newPk === null) {
+            \Log::error('officeCloneById 返回的 resource_id 無法解析', ['resource_id' => $officeResourceId]);
 
-            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);
+            return redirect(route('basicinformation.offices.index', $id, false));
+        }
 
-            $data = (new ToolsRepository())->timestamp($data, true);
-            DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
+        flash('Store success @ '.Carbon::now(), 'success');
 
-            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $data['c_office_id'] . '-' . $data['c_posting_id'], $data);
-
-            $addressRows = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $id)
-                ->where('c_posting_id', $data['c_posting_id'])
-                ->where('c_office_id', $data['c_office_id'])
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'c_personid' => (int) $row->c_personid,
-                        'c_posting_id' => (int) $row->c_posting_id,
-                        'c_office_id' => (int) $row->c_office_id,
-                        'c_addr_id' => (int) $row->c_addr_id,
-                    ];
-                })
-                ->values()
-                ->all();
-            if (!empty($addressRows)) {
-                (new OperationRepository())->store(
-                    Auth::id(),
-                    $id,
-                    1,
-                    'POSTED_TO_ADDR_DATA',
-                    $data['c_office_id'] . '-' . $data['c_posting_id'],
-                    ['rows' => $addressRows]
-                );
-            }
-
-            $newPk = [
-                'c_office_id' => $data['c_office_id'],
-                'c_posting_id' => $data['c_posting_id'],
-            ];
-
-            flash('Store success @ '.Carbon::now(), 'success');
-
-            return redirect(CompositePrimaryKey::buildUrl(
-                'basicinformation.offices.edit.query',
-                ['id' => $id],
-                $newPk
-            ));
-        });
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.offices.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
 
         //20251203遮除原本的資料另存程式，改用transaction程式碼。
         /*
@@ -417,22 +355,6 @@ class BasicInformationOfficesController extends Controller {
             'office' => $_id,
     ]);
     */
-    }
-
-    public function insertAddr(array $c_addr, $_id, $_postingid, $_officeid, $c_created_by = '', $c_created_date = '') {
-        DB::table('POSTED_TO_ADDR_DATA')->where('c_personid', $_id)->where('c_posting_id', $_postingid)->delete();
-        foreach ($c_addr as $item) {
-            DB::table('POSTED_TO_ADDR_DATA')->insert(
-                [
-                    'c_personid' => $_id,
-                    'c_posting_id' => $_postingid,
-                    'c_office_id' => $_officeid,
-            'c_addr_id' => $item == -999 ? 0 : $item,
-            'c_created_by' => $c_created_by,
-                    'c_created_date' => $c_created_date,
-                ]
-            );
-        }
     }
 
     /**

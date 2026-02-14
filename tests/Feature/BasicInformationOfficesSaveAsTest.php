@@ -125,21 +125,30 @@ class BasicInformationOfficesSaveAsTest extends TestCase {
         Auth::shouldReceive('user')->andReturn($user);
         Auth::shouldReceive('id')->andReturn(1);
 
-        $biogMainRepository = \Mockery::mock(BiogMainRepository::class);
-        $biogMainRepository->shouldReceive('officeById')->once()->with('30-1')->andReturn([
-            'row' => (object) [
-                'c_personid' => 999,
-                'c_posting_id' => 1,
-                'c_office_id' => 30,
-                'c_fy_intercalary' => 0,
-                'c_ly_intercalary' => 0,
-                'c_source' => 0,
-            ],
-            'addr_str' => [
-                [5, 'Addr A'],
-                [6, 'Addr B'],
-            ],
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_posting_id' => 1,
+            'c_personid' => 999,
+            'c_office_id' => 30,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
         ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 999,
+            'c_posting_id' => 1,
+            'c_office_id' => 30,
+            'c_addr_id' => 5,
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 999,
+            'c_posting_id' => 1,
+            'c_office_id' => 30,
+            'c_addr_id' => 6,
+        ]);
+
+        $biogMainRepository = new BiogMainRepository();
 
         $controller = new BasicInformationOfficesController(
             $biogMainRepository,
@@ -173,12 +182,12 @@ class BasicInformationOfficesSaveAsTest extends TestCase {
 
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_OFFICE_DATA',
-            'resource_id' => '30-2',
+            'resource_id' => 'c_office_id=30&c_posting_id=2',
             'op_type' => 1,
         ]);
         $this->assertDatabaseHas('operations', [
             'resource' => 'POSTED_TO_ADDR_DATA',
-            'resource_id' => '30-2',
+            'resource_id' => 'c_office_id=30&c_posting_id=2',
             'op_type' => 1,
         ]);
 

@@ -104,7 +104,6 @@ Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽�
 ### Phase E — Final Cleanup
 - 移除 `BiogMainRepository` 中已完全轉移的方法與過渡註記。
 - 更新架構文檔（本檔、必要時補 `AGENTS.md` / `CHANGELOG.md`）。
-
 ## Risks and Mitigations (Reality-Based)
 - 風險：交易被拆開，導致三表資料不一致  
   對策：workflow 類別只暴露交易入口，不暴露碎片化寫入 API。
@@ -120,6 +119,25 @@ Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽�
   - 新增/調整測試清單
   - 與 baseline 的差異說明（應為「無行為差異」或明確列出差異）
 
+### Execution Record (Completed, 2026-02-13)
+- Phase B 已完成：
+  - `officeStoreById`、`officeUpdateById`、`officeDeleteById` 搬移至 `app/Repositories/OfficePostingRepository.php`
+  - `insertAddr`、`updateAddr` 搬移至 `app/Repositories/OfficePostingRepository.php`
+  - `BiogMainRepository` 保留同名公開方法並轉呼叫 `OfficePostingRepository`
+- 驗證結果：
+  - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php`
+  - `OK (17 tests, 59 assertions)`
+
+### Execution Record (Completed, 2026-02-13)
+- Phase C 已完成：
+  - `BasicInformationOfficesController::saveas()` 改為呼叫 repository（`officeCloneById`）
+  - 新增 `OfficePostingRepository::officeCloneById()` 收斂另存交易寫入流程
+  - 移除 controller 內重複的 `insertAddr` 寫入方法
+  - 另存流程的 `operations.resource_id` 對齊 `CompositePrimaryKey::buildStoredResourceId()` 格式
+- 驗證結果：
+  - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php tests/Feature/BasicInformationOfficesSaveAsTest.php`
+  - `OK (18 tests, 66 assertions)`
+
 ## Version
-- Version: 0.2
-- Date: 2026-02-12
+- Version: 0.4
+- Date: 2026-02-13

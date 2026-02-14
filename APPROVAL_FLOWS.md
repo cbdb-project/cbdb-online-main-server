@@ -1,6 +1,6 @@
 # Proposal / Approval Flows
 
-本文件說明目前在 `/codes/*` 模組導入的提案與審核流程，供後續擴充至其他頁面時參考。
+本文件說明目前在 `/codes/*` 與 `/basicinformation/*` 模組導入的提案與審核流程，供後續擴充時參考。
 
 ## 背景
 
@@ -11,6 +11,11 @@
 ## 目前支援範圍
 
 - `/codes/{table}` 新增、編輯頁面。
+- `/basicinformation/{id}` 基本資料編輯頁（BIOG_MAIN）。
+- `/basicinformation/{id}` 子資源：
+  - `altnames`
+  - `addresses`
+  - `texts`
 - 刪除提案目前不開放。
 - 只有活躍帳號 (`is_active == 1`) 才能送出提案或直接儲存；只讀代碼表不提供提案按鈕。
 
@@ -19,7 +24,9 @@
 1. 使用者在新增或編輯頁面填寫表單。
 2. 若選擇 **直接儲存**，沿用原流程，資料立即寫回代碼表並產生 `op_type = 1/2` 的操作紀錄。
 3. 若選擇 **提交提案**：
-   - 後端呼叫 `CodesController@proposalStore`（新增）或 `@proposalUpdate`（修改）。
+   - 後端呼叫：
+     - `CodesController@proposalStore` / `@proposalUpdate`（codes 模組）
+     - `BasicInformationProposalController@proposalStore` / `@proposalUpdateWithPk`（basicinformation 模組）
    - 依主鍵確認資料是否存在，以決定屬於新增提案或修改提案。
    - 組出 `resource_data`，附帶：
      ```json
@@ -43,12 +50,22 @@
    - 回傳提示：「已提交提案，等待管理員審核」。
 - 提案送出後，使用者可於 `/operations?proposals_only=1` 檢視自己的提案，若狀態為 `pending` 或 `rejected`，介面會提供「修改提案」與「撤回提案」按鈕。
 
+### BIOG_MAIN（基本資料）提案前處理
+
+- `BasicInformationController@update` 當 `action=proposal` 時，會先做：
+  - 姓名欄位合成（`c_name_chn`、`c_name`、`c_name_proper`、`c_name_rm`）。
+  - 旗標欄位型別轉換（如 `c_female`）。
+  - timestamp 填充（沿用 `ToolsRepository::timestamp()`）。
+- 僅在 `pinyin` 表存在時才執行 `auto_pinyin()`。
+  - 目的：避免 SQLite/in-memory 測試最小 schema 下因缺少 `pinyin` 表導致 500。
+
 ## 審核流程（已實作於 `/operations`）
 
 - **核准**：
   - 進入操作紀錄頁面，管理員可見「核准」按鈕。
   - 系統會依 `op_type` 執行 `insert`（提案新增）或 `update`（提案修改），套用至代碼表。
   - 成功後更新提案紀錄：`__review_status = 'approved'`，並記錄審核者與時間，另新增一筆正式操作 (`op_type = 1/2`) 供追蹤。
+  - 會同步寫入 `audit_log`（`INSERT` 或 `UPDATE`）以保留資料面審計軌跡。
 - **退回**：
   - 於提案卡片點選「退回」，可填寫備註。
   - 提案紀錄會標示 `__review_status = 'rejected'` 與審核備註，但不變更原資料表內容。
@@ -73,3 +90,15 @@
   2. 重複利用 `recordProposalOperation()` 的概念，統一差異與審核欄位。
   3. 在 `operations` 頁面依 `op_type` 加上醒目標示，提供核准／退回按鈕。
 - 視需求補充通知機制（Mail、Slack 等），於提案或審核時提醒相關人員。
+
+## 參考路由
+
+- 提案審核：
+  - `POST /operations/{operation}/approve` (`operations.proposals.approve`)
+  - `POST /operations/{operation}/reject` (`operations.proposals.reject`)
+- basicinformation 提案：
+  - `POST /basicinformation/{personid}/{resource}/proposal`
+  - `POST /basicinformation/{personid}/{resource}/{id}/proposal`
+- codes 提案：
+  - `POST|PATCH /codes/{table_name}/{id}/proposal`
+  - `POST /codes/{table_name}/proposal`

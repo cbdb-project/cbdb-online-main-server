@@ -1,5 +1,8 @@
 # BiogMain 審批流程實施計劃
 
+> 狀態說明（2026-02）：此文件為「規劃草案/歷史記錄」，其中路由與待辦清單含已過時內容。  
+> 目前實際行為請以 `APPROVAL_FLOWS.md`、`routes/web.php`、`BasicInformationProposalController`、`OperationsProposalController` 為準。
+
 ## 一、背景與目標
 
 ### 1.1 目標

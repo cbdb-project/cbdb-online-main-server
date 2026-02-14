@@ -632,6 +632,7 @@ class BasicInformationAltnamesController extends Controller {
 
         // 準備更新資料（保留 PK 欄位，允許修改）
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
 
@@ -651,7 +652,14 @@ class BasicInformationAltnamesController extends Controller {
             'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
         ];
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+
+        // 準備存入 operations 的數據，加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
         (new AuditLogService())->write(
             'ALTNAME_DATA',
             'UPDATE',

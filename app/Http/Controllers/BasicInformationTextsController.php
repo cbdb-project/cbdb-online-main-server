@@ -227,13 +227,40 @@ class BasicInformationTextsController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，请聯繫管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 解析舊格式的複合主鍵
+            $temp_l = explode("-", $id_);
+            $originalPk = [
+                'c_personid' => $temp_l[0],
+                'c_textid' => $temp_l[1],
+                'c_role_id' => $temp_l[2],
+            ];
+
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'texts', $originalPk);
+        }
+
+        // 直接儲存需要額外權限檢查
+        if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
+
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         $temp_l = explode("-", $id_);
 
@@ -250,11 +277,18 @@ class BasicInformationTextsController extends Controller {
             ['c_role_id', '=', $temp_l[2]],
         ])->update($data);
         $data['c_personid'] = $temp_l[0];
+
+        // 準備要存入 operations 表的數據，加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
         $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_textid' => $data['c_textid'],
             'c_role_id' => $data['c_role_id'],
-        ]), $data, $ori);
+        ]), $operationData, $ori);
         (new AuditLogService())->write(
             $this->table_name,
             'UPDATE',
@@ -373,22 +407,38 @@ class BasicInformationTextsController extends Controller {
 
             return redirect()->back();
         }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，請聯繫管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        // 從查詢參數提取複合主鍵
+        $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        if ($action === 'proposal') {
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'texts', $pk);
+        }
+
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
-        $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
-
         // 驗證必填欄位（c_role_id 為可選，預設為 0）
         CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
 
         // 準備更新資料
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'c_personid', 'c_textid', 'c_role_id']);
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_textid', 'c_role_id']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 構建查詢條件（使用 BIOG_TEXT_DATA 表）
@@ -414,7 +464,14 @@ class BasicInformationTextsController extends Controller {
             'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
             'c_role_id' => $data['c_role_id'] ?? $c_role_id,
         ];
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $data, $ori);
+
+        // 準備要存入 operations 表的數據，加入註解
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
+
+        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
         (new AuditLogService())->write(
             $this->table_name,
             'UPDATE',

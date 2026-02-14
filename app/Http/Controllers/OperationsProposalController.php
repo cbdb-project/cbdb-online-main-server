@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
+use App\Services\AuditLogService;
 use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +67,7 @@ class OperationsProposalController extends Controller {
         }
 
         $this->logFinalOperation($operation, $appliedRow, $original, $opType);
+        $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
         $this->updateProposalStatus(
             $operation,
             'approved',
@@ -267,11 +270,48 @@ class OperationsProposalController extends Controller {
         if (is_array($row)) {
             return $row;
         }
+        if ($row instanceof Model) {
+            return $row->toArray();
+        }
         if ($row instanceof \ArrayAccess) {
             return (array) $row;
         }
 
         return json_decode(json_encode($row), true) ?: [];
+    }
+
+    protected function writeAuditLogForApproval(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {
+        if (!DB::getSchemaBuilder()->hasTable('audit_log')) {
+            return;
+        }
+
+        $payload = json_decode($proposal->resource_data, true) ?: [];
+        $keyColumns = $payload['__key_columns'] ?? [];
+        if (empty($keyColumns)) {
+            return;
+        }
+
+        $rowPk = [];
+        foreach ($keyColumns as $column) {
+            if (array_key_exists($column, $appliedRow)) {
+                $rowPk[$column] = $appliedRow[$column];
+            }
+        }
+
+        if (empty($rowPk)) {
+            return;
+        }
+
+        (new AuditLogService())->write(
+            $proposal->resource,
+            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? 'INSERT' : 'UPDATE',
+            $rowPk,
+            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? null : $original,
+            $appliedRow,
+            'user',
+            (string) Auth::id(),
+            (string) $proposal->id
+        );
     }
 
     protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {

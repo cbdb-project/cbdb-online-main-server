@@ -14,7 +14,15 @@ class Operation extends Model {
 
     //
     protected $fillable = [
-        'user_id', 'c_personid', 'op_type', 'resource', 'resource_id', 'resource_data', 'biog',
+        'user_id',
+        'c_personid',
+        'op_type',
+        'resource',
+        'resource_id',
+        'resource_data',
+        'resource_original',
+        'crowdsourcing_status',
+        'biog',
     ];
 
     public function user() {

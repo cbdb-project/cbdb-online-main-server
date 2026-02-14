@@ -304,6 +304,39 @@ class BasicInformationController extends Controller {
             return redirect()->back();
         }
 
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 基本資料表提案前，需先經過姓名正規化與時間戳邏輯，確保提案內容完整
+            $data = $request->all();
+
+            // 姓名合成邏輯
+            $data['c_name_chn'] = ($data['c_surname_chn'] ?? '') . ($data['c_mingzi_chn'] ?? '');
+            $data['c_name'] = trim(($data['c_surname'] ?? '') . ' ' . ($data['c_mingzi'] ?? ''));
+            $data['c_name_proper'] = trim(($data['c_mingzi_proper'] ?? '') . ' ' . ($data['c_surname_proper'] ?? ''));
+            $data['c_name_rm'] = trim(($data['c_mingzi_rm'] ?? '') . ' ' . ($data['c_surname_rm'] ?? ''));
+
+            // 數據類型轉換
+            $data['c_female'] = (int)($data['c_female'] ?? 0);
+            $data['c_by_intercalary'] = (int)($data['c_by_intercalary'] ?? 0);
+            $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary'] ?? 0);
+
+            // 拼音自動生成（測試環境可能未建立 pinyin 表）
+            if (Schema::hasTable('pinyin')) {
+                $data = $this->biogMainRepository->auto_pinyin($data);
+            }
+
+            // 時間戳
+            $data = $this->toolRepository->timestamp($data);
+
+            // 替換 Request 中的數據（以便 ProposalController 提取）
+            $request->replace($data);
+
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'biogmain', ['c_personid' => $id]);
+        }
+
         $result = $this->biogMainRepository->updateById($request, $id);
 
         // 檢查是否有實質變更

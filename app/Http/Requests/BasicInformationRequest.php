@@ -20,12 +20,19 @@ class BasicInformationRequest extends FormRequest {
      * @return array
      */
     public function rules() {
-        return [
+        $rules = [
             'c_mingzi_chn' => 'required',
             'c_mingzi' => 'required',
             'c_index_year' => 'min:-3000|max:3000',
             'c_death_age' => 'min:0|max:200',
         ];
+
+        // 提案允許部分欄位更新，不應套用基本資料必填限制。
+        if ($this->input('action') === 'proposal') {
+            unset($rules['c_mingzi_chn'], $rules['c_mingzi']);
+        }
+
+        return $rules;
     }
 
     public function messages() {

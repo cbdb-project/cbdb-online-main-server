@@ -34,6 +34,8 @@ class RouteServiceProvider extends ServiceProvider {
     public function map() {
         $this->mapApiRoutes();
 
+        $this->mapAiRoutes();
+
         $this->mapWebRoutes();
 
         //
@@ -64,5 +66,18 @@ class RouteServiceProvider extends ServiceProvider {
              ->middleware('api')
              ->namespace($this->namespace)
              ->group(base_path('routes/api.php'));
+    }
+
+    /**
+     * Define MCP routes.
+     *
+     * These routes are API-like and stateless.
+     *
+     * @return void
+     */
+    protected function mapAiRoutes() {
+        Route::middleware('api')
+            ->namespace($this->namespace)
+            ->group(base_path('routes/ai.php'));
     }
 }

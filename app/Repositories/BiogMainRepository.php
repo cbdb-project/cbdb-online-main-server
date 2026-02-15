@@ -814,6 +814,10 @@ class BiogMainRepository {
             ['c_kin_id', '=', $temp_l[1]],
             ['c_kin_code', '=', $temp_l[2]],
         ])->first();
+        if (!$row) {
+            return ['err' => 0];
+        }
+
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
         $kin_id = $data['c_kin_id'];
@@ -825,60 +829,47 @@ class BiogMainRepository {
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
-        //dump($data);
-        DB::table('KIN_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_kin_id', '=', $temp_l[1]],
-            ['c_kin_code', '=', $temp_l[2]],
-        ])->update($data);
+
         $ori_data = $data;
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $id,
-            'c_kin_id' => $data['c_kin_id'],
-            'c_kin_code' => $data['c_kin_code'],
-        ]), $data, $row);
-        $operationId = $operation ? (string) $operation->id : null;
-        $auditLog->write(
-            'KIN_DATA',
-            'UPDATE',
-            [
-                'c_personid' => $data['c_personid'],
+        $sumCount = 0;
+
+        DB::transaction(function () use (&$ori_data, &$sumCount, $id, $id_, $temp_l, $row, $data, $kin_pair, $kin_id, $c_autogen_notes, $old_kin_id, $old_kin_code, $auditLog) {
+            DB::table('KIN_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_kin_id', '=', $temp_l[1]],
+                ['c_kin_code', '=', $temp_l[2]],
+            ])->update($data);
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $id,
                 'c_kin_id' => $data['c_kin_id'],
                 'c_kin_code' => $data['c_kin_code'],
-            ],
-            $auditLog->normalizeRow($row),
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operationId
-        );
-        $data['c_kin_code'] = $kin_pair;
-        $data['c_personid'] = $kin_id;
-        $data = Arr::except($data, ['c_kin_id']);
-        //dump($data);
-        //dd(DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id]])->first());
-        #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-        #20240710提前做一次查詢，檢查資料庫是否有0筆資料或多筆資料。
-        $kin_code_pair = KinshipCode::find($old_kin_code);
-        $sumQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-            $query->where('c_kin_id', $id)
-                ->where('c_personid', $old_kin_id)
-                ->where('c_autogen_notes', $c_autogen_notes)
-                ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-        });
+            ]), $data, $row);
+            $operationId = $operation ? (string) $operation->id : null;
 
-        if (!empty($kin_code_pair->c_kin_pair2)) {
-            $sumQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                $query->where('c_kin_id', $id)
-                    ->where('c_personid', $old_kin_id)
-                    ->where('c_autogen_notes', $c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-            });
-        }
+            $auditLog->write(
+                'KIN_DATA',
+                'UPDATE',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_kin_id' => $data['c_kin_id'],
+                    'c_kin_code' => $data['c_kin_code'],
+                ],
+                $auditLog->normalizeRow($row),
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
 
-        $sum = $sumQuery->get();
-        if (count($sum) == 1) {
-            $updateQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+            $data_mirror = $data;
+            $data_mirror['c_kin_code'] = $kin_pair;
+            $data_mirror['c_personid'] = $kin_id;
+            $data_mirror = Arr::except($data_mirror, ['c_kin_id']);
+
+            #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
+            $kin_code_pair = KinshipCode::find($old_kin_code);
+            $sumQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
                 $query->where('c_kin_id', $id)
                     ->where('c_personid', $old_kin_id)
                     ->where('c_autogen_notes', $c_autogen_notes)
@@ -886,7 +877,7 @@ class BiogMainRepository {
             });
 
             if (!empty($kin_code_pair->c_kin_pair2)) {
-                $updateQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                $sumQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
                     $query->where('c_kin_id', $id)
                         ->where('c_personid', $old_kin_id)
                         ->where('c_autogen_notes', $c_autogen_notes)
@@ -894,30 +885,51 @@ class BiogMainRepository {
                 });
             }
 
-            $mirroredRows = (clone $updateQuery)->get();
-            $updateQuery->update($data);
-        } else {
-            $updateQuery = DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]]);
-            $mirroredRows = (clone $updateQuery)->get();
-            $updateQuery->update($data);
-        }
+            $sum = $sumQuery->get();
+            $sumCount = count($sum);
+            if ($sumCount == 1) {
+                $updateQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                    $query->where('c_kin_id', $id)
+                        ->where('c_personid', $old_kin_id)
+                        ->where('c_autogen_notes', $c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+                });
 
-        foreach ($mirroredRows as $mirroredRow) {
-            $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
-            $newMirroredData = array_merge($oldMirroredData, $data);
+                if (!empty($kin_code_pair->c_kin_pair2)) {
+                    $updateQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
+                        $query->where('c_kin_id', $id)
+                            ->where('c_personid', $old_kin_id)
+                            ->where('c_autogen_notes', $c_autogen_notes)
+                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+                    });
+                }
 
-            $auditLog->write(
-                'KIN_DATA',
-                'UPDATE',
-                $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData),
-                $oldMirroredData,
-                $newMirroredData,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
-        }
-        $ori_data['err'] = count($sum) ?? 0;
+                $mirroredRows = (clone $updateQuery)->get();
+                $updateQuery->update($data_mirror);
+            } else {
+                $updateQuery = DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]]);
+                $mirroredRows = (clone $updateQuery)->get();
+                $updateQuery->update($data_mirror);
+            }
+
+            foreach ($mirroredRows as $mirroredRow) {
+                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+                $newMirroredData = array_merge($oldMirroredData, $data_mirror);
+
+                $auditLog->write(
+                    'KIN_DATA',
+                    'UPDATE',
+                    $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData),
+                    $oldMirroredData,
+                    $newMirroredData,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
+        });
+
+        $ori_data['err'] = $sumCount;
 
         return $ori_data;
     }
@@ -932,54 +944,58 @@ class BiogMainRepository {
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
-        DB::table('KIN_DATA')->insert($data);
-        $ori_Data = $data;
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_kin_id' => $data['c_kin_id'],
-            'c_kin_code' => $data['c_kin_code'],
-        ]), $data);
-        $operationId = $operation ? (string) $operation->id : null;
-        $auditLog->write(
-            'KIN_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_kin_id' => $data['c_kin_id'],
-                'c_kin_code' => $data['c_kin_code'],
-            ],
-            null,
-            $ori_Data,
-            'user',
-            (string) Auth::id(),
-            $operationId
-        );
-        $data['c_kin_code'] = $kin_pair;
-        $data['c_personid'] = $data['c_kin_id'];
-        $data['c_kin_id'] = $id;
-        DB::table('KIN_DATA')->insert($data);
-        $auditLog->write(
-            'KIN_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_kin_id' => $data['c_kin_id'],
-                'c_kin_code' => $data['c_kin_code'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operationId
-        );
 
-        //return $tts;
+        $ori_Data = $data;
+
+        DB::transaction(function () use ($id, $data, $kin_pair, $auditLog, &$ori_Data) {
+            DB::table('KIN_DATA')->insert($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $data['c_personid'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_kin_code' => $data['c_kin_code'],
+            ]), $data);
+            $operationId = $operation ? (string) $operation->id : null;
+            $auditLog->write(
+                'KIN_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_kin_id' => $data['c_kin_id'],
+                    'c_kin_code' => $data['c_kin_code'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+
+            $data_mirror = $data;
+            $data_mirror['c_kin_code'] = $kin_pair;
+            $data_mirror['c_personid'] = $data['c_kin_id'];
+            $data_mirror['c_kin_id'] = $id;
+            DB::table('KIN_DATA')->insert($data_mirror);
+            $auditLog->write(
+                'KIN_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data_mirror['c_personid'],
+                    'c_kin_id' => $data_mirror['c_kin_id'],
+                    'c_kin_code' => $data_mirror['c_kin_code'],
+                ],
+                null,
+                $data_mirror,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        });
+
         return $ori_Data;
     }
 
     public function kinshipDeleteById($id, $id_) {
         $auditLog = new AuditLogService();
-        $operationRepository = new OperationRepository();
         $id = str_replace("--", "-minus", $id);
         $temp_l = explode("-", $id);
         foreach ($temp_l as $key => $value) {
@@ -992,117 +1008,123 @@ class BiogMainRepository {
             ['c_kin_code', '=', $temp_l[2]],
         ])->first();
 
-        #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-        $old_kin_code = $row->c_kin_code;
-        $kin_code_pair = KinshipCode::find($old_kin_code);
+        if (!$row) {
+            return;
+        }
 
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $temp_l[0],
-            'c_kin_id' => $temp_l[1],
-            'c_kin_code' => $temp_l[2],
-        ]), $row);
-        $operationId = $operation ? (string) $operation->id : null;
-        $auditLog->write(
-            'KIN_DATA',
-            'DELETE',
-            [
+        DB::transaction(function () use ($id, $temp_l, $row, $auditLog) {
+            #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
+            $old_kin_code = $row->c_kin_code;
+            $kin_code_pair = KinshipCode::find($old_kin_code);
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $temp_l[0],
                 'c_kin_id' => $temp_l[1],
                 'c_kin_code' => $temp_l[2],
-            ],
-            $auditLog->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operationId
-        );
-
-        $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
-            $query->where('c_kin_id', $row->c_personid)
-                ->where('c_personid', $row->c_kin_id)
-                ->where('c_autogen_notes', $row->c_autogen_notes)
-                ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-        });
-
-        if (!empty($kin_code_pair->c_kin_pair2)) {
-            $row2Query->orWhere(function ($query) use ($row, $kin_code_pair) {
-                $query->where('c_kin_id', $row->c_personid)
-                    ->where('c_personid', $row->c_kin_id)
-                    ->where('c_autogen_notes', $row->c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-            });
-        }
-
-        $row2 = $row2Query->first();
-
-        DB::table('KIN_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_kin_id', '=', $temp_l[1]],
-            ['c_kin_code', '=', $temp_l[2]],
-        ])->delete();
-
-        //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
-        if ($row2 !== null && is_null($row2->c_modified_date)) {
-            $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                $query->where('c_kin_id', $row2->c_kin_id)
-                    ->where('c_personid', $row2->c_personid)
-                    ->where('c_source', $row2->c_source)
-                    ->where('c_autogen_notes', $row2->c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                });
-            }
-
-            $mirroredRows = (clone $deleteQuery)->get();
-            $deleteQuery->delete();
-        } elseif ($row2 !== null) {
-            $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                $query->where('c_kin_id', $row2->c_kin_id)
-                    ->where('c_personid', $row2->c_personid)
-                    ->where('c_source', $row2->c_source)
-                    ->where('c_autogen_notes', $row2->c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1)
-                    ->where('c_modified_date', $row2->c_modified_date);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2)
-                        ->where('c_modified_date', $row2->c_modified_date);
-                });
-            }
-
-            $mirroredRows = (clone $deleteQuery)->get();
-            $deleteQuery->delete();
-        } else {
-            $mirroredRows = collect();
-        }
-
-        foreach ($mirroredRows as $mirroredRow) {
-            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            ]), $row);
+            $operationId = $operation ? (string) $operation->id : null;
             $auditLog->write(
                 'KIN_DATA',
                 'DELETE',
-                $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData),
-                $mirroredRowData,
+                [
+                    'c_personid' => $temp_l[0],
+                    'c_kin_id' => $temp_l[1],
+                    'c_kin_code' => $temp_l[2],
+                ],
+                $auditLog->normalizeRow($row),
                 null,
                 'user',
                 (string) Auth::id(),
                 $operationId
             );
-        }
+
+            $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
+                $query->where('c_kin_id', $row->c_personid)
+                    ->where('c_personid', $row->c_kin_id)
+                    ->where('c_autogen_notes', $row->c_autogen_notes)
+                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+            });
+
+            if (!empty($kin_code_pair->c_kin_pair2)) {
+                $row2Query->orWhere(function ($query) use ($row, $kin_code_pair) {
+                    $query->where('c_kin_id', $row->c_personid)
+                        ->where('c_personid', $row->c_kin_id)
+                        ->where('c_autogen_notes', $row->c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+                });
+            }
+
+            $row2 = $row2Query->first();
+
+            DB::table('KIN_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_kin_id', '=', $temp_l[1]],
+                ['c_kin_code', '=', $temp_l[2]],
+            ])->delete();
+
+            //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
+            if ($row2 !== null && is_null($row2->c_modified_date)) {
+                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
+                    $query->where('c_kin_id', $row2->c_kin_id)
+                        ->where('c_personid', $row2->c_personid)
+                        ->where('c_source', $row2->c_source)
+                        ->where('c_autogen_notes', $row2->c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
+                });
+
+                if (!empty($kin_code_pair->c_kin_pair2)) {
+                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
+                        $query->where('c_kin_id', $row2->c_kin_id)
+                            ->where('c_personid', $row2->c_personid)
+                            ->where('c_source', $row2->c_source)
+                            ->where('c_autogen_notes', $row2->c_autogen_notes)
+                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
+                    });
+                }
+
+                $mirroredRows = (clone $deleteQuery)->get();
+                $deleteQuery->delete();
+            } elseif ($row2 !== null) {
+                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
+                    $query->where('c_kin_id', $row2->c_kin_id)
+                        ->where('c_personid', $row2->c_personid)
+                        ->where('c_source', $row2->c_source)
+                        ->where('c_autogen_notes', $row2->c_autogen_notes)
+                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1)
+                        ->where('c_modified_date', $row2->c_modified_date);
+                });
+
+                if (!empty($kin_code_pair->c_kin_pair2)) {
+                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
+                        $query->where('c_kin_id', $row2->c_kin_id)
+                            ->where('c_personid', $row2->c_personid)
+                            ->where('c_source', $row2->c_source)
+                            ->where('c_autogen_notes', $row2->c_autogen_notes)
+                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2)
+                            ->where('c_modified_date', $row2->c_modified_date);
+                    });
+                }
+
+                $mirroredRows = (clone $deleteQuery)->get();
+                $deleteQuery->delete();
+            } else {
+                $mirroredRows = collect();
+            }
+
+            foreach ($mirroredRows as $mirroredRow) {
+                $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+                $auditLog->write(
+                    'KIN_DATA',
+                    'DELETE',
+                    $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData),
+                    $mirroredRowData,
+                    null,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
+        });
     }
 
     public function possessionById($id) {
@@ -1128,71 +1150,81 @@ class BiogMainRepository {
 
     public function possessionUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
-        $this->insertAddrPo($data['c_addr_id'], $id_, $id);
+        $c_addr_id = $data['c_addr_id'];
         $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
         $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->first();
-        DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
-        (new AuditLogService())->write(
-            'POSSESSION_DATA',
-            'UPDATE',
-            ['c_possession_record_id' => $id_],
-            (new AuditLogService())->normalizeRow($ori),
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        if (!$ori) {
+            return;
+        }
+
+        DB::transaction(function () use ($id, $id_, $data, $c_addr_id, $ori) {
+            $this->insertAddrPo($c_addr_id, $id_, $id);
+            DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
+            (new AuditLogService())->write(
+                'POSSESSION_DATA',
+                'UPDATE',
+                ['c_possession_record_id' => $id_],
+                (new AuditLogService())->normalizeRow($ori),
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
     }
 
     public function possessionStoreById(Request $request, $id) {
         $data = $request->all();
         $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
-        //20210205因為資料表關聯欄位的設定，資料新增的流程需要往後移動。
-        //$this->insertAddrPo($data['c_addr_id'], $data['c_possession_record_id'], $data['c_personid']);
-        $addr = [];
         $addr = $data['c_addr_id'];
-        //修改段落
         $data = Arr::except($data, ['_token', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
-        DB::table('POSSESSION_DATA')->insert($data);
-        //移動到這裡
-        $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
-        //修改結束
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
-        (new AuditLogService())->write(
-            'POSSESSION_DATA',
-            'INSERT',
-            ['c_possession_record_id' => $data['c_possession_record_id']],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+
+        DB::transaction(function () use ($id, $data, $addr) {
+            DB::table('POSSESSION_DATA')->insert($data);
+            $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+            (new AuditLogService())->write(
+                'POSSESSION_DATA',
+                'INSERT',
+                ['c_possession_record_id' => $data['c_possession_record_id']],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         return $data['c_possession_record_id'];
     }
 
     public function possessionDeleteById($id, $c_personid) {
         $row = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->first();
-        DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
-        DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $row->c_possession_record_id)->delete();
-        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
-        (new AuditLogService())->write(
-            'POSSESSION_DATA',
-            'DELETE',
-            ['c_possession_record_id' => $id],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        if (!$row) {
+            return;
+        }
+
+        DB::transaction(function () use ($id, $c_personid, $row) {
+            DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
+            DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $row->c_possession_record_id)->delete();
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
+            (new AuditLogService())->write(
+                'POSSESSION_DATA',
+                'DELETE',
+                ['c_possession_record_id' => $id],
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
     }
 
     public function socialInstById($id) {
@@ -1265,30 +1297,35 @@ class BiogMainRepository {
         $data = Arr::except($data, ['_token']);
         $data['c_source'] = ($data['c_source'] == -999) ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
-        $tts = DB::table('BIOG_INST_DATA')->insertGetId($data);
-        //新增的聯合主鍵 //20211022修改增加c_inst_code與c_inst_name_code
-        $newid = CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_inst_code' => $data['c_inst_code'],
-            'c_inst_name_code' => $data['c_inst_name_code'],
-            'c_bi_role_code' => $data['c_bi_role_code'],
-        ]);
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
-        (new AuditLogService())->write(
-            'BIOG_INST_DATA',
-            'INSERT',
-            [
+
+        $newid = '';
+
+        DB::transaction(function () use ($id, $data, &$newid) {
+            DB::table('BIOG_INST_DATA')->insert($data);
+            //新增的聯合主鍵 //20211022修改增加c_inst_code與c_inst_name_code
+            $newid = CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
                 'c_inst_code' => $data['c_inst_code'],
                 'c_inst_name_code' => $data['c_inst_name_code'],
                 'c_bi_role_code' => $data['c_bi_role_code'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+            ]);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_INST_DATA', $newid, $data);
+            (new AuditLogService())->write(
+                'BIOG_INST_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_inst_code' => $data['c_inst_code'],
+                    'c_inst_name_code' => $data['c_inst_name_code'],
+                    'c_bi_role_code' => $data['c_bi_role_code'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         return $newid;
     }
@@ -1315,15 +1352,6 @@ class BiogMainRepository {
                 ->where('c_inst_name_code', $addr_l[2])
                 ->where('c_bi_role_code', $addr_l[3])
                 ->first();
-
-            if ($row) {
-                DB::table('BIOG_INST_DATA')
-                    ->where('c_personid', $addr_l[0])
-                    ->where('c_inst_code', $addr_l[1])
-                    ->where('c_inst_name_code', $addr_l[2])
-                    ->where('c_bi_role_code', $addr_l[3])
-                    ->delete();
-            }
         }
 
         // 如果新格式找不到，嘗試舊版 2-field 格式（c_personid 和 c_bi_role_code）
@@ -1332,26 +1360,29 @@ class BiogMainRepository {
                 ->where('c_personid', $addr_l[0])
                 ->where('c_bi_role_code', $addr_l[1])
                 ->first();
-
-            if ($row) {
-                DB::table('BIOG_INST_DATA')
-                    ->where('c_personid', $addr_l[0])
-                    ->where('c_bi_role_code', $addr_l[1])
-                    ->delete();
-            }
         }
 
-        // 記錄操作（即使 $row 為 null 也記錄，以便追蹤失敗的刪除嘗試）
-        $instResourceId = $row
-            ? CompositePrimaryKey::buildStoredResourceId([
+        if (!$row) {
+            return;
+        }
+
+        DB::transaction(function () use ($id, $c_personid, $row) {
+            DB::table('BIOG_INST_DATA')
+                ->where('c_personid', $row->c_personid)
+                ->where('c_inst_code', $row->c_inst_code)
+                ->where('c_inst_name_code', $row->c_inst_name_code)
+                ->where('c_bi_role_code', $row->c_bi_role_code)
+                ->delete();
+
+            // 記錄操作
+            $instResourceId = CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $row->c_personid,
                 'c_inst_code' => $row->c_inst_code,
                 'c_inst_name_code' => $row->c_inst_name_code,
                 'c_bi_role_code' => $row->c_bi_role_code,
-            ])
-            : $id;
-        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $instResourceId, $row);
-        if ($row) {
+            ]);
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_INST_DATA', $instResourceId, $row);
+
             (new AuditLogService())->write(
                 'BIOG_INST_DATA',
                 'DELETE',
@@ -1367,7 +1398,7 @@ class BiogMainRepository {
                 (string) Auth::id(),
                 $operation ? (string) $operation->id : null
             );
-        }
+        });
     }
 
     public function eventById($id) {
@@ -1675,6 +1706,11 @@ class BiogMainRepository {
                 $c_text_title = $temp_l[7] ?? '';
             }
         }
+
+        if (!$row) {
+            return [];
+        }
+
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
@@ -1687,53 +1723,31 @@ class BiogMainRepository {
         //20210910增加$old_c_assocship_pair用來查詢對應的資料
         $old_c_assoc_code = $row->c_assoc_code;
         $old_c_assocship_pair = AssocCode::where('c_assoc_code', '=', $old_c_assoc_code)->first();
-        $old_c_assocship_pair1 = $old_c_assocship_pair['c_assoc_pair'];
-        $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'];
-        //20190118筆記 原程式移除c_assoc_id的值,當社會關係人修改時,資料就不能成對.
-        //$data = Arr::except($data, ['_method', '_token', 'c_assocship_pair', 'c_assoc_id']);
+        $old_c_assocship_pair1 = $old_c_assocship_pair['c_assoc_pair'] ?? null;
+        $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'] ?? null;
+
         $data = Arr::except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
-        #20250411 ASSOC_DATA 表 c_assoc_year 欄位重構遮除c_assoc_intercalary(原本資料有null)
-        #$data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
-        //20210204增加儲存c_inst_name_code
-        //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
-        //新增結束
-        #20260126「出處」缺省值製作，若「出處」為空，則自動填充為[n/a]，避免複合主鍵 ID 中出現 -- 導致解析問題。
-        if (empty($data['c_text_title'])) {
-            $data['c_text_title'] = '[n/a]';
-        }
         $data = (new ToolsRepository())->timestamp($data);
-        DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_assoc_code', '=', $temp_l[1]],
-            ['c_assoc_id', '=', $temp_l[2]],
-            //20191028進行聯合主鍵的擴充修改
-            ['c_kin_code', '=', $temp_l[3]],
-            ['c_kin_id', '=', $temp_l[4]],
-            ['c_assoc_kin_code', '=', $temp_l[5]],
-            ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $c_text_title],
-            ['c_assoc_first_year', '=', $c_assoc_first_year],
-        ])->update($data);
+
         $ori_data = $data;
-        $data['c_personid'] = $c_personid;
-        // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
-        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_assoc_code' => $data['c_assoc_code'],
-            'c_assoc_id' => $data['c_assoc_id'],
-            'c_kin_code' => $data['c_kin_code'],
-            'c_kin_id' => $data['c_kin_id'],
-            'c_assoc_kin_code' => $data['c_assoc_kin_code'],
-            'c_assoc_kin_id' => $data['c_assoc_kin_id'],
-            'c_text_title' => $data['c_text_title'] ?? '',
-            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
-        ]), $data, $row);
-        (new AuditLogService())->write(
-            'ASSOC_DATA',
-            'UPDATE',
-            [
-                'c_personid' => $data['c_personid'],
+
+        DB::transaction(function () use (&$ori_data, $c_personid, $temp_l, $c_text_title, $c_assoc_first_year, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2) {
+            DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                //20191028進行聯合主鍵的擴充修改
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title],
+                ['c_assoc_first_year', '=', $c_assoc_first_year],
+            ])->update($data);
+
+            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $c_personid,
                 'c_assoc_code' => $data['c_assoc_code'],
                 'c_assoc_id' => $data['c_assoc_id'],
                 'c_kin_code' => $data['c_kin_code'],
@@ -1742,38 +1756,54 @@ class BiogMainRepository {
                 'c_assoc_kin_id' => $data['c_assoc_kin_id'],
                 'c_text_title' => $data['c_text_title'] ?? '',
                 'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-        //20210702取得成對資料原本的c_kin_code
-        $data['c_kin_code'] = $kin_pair;
-        $data['c_assoc_kin_code'] = $assoc_kin_pair;
-        //新增結束
-        //20210708增加[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係
-        $data['c_kin_id'] = $c_personid;
-        $data['c_assoc_kin_id'] = $c_personid;
-        //新增結束
-        $data['c_assoc_code'] = $assoc_pair;
-        $data['c_personid'] = $assoc_id;
-        $data = Arr::except($data, ['c_assoc_id']);
-        //20190118筆記 修改這邊的更新功能.
-        //DB::table('ASSOC_DATA')->where([['c_assoc_id',$id], ['c_personid', $assoc_id]])->update($data);
-        // 修正：更新配對記錄時需要包含 c_assoc_first_year，避免當存在相同 c_text_title 但不同 year 時更新錯誤的記錄
-        DB::table('ASSOC_DATA')->where([
-            ['c_assoc_id', '=', $c_personid],
-            ['c_personid', '=', $old_assoc_id],
-            ['c_text_title', '=', $old_c_text_title],
-            ['c_assoc_first_year', '=', $old_c_assoc_first_year],
-        ])
-        ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
-            $query->where('c_assoc_code', '=', $old_c_assocship_pair1)
-                ->orWhere('c_assoc_code', '=', $old_c_assocship_pair2);
-        })
-        ->update($data);
+            ]), $data, $row);
+
+            (new AuditLogService())->write(
+                'ASSOC_DATA',
+                'UPDATE',
+                [
+                    'c_personid' => $c_personid,
+                    'c_assoc_code' => $data['c_assoc_code'],
+                    'c_assoc_id' => $data['c_assoc_id'],
+                    'c_kin_code' => $data['c_kin_code'],
+                    'c_kin_id' => $data['c_kin_id'],
+                    'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+                    'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+                    'c_text_title' => $data['c_text_title'] ?? '',
+                    'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+                ],
+                (new AuditLogService())->normalizeRow($row),
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            $data_mirror = $data;
+            $data_mirror['c_kin_code'] = $kin_pair;
+            $data_mirror['c_assoc_kin_code'] = $assoc_kin_pair;
+            $data_mirror['c_kin_id'] = $c_personid;
+            $data_mirror['c_assoc_kin_id'] = $c_personid;
+            $data_mirror['c_assoc_code'] = $assoc_pair;
+            $data_mirror['c_personid'] = $assoc_id;
+            $data_mirror = Arr::except($data_mirror, ['c_assoc_id']);
+
+            DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', '=', $c_personid],
+                ['c_personid', '=', $old_assoc_id],
+                ['c_text_title', '=', $old_c_text_title],
+                ['c_assoc_first_year', '=', $old_c_assoc_first_year],
+            ])
+            ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
+                if ($old_c_assocship_pair1 !== null) {
+                    $query->where('c_assoc_code', '=', $old_c_assocship_pair1);
+                }
+                if ($old_c_assocship_pair2 !== null) {
+                    $query->orWhere('c_assoc_code', '=', $old_c_assocship_pair2);
+                }
+            })
+            ->update($data_mirror);
+        });
 
         return $ori_data;
     }
@@ -1786,39 +1816,19 @@ class BiogMainRepository {
         $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $data['c_personid'] = $id;
         $data = Arr::except($data, ['_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
-        #20250411 ASSOC_DATA 表 c_assoc_year 欄位重構遮除c_assoc_intercalary(原本資料有null)
-        #$data['c_assoc_intercalary'] = (int)($data['c_assoc_intercalary']);
-        //20210204增加儲存c_inst_name_code
-        //$data['c_inst_name_code'] = SocialInstCode::where('c_inst_code', $data['c_inst_code'])->first()->c_inst_name_code;
-        //新增結束
+
         #20250417「社會關係始年」缺省值製作，若「社會關係始年」為空，則自動填充為-9999。
         if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
             $data['c_assoc_first_year'] = '-9999';
         }
-        #20260126「出處」缺省值製作，若「出處」為空，則自動填充為[n/a]，避免複合主鍵 ID 中出現 -- 導致解析問題。
-        if (empty($data['c_text_title'])) {
-            $data['c_text_title'] = '[n/a]';
-        }
         $data = (new ToolsRepository())->timestamp($data, true);
-        DB::table('ASSOC_DATA')->insert($data);
+
         $ori_Data = $data;
-        // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
-        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_assoc_code' => $data['c_assoc_code'],
-            'c_assoc_id' => $data['c_assoc_id'],
-            'c_kin_code' => $data['c_kin_code'],
-            'c_kin_id' => $data['c_kin_id'],
-            'c_assoc_kin_code' => $data['c_assoc_kin_code'],
-            'c_assoc_kin_id' => $data['c_assoc_kin_id'],
-            'c_text_title' => $data['c_text_title'] ?? '',
-            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
-        ]), $data);
-        (new AuditLogService())->write(
-            'ASSOC_DATA',
-            'INSERT',
-            [
+
+        DB::transaction(function () use ($id, $data, $assoc_pair, $kin_pair, $assoc_kin_pair, &$ori_Data) {
+            DB::table('ASSOC_DATA')->insert($data);
+            // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
                 'c_assoc_code' => $data['c_assoc_code'],
                 'c_assoc_id' => $data['c_assoc_id'],
@@ -1828,25 +1838,40 @@ class BiogMainRepository {
                 'c_assoc_kin_id' => $data['c_assoc_kin_id'],
                 'c_text_title' => $data['c_text_title'] ?? '',
                 'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-        $data['c_assoc_code'] = $assoc_pair;
-        $data['c_personid'] = $data['c_assoc_id'];
-        $data['c_assoc_id'] = $id;
-        //20210702增加成對親屬關係
-        $data['c_kin_code'] = $kin_pair;
-        $data['c_assoc_kin_code'] = $assoc_kin_pair;
-        //新增結束
-        //20210708增加[親屬關係人]與[社會關係人親屬]的[姓名]欄位調整為對應關係
-        $data['c_kin_id'] = $id;
-        $data['c_assoc_kin_id'] = $id;
-        //新增結束
-        DB::table('ASSOC_DATA')->insert($data);
+            ]), $data);
+
+            (new AuditLogService())->write(
+                'ASSOC_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_assoc_code' => $data['c_assoc_code'],
+                    'c_assoc_id' => $data['c_assoc_id'],
+                    'c_kin_code' => $data['c_kin_code'],
+                    'c_kin_id' => $data['c_kin_id'],
+                    'c_assoc_kin_code' => $data['c_assoc_kin_code'],
+                    'c_assoc_kin_id' => $data['c_assoc_kin_id'],
+                    'c_text_title' => $data['c_text_title'] ?? '',
+                    'c_assoc_first_year' => $data['c_assoc_first_year'] ?? '-9999',
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            $data_mirror = $data;
+            $data_mirror['c_assoc_code'] = $assoc_pair;
+            $data_mirror['c_personid'] = $data['c_assoc_id'];
+            $data_mirror['c_assoc_id'] = $id;
+            $data_mirror['c_kin_code'] = $kin_pair;
+            $data_mirror['c_assoc_kin_code'] = $assoc_kin_pair;
+            $data_mirror['c_kin_id'] = $id;
+            $data_mirror['c_assoc_kin_id'] = $id;
+
+            DB::table('ASSOC_DATA')->insert($data_mirror);
+        });
 
         return $ori_Data;
     }
@@ -1926,17 +1951,20 @@ class BiogMainRepository {
                 $c_text_title = $temp_l[7] ?? '';
             }
         }
-        // 修正：查找配對記錄時使用多層次策略
-        // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
-        // 2. 否則使用 paired c_assoc_code 來精確匹配
-        // 3. 如果沒有配對映射且非 0,0 情況，為避免誤刪不嘗試反向刪除
-        $row2 = null;
-        $reverseDeleteSkipReason = null;
 
-        // 修正：必須檢查 $row 是否存在，記錄可能不存在（malformed ID 或已刪除）
-        if ($row) {
+        if (!$row) {
+            return;
+        }
+
+        DB::transaction(function () use ($id, $c_personid, $temp_l, $c_text_title, $c_assoc_first_year, $row) {
+            // 修正：查找配對記錄時使用多層次策略
+            // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
+            // 2. 否則使用 paired c_assoc_code 來精確匹配
+            // 3. 如果沒有配對映射且非 0,0 情況，為避免誤刪不嘗試反向刪除
+            $row2 = null;
+            $reverseDeleteSkipReason = null;
+
             // 策略 1：如果 c_kin_id = 0 且 c_assoc_kin_id = 0，直接用這些值匹配反向記錄
-            // 注意：此策略僅處理對稱情況，若原記錄非 0,0，則依賴策略 2 的配對代碼
             if ($row->c_kin_id == 0 && $row->c_assoc_kin_id == 0) {
                 $row2 = DB::table('ASSOC_DATA')->where([
                     ['c_personid', $row->c_assoc_id],
@@ -1951,12 +1979,9 @@ class BiogMainRepository {
             // 策略 2：如果策略 1 沒找到，使用 paired c_assoc_code 匹配
             if (!$row2) {
                 $assocCodePair = AssocCode::where('c_assoc_code', '=', $row->c_assoc_code)->first();
-                // 修正：AssocCode::first() 可能返回 null，需要先檢查
                 $assocPair1 = $assocCodePair?->c_assoc_pair;
                 $assocPair2 = $assocCodePair?->c_assoc_pair2;
 
-                // 只有在有配對代碼時才嘗試查找反向記錄
-                // 如果沒有配對映射，為避免誤刪錯誤的記錄，不執行反向刪除
                 if ($assocPair1 !== null || $assocPair2 !== null) {
                     $row2Query = DB::table('ASSOC_DATA')->where([
                         ['c_personid', $row->c_assoc_id],
@@ -1974,28 +1999,23 @@ class BiogMainRepository {
                     });
                     $row2 = $row2Query->first();
                 } else {
-                    // 記錄跳過原因：沒有配對代碼且非 0,0 情況
                     $reverseDeleteSkipReason = 'no_pair_mapping';
                 }
             }
-        } else {
-            // 記錄跳過原因：原記錄不存在
-            $reverseDeleteSkipReason = 'source_record_not_found';
-        }
-        DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_assoc_code', '=', $temp_l[1]],
-            ['c_assoc_id', '=', $temp_l[2]],
-            //20191028進行聯合主鍵的擴充修改
-            ['c_kin_code', '=', $temp_l[3]],
-            ['c_kin_id', '=', $temp_l[4]],
-            ['c_assoc_kin_code', '=', $temp_l[5]],
-            ['c_assoc_kin_id', '=', $temp_l[6]],
-            ['c_text_title', '=', $c_text_title],
-            ['c_assoc_first_year', '=', $c_assoc_first_year],
-        ])->delete();
-        $assocResourceId = $row
-            ? CompositePrimaryKey::buildStoredResourceId([
+
+            DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_assoc_code', '=', $temp_l[1]],
+                ['c_assoc_id', '=', $temp_l[2]],
+                ['c_kin_code', '=', $temp_l[3]],
+                ['c_kin_id', '=', $temp_l[4]],
+                ['c_assoc_kin_code', '=', $temp_l[5]],
+                ['c_assoc_kin_id', '=', $temp_l[6]],
+                ['c_text_title', '=', $c_text_title],
+                ['c_assoc_first_year', '=', $c_assoc_first_year],
+            ])->delete();
+
+            $assocResourceId = CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $row->c_personid,
                 'c_assoc_code' => $row->c_assoc_code,
                 'c_assoc_id' => $row->c_assoc_id,
@@ -2005,10 +2025,9 @@ class BiogMainRepository {
                 'c_assoc_kin_id' => $row->c_assoc_kin_id,
                 'c_text_title' => $row->c_text_title ?? '',
                 'c_assoc_first_year' => $row->c_assoc_first_year ?? '-9999',
-            ])
-            : $id;
-        $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $assocResourceId, $row);
-        if ($row) {
+            ]);
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ASSOC_DATA', $assocResourceId, $row);
+
             (new AuditLogService())->write(
                 'ASSOC_DATA',
                 'DELETE',
@@ -2029,34 +2048,32 @@ class BiogMainRepository {
                 (string) Auth::id(),
                 $operation ? (string) $operation->id : null
             );
-        }
 
-        // 檢查$row2是否存在後再刪除反向關係
-        // 修正：使用完整主鍵欄位進行刪除，避免誤刪其他記錄
-        if ($row2 !== null) {
-            DB::table('ASSOC_DATA')->where([
-                ['c_personid', $row2->c_personid],
-                ['c_assoc_id', $row2->c_assoc_id],
-                ['c_assoc_code', $row2->c_assoc_code],
-                ['c_kin_code', $row2->c_kin_code],
-                ['c_kin_id', $row2->c_kin_id],
-                ['c_assoc_kin_code', $row2->c_assoc_kin_code],
-                ['c_assoc_kin_id', $row2->c_assoc_kin_id],
-                ['c_text_title', $row2->c_text_title],
-                ['c_assoc_first_year', $row2->c_assoc_first_year],
-            ])->delete();
-        } elseif ($reverseDeleteSkipReason !== null) {
-            // 記錄跳過反向刪除的原因，便於審計和問題排查
-            Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
-                'reason' => $reverseDeleteSkipReason,
-                'forward_id' => $id,
-                'c_personid' => $temp_l[0] ?? null,
-                'c_assoc_id' => $temp_l[2] ?? null,
-                'c_assoc_code' => $temp_l[1] ?? null,
-                'c_kin_id' => $row?->c_kin_id,
-                'c_assoc_kin_id' => $row?->c_assoc_kin_id,
-            ]);
-        }
+            // 檢查$row2是否存在後再刪除反向關係
+            if ($row2 !== null) {
+                DB::table('ASSOC_DATA')->where([
+                    ['c_personid', $row2->c_personid],
+                    ['c_assoc_id', $row2->c_assoc_id],
+                    ['c_assoc_code', $row2->c_assoc_code],
+                    ['c_kin_code', $row2->c_kin_code],
+                    ['c_kin_id', $row2->c_kin_id],
+                    ['c_assoc_kin_code', $row2->c_assoc_kin_code],
+                    ['c_assoc_kin_id', $row2->c_assoc_kin_id],
+                    ['c_text_title', $row2->c_text_title],
+                    ['c_assoc_first_year', $row2->c_assoc_first_year],
+                ])->delete();
+            } elseif ($reverseDeleteSkipReason !== null) {
+                Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
+                    'reason' => $reverseDeleteSkipReason,
+                    'forward_id' => $id,
+                    'c_personid' => $temp_l[0] ?? null,
+                    'c_assoc_id' => $temp_l[2] ?? null,
+                    'c_assoc_code' => $temp_l[1] ?? null,
+                    'c_kin_id' => $row->c_kin_id,
+                    'c_assoc_kin_id' => $row->c_assoc_kin_id,
+                ]);
+            }
+        });
     }
 
     public function sourceById($id, $_id) {
@@ -2096,6 +2113,10 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->first();
+        if (!$row) {
+            return [];
+        }
+
         $data = $request->all();
         $data = Arr::except($data, ['_method', '_token']);
         $data['c_personid'] = $id;
@@ -2103,34 +2124,39 @@ class BiogMainRepository {
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        $c_modified_by = Auth::user()->name;
+        $c_modified_by = Auth::user()->name ?? Auth::id();
         $c_modified_date = Carbon::now();
         $data['c_modified_by'] = $c_modified_by;
         $data['c_modified_date'] = $c_modified_date;
-        DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_pages', '=', $temp_l[2]],
-        ])->update($data);
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_textid' => $data['c_textid'],
-            'c_pages' => $data['c_pages'],
-        ]), $data, $row);
-        (new AuditLogService())->write(
-            'BIOG_SOURCE_DATA',
-            'UPDATE',
-            [
+
+        DB::transaction(function () use ($id, $temp_l, $row, $data) {
+            DB::table('BIOG_SOURCE_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_pages', '=', $temp_l[2]],
+            ])->update($data);
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
                 'c_textid' => $data['c_textid'],
                 'c_pages' => $data['c_pages'],
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+            ]), $data, $row);
+
+            (new AuditLogService())->write(
+                'BIOG_SOURCE_DATA',
+                'UPDATE',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_textid' => $data['c_textid'],
+                    'c_pages' => $data['c_pages'],
+                ],
+                (new AuditLogService())->normalizeRow($row),
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         return $data;
     }
@@ -2143,30 +2169,33 @@ class BiogMainRepository {
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        $c_created_by = Auth::user()->name;
+        $c_created_by = Auth::user()->name ?? Auth::id();
         $c_created_date = Carbon::now();
         $data['c_created_by'] = $c_created_by;
         $data['c_created_date'] = $c_created_date;
-        DB::table('BIOG_SOURCE_DATA')->insert($data);
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_textid' => $data['c_textid'],
-            'c_pages' => $data['c_pages'],
-        ]), $data);
-        (new AuditLogService())->write(
-            'BIOG_SOURCE_DATA',
-            'INSERT',
-            [
+
+        DB::transaction(function () use ($id, $data) {
+            DB::table('BIOG_SOURCE_DATA')->insert($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
                 'c_textid' => $data['c_textid'],
                 'c_pages' => $data['c_pages'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+            ]), $data);
+            (new AuditLogService())->write(
+                'BIOG_SOURCE_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_textid' => $data['c_textid'],
+                    'c_pages' => $data['c_pages'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
 
         return $data;
     }
@@ -2185,30 +2214,37 @@ class BiogMainRepository {
             ['c_textid', '=', $temp_l[1]],
             ['c_pages', '=', $temp_l[2]],
         ])->first();
-        DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_pages', '=', $temp_l[2]],
-        ])->delete();
-        $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $temp_l[0],
-            'c_textid' => $temp_l[1],
-            'c_pages' => $temp_l[2],
-        ]), $row);
-        (new AuditLogService())->write(
-            'BIOG_SOURCE_DATA',
-            'DELETE',
-            [
+
+        if (!$row) {
+            return;
+        }
+
+        DB::transaction(function () use ($id, $temp_l, $row) {
+            DB::table('BIOG_SOURCE_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_pages', '=', $temp_l[2]],
+            ])->delete();
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $temp_l[0],
                 'c_textid' => $temp_l[1],
                 'c_pages' => $temp_l[2],
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+            ]), $row);
+            (new AuditLogService())->write(
+                'BIOG_SOURCE_DATA',
+                'DELETE',
+                [
+                    'c_personid' => $temp_l[0],
+                    'c_textid' => $temp_l[1],
+                    'c_pages' => $temp_l[2],
+                ],
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
     }
 
     protected function addr_str($id) {

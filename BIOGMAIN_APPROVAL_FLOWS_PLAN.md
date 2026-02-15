@@ -6,9 +6,9 @@
 ## 1. 基本資訊
 
 - 文檔性質：實作狀態（Status）
-- 文檔版本：4.0
+- 文檔版本：4.1
 - 創建日期：2025-11-27
-- 最後更新：2026-02-14
+- 最後更新：2026-02-15
 
 ## 2. 目前實作概覽
 
@@ -54,15 +54,15 @@
 | `ALTNAME_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
 | `BIOG_ADDR_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
 | `BIOG_TEXT_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
-| `STATUS_DATA` | 部分實作 | 已在 `BasicInformationProposalController` 配置資源，但頁面入口尚未全面接入。 |
-| `POSSESSION_DATA` | 部分實作 | 已在 `BasicInformationProposalController` 配置資源，但頁面入口尚未全面接入。 |
-| `POSTED_TO_OFFICE_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `ASSOC_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `ENTRY_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `EVENTS_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `KIN_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `BIOG_INST_DATA` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
-| `SOURCES` | 未接入提案入口 | 目前未納入 basicinformation 提案提交流程。 |
+| `STATUS_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `POSSESSION_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `POSTED_TO_OFFICE_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `ASSOC_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `ENTRY_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `EVENTS_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `KIN_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `BIOG_INST_DATA` | 已實作 | 提案提交與審核流程可用。 |
+| `BIOG_SOURCE_DATA` | 已實作 | 提案提交與審核流程可用。 |
 
 ## 4. 測試覆蓋（已存在）
 
@@ -75,11 +75,34 @@
 
 ## 5. 已知缺口
 
-1. basicinformation 仍有多個子資源未接上 `action=proposal` 入口（見第 3 節）。
-2. 提案者「修改/撤回」目前沿用 `CodesController` 的提案管理路由與頁面，流程可用但命名層面仍偏向 codes。
-3. 若後續要完整覆蓋 13 類資源，需補齊各子頁控制器入口與對應 Feature 測試。
+1. 提案者「修改/撤回」目前沿用 `CodesController` 的提案管理路由與頁面，流程可用但命名層面仍偏向 codes。
+2. 仍需持續維護各資源的 `__key_columns` 與實際 schema 一致性，避免提案審核階段出現主鍵誤判。
 
-## 6. 後續維護規則
+## 6. 近期修正紀錄（2026-02-15）
+
+1. 提案主鍵配置修正
+- `BasicInformationProposalController` 的資源主鍵配置已校正為與 schema 一致：
+  - `POSSESSION_DATA`：`['c_possession_record_id']`
+  - `BIOG_TEXT_DATA`：`['c_personid', 'c_textid', 'c_role_id']`
+  - `BIOG_ADDR_DATA`：`['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']`
+- 影響：後續新提交提案的 `resource_data.__key_columns` 與 `resource_id` 生成邏輯一致，降低審核時誤判風險。
+
+2. 單一數值主鍵提案補號
+- 在 `BasicInformationProposalController::proposalStore()` 增加單一數值主鍵的自動補號（max + 1）流程。
+- 目的：避免 `POSSESSION_DATA` 等單主鍵資源在未帶主鍵時寫入錯誤提案資料。
+
+3. Codes 模組主鍵覆寫補齊
+- `CodesController::$tablePrimaryKeyOverrides` 新增 `POSSESSION_DATA => ['c_possession_record_id']`。
+- 目的：確保 `/codes/POSSESSION_DATA` 的提案主鍵判定與資料表一致。
+
+4. 測試補強
+- `tests/Feature/BasicInformationProposalTest.php`
+  - 新增 `POSSESSION_DATA` 提案自動補號與 `__key_columns` 驗證。
+  - 新增提案資源主鍵配置一致性檢查（addresses/texts/possessions）。
+- `tests/Feature/CodesControllerTest.php`
+  - 新增 `/codes/POSSESSION_DATA/proposal` 主鍵覆寫流程驗證。
+
+## 7. 後續維護規則
 
 - 每次新增一個 basicinformation 子資源的 proposal 入口，需同步更新：
   - 本文件第 3 節狀態表

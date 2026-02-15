@@ -1,9 +1,19 @@
 {{-- 共享表单组件 - Kinship --}}
 @php
+    use App\Support\CompositePrimaryKey;
     $isEdit = isset($row);
-    $formAction = $isEdit
-        ? route('basicinformation.kinship.update', ['basicinformation' => $id, 'kinship' => $row->c_personid.'-'.$row->c_kin_id.'-'.$row->c_kin_code])
-        : route('basicinformation.kinship.store', ['basicinformation' => $id]);
+
+    if ($isEdit && isset($pk)) {
+        $formAction = CompositePrimaryKey::buildUrl(
+            'basicinformation.kinship.update.query',
+            ['id' => $id],
+            $pk
+        );
+    } elseif ($isEdit) {
+        $formAction = route('basicinformation.kinship.update', ['basicinformation' => $id, 'kinship' => $row->c_personid.'-'.$row->c_kin_id.'-'.$row->c_kin_code]);
+    } else {
+        $formAction = route('basicinformation.kinship.store', ['basicinformation' => $id]);
+    }
 @endphp
 
 <form action="{{ $formAction }}" method="post">
@@ -105,8 +115,32 @@
     />
 
     <div class="form-group row">
+        <label for="__proposal_comment" class="col-sm-2 col-form-label">修改說明 / 提案理由</label>
+        <div class="col-sm-10">
+            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）"></textarea>
+            <small class="text-muted">此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。</small>
+        </div>
+    </div>
+
+    <div class="form-group row">
         <div class="offset-sm-2 col-sm-10">
-            <button type="submit" class="btn btn-secondary">Submit</button>
+            @if(Auth::check() && Auth::user()->isActive())
+                <!-- 直接儲存按鈕（非眾包用戶可見） -->
+                @if(Auth::user()->canWriteDirectly())
+                    <button type="submit" name="action" value="save" class="btn btn-primary">
+                        <i class="fa fa-save"></i> 直接儲存
+                    </button>
+                @endif
+
+                <!-- 提交提案按鈕（所有活躍用戶可見） -->
+                <button type="submit" name="action" value="proposal" class="btn btn-info">
+                    <i class="fa fa-paper-plane"></i> 提交提案
+                </button>
+            @endif
+
+            <a href="{{ route('basicinformation.kinship.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
+                <i class="fa fa-times"></i> 取消
+            </a>
         </div>
     </div>
 </form>

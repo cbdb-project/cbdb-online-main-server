@@ -357,6 +357,7 @@ class CodesController extends Controller {
     protected $tablePrimaryKeyOverrides = [
         'CBDB__NAME_FTS' => ['id'],
         'CBDB__TRAD_SIMP_MAP' => ['trad_char'],
+        'POSSESSION_DATA' => ['c_possession_record_id'],
         'TEXT_CODES' => ['c_textid'],
     ];
     /**

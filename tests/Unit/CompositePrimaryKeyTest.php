@@ -65,7 +65,7 @@ class CompositePrimaryKeyTest extends TestCase {
     }
 
     /** @test */
-    public function it_filters_out_empty_values_from_request(): void {
+    public function it_filters_out_null_but_preserves_empty_strings_from_request(): void {
         $request = new Request([
             'c_personid' => 12345,
             'c_sequence' => '',
@@ -76,9 +76,10 @@ class CompositePrimaryKeyTest extends TestCase {
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
-        // 空字串和 null 應該被過濾掉
+        // NULL 應該被過濾掉，但空字串應該保留（支援某些表的主鍵欄位可以為空）
         $this->assertEquals([
             'c_personid' => 12345,
+            'c_sequence' => '',
             'c_alt_name_chn' => '張三',
         ], $pk);
     }

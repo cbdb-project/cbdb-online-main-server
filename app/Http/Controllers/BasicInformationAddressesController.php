@@ -127,11 +127,35 @@ class BasicInformationAddressesController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
+
+        // 數據預處理
+        $request->merge([
+            'c_addr_id' => ($request->input('c_addr_id') == -999) ? '0' : ($request->input('c_addr_id') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalStore($request, $id, 'addresses');
+        }
+
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
         $data = $request->all();
         $data = Arr::except($data, ['_token']);
         $data['c_personid'] = $id;
@@ -324,6 +348,12 @@ class BasicInformationAddressesController extends Controller {
 
             return redirect()->back();
         }
+
+        // 數據預處理
+        $request->merge([
+            'c_addr_id' => ($request->input('c_addr_id') == -999) ? '0' : ($request->input('c_addr_id') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');
@@ -572,7 +602,7 @@ class BasicInformationAddressesController extends Controller {
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，請聯繫管理員 @ '.Carbon::now(), 'error');
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }

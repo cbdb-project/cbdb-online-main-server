@@ -31,7 +31,7 @@
   - `MergePreviewController.php:964, 1049` - 在閉包內
 
 - ✅ **安全的 orWhere（查詢起始位置）**：
-  所有 Repository 中的簡單搜索查詢（如 `TextCodeRepository`、`AddrCodeRepository` 等）都是從 Eloquent 模型或 Query Builder 的起始位置開始，沒有前置條件，因此是安全的。
+  所有 Repository 中的簡單搜索查詢（如 `AddrCodeRepository` 等）都是從 Eloquent 模型或 Query Builder 的起始位置開始，沒有前置條件，因此是安全的。
 
 - ℹ️ **whereNot**：代碼庫中未使用此方法（Laravel 9+ 新增）
 - ℹ️ **when**：未發現問題使用模式

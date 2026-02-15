@@ -420,17 +420,21 @@ class BasicInformationController extends Controller {
 
             return redirect()->back();
         }
-        $data = BiogMain::find($id)->toArray();
-        $new_id = BiogMain::max('c_personid') + 1;
-        $data['c_personid'] = $new_id;
-        $data = $this->toolRepository->timestamp($data, true); //建檔資訊
-        $data['c_modified_by'] = $data['c_modified_date'] = '';
+
+        $auditLogService = new AuditLogService();
         $flight = null;
-        DB::transaction(function () use (&$flight, $data, $new_id) {
+        $new_id = BiogMain::max('c_personid') + 1;
+
+        DB::transaction(function () use (&$flight, $id, $new_id, $auditLogService) {
+            $data = BiogMain::find($id)->toArray();
+            $data['c_personid'] = $new_id;
+            $data = $this->toolRepository->timestamp($data, true); //建檔資訊
+            $data['c_modified_by'] = $data['c_modified_date'] = '';
+
             $flight = BiogMain::create($data);
             $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
 
-            (new AuditLogService())->write(
+            $auditLogService->write(
                 'BIOG_MAIN',
                 'INSERT',
                 ['c_personid' => $new_id],
@@ -440,169 +444,303 @@ class BasicInformationController extends Controller {
                 (string) Auth::id(),
                 $operation ? (string) $operation->id : null
             );
+
+            if (Schema::hasTable('CBDB__NAME_FTS')) {
+                $this->nameSearchIndexService->reindexPerson($flight);
+            }
+
+            //擴充複製訊息：地址，出處，親屬，社會關係，社會機構，社會區分
+            //地址
+            $addr = DB::table('BIOG_ADDR_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($addr as $addr_data) {
+                $addr_data = (array)$addr_data;
+                $addr_data['c_personid'] = $new_id;
+                $addr_data = Arr::except($addr_data, ['_token']);
+                $addr_data = $this->toolRepository->timestamp($addr_data, true); //建檔資訊
+                DB::table('BIOG_ADDR_DATA')->insert($addr_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $addr_data['c_personid'],
+                    'c_addr_id' => $addr_data['c_addr_id'],
+                    'c_addr_type' => $addr_data['c_addr_type'],
+                    'c_sequence' => $addr_data['c_sequence'],
+                ]), $addr_data);
+
+                $auditLogService->write(
+                    'BIOG_ADDR_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $addr_data['c_personid'],
+                        'c_addr_id' => $addr_data['c_addr_id'],
+                        'c_addr_type' => $addr_data['c_addr_type'],
+                        'c_sequence' => $addr_data['c_sequence'],
+                    ],
+                    null,
+                    $addr_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            //出處
+            $source = DB::table('BIOG_SOURCE_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($source as $source_data) {
+                $source_data = (array)$source_data;
+                $source_data['c_personid'] = $new_id;
+                $source_data = Arr::except($source_data, ['_token']);
+                DB::table('BIOG_SOURCE_DATA')->insert($source_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $source_data['c_personid'],
+                    'c_textid' => $source_data['c_textid'],
+                    'c_pages' => $source_data['c_pages'],
+                ]), $source_data);
+
+                $auditLogService->write(
+                    'BIOG_SOURCE_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $source_data['c_personid'],
+                        'c_textid' => $source_data['c_textid'],
+                        'c_pages' => $source_data['c_pages'],
+                    ],
+                    null,
+                    $source_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            //親屬
+            $kin = DB::table('KIN_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($kin as $kin_data) {
+                $kin_data = (array)$kin_data;
+                $kin_data['c_personid'] = $new_id;
+                $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
+                DB::table('KIN_DATA')->insert($kin_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $kin_data['c_personid'],
+                    'c_kin_id' => $kin_data['c_kin_id'],
+                    'c_kin_code' => $kin_data['c_kin_code'],
+                ]), $kin_data);
+
+                $auditLogService->write(
+                    'KIN_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $kin_data['c_personid'],
+                        'c_kin_id' => $kin_data['c_kin_id'],
+                        'c_kin_code' => $kin_data['c_kin_code'],
+                    ],
+                    null,
+                    $kin_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            $kin_pair = DB::table('KIN_DATA')->where([
+                ['c_kin_id', '=', $id],
+            ])->get();
+            foreach ($kin_pair as $kin_data) {
+                $kin_data = (array)$kin_data;
+                $kin_pair_id = $kin_data['c_personid'];
+                $kin_data['c_kin_id'] = $new_id;
+                $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
+                DB::table('KIN_DATA')->insert($kin_data);
+                $operation = $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $kin_data['c_personid'],
+                    'c_kin_id' => $kin_data['c_kin_id'],
+                    'c_kin_code' => $kin_data['c_kin_code'],
+                ]), $kin_data);
+
+                $auditLogService->write(
+                    'KIN_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $kin_data['c_personid'],
+                        'c_kin_id' => $kin_data['c_kin_id'],
+                        'c_kin_code' => $kin_data['c_kin_code'],
+                    ],
+                    null,
+                    $kin_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            //社會關係
+            $assoc = DB::table('ASSOC_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($assoc as $assoc_data) {
+                $assoc_data = (array)$assoc_data;
+                $assoc_data['c_personid'] = $new_id;
+                $assoc_data['c_kin_id'] = 0;
+                $assoc_data['c_kin_code'] = 0;
+                $assoc_data['c_assoc_kin_id'] = 0;
+                $assoc_data['c_assoc_kin_code'] = 0;
+                $assoc_data['c_tertiary_personid'] = 0;
+                $assoc_data['c_tertiary_type_notes'] = null;
+                $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
+                DB::table('ASSOC_DATA')->insert($assoc_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $assoc_data['c_personid'],
+                    'c_assoc_code' => $assoc_data['c_assoc_code'],
+                    'c_assoc_id' => $assoc_data['c_assoc_id'],
+                    'c_kin_code' => $assoc_data['c_kin_code'],
+                    'c_kin_id' => $assoc_data['c_kin_id'],
+                    'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                    'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                    'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                    'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+                ]), $assoc_data);
+
+                $auditLogService->write(
+                    'ASSOC_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $assoc_data['c_personid'],
+                        'c_assoc_code' => $assoc_data['c_assoc_code'],
+                        'c_assoc_id' => $assoc_data['c_assoc_id'],
+                        'c_kin_code' => $assoc_data['c_kin_code'],
+                        'c_kin_id' => $assoc_data['c_kin_id'],
+                        'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                        'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                        'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                        'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+                    ],
+                    null,
+                    $assoc_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            $assoc_pair = DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', '=', $id],
+            ])->get();
+            foreach ($assoc_pair as $assoc_data) {
+                $assoc_data = (array)$assoc_data;
+                $assoc_pair_id = $assoc_data['c_personid'];
+                $assoc_data['c_assoc_id'] = $new_id;
+                $assoc_data['c_kin_id'] = 0;
+                $assoc_data['c_kin_code'] = 0;
+                $assoc_data['c_assoc_kin_id'] = 0;
+                $assoc_data['c_assoc_kin_code'] = 0;
+                $assoc_data['c_tertiary_personid'] = 0;
+                $assoc_data['c_tertiary_type_notes'] = null;
+                $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
+                DB::table('ASSOC_DATA')->insert($assoc_data);
+                $operation = $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $assoc_data['c_personid'],
+                    'c_assoc_code' => $assoc_data['c_assoc_code'],
+                    'c_assoc_id' => $assoc_data['c_assoc_id'],
+                    'c_kin_code' => $assoc_data['c_kin_code'],
+                    'c_kin_id' => $assoc_data['c_kin_id'],
+                    'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                    'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                    'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                    'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+                ]), $assoc_data);
+
+                $auditLogService->write(
+                    'ASSOC_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $assoc_data['c_personid'],
+                        'c_assoc_code' => $assoc_data['c_assoc_code'],
+                        'c_assoc_id' => $assoc_data['c_assoc_id'],
+                        'c_kin_code' => $assoc_data['c_kin_code'],
+                        'c_kin_id' => $assoc_data['c_kin_id'],
+                        'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
+                        'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
+                        'c_text_title' => $assoc_data['c_text_title'] ?? '',
+                        'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
+                    ],
+                    null,
+                    $assoc_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            //社交機構
+            $inst = DB::table('BIOG_INST_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($inst as $inst_data) {
+                $inst_data = (array)$inst_data;
+                $inst_data['c_personid'] = $new_id;
+                $inst_data = Arr::except($inst_data, ['_token']);
+                $inst_data = $this->toolRepository->timestamp($inst_data, true); //建檔資訊
+                DB::table('BIOG_INST_DATA')->insert($inst_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $inst_data['c_personid'],
+                    'c_inst_code' => $inst_data['c_inst_code'],
+                    'c_inst_name_code' => $inst_data['c_inst_name_code'],
+                    'c_bi_role_code' => $inst_data['c_bi_role_code'],
+                ]), $inst_data);
+
+                $auditLogService->write(
+                    'BIOG_INST_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $inst_data['c_personid'],
+                        'c_inst_code' => $inst_data['c_inst_code'],
+                        'c_inst_name_code' => $inst_data['c_inst_name_code'],
+                        'c_bi_role_code' => $inst_data['c_bi_role_code'],
+                    ],
+                    null,
+                    $inst_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
+
+            //社會區分
+            $status = DB::table('STATUS_DATA')->where([
+                ['c_personid', '=', $id],
+            ])->get();
+            foreach ($status as $status_data) {
+                $status_data = (array)$status_data;
+                $status_data['c_personid'] = $new_id;
+                $status_data = Arr::except($status_data, ['_token']);
+                $status_data = $this->toolRepository->timestamp($status_data, true); //建檔資訊
+                DB::table('STATUS_DATA')->insert($status_data);
+                $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
+                    'c_personid' => $status_data['c_personid'],
+                    'c_sequence' => $status_data['c_sequence'],
+                    'c_status_code' => $status_data['c_status_code'],
+                ]), $status_data);
+
+                $auditLogService->write(
+                    'STATUS_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $status_data['c_personid'],
+                        'c_sequence' => $status_data['c_sequence'],
+                        'c_status_code' => $status_data['c_status_code'],
+                    ],
+                    null,
+                    $status_data,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            }
         });
-
-        if (Schema::hasTable('CBDB__NAME_FTS')) {
-            $this->nameSearchIndexService->reindexPerson($flight);
-        }
-
-        //擴充複製訊息：地址，出處，親屬，社會關係，社會機構，社會區分
-        //地址
-        $addr = DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($addr as $addr_data) {
-            $addr_data = (array)$addr_data;
-            $addr_data['c_personid'] = $new_id;
-            $addr_data = Arr::except($addr_data, ['_token']);
-            $addr_data = $this->toolRepository->timestamp($addr_data, true); //建檔資訊
-            DB::table('BIOG_ADDR_DATA')->insert($addr_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $addr_data['c_personid'],
-                'c_addr_id' => $addr_data['c_addr_id'],
-                'c_addr_type' => $addr_data['c_addr_type'],
-                'c_sequence' => $addr_data['c_sequence'],
-            ]), $addr_data);
-        }
-
-        //出處
-        $source = DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($source as $source_data) {
-            $source_data = (array)$source_data;
-            $source_data['c_personid'] = $new_id;
-            $source_data = Arr::except($source_data, ['_token']);
-            DB::table('BIOG_SOURCE_DATA')->insert($source_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $source_data['c_personid'],
-                'c_textid' => $source_data['c_textid'],
-                'c_pages' => $source_data['c_pages'],
-            ]), $source_data);
-        }
-
-        //親屬
-        $kin = DB::table('KIN_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($kin as $kin_data) {
-            $kin_data = (array)$kin_data;
-            $kin_data['c_personid'] = $new_id;
-            $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
-            DB::table('KIN_DATA')->insert($kin_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $kin_data['c_personid'],
-                'c_kin_id' => $kin_data['c_kin_id'],
-                'c_kin_code' => $kin_data['c_kin_code'],
-            ]), $kin_data);
-        }
-
-        $kin_pair = DB::table('KIN_DATA')->where([
-            ['c_kin_id', '=', $id],
-        ])->get();
-        foreach ($kin_pair as $kin_data) {
-            $kin_data = (array)$kin_data;
-            $kin_pair_id = $kin_data['c_personid'];
-            $kin_data['c_kin_id'] = $new_id;
-            $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
-            DB::table('KIN_DATA')->insert($kin_data);
-            $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $kin_data['c_personid'],
-                'c_kin_id' => $kin_data['c_kin_id'],
-                'c_kin_code' => $kin_data['c_kin_code'],
-            ]), $kin_data);
-        }
-
-        //社會關係
-        $assoc = DB::table('ASSOC_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($assoc as $assoc_data) {
-            $assoc_data = (array)$assoc_data;
-            $assoc_data['c_personid'] = $new_id;
-            $assoc_data['c_kin_id'] = 0;
-            $assoc_data['c_kin_code'] = 0;
-            $assoc_data['c_assoc_kin_id'] = 0;
-            $assoc_data['c_assoc_kin_code'] = 0;
-            $assoc_data['c_tertiary_personid'] = 0;
-            $assoc_data['c_tertiary_type_notes'] = null;
-            $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
-            DB::table('ASSOC_DATA')->insert($assoc_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $assoc_data['c_personid'],
-                'c_assoc_code' => $assoc_data['c_assoc_code'],
-                'c_assoc_id' => $assoc_data['c_assoc_id'],
-                'c_kin_code' => $assoc_data['c_kin_code'],
-                'c_kin_id' => $assoc_data['c_kin_id'],
-                'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
-                'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
-                'c_text_title' => $assoc_data['c_text_title'] ?? '',
-                'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
-            ]), $assoc_data);
-        }
-
-        $assoc_pair = DB::table('ASSOC_DATA')->where([
-            ['c_assoc_id', '=', $id],
-        ])->get();
-        foreach ($assoc_pair as $assoc_data) {
-            $assoc_data = (array)$assoc_data;
-            $assoc_pair_id = $assoc_data['c_personid'];
-            $assoc_data['c_assoc_id'] = $new_id;
-            $assoc_data['c_kin_id'] = 0;
-            $assoc_data['c_kin_code'] = 0;
-            $assoc_data['c_assoc_kin_id'] = 0;
-            $assoc_data['c_assoc_kin_code'] = 0;
-            $assoc_data['c_tertiary_personid'] = 0;
-            $assoc_data['c_tertiary_type_notes'] = null;
-            $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
-            DB::table('ASSOC_DATA')->insert($assoc_data);
-            $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $assoc_data['c_personid'],
-                'c_assoc_code' => $assoc_data['c_assoc_code'],
-                'c_assoc_id' => $assoc_data['c_assoc_id'],
-                'c_kin_code' => $assoc_data['c_kin_code'],
-                'c_kin_id' => $assoc_data['c_kin_id'],
-                'c_assoc_kin_code' => $assoc_data['c_assoc_kin_code'],
-                'c_assoc_kin_id' => $assoc_data['c_assoc_kin_id'],
-                'c_text_title' => $assoc_data['c_text_title'] ?? '',
-                'c_assoc_first_year' => $assoc_data['c_assoc_first_year'] ?? '-9999',
-            ]), $assoc_data);
-        }
-
-        //社交機構
-        $inst = DB::table('BIOG_INST_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($inst as $inst_data) {
-            $inst_data = (array)$inst_data;
-            $inst_data['c_personid'] = $new_id;
-            $inst_data = Arr::except($inst_data, ['_token']);
-            $inst_data = $this->toolRepository->timestamp($inst_data, true); //建檔資訊
-            DB::table('BIOG_INST_DATA')->insert($inst_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $inst_data['c_personid'],
-                'c_inst_code' => $inst_data['c_inst_code'],
-                'c_inst_name_code' => $inst_data['c_inst_name_code'],
-                'c_bi_role_code' => $inst_data['c_bi_role_code'],
-            ]), $inst_data);
-        }
-
-        //社會區分
-        $status = DB::table('STATUS_DATA')->where([
-            ['c_personid', '=', $id],
-        ])->get();
-        foreach ($status as $status_data) {
-            $status_data = (array)$status_data;
-            $status_data['c_personid'] = $new_id;
-            $status_data = Arr::except($status_data, ['_token']);
-            $status_data = $this->toolRepository->timestamp($status_data, true); //建檔資訊
-            DB::table('STATUS_DATA')->insert($status_data);
-            $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
-                'c_personid' => $status_data['c_personid'],
-                'c_sequence' => $status_data['c_sequence'],
-                'c_status_code' => $status_data['c_status_code'],
-            ]), $status_data);
-        }
 
         //擴充結束
         flash('Create success @ '.Carbon::now(), 'success');
@@ -627,8 +765,12 @@ class BasicInformationController extends Controller {
             return redirect()->back();
         }
         $ori = $this->biogMainRepository->byPersonId($id);
+        if (!$ori) {
+            abort(404);
+        }
         $biog = BiogMain::find($id);
         $biog->c_name_chn = '<待删除>';
+
         //20190605判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori, 2);
@@ -636,12 +778,25 @@ class BasicInformationController extends Controller {
 
             return redirect()->route('basicinformation.index');
         } else {
-            $biog->save();
-            $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori);
+            DB::transaction(function () use ($biog, $id, $ori) {
+                $biog->save();
+                $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori);
 
-            if (Schema::hasTable('CBDB__NAME_FTS')) {
-                $this->nameSearchIndexService->reindexPerson($biog);
-            }
+                (new AuditLogService())->write(
+                    'BIOG_MAIN',
+                    'UPDATE',
+                    ['c_personid' => $id],
+                    $ori->toArray(),
+                    $biog->toArray(),
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+
+                if (Schema::hasTable('CBDB__NAME_FTS')) {
+                    $this->nameSearchIndexService->reindexPerson($biog);
+                }
+            });
 
             flash('Delete success @ '.Carbon::now(), 'success');
 

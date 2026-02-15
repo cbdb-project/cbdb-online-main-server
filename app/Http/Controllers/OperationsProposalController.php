@@ -53,29 +53,29 @@ class OperationsProposalController extends Controller {
         $comment = trim((string) $request->input('review_comment', ''));
 
         try {
-            $appliedRow = DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original) {
+            DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original, $operation, $comment) {
                 if ($opType === Operation::TYPE_PROPOSAL_CREATE) {
-                    return $this->applyCreateProposal($table, $data, $keyColumns);
+                    $appliedRow = $this->applyCreateProposal($table, $data, $keyColumns);
+                } else {
+                    $appliedRow = $this->applyUpdateProposal($table, $data, $keyColumns, $original);
                 }
 
-                return $this->applyUpdateProposal($table, $data, $keyColumns, $original);
+                $this->logFinalOperation($operation, $appliedRow, $original, $opType);
+                $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
+                $this->updateProposalStatus(
+                    $operation,
+                    'approved',
+                    $comment,
+                    $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null,
+                    $keyColumns,
+                    $opType === Operation::TYPE_PROPOSAL_CREATE
+                );
             });
         } catch (\Throwable $e) {
             flash('審核失敗：'.$e->getMessage(), 'error');
 
             return redirect()->back();
         }
-
-        $this->logFinalOperation($operation, $appliedRow, $original, $opType);
-        $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
-        $this->updateProposalStatus(
-            $operation,
-            'approved',
-            $comment,
-            $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null,
-            $keyColumns,
-            $opType === Operation::TYPE_PROPOSAL_CREATE
-        );
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
 

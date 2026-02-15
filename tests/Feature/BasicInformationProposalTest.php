@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\BasicInformationProposalController;
 use App\Models\Operation;
 use App\Models\User;
 use App\Repositories\BiogMainRepository;
@@ -105,9 +106,20 @@ class BasicInformationProposalTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->timestamp('c_modified_date')->nullable();
         });
+
+        Schema::dropIfExists('POSSESSION_DATA');
+        Schema::create('POSSESSION_DATA', function (Blueprint $table) {
+            $table->integer('c_personid')->nullable();
+            $table->integer('c_possession_record_id')->nullable();
+            $table->integer('c_sequence')->nullable();
+            $table->integer('c_possession_act_code')->nullable();
+            $table->string('c_possession_desc')->nullable();
+            $table->string('c_possession_desc_chn')->nullable();
+        });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('POSSESSION_DATA');
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
@@ -221,6 +233,63 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame('pending', $payload['__review_status']);
         $this->assertSame('新增測試別名', $payload['__proposal_meta']['comment']);
         $this->assertSame(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
+    }
+
+    #[Test]
+    public function testPossessionProposalStoreAssignsRecordIdAndUsesSingleKeyColumn() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        DB::table('POSSESSION_DATA')->insert([
+            'c_personid' => 99,
+            'c_possession_record_id' => 2,
+            'c_sequence' => 1,
+            'c_possession_act_code' => 1,
+            'c_possession_desc' => 'existing',
+            'c_possession_desc_chn' => '既有',
+        ]);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'possessions',
+        ]), [
+            'c_sequence' => 1,
+            'c_possession_act_code' => 0,
+            'c_possession_desc' => '提案財產',
+            'c_possession_desc_chn' => '提案財產中文',
+            '__proposal_comment' => '新增所有物',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'POSSESSION_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame(3, $payload['c_possession_record_id']);
+        $this->assertSame(['c_possession_record_id'], $payload['__key_columns']);
+    }
+
+    #[Test]
+    public function testProposalResourceConfigUsesExpectedPrimaryKeys() {
+        $config = (new \ReflectionClass(BasicInformationProposalController::class))
+            ->getDefaultProperties()['resourceConfigs'];
+
+        $this->assertSame(
+            ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence'],
+            $config['addresses']['key_columns']
+        );
+        $this->assertSame(
+            ['c_personid', 'c_textid', 'c_role_id'],
+            $config['texts']['key_columns']
+        );
+        $this->assertSame(
+            ['c_possession_record_id'],
+            $config['possessions']['key_columns']
+        );
     }
 
     #[Test]

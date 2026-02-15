@@ -151,7 +151,7 @@ class CompositePrimaryKey {
     public static function fromRequest(Request $request, array $fields): array {
         return array_filter(
             $request->only($fields),
-            fn ($value) => $value !== null && $value !== ''
+            fn ($value) => $value !== null
         );
     }
 
@@ -206,8 +206,8 @@ class CompositePrimaryKey {
                 continue;
             }
 
-            // 必填欄位必須存在且不為空
-            if (!isset($pk[$field]) || $pk[$field] === '' || $pk[$field] === null) {
+            // 必填欄位必須存在且不為 NULL
+            if (!array_key_exists($field, $pk) || $pk[$field] === null) {
                 return false;
             }
         }
@@ -236,8 +236,8 @@ class CompositePrimaryKey {
                 continue;
             }
 
-            // 必填欄位必須存在且不為空
-            if (!isset($pk[$field]) || $pk[$field] === '' || $pk[$field] === null) {
+            // 必填欄位必須存在且不為 NULL
+            if (!array_key_exists($field, $pk) || $pk[$field] === null) {
                 $missing[] = $field;
             }
         }

@@ -122,27 +122,43 @@ class BasicInformationOfficesController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
-        //20211020在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
-        //20211020修正$c_inst_name_code預設為0
-        $temp = explode("-", $request->c_inst_code);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
+
+        // 數據預處理：分割 c_inst_code
+        // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
             $c_inst_name_code = '0';
         }
 
-        if ($c_inst_name_code != '') {
-            $request->c_inst_code = $c_inst_code;
-            $request->c_inst_name_code = $c_inst_name_code;
-            $request->merge(['c_inst_code' => $c_inst_code]);
-            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalStore($request, $id, 'offices');
+        }
+
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
         }
         //return $request;
         //修改結束
@@ -228,27 +244,27 @@ class BasicInformationOfficesController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
         }
-        //20211020在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位
-        //20211020修正$c_inst_name_code預設為0
-        $temp = explode("-", $request->c_inst_code);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
+
+        // 數據預處理：分割 c_inst_code
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
             $c_inst_name_code = '0';
         }
 
-        if ($c_inst_name_code != '') {
-            $request->c_inst_code = $c_inst_code;
-            $request->c_inst_name_code = $c_inst_name_code;
-            $request->merge(['c_inst_code' => $c_inst_code]);
-            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
         }
 
         //return $request;
@@ -461,6 +477,47 @@ class BasicInformationOfficesController extends Controller {
 
             return redirect()->back();
         }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 數據預處理：分割 c_inst_code
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
+            $c_inst_name_code = '0';
+        }
+
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+            $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
+            $originalPk = [];
+            foreach ($schema as $field) {
+                $value = $request->query($field);
+                if ($value !== null) {
+                    $originalPk[$field] = $value;
+                }
+            }
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'offices', $originalPk);
+        }
+
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
@@ -476,23 +533,6 @@ class BasicInformationOfficesController extends Controller {
 
         // 構建舊格式 ID（格式：c_office_id-c_posting_id）
         $id_ = $pk['c_office_id'].'-'.$pk['c_posting_id'];
-
-        // 處理 c_inst_code
-        $temp = explode("-", $request->c_inst_code);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
-            $c_inst_name_code = '0';
-        }
-
-        if ($c_inst_name_code != '') {
-            $request->c_inst_code = $c_inst_code;
-            $request->c_inst_name_code = $c_inst_name_code;
-            $request->merge(['c_inst_code' => $c_inst_code]);
-            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
-        }
 
         try {
             $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);

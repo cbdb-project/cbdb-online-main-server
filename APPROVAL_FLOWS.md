@@ -16,9 +16,18 @@
 - `/codes/{table}` 新增、編輯頁面。
 - `/basicinformation/{id}` 基本資料編輯頁（BIOG_MAIN）。
 - `/basicinformation/{id}` 子資源：
-  - `altnames`
-  - `addresses`
-  - `texts`
+  - `altnames` (ALTNAME_DATA)
+  - `addresses` (BIOG_ADDR_DATA)
+  - `texts` (BIOG_TEXT_DATA)
+  - `statuses` (STATUS_DATA)
+  - `possessions` (POSSESSION_DATA)
+  - `offices` (POSTED_TO_OFFICE_DATA)
+  - `assoc` (ASSOC_DATA)
+  - `entries` (ENTRY_DATA)
+  - `events` (EVENTS_DATA)
+  - `kinship` (KIN_DATA)
+  - `socialinst` (BIOG_INST_DATA)
+  - `sources` (BIOG_SOURCE_DATA)
 - 刪除提案目前不開放。
 - 只有活躍帳號 (`is_active == 1`) 才能送出提案或直接儲存；只讀代碼表不提供提案按鈕。
 

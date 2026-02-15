@@ -97,6 +97,12 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
+        // 數據預處理
+        $request->merge([
+            'c_alt_name_type_code' => ($request->input('c_alt_name_type_code') == -999) ? '0' : ($request->input('c_alt_name_type_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
@@ -271,6 +277,12 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
+        // 數據預處理
+        $request->merge([
+            'c_alt_name_type_code' => ($request->input('c_alt_name_type_code') == -999) ? '0' : ($request->input('c_alt_name_type_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
@@ -291,7 +303,7 @@ class BasicInformationAltnamesController extends Controller {
 
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('该用户沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -405,7 +417,7 @@ class BasicInformationAltnamesController extends Controller {
         } else {
             // 使用 - 格式
             // 先用 - 分割，然後對每個部分調用 unionPKDef_decode
-            // （因為 - 被編碼為 (minus)，所以可以安全地用 - 分割）
+            // （因為 - 被編碼為 (minus) 所以可以安全地用 - 分割）
             $addr_l = explode("-", $alt);
             foreach ($addr_l as $key => $value) {
                 $addr_l[$key] = $this->biogMainRepository->unionPKDef_decode($value);
@@ -568,7 +580,7 @@ class BasicInformationAltnamesController extends Controller {
             $originalPk = [];
             foreach ($schema as $field) {
                 $value = $request->query($field);
-                if ($value !== null && $value !== '') {
+                if ($value !== null) {
                     $originalPk[$field] = $value;
                 }
             }
@@ -596,7 +608,7 @@ class BasicInformationAltnamesController extends Controller {
         $originalPk = [];
         foreach ($schema as $field) {
             $value = $request->query($field);
-            if ($value !== null && $value !== '') {
+            if ($value !== null) {
                 $originalPk[$field] = $value;
             }
         }

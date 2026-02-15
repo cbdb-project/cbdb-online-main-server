@@ -37,33 +37,82 @@ class BasicInformationProposalController extends Controller {
         ],
         'addresses' => [
             'table' => 'BIOG_ADDR_DATA',
-            'key_columns' => ['c_personid', 'c_addr_id', 'c_sequence', 'c_addr_type'],
+            'key_columns' => ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence'],
             'controller' => 'BasicInformationAddressesController',
             'route_prefix' => 'basicinformation.addresses',
             'display_name' => '地址',
         ],
         'texts' => [
             'table' => 'BIOG_TEXT_DATA',
-            'key_columns' => ['c_personid', 'c_textid', 'c_year_year', 'c_text_role_code'],
+            'key_columns' => ['c_personid', 'c_textid', 'c_role_id'],
             'controller' => 'BasicInformationTextsController',
             'route_prefix' => 'basicinformation.texts',
             'display_name' => '著述',
         ],
         'statuses' => [
             'table' => 'STATUS_DATA',
-            'key_columns' => ['c_personid', 'c_status_code', 'c_sequence'],
+            'key_columns' => ['c_personid', 'c_sequence', 'c_status_code'],
             'controller' => 'BasicInformationStatusesController',
             'route_prefix' => 'basicinformation.statuses',
             'display_name' => '身份',
         ],
         'possessions' => [
             'table' => 'POSSESSION_DATA',
-            'key_columns' => ['c_personid', 'c_poss_code', 'c_sequence'],
+            'key_columns' => ['c_possession_record_id'],
             'controller' => 'BasicInformationPossessionController',
             'route_prefix' => 'basicinformation.possession',
             'display_name' => '所有物',
         ],
-        // 其他資源配置待後續添加
+        'offices' => [
+            'table' => 'POSTED_TO_OFFICE_DATA',
+            'key_columns' => ['c_office_id', 'c_posting_id'],
+            'controller' => 'BasicInformationOfficesController',
+            'route_prefix' => 'basicinformation.offices',
+            'display_name' => '官名',
+        ],
+        'assoc' => [
+            'table' => 'ASSOC_DATA',
+            'key_columns' => ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'],
+            'optional_key_columns' => ['c_text_title'],
+            'controller' => 'BasicInformationAssocController',
+            'route_prefix' => 'basicinformation.assoc',
+            'display_name' => '社會關係',
+        ],
+        'entries' => [
+            'table' => 'ENTRY_DATA',
+            'key_columns' => ['c_personid', 'c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code'],
+            'controller' => 'BasicInformationEntriesController',
+            'route_prefix' => 'basicinformation.entries',
+            'display_name' => '入仕',
+        ],
+        'events' => [
+            'table' => 'EVENTS_DATA',
+            'key_columns' => ['c_personid', 'c_sequence', 'c_event_code'],
+            'controller' => 'BasicInformationEventsController',
+            'route_prefix' => 'basicinformation.events',
+            'display_name' => '事件',
+        ],
+        'kinship' => [
+            'table' => 'KIN_DATA',
+            'key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            'controller' => 'BasicInformationKinshipController',
+            'route_prefix' => 'basicinformation.kinship',
+            'display_name' => '親屬',
+        ],
+        'socialinst' => [
+            'table' => 'BIOG_INST_DATA',
+            'key_columns' => ['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code'],
+            'controller' => 'BasicInformationSocialInstController',
+            'route_prefix' => 'basicinformation.socialinst',
+            'display_name' => '社交機構',
+        ],
+        'sources' => [
+            'table' => 'BIOG_SOURCE_DATA',
+            'key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+            'controller' => 'BasicInformationSourcesController',
+            'route_prefix' => 'basicinformation.sources',
+            'display_name' => '出處',
+        ],
     ];
 
     public function __construct(
@@ -87,13 +136,15 @@ class BasicInformationProposalController extends Controller {
         $config = $this->getResourceConfig($resourceType);
         $table = $config['table'];
         $keyColumns = $config['key_columns'];
+        $optionalKeyColumns = $config['optional_key_columns'] ?? [];
 
         // 提取表單數據
         $payload = $this->extractFormData($request);
         $payload['c_personid'] = $personid;
+        $payload = $this->assignSingleNumericPrimaryKeyIfNeeded($table, $keyColumns, $payload);
 
         // 驗證主鍵完整性
-        if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
+        if (!$this->hasPrimaryKeyValues($keyColumns, $payload, $optionalKeyColumns)) {
             flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
 
             return redirect()->back()->withInput();
@@ -372,8 +423,11 @@ class BasicInformationProposalController extends Controller {
     /**
      * 檢查主鍵完整性
      */
-    protected function hasPrimaryKeyValues($keyColumns, $row) {
+    protected function hasPrimaryKeyValues($keyColumns, $row, array $optionalKeyColumns = []) {
         foreach ($keyColumns as $column) {
+            if (in_array($column, $optionalKeyColumns, true)) {
+                continue;
+            }
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }
@@ -450,7 +504,7 @@ class BasicInformationProposalController extends Controller {
         }
 
         if (!Auth::user()->isActive()) {
-            abort(403, '該用戶沒有權限，請聯繫管理員');
+            abort(403, '该用户没有权限，请联系管理员');
         }
     }
 
@@ -463,7 +517,37 @@ class BasicInformationProposalController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            abort(403, '該用戶沒有權限，請聯繫管理員');
+            abort(403, '该用户没有权限，请联系管理员');
         }
+    }
+
+    protected function assignSingleNumericPrimaryKeyIfNeeded(string $table, array $keyColumns, array $payload): array {
+        if (count($keyColumns) !== 1) {
+            return $payload;
+        }
+
+        $keyColumn = $keyColumns[0];
+        $keyValue = $payload[$keyColumn] ?? null;
+        if ($keyValue !== null && $keyValue !== '') {
+            return $payload;
+        }
+
+        try {
+            $max = DB::table($table)->max($keyColumn);
+        } catch (\Throwable $e) {
+            return $payload;
+        }
+
+        if ($max === null) {
+            $payload[$keyColumn] = 1;
+
+            return $payload;
+        }
+
+        if (is_numeric($max)) {
+            $payload[$keyColumn] = (int) $max + 1;
+        }
+
+        return $payload;
     }
 }

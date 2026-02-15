@@ -107,7 +107,30 @@ class BasicInformationEventsController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 數據預處理
+        $request->merge([
+            'c_event_code' => ($request->input('c_event_code') == -999) ? '0' : ($request->input('c_event_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalStore($request, $id, 'events');
+        }
+
+        if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
@@ -290,6 +313,38 @@ class BasicInformationEventsController extends Controller {
 
             return redirect()->back();
         }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 數據預處理
+        $request->merge([
+            'c_event_code' => ($request->input('c_event_code') == -999) ? '0' : ($request->input('c_event_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+            $schema = CompositePrimaryKey::SCHEMAS['EVENTS_DATA'];
+            $originalPk = [];
+            foreach ($schema as $field) {
+                $value = $request->query($field);
+                if ($value !== null) {
+                    $originalPk[$field] = $value;
+                }
+            }
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'events', $originalPk);
+        }
+
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 

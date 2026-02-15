@@ -115,26 +115,48 @@ class BasicInformationSocialInstController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        if (!Auth::user()->isActive()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
-        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
-        $temp = explode("-", $request->c_inst_code);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
+
+        // 數據預處理：處理 -999 轉為 0 並分割 c_inst_code
+        // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
+        $request->merge([
+            'c_bi_role_code' => ($request->input('c_bi_role_code') == -999) ? '0' : ($request->input('c_bi_role_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
             $c_inst_name_code = '0';
         }
 
-        if ($c_inst_name_code != '') {
-            $request->c_inst_code = $c_inst_code;
-            $request->c_inst_name_code = $c_inst_name_code;
-            $request->merge(['c_inst_code' => $c_inst_code]);
-            $request->merge(['c_inst_name_code' => $c_inst_name_code]);
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 轉發到提案控制器
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalStore($request, $id, 'socialinst');
+        }
+
+        if (!Auth::user()->canWriteDirectly()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
         }
         //return $request;
         //修改結束
@@ -210,38 +232,38 @@ class BasicInformationSocialInstController extends Controller {
             flash('请登入后编辑 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
-        } elseif (!Auth::user()->canWriteDirectly()) {
+        }
+
+        // 數據預處理
+        $request->merge([
+            'c_bi_role_code' => ($request->input('c_bi_role_code') == -999) ? '0' : ($request->input('c_bi_role_code') ?? '0'),
+            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+        ]);
+
+        // 數據預處理：分割 c_inst_code
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
+            $c_inst_name_code = '0';
+        }
+
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
-        /*
-        //原本的寫法，保留做為參考。
-        $this->biogMainRepository->socialInstUpdateById($request, $id_, $id);
-        flash('Update success @ '.Carbon::now(), 'success');
-        return redirect()->route('basicinformation.socialinst.edit', [
-            'basicinformation' => $id,
-            'socialinst' => $id_,
-        ]);
-        */
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action']);
         $data = $this->toolsRepository->timestamp($data);
-        //20210804在這裡處理c_inst_code傳遞過來的值，分別儲存至c_inst_code與c_inst_name_code欄位，$c_inst_name_code預設為0
-        $temp = explode("-", $data['c_inst_code']);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
-            $c_inst_name_code = '0';
-        }
-
-        if ($c_inst_name_code != '') {
-            $data['c_inst_code'] = $c_inst_code;
-            $data['c_inst_name_code'] = $c_inst_name_code;
-        }
         //return $request;
         //修改結束 //20211020修改增加c_bi_begin_year與c_bi_end_year
         $addr_l = explode("-", $id_);
@@ -373,6 +395,47 @@ class BasicInformationSocialInstController extends Controller {
 
             return redirect()->back();
         }
+
+        if (!Auth::user()->isActive()) {
+            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 數據預處理：分割 c_inst_code
+        $temp = explode("-", $request->input('c_inst_code', ''));
+        $c_inst_code = $temp[0] ?: '0';
+        $c_inst_name_code = $temp[1] ?? '0';
+
+        if (empty($temp[1])) {
+            $c_inst_code = $c_inst_code ?: '0';
+            $c_inst_name_code = '0';
+        }
+
+        $request->merge([
+            'c_inst_code' => $c_inst_code,
+            'c_inst_name_code' => $c_inst_name_code,
+        ]);
+
+        // 檢查動作類型
+        $action = $request->input('action', 'save');
+
+        if ($action === 'proposal') {
+            // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+            $schema = CompositePrimaryKey::SCHEMAS['BIOG_INST_DATA'];
+            $originalPk = [];
+            foreach ($schema as $field) {
+                $value = $request->query($field);
+                if ($value !== null) {
+                    $originalPk[$field] = $value;
+                }
+            }
+
+            // 使用新的查詢參數模式，直接傳遞主鍵陣列
+            return app(\App\Http\Controllers\BasicInformationProposalController::class)
+                ->proposalUpdateWithPk($request, $id, 'socialinst', $originalPk);
+        }
+
         if (!Auth::user()->canWriteDirectly()) {
             flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
 
@@ -385,7 +448,7 @@ class BasicInformationSocialInstController extends Controller {
         $originalPk = [];
         foreach ($schema as $field) {
             $value = $request->query($field);
-            if ($value !== null && $value !== '') {
+            if ($value !== null) {
                 $originalPk[$field] = $value;
             }
         }
@@ -394,23 +457,8 @@ class BasicInformationSocialInstController extends Controller {
         CompositePrimaryKey::validateOrFail($originalPk, 'BIOG_INST_DATA');
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action']);
         $data = $this->toolsRepository->timestamp($data);
-
-        // 處理 c_inst_code 分割
-        $temp = explode("-", $data['c_inst_code']);
-        $c_inst_code = $temp[0];
-        if (!empty($temp[1])) {
-            $c_inst_name_code = $temp[1];
-        } else {
-            $c_inst_code = '0';
-            $c_inst_name_code = '0';
-        }
-
-        if ($c_inst_name_code != '') {
-            $data['c_inst_code'] = $c_inst_code;
-            $data['c_inst_name_code'] = $c_inst_name_code;
-        }
 
         // 取得原始資料（使用原始 PK）
         $ori = DB::table('BIOG_INST_DATA')->where([

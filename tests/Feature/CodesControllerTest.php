@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -37,11 +37,13 @@ class CodesControllerTest extends TestCase {
             [
                 'TEST_CODES' => [],
                 'TEXT_CODES' => [],
+                'POSSESSION_DATA' => [],
                 'operations' => [],
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
                 'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
+                'POSSESSION_DATA' => ['c_personid', 'c_possession_record_id', 'c_sequence', 'c_possession_act_code', 'c_possession_desc'],
                 'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
             ]
         );
@@ -50,13 +52,14 @@ class CodesControllerTest extends TestCase {
 
         $this->app->instance(CodesRepository::class, new class () extends CodesRepository {
             public function allowedTables(): array {
-                return ['TEST_CODES', 'TEXT_CODES'];
+                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA'];
             }
 
             public function allowedTableMap(): array {
                 return [
                     'TEST_CODES' => 'TEST_CODES',
                     'TEXT_CODES' => 'TEXT_CODES',
+                    'POSSESSION_DATA' => 'POSSESSION_DATA',
                 ];
             }
         });
@@ -241,6 +244,31 @@ class CodesControllerTest extends TestCase {
         $this->assertEquals(Carbon::now()->timestamp, $parsedTime->timestamp, '', 1);
 
         Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function testProposalStoreUsesPrimaryKeyOverrideForPossessionData() {
+        $user = new User([
+            'name' => 'active',
+            'email' => 'active-override@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 21;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->post('/codes/POSSESSION_DATA/proposal', [
+            'c_possession_record_id' => 3,
+            'c_possession_desc' => 'proposal row',
+            '__proposal_comment' => 'pk override',
+        ]);
+
+        $response->assertRedirect('/codes/POSSESSION_DATA');
+        $this->assertCount(1, $this->operationSpy->calls);
+        $call = $this->operationSpy->calls[0];
+        $this->assertSame(Operation::TYPE_PROPOSAL_CREATE, $call['op_type']);
+        $this->assertSame('POSSESSION_DATA', $call['resource']);
+        $this->assertSame(['c_possession_record_id'], $call['resource_data']['__key_columns']);
     }
 
     #[Test]

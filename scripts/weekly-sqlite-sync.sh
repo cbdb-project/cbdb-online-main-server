@@ -33,6 +33,11 @@ if [ -z "$HOME" ]; then
     fi
 fi
 
+# 確保 pipx/pip 安裝的工具（如 hf CLI）可被找到（cron 環境 PATH 可能不含 ~/.local/bin）
+if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 # 前置檢查：確認必要工具已安裝
 check_requirements() {
     local missing=()

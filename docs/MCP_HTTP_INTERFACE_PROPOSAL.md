@@ -1,5 +1,8 @@
 # Laravel MCP Web Interface Proposal（Official Package）
 
+> 實作狀態：已完成 MVP（`laravel/mcp` + Sanctum + 5 個 read-only tools）  
+> 使用說明請參考：`docs/MCP_USER_GUIDE.md`
+
 ## 1. 目標與背景
 
 本提案目標是為 CBDB Laravel server 新增一個可透過 **Web Request** 訪問的 MCP 介面，並使用既有的使用者 API key（Laravel Sanctum Personal Access Token）做身分驗證。
@@ -166,11 +169,11 @@
 
 ### Phase 1（MVP）
 
-- 安裝 `laravel/mcp`
-- 建 MCP endpoint（web）
-- 串接 `auth:sanctum` + `throttle`
-- 完成 5 個 read-only tools
-- 補齊最小測試集
+- [x] 安裝 `laravel/mcp`
+- [x] 建 MCP endpoint（web）
+- [x] 串接 `auth:sanctum` + `mcp.ability` + `throttle`
+- [x] 完成 5 個 read-only tools
+- [x] 補齊最小測試集（`ReadOnlyTableQueryServiceTest`）
 
 ### Phase 2
 
@@ -208,3 +211,14 @@
 - MVP 開發（含測試）：1.5~2.5 天
 - 聯調與修正：1~2 天
 - 合計：約 3~5 個工作天
+
+## 13. 已落地檔案（摘要）
+
+- 路由：`routes/ai.php`
+- Server：`app/Mcp/Servers/CbdbReadOnlyServer.php`
+- Tools：`app/Mcp/Tools/*.php`
+- 查詢服務：`app/Services/Mcp/ReadOnlyTableQueryService.php`
+- 權限中介層：`app/Http/Middleware/EnsureMcpAbility.php`
+- 設定：`config/mcp.php`
+- 測試：`tests/Unit/Mcp/ReadOnlyTableQueryServiceTest.php`
+- 使用文件：`docs/MCP_USER_GUIDE.md`

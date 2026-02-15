@@ -171,6 +171,7 @@ class BasicInformationEntriesController extends Controller {
         }
 
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, true);
@@ -194,6 +195,10 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
         DB::table('ENTRY_DATA')->insert($data);
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
         $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $data['c_personid'],
             'c_entry_code' => $data['c_entry_code'],
@@ -205,7 +210,7 @@ class BasicInformationEntriesController extends Controller {
             'c_assoc_id' => $data['c_assoc_id'],
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
-        ]), $data);
+        ]), $operationData);
         (new AuditLogService())->write(
             'ENTRY_DATA',
             'INSERT',
@@ -350,6 +355,7 @@ class BasicInformationEntriesController extends Controller {
         ]);
 
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         //return $request;
@@ -386,6 +392,10 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_code', '=', $addr_a[8]],
             ['c_inst_name_code', '=', $addr_a[9]],
         ])->update($data);
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
         $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_entry_code' => $data['c_entry_code'],
@@ -397,7 +407,7 @@ class BasicInformationEntriesController extends Controller {
             'c_assoc_id' => $data['c_assoc_id'],
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
-        ]), $data, $ori);
+        ]), $operationData, $ori);
         (new AuditLogService())->write(
             'ENTRY_DATA',
             'UPDATE',
@@ -610,6 +620,7 @@ class BasicInformationEntriesController extends Controller {
         CompositePrimaryKey::validateOrFail($originalPk, 'ENTRY_DATA');
 
         $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
 
@@ -646,6 +657,10 @@ class BasicInformationEntriesController extends Controller {
             ['c_inst_name_code', '=', $originalPk['c_inst_name_code']],
         ])->update($data);
 
+        $operationData = $data;
+        if ($comment) {
+            $operationData['__note'] = $comment;
+        }
         $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => $id,
             'c_entry_code' => $data['c_entry_code'],
@@ -657,7 +672,7 @@ class BasicInformationEntriesController extends Controller {
             'c_assoc_id' => $data['c_assoc_id'],
             'c_inst_code' => $data['c_inst_code'],
             'c_inst_name_code' => $data['c_inst_name_code'],
-        ]), $data, $ori);
+        ]), $operationData, $ori);
         (new AuditLogService())->write(
             'ENTRY_DATA',
             'UPDATE',

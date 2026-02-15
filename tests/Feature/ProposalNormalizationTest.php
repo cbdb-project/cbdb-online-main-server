@@ -284,5 +284,13 @@ class ProposalNormalizationTest extends TestCase {
             'c_inst_code' => 0,
             'c_inst_name_code' => 0,
         ]);
+
+        $operation = Operation::where('resource', 'ENTRY_DATA')
+            ->where('op_type', 1)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('這個欄位不應寫入 ENTRY_DATA', $payload['__note'] ?? null);
     }
 }

@@ -73,6 +73,7 @@ class BasicInformationProposalController extends Controller {
         'assoc' => [
             'table' => 'ASSOC_DATA',
             'key_columns' => ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'],
+            'optional_key_columns' => ['c_text_title'],
             'controller' => 'BasicInformationAssocController',
             'route_prefix' => 'basicinformation.assoc',
             'display_name' => '社會關係',
@@ -135,6 +136,7 @@ class BasicInformationProposalController extends Controller {
         $config = $this->getResourceConfig($resourceType);
         $table = $config['table'];
         $keyColumns = $config['key_columns'];
+        $optionalKeyColumns = $config['optional_key_columns'] ?? [];
 
         // 提取表單數據
         $payload = $this->extractFormData($request);
@@ -142,7 +144,7 @@ class BasicInformationProposalController extends Controller {
         $payload = $this->assignSingleNumericPrimaryKeyIfNeeded($table, $keyColumns, $payload);
 
         // 驗證主鍵完整性
-        if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
+        if (!$this->hasPrimaryKeyValues($keyColumns, $payload, $optionalKeyColumns)) {
             flash('提案失敗：請確認主鍵欄位已填寫完整。', 'error');
 
             return redirect()->back()->withInput();
@@ -421,8 +423,11 @@ class BasicInformationProposalController extends Controller {
     /**
      * 檢查主鍵完整性
      */
-    protected function hasPrimaryKeyValues($keyColumns, $row) {
+    protected function hasPrimaryKeyValues($keyColumns, $row, array $optionalKeyColumns = []) {
         foreach ($keyColumns as $column) {
+            if (in_array($column, $optionalKeyColumns, true)) {
+                continue;
+            }
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }

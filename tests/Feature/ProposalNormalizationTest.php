@@ -42,6 +42,21 @@ class ProposalNormalizationTest extends TestCase {
             $table->timestamps();
         });
 
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->increments('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name');
+            $table->string('operation');
+            $table->string('actor_type');
+            $table->string('actor_id');
+            $table->string('operation_id');
+            $table->text('row_pk')->nullable();
+            $table->text('row_pk_text')->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+
         Schema::create('ASSOC_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
             $table->integer('c_assoc_code');
@@ -67,6 +82,11 @@ class ProposalNormalizationTest extends TestCase {
             $table->integer('c_inst_code')->default(0);
             $table->integer('c_inst_name_code')->default(0);
             $table->integer('c_source')->default(0);
+            $table->integer('c_entry_addr_id')->default(0);
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
         });
     }
 
@@ -127,6 +147,38 @@ class ProposalNormalizationTest extends TestCase {
         // 驗證 resource_id 包含 c_text_title 的空字串 (應被編碼為 NULL 或空，取決於 buildCompositeId)
         // 在 BasicInformationProposalController 中，'' 或 null 會被轉為 'NULL'
         $this->assertStringContainsString('NULL', $operation->resource_id);
+    }
+
+    /**
+     * 驗證 ASSOC_DATA 新增提案允許空字串 c_text_title
+     */
+    #[Test]
+    public function testAssocCreateProposalAllowsEmptyTextTitle() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 100,
+            'resource' => 'assoc',
+        ]), [
+            'c_assoc_code' => 1,
+            'c_assoc_id' => 2,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '',
+            'c_assoc_first_year' => 1000,
+            '__proposal_comment' => '空標題提案',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($operation, 'ASSOC_DATA 空標題新增提案未建立');
     }
 
     /**
@@ -196,5 +248,41 @@ class ProposalNormalizationTest extends TestCase {
 
         $payload = json_decode($operation->resource_data, true);
         $this->assertEquals('0', $payload['c_source']);
+    }
+
+    /**
+     * 驗證 ENTRY_DATA 直接儲存會忽略 __proposal_comment 欄位
+     */
+    #[Test]
+    public function testEntryDirectSaveIgnoresProposalCommentField() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.entries.store', [
+            'basicinformation' => 100,
+            'action' => 'save',
+        ]), [
+            'action' => 'save',
+            'c_entry_code' => 1,
+            'c_sequence' => 1,
+            'c_kin_code' => 0,
+            'c_assoc_code' => 0,
+            'c_kin_id' => 0,
+            'c_year' => 0,
+            'c_assoc_id' => 0,
+            'c_inst_code' => '0-0',
+            'c_source' => 0,
+            '__proposal_comment' => '這個欄位不應寫入 ENTRY_DATA',
+        ]);
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 100,
+            'c_entry_code' => 1,
+            'c_sequence' => 1,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+        ]);
     }
 }

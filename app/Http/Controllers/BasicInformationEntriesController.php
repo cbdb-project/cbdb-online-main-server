@@ -171,7 +171,7 @@ class BasicInformationEntriesController extends Controller {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_token', 'action']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, true);
         //return $request;
@@ -350,7 +350,7 @@ class BasicInformationEntriesController extends Controller {
         ]);
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         //return $request;
         //修改結束
@@ -610,7 +610,7 @@ class BasicInformationEntriesController extends Controller {
         CompositePrimaryKey::validateOrFail($originalPk, 'ENTRY_DATA');
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
 
 

@@ -42,11 +42,10 @@ return new class () extends Migration {
             foreach ($tablesToModify as $tableName => $data) {
                 if (Schema::hasColumn($tableName, $data['column'])) {
                     Schema::table($tableName, function (Blueprint $table) use ($data) {
-                        // Drop index first if it exists
-                        try {
+                        // SQLite baseline schema omits standalone KEY definitions.
+                        // Guard dropIndex() to avoid "no such index" during migration.
+                        if (!is_sqlite()) {
                             $table->dropIndex($data['index']);
-                        } catch (\Exception $e) {
-                            // Index might not exist or have a different name; ignore
                         }
                         $table->dropColumn($data['column']);
                     });

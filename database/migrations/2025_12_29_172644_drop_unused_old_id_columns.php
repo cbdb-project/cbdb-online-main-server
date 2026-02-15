@@ -23,19 +23,19 @@ return new class () extends Migration {
             $tablesToModify = [
                 'OFFICE_CODES' => [
                     'column' => 'c_office_id_old',
-                    'index' => 'c_office_id_old_OFFICE_CODES_index'
+                    'index' => 'c_office_id_old_OFFICE_CODES_index',
                 ],
                 'POSTED_TO_ADDR_DATA' => [
                     'column' => 'c_posting_id_old',
-                    'index' => 'c_posting_id_old_POSTED_TO_ADDR_DATA_index'
+                    'index' => 'c_posting_id_old_POSTED_TO_ADDR_DATA_index',
                 ],
                 'POSTED_TO_OFFICE_DATA' => [
                     'column' => 'c_posting_id_old',
-                    'index' => 'c_posting_id_old_POSTED_TO_OFFICE_DATA_index'
+                    'index' => 'c_posting_id_old_POSTED_TO_OFFICE_DATA_index',
                 ],
                 'POSTING_DATA' => [
                     'column' => 'c_posting_id_old',
-                    'index' => 'c_posting_id_old_POSTING_DATA_index'
+                    'index' => 'c_posting_id_old_POSTING_DATA_index',
                 ],
             ];
 

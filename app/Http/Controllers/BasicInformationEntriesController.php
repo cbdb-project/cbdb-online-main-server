@@ -704,7 +704,10 @@ class BasicInformationEntriesController extends Controller {
         ]);
 
         // 使用 Repository 進行刪除（內含事務與審計）
-        $this->biogMainRepository->entryDeleteById($id_, $id);
+        $deleted = $this->biogMainRepository->entryDeleteById($id_, $id);
+        if (!$deleted) {
+            abort(404, 'ENTRY_DATA 記錄不存在');
+        }
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

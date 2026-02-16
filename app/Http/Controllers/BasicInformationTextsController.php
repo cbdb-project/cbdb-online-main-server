@@ -263,6 +263,9 @@ class BasicInformationTextsController extends Controller {
 
         // 使用 Repository 進行更新（內含事務與審計）
         $newPk = $this->biogMainRepository->textUpdateById($request, $id, $id_);
+        if (!$newPk) {
+            abort(404, 'BIOG_TEXT_DATA 記錄不存在');
+        }
 
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -478,7 +481,10 @@ class BasicInformationTextsController extends Controller {
         $id_ = $pk['c_personid']."-".$pk['c_textid']."-".($pk['c_role_id'] ?? 0);
 
         // 使用 Repository 進行刪除（內含事務與審計）
-        $this->biogMainRepository->textDeleteById($id_, $id);
+        $deleted = $this->biogMainRepository->textDeleteById($id_, $id);
+        if (!$deleted) {
+            abort(404, 'BIOG_TEXT_DATA 記錄不存在');
+        }
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

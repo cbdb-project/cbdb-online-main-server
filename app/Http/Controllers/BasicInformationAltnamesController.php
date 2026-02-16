@@ -267,6 +267,9 @@ class BasicInformationAltnamesController extends Controller {
         // 使用 Repository 進行更新（內含事務與審計，且修復 LIKE 謂詞風險）
         $ori = $this->biogMainRepository->altnameById($alt);
         $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $alt);
+        if (!$newPk) {
+            abort(404, 'ALTNAME_DATA 記錄不存在');
+        }
 
         // 手動調用索引服務
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -328,6 +331,10 @@ class BasicInformationAltnamesController extends Controller {
             foreach ($addr_l as $key => $value) {
                 $addr_l[$key] = $this->biogMainRepository->unionPKDef_decode($value);
             }
+        }
+
+        if (isset($addr_l[1]) && $addr_l[1] === 'NULL') {
+            $addr_l[1] = null;
         }
 
         return $addr_l;
@@ -606,7 +613,10 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         // 使用 Repository 進行刪除（內含事務與審計）
-        $this->biogMainRepository->altnameDeleteById($id_, $id);
+        $deleted = $this->biogMainRepository->altnameDeleteById($id_, $id);
+        if (!$deleted) {
+            abort(404, 'ALTNAME_DATA 記錄不存在');
+        }
 
         // 清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {

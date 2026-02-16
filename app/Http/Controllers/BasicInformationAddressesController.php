@@ -350,6 +350,9 @@ class BasicInformationAddressesController extends Controller {
 
         // 使用 Repository 進行更新（內含事務與審計）
         $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $addr);
+        if (!$newPk) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
+        }
 
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -627,7 +630,10 @@ class BasicInformationAddressesController extends Controller {
         $id_ = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
 
         // 使用 Repository 進行刪除（內含事務與審計）
-        $this->biogMainRepository->addrDeleteById($id_, $id);
+        $deleted = $this->biogMainRepository->addrDeleteById($id_, $id);
+        if (!$deleted) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
+        }
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

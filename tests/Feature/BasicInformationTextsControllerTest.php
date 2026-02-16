@@ -161,4 +161,21 @@ class BasicInformationTextsControllerTest extends TestCase {
         $response->assertStatus(302);
         $this->assertEquals(1, DB::table('BIOG_TEXT_DATA')->count());
     }
+
+    #[Test]
+    public function testDestroyQueryReturns404WhenRowDoesNotExist(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'texts-delete-missing@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        $response = $this->actingAs($user)->delete(
+            '/basicinformation/1/texts/delete?c_personid=1&c_textid=999&c_role_id=0'
+        );
+
+        $response->assertStatus(404);
+    }
 }

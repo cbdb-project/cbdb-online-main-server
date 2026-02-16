@@ -432,6 +432,47 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $this->assertEquals('測試備註', $resourceData['__note'] ?? null);
     }
 
+    #[Test]
+    public function testUpdateProposalWithNullSequenceUsesNullPkCorrectly() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'proposal-null-sequence@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => null,
+            'c_alt_name_chn' => '空序號別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/basicinformation/1/altnames/1-NULL-空序號別名-1', [
+            'action' => 'proposal',
+            'c_sequence' => null,
+            'c_alt_name_chn' => '空序號別名-提案',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+            '__proposal_comment' => '空序號提案',
+        ]);
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'ALTNAME_DATA',
+            'op_type' => 9,
+            'c_personid' => 1,
+        ]);
+    }
+
     /**
      * 測試 c_source 為 0 時的處理
      */

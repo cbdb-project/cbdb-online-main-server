@@ -2361,7 +2361,9 @@ class BiogMainRepository {
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
             $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
-            $c_name = $c_surname.' '.$c_mingzi;
+            $c_name = $c_mingzi;
+            $data['c_surname_chn'] = '';
+            $data['c_surname'] = '';
             $data['c_mingzi_chn'] = $c_mingzi_chn;
             $data['c_mingzi'] = $c_mingzi;
             $data['c_name'] = $c_name;

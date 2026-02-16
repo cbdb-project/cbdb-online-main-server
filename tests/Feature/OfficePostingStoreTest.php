@@ -150,6 +150,32 @@ class OfficePostingStoreTest extends TestCase {
     }
 
     #[Test]
+    public function testOfficeStoreIgnoresProposalMetaFields(): void {
+        $repository = new BiogMainRepository();
+        $request = $this->makeRequest([
+            'action' => 'save',
+            '__proposal_comment' => 'should not be persisted to office table',
+        ]);
+        $this->app->instance('request', $request);
+
+        $repository->officeStoreById($request, 321);
+
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_posting_id' => 1,
+            'c_personid' => 321,
+            'c_office_id' => 10,
+        ]);
+
+        $officeOperation = DB::table('operations')
+            ->where('resource', 'POSTED_TO_OFFICE_DATA')
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($officeOperation);
+        $payload = json_decode($officeOperation->resource_data, true);
+        $this->assertSame('should not be persisted to office table', $payload['__note'] ?? null);
+    }
+
+    #[Test]
     public function testOfficeStoreRollsBackPostingDataWhenAnExceptionOccurs(): void {
         /** @var OfficePostingRepository&\Mockery\MockInterface $repository */
         $repository = Mockery::mock(OfficePostingRepository::class)->makePartial();
@@ -206,6 +232,41 @@ class OfficePostingStoreTest extends TestCase {
             'resource' => 'POSTED_TO_OFFICE_DATA',
             'resource_id' => 'c_office_id=20&c_posting_id=1',
             'op_type' => 3,
+        ]);
+    }
+
+    #[Test]
+    public function testOfficeUpdateIgnoresProposalMetaFields(): void {
+        $repo = new BiogMainRepository();
+        $repo->officeStoreById($this->makeRequest([
+            'c_office_id' => 22,
+            'c_addr' => [2],
+        ]), 901);
+
+        $updateRequest = new Request([
+            '_method' => 'PATCH',
+            '_token' => 'token',
+            'action' => 'save',
+            '__proposal_comment' => 'not a db column',
+            'c_addr' => [2],
+            '_id' => 901,
+            '_postingid' => 1,
+            '_officeid' => 22,
+            'c_personid' => 901,
+            'c_office_id' => 22,
+            'c_fy_intercalary' => 1,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        $result = $repo->officeUpdateById($updateRequest, 1, 901);
+
+        $this->assertFalse($result['no_changes']);
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_posting_id' => 1,
+            'c_office_id' => 22,
+            'c_personid' => 901,
+            'c_fy_intercalary' => 1,
         ]);
     }
 

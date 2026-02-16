@@ -45,7 +45,7 @@ class OfficePostingRepository {
         $hasAddressChange = $incomingAddr !== null
             && $this->selectionListHasChanges($incomingAddr, $existingAddresses, -999);
 
-        $data = Arr::except($data, ['_method', '_token', 'c_addr', 'c_addr_cleared', '_id', '_postingid', '_officeid', 'ai_fill_log_id']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr', 'c_addr_cleared', '_id', '_postingid', '_officeid', 'ai_fill_log_id']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
         $data['c_office_id'] = $data['c_office_id'] == -999 ? '0' : $data['c_office_id'];
@@ -362,7 +362,7 @@ class OfficePostingRepository {
             $auditLog = new AuditLogService();
             $payload = $request->all();
             $c_addr = $payload['c_addr'] ?? [];
-            $data = Arr::except($payload, ['_token', 'c_addr', 'c_addr_cleared', 'ai_fill_log_id']);
+            $data = Arr::except($payload, ['_token', 'action', '__proposal_comment', 'c_addr', 'c_addr_cleared', 'ai_fill_log_id']);
 
             $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
             $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);

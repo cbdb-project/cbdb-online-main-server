@@ -29,6 +29,7 @@ class OperationRepository {
      * @return mixed
      */
     public function store($user_id, $c_personid, $op_type, $resource, $resource_id, $resource_data, $ori = '', $crowdsourcing_status = 0) {
+        $resource_data = $this->attachProposalNote($resource_data);
         $operation = new Operation();
         $operation->user_id = $user_id;
         $operation->c_personid = $c_personid;
@@ -45,6 +46,34 @@ class OperationRepository {
         $operation->save();
 
         return $operation;
+    }
+
+    protected function attachProposalNote($resourceData) {
+        if (!is_array($resourceData)) {
+            return $resourceData;
+        }
+
+        if (array_key_exists('__proposal_comment', $resourceData)) {
+            unset($resourceData['__proposal_comment']);
+        }
+
+        if (array_key_exists('__note', $resourceData) && trim((string) $resourceData['__note']) !== '') {
+            return $resourceData;
+        }
+
+        $comment = '';
+
+        try {
+            $comment = trim((string) request()->input('__proposal_comment', ''));
+        } catch (\Throwable $e) {
+            $comment = '';
+        }
+
+        if ($comment !== '') {
+            $resourceData['__note'] = $comment;
+        }
+
+        return $resourceData;
     }
 
     public function hasPendingCreateProposal(string $resource, string $resourceId, ?int $excludeId = null): bool {

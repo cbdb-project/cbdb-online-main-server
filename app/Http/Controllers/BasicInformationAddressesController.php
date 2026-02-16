@@ -157,7 +157,7 @@ class BasicInformationAddressesController extends Controller {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);

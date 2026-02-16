@@ -824,7 +824,7 @@ class BiogMainRepository {
         $c_autogen_notes = $row->c_autogen_notes;
         $old_kin_id = $row->c_kin_id;
         $old_kin_code = $row->c_kin_code;
-        $data = Arr::except($data, ['_token', '_method', 'c_kinship_pair']);
+        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment', 'c_kinship_pair']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
@@ -938,7 +938,7 @@ class BiogMainRepository {
         $auditLog = new AuditLogService();
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
-        $data = Arr::except($data, ['_token', 'c_kinship_pair']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_kinship_pair']);
         $data['c_personid'] = $id;
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
@@ -1151,7 +1151,7 @@ class BiogMainRepository {
     public function possessionUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
         $c_addr_id = $data['c_addr_id'];
-        $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
         $ori = DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->first();
@@ -1181,7 +1181,7 @@ class BiogMainRepository {
         $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
         $addr = $data['c_addr_id'];
-        $data = Arr::except($data, ['_token', 'c_addr_id']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
 
@@ -1294,7 +1294,7 @@ class BiogMainRepository {
     public function socialInstStoreById(Request $request, $id) {
         $data = $request->all();
         $data['c_personid'] = $id;
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_source'] = ($data['c_source'] == -999) ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
 
@@ -1726,7 +1726,7 @@ class BiogMainRepository {
         $old_c_assocship_pair1 = $old_c_assocship_pair['c_assoc_pair'] ?? null;
         $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'] ?? null;
 
-        $data = Arr::except($data, ['_method', '_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
         $data = (new ToolsRepository())->timestamp($data);
 
         $ori_data = $data;
@@ -1815,7 +1815,7 @@ class BiogMainRepository {
         $kin_pair = $data['c_kinship_pair'];
         $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $data['c_personid'] = $id;
-        $data = Arr::except($data, ['_token', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
 
         #20250417「社會關係始年」缺省值製作，若「社會關係始年」為空，則自動填充為-9999。
         if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
@@ -2118,7 +2118,7 @@ class BiogMainRepository {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         // Select2 對 id=0 處理有問題，API 中 c_textid=0 會被轉換為 -999，需轉回 0
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
@@ -2163,7 +2163,7 @@ class BiogMainRepository {
 
     public function sourceStoreById(Request $request, $id) {
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         // Select2 對 id=0 處理有問題，API 中 c_textid=0 會被轉換為 -999，需轉回 0
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];

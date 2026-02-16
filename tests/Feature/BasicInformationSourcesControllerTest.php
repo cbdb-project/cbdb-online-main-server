@@ -128,6 +128,40 @@ class BasicInformationSourcesControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testSourceStoreAndUpdateIgnoreProposalMetaFields(): void {
+        $repository = new BiogMainRepository();
+
+        $storeRequest = new Request([
+            'c_textid' => 777,
+            'c_pages' => 'pp-1',
+            'c_notes' => 'first',
+            'c_main_source' => 1,
+            'c_self_bio' => 0,
+            'action' => 'save',
+            '__proposal_comment' => 'should not touch SQL',
+        ]);
+
+        $repository->sourceStoreById($storeRequest, 2468);
+        $storedRow = DB::table('BIOG_SOURCE_DATA')->first();
+        $this->assertSame('first', $storedRow->c_notes);
+
+        Auth::guard()->setUser($this->makeUser(12, 'Updater User'));
+        $updateRequest = new Request([
+            'c_textid' => 777,
+            'c_pages' => 'pp-1',
+            'c_notes' => 'second',
+            'c_main_source' => 0,
+            'c_self_bio' => 1,
+            'action' => 'save',
+            '__proposal_comment' => 'still should not touch SQL',
+        ]);
+
+        $repository->sourceUpdateById($updateRequest, 2468, '2468-777-pp(minus)1');
+        $updatedRow = DB::table('BIOG_SOURCE_DATA')->first();
+        $this->assertSame('second', $updatedRow->c_notes);
+    }
+
+    #[Test]
     public function testSourceUpdatePreservesCreationAndSetsModification(): void {
         $repository = new BiogMainRepository();
         $initialRequest = new Request([

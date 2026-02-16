@@ -52,7 +52,7 @@ class EventStatusRepository {
             ['c_status_code', '=', $temp_l[2]],
         ])->first();
         $data = $request->all();
-        $data = Arr::except($data, ['_token', '_method']);
+        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment']);
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
@@ -86,7 +86,7 @@ class EventStatusRepository {
 
     public function statuseStoreById(Request $request, $id) {
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data['c_status_code'] = $data['c_status_code'] == -999 ? '0' : $data['c_status_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
@@ -217,7 +217,7 @@ class EventStatusRepository {
             $data['c_event_code']
         );
 
-        $data = Arr::except($data, ['_method', '_token', 'c_addr_id']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data);
         $updateQuery = DB::table('EVENTS_DATA')
@@ -256,7 +256,7 @@ class EventStatusRepository {
         $data = $this->formatSelect($data);
         $data['c_personid'] = $id;
         $this->insertAddrEvent($data['c_addr_id'], $id, $data['c_sequence'], $data['c_event_code']);
-        $data = Arr::except($data, ['_token', 'c_addr_id']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data, true);
         DB::table('EVENTS_DATA')->insert($data);

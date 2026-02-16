@@ -112,6 +112,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                             <td>{{ $item->resource }}</td>
                             @php
                                 $diffSource = $item->resource_diff ?? $item->resource_original;
+                                $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
+                                $hasAuditLogs = !empty($auditLogs);
                                 $hasDiffContent = false;
                                 if (is_array($diffSource)) {
                                     if (($diffSource['type'] ?? null) === 'POSTED_TO_ADDR_DATA') {
@@ -180,7 +182,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 }
                             @endphp
                                 @php
-                                    $canCompare = $hasDiffContent && (int)$item->op_type !== 4;
+                                    $canCompare = ($hasAuditLogs || $hasDiffContent) && (int)$item->op_type !== 4;
                                 @endphp
                             <td>
                                 @if($isProposal)
@@ -262,9 +264,23 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
-                                        <div>
-                                        @include('components.diff-table', ['diff' => $diffSource])
-                                        </div>
+                                        @if($hasAuditLogs)
+                                            <div class="text-muted small" style="margin-bottom: 8px;">審計記錄（{{ count($auditLogs) }} 筆）</div>
+                                            @foreach($auditLogs as $audit)
+                                                <div class="border rounded p-2" style="margin-bottom: 10px;">
+                                                    <div class="small" style="margin-bottom: 6px;">
+                                                        <strong>{{ $audit['table_name'] ?? '未知資料表' }}</strong>
+                                                        · {{ strtoupper($audit['operation'] ?? 'UNKNOWN') }}
+                                                        · <span class="text-monospace">{{ $audit['row_pk_text'] ?? '' }}</span>
+                                                    </div>
+                                                    @include('components.diff-table', ['diff' => $audit['diff'] ?? null])
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div>
+                                            @include('components.diff-table', ['diff' => $diffSource])
+                                            </div>
+                                        @endif
                                       </div>
                                       <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

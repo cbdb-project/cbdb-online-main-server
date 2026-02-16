@@ -170,8 +170,11 @@ class CompositePrimaryKey {
         array $queryParams,
         bool $absolute = false
     ): string {
+        // 將 null 值轉為 'NULL' 字串，避免 http_build_query 靜默丟棄
+        // （與 buildStoredResourceId() 保持一致的處理方式）
+        $encoded = array_map(fn ($v) => $v === null ? 'NULL' : $v, $queryParams);
         $url = route($route, $pathParams, $absolute);
-        $query = http_build_query($queryParams);
+        $query = http_build_query($encoded);
 
         return $query ? "{$url}?{$query}" : $url;
     }

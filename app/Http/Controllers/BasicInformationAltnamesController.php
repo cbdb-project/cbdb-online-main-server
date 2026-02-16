@@ -540,8 +540,8 @@ class BasicInformationAltnamesController extends Controller {
 
         // 更新索引
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
-            $nameChanged = ($ori->c_alt_name_chn ?? null) !== ($data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn']);
-            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== ($data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code']);
+            $nameChanged = ($ori->c_alt_name_chn ?? null) !== ($data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'] ?? null);
+            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== ($data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'] ?? null);
 
             if ($nameChanged || $typeChanged) {
                 if ($ori->c_alt_name_chn) {
@@ -552,11 +552,11 @@ class BasicInformationAltnamesController extends Controller {
                     );
                 }
 
-                $newAltNameChn = $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'];
+                $newAltNameChn = $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'] ?? null;
                 if (!empty($newAltNameChn)) {
                     $this->nameSearchIndexService->indexAltname(
                         $newPk['c_personid'] ?? $originalPk['c_personid'],
-                        $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
+                        $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'] ?? null,
                         $newAltNameChn
                     );
                 }

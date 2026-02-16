@@ -2,6 +2,39 @@
 
 本文檔說明 CBDB 系統中複合主鍵（Composite Primary Key）的 URL 編碼問題分析與長期解決方案設計。
 
+## 2026-02-17 現況快照（請先讀）
+
+本文件早期章節以「設計提案」為主；目前專案已進入「部分落地、部分過渡」狀態，需先對齊以下現況：
+
+1. 已落地：
+- `App\Support\CompositePrimaryKey` 已存在，且查詢參數模式路由已在多個 BasicInformation 模組使用（`*.edit.query` / `*.update.query` / `*.destroy.query`）。
+- `ALTNAME_DATA`、`BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ENTRY_DATA` 等模組已有查詢參數模式的 Controller 路徑與 URL 生成。
+
+2. 過渡中：
+- Resource 路由（path-based）仍保留，且部分前端表單仍直接提交到舊 resource 寫路徑。
+- 目前確認仍走舊 resource 寫路徑（或保留回退）的表單：
+  - `resources/views/biogmains/texts/_form.blade.php`
+  - `resources/views/biogmains/addresses/_form.blade.php`
+  - `resources/views/biogmains/altname/_form.blade.php`
+  - `resources/views/biogmains/entries/_form.blade.php`
+
+3. 閱讀提醒：
+- 本文中部分範例仍使用舊命名（如 `basicinformation.altnames.edit`）作為示意；實際專案請以目前路由命名（含 `.query`）為準。
+
+## 尚未完成的重構項目（與本文件直接相關）
+
+1. 前端寫入入口收斂：
+- 將上述 4 個表單全面切換為 query 路徑提交，移除或封存舊 resource 回退分支。
+
+2. 路由收斂策略：
+- 在確認無流量依賴後，逐步下線 `basicinformation.*` 的舊 path-based 寫入入口（至少先下線 update/store 的舊入口）。
+
+3. 測試補齊：
+- 針對 query 路徑的 store/update/destroy 增加對應 Feature Tests，並加入「舊入口是否仍被觸發」的回歸檢查。
+
+4. 文件同步：
+- 本文件的範例路由名稱與 `routes/web.php` 需維持一致（避免設計名詞與實作命名漂移）。
+
 ## 背景與問題
 
 ### 當前實作機制
@@ -955,6 +988,16 @@ class CompositePrimaryKeyRoutingTest extends TestCase {
 3. ✅ 所有內部連結已更新為新格式
 4. ✅ Operations 模組的歷史記錄連結已驗證正常
 
+### Query 路徑遷移完成標準（新增）
+
+下列條件全部成立，才可視為「複合主鍵 URL 重構完成」：
+
+1. 所有 BasicInformation 寫操作表單（create/edit）預設只產生 query 路徑 URL。
+2. Controller 的主要寫入邏輯不再依賴 path-based 複合主鍵字串解析。
+3. `CompositePrimaryKey` 的 schema 定義、路由、Controller 驗證規則三者一致。
+4. Feature Tests 覆蓋 query 路徑的 store/update/destroy 主流程與關鍵邊界值（含 `NULL` PK 片段）。
+5. 舊 path-based 寫入口僅保留顯式兼容策略，並有可追蹤的下線計畫與日期。
+
 ### 移除清單
 
 ```php
@@ -1244,11 +1287,16 @@ if (count($temp_l) > 9) {
 
 ---
 
-**文檔版本**：1.2
-**最後更新**：2026-01-26
+**文檔版本**：1.3
+**最後更新**：2026-02-17
 **維護者**：CBDB 開發團隊
 
 ### 版本歷史
+
+#### v1.3 (2026-02-17)
+- 新增「2026-02-17 現況快照」，明確標註 query 路徑已部分落地、resource 寫入口仍在過渡期
+- 補充尚未完成項目：前端表單寫入口收斂、路由下線策略、測試與文件同步
+- 新增「Query 路徑遷移完成標準」，作為重構收斂判斷依據
 
 #### v1.2 (2026-01-26)
 - 修正 ASSOC_DATA：增加第 9 個欄位 `c_assoc_first_year` 到所有 Repository 方法

@@ -90,6 +90,23 @@ class BasicInformationAltnamesControllerTest extends TestCase {
             $table->timestamps();
         });
 
+        // 創建 audit_log 表
+        Schema::dropIfExists('audit_log');
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->increments('id');
+            $table->timestamp('occurred_at');
+            $table->timestamp('created_at');
+            $table->string('table_name');
+            $table->string('operation');
+            $table->string('actor_type');
+            $table->string('actor_id');
+            $table->string('operation_id');
+            $table->json('row_pk');
+            $table->string('row_pk_text');
+            $table->json('old_data')->nullable();
+            $table->json('new_data')->nullable();
+        });
+
         // 插入測試用的別名類型代碼
         DB::table('ALTNAME_CODES')->insert([
             'c_name_type_code' => 1,
@@ -103,8 +120,89 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('ALTNAME_CODES');
         Schema::dropIfExists('operations');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('users');
         parent::tearDown();
+    }
+
+    /**
+     * 測試新增別名會正確寫入 audit_log
+     */
+    #[Test]
+    public function testStoreWritesAuditLog() {
+        // 創建用戶
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        // 創建 BIOG_MAIN 記錄
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        $data = [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '新增別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ];
+
+        $response = $this->actingAs($user)
+            ->post('/basicinformation/1/altnames', $data);
+
+        $response->assertStatus(302);
+
+        // 驗證 audit_log 記錄
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'ALTNAME_DATA',
+            'operation' => 'INSERT',
+            'actor_id' => (string) $user->id,
+            'row_pk_text' => 'c_personid=1&c_sequence=1&c_alt_name_chn=%E6%96%B0%E5%A2%9E%E5%88%A5%E5%90%8D&c_alt_name_type_code=1',
+        ]);
+
+        $log = DB::table('audit_log')->first();
+        $this->assertNotNull($log->operation_id);
+        $new_data = json_decode($log->new_data, true);
+        $this->assertEquals('新增別名', $new_data['c_alt_name_chn']);
+    }
+
+    #[Test]
+    public function testStoreDuplicateAltnameShowsErrorAndDoesNotInsertAgain() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'duplicate-altname@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '重複別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '重複別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+        $this->assertEquals(1, DB::table('ALTNAME_DATA')->count());
     }
 
     /**
@@ -250,6 +348,129 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $response->assertStatus(200);
         $response->assertViewHas('row');
         $response->assertViewHas('text_str', '100 Test Title 測試標題');
+    }
+
+    #[Test]
+    public function testDestroyQueryCanDeleteWhenSequenceIsNull() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'null-sequence@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => null,
+            'c_alt_name_chn' => '空序號別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->delete('/basicinformation/1/altnames/delete?c_personid=1&c_alt_name_chn=空序號別名&c_alt_name_type_code=1');
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseMissing('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '空序號別名',
+            'c_alt_name_type_code' => '1',
+        ]);
+    }
+
+    #[Test]
+    public function testUpdateQueryWritesProposalCommentIntoOperationNote() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'update-note@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_sequence=1&c_alt_name_chn=舊別名&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '新別名',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 0,
+                '__proposal_comment' => '測試備註',
+            ]
+        );
+
+        $response->assertStatus(302);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'ALTNAME_DATA')
+            ->where('op_type', 3)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $resourceData = json_decode($operation->resource_data, true);
+        $this->assertEquals('測試備註', $resourceData['__note'] ?? null);
+    }
+
+    #[Test]
+    public function testUpdateProposalWithNullSequenceUsesNullPkCorrectly() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'proposal-null-sequence@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => null,
+            'c_alt_name_chn' => '空序號別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/basicinformation/1/altnames/1-NULL-空序號別名-1', [
+            'action' => 'proposal',
+            'c_sequence' => null,
+            'c_alt_name_chn' => '空序號別名-提案',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+            '__proposal_comment' => '空序號提案',
+        ]);
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'ALTNAME_DATA',
+            'op_type' => 9,
+            'c_personid' => 1,
+        ]);
     }
 
     /**

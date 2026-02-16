@@ -124,13 +124,13 @@ class BasicInformationAddressesController extends Controller {
      */
     public function store(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -151,51 +151,19 @@ class BasicInformationAddressesController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
-        $data['c_personid'] = $id;
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-
-        $temp = DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $data['c_personid']],
-            ['c_addr_id', '=', $data['c_addr_id']],
-            ['c_addr_type', '=', $data['c_addr_type']],
-            ['c_sequence', '=', $data['c_sequence']],
-        ])->first();
-        if (!blank($temp)) {
-            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+        // 使用 Repository 進行儲存（內含事務與審計）
+        $data = $this->biogMainRepository->addrStoreById($request, $id);
+        if ($data === false) {
+            flash('重複資料，儲存失敗 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
-        $data = $this->toolsRepository->timestamp($data, true);
-        DB::table('BIOG_ADDR_DATA')->insert($data);
-        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ]), $data);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_addr_id' => $data['c_addr_id'],
-                'c_addr_type' => $data['c_addr_type'],
-                'c_sequence' => $data['c_sequence'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -338,13 +306,13 @@ class BasicInformationAddressesController extends Controller {
      */
     public function update(Request $request, $id, $addr) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -375,78 +343,20 @@ class BasicInformationAddressesController extends Controller {
 
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
-        $data = $this->toolsRepository->timestamp($data);
-        $addr = str_replace("--", "-minus", $addr);
-        $addr_l = explode("-", $addr);
-        foreach ($addr_l as $key => $value) {
-            $addr_l[$key] = str_replace("minus", "-", $value);
+        // 使用 Repository 進行更新（內含事務與審計）
+        $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $addr);
+        if (!$newPk) {
+            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
         }
 
-        //20251213新增差異比對紀錄
-        $ori = DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_addr_id', '=', $addr_l[1]],
-            ['c_addr_type', '=', $addr_l[2]],
-            ['c_sequence', '=', $addr_l[3]],
-        ])->first();
-
-        DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_addr_id', '=', $addr_l[1]],
-            ['c_addr_type', '=', $addr_l[2]],
-            ['c_sequence', '=', $addr_l[3]],
-        ])->update($data);
-        $data['c_personid'] = $addr_l[0];
-
-        // 準備要存入 operations 表的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ]), $operationData, $ori);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'UPDATE',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_addr_id' => $data['c_addr_id'],
-                'c_addr_type' => $data['c_addr_type'],
-                'c_sequence' => $data['c_sequence'],
-            ],
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
-        $newPk = [
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ];
-
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.addresses.edit.query',
             ['id' => $id],
@@ -596,13 +506,13 @@ class BasicInformationAddressesController extends Controller {
      */
     public function updateQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -621,7 +531,7 @@ class BasicInformationAddressesController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -699,12 +609,12 @@ class BasicInformationAddressesController extends Controller {
      */
     public function destroyQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -716,34 +626,14 @@ class BasicInformationAddressesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
-        // 構建查詢條件
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_addr_id', '=', $pk['c_addr_id']],
-            ['c_addr_type', '=', $pk['c_addr_type']],
-            ['c_sequence', '=', $pk['c_sequence']],
-        ];
+        // 構建舊格式 ID 用於 Repository
+        $id_ = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
 
-        $row = DB::table('BIOG_ADDR_DATA')->where($conditions)->first();
-        if (!$row) {
+        // 使用 Repository 進行刪除（內含事務與審計）
+        $deleted = $this->biogMainRepository->addrDeleteById($id_, $id);
+        if (!$deleted) {
             abort(404, 'BIOG_ADDR_DATA 記錄不存在');
         }
-
-        // 刪除資料
-        DB::table('BIOG_ADDR_DATA')->where($conditions)->delete();
-
-        // 記錄操作
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'DELETE',
-            $pk,
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

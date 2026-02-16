@@ -136,6 +136,16 @@
   - `./vendor/bin/phpunit tests/Feature/EventStatusWriteActionsTest.php`
   - `OK (6 tests, 35 assertions)`
 
+### 2026-02-17 — Transitional Hardening (BasicInformation Core Writes)
+- `ALTNAME_DATA`、`BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ENTRY_DATA` 的主要寫入路徑已收斂至 repository 寫入與審計流程。
+- 補強「不存在記錄」防護：
+  - 更新流程對 repository 回傳 `null` 統一改為 `404`（避免 `CompositePrimaryKey::buildUrl()` 型別錯誤導致 `500`）。
+  - 刪除流程對 repository 回傳 `false` 統一改為 `404`（避免刪除假成功提示）。
+- 修正 ALTNAME 舊格式主鍵解析中的 `c_sequence = "NULL"`，確保提案更新可正確命中 nullable PK 記錄。
+- 測試：
+  - `./vendor/bin/phpunit tests/Feature/BasicInformationAltnamesControllerTest.php tests/Feature/BasicInformationTextsControllerTest.php`
+  - `./vendor/bin/phpunit`（全量）
+
 ## 10. Version
-- Version: 1.0
-- Date: 2026-02-16
+- Version: 1.1
+- Date: 2026-02-17

@@ -308,6 +308,30 @@ class BiogMainRepository {
         ];
     }
 
+    public function store(Request $request) {
+        $data = $request->all();
+        $data = (new ToolsRepository())->timestamp($data, true);
+        $data = $this->auto_pinyin($data);
+
+        return DB::transaction(function () use ($data) {
+            $flight = BiogMain::create($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
+
+            (new AuditLogService())->write(
+                'BIOG_MAIN',
+                'INSERT',
+                ['c_personid' => $data['c_personid']],
+                null,
+                $flight->toArray(),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $flight;
+        });
+    }
+
     /**
      * @param $request
      * @param $num
@@ -545,8 +569,346 @@ class BiogMainRepository {
         return $data;
     }
 
-    public function textUpdateById() {
+    public function textUpdateById(Request $request, $id, $id_) {
+        $temp_l = explode("-", $id_);
+        $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = (new ToolsRepository())->timestamp($data);
 
+        return DB::transaction(function () use ($id, $temp_l, $data, $comment) {
+            $ori = DB::table('BIOG_TEXT_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_role_id', '=', $temp_l[2]],
+            ])->lockForUpdate()->first();
+
+            if (!$ori) {
+                return null;
+            }
+
+            DB::table('BIOG_TEXT_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_role_id', '=', $temp_l[2]],
+            ])->update($data);
+
+            $newPk = [
+                'c_personid' => $id,
+                'c_textid' => $data['c_textid'] ?? $ori->c_textid,
+                'c_role_id' => $data['c_role_id'] ?? $ori->c_role_id,
+            ];
+
+            $operationData = $data;
+            if ($comment) {
+                $operationData['__note'] = $comment;
+            }
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_TEXT_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
+
+            (new AuditLogService())->write(
+                'BIOG_TEXT_DATA',
+                'UPDATE',
+                $newPk,
+                (new AuditLogService())->normalizeRow($ori),
+                array_merge((new AuditLogService())->normalizeRow($ori), $data),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $newPk;
+        });
+    }
+
+    public function textStoreById(Request $request, $id) {
+        $data = $request->all();
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
+        $data['c_personid'] = $id;
+        $duplicate = DB::table('BIOG_TEXT_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_textid', '=', $data['c_textid']],
+            ['c_role_id', '=', $data['c_role_id']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
+        $data = (new ToolsRepository())->timestamp($data, true);
+
+        return DB::transaction(function () use ($id, $data) {
+            DB::table('BIOG_TEXT_DATA')->insert($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_TEXT_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $data['c_personid'],
+                'c_textid' => $data['c_textid'],
+                'c_role_id' => $data['c_role_id'],
+            ]), $data);
+
+            (new AuditLogService())->write(
+                'BIOG_TEXT_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_textid' => $data['c_textid'],
+                    'c_role_id' => $data['c_role_id'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $data;
+        });
+    }
+
+    public function textDeleteById($id_, $c_personid) {
+        $temp_l = explode("-", $id_);
+
+        return DB::transaction(function () use ($c_personid, $temp_l) {
+            $row = DB::table('BIOG_TEXT_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_role_id', '=', $temp_l[2]],
+            ])->lockForUpdate()->first();
+
+            if (!$row) {
+                return false;
+            }
+
+            DB::table('BIOG_TEXT_DATA')->where([
+                ['c_personid', '=', $temp_l[0]],
+                ['c_textid', '=', $temp_l[1]],
+                ['c_role_id', '=', $temp_l[2]],
+            ])->delete();
+
+            $pk = [
+                'c_personid' => $row->c_personid,
+                'c_textid' => $row->c_textid,
+                'c_role_id' => $row->c_role_id,
+            ];
+
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_TEXT_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+
+            (new AuditLogService())->write(
+                'BIOG_TEXT_DATA',
+                'DELETE',
+                $pk,
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return true;
+        });
+    }
+
+    public function entryStoreById(Request $request, $id) {
+        $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
+        $data['c_personid'] = $id;
+        $duplicate = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_entry_code', '=', $data['c_entry_code']],
+            ['c_sequence', '=', $data['c_sequence']],
+            ['c_kin_code', '=', $data['c_kin_code']],
+            ['c_assoc_code', '=', $data['c_assoc_code']],
+            ['c_kin_id', '=', $data['c_kin_id']],
+            ['c_year', '=', $data['c_year']],
+            ['c_assoc_id', '=', $data['c_assoc_id']],
+            ['c_inst_code', '=', $data['c_inst_code']],
+            ['c_inst_name_code', '=', $data['c_inst_name_code']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
+        $data = (new ToolsRepository())->timestamp($data, true);
+
+        return DB::transaction(function () use ($id, $data, $comment) {
+            DB::table('ENTRY_DATA')->insert($data);
+
+            $operationData = $data;
+            if ($comment) {
+                $operationData['__note'] = $comment;
+            }
+
+            $pk = [
+                'c_personid' => $data['c_personid'],
+                'c_entry_code' => $data['c_entry_code'],
+                'c_sequence' => $data['c_sequence'],
+                'c_kin_code' => $data['c_kin_code'],
+                'c_assoc_code' => $data['c_assoc_code'],
+                'c_kin_id' => $data['c_kin_id'],
+                'c_year' => $data['c_year'],
+                'c_assoc_id' => $data['c_assoc_id'],
+                'c_inst_code' => $data['c_inst_code'],
+                'c_inst_name_code' => $data['c_inst_name_code'],
+            ];
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $operationData);
+
+            (new AuditLogService())->write(
+                'ENTRY_DATA',
+                'INSERT',
+                $pk,
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $data;
+        });
+    }
+
+    public function entryUpdateById(Request $request, $id, $id_) {
+        $id = str_replace("--", "-minus", $id_);
+        $addr_a = explode("-", $id);
+        foreach ($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus", "-", $value);
+        }
+
+        $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = (new ToolsRepository())->timestamp($data);
+
+        return DB::transaction(function () use ($id, $addr_a, $data, $comment) {
+            $ori = DB::table('ENTRY_DATA')->where([
+                ['c_personid', '=', $addr_a[0]],
+                ['c_entry_code', '=', $addr_a[1]],
+                ['c_sequence', '=', $addr_a[2]],
+                ['c_kin_code', '=', $addr_a[3]],
+                ['c_assoc_code', '=', $addr_a[4]],
+                ['c_kin_id', '=', $addr_a[5]],
+                ['c_year', '=', $addr_a[6]],
+                ['c_assoc_id', '=', $addr_a[7]],
+                ['c_inst_code', '=', $addr_a[8]],
+                ['c_inst_name_code', '=', $addr_a[9]],
+            ])->lockForUpdate()->first();
+
+            if (!$ori) {
+                return null;
+            }
+
+            DB::table('ENTRY_DATA')->where([
+                ['c_personid', '=', $addr_a[0]],
+                ['c_entry_code', '=', $addr_a[1]],
+                ['c_sequence', '=', $addr_a[2]],
+                ['c_kin_code', '=', $addr_a[3]],
+                ['c_assoc_code', '=', $addr_a[4]],
+                ['c_kin_id', '=', $addr_a[5]],
+                ['c_year', '=', $addr_a[6]],
+                ['c_assoc_id', '=', $addr_a[7]],
+                ['c_inst_code', '=', $addr_a[8]],
+                ['c_inst_name_code', '=', $addr_a[9]],
+            ])->update($data);
+
+            $newPk = [
+                'c_personid' => $addr_a[0],
+                'c_entry_code' => $data['c_entry_code'] ?? $ori->c_entry_code,
+                'c_sequence' => $data['c_sequence'] ?? $ori->c_sequence,
+                'c_kin_code' => $data['c_kin_code'] ?? $ori->c_kin_code,
+                'c_assoc_code' => $data['c_assoc_code'] ?? $ori->c_assoc_code,
+                'c_kin_id' => $data['c_kin_id'] ?? $ori->c_kin_id,
+                'c_year' => $data['c_year'] ?? $ori->c_year,
+                'c_assoc_id' => $data['c_assoc_id'] ?? $ori->c_assoc_id,
+                'c_inst_code' => $data['c_inst_code'] ?? $ori->c_inst_code,
+                'c_inst_name_code' => $data['c_inst_name_code'] ?? $ori->c_inst_name_code,
+            ];
+
+            $operationData = $data;
+            if ($comment) {
+                $operationData['__note'] = $comment;
+            }
+
+            $operation = (new OperationRepository())->store(Auth::id(), $addr_a[0], 3, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
+
+            (new AuditLogService())->write(
+                'ENTRY_DATA',
+                'UPDATE',
+                $newPk,
+                (new AuditLogService())->normalizeRow($ori),
+                array_merge((new AuditLogService())->normalizeRow($ori), $data),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $newPk;
+        });
+    }
+
+    public function entryDeleteById($id_, $c_personid) {
+        $id = str_replace("--", "-minus", $id_);
+        $addr_a = explode("-", $id);
+        foreach ($addr_a as $key => $value) {
+            $addr_a[$key] = str_replace("minus", "-", $value);
+        }
+
+        return DB::transaction(function () use ($c_personid, $addr_a) {
+            $row = DB::table('ENTRY_DATA')->where([
+                ['c_personid', '=', $addr_a[0]],
+                ['c_entry_code', '=', $addr_a[1]],
+                ['c_sequence', '=', $addr_a[2]],
+                ['c_kin_code', '=', $addr_a[3]],
+                ['c_assoc_code', '=', $addr_a[4]],
+                ['c_kin_id', '=', $addr_a[5]],
+                ['c_year', '=', $addr_a[6]],
+                ['c_assoc_id', '=', $addr_a[7]],
+                ['c_inst_code', '=', $addr_a[8]],
+                ['c_inst_name_code', '=', $addr_a[9]],
+            ])->lockForUpdate()->first();
+
+            if (!$row) {
+                return false;
+            }
+
+            DB::table('ENTRY_DATA')->where([
+                ['c_personid', '=', $addr_a[0]],
+                ['c_entry_code', '=', $addr_a[1]],
+                ['c_sequence', '=', $addr_a[2]],
+                ['c_kin_code', '=', $addr_a[3]],
+                ['c_assoc_code', '=', $addr_a[4]],
+                ['c_kin_id', '=', $addr_a[5]],
+                ['c_year', '=', $addr_a[6]],
+                ['c_assoc_id', '=', $addr_a[7]],
+                ['c_inst_code', '=', $addr_a[8]],
+                ['c_inst_name_code', '=', $addr_a[9]],
+            ])->delete();
+
+            $pk = [
+                'c_personid' => $row->c_personid,
+                'c_entry_code' => $row->c_entry_code,
+                'c_sequence' => $row->c_sequence,
+                'c_kin_code' => $row->c_kin_code,
+                'c_assoc_code' => $row->c_assoc_code,
+                'c_kin_id' => $row->c_kin_id,
+                'c_year' => $row->c_year,
+                'c_assoc_id' => $row->c_assoc_id,
+                'c_inst_code' => $row->c_inst_code,
+                'c_inst_name_code' => $row->c_inst_name_code,
+            ];
+
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+
+            (new AuditLogService())->write(
+                'ENTRY_DATA',
+                'DELETE',
+                $pk,
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return true;
+        });
     }
 
     public function officeById($id) {
@@ -2074,6 +2436,349 @@ class BiogMainRepository {
                 ]);
             }
         });
+    }
+
+    public function addrStoreById(Request $request, $id) {
+        $data = $request->all();
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
+        $data['c_personid'] = $id;
+        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
+        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
+        $duplicate = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_addr_id', '=', $data['c_addr_id']],
+            ['c_addr_type', '=', $data['c_addr_type']],
+            ['c_sequence', '=', $data['c_sequence']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
+        $data = (new ToolsRepository())->timestamp($data, true);
+
+        return DB::transaction(function () use ($id, $data) {
+            DB::table('BIOG_ADDR_DATA')->insert($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $data['c_personid'],
+                'c_addr_id' => $data['c_addr_id'],
+                'c_addr_type' => $data['c_addr_type'],
+                'c_sequence' => $data['c_sequence'],
+            ]), $data);
+
+            (new AuditLogService())->write(
+                'BIOG_ADDR_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_addr_id' => $data['c_addr_id'],
+                    'c_addr_type' => $data['c_addr_type'],
+                    'c_sequence' => $data['c_sequence'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $data;
+        });
+    }
+
+    public function addrUpdateById(Request $request, $id, $addr) {
+        $addr_l = $this->parseAddrId($addr);
+        $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
+        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
+        $data = (new ToolsRepository())->timestamp($data);
+
+        return DB::transaction(function () use ($id, $addr_l, $data, $comment) {
+            $ori = DB::table('BIOG_ADDR_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_addr_id', '=', $addr_l[1]],
+                ['c_addr_type', '=', $addr_l[2]],
+                ['c_sequence', '=', $addr_l[3]],
+            ])->lockForUpdate()->first();
+
+            if (!$ori) {
+                return null;
+            }
+
+            DB::table('BIOG_ADDR_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_addr_id', '=', $addr_l[1]],
+                ['c_addr_type', '=', $addr_l[2]],
+                ['c_sequence', '=', $addr_l[3]],
+            ])->update($data);
+
+            $newPk = [
+                'c_personid' => $id,
+                'c_addr_id' => $data['c_addr_id'] ?? $ori->c_addr_id,
+                'c_addr_type' => $data['c_addr_type'] ?? $ori->c_addr_type,
+                'c_sequence' => $data['c_sequence'] ?? $ori->c_sequence,
+            ];
+
+            $operationData = $data;
+            if ($comment) {
+                $operationData['__note'] = $comment;
+            }
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
+
+            (new AuditLogService())->write(
+                'BIOG_ADDR_DATA',
+                'UPDATE',
+                $newPk,
+                (new AuditLogService())->normalizeRow($ori),
+                array_merge((new AuditLogService())->normalizeRow($ori), $data),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $newPk;
+        });
+    }
+
+    public function addrDeleteById($id, $c_personid) {
+        $addr_l = $this->parseAddrId($id);
+
+        return DB::transaction(function () use ($c_personid, $addr_l) {
+            $row = DB::table('BIOG_ADDR_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_addr_id', '=', $addr_l[1]],
+                ['c_addr_type', '=', $addr_l[2]],
+                ['c_sequence', '=', $addr_l[3]],
+            ])->lockForUpdate()->first();
+
+            if (!$row) {
+                return false;
+            }
+
+            DB::table('BIOG_ADDR_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_addr_id', '=', $addr_l[1]],
+                ['c_addr_type', '=', $addr_l[2]],
+                ['c_sequence', '=', $addr_l[3]],
+            ])->delete();
+
+            $pk = [
+                'c_personid' => $row->c_personid,
+                'c_addr_id' => $row->c_addr_id,
+                'c_addr_type' => $row->c_addr_type,
+                'c_sequence' => $row->c_sequence,
+            ];
+
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+
+            (new AuditLogService())->write(
+                'BIOG_ADDR_DATA',
+                'DELETE',
+                $pk,
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return true;
+        });
+    }
+
+    protected function parseAddrId($addr) {
+        $addr = str_replace("--", "-minus", $addr);
+        $addr_l = explode("-", $addr);
+        foreach ($addr_l as $key => $value) {
+            $addr_l[$key] = str_replace("minus", "-", $value);
+        }
+
+        return $addr_l;
+    }
+
+    public function altnameById($id) {
+        $addr_l = $this->parseAltnameId($id);
+
+        $row = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $addr_l[0]],
+            ['c_sequence', '=', $addr_l[1]],
+            ['c_alt_name_chn', '=', $addr_l[2]],
+            ['c_alt_name_type_code', '=', $addr_l[3]],
+        ])->first();
+
+        return $row;
+    }
+
+    public function altnameStoreById(Request $request, $id) {
+        $data = $request->all();
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
+        $data['c_personid'] = $id;
+        $duplicate = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_sequence', '=', $data['c_sequence']],
+            ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
+        $data = (new ToolsRepository())->timestamp($data, true);
+
+        return DB::transaction(function () use ($id, $data) {
+            DB::table('ALTNAME_DATA')->insert($data);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+                'c_personid' => $data['c_personid'],
+                'c_sequence' => $data['c_sequence'],
+                'c_alt_name_chn' => $data['c_alt_name_chn'],
+                'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+            ]), $data);
+
+            (new AuditLogService())->write(
+                'ALTNAME_DATA',
+                'INSERT',
+                [
+                    'c_personid' => $data['c_personid'],
+                    'c_sequence' => $data['c_sequence'],
+                    'c_alt_name_chn' => $data['c_alt_name_chn'],
+                    'c_alt_name_type_code' => $data['c_alt_name_type_code'],
+                ],
+                null,
+                $data,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $data;
+        });
+    }
+
+    public function altnameUpdateById(Request $request, $id, $alt) {
+        $addr_l = $this->parseAltnameId($alt);
+        $data = $request->all();
+        $comment = $data['__proposal_comment'] ?? null;
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = (new ToolsRepository())->timestamp($data);
+
+        return DB::transaction(function () use ($id, $addr_l, $data, $comment) {
+            $ori = DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_sequence', '=', $addr_l[1]],
+                ['c_alt_name_chn', '=', $addr_l[2]],
+                ['c_alt_name_type_code', '=', $addr_l[3]],
+            ])->lockForUpdate()->first();
+
+            if (!$ori) {
+                return null;
+            }
+
+            DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_sequence', '=', $addr_l[1]],
+                ['c_alt_name_chn', '=', $addr_l[2]],
+                ['c_alt_name_type_code', '=', $addr_l[3]],
+            ])->update($data);
+
+            $newPk = [
+                'c_personid' => $id,
+                'c_sequence' => $data['c_sequence'] ?? $ori->c_sequence,
+                'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $ori->c_alt_name_chn,
+                'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code,
+            ];
+
+            $operationData = $data;
+            if ($comment) {
+                $operationData['__note'] = $comment;
+            }
+
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
+
+            (new AuditLogService())->write(
+                'ALTNAME_DATA',
+                'UPDATE',
+                $newPk,
+                (new AuditLogService())->normalizeRow($ori),
+                array_merge((new AuditLogService())->normalizeRow($ori), $data),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return $newPk;
+        });
+    }
+
+    public function altnameDeleteById($id, $c_personid) {
+        $addr_l = $this->parseAltnameId($id);
+
+        return DB::transaction(function () use ($c_personid, $addr_l) {
+            $row = DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_sequence', '=', $addr_l[1]],
+                ['c_alt_name_chn', '=', $addr_l[2]],
+                ['c_alt_name_type_code', '=', $addr_l[3]],
+            ])->lockForUpdate()->first();
+
+            if (!$row) {
+                return false;
+            }
+
+            DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $addr_l[0]],
+                ['c_sequence', '=', $addr_l[1]],
+                ['c_alt_name_chn', '=', $addr_l[2]],
+                ['c_alt_name_type_code', '=', $addr_l[3]],
+            ])->delete();
+
+            $pk = [
+                'c_personid' => $row->c_personid,
+                'c_sequence' => $row->c_sequence,
+                'c_alt_name_chn' => $row->c_alt_name_chn,
+                'c_alt_name_type_code' => $row->c_alt_name_type_code,
+            ];
+
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+
+            (new AuditLogService())->write(
+                'ALTNAME_DATA',
+                'DELETE',
+                $pk,
+                (new AuditLogService())->normalizeRow($row),
+                null,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            return true;
+        });
+    }
+
+    protected function parseAltnameId($alt) {
+        if (strpos($alt, '_._') !== false) {
+            $addr_l = explode('_._', $alt);
+        } else {
+            $addr_l = explode("-", $alt);
+            foreach ($addr_l as $key => $value) {
+                $addr_l[$key] = $this->unionPKDef_decode($value);
+            }
+        }
+
+        if (count($addr_l) < 4) {
+            Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
+                'parsed' => $addr_l,
+                'expected_count' => 4,
+                'actual_count' => count($addr_l),
+            ]);
+            abort(400, 'ALTNAME_DATA ID 格式不正確');
+        }
+
+        if (isset($addr_l[1]) && $addr_l[1] === 'NULL') {
+            $addr_l[1] = null;
+        }
+
+        return $addr_l;
     }
 
     public function sourceById($id, $_id) {

@@ -115,13 +115,13 @@ class BasicInformationTextsController extends Controller {
      */
     public function store(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -142,45 +142,19 @@ class BasicInformationTextsController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
-        $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, true);
-        $temp = DB::table($this->table_name)->where([
-            ['c_personid', '=', $data['c_personid']],
-            ['c_textid', '=', $data['c_textid']],
-            ['c_role_id', '=', $data['c_role_id']],
-        ])->first();
-        if (!blank($temp)) {
-            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+        // 使用 Repository 進行儲存（內含事務與審計）
+        $data = $this->biogMainRepository->textStoreById($request, $id);
+        if ($data === false) {
+            flash('重複資料，儲存失敗 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
-        DB::table($this->table_name)->insert($data);
-        $operation = $this->operationRepository->store(Auth::id(), $id, 1, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_textid' => $data['c_textid'],
-            'c_role_id' => $data['c_role_id'],
-        ]), $data);
-        (new AuditLogService())->write(
-            $this->table_name,
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_textid' => $data['c_textid'],
-                'c_role_id' => $data['c_role_id'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -248,13 +222,13 @@ class BasicInformationTextsController extends Controller {
      */
     public function update(Request $request, $id, $id_) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -281,67 +255,21 @@ class BasicInformationTextsController extends Controller {
                 ->proposalUpdateWithPk($request, $id, 'texts', $originalPk);
         }
 
-        // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
-        $data = $this->toolsRepository->timestamp($data);
-        $temp_l = explode("-", $id_);
-
-        //20251214新增差異比對紀錄
-        $ori = DB::table($this->table_name)->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]],
-        ])->first();
-
-        DB::table($this->table_name)->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_role_id', '=', $temp_l[2]],
-        ])->update($data);
-        $data['c_personid'] = $temp_l[0];
-
-        // 準備要存入 operations 表的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
+        // 使用 Repository 進行更新（內含事務與審計）
+        $newPk = $this->biogMainRepository->textUpdateById($request, $id, $id_);
+        if (!$newPk) {
+            abort(404, 'BIOG_TEXT_DATA 記錄不存在');
         }
 
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_textid' => $data['c_textid'],
-            'c_role_id' => $data['c_role_id'],
-        ]), $operationData, $ori);
-        (new AuditLogService())->write(
-            $this->table_name,
-            'UPDATE',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_textid' => $data['c_textid'],
-                'c_role_id' => $data['c_role_id'],
-            ],
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
-        $newPk = [
-            'c_personid' => $data['c_personid'],
-            'c_textid' => $data['c_textid'],
-            'c_role_id' => $data['c_role_id'],
-        ];
-
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.texts.edit.query',
             ['id' => $id],
@@ -433,13 +361,13 @@ class BasicInformationTextsController extends Controller {
      */
     public function updateQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -457,7 +385,7 @@ class BasicInformationTextsController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -532,12 +460,12 @@ class BasicInformationTextsController extends Controller {
      */
     public function destroyQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -549,42 +477,14 @@ class BasicInformationTextsController extends Controller {
         // 驗證必填欄位（c_role_id 為可選，預設為 0）
         CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
 
-        // 構建查詢條件
-        $c_role_id = $pk['c_role_id'] ?? 0;
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_textid']],
-            ['c_role_id', '=', $c_role_id],
-        ];
+        // 構建舊格式 ID 用於 Repository
+        $id_ = $pk['c_personid']."-".$pk['c_textid']."-".($pk['c_role_id'] ?? 0);
 
-        $row = DB::table($this->table_name)->where($conditions)->first();
-        if (!$row) {
+        // 使用 Repository 進行刪除（內含事務與審計）
+        $deleted = $this->biogMainRepository->textDeleteById($id_, $id);
+        if (!$deleted) {
             abort(404, 'BIOG_TEXT_DATA 記錄不存在');
         }
-
-        // 刪除資料
-        DB::table($this->table_name)->where($conditions)->delete();
-
-        // 記錄操作
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, $this->table_name, CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $pk['c_personid'],
-            'c_textid' => $pk['c_textid'],
-            'c_role_id' => $c_role_id,
-        ]), $row);
-        (new AuditLogService())->write(
-            $this->table_name,
-            'DELETE',
-            [
-                'c_personid' => $pk['c_personid'],
-                'c_textid' => $pk['c_textid'],
-                'c_role_id' => $c_role_id,
-            ],
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

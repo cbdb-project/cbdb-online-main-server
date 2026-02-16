@@ -68,6 +68,7 @@ class OfficePostingRepository {
             $auditLog = new AuditLogService();
             $previousOfficeId = (int) ($ori['c_office_id'] ?? $_officeid);
             $currentOfficeId = $previousOfficeId;
+            $officeOperation = null;
             if ($hasPostingChange) {
                 $timestamped = (new ToolsRepository())->timestamp($data);
 
@@ -269,15 +270,18 @@ class OfficePostingRepository {
                     'c_posting_id' => $_postingid,
                 ]);
 
-                $addrOperation = (new OperationRepository())->store(
-                    Auth::id(),
-                    $c_personid,
-                    3,
-                    'POSTED_TO_ADDR_DATA',
-                    $addrResourceId,
-                    ['rows' => $afterRows],
-                    ['rows' => $beforeRows]
-                );
+                $addrOperation = $officeOperation;
+                if ($addrOperation === null) {
+                    $addrOperation = (new OperationRepository())->store(
+                        Auth::id(),
+                        $c_personid,
+                        3,
+                        'POSTED_TO_ADDR_DATA',
+                        $addrResourceId,
+                        ['rows' => $afterRows],
+                        ['rows' => $beforeRows]
+                    );
+                }
 
                 $addrAfterAuditRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $_id)

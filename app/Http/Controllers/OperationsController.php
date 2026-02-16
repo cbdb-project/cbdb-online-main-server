@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Schema;
 
 class OperationsController extends Controller {
     protected $operationRepository;
+    protected array $auditCurrentRowCache = [];
 
     public function __construct(OperationRepository $operationRepository) {
         $this->operationRepository = $operationRepository;
@@ -1036,6 +1037,7 @@ class OperationsController extends Controller {
                 'operation_id',
                 'table_name',
                 'operation',
+                'row_pk',
                 'row_pk_text',
                 'old_data',
                 'new_data',
@@ -1050,13 +1052,15 @@ class OperationsController extends Controller {
 
             $oldData = $this->decodeJsonNullable($log->old_data ?? null);
             $newData = $this->decodeJsonNullable($log->new_data ?? null);
+            $rowPk = $this->decodeJsonNullable($log->row_pk ?? null);
+            $currentData = $this->resolveAuditCurrentRow((string) $log->table_name, $rowPk);
 
             $grouped[$operationId][] = [
                 'id' => (int) $log->id,
                 'table_name' => (string) $log->table_name,
                 'operation' => (string) $log->operation,
                 'row_pk_text' => (string) $log->row_pk_text,
-                'diff' => $this->buildAuditDiff($oldData, $newData),
+                'diff' => $this->buildAuditDiff($oldData, $newData, $currentData),
             ];
         }
 
@@ -1082,9 +1086,10 @@ class OperationsController extends Controller {
         return null;
     }
 
-    protected function buildAuditDiff(?array $oldData, ?array $newData): ?array {
+    protected function buildAuditDiff(?array $oldData, ?array $newData, ?array $currentData = null): ?array {
         $oldArr = is_array($oldData) ? $oldData : [];
         $newArr = is_array($newData) ? $newData : [];
+        $currentArr = is_array($currentData) ? $currentData : [];
         $allKeys = array_unique(array_merge(array_keys($oldArr), array_keys($newArr)));
         if (empty($allKeys)) {
             return null;
@@ -1128,16 +1133,45 @@ class OperationsController extends Controller {
             if ($normalizeValue($beforeRaw) === $normalizeValue($afterRaw)) {
                 continue;
             }
+            $currentExists = array_key_exists($key, $currentArr);
+            $currentRaw = $currentExists ? $currentArr[$key] : null;
             $rows[] = [
                 'field' => $key,
                 'before' => $formatValue($beforeRaw),
                 'after' => $formatValue($afterRaw),
-                'current' => '(未取得)',
-                'matches_current' => false,
-                'matches_before' => false,
+                'current' => $currentExists ? $formatValue($currentRaw) : '(未取得)',
+                'matches_current' => $currentExists && $normalizeValue($afterRaw) === $normalizeValue($currentRaw),
+                'matches_before' => $currentExists && $normalizeValue($beforeRaw) === $normalizeValue($currentRaw),
             ];
         }
 
         return !empty($rows) ? ['rows' => $rows] : null;
+    }
+
+    protected function resolveAuditCurrentRow(string $tableName, ?array $rowPk): ?array {
+        $tableName = trim($tableName);
+        if ($tableName === '' || empty($rowPk) || !Schema::hasTable($tableName)) {
+            return null;
+        }
+
+        $cacheKey = $tableName . '|' . json_encode($rowPk, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (array_key_exists($cacheKey, $this->auditCurrentRowCache)) {
+            return $this->auditCurrentRowCache[$cacheKey];
+        }
+
+        $query = DB::table($tableName);
+        foreach ($rowPk as $column => $value) {
+            if ($value === null || $value === 'NULL') {
+                $query->whereNull($column);
+            } else {
+                $query->where($column, '=', $value);
+            }
+        }
+
+        $row = $query->first();
+        $normalized = $row ? json_decode(json_encode($row), true) : null;
+        $this->auditCurrentRowCache[$cacheKey] = $normalized;
+
+        return $normalized;
     }
 }

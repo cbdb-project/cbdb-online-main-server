@@ -109,10 +109,25 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 <a href="{{ $personLink }}">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
                             @endif
                             </td>
-                            <td>{{ $item->resource }}</td>
+                            @php
+                                $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
+                                $auditTableNames = [];
+                                foreach ($auditLogs as $audit) {
+                                    $tableName = trim((string) ($audit['table_name'] ?? ''));
+                                    if ($tableName !== '') {
+                                        $auditTableNames[] = $tableName;
+                                    }
+                                }
+                                $auditTableNames = array_values(array_unique($auditTableNames));
+                                $resourceDisplay = !empty($auditTableNames)
+                                    ? implode(' / ', $auditTableNames)
+                                    : (string) $item->resource;
+                            @endphp
+                            <td>
+                                {{ $resourceDisplay }}
+                            </td>
                             @php
                                 $diffSource = $item->resource_diff ?? $item->resource_original;
-                                $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
                                 $hasAuditLogs = !empty($auditLogs);
                                 $hasDiffContent = false;
                                 if (is_array($diffSource)) {

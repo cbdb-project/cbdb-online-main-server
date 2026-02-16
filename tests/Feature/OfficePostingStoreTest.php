@@ -233,6 +233,11 @@ class OfficePostingStoreTest extends TestCase {
             'resource_id' => 'c_office_id=20&c_posting_id=1',
             'op_type' => 3,
         ]);
+        $this->assertDatabaseMissing('operations', [
+            'resource' => 'POSTED_TO_ADDR_DATA',
+            'resource_id' => 'c_office_id=20&c_posting_id=1',
+            'op_type' => 3,
+        ]);
     }
 
     #[Test]

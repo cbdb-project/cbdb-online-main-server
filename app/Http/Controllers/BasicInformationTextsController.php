@@ -148,7 +148,7 @@ class BasicInformationTextsController extends Controller {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_token']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
         $data = $this->toolsRepository->timestamp($data, true);
         $temp = DB::table($this->table_name)->where([

@@ -36,6 +36,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_sequence' => 1,
             'c_status_code' => 2,
             'c_source' => -999,
+            'action' => 'save',
+            '__proposal_comment' => 'should be ignored',
         ]);
 
         $response->assertRedirect(route('basicinformation.statuses.edit.query', [
@@ -59,6 +61,14 @@ class EventStatusWriteActionsTest extends TestCase {
             'op_type' => 1,
         ]);
 
+        $op = \DB::table('operations')
+            ->where('resource', 'STATUS_DATA')
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($op);
+        $opPayload = json_decode($op->resource_data, true);
+        $this->assertSame('should be ignored', $opPayload['__note'] ?? null);
+
         $this->assertDatabaseHas('audit_log', [
             'table_name' => 'STATUS_DATA',
             'operation' => 'INSERT',
@@ -80,6 +90,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_sequence' => 1,
             'c_status_code' => 2,
             'c_source' => 10,
+            'action' => 'save',
+            '__proposal_comment' => 'should be ignored',
         ]);
 
         $response->assertRedirect(route('basicinformation.statuses.edit.query', [
@@ -150,6 +162,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_intercalary' => 1,
             'c_source' => 9,
             'c_addr_id' => [100, -999],
+            'action' => 'save',
+            '__proposal_comment' => 'should be ignored',
         ]);
 
         $response->assertRedirect(route('basicinformation.events.edit.query', [
@@ -211,6 +225,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_intercalary' => 0,
             'c_source' => 10,
             'c_addr_id' => [200],
+            'action' => 'save',
+            '__proposal_comment' => 'should be ignored',
         ]);
 
         $response->assertRedirect(route('basicinformation.events.edit.query', [

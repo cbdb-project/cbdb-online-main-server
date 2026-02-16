@@ -262,7 +262,7 @@ class BasicInformationSocialInstController extends Controller {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
         //return $request;
         //修改結束 //20211020修改增加c_bi_begin_year與c_bi_end_year
@@ -457,7 +457,7 @@ class BasicInformationSocialInstController extends Controller {
         CompositePrimaryKey::validateOrFail($originalPk, 'BIOG_INST_DATA');
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = $this->toolsRepository->timestamp($data);
 
         // 取得原始資料（使用原始 PK）

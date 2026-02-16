@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Schema;
 
 class OperationsController extends Controller {
     protected $operationRepository;
+    protected array $auditCurrentRowCache = [];
 
     public function __construct(OperationRepository $operationRepository) {
         $this->operationRepository = $operationRepository;
@@ -60,6 +61,7 @@ class OperationsController extends Controller {
         //將物件轉為陣列進行陣列比對
         $listsArr = $this->operationRepository->objectToArray($lists);
         $dataRows = isset($listsArr['data']) && is_array($listsArr['data']) ? $listsArr['data'] : [];
+        $auditLogsByOperation = $this->loadAuditLogsByOperation($dataRows);
         $all = count($dataRows);
         for ($x = 0;$x < $all;$x++) {
             $c_personid = '';
@@ -67,6 +69,8 @@ class OperationsController extends Controller {
             $resource = $dataRows[$x]['resource'];
             $arr1 = $dataRows[$x]['resource_data'];
             $arr2 = $dataRows[$x]['resource_original'];
+            $operationId = (string) ($dataRows[$x]['id'] ?? '');
+            $lists[$x]->setAttribute('audit_logs', $auditLogsByOperation[$operationId] ?? []);
             //20191225實時比對的程式判斷
             if (!empty($c_personid = $dataRows[$x]['c_personid']) && $dataRows[$x]['resource'] == "BIOG_MAIN") {
                 $arr3 = BiogMain::find($c_personid)->toArray();
@@ -1006,5 +1010,168 @@ class OperationsController extends Controller {
         $result = $key;
 
         return $result;
+    }
+
+    protected function loadAuditLogsByOperation(array $dataRows): array {
+        if (empty($dataRows) || !Schema::hasTable('audit_log')) {
+            return [];
+        }
+
+        $operationIds = [];
+        foreach ($dataRows as $row) {
+            if (!isset($row['id'])) {
+                continue;
+            }
+            $operationIds[] = (string) $row['id'];
+        }
+        $operationIds = array_values(array_unique($operationIds));
+        if (empty($operationIds)) {
+            return [];
+        }
+
+        $logs = DB::table('audit_log')
+            ->whereIn('operation_id', $operationIds)
+            ->orderBy('id')
+            ->get([
+                'id',
+                'operation_id',
+                'table_name',
+                'operation',
+                'row_pk',
+                'row_pk_text',
+                'old_data',
+                'new_data',
+            ]);
+
+        $grouped = [];
+        foreach ($logs as $log) {
+            $operationId = (string) ($log->operation_id ?? '');
+            if ($operationId === '') {
+                continue;
+            }
+
+            $oldData = $this->decodeJsonNullable($log->old_data ?? null);
+            $newData = $this->decodeJsonNullable($log->new_data ?? null);
+            $rowPk = $this->decodeJsonNullable($log->row_pk ?? null);
+            $currentData = $this->resolveAuditCurrentRow((string) $log->table_name, $rowPk);
+
+            $grouped[$operationId][] = [
+                'id' => (int) $log->id,
+                'table_name' => (string) $log->table_name,
+                'operation' => (string) $log->operation,
+                'row_pk_text' => (string) $log->row_pk_text,
+                'diff' => $this->buildAuditDiff($oldData, $newData, $currentData),
+            ];
+        }
+
+        return $grouped;
+    }
+
+    protected function decodeJsonNullable($payload): ?array {
+        if ($payload === null || $payload === '') {
+            return null;
+        }
+
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    protected function buildAuditDiff(?array $oldData, ?array $newData, ?array $currentData = null): ?array {
+        $oldArr = is_array($oldData) ? $oldData : [];
+        $newArr = is_array($newData) ? $newData : [];
+        $currentArr = is_array($currentData) ? $currentData : [];
+        $allKeys = array_unique(array_merge(array_keys($oldArr), array_keys($newArr)));
+        if (empty($allKeys)) {
+            return null;
+        }
+
+        $formatValue = function ($value) {
+            if (is_array($value) || is_object($value)) {
+                return json_encode($value, JSON_UNESCAPED_UNICODE);
+            }
+            if ($value === null) {
+                return '(null)';
+            }
+            if (is_bool($value)) {
+                return $value ? 'true' : 'false';
+            }
+
+            return (string) $value;
+        };
+
+        $normalizeValue = function ($value) {
+            if (is_array($value) || is_object($value)) {
+                return json_encode($value);
+            }
+            if ($value === null) {
+                return '';
+            }
+            if (is_bool($value)) {
+                return $value ? '1' : '0';
+            }
+
+            return trim((string) $value);
+        };
+
+        $rows = [];
+        foreach ($allKeys as $key) {
+            if (in_array($key, ['_method', '_token'], true)) {
+                continue;
+            }
+            $beforeRaw = array_key_exists($key, $oldArr) ? $oldArr[$key] : null;
+            $afterRaw = array_key_exists($key, $newArr) ? $newArr[$key] : null;
+            if ($normalizeValue($beforeRaw) === $normalizeValue($afterRaw)) {
+                continue;
+            }
+            $currentExists = array_key_exists($key, $currentArr);
+            $currentRaw = $currentExists ? $currentArr[$key] : null;
+            $rows[] = [
+                'field' => $key,
+                'before' => $formatValue($beforeRaw),
+                'after' => $formatValue($afterRaw),
+                'current' => $currentExists ? $formatValue($currentRaw) : '(未取得)',
+                'matches_current' => $currentExists && $normalizeValue($afterRaw) === $normalizeValue($currentRaw),
+                'matches_before' => $currentExists && $normalizeValue($beforeRaw) === $normalizeValue($currentRaw),
+            ];
+        }
+
+        return !empty($rows) ? ['rows' => $rows] : null;
+    }
+
+    protected function resolveAuditCurrentRow(string $tableName, ?array $rowPk): ?array {
+        $tableName = trim($tableName);
+        if ($tableName === '' || empty($rowPk) || !Schema::hasTable($tableName)) {
+            return null;
+        }
+
+        $cacheKey = $tableName . '|' . json_encode($rowPk, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (array_key_exists($cacheKey, $this->auditCurrentRowCache)) {
+            return $this->auditCurrentRowCache[$cacheKey];
+        }
+
+        $query = DB::table($tableName);
+        foreach ($rowPk as $column => $value) {
+            if ($value === null || $value === 'NULL') {
+                $query->whereNull($column);
+            } else {
+                $query->where($column, '=', $value);
+            }
+        }
+
+        $row = $query->first();
+        $normalized = $row ? json_decode(json_encode($row), true) : null;
+        $this->auditCurrentRowCache[$cacheKey] = $normalized;
+
+        return $normalized;
     }
 }

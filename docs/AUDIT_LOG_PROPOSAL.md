@@ -71,13 +71,19 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
   - `tests/Feature/BasicInformationTextsControllerTest.php`
   - 全量 PHPUnit 通過（含上述新增／補強測試）。
 
+### Progress Update (2026-02-17)
+- 進一步修正空主鍵與不存在記錄處理：
+  - ALTNAME 舊格式主鍵中的 `c_sequence = "NULL"` 現在會正確轉為 `null`，避免提案更新誤判找不到資料。
+  - `BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ALTNAME_DATA` 更新流程已補上 repository 回傳 `null` 時的 `404` 處理，避免型別錯誤導致 `500`。
+  - `BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ENTRY_DATA`、`ALTNAME_DATA` 刪除流程已補上 repository 回傳 `false` 時的 `404`，不再出現「刪除成功」假陽性提示。
+- 測試補強：
+  - `tests/Feature/BasicInformationAltnamesControllerTest.php`（新增 `NULL sequence` 提案更新場景）
+  - `tests/Feature/BasicInformationTextsControllerTest.php`（新增刪除不存在資料回傳 `404`）
+
 ## Known Issues (Current Branch)
 - **Transaction consistency gaps**:
   - Multiple controller write paths still execute `data write -> operations write -> audit_log write` without wrapping all steps in one DB transaction.
   - A partial failure can leave data/operations/audit out of sync.
-- **ALTNAME delete predicate risk**:
-  - Some delete paths use `LIKE` matching for `c_alt_name_chn`, which can affect multiple rows.
-  - Current audit logging on these paths records only one row snapshot, so audit may be incomplete if multiple rows are deleted.
 - **Test coverage gaps**:
   - Several feature tests were updated to create `audit_log` schema only, but do not yet assert audit payload correctness (row count, operation type, PK serialization, before/after snapshot).
 - **Progress semantics caveat**:
@@ -189,5 +195,5 @@ If history lookup becomes too slow or volume grows:
 - Consider partitioning in MariaDB for very large volumes.
 
 ## Version
-- Version: 0.4
-- Date: 2026-02-16
+- Version: 0.5
+- Date: 2026-02-17

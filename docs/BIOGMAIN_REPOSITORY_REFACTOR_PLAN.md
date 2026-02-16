@@ -1,156 +1,141 @@
-# BiogMainRepository Refactor Plan
+# BasicInformation Write Architecture Refactor Plan
 
-## Goal
-在不改變既有行為的前提下，逐步降低 `BiogMainRepository`（目前約 3182 行）複雜度，並把邏輯按「業務流程」拆分，而非按資料表拆分。
+## 1. Goal
+在不改變既有對外行為的前提下，將 BasicInformation 寫入流程從「大型 repository + 混合語義記錄」重構為「workflow 分層 + 單一操作語義」。
 
-## Scope and Non-Goals
-- 本計畫以重構為主，不做功能擴充。
+核心目標：
+- 降低 `BiogMainRepository` 複雜度。
+- 以 workflow（業務流程）為單位拆分寫入責任，而非按資料表分割。
+- 明確區分 `operations`（操作語義）與 `audit_log`（資料變更明細）的責任邊界。
+
+## 2. Scope and Non-Goals
+### Scope
+- BasicInformation 各子模組寫入路徑（Office、Status、Event、Assoc、Kinship、Entry、Possession、SocialInst、Source、Texts、Addresses、Altnames）。
+- Repository 與 Controller 的責任重整。
+- `operations` / `audit_log` 產生點與關聯方式整理。
+
+### Non-Goals
+- 不做功能擴充。
 - 不變更資料庫 schema。
-- 不變更既有路由與 API 合約。
-- 不變更使用者可見 UI 行為。
+- 不改既有路由、API 合約與 UI 互動行為。
 
-## Current State Snapshot (2026-02-12)
-- `BiogMainRepository` 仍為單一大型類別，包含 Basic Info / Office / Relations / Events / Sources 等多模組方法。
-- `officeStoreById`、`officeUpdateById`、`officeDeleteById` 仍在 `BiogMainRepository`，但已具備：
-  - 單一交易中同步 `POSTING_DATA`、`POSTED_TO_OFFICE_DATA`、`POSTED_TO_ADDR_DATA`
-  - `operations` 寫入（含 `POSTED_TO_ADDR_DATA` 的 `rows` before/after）
-  - `audit_log` 寫入
-  - `resource_id` 使用 `c_office_id=...&c_posting_id=...` 格式
-- 控制器仍直接依賴 `BiogMainRepository`（`BasicInformationOfficesController`），且 `saveas()` 內仍有一段與 repository 重複的寫入流程。
-- 既有測試已覆蓋 Office 核心流程（`OfficePostingStoreTest`、`OfficeAddressOperationLoggingTest`、`OfficeIdChangeAddressLossTest`），可作為重構安全網。
+## 3. Architecture Principles
+### 3.1 Workflow-Based Split (Not Table-Based)
+跨表寫入（例如任官）本質上是單一 workflow，需在同一交易內維持一致性。  
+因此採「一個 workflow 一個 entry point」原則，避免「一表一 repository」造成交易與邏輯碎片化。
 
-## Why Workflow-Based Split (Not Table-Based)
-Office 流程橫跨多表且要求交易一致性、操作記錄一致性、稽核一致性。若按「一表一 repository」拆分，會把同一交易流程拆散，風險高。  
-因此維持「一個 workflow 一個 entry point」原則。
+### 3.2 Operation vs Audit Layering (2026-02-16 Consensus)
+為避免「一次使用者操作對應多筆 operations」的語義混亂，記錄責任需分層：
 
-## Target Architecture
-命名比照現有 repository 風格（功能導向、簡潔命名）：
+- Controller / Application 層（互動語義層）：
+  - 定義一次使用者操作邊界。
+  - 建立 `operations` 主記錄（operation-level）。
+  - 原則：一次互動操作對應一筆主 `operations`（除非規格明確例外）。
 
+- Repository 層（資料持久層）：
+  - 處理 underlying tables 寫入、交易與資料一致性。
+  - 建立 `audit_log` 明細（table-level / row-level before-after）。
+  - 原則：一筆 `operations` 可對應多筆 `audit_log`。
+
+## 4. Current State Snapshot (2026-02-16)
+- `BiogMainRepository` 仍為大型 façade，但已完成部分 workflow 內部拆分與委派。
+- Office workflow 已抽出至 `OfficePostingRepository`，並支援同交易中同步三表與審計資料。
+- Status/Event workflow 已抽出至 `EventStatusRepository`。
+- `/operations` 已可用 `audit_log.operation_id` 聚合顯示多筆明細 diff。
+- 仍處於過渡期：部分路徑尚由 Repository 直接寫 `operations`，需逐步上移到語義層。
+
+## 5. Target Architecture
+### 5.1 Repository Layout (Workflow-Oriented)
 1. `OfficePostingRepository`
 2. `RelationshipRepository`
 3. `EventStatusRepository`
 4. `EntryRepository`
 5. `PossessionRepository`
 6. `SocialInstitutionRepository`
-7. `BiogSourceRepository`（或 `SourceRepository`，避免與其他 source 模組混淆）
+7. `BiogSourceRepository`（或 `SourceRepository`）
 
-`BiogMainRepository` 保留「人物自身」相關職責，不另拆 `BasicInfoRepository`：
+`BiogMainRepository` 最終保留：
 - `BIOG_MAIN` 主記錄讀寫
-- 以人物為中心的聚合查詢（`byPersonId`、`byIdWith*`）
-- 人名與拼音相關邏輯（例如 `namesByQuery`、`auto_pinyin`）
+- 人物聚合查詢（`byPersonId`、`byIdWith*`）
+- 人名/拼音等人物中心邏輯
+- 作為過渡期 façade（逐步縮小）
 
-過渡期由 `BiogMainRepository` 作 façade，逐步轉呼叫新 repository，避免一次性改動大量 controller/test。
+### 5.2 Logging Responsibility
+- `operations`：Controller / Application service 產生。
+- `audit_log`：Repository 產生。
+- 透過 operation context（同一 operation id）串接一筆主操作與多筆資料明細。
 
-## Refactor Phases (Updated)
+## 6. Migration Roadmap
+### Phase A — Baseline Lock
+- 固定核心回歸測試（Office 為首要守門）。
+- 建立主要寫入方法呼叫清單，明確影響面。
 
-### Phase A — Baseline Lock (Must Do First)
-- 固定 Office 流程回歸測試作為守門：
-  - `tests/Feature/OfficePostingStoreTest.php`
-  - `tests/Feature/OfficeAddressOperationLoggingTest.php`
-  - `tests/Feature/OfficeIdChangeAddressLossTest.php`
-- 以 `rg` 建立方法呼叫清單（特別是 `office*ById`）並記錄遷移範圍。
+### Phase B — Office Workflow Extraction
+- 搬移 `officeStoreById` / `officeUpdateById` / `officeDeleteById` 與 helper 至 `OfficePostingRepository`。
+- `BiogMainRepository` 保留同名方法，轉呼叫新 repository。
 
-**Acceptance**
-- 上述測試在重構前全綠，作為 baseline。
+### Phase C — Controller Duplicate Removal
+- 將 `BasicInformationOfficesController::saveas()` 重複寫入收斂到 repository（`officeCloneById`）。
 
-**Execution Record (Completed, 2026-02-12)**
-- 測試命令：
-  - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php`
-- 結果：
-  - `OK (17 tests, 59 assertions)`
-- `office*ById` 直接呼叫點（遷移影響面）：
-  - `app/Http/Controllers/BasicInformationOfficesController.php`
-  - `tests/Feature/OfficePostingStoreTest.php`
-  - `tests/Feature/OfficeAddressOperationLoggingTest.php`
-  - `tests/Feature/OfficeIdChangeAddressLossTest.php`
-- `office*ById` 定義位置（待 Phase B 搬移）：
-  - `app/Repositories/BiogMainRepository.php`
+### Phase D — Remaining Workflows (Incremental Batches)
+1. Status + Event  
+2. Assoc + Kinship  
+3. Entry + Possession + SocialInst + Source
 
-### Phase B — Office Workflow Internal Extraction (No External Behavior Change)
-- 新增 `OfficePostingRepository`，搬移：
-  - `officeStoreById`
-  - `officeUpdateById`
-  - `officeDeleteById`
-  - `insertAddr` / `updateAddr` 等 Office 專用 helper
-- `BiogMainRepository` 保留同名 public 方法，僅轉呼叫新 repository。
-- 保持以下行為完全一致：
-  - 回傳 `resource_id` 字串格式
-  - `ValidationException` 拋出時機
-  - `operations` 與 `audit_log` 內容結構
-  - 交易邊界（單一 `DB::transaction`）
+每批遵循「先內部搬移，後替換呼叫點」。
 
-**Acceptance**
-- Phase A 三個測試維持全綠。
-- `BasicInformationOfficesController` 不需改動即可通過既有流程。
+### Phase E — Operation Layer Realignment
+- 將 `operations` 主記錄建立點逐步上移至 Controller / Application service。
+- Repository 端最終收斂為只寫 `audit_log` 明細。
+- 驗證準則：一次操作 = 1 筆 `operations` + N 筆 `audit_log`。
 
-### Phase C — Remove Duplicate Office Write Logic from Controller
-- 將 `BasicInformationOfficesController::saveas()` 的交易寫入流程收斂到 Office workflow repository（新增 `officeCloneById` 之類方法）。
-- 移除 controller 內重複 `insertAddr` 寫法，避免雙實作漂移。
+### Phase F — Final Cleanup
+- 清理 `BiogMainRepository` 過渡方法與註記。
+- 同步更新文檔（本檔、`AGENTS.md`、必要的 CHANGELOG）。
 
-**Acceptance**
-- `saveas()` 行為與既有 UI 流程一致。
-- 新增/補強對 `saveas` 的 Feature 測試（至少涵蓋新增 posting + address + operation）。
+## 7. Risks and Mitigations
+- 風險：交易被拆散，導致跨表不一致。  
+  對策：workflow repository 僅暴露交易入口，不暴露碎片 API。
 
-### Phase D — Extract Remaining Workflows (One Module at a Time)
-- 依風險與耦合度分批搬移：
-  1. Status + Event
-  2. Assoc + Kinship
-  3. Entry + Possession + SocialInst + Source
-- 每批均採「先搬內部、後替換呼叫點」策略，避免大爆炸。
+- 風險：`resource_id` / `resource_data` 格式漂移，影響比對與復原。  
+  對策：持續使用 `CompositePrimaryKey` 與既有斷言測試。
 
-**Acceptance**
-- 每批搬移後，受影響測試與 smoke test 維持綠燈。
+- 風險：過渡期雙軌寫入（Controller 與 Repository）造成語義分叉。  
+  對策：先引入 operation context，再分批上移 `operations` 產生點。
 
-### Phase E — Final Cleanup
-- 移除 `BiogMainRepository` 中已完全轉移的方法與過渡註記。
-- 更新架構文檔（本檔、必要時補 `AGENTS.md` / `CHANGELOG.md`）。
-## Risks and Mitigations (Reality-Based)
-- 風險：交易被拆開，導致三表資料不一致  
-  對策：workflow 類別只暴露交易入口，不暴露碎片化寫入 API。
-- 風險：`operations.resource_id` 或 `resource_data` 格式漂移，影響復原/審計  
-  對策：沿用既有 helper（`CompositePrimaryKey`）與既有測試斷言。
-- 風險：控制器仍有重複寫入邏輯，重構後兩邊行為分叉  
-  對策：優先完成 Phase C，確保 Office 寫入單一實作來源。
-
-## Tracking
-- 本檔為實施計畫文件，可隨重構進度更新。
-- 每完成一個 phase，請在 PR 描述附上：
+## 8. Quality Gates
+- 受影響模組必跑對應 Feature 測試。
+- 每個 phase 完成時需提供：
   - 受影響方法清單
   - 新增/調整測試清單
-  - 與 baseline 的差異說明（應為「無行為差異」或明確列出差異）
+  - 與 baseline 差異說明（無行為差異或明確列差異）
 
-### Execution Record (Completed, 2026-02-13)
-- Phase B 已完成：
-  - `officeStoreById`、`officeUpdateById`、`officeDeleteById` 搬移至 `app/Repositories/OfficePostingRepository.php`
-  - `insertAddr`、`updateAddr` 搬移至 `app/Repositories/OfficePostingRepository.php`
-  - `BiogMainRepository` 保留同名公開方法並轉呼叫 `OfficePostingRepository`
-- 驗證結果：
+## 9. Execution Records
+### 2026-02-12 — Phase A Completed
+- 測試：
   - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php`
   - `OK (17 tests, 59 assertions)`
+- 完成 Office 寫入呼叫點盤點。
 
-### Execution Record (Completed, 2026-02-13)
-- Phase C 已完成：
-  - `BasicInformationOfficesController::saveas()` 改為呼叫 repository（`officeCloneById`）
-  - 新增 `OfficePostingRepository::officeCloneById()` 收斂另存交易寫入流程
-  - 移除 controller 內重複的 `insertAddr` 寫入方法
-  - 另存流程的 `operations.resource_id` 對齊 `CompositePrimaryKey::buildStoredResourceId()` 格式
-- 驗證結果：
+### 2026-02-13 — Phase B Completed
+- `officeStoreById` / `officeUpdateById` / `officeDeleteById` 及 helper 搬移至 `OfficePostingRepository`。
+- `BiogMainRepository` 改為委派。
+- 測試維持全綠（同 Phase A 套件）。
+
+### 2026-02-13 — Phase C Completed
+- `BasicInformationOfficesController::saveas()` 收斂至 `officeCloneById`。
+- 移除 controller 內重複地址寫入邏輯。
+- 測試：
   - `./vendor/bin/phpunit tests/Feature/OfficePostingStoreTest.php tests/Feature/OfficeAddressOperationLoggingTest.php tests/Feature/OfficeIdChangeAddressLossTest.php tests/Feature/BasicInformationOfficesSaveAsTest.php`
   - `OK (18 tests, 66 assertions)`
 
-### Execution Record (In Progress, 2026-02-14)
-- Phase D 第一階段完成：
-  - `STATUS_DATA` 相關方法遷移至 `app/Repositories/EventStatusRepository.php`
-  - `EVENTS_DATA` 相關方法（含 `EVENTS_ADDR` 輔助方法）遷移至 `app/Repositories/EventStatusRepository.php`
-  - `BiogMainRepository` 已完成 Status 與 Event 相關公開方法的委派呼叫
-- 驗證結果：
+### 2026-02-14 — Phase D Batch 1 Completed
+- `STATUS_DATA` / `EVENTS_DATA`（含 `EVENTS_ADDR`）遷移至 `EventStatusRepository`。
+- `BiogMainRepository` 完成委派。
+- 測試：
   - `./vendor/bin/phpunit tests/Feature/EventStatusWriteActionsTest.php`
   - `OK (6 tests, 35 assertions)`
-  - `./vendor/bin/phpunit --filter "CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
-  - `OK (27 tests, 106 assertions)`（另有既有 PHPUnit deprecations）
-  - `./vendor/bin/phpunit --filter "EventStatusWriteActionsTest|CompositePrimaryKeyRoutesTest|BasicInformationPagesLoadTest"`
-  - `OK (33 tests, 141 assertions)`（另有既有 PHPUnit deprecations）
 
-## Version
-- Version: 0.5
-- Date: 2026-02-14
+## 10. Version
+- Version: 1.0
+- Date: 2026-02-16

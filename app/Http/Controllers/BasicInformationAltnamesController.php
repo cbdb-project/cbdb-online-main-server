@@ -6,12 +6,10 @@ use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\Services\AuditLogService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -119,48 +117,8 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // 原有的直接儲存邏輯
-        $data = $request->all();
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
-        $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, true);
-
-        // 檢查重複資料
-        $temp = DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $data['c_personid']],
-            ['c_sequence', '=', $data['c_sequence']],
-            ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
-            ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
-        ])->first();
-        if (!blank($temp)) {
-            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-
-        // 使用 Query Builder 插入資料
-        DB::table('ALTNAME_DATA')->insert($data);
-        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_sequence' => $data['c_sequence'],
-            'c_alt_name_chn' => $data['c_alt_name_chn'],
-            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-        ]), $data);
-        (new AuditLogService())->write(
-            'ALTNAME_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_sequence' => $data['c_sequence'],
-                'c_alt_name_chn' => $data['c_alt_name_chn'],
-                'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        // 使用 Repository 進行儲存（內含事務與審計）
+        $data = $this->biogMainRepository->altnameStoreById($request, $id);
 
         // 手動調用索引服務
         if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
@@ -195,14 +153,7 @@ class BasicInformationAltnamesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit($id, $alt) {
-        $addr_l = $this->parseAltnameId($alt);
-
-        $row = DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
-        ])->first();
+        $row = $this->biogMainRepository->altnameById($alt);
 
         if (!$row) {
             abort(404, 'ALTNAME_DATA record not found');
@@ -308,54 +259,15 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // 原有的直接儲存邏輯
-        $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
-        $data = $this->toolsRepository->timestamp($data);
-        $addr_l = $this->parseAltnameId($alt);
-
-        //20251213新增差異比對紀錄
-        $ori = DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
-        ])->first();
-
-        // 使用 Query Builder 更新資料
-        DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
-        ])->update($data);
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $id,
-            'c_sequence' => $data['c_sequence'],
-            'c_alt_name_chn' => $data['c_alt_name_chn'],
-            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-        ]), $data, $ori);
-        (new AuditLogService())->write(
-            'ALTNAME_DATA',
-            'UPDATE',
-            [
-                'c_personid' => $id,
-                'c_sequence' => $data['c_sequence'],
-                'c_alt_name_chn' => $data['c_alt_name_chn'],
-                'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-            ],
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        // 使用 Repository 進行更新（內含事務與審計，且修復 LIKE 謂詞風險）
+        $ori = $this->biogMainRepository->altnameById($alt);
+        $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $alt);
 
         // 手動調用索引服務
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
-            $nameChanged = $ori->c_alt_name_chn !== $data['c_alt_name_chn'];
-            $typeChanged = $ori->c_alt_name_type_code !== $data['c_alt_name_type_code'];
+            $data = $request->all();
+            $nameChanged = $ori->c_alt_name_chn !== ($data['c_alt_name_chn'] ?? $ori->c_alt_name_chn);
+            $typeChanged = $ori->c_alt_name_type_code !== ($data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code);
 
             if ($nameChanged || $typeChanged) {
                 // 刪除舊索引
@@ -368,11 +280,12 @@ class BasicInformationAltnamesController extends Controller {
                 }
 
                 // 創建新索引
-                if (!empty($data['c_alt_name_chn'])) {
+                $newAltNameChn = $data['c_alt_name_chn'] ?? $ori->c_alt_name_chn;
+                if (!empty($newAltNameChn)) {
                     $this->nameSearchIndexService->indexAltname(
-                        $addr_l[0],
-                        $data['c_alt_name_type_code'],
-                        $data['c_alt_name_chn']
+                        $id,
+                        $data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code,
+                        $newAltNameChn
                     );
                 }
             }
@@ -381,13 +294,6 @@ class BasicInformationAltnamesController extends Controller {
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
-        $newPk = [
-            'c_personid' => $id,
-            'c_sequence' => $data['c_sequence'],
-            'c_alt_name_chn' => $data['c_alt_name_chn'],
-            'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-        ];
-
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.altnames.edit.query',
             ['id' => $id],
@@ -410,33 +316,13 @@ class BasicInformationAltnamesController extends Controller {
      * @return array 包含 4 個元素的陣列 [c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
      */
     protected function parseAltnameId($alt) {
-        // 檢測分隔符類型：支持兩種格式 '_._' 或 '-'
         if (strpos($alt, '_._') !== false) {
-            // 使用 _._格式
             $addr_l = explode('_._', $alt);
         } else {
-            // 使用 - 格式
-            // 先用 - 分割，然後對每個部分調用 unionPKDef_decode
-            // （因為 - 被編碼為 (minus) 所以可以安全地用 - 分割）
             $addr_l = explode("-", $alt);
             foreach ($addr_l as $key => $value) {
                 $addr_l[$key] = $this->biogMainRepository->unionPKDef_decode($value);
             }
-        }
-
-        // 檢查陣列長度是否足夠（ALTNAME_DATA 需要 4 個欄位）
-        if (count($addr_l) < 4) {
-            \Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
-                'parsed' => $addr_l,
-                'expected_count' => 4,
-                'actual_count' => count($addr_l),
-            ]);
-            abort(400, 'ALTNAME_DATA ID 格式不正確');
-        }
-
-        // 處理 NULL 值
-        if (isset($addr_l[1]) && $addr_l[1] == 'NULL') {
-            $addr_l[1] = null;
         }
 
         return $addr_l;
@@ -621,67 +507,24 @@ class BasicInformationAltnamesController extends Controller {
             $originalPk['c_sequence'] = null;
         }
 
-        // 構建查詢條件（使用原始 PK）
-        $conditions = [
-            ['c_personid', '=', $originalPk['c_personid']],
-            ['c_alt_name_chn', '=', $originalPk['c_alt_name_chn']],
-            ['c_alt_name_type_code', '=', $originalPk['c_alt_name_type_code']],
-        ];
+        // 構建舊格式 ID 用於 Repository
+        $originalPkString = $originalPk['c_personid']."-".
+            ($originalPk['c_sequence'] ?? 'NULL')."-".
+            $this->biogMainRepository->unionPKDef($originalPk['c_alt_name_chn'])."-".
+            $originalPk['c_alt_name_type_code'];
 
-        // c_sequence 可能為 null，需要使用 whereNull
-        $queryBuilder = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] !== null) {
-            $queryBuilder->where('c_sequence', '=', $originalPk['c_sequence']);
-        } else {
-            $queryBuilder->whereNull('c_sequence');
-        }
-
-        // 取得原始資料
-        $ori = $queryBuilder->first();
+        // 取得原始資料（供索引更新判斷）
+        $ori = $this->biogMainRepository->altnameById($originalPkString);
         if (!$ori) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 準備更新資料（保留 PK 欄位，允許修改）
+        // 保留原始請求資料供索引差異判斷
         $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
-        $data = $this->toolsRepository->timestamp($data);
-
-        // 更新資料（需要重新構建 query builder，因為 $queryBuilder 已經被 first() 消耗）
-        $updateQuery = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] !== null) {
-            $updateQuery->where('c_sequence', '=', $originalPk['c_sequence']);
-        } else {
-            $updateQuery->whereNull('c_sequence');
+        $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $originalPkString);
+        if (!$newPk) {
+            abort(404, 'ALTNAME_DATA 記錄不存在');
         }
-        $updateQuery->update($data);
-
-        // 記錄操作（使用新的複合主鍵）
-        $newPk = [
-            'c_personid' => $data['c_personid'] ?? $originalPk['c_personid'],
-            'c_sequence' => $data['c_sequence'] ?? $originalPk['c_sequence'],
-            'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'],
-            'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
-        ];
-
-        // 準備存入 operations 的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
-        (new AuditLogService())->write(
-            'ALTNAME_DATA',
-            'UPDATE',
-            $newPk,
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
 
         // 更新索引
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
@@ -700,7 +543,7 @@ class BasicInformationAltnamesController extends Controller {
                 $newAltNameChn = $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'];
                 if (!empty($newAltNameChn)) {
                     $this->nameSearchIndexService->indexAltname(
-                        $originalPk['c_personid'],
+                        $newPk['c_personid'] ?? $originalPk['c_personid'],
                         $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'],
                         $newAltNameChn
                     );
@@ -745,52 +588,20 @@ class BasicInformationAltnamesController extends Controller {
         // 驗證必填欄位（c_sequence 為可選）
         CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA', ['c_sequence']);
 
-        // 處理 c_sequence
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] === 'NULL') {
-            $pk['c_sequence'] = null;
-        }
+        // 構建舊格式 ID 用於 Repository
+        $id_ = $pk['c_personid']."-".
+               ($pk['c_sequence'] ?? 'NULL')."-".
+               $this->biogMainRepository->unionPKDef($pk['c_alt_name_chn'])."-".
+               $pk['c_alt_name_type_code'];
 
-        // 構建查詢條件
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
-            ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
-        ];
-
-        // c_sequence 可能為 null，需要使用 whereNull
-        $query = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $query->where('c_sequence', '=', $pk['c_sequence']);
-        } else {
-            $query->whereNull('c_sequence');
-        }
-
-        $row = $query->first();
+        // 取得原始資料用於索引清理
+        $row = $this->biogMainRepository->altnameById($id_);
         if (!$row) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 記錄操作
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
-
-        // 刪除資料（需要重新構建 query builder）
-        $deleteQuery = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $deleteQuery->where('c_sequence', '=', $pk['c_sequence']);
-        } else {
-            $deleteQuery->whereNull('c_sequence');
-        }
-        $deleteQuery->delete();
-        (new AuditLogService())->write(
-            'ALTNAME_DATA',
-            'DELETE',
-            $pk,
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        // 使用 Repository 進行刪除（內含事務與審計）
+        $this->biogMainRepository->altnameDeleteById($id_, $id);
 
         // 清理索引
         if ($row && Schema::hasTable('CBDB__NAME_FTS') && $row->c_alt_name_chn) {

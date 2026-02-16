@@ -142,34 +142,17 @@ class BasicInformationController extends Controller {
 
             return redirect()->back();
         }
-        //        $data['c_personid'] = BiogMain::max('c_personid') + 1;
-        $data = $this->toolRepository->timestamp($data, true);
+
         //20190531判別是否為眾包用戶
         if (Auth::user()->isCrowdsourcingUser()) {
+            $data = $this->toolRepository->timestamp($data, true);
             $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data, '', 2);
             flash('眾包紀錄 Create success @ '.Carbon::now(), 'success');
 
             return redirect()->route('basicinformation.index');
         } else {
-            //20230628觸發「自動生成」功能
-            $data = $this->biogMainRepository->auto_pinyin($data);
-            //增加完成
-            $flight = null;
-            DB::transaction(function () use (&$flight, $data) {
-                $flight = BiogMain::create($data);
-                $operation = $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
-
-                (new AuditLogService())->write(
-                    'BIOG_MAIN',
-                    'INSERT',
-                    ['c_personid' => $data['c_personid']],
-                    null,
-                    $flight->toArray(),
-                    'user',
-                    (string) Auth::id(),
-                    $operation ? (string) $operation->id : null
-                );
-            });
+            // 使用 Repository 進行儲存（內含事務與審計）
+            $flight = $this->biogMainRepository->store($request);
 
             if (Schema::hasTable('CBDB__NAME_FTS')) {
                 $this->nameSearchIndexService->reindexPerson($flight);
@@ -177,7 +160,7 @@ class BasicInformationController extends Controller {
 
             flash('Create success @ '.Carbon::now(), 'success');
 
-            return redirect()->route('basicinformation.edit', $data['c_personid']);
+            return redirect()->route('basicinformation.edit', $flight->c_personid);
         }
         //20190531修改結束
     }

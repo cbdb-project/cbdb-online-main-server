@@ -170,68 +170,9 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
-        $data['c_personid'] = $id;
-        $data = $this->toolsRepository->timestamp($data, true);
-        //return $request;
-        //修改結束
-        $temp = DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $data['c_personid']],
-            ['c_entry_code', '=', $data['c_entry_code']],
-            ['c_sequence', '=', $data['c_sequence']],
-            ['c_kin_code', '=', $data['c_kin_code']],
-            ['c_assoc_code', '=', $data['c_assoc_code']],
-            ['c_kin_id', '=', $data['c_kin_id']],
-            ['c_year', '=', $data['c_year']],
-            ['c_assoc_id', '=', $data['c_assoc_id']],
-            ['c_inst_code', '=', $data['c_inst_code']],
-            ['c_inst_name_code', '=', $data['c_inst_name_code']],
-        ])->first();
-        if (!blank($temp)) {
-            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
+        // 使用 Repository 進行儲存（內含事務與審計）
+        $data = $this->biogMainRepository->entryStoreById($request, $id);
 
-            return redirect()->back();
-        }
-        DB::table('ENTRY_DATA')->insert($data);
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_entry_code' => $data['c_entry_code'],
-            'c_sequence' => $data['c_sequence'],
-            'c_kin_code' => $data['c_kin_code'],
-            'c_assoc_code' => $data['c_assoc_code'],
-            'c_kin_id' => $data['c_kin_id'],
-            'c_year' => $data['c_year'],
-            'c_assoc_id' => $data['c_assoc_id'],
-            'c_inst_code' => $data['c_inst_code'],
-            'c_inst_name_code' => $data['c_inst_name_code'],
-        ]), $operationData);
-        (new AuditLogService())->write(
-            'ENTRY_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_entry_code' => $data['c_entry_code'],
-                'c_sequence' => $data['c_sequence'],
-                'c_kin_code' => $data['c_kin_code'],
-                'c_assoc_code' => $data['c_assoc_code'],
-                'c_kin_id' => $data['c_kin_id'],
-                'c_year' => $data['c_year'],
-                'c_assoc_id' => $data['c_assoc_id'],
-                'c_inst_code' => $data['c_inst_code'],
-                'c_inst_name_code' => $data['c_inst_name_code'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -731,7 +672,7 @@ class BasicInformationEntriesController extends Controller {
             return redirect()->back();
         }
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('该用户沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -743,44 +684,22 @@ class BasicInformationEntriesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'ENTRY_DATA');
 
-        // 取得原始資料
-        $row = DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_entry_code', '=', $pk['c_entry_code']],
-            ['c_sequence', '=', $pk['c_sequence']],
-            ['c_kin_code', '=', $pk['c_kin_code']],
-            ['c_assoc_code', '=', $pk['c_assoc_code']],
-            ['c_kin_id', '=', $pk['c_kin_id']],
-            ['c_year', '=', $pk['c_year']],
-            ['c_assoc_id', '=', $pk['c_assoc_id']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
-        ])->first();
+        // 構建舊格式 ID 用於 Repository
+        $id_ = implode('-', [
+            $pk['c_personid'],
+            $pk['c_entry_code'],
+            $pk['c_sequence'],
+            $pk['c_kin_code'],
+            $pk['c_assoc_code'],
+            $pk['c_kin_id'],
+            $pk['c_year'],
+            $pk['c_assoc_id'],
+            $pk['c_inst_code'],
+            $pk['c_inst_name_code'],
+        ]);
 
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'ENTRY_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
-
-        DB::table('ENTRY_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_entry_code', '=', $pk['c_entry_code']],
-            ['c_sequence', '=', $pk['c_sequence']],
-            ['c_kin_code', '=', $pk['c_kin_code']],
-            ['c_assoc_code', '=', $pk['c_assoc_code']],
-            ['c_kin_id', '=', $pk['c_kin_id']],
-            ['c_year', '=', $pk['c_year']],
-            ['c_assoc_id', '=', $pk['c_assoc_id']],
-            ['c_inst_code', '=', $pk['c_inst_code']],
-            ['c_inst_name_code', '=', $pk['c_inst_name_code']],
-        ])->delete();
-        (new AuditLogService())->write(
-            'ENTRY_DATA',
-            'DELETE',
-            $pk,
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        // 使用 Repository 進行刪除（內含事務與審計）
+        $this->biogMainRepository->entryDeleteById($id_, $id);
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

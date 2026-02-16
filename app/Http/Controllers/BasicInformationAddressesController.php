@@ -156,46 +156,9 @@ class BasicInformationAddressesController extends Controller {
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
-        $data['c_personid'] = $id;
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+        // 使用 Repository 進行儲存（內含事務與審計）
+        $data = $this->biogMainRepository->addrStoreById($request, $id);
 
-        $temp = DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $data['c_personid']],
-            ['c_addr_id', '=', $data['c_addr_id']],
-            ['c_addr_type', '=', $data['c_addr_type']],
-            ['c_sequence', '=', $data['c_sequence']],
-        ])->first();
-        if (!blank($temp)) {
-            flash('重复数据，保存失败 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        $data = $this->toolsRepository->timestamp($data, true);
-        DB::table('BIOG_ADDR_DATA')->insert($data);
-        $operation = $this->operationRepository->store(Auth::id(), $id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ]), $data);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'INSERT',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_addr_id' => $data['c_addr_id'],
-                'c_addr_type' => $data['c_addr_type'],
-                'c_sequence' => $data['c_sequence'],
-            ],
-            null,
-            $data,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
         flash('Store success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
@@ -380,73 +343,12 @@ class BasicInformationAddressesController extends Controller {
             return redirect()->back();
         }
 
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
+        // 使用 Repository 進行更新（內含事務與審計）
+        $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $addr);
 
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
-        $data = $this->toolsRepository->timestamp($data);
-        $addr = str_replace("--", "-minus", $addr);
-        $addr_l = explode("-", $addr);
-        foreach ($addr_l as $key => $value) {
-            $addr_l[$key] = str_replace("minus", "-", $value);
-        }
-
-        //20251213新增差異比對紀錄
-        $ori = DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_addr_id', '=', $addr_l[1]],
-            ['c_addr_type', '=', $addr_l[2]],
-            ['c_sequence', '=', $addr_l[3]],
-        ])->first();
-
-        DB::table('BIOG_ADDR_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_addr_id', '=', $addr_l[1]],
-            ['c_addr_type', '=', $addr_l[2]],
-            ['c_sequence', '=', $addr_l[3]],
-        ])->update($data);
-        $data['c_personid'] = $addr_l[0];
-
-        // 準備要存入 operations 表的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ]), $operationData, $ori);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'UPDATE',
-            [
-                'c_personid' => $data['c_personid'],
-                'c_addr_id' => $data['c_addr_id'],
-                'c_addr_type' => $data['c_addr_type'],
-                'c_sequence' => $data['c_sequence'],
-            ],
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
         flash('Update success @ '.Carbon::now(), 'success');
 
         // 使用新的查詢參數模式重定向
-        $newPk = [
-            'c_personid' => $data['c_personid'],
-            'c_addr_id' => $data['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'],
-            'c_sequence' => $data['c_sequence'],
-        ];
-
         return redirect(CompositePrimaryKey::buildUrl(
             'basicinformation.addresses.edit.query',
             ['id' => $id],
@@ -716,34 +618,11 @@ class BasicInformationAddressesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
-        // 構建查詢條件
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_addr_id', '=', $pk['c_addr_id']],
-            ['c_addr_type', '=', $pk['c_addr_type']],
-            ['c_sequence', '=', $pk['c_sequence']],
-        ];
+        // 構建舊格式 ID 用於 Repository
+        $id_ = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
 
-        $row = DB::table('BIOG_ADDR_DATA')->where($conditions)->first();
-        if (!$row) {
-            abort(404, 'BIOG_ADDR_DATA 記錄不存在');
-        }
-
-        // 刪除資料
-        DB::table('BIOG_ADDR_DATA')->where($conditions)->delete();
-
-        // 記錄操作
-        $operation = $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'DELETE',
-            $pk,
-            (new AuditLogService())->normalizeRow($row),
-            null,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
+        // 使用 Repository 進行刪除（內含事務與審計）
+        $this->biogMainRepository->addrDeleteById($id_, $id);
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

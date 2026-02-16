@@ -305,11 +305,6 @@ class BasicInformationController extends Controller {
             $data['c_by_intercalary'] = (int)($data['c_by_intercalary'] ?? 0);
             $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary'] ?? 0);
 
-            // 拼音自動生成（測試環境可能未建立 pinyin 表）
-            if (Schema::hasTable('pinyin')) {
-                $data = $this->biogMainRepository->auto_pinyin($data);
-            }
-
             // 時間戳
             $data = $this->toolRepository->timestamp($data);
 

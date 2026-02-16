@@ -84,12 +84,19 @@ class BiogMainProposalTest extends TestCase {
             $table->json('old_data')->nullable();
             $table->json('new_data')->nullable();
         });
+
+        Schema::create('pinyin', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('lastname_chn')->nullable();
+            $table->string('lastname_pinyin')->nullable();
+        });
     }
 
     protected function tearDown(): void {
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('pinyin');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
@@ -209,5 +216,55 @@ class BiogMainProposalTest extends TestCase {
             'table_name' => 'BIOG_MAIN',
             'operation' => 'UPDATE',
         ]);
+    }
+
+    #[Test]
+    public function testBiogMainProposalDoesNotRewriteMingziFieldsWhenNotChanged() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $personId = 3;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '歐陽修',
+            'c_name' => 'Ouyang Xiu',
+            'c_surname_chn' => '歐陽',
+            'c_surname' => 'Ouyang',
+            'c_mingzi_chn' => '修',
+            'c_mingzi' => 'Xiu',
+            'c_notes' => 'Original notes',
+        ]);
+
+        DB::table('pinyin')->insert([
+            'lastname_chn' => '李',
+            'lastname_pinyin' => 'Li',
+        ]);
+
+        $response = $this->patch(route('basicinformation.update', $personId), [
+            'action' => 'proposal',
+            'c_surname_chn' => '歐陽',
+            'c_mingzi_chn' => '修',
+            'c_surname' => 'Ouyang',
+            'c_mingzi' => 'Xiu',
+            'c_name_chn' => '歐陽修',
+            'c_name' => 'Ouyang Xiu',
+            'c_notes' => 'Only notes changed',
+            '__proposal_comment' => '僅修改註解',
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', $personId));
+
+        $operation = Operation::where('resource', 'BIOG_MAIN')
+            ->where('c_personid', $personId)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('修', $payload['c_mingzi_chn']);
+        $this->assertSame('Xiu', $payload['c_mingzi']);
+        $this->assertSame('歐陽修', $payload['c_name_chn']);
+        $this->assertSame('Ouyang Xiu', $payload['c_name']);
     }
 }

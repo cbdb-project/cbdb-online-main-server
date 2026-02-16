@@ -56,9 +56,20 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
 - [x] Add AuditLog service (create)
 - [~] Integrate `BIOG_MAIN` writes (currently split across `BiogMainRepository` and controller/API paths)
 - [x] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
-- [~] Integrate remaining `/basicinformation` tables (core CRUD paths mostly covered, but quality gaps remain in some legacy flows)
+- [x] Integrate remaining `/basicinformation` tables
 - [~] Ensure transactional writes for audit + data changes (partially done; several controller paths still write without single transaction boundary)
 - [~] Add SQLite migration/test coverage in tests (multiple feature tests now create `audit_log`; assertion coverage for audit behavior is still incomplete)
+
+### Progress Update (2026-02-16)
+- BasicInformation 核心寫入路徑（`BIOG_MAIN`、`ALTNAME_DATA`、`BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ENTRY_DATA`）已統一改為 Repository 層處理，並在主要 CRUD 路徑寫入 `audit_log`。
+- `textDeleteById()` 已補齊為完整交易刪除流程（資料刪除 + `operations` + `audit_log`）。
+- ALTNAME 流程已修正查詢參數更新路徑中的未定義變數與重複更新問題，並補回 `c_sequence = NULL` 主鍵解析、`__proposal_comment` 寫入 `operations.resource_data.__note`。
+- `store` 路徑已恢復舊行為：重複資料時不直接插入，改為回傳錯誤並由 Controller 顯示提示。
+- `flash` 提示文字已在本次涉及之 BasicInformation Controller 轉為繁體中文。
+- 測試已補強：
+  - `tests/Feature/BasicInformationAltnamesControllerTest.php`
+  - `tests/Feature/BasicInformationTextsControllerTest.php`
+  - 全量 PHPUnit 通過（含上述新增／補強測試）。
 
 ## Known Issues (Current Branch)
 - **Transaction consistency gaps**:
@@ -178,5 +189,5 @@ If history lookup becomes too slow or volume grows:
 - Consider partitioning in MariaDB for very large volumes.
 
 ## Version
-- Version: 0.3
-- Date: 2026-02-11
+- Version: 0.4
+- Date: 2026-02-16

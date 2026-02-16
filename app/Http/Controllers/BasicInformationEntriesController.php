@@ -113,13 +113,13 @@ class BasicInformationEntriesController extends Controller {
      */
     public function store(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -165,13 +165,18 @@ class BasicInformationEntriesController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         // 使用 Repository 進行儲存（內含事務與審計）
         $data = $this->biogMainRepository->entryStoreById($request, $id);
+        if ($data === false) {
+            flash('重複資料，儲存失敗 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
 
         flash('Store success @ '.Carbon::now(), 'success');
 
@@ -250,11 +255,11 @@ class BasicInformationEntriesController extends Controller {
     public function update(Request $request, $id, $id_) {
         //建安修改20181109
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -486,13 +491,13 @@ class BasicInformationEntriesController extends Controller {
      */
     public function updateQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -541,7 +546,7 @@ class BasicInformationEntriesController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -667,12 +672,12 @@ class BasicInformationEntriesController extends Controller {
      */
     public function destroyQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }

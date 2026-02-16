@@ -134,4 +134,31 @@ class BasicInformationTextsControllerTest extends TestCase {
         $oldData = json_decode($log->old_data, true);
         $this->assertEquals(100, $oldData['c_textid']);
     }
+
+    #[Test]
+    public function testStoreDuplicateTextShowsErrorAndDoesNotInsertAgain(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'texts-duplicate@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_TEXT_DATA')->insert([
+            'c_personid' => 1,
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->post('/basicinformation/1/texts', [
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+        $this->assertEquals(1, DB::table('BIOG_TEXT_DATA')->count());
+    }
 }

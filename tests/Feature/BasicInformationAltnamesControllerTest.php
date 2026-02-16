@@ -171,6 +171,40 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $this->assertEquals('新增別名', $new_data['c_alt_name_chn']);
     }
 
+    #[Test]
+    public function testStoreDuplicateAltnameShowsErrorAndDoesNotInsertAgain() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'duplicate-altname@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '重複別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '重複別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+        $this->assertEquals(1, DB::table('ALTNAME_DATA')->count());
+    }
+
     /**
      * 測試當 ALTNAME_DATA 記錄不存在時返回 404
      */

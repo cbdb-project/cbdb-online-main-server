@@ -625,6 +625,14 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
+        $duplicate = DB::table('BIOG_TEXT_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_textid', '=', $data['c_textid']],
+            ['c_role_id', '=', $data['c_role_id']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
         $data = (new ToolsRepository())->timestamp($data, true);
 
         return DB::transaction(function () use ($id, $data) {
@@ -702,6 +710,21 @@ class BiogMainRepository {
         $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
+        $duplicate = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_entry_code', '=', $data['c_entry_code']],
+            ['c_sequence', '=', $data['c_sequence']],
+            ['c_kin_code', '=', $data['c_kin_code']],
+            ['c_assoc_code', '=', $data['c_assoc_code']],
+            ['c_kin_id', '=', $data['c_kin_id']],
+            ['c_year', '=', $data['c_year']],
+            ['c_assoc_id', '=', $data['c_assoc_id']],
+            ['c_inst_code', '=', $data['c_inst_code']],
+            ['c_inst_name_code', '=', $data['c_inst_name_code']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
         $data = (new ToolsRepository())->timestamp($data, true);
 
         return DB::transaction(function () use ($id, $data, $comment) {
@@ -2421,6 +2444,15 @@ class BiogMainRepository {
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
+        $duplicate = DB::table('BIOG_ADDR_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_addr_id', '=', $data['c_addr_id']],
+            ['c_addr_type', '=', $data['c_addr_type']],
+            ['c_sequence', '=', $data['c_sequence']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
         $data = (new ToolsRepository())->timestamp($data, true);
 
         return DB::transaction(function () use ($id, $data) {
@@ -2582,6 +2614,15 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
+        $duplicate = DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $data['c_personid']],
+            ['c_sequence', '=', $data['c_sequence']],
+            ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
+        ])->first();
+        if (!blank($duplicate)) {
+            return false;
+        }
         $data = (new ToolsRepository())->timestamp($data, true);
 
         return DB::transaction(function () use ($id, $data) {

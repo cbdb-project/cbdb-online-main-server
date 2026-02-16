@@ -84,13 +84,13 @@ class BasicInformationAltnamesController extends Controller {
     public function store(Request $request, $id) {
         // 權限檢查
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -112,13 +112,18 @@ class BasicInformationAltnamesController extends Controller {
 
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         // 使用 Repository 進行儲存（內含事務與審計）
         $data = $this->biogMainRepository->altnameStoreById($request, $id);
+        if ($data === false) {
+            flash('重複資料，儲存失敗 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
 
         // 手動調用索引服務
         if (Schema::hasTable('CBDB__NAME_FTS') && !empty($data['c_alt_name_chn'])) {
@@ -217,13 +222,13 @@ class BasicInformationAltnamesController extends Controller {
     public function update(Request $request, $id, $alt) {
         // 權限檢查
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -254,7 +259,7 @@ class BasicInformationAltnamesController extends Controller {
 
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -446,13 +451,13 @@ class BasicInformationAltnamesController extends Controller {
     public function updateQuery(Request $request, $id) {
         // 權限檢查
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -483,7 +488,7 @@ class BasicInformationAltnamesController extends Controller {
 
         // 直接儲存需要額外權限檢查
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -570,13 +575,13 @@ class BasicInformationAltnamesController extends Controller {
      */
     public function destroyQuery(Request $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該使用者沒有權限，請聯繫管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }

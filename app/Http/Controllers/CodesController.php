@@ -1695,7 +1695,7 @@ class CodesController extends Controller {
         $keyColumns = $this->getKeyColumns($table);
         $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
-                    // 标记哪些列是通过 JOIN 获得的別名列        $upperTable = strtoupper($table);
+        // 标记哪些列是通过 JOIN 获得的別名列        $upperTable = strtoupper($table);
         $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
         $joinedColumns = [];
         if ($joinConfig) {

@@ -136,10 +136,9 @@ class BasicInformationAltnamesController extends Controller {
 
         flash('Store success @ '.Carbon::now(), 'success');
 
-        // 使用新的查詢參數模式重定向
+        // (#834 Phase 2): 使用 3-key 重定向，c_sequence 不參與定位
         $newPk = [
             'c_personid' => $data['c_personid'],
-            'c_sequence' => $data['c_sequence'],
             'c_alt_name_chn' => $data['c_alt_name_chn'],
             'c_alt_name_type_code' => $data['c_alt_name_type_code'],
         ];
@@ -243,16 +242,9 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 解析舊格式的複合主鍵，轉換為陣列
-            $addr_l = $this->parseAltnameId($alt);
-            $originalPk = [
-                'c_personid' => $addr_l[0],
-                'c_sequence' => $addr_l[1],
-                'c_alt_name_chn' => $addr_l[2],
-                'c_alt_name_type_code' => $addr_l[3],
-            ];
+            // (#834 Phase 2): 使用 3-key 關聯陣列
+            $originalPk = $this->parseAltnameId($alt);
 
-            // 使用新的查詢參數模式，直接傳遞主鍵陣列
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
                 ->proposalUpdateWithPk($request, $id, 'altnames', $originalPk);
         }
@@ -317,27 +309,15 @@ class BasicInformationAltnamesController extends Controller {
      */
 
     /**
-     * 解析別名複合主鍵 ID
-     * 支持兩種分隔符格式：'_._' (新格式) 和 '-' (舊格式)
+     * 解析別名複合主鍵 ID 為 3-key 關聯陣列
+     *
+     * (#834 Phase 2): 委派給 Repository，支援歷史 4-key 與新 3-key 格式。
      *
      * @param string $alt 複合主鍵 ID
-     * @return array 包含 4 個元素的陣列 [c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
+     * @return array 3-key 關聯陣列 ['c_personid' => ..., 'c_alt_name_chn' => ..., 'c_alt_name_type_code' => ...]
      */
     protected function parseAltnameId($alt) {
-        if (strpos($alt, '_._') !== false) {
-            $addr_l = explode('_._', $alt);
-        } else {
-            $addr_l = explode("-", $alt);
-            foreach ($addr_l as $key => $value) {
-                $addr_l[$key] = $this->biogMainRepository->unionPKDef_decode($value);
-            }
-        }
-
-        if (isset($addr_l[1]) && $addr_l[1] === 'NULL') {
-            $addr_l[1] = null;
-        }
-
-        return $addr_l;
+        return $this->biogMainRepository->parseAltnameId($alt);
     }
 
     // ===================================================================
@@ -356,39 +336,19 @@ class BasicInformationAltnamesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function editQuery(Request $request, $id) {
-        // 從查詢參數提取複合主鍵
+        // (#834 Phase 2): 從查詢參數提取 3-key
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
         // 驗證必填欄位
-        $required = ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'];
-        foreach ($required as $field) {
-            if (!isset($pk[$field]) || $pk[$field] === '') {
-                abort(400, "缺少必要參數：{$field}");
-            }
-        }
+        CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA');
 
-        // 處理 c_sequence 可能為 'NULL' 或 null 的情況
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] === 'NULL') {
-            $pk['c_sequence'] = null;
-        }
-
-        // 構建查詢條件
-        $conditions = [
+        // 構建 3-key 查詢條件
+        $row = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $pk['c_personid']],
             ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
             ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
-        ];
-
-        // c_sequence 可能為 null，需要使用 whereNull
-        $query = DB::table('ALTNAME_DATA')->where($conditions);
-        if (isset($pk['c_sequence']) && $pk['c_sequence'] !== null) {
-            $query->where('c_sequence', '=', $pk['c_sequence']);
-        } else {
-            $query->whereNull('c_sequence');
-        }
-
-        $row = $query->first();
+        ])->first();
 
         if (!$row) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
@@ -473,7 +433,7 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+            // (#834 Phase 2): 從 URL 查詢字串取得 3-key 原始 PK
             $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
             $originalPk = [];
             foreach ($schema as $field) {
@@ -483,12 +443,6 @@ class BasicInformationAltnamesController extends Controller {
                 }
             }
 
-            // 處理 c_sequence 可能為 'NULL' 的情況
-            if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] === 'NULL') {
-                $originalPk['c_sequence'] = null;
-            }
-
-            // 使用新的查詢參數模式，直接傳遞主鍵陣列
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
                 ->proposalUpdateWithPk($request, $id, 'altnames', $originalPk);
         }
@@ -500,8 +454,7 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // 從 URL 查詢字串提取原始 PK（用於定位記錄）
-        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
+        // (#834 Phase 2): 從 URL 查詢字串提取 3-key 原始 PK
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $originalPk = [];
         foreach ($schema as $field) {
@@ -511,29 +464,17 @@ class BasicInformationAltnamesController extends Controller {
             }
         }
 
-        // 驗證必填欄位（c_sequence 為可選）
-        CompositePrimaryKey::validateOrFail($originalPk, 'ALTNAME_DATA', ['c_sequence']);
-
-        // 處理 c_sequence
-        if (isset($originalPk['c_sequence']) && $originalPk['c_sequence'] === 'NULL') {
-            $originalPk['c_sequence'] = null;
-        }
-
-        // 構建舊格式 ID 用於 Repository
-        $originalPkString = $originalPk['c_personid']."-".
-            ($originalPk['c_sequence'] ?? 'NULL')."-".
-            $this->biogMainRepository->unionPKDef($originalPk['c_alt_name_chn'])."-".
-            $originalPk['c_alt_name_type_code'];
+        CompositePrimaryKey::validateOrFail($originalPk, 'ALTNAME_DATA');
 
         // 取得原始資料（供索引更新判斷）
-        $ori = $this->biogMainRepository->altnameById($originalPkString);
+        $ori = $this->biogMainRepository->altnameById($originalPk);
         if (!$ori) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
         // 保留原始請求資料供索引差異判斷
         $data = $request->all();
-        $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $originalPkString);
+        $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $originalPk);
         if (!$newPk) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
@@ -593,27 +534,19 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // (#834 Phase 2): 從查詢參數提取 3-key
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
-
-        // 驗證必填欄位（c_sequence 為可選）
-        CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA', ['c_sequence']);
-
-        // 構建舊格式 ID 用於 Repository
-        $id_ = $pk['c_personid']."-".
-               ($pk['c_sequence'] ?? 'NULL')."-".
-               $this->biogMainRepository->unionPKDef($pk['c_alt_name_chn'])."-".
-               $pk['c_alt_name_type_code'];
+        CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA');
 
         // 取得原始資料用於索引清理
-        $row = $this->biogMainRepository->altnameById($id_);
+        $row = $this->biogMainRepository->altnameById($pk);
         if (!$row) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
         // 使用 Repository 進行刪除（內含事務與審計）
-        $deleted = $this->biogMainRepository->altnameDeleteById($id_, $id);
+        $deleted = $this->biogMainRepository->altnameDeleteById($pk, $id);
         if (!$deleted) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }

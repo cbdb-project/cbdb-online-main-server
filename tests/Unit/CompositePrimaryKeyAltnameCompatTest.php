@@ -7,9 +7,10 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * ALTNAME_DATA 3-key 相容層測試 (#834 Phase 1)
+ * ALTNAME_DATA 3-key 相容層測試 (#834 Phase 2)
  *
- * 確保 parseStoredResourceId() 同時支援歷史 4-key 與未來 3-key 格式，
+ * Schema 已切為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)。
+ * 確保 parseStoredResourceId() 對歷史 4-key resource_id 自動 strip c_sequence 返回 3-key，
  * 涵蓋 query-string、_._、dash 三種分隔符。
  */
 class CompositePrimaryKeyAltnameCompatTest extends TestCase {
@@ -31,25 +32,30 @@ class CompositePrimaryKeyAltnameCompatTest extends TestCase {
 
     #[Test]
     public function test_parse_altname_4key_query_string_still_works(): void {
+        // 歷史 4-key query-string → array_intersect_key 自動過濾 c_sequence 返回 3-key
         $resourceId = 'c_personid=123&c_sequence=1&c_alt_name_chn=%E5%BC%B5%E4%B8%89&c_alt_name_type_code=10';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
         $this->assertNotNull($result);
-        $this->assertCount(4, $result);
+        $this->assertCount(3, $result);
         $this->assertSame('123', $result['c_personid']);
-        $this->assertSame('1', $result['c_sequence']);
         $this->assertSame('張三', $result['c_alt_name_chn']);
         $this->assertSame('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     #[Test]
     public function test_parse_altname_4key_query_string_with_null_sentinel(): void {
+        // 歷史 4-key query-string（含 NULL sentinel）→ c_sequence 被過濾
         $resourceId = 'c_personid=200&c_sequence=NULL&c_alt_name_chn=%E6%B8%AC%E8%A9%A6&c_alt_name_type_code=5';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
         $this->assertNotNull($result);
-        $this->assertCount(4, $result);
-        $this->assertSame('NULL', $result['c_sequence']);
+        $this->assertCount(3, $result);
+        $this->assertArrayNotHasKey('c_sequence', $result);
+        $this->assertSame('200', $result['c_personid']);
+        $this->assertSame('測試', $result['c_alt_name_chn']);
+        $this->assertSame('5', $result['c_alt_name_type_code']);
     }
 
     // -------------------------------------------------------
@@ -70,15 +76,16 @@ class CompositePrimaryKeyAltnameCompatTest extends TestCase {
 
     #[Test]
     public function test_parse_altname_4key_dot_format_still_works(): void {
+        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $resourceId = '123_._1_._張三_._10';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
         $this->assertNotNull($result);
-        $this->assertCount(4, $result);
+        $this->assertCount(3, $result);
         $this->assertSame('123', $result['c_personid']);
-        $this->assertSame('1', $result['c_sequence']);
         $this->assertSame('張三', $result['c_alt_name_chn']);
         $this->assertSame('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     // -------------------------------------------------------
@@ -124,15 +131,16 @@ class CompositePrimaryKeyAltnameCompatTest extends TestCase {
 
     #[Test]
     public function test_parse_altname_4key_dash_format_still_works(): void {
+        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $resourceId = '123-1-張三-10';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
         $this->assertNotNull($result);
-        $this->assertCount(4, $result);
+        $this->assertCount(3, $result);
         $this->assertSame('123', $result['c_personid']);
-        $this->assertSame('1', $result['c_sequence']);
         $this->assertSame('張三', $result['c_alt_name_chn']);
         $this->assertSame('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     // -------------------------------------------------------

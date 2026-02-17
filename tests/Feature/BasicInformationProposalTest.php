@@ -232,7 +232,7 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame('測試別名', $payload['c_alt_name_chn']);
         $this->assertSame('pending', $payload['__review_status']);
         $this->assertSame('新增測試別名', $payload['__proposal_meta']['comment']);
-        $this->assertSame(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
+        $this->assertSame(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
     }
 
     #[Test]
@@ -325,20 +325,24 @@ class BasicInformationProposalTest extends TestCase {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
-        // 先創建一個待審核的新增提案
+        // 先創建一個待審核的新增提案（query-string 格式）
         $operation = new Operation();
         $operation->user_id = $user->id;
         $operation->c_personid = 1;
         $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
         $operation->resource = 'ALTNAME_DATA';
-        $operation->resource_id = '1-1-衝突別名-1';
+        $operation->resource_id = \App\Support\CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => 1,
+            'c_alt_name_chn' => '衝突別名',
+            'c_alt_name_type_code' => 1,
+        ]);
         $operation->resource_data = json_encode([
             'c_personid' => 1,
             'c_sequence' => 1,
             'c_alt_name_chn' => '衝突別名',
             'c_alt_name_type_code' => 1,
             '__review_status' => 'pending',
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
         ], JSON_UNESCAPED_UNICODE);
         $operation->save();
 
@@ -378,7 +382,7 @@ class BasicInformationProposalTest extends TestCase {
         $response = $this->post(route('basicinformation.proposal.update', [
             'personid' => 1,
             'resource' => 'altnames',
-            'id' => '1-1-原始別名-1',
+            'id' => '1-原始別名-1',
         ]), [
             'c_sequence' => 1,
             'c_alt_name_chn' => '原始別名',
@@ -428,7 +432,7 @@ class BasicInformationProposalTest extends TestCase {
         $response = $this->post(route('basicinformation.proposal.update', [
             'personid' => 1,
             'resource' => 'altnames',
-            'id' => '1-1-無變更別名-1',
+            'id' => '1-無變更別名-1',
         ]), [
             'c_sequence' => 1,
             'c_alt_name_chn' => '無變更別名',
@@ -456,7 +460,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_source' => 100,
             'c_pages' => '第1頁',
             'c_notes' => '核准的別名',
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
             '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s')],
         ];
@@ -523,7 +527,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_alt_name' => 'After',
             'c_alt_name_type_code' => 1,
             'c_notes' => '修改後筆記',
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ];
 
@@ -581,7 +585,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_sequence' => 1,
             'c_alt_name_chn' => '退回別名',
             'c_alt_name_type_code' => 1,
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ];
 
@@ -627,7 +631,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_sequence' => 1,
             'c_alt_name_chn' => '無權',
             'c_alt_name_type_code' => 1,
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ], JSON_UNESCAPED_UNICODE);
         $operation->save();
@@ -652,7 +656,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_sequence' => 1,
             'c_alt_name_chn' => '非提案',
             'c_alt_name_type_code' => 1,
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
         ], JSON_UNESCAPED_UNICODE);
         $operation->save();
 
@@ -710,7 +714,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_sequence' => 1,
             'c_alt_name_chn' => '已存在',
             'c_alt_name_type_code' => 1,
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ], JSON_UNESCAPED_UNICODE);
         $operation->save();
@@ -751,7 +755,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_alt_name_chn' => '缺少原始',
             'c_alt_name_type_code' => 1,
             'c_notes' => '新的備註',
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ], JSON_UNESCAPED_UNICODE);
         $operation->resource_original = json_encode([]);
@@ -794,7 +798,7 @@ class BasicInformationProposalTest extends TestCase {
             'c_sequence' => 1,
             'c_alt_name_chn' => '新主鍵值',
             'c_alt_name_type_code' => 1,
-            '__key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             '__review_status' => 'pending',
         ], JSON_UNESCAPED_UNICODE);
         $operation->resource_original = json_encode([
@@ -822,12 +826,12 @@ class BasicInformationProposalTest extends TestCase {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
+        // (#834 Phase 2): 3-key 中缺少 c_alt_name_type_code
         $response = $this->post(route('basicinformation.proposal.store', [
             'personid' => 1,
             'resource' => 'altnames',
         ]), [
             'c_alt_name_chn' => '缺少主鍵欄位',
-            'c_alt_name_type_code' => 1,
             '__proposal_comment' => '主鍵缺失',
         ]);
 
@@ -846,7 +850,7 @@ class BasicInformationProposalTest extends TestCase {
         $response = $this->post(route('basicinformation.proposal.update', [
             'personid' => 1,
             'resource' => 'altnames',
-            'id' => '1-1-不存在-1',
+            'id' => '1-不存在-1',
         ]), [
             'c_sequence' => 1,
             'c_alt_name_chn' => '不存在',
@@ -898,6 +902,94 @@ class BasicInformationProposalTest extends TestCase {
 
         $operation = Operation::first();
         $this->assertNotNull($operation);
-        $this->assertSame('1-1-名minus字-1', $operation->resource_id);
+        // query-string 格式：連字符透過 URL 編碼處理，不再使用 bare minus
+        $expected = \App\Support\CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => 1,
+            'c_alt_name_chn' => '名-字',
+            'c_alt_name_type_code' => 1,
+        ]);
+        $this->assertSame($expected, $operation->resource_id);
+        // 確認 resource_id 中不含 bare 'minus' 編碼
+        $this->assertStringNotContainsString('minus', $operation->resource_id);
+    }
+
+    #[Test]
+    public function testConflictDetectionMatchesLegacyDashFormatPendingProposal() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        // 模擬歷史舊格式（dash + bare minus）的 pending 提案
+        $operation = new Operation();
+        $operation->user_id = $user->id;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        // 舊格式：dash 分隔 + bare minus 編碼
+        $operation->resource_id = '1-舊別名-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => 1,
+            '__review_status' => 'pending',
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        // 用新格式提交相同主鍵的新增提案，應偵測到衝突
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'altnames',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '嘗試與舊格式衝突',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('已有其他新增提案', $flash[0]['message'] ?? '');
+    }
+
+    #[Test]
+    public function testConflictDetectionMatchesLegacyDashFormatWithHyphenInName() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        // 舊格式中含連字符的名字用 bare minus 編碼
+        $operation = new Operation();
+        $operation->user_id = $user->id;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_CREATE;
+        $operation->resource = 'ALTNAME_DATA';
+        // 舊格式：名-字 → 名minus字
+        $operation->resource_id = '1-名minus字-1';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '名-字',
+            'c_alt_name_type_code' => 1,
+            '__review_status' => 'pending',
+            '__key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        // 用新格式提交相同主鍵，應偵測到衝突
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'altnames',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '名-字',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '嘗試與含連字符舊格式衝突',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('已有其他新增提案', $flash[0]['message'] ?? '');
     }
 }

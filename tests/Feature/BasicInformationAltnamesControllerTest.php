@@ -165,7 +165,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
             'table_name' => 'ALTNAME_DATA',
             'operation' => 'INSERT',
             'actor_id' => (string) $user->id,
-            'row_pk_text' => 'c_personid=1&c_sequence=1&c_alt_name_chn=%E6%96%B0%E5%A2%9E%E5%88%A5%E5%90%8D&c_alt_name_type_code=1',
+            'row_pk_text' => 'c_personid=1&c_alt_name_chn=%E6%96%B0%E5%A2%9E%E5%88%A5%E5%90%8D&c_alt_name_type_code=1',
         ]);
 
         $log = DB::table('audit_log')->first();
@@ -546,9 +546,9 @@ class BasicInformationAltnamesControllerTest extends TestCase {
             'c_source' => null,
         ]);
 
-        // 使用查詢參數模式（c_sequence=NULL）
+        // 使用查詢參數模式（舊 URL 含 c_sequence=NULL，controller 會忽略多餘參數）
         $response = $this->actingAs($user)
-            ->get('/basicinformation/1/altnames/edit?c_personid=1&c_sequence=NULL&c_alt_name_chn=別名測試&c_alt_name_type_code=1');
+            ->get('/basicinformation/1/altnames/edit?c_personid=1&c_alt_name_chn=別名測試&c_alt_name_type_code=1');
 
         $response->assertStatus(200);
         $response->assertViewHas('row');
@@ -594,9 +594,10 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $response->assertRedirect();
         $response->assertSessionHas('flash_notification');
 
-        // 驗證重定向 URL 包含 c_sequence=NULL
+        // (#834 Phase 2): 重定向 URL 使用 3-key，不含 c_sequence
         $redirectUrl = $response->headers->get('Location');
-        $this->assertStringContainsString('c_sequence=NULL', $redirectUrl);
+        $this->assertStringContainsString('c_personid=1', $redirectUrl);
+        $this->assertStringNotContainsString('c_sequence', $redirectUrl);
 
         // 跟隨重定向，確認編輯頁可正常載入（200）
         $followResponse = $this->actingAs($user)->get($redirectUrl);

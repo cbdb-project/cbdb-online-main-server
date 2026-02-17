@@ -149,7 +149,7 @@ class BiogMainProposalTest extends TestCase {
             'c_personid' => $personId,
             'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
             'resource' => 'BIOG_MAIN',
-            'resource_id' => (string)$personId,
+            'resource_id' => \App\Support\CompositePrimaryKey::buildStoredResourceId(['c_personid' => $personId]),
         ]);
 
         $operation = Operation::where('resource', 'BIOG_MAIN')->first();

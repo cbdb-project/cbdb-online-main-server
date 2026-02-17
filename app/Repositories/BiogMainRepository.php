@@ -2600,30 +2600,28 @@ class BiogMainRepository {
     /**
      * 依複合主鍵取得 ALTNAME_DATA 記錄
      *
-     * NOTE (#834): 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
-     * c_sequence 非 PK。此方法暫維持 4-key 查詢以相容歷史格式，
-     * 待 Phase 2 統一切為 3-key。
+     * (#834 Phase 2): 使用 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code) 定位，
+     * c_sequence 不參與定位。接受字串或 3-key 關聯陣列。
+     *
+     * @param string|array $id 複合主鍵字串或 3-key 關聯陣列
      */
     public function altnameById($id) {
-        $addr_l = $this->parseAltnameId($id);
+        $pk = is_array($id) ? $id : $this->parseAltnameId($id);
 
-        $row = DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $addr_l[0]],
-            ['c_sequence', '=', $addr_l[1]],
-            ['c_alt_name_chn', '=', $addr_l[2]],
-            ['c_alt_name_type_code', '=', $addr_l[3]],
+        return DB::table('ALTNAME_DATA')->where([
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
         ])->first();
-
-        return $row;
     }
 
     public function altnameStoreById(Request $request, $id) {
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
+        // (#834 Phase 2): 重複檢查使用 3-key，c_sequence 不參與定位
         $duplicate = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
-            ['c_sequence', '=', $data['c_sequence']],
             ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
             ['c_alt_name_type_code', '=', $data['c_alt_name_type_code']],
         ])->first();
@@ -2634,22 +2632,17 @@ class BiogMainRepository {
 
         return DB::transaction(function () use ($id, $data) {
             DB::table('ALTNAME_DATA')->insert($data);
-            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId([
+            $pk3 = [
                 'c_personid' => $data['c_personid'],
-                'c_sequence' => $data['c_sequence'],
                 'c_alt_name_chn' => $data['c_alt_name_chn'],
                 'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-            ]), $data);
+            ];
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk3), $data);
 
             (new AuditLogService())->write(
                 'ALTNAME_DATA',
                 'INSERT',
-                [
-                    'c_personid' => $data['c_personid'],
-                    'c_sequence' => $data['c_sequence'],
-                    'c_alt_name_chn' => $data['c_alt_name_chn'],
-                    'c_alt_name_type_code' => $data['c_alt_name_type_code'],
-                ],
+                $pk3,
                 null,
                 $data,
                 'user',
@@ -2661,35 +2654,34 @@ class BiogMainRepository {
         });
     }
 
+    /**
+     * @param string|array $alt 複合主鍵字串或 3-key 關聯陣列
+     */
     public function altnameUpdateById(Request $request, $id, $alt) {
-        $addr_l = $this->parseAltnameId($alt);
+        $pk = is_array($alt) ? $alt : $this->parseAltnameId($alt);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = (new ToolsRepository())->timestamp($data);
 
-        return DB::transaction(function () use ($id, $addr_l, $data, $comment) {
-            $ori = DB::table('ALTNAME_DATA')->where([
-                ['c_personid', '=', $addr_l[0]],
-                ['c_sequence', '=', $addr_l[1]],
-                ['c_alt_name_chn', '=', $addr_l[2]],
-                ['c_alt_name_type_code', '=', $addr_l[3]],
-            ])->lockForUpdate()->first();
+        // (#834 Phase 2): WHERE 使用 3-key 定位
+        $where3key = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
+        ];
+
+        return DB::transaction(function () use ($id, $where3key, $data, $comment) {
+            $ori = DB::table('ALTNAME_DATA')->where($where3key)->lockForUpdate()->first();
 
             if (!$ori) {
                 return null;
             }
 
-            DB::table('ALTNAME_DATA')->where([
-                ['c_personid', '=', $addr_l[0]],
-                ['c_sequence', '=', $addr_l[1]],
-                ['c_alt_name_chn', '=', $addr_l[2]],
-                ['c_alt_name_type_code', '=', $addr_l[3]],
-            ])->update($data);
+            DB::table('ALTNAME_DATA')->where($where3key)->update($data);
 
             $newPk = [
                 'c_personid' => $id,
-                'c_sequence' => $data['c_sequence'] ?? $ori->c_sequence,
                 'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $ori->c_alt_name_chn,
                 'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code,
             ];
@@ -2716,41 +2708,41 @@ class BiogMainRepository {
         });
     }
 
+    /**
+     * @param string|array $id 複合主鍵字串或 3-key 關聯陣列
+     * @param int|string $c_personid 人物 ID
+     */
     public function altnameDeleteById($id, $c_personid) {
-        $addr_l = $this->parseAltnameId($id);
+        $pk = is_array($id) ? $id : $this->parseAltnameId($id);
 
-        return DB::transaction(function () use ($c_personid, $addr_l) {
-            $row = DB::table('ALTNAME_DATA')->where([
-                ['c_personid', '=', $addr_l[0]],
-                ['c_sequence', '=', $addr_l[1]],
-                ['c_alt_name_chn', '=', $addr_l[2]],
-                ['c_alt_name_type_code', '=', $addr_l[3]],
-            ])->lockForUpdate()->first();
+        // (#834 Phase 2): WHERE 使用 3-key 定位
+        $where3key = [
+            ['c_personid', '=', $pk['c_personid']],
+            ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
+            ['c_alt_name_type_code', '=', $pk['c_alt_name_type_code']],
+        ];
+
+        return DB::transaction(function () use ($c_personid, $where3key) {
+            $row = DB::table('ALTNAME_DATA')->where($where3key)->lockForUpdate()->first();
 
             if (!$row) {
                 return false;
             }
 
-            DB::table('ALTNAME_DATA')->where([
-                ['c_personid', '=', $addr_l[0]],
-                ['c_sequence', '=', $addr_l[1]],
-                ['c_alt_name_chn', '=', $addr_l[2]],
-                ['c_alt_name_type_code', '=', $addr_l[3]],
-            ])->delete();
+            DB::table('ALTNAME_DATA')->where($where3key)->delete();
 
-            $pk = [
+            $pk3 = [
                 'c_personid' => $row->c_personid,
-                'c_sequence' => $row->c_sequence,
                 'c_alt_name_chn' => $row->c_alt_name_chn,
                 'c_alt_name_type_code' => $row->c_alt_name_type_code,
             ];
 
-            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk), $row);
+            $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'ALTNAME_DATA', CompositePrimaryKey::buildStoredResourceId($pk3), $row);
 
             (new AuditLogService())->write(
                 'ALTNAME_DATA',
                 'DELETE',
-                $pk,
+                $pk3,
                 (new AuditLogService())->normalizeRow($row),
                 null,
                 'user',
@@ -2762,30 +2754,48 @@ class BiogMainRepository {
         });
     }
 
-    protected function parseAltnameId($alt) {
+    /**
+     * 解析 ALTNAME_DATA 複合主鍵字串為 3-key 關聯陣列
+     *
+     * (#834 Phase 2): 返回 3-key 關聯陣列，支援歷史 4-key 與新 3-key 格式。
+     *
+     * @param string $alt 複合主鍵字串
+     * @return array 3-key 關聯陣列 ['c_personid' => ..., 'c_alt_name_chn' => ..., 'c_alt_name_type_code' => ...]
+     */
+    public function parseAltnameId($alt) {
         if (strpos($alt, '_._') !== false) {
-            $addr_l = explode('_._', $alt);
+            $parts = explode('_._', $alt);
         } else {
-            $addr_l = explode("-", $alt);
-            foreach ($addr_l as $key => $value) {
-                $addr_l[$key] = $this->unionPKDef_decode($value);
+            $parts = explode("-", $alt);
+            foreach ($parts as $key => $value) {
+                $parts[$key] = $this->unionPKDef_decode($value);
             }
         }
 
-        if (count($addr_l) < 4) {
-            Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
-                'parsed' => $addr_l,
-                'expected_count' => 4,
-                'actual_count' => count($addr_l),
-            ]);
-            abort(400, 'ALTNAME_DATA ID 格式不正確');
+        $count = count($parts);
+        if ($count === 4) {
+            // 歷史 4-key 格式：[c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
+            // 忽略 c_sequence (index 1)，返回 3-key
+            return [
+                'c_personid' => $parts[0],
+                'c_alt_name_chn' => $parts[2],
+                'c_alt_name_type_code' => $parts[3],
+            ];
+        } elseif ($count === 3) {
+            // 新 3-key 格式：[c_personid, c_alt_name_chn, c_alt_name_type_code]
+            return [
+                'c_personid' => $parts[0],
+                'c_alt_name_chn' => $parts[1],
+                'c_alt_name_type_code' => $parts[2],
+            ];
         }
 
-        if (isset($addr_l[1]) && $addr_l[1] === 'NULL') {
-            $addr_l[1] = null;
-        }
-
-        return $addr_l;
+        Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
+            'parsed' => $parts,
+            'expected_count' => '3 or 4',
+            'actual_count' => $count,
+        ]);
+        abort(400, 'ALTNAME_DATA ID 格式不正確');
     }
 
     public function sourceById($id, $_id) {

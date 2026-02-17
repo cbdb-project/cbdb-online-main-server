@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -30,9 +31,8 @@ class BasicInformationProposalController extends Controller {
         ],
         'altnames' => [
             'table' => 'ALTNAME_DATA',
-            // NOTE (#834): 資料庫 PK 為 3-key，c_sequence 非 PK；
-            // 暫維持 4-key 以相容歷史格式，Phase 2 將移除 c_sequence。
-            'key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
+            // (#834 Phase 2): 3-key，c_sequence 不參與定位
+            'key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             'controller' => 'BasicInformationAltnamesController',
             'route_prefix' => 'basicinformation.altnames',
             'display_name' => '別名',
@@ -369,28 +369,56 @@ class BasicInformationProposalController extends Controller {
 
     /**
      * 構建複合主鍵 ID
+     *
+     * 使用 query-string 格式（http_build_query），與 CompositePrimaryKey::buildStoredResourceId() 一致，
+     * 所有特殊字符（中文、連字符等）自動 URL 編碼，消除舊 dash 分隔符的解析歧義。
      */
     protected function buildCompositeId($keyColumns, $data) {
-        $parts = [];
+        $pk = [];
         foreach ($keyColumns as $column) {
-            $value = $data[$column] ?? '';
-            // 處理 NULL 值
-            if ($value === null || $value === '') {
-                $value = 'NULL';
+            $value = $data[$column] ?? null;
+            if ($value === '') {
+                $value = null;
             }
-            // 處理特殊字符（連字符）
-            $value = str_replace('-', 'minus', (string) $value);
-            $parts[] = $value;
+            $pk[$column] = $value;
         }
 
-        return implode('-', $parts);
+        return CompositePrimaryKey::buildStoredResourceId($pk);
     }
 
     /**
      * 解析複合主鍵 ID
+     *
+     * 支援兩種格式：
+     * - query-string 格式（新）：c_personid=1&c_alt_name_chn=%E5%BC%B5%E4%B8%89&c_alt_name_type_code=10
+     * - dash 分隔格式（舊，@deprecated）：1-張三-10
      */
     protected function parseCompositeId($id, $keyColumns) {
-        // 使用現有的 unionPKDef_decode
+        // 嘗試 query-string 解析：若所有 keyColumn 都出現在結果中，視為 query-string 格式
+        parse_str($id, $parsed);
+        $allKeysPresent = true;
+        foreach ($keyColumns as $col) {
+            if (!array_key_exists($col, $parsed)) {
+                $allKeysPresent = false;
+
+                break;
+            }
+        }
+
+        if ($allKeysPresent) {
+            $conditions = [];
+            foreach ($keyColumns as $column) {
+                $value = $parsed[$column];
+                if ($value === 'NULL') {
+                    $value = null;
+                }
+                $conditions[$column] = $value;
+            }
+
+            return $conditions;
+        }
+
+        // 舊格式：dash 分隔
         $id = $this->biogMainRepository->unionPKDef_decode($id);
 
         $parts = explode('-', $id);
@@ -482,10 +510,26 @@ class BasicInformationProposalController extends Controller {
             return false;
         }
 
+        // 新格式（query-string）
         $resourceId = $this->buildCompositeId($keyColumns, $data);
 
+        // 舊格式（dash 分隔 + bare minus 編碼），用於匹配歷史 pending 提案
+        $legacyParts = [];
+        foreach ($keyColumns as $column) {
+            $value = $data[$column] ?? null;
+            $legacyParts[] = ($value === null || $value === '')
+                ? 'NULL'
+                : str_replace('-', 'minus', (string) $value);
+        }
+        $legacyResourceId = implode('-', $legacyParts);
+
+        $candidateIds = [$resourceId];
+        if ($legacyResourceId !== $resourceId) {
+            $candidateIds[] = $legacyResourceId;
+        }
+
         $operations = Operation::where('resource', $table)
-            ->where('resource_id', $resourceId)
+            ->whereIn('resource_id', $candidateIds)
             ->where('op_type', $opType)
             ->get();
 

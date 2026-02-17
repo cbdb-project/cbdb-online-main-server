@@ -438,22 +438,13 @@ class OfficePostingRepository {
             ]);
 
             if (!empty($addressRows)) {
-                $addrOperation = (new OperationRepository())->store(
-                    Auth::id(),
-                    $id,
-                    1,
-                    'POSTED_TO_ADDR_DATA',
-                    $officeResourceId,
-                    ['rows' => $addressRows]
-                );
-
                 $addrAuditRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $id)
                     ->where('c_posting_id', $data['c_posting_id'])
                     ->where('c_office_id', $data['c_office_id'])
                     ->get();
 
-                $addrOperationId = $addrOperation ? (string) $addrOperation->id : null;
+                $addrOperationId = $officeOperation ? (string) $officeOperation->id : null;
                 foreach ($addrAuditRows as $row) {
                     $rowData = $auditLog->normalizeRow($row);
                     $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
@@ -526,33 +517,6 @@ class OfficePostingRepository {
             ]);
 
             (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $officeResourceId, $data);
-
-            $addressRows = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $id)
-                ->where('c_posting_id', $data['c_posting_id'])
-                ->where('c_office_id', $data['c_office_id'])
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'c_personid' => (int) $row->c_personid,
-                        'c_posting_id' => (int) $row->c_posting_id,
-                        'c_office_id' => (int) $row->c_office_id,
-                        'c_addr_id' => (int) $row->c_addr_id,
-                    ];
-                })
-                ->values()
-                ->all();
-
-            if (!empty($addressRows)) {
-                (new OperationRepository())->store(
-                    Auth::id(),
-                    $id,
-                    1,
-                    'POSTED_TO_ADDR_DATA',
-                    $officeResourceId,
-                    ['rows' => $addressRows]
-                );
-            }
 
             return $officeResourceId;
         });

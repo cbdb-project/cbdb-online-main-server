@@ -142,10 +142,25 @@ class OfficePostingStoreTest extends TestCase {
             'op_type' => 1,
         ]);
 
-        $this->assertDatabaseHas('operations', [
+        $this->assertDatabaseMissing('operations', [
             'resource' => 'POSTED_TO_ADDR_DATA',
             'resource_id' => 'c_office_id=10&c_posting_id=1',
             'op_type' => 1,
+        ]);
+
+        $officeOperation = DB::table('operations')
+            ->where('resource', 'POSTED_TO_OFFICE_DATA')
+            ->where('resource_id', 'c_office_id=10&c_posting_id=1')
+            ->first();
+        $this->assertNotNull($officeOperation);
+
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'POSTED_TO_OFFICE_DATA',
+            'operation_id' => (string) $officeOperation->id,
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'POSTED_TO_ADDR_DATA',
+            'operation_id' => (string) $officeOperation->id,
         ]);
     }
 

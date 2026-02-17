@@ -44,13 +44,16 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         Schema::create('ALTNAME_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
             $table->integer('c_sequence')->nullable();
+            $table->string('c_alt_name')->nullable();
             $table->string('c_alt_name_chn');
             $table->string('c_alt_name_type_code');
             $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->text('c_notes')->nullable();
             $table->string('c_created_by')->nullable();
-            $table->timestamp('c_created_date')->nullable();
+            $table->string('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
-            $table->timestamp('c_modified_date')->nullable();
+            $table->string('c_modified_date')->nullable();
         });
 
         // 創建 TEXT_CODES 表
@@ -515,5 +518,97 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $response->assertStatus(200);
         $response->assertViewHas('row');
         $response->assertViewHas('text_str', '0 Zero Source 零來源');
+    }
+
+    /**
+     * 測試使用查詢參數模式編輯 c_sequence 為 NULL 的記錄
+     */
+    #[Test]
+    public function testEditQueryHandlesNullCSequence() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => null,
+            'c_alt_name_chn' => '別名測試',
+            'c_alt_name_type_code' => '1',
+            'c_source' => null,
+        ]);
+
+        // 使用查詢參數模式（c_sequence=NULL）
+        $response = $this->actingAs($user)
+            ->get('/basicinformation/1/altnames/edit?c_personid=1&c_sequence=NULL&c_alt_name_chn=別名測試&c_alt_name_type_code=1');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('row');
+    }
+
+    /**
+     * 測試更新 c_sequence 為 NULL 的記錄不會拋出 Undefined array key
+     */
+    #[Test]
+    public function testUpdateQueryWithNullCSequenceDoesNotThrow() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => null,
+            'c_alt_name_chn' => '別名測試',
+            'c_alt_name_type_code' => '1',
+            'c_source' => null,
+        ]);
+
+        // 透過查詢參數模式更新（c_sequence=NULL 在 URL 中）
+        $response = $this->actingAs($user)
+            ->patch('/basicinformation/1/altnames/update?c_personid=1&c_sequence=NULL&c_alt_name_chn=別名測試&c_alt_name_type_code=1', [
+                'c_sequence' => '',
+                'c_alt_name_chn' => '別名測試',
+                'c_alt_name_type_code' => '1',
+                'c_source' => '',
+                'c_notes' => '更新備註',
+            ]);
+
+        // 應成功重定向而非拋出 ErrorException
+        $response->assertRedirect();
+        $response->assertSessionHas('flash_notification');
+
+        // 驗證重定向 URL 包含 c_sequence=NULL
+        $redirectUrl = $response->headers->get('Location');
+        $this->assertStringContainsString('c_sequence=NULL', $redirectUrl);
+
+        // 跟隨重定向，確認編輯頁可正常載入（200）
+        $followResponse = $this->actingAs($user)->get($redirectUrl);
+        $followResponse->assertStatus(200);
+        $followResponse->assertViewHas('row');
+
+        // 驗證記錄已正確更新
+        $record = DB::table('ALTNAME_DATA')
+            ->where('c_personid', 1)
+            ->where('c_alt_name_chn', '別名測試')
+            ->first();
+
+        $this->assertNotNull($record);
     }
 }

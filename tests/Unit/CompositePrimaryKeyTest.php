@@ -105,6 +105,128 @@ class CompositePrimaryKeyTest extends TestCase {
     }
 
     /** @test */
+    public function build_url_preserves_null_values_as_null_string(): void {
+        // buildUrl() 應將 null 值轉為 'NULL' 字串，避免 http_build_query 丟棄
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.edit.query',
+            ['id' => 12345],
+            [
+                'c_personid' => 12345,
+                'c_sequence' => null,
+                'c_alt_name_chn' => '張三',
+                'c_alt_name_type_code' => 10,
+            ]
+        );
+
+        // c_sequence=NULL 應保留在 URL 中
+        $this->assertStringContainsString('c_sequence=NULL', $url);
+        $this->assertStringContainsString('c_personid=12345', $url);
+        $this->assertStringContainsString('c_alt_name_type_code=10', $url);
+    }
+
+    /** @test */
+    public function build_url_preserves_null_for_addresses_route(): void {
+        // BIOG_ADDR_DATA 的 c_sequence 也可為 null
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.addresses.edit.query',
+            ['id' => 100],
+            [
+                'c_personid' => 100,
+                'c_addr_id' => 50,
+                'c_addr_type' => 1,
+                'c_sequence' => null,
+            ]
+        );
+
+        $this->assertStringContainsString('c_sequence=NULL', $url);
+        $this->assertStringContainsString('c_personid=100', $url);
+        $this->assertStringContainsString('c_addr_id=50', $url);
+        $this->assertStringContainsString('c_addr_type=1', $url);
+    }
+
+    /** @test */
+    public function build_url_preserves_null_for_events_route(): void {
+        // EVENTS_DATA 的 c_sequence 也可為 null
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.events.edit.query',
+            ['id' => 200],
+            [
+                'c_personid' => 200,
+                'c_sequence' => null,
+                'c_event_code' => 5,
+            ]
+        );
+
+        $this->assertStringContainsString('c_sequence=NULL', $url);
+        $this->assertStringContainsString('c_personid=200', $url);
+        $this->assertStringContainsString('c_event_code=5', $url);
+    }
+
+    /** @test */
+    public function build_url_preserves_null_for_statuses_route(): void {
+        // STATUS_DATA 的 c_sequence 也可為 null
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.statuses.edit.query',
+            ['id' => 300],
+            [
+                'c_personid' => 300,
+                'c_sequence' => null,
+                'c_status_code' => 10,
+            ]
+        );
+
+        $this->assertStringContainsString('c_sequence=NULL', $url);
+        $this->assertStringContainsString('c_personid=300', $url);
+        $this->assertStringContainsString('c_status_code=10', $url);
+    }
+
+    /** @test */
+    public function build_url_preserves_multiple_null_values(): void {
+        // ENTRY_DATA 有多個可能為 null 的欄位
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.entries.edit.query',
+            ['id' => 400],
+            [
+                'c_personid' => 400,
+                'c_entry_code' => 36,
+                'c_sequence' => null,
+                'c_kin_code' => null,
+                'c_assoc_code' => 0,
+                'c_kin_id' => null,
+                'c_year' => 1000,
+                'c_assoc_id' => 0,
+                'c_inst_code' => 0,
+                'c_inst_name_code' => 0,
+            ]
+        );
+
+        $this->assertStringContainsString('c_sequence=NULL', $url);
+        $this->assertStringContainsString('c_kin_code=NULL', $url);
+        $this->assertStringContainsString('c_kin_id=NULL', $url);
+        // 非 null 值不受影響
+        $this->assertStringContainsString('c_assoc_code=0', $url);
+        $this->assertStringContainsString('c_year=1000', $url);
+    }
+
+    /** @test */
+    public function build_url_does_not_alter_non_null_values(): void {
+        $url = CompositePrimaryKey::buildUrl(
+            'basicinformation.altnames.edit.query',
+            ['id' => 12345],
+            [
+                'c_personid' => 12345,
+                'c_sequence' => 0,
+                'c_alt_name_chn' => '張三',
+                'c_alt_name_type_code' => 10,
+            ]
+        );
+
+        // c_sequence=0 應保持為 0（不被轉為 'NULL'）
+        $this->assertStringContainsString('c_sequence=0', $url);
+        $this->assertStringNotContainsString('c_sequence=NULL', $url);
+    }
+
+    /** @test */
     public function it_encodes_special_chars_in_query_params(): void {
         // 測試特殊字符（負號、斜線等）被正確編碼
         $params = [

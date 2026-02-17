@@ -185,7 +185,7 @@ class BasicInformationOfficesSaveAsTest extends TestCase {
             'resource_id' => 'c_office_id=30&c_posting_id=2',
             'op_type' => 1,
         ]);
-        $this->assertDatabaseHas('operations', [
+        $this->assertDatabaseMissing('operations', [
             'resource' => 'POSTED_TO_ADDR_DATA',
             'resource_id' => 'c_office_id=30&c_posting_id=2',
             'op_type' => 1,

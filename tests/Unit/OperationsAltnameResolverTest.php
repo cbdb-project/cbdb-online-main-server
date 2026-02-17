@@ -68,7 +68,9 @@ class OperationsAltnameResolverTest extends TestCase {
     #[Test]
     public function test_fetch_altname_handles_null_sentinel_in_query_string_resource_id(): void {
         // 當 resource_data 缺少欄位，且 resource_id 用新格式包含 NULL sentinel 時，
-        // fetchAltnameCurrentRow 不應將 'NULL' 強轉為 (int)0
+        // c_sequence=NULL 經解析後為 PHP null。
+        // Phase 1 (#834)：c_sequence 為 null 時改走 3-key 查詢（DB PK），
+        // 因此能正確定位到該筆資料（不論 c_sequence 實際值為何）。
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 200,
             'c_sequence' => 0,
@@ -94,9 +96,12 @@ class OperationsAltnameResolverTest extends TestCase {
 
         $row = $controller->resolveAltname($operationPayload);
 
-        // c_sequence=NULL 應解析為 null，WHERE c_sequence IS NULL 不會匹配到 c_sequence=0
-        // 因此 row 應為 null（因為資料庫中 c_sequence=0，不是 NULL）
-        $this->assertNull($row);
+        // Phase 1：c_sequence 為 null → 3-key 回退查詢，以 DB PK 定位
+        // (c_personid=200, c_alt_name_chn=測試, c_alt_name_type_code=5) 能唯一找到該列
+        $this->assertNotNull($row);
+        $this->assertEquals(200, $row->c_personid);
+        $this->assertSame('測試', $row->c_alt_name_chn);
+        $this->assertEquals(0, $row->c_sequence);
     }
 
     #[Test]
@@ -135,6 +140,94 @@ class OperationsAltnameResolverTest extends TestCase {
         $this->assertNull($conditions['c_sequence']); // 'NULL' 應轉為 PHP null
         $this->assertSame('張三', $conditions['c_alt_name_chn']);
         $this->assertSame('10', $conditions['c_alt_name_type_code']);
+
+        Schema::dropIfExists('operations');
+    }
+
+    // -------------------------------------------------------
+    // Phase 1 (#834)：3-key 相容層測試
+    // -------------------------------------------------------
+
+    #[Test]
+    public function test_fetch_altname_current_row_with_3key_query_string(): void {
+        // 3-key query-string 格式（不含 c_sequence），應以 DB 3-key 查到正確資料列
+        $controller = new class (new OperationRepository()) extends OperationsController {
+            public function resolveAltname(array $payload) {
+                return $this->fetchAltnameCurrentRow($payload);
+            }
+        };
+
+        $operationPayload = [
+            'resource_id' => 'c_personid=123&c_alt_name_chn=%E5%BC%B5%2D%E4%B8%80&c_alt_name_type_code=10',
+            'resource_data' => json_encode([
+                'c_personid' => 123,
+            ]),
+        ];
+
+        $row = $controller->resolveAltname($operationPayload);
+
+        $this->assertNotNull($row);
+        $this->assertSame('張-一', $row->c_alt_name_chn);
+        $this->assertSame('Zi Jing', $row->c_alt_name);
+    }
+
+    #[Test]
+    public function test_fetch_altname_current_row_with_3key_dash_format(): void {
+        // 3-key dash 格式：c_personid-c_alt_name_chn-c_alt_name_type_code
+        $controller = new class (new OperationRepository()) extends OperationsController {
+            public function resolveAltname(array $payload) {
+                return $this->fetchAltnameCurrentRow($payload);
+            }
+        };
+
+        // 「張-一」在 dash 格式中編碼為 張(minus)一
+        $operationPayload = [
+            'resource_id' => '123-張(minus)一-10',
+            'resource_data' => json_encode([]),
+        ];
+
+        $row = $controller->resolveAltname($operationPayload);
+
+        $this->assertNotNull($row);
+        $this->assertSame('張-一', $row->c_alt_name_chn);
+        $this->assertEquals(1, $row->c_sequence);
+    }
+
+    #[Test]
+    public function test_build_key_conditions_with_3key_altname_resource_id(): void {
+        // 3-key resource_id → buildKeyConditions 應返回 3 個 condition
+        Schema::create('operations', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('user_id')->nullable();
+            $table->integer('c_personid')->nullable();
+            $table->tinyInteger('op_type');
+            $table->string('resource');
+            $table->string('resource_id')->nullable();
+            $table->text('resource_data')->nullable();
+            $table->text('resource_original')->nullable();
+            $table->timestamps();
+            $table->tinyInteger('crowdsourcing_status')->default(0);
+            $table->tinyInteger('rate')->default(0);
+        });
+
+        $controller = new class (new OperationRepository()) extends OperationsController {
+            public function publicBuildKeyConditions(Operation $op, array $current, array $fallback) {
+                return $this->buildKeyConditions($op, $current, $fallback);
+            }
+        };
+
+        $op = new Operation();
+        $op->resource = 'ALTNAME_DATA';
+        $op->resource_id = 'c_personid=123&c_alt_name_chn=%E5%BC%B5%E4%B8%89&c_alt_name_type_code=10';
+
+        $conditions = $controller->publicBuildKeyConditions($op, [], []);
+
+        // 3-key resource_id → parseStoredResourceId 返回 3 個欄位
+        // buildKeyConditions 中只有 3 個欄位在 namedParsed 中，c_sequence 無法從任何來源取得
+        $this->assertSame('123', $conditions['c_personid']);
+        $this->assertSame('張三', $conditions['c_alt_name_chn']);
+        $this->assertSame('10', $conditions['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $conditions);
 
         Schema::dropIfExists('operations');
     }

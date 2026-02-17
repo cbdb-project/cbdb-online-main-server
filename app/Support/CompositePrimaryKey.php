@@ -121,6 +121,17 @@ class CompositePrimaryKey {
     ];
 
     /**
+     * ALTNAME_DATA 實際資料庫主鍵（3-key）
+     *
+     * 資料庫 PK 為 (c_personid, c_alt_name_chn, c_alt_name_type_code)，
+     * c_sequence 不參與定位。此常數用於 Phase 1 相容層：
+     * 當 resource_id 不含 c_sequence 時，以此 schema 進行解析。
+     *
+     * @see https://github.com/cbdb-project/cbdb-online-main-server/issues/834
+     */
+    private const ALTNAME_DB_PRIMARY_KEY = ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'];
+
+    /**
      * resource_id 的 schema 別名對應
      *
      * 某些資料表的 resource_id 刻意沿用其他表的格式（共用編輯頁面），
@@ -416,6 +427,13 @@ class CompositePrimaryKey {
             if (!empty($parsed) && count(array_intersect($schema, array_keys($parsed))) === count($schema)) {
                 return array_intersect_key($parsed, array_flip($schema));
             }
+            // ALTNAME_DATA Phase 1 相容 (#834)：接受不含 c_sequence 的 3-key query-string
+            if (strtoupper($effectiveTable) === 'ALTNAME_DATA' && !empty($parsed)) {
+                $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
+                if (count(array_intersect($dbPk, array_keys($parsed))) === count($dbPk)) {
+                    return array_intersect_key($parsed, array_flip($dbPk));
+                }
+            }
         }
 
         $expectedCount = count($schema);
@@ -425,6 +443,13 @@ class CompositePrimaryKey {
             $parts = explode('_._', $resourceId);
             if (count($parts) >= $expectedCount) {
                 return array_combine($schema, array_slice($parts, 0, $expectedCount));
+            }
+            // ALTNAME_DATA Phase 1 相容 (#834)：接受 3-key _._  格式
+            if (strtoupper($effectiveTable) === 'ALTNAME_DATA') {
+                $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
+                if (count($parts) === count($dbPk)) {
+                    return array_combine($dbPk, $parts);
+                }
             }
 
             return null;
@@ -462,7 +487,24 @@ class CompositePrimaryKey {
             return $p;
         }, $parts2);
 
-        return self::combinePartsWithSchema($parts2, $schema, $table);
+        $result2 = self::combinePartsWithSchema($parts2, $schema, $table);
+        if ($result2 !== null) {
+            return $result2;
+        }
+
+        // ALTNAME_DATA Phase 1 相容 (#834)：以 DB 3-key 重試 dash 格式
+        if (strtoupper($effectiveTable) === 'ALTNAME_DATA') {
+            $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
+            $dbPkCount = count($dbPk);
+            if (count($parts) === $dbPkCount) {
+                return array_combine($dbPk, $parts);
+            }
+            if (count($parts2) === $dbPkCount) {
+                return array_combine($dbPk, $parts2);
+            }
+        }
+
+        return null;
     }
 
     /**

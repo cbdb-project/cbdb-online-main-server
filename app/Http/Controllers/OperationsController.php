@@ -177,29 +177,37 @@ class OperationsController extends Controller {
                                 }
                             }
 
-                            // 檢查陣列長度是否足夠（ALTNAME_DATA 需要 4 個欄位）
-                            if (count($addr_l) < 4) {
+                            $addrCount = count($addr_l);
+                            if ($addrCount >= 4) {
+                                // 4-key 格式：c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code
+                                if (isset($addr_l[1]) && $addr_l[1] == 'NULL') {
+                                    $addr_l[1] = null;
+                                }
+                                $arr3 = DB::table('ALTNAME_DATA')->where([
+                                    ['c_personid', '=', $addr_l[0]],
+                                    ['c_sequence', '=', $addr_l[1]],
+                                    ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
+                                    ['c_alt_name_type_code', '=', $addr_l[3]],
+                                ])->first();
+                            } elseif ($addrCount === 3) {
+                                // Phase 1 相容 (#834)：3-key 格式 (c_personid, c_alt_name_chn, c_alt_name_type_code)
+                                $arr3 = DB::table('ALTNAME_DATA')->where([
+                                    ['c_personid', '=', $addr_l[0]],
+                                    ['c_alt_name_chn', '=', $addr_l[1]],
+                                    ['c_alt_name_type_code', '=', $addr_l[2]],
+                                ])->first();
+                            } else {
                                 // 記錄錯誤並跳過此筆資料
                                 \Log::warning("ALTNAME_DATA resource_id 格式不正確: {$resource_id}", [
                                     'parsed' => $addr_l,
-                                    'expected_count' => 4,
-                                    'actual_count' => count($addr_l),
+                                    'expected_count' => '3 or 4',
+                                    'actual_count' => $addrCount,
                                     'operation_id' => $listsArr['data'][$x]['id'] ?? null,
                                 ]);
                                 $arr3 = null;
 
                                 break;
                             }
-
-                            if (isset($addr_l[1]) && $addr_l[1] == 'NULL') {
-                                $addr_l[1] = null;
-                            }
-                            $arr3 = DB::table('ALTNAME_DATA')->where([
-                                ['c_personid', '=', $addr_l[0]],
-                                ['c_sequence', '=', $addr_l[1]],
-                                ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-                                ['c_alt_name_type_code', '=', $addr_l[3]],
-                            ])->first();
                             $arr3 = json_encode($arr3);
                             $arr3 = json_decode($arr3, true);
 
@@ -921,17 +929,28 @@ class OperationsController extends Controller {
         }
 
         // NOTE (#834): 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
-        // c_sequence 非 PK。暫維持 4-key 查詢以相容歷史格式，Phase 2 將統一切為 3-key。
-        if ($personId === null || $sequence === null || $altNameChn === null || $typeCode === null) {
-            return null;
+        // c_sequence 非 PK。
+
+        // 4-key 查詢：所有欄位皆有值時（相容歷史 4-key resource_id）
+        if ($personId !== null && $sequence !== null && $altNameChn !== null && $typeCode !== null) {
+            return DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $personId],
+                ['c_sequence', '=', $sequence],
+                ['c_alt_name_chn', '=', $altNameChn],
+                ['c_alt_name_type_code', '=', $typeCode],
+            ])->first();
         }
 
-        return DB::table('ALTNAME_DATA')->where([
-            ['c_personid', '=', $personId],
-            ['c_sequence', '=', $sequence],
-            ['c_alt_name_chn', '=', $altNameChn],
-            ['c_alt_name_type_code', '=', $typeCode],
-        ])->first();
+        // Phase 1 相容 (#834)：c_sequence 未知時，以 DB 3-key 查詢
+        if ($personId !== null && $altNameChn !== null && $typeCode !== null) {
+            return DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $personId],
+                ['c_alt_name_chn', '=', $altNameChn],
+                ['c_alt_name_type_code', '=', $typeCode],
+            ])->first();
+        }
+
+        return null;
     }
 
     protected function resourceKeyColumns($resource) {

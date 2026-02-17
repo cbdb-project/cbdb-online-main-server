@@ -48,8 +48,9 @@ class AuditLogServiceTest extends TestCase {
 
         $text = $this->service->buildRowPkText('ALTNAME_DATA', $rowPk);
 
+        // (#834 Phase 2): Schema 已切為 3-key，c_sequence 被過濾
         $this->assertSame(
-            'c_personid=123&c_sequence=1&c_alt_name_chn=A%20%26%20B&c_alt_name_type_code=10',
+            'c_personid=123&c_alt_name_chn=A%20%26%20B&c_alt_name_type_code=10',
             $text
         );
     }

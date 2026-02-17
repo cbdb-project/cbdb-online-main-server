@@ -585,10 +585,10 @@ class FormUrlEncodingTest extends TestCase {
 
         // 驗證 redirect URL 使用新的查詢參數模式
         $redirectUrl = $response->headers->get('Location');
-        // 新模式使用 ?c_personid=...&c_sequence=...&c_alt_name_chn=... 格式
+        // (#834 Phase 2): 3-key 格式 ?c_personid=...&c_alt_name_chn=...&c_alt_name_type_code=...
         $this->assertStringContainsString('c_personid=', $redirectUrl);
-        $this->assertStringContainsString('c_sequence=', $redirectUrl);
         $this->assertStringContainsString('c_alt_name_chn=', $redirectUrl);
+        $this->assertStringContainsString('c_alt_name_type_code=', $redirectUrl);
         // 特殊字符會被標準 URL 編碼（%2F = /, %3F = ?）
         $this->assertMatchesRegularExpression('/c_alt_name_chn=.*%2F.*%3F/', $redirectUrl);
     }

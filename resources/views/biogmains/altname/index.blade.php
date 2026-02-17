@@ -55,14 +55,6 @@ if ($altTypeLabel === '') {
     $altTypeLabel = $value->pivot->c_alt_name_type_code;
 }
 
-//20240508修正c_sequence的判斷，資料有NULL、0、1-7
-if($value->pivot->c_sequence === 0) {
-  $value->pivot->c_sequence = 0;
-} elseif($value->pivot->c_sequence == NULL) {
-  $value->pivot->c_sequence = 'NULL';
-} else {
-  $value->pivot->c_sequence = $value->pivot->c_sequence;
-}
 @endphp
                     <tr>
                         <td>{{ $key+1 }}</td>
@@ -73,7 +65,7 @@ if($value->pivot->c_sequence === 0) {
                             @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_sequence' => $value->pivot->c_sequence ?? 'NULL', 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}">edit</a>
                                         <a href=""
                                            onclick="
                                                    let msg = '您真的确定要删除吗？\n\n请确认！';
@@ -87,7 +79,7 @@ if($value->pivot->c_sequence === 0) {
                                            class="btn btn-sm btn-danger">delete</a>
 
                                     </div>
-                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.destroy.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_sequence' => $value->pivot->c_sequence ?? 'NULL', 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
+                                    <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.destroy.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
                                         {{ csrf_field() }}
                                     </form>

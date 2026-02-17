@@ -25,14 +25,11 @@ class CompositePrimaryKey {
         'BIOG_MAIN' => [
             'c_personid',
         ],
-        // ⚠️ ALTNAME_DATA 定位 key 收斂計畫 (#834)
+        // ALTNAME_DATA 定位 key (#834 Phase 2)
         // 資料庫 PK 為 3-key: (c_personid, c_alt_name_chn, c_alt_name_type_code)
         // c_sequence 為一般排序欄位，不參與定位。
-        // 此處暫維持 4-key 以相容歷史 resource_id / URL 格式，
-        // 待 Phase 2 切為 3-key: ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code']
         'ALTNAME_DATA' => [
             'c_personid',
-            'c_sequence',       // 非 PK，Phase 2 將移除
             'c_alt_name_chn',
             'c_alt_name_type_code',
         ],
@@ -121,15 +118,14 @@ class CompositePrimaryKey {
     ];
 
     /**
-     * ALTNAME_DATA 實際資料庫主鍵（3-key）
+     * ALTNAME_DATA 歷史 4-key 格式（Phase 2 向後相容用）
      *
-     * 資料庫 PK 為 (c_personid, c_alt_name_chn, c_alt_name_type_code)，
-     * c_sequence 不參與定位。此常數用於 Phase 1 相容層：
-     * 當 resource_id 不含 c_sequence 時，以此 schema 進行解析。
+     * Phase 1 及之前的 resource_id 使用 4-key 格式（含 c_sequence），
+     * 此常數用於解析歷史 resource_id，解析後會自動 strip c_sequence 返回 3-key。
      *
      * @see https://github.com/cbdb-project/cbdb-online-main-server/issues/834
      */
-    private const ALTNAME_DB_PRIMARY_KEY = ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'];
+    private const ALTNAME_LEGACY_4KEY = ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'];
 
     /**
      * resource_id 的 schema 別名對應
@@ -425,14 +421,8 @@ class CompositePrimaryKey {
         if (str_contains($resourceId, '=') && !str_contains($resourceId, '_._')) {
             parse_str($resourceId, $parsed);
             if (!empty($parsed) && count(array_intersect($schema, array_keys($parsed))) === count($schema)) {
+                // 自動過濾多餘欄位（如歷史 4-key ALTNAME 的 c_sequence）
                 return array_intersect_key($parsed, array_flip($schema));
-            }
-            // ALTNAME_DATA Phase 1 相容 (#834)：接受不含 c_sequence 的 3-key query-string
-            if (strtoupper($effectiveTable) === 'ALTNAME_DATA' && !empty($parsed)) {
-                $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
-                if (count(array_intersect($dbPk, array_keys($parsed))) === count($dbPk)) {
-                    return array_intersect_key($parsed, array_flip($dbPk));
-                }
             }
         }
 
@@ -441,15 +431,18 @@ class CompositePrimaryKey {
         // 格式 1：_._  分隔符（CodesController）
         if (strpos($resourceId, '_._') !== false) {
             $parts = explode('_._', $resourceId);
+
+            // ALTNAME_DATA Phase 2 相容 (#834)：歷史 4-key _._  格式 → strip c_sequence 返回 3-key
+            // 必須在通用匹配前處理，否則 4 parts >= 3 expectedCount 會導致錯位
+            if (strtoupper($effectiveTable) === 'ALTNAME_DATA' && count($parts) === count(self::ALTNAME_LEGACY_4KEY)) {
+                $parsed4 = array_combine(self::ALTNAME_LEGACY_4KEY, $parts);
+                unset($parsed4['c_sequence']);
+
+                return $parsed4;
+            }
+
             if (count($parts) >= $expectedCount) {
                 return array_combine($schema, array_slice($parts, 0, $expectedCount));
-            }
-            // ALTNAME_DATA Phase 1 相容 (#834)：接受 3-key _._  格式
-            if (strtoupper($effectiveTable) === 'ALTNAME_DATA') {
-                $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
-                if (count($parts) === count($dbPk)) {
-                    return array_combine($dbPk, $parts);
-                }
             }
 
             return null;
@@ -492,15 +485,21 @@ class CompositePrimaryKey {
             return $result2;
         }
 
-        // ALTNAME_DATA Phase 1 相容 (#834)：以 DB 3-key 重試 dash 格式
+        // ALTNAME_DATA Phase 2 相容 (#834)：歷史 4-key dash 格式 → strip c_sequence 返回 3-key
         if (strtoupper($effectiveTable) === 'ALTNAME_DATA') {
-            $dbPk = self::ALTNAME_DB_PRIMARY_KEY;
-            $dbPkCount = count($dbPk);
-            if (count($parts) === $dbPkCount) {
-                return array_combine($dbPk, $parts);
+            $legacy4key = self::ALTNAME_LEGACY_4KEY;
+            $legacy4keyCount = count($legacy4key);
+            if (count($parts) === $legacy4keyCount) {
+                $parsed4 = array_combine($legacy4key, $parts);
+                unset($parsed4['c_sequence']);
+
+                return $parsed4;
             }
-            if (count($parts2) === $dbPkCount) {
-                return array_combine($dbPk, $parts2);
+            if (count($parts2) === $legacy4keyCount) {
+                $parsed4 = array_combine($legacy4key, $parts2);
+                unset($parsed4['c_sequence']);
+
+                return $parsed4;
             }
         }
 

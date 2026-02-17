@@ -106,8 +106,9 @@ class OperationsAltnameResolverTest extends TestCase {
 
     #[Test]
     public function test_build_key_conditions_normalizes_null_sentinel(): void {
-        // buildKeyConditions() 從 resource_id 的 query-string 中讀取 'NULL' 時，
-        // 應轉換為 PHP null（以便後續產生 WHERE IS NULL）
+        // (#834 Phase 2): resourceKeyColumns 已切為 3-key，
+        // 歷史 4-key resource_id 中的 c_sequence 被 parseStoredResourceId 過濾，
+        // buildKeyConditions 只返回 3 個 conditions
         Schema::create('operations', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('user_id')->nullable();
@@ -135,17 +136,17 @@ class OperationsAltnameResolverTest extends TestCase {
         // $current 和 $fallback 都不含完整 key，迫使 buildKeyConditions 解析 resource_id
         $conditions = $controller->publicBuildKeyConditions($op, [], []);
 
-        $this->assertCount(4, $conditions); // ALTNAME_DATA key columns: c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code
+        $this->assertCount(3, $conditions); // ALTNAME_DATA 3-key: c_personid, c_alt_name_chn, c_alt_name_type_code
         $this->assertSame('123', $conditions['c_personid']);
-        $this->assertNull($conditions['c_sequence']); // 'NULL' 應轉為 PHP null
         $this->assertSame('張三', $conditions['c_alt_name_chn']);
         $this->assertSame('10', $conditions['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $conditions);
 
         Schema::dropIfExists('operations');
     }
 
     // -------------------------------------------------------
-    // Phase 1 (#834)：3-key 相容層測試
+    // (#834): 3-key 查詢測試
     // -------------------------------------------------------
 
     #[Test]

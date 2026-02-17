@@ -19,7 +19,6 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertEquals([
             'c_personid',
-            'c_sequence',
             'c_alt_name_chn',
             'c_alt_name_type_code',
         ], $schema);
@@ -55,20 +54,19 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertEquals([
             'c_personid' => 12345,
-            'c_sequence' => 1,
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => 10,
         ], $pk);
 
-        // 確認 other_field 被過濾掉
+        // 確認 c_sequence 和 other_field 被過濾掉（c_sequence 不在 3-key schema 中）
         $this->assertArrayNotHasKey('other_field', $pk);
+        $this->assertArrayNotHasKey('c_sequence', $pk);
     }
 
     /** @test */
     public function it_filters_out_null_but_preserves_empty_strings_from_request(): void {
         $request = new Request([
             'c_personid' => 12345,
-            'c_sequence' => '',
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => null,
         ]);
@@ -79,7 +77,6 @@ class CompositePrimaryKeyTest extends TestCase {
         // NULL 應該被過濾掉，但空字串應該保留（支援某些表的主鍵欄位可以為空）
         $this->assertEquals([
             'c_personid' => 12345,
-            'c_sequence' => '',
             'c_alt_name_chn' => '張三',
         ], $pk);
     }
@@ -246,7 +243,6 @@ class CompositePrimaryKeyTest extends TestCase {
     public function it_can_validate_complete_pk(): void {
         $pk = [
             'c_personid' => 12345,
-            'c_sequence' => 1,
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => 10,
         ];
@@ -256,21 +252,20 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_can_validate_pk_with_optional_fields(): void {
-        // c_sequence 是可選的
+        // BIOG_ADDR_DATA 的 c_sequence 是可選的
         $pk = [
             'c_personid' => 12345,
-            'c_alt_name_chn' => '張三',
-            'c_alt_name_type_code' => 10,
+            'c_addr_id' => 100,
+            'c_addr_type' => 2,
         ];
 
-        $this->assertTrue(CompositePrimaryKey::validate($pk, 'ALTNAME_DATA', ['c_sequence']));
+        $this->assertTrue(CompositePrimaryKey::validate($pk, 'BIOG_ADDR_DATA', ['c_sequence']));
     }
 
     /** @test */
     public function it_fails_validation_for_missing_required_field(): void {
         $pk = [
             'c_personid' => 12345,
-            'c_sequence' => 1,
             // 缺少 c_alt_name_chn 和 c_alt_name_type_code
         ];
 
@@ -298,20 +293,19 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertEquals([
             'c_personid' => 12345,
-            'c_sequence' => 1,
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => 10,
         ], $pk);
 
-        // 確認非主鍵欄位被過濾掉
+        // 確認非主鍵欄位被過濾掉（c_sequence 和 c_notes 不在 3-key schema 中）
         $this->assertArrayNotHasKey('c_notes', $pk);
+        $this->assertArrayNotHasKey('c_sequence', $pk);
     }
 
     /** @test */
     public function it_can_build_pk_from_record_array(): void {
         $record = [
             'c_personid' => 12345,
-            'c_sequence' => 1,
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => 10,
         ];
@@ -353,15 +347,14 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_can_parse_legacy_pk_format(): void {
-        // 測試舊格式解析（用於向後相容）
+        // 測試舊格式解析（Schema 已切為 3-key，parseLegacy 使用 3-key 格式）
         $decoded = CompositePrimaryKey::parseLegacy(
-            '12345-1-張三-10',
+            '12345-張三-10',
             'ALTNAME_DATA'
         );
 
         $this->assertEquals([
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => '10',
         ], $decoded);
@@ -369,15 +362,14 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_can_parse_legacy_pk_with_embedded_minus(): void {
-        // 測試欄位值中包含負號的情況
+        // 測試欄位值中包含負號的情況（Schema 已切為 3-key）
         $decoded = CompositePrimaryKey::parseLegacy(
-            '12345-1-張--三-10', // 張-三 在舊格式中被編碼為 張--三
+            '12345-張--三-10', // 張-三 在舊格式中被編碼為 張--三
             'ALTNAME_DATA'
         );
 
         $this->assertEquals([
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張-三',
             'c_alt_name_type_code' => '10',
         ], $decoded);
@@ -385,7 +377,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_returns_null_for_invalid_legacy_pk(): void {
-        // 測試欄位數量不足的情況
+        // ALTNAME_DATA 需要 3 個欄位，只提供 2 個
         $decoded = CompositePrimaryKey::parseLegacy(
             '12345-1',
             'ALTNAME_DATA'
@@ -413,6 +405,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_parses_resource_id_with_encoded_slash(): void {
+        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-張(slash)三-10',
             'ALTNAME_DATA'
@@ -420,7 +413,6 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertEquals([
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張/三',
             'c_alt_name_type_code' => '10',
         ], $result);
@@ -469,7 +461,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_parses_underscore_dot_separator_format(): void {
-        // CodesController 使用的 _._ 分隔符格式
+        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345_._1_._張三_._10',
             'ALTNAME_DATA'
@@ -477,7 +469,6 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertEquals([
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => '10',
         ], $result);
@@ -492,7 +483,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_returns_null_for_insufficient_parts(): void {
-        // ALTNAME_DATA 需要 4 個欄位，只提供 2 個
+        // ALTNAME_DATA 需要 3 個欄位，只提供 2 個
         $result = CompositePrimaryKey::parseStoredResourceId('12345-1', 'ALTNAME_DATA');
 
         $this->assertNull($result);
@@ -556,6 +547,7 @@ class CompositePrimaryKeyTest extends TestCase {
     /** @test */
     public function it_parses_old_format_with_double_dash(): void {
         // 舊格式：-- 代表欄位值中的 -
+        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-張--三-10',
             'ALTNAME_DATA'
@@ -563,6 +555,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertNotNull($result);
         $this->assertEquals('張-三', $result['c_alt_name_chn']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     // === buildStoredResourceId 測試 ===
@@ -603,11 +596,11 @@ class CompositePrimaryKeyTest extends TestCase {
         $this->assertStringContainsString('c_sequence=NULL', $result);
         $this->assertStringContainsString('c_personid=12345', $result);
 
-        // 來回測試：build → parse → 應還原 'NULL' 字串
+        // 來回測試：build → parse → Schema 已切為 3-key，c_sequence 被自動過濾
         $parsed = CompositePrimaryKey::parseStoredResourceId($result, 'ALTNAME_DATA');
         $this->assertNotNull($parsed);
-        $this->assertArrayHasKey('c_sequence', $parsed);
-        $this->assertSame('NULL', $parsed['c_sequence']);
+        $this->assertCount(3, $parsed);
+        $this->assertArrayNotHasKey('c_sequence', $parsed);
         $this->assertEquals('12345', $parsed['c_personid']);
         $this->assertEquals('張三', $parsed['c_alt_name_chn']);
         $this->assertEquals('10', $parsed['c_alt_name_type_code']);
@@ -661,9 +654,9 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_roundtrips_build_and_parse_for_altname(): void {
+        // Phase 2：3-key roundtrip（c_sequence 不參與定位）
         $pk = [
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張-三',
             'c_alt_name_type_code' => '10',
         ];
@@ -719,7 +712,6 @@ class CompositePrimaryKeyTest extends TestCase {
     public function it_roundtrips_build_and_parse_with_chinese_chars(): void {
         $pk = [
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '張三',
             'c_alt_name_type_code' => '10',
         ];
@@ -734,7 +726,6 @@ class CompositePrimaryKeyTest extends TestCase {
     public function it_roundtrips_build_and_parse_with_brackets(): void {
         $pk = [
             'c_personid' => '12345',
-            'c_sequence' => '1',
             'c_alt_name_chn' => '{張三}',
             'c_alt_name_type_code' => '10',
         ];
@@ -747,16 +738,17 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_parses_query_string_format_resource_id(): void {
-        // 直接測試 parseStoredResourceId 對 query-string 格式的偵測
+        // 歷史 4-key query-string → array_intersect_key 自動過濾 c_sequence 返回 3-key
         $resourceId = 'c_personid=12345&c_sequence=1&c_alt_name_chn=%E5%BC%B5%E4%B8%89&c_alt_name_type_code=10';
 
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
         $this->assertNotNull($result);
+        $this->assertCount(3, $result);
         $this->assertEquals('12345', $result['c_personid']);
-        $this->assertEquals('1', $result['c_sequence']);
         $this->assertEquals('張三', $result['c_alt_name_chn']);
         $this->assertEquals('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     /** @test */
@@ -775,33 +767,37 @@ class CompositePrimaryKeyTest extends TestCase {
     /** @test */
     public function it_still_parses_underscore_dot_format_with_equals(): void {
         // 確保含 = 但也含 _._ 的格式不會被誤判為 query-string
-        // （雖然現實中不太可能，但邊界情況要處理）
+        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345_._1_._a=b_._10',
             'ALTNAME_DATA'
         );
 
         $this->assertNotNull($result);
+        $this->assertCount(3, $result);
         $this->assertEquals('12345', $result['c_personid']);
         $this->assertEquals('a=b', $result['c_alt_name_chn']);
+        $this->assertEquals('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     /** @test */
     public function it_rejects_legacy_id_with_equals_via_schema_validation(): void {
         // 舊格式 resource_id 的欄位值恰好含有 '='（極端邊界情況）
         // parse_str('12345-1-a=b-10') 會產生 ['12345-1-a' => 'b-10']
-        // 因為 key 不在 ALTNAME_DATA schema 中，應回退到 dash 分隔符解析
+        // 因為 key 不在 ALTNAME_DATA schema 中，回退到 dash 分隔符解析
+        // 歷史 4-key dash → Phase 2 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-a=b-10',
             'ALTNAME_DATA'
         );
 
         $this->assertNotNull($result);
-        // 應走 dash 分隔符路徑，正確解析出 4 個欄位
+        $this->assertCount(3, $result);
         $this->assertEquals('12345', $result['c_personid']);
-        $this->assertEquals('1', $result['c_sequence']);
         $this->assertEquals('a=b', $result['c_alt_name_chn']);
         $this->assertEquals('10', $result['c_alt_name_type_code']);
+        $this->assertArrayNotHasKey('c_sequence', $result);
     }
 
     /** @test */

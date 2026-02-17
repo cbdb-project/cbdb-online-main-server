@@ -157,56 +157,24 @@ class OperationsController extends Controller {
 
                             break;
                         case "ALTNAME_DATA":
-                            //20251201先遮除原本存取方式，改使用聯合主鍵解析
-                            //$arr3 = $this->fetchAltnameCurrentRow($listsArr['data'][$x]);
-
-                            // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
-                            if (strpos($resource_id, '_._') !== false) {
-                                // 使用 _._格式
-                                $addr_l = explode('_._', $resource_id);
-                            } else {
-                                // 使用 - 格式
-                                $alt = str_replace("--", "-minus", $resource_id);
-                                //聯合主鍵保留字弱點防禦函式，解析保留字。
-                                $alt = $this->unionPKDef_decode($alt);
-                                $addr_l = explode("-", $alt);
-                                foreach ($addr_l as $key => $value) {
-                                    // 注意：必須先處理 (minus) 再處理 minus
-                                    $value = str_replace("(minus)", "-", $value);
-                                    $addr_l[$key] = str_replace("minus", "-", $value);
+                            // (#834 Phase 2): 使用 CompositePrimaryKey 解析 resource_id（支援歷史 4-key 與新 3-key），
+                            // 返回 3-key 查詢
+                            $parsedAlt = CompositePrimaryKey::parseStoredResourceId($resource_id, 'ALTNAME_DATA');
+                            if ($parsedAlt !== null) {
+                                $altQuery = DB::table('ALTNAME_DATA');
+                                foreach ($parsedAlt as $col => $val) {
+                                    if ($val === 'NULL' || $val === null) {
+                                        $altQuery->whereNull($col);
+                                    } else {
+                                        $altQuery->where($col, '=', $val);
+                                    }
                                 }
-                            }
-
-                            $addrCount = count($addr_l);
-                            if ($addrCount >= 4) {
-                                // 4-key 格式：c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code
-                                if (isset($addr_l[1]) && $addr_l[1] == 'NULL') {
-                                    $addr_l[1] = null;
-                                }
-                                $arr3 = DB::table('ALTNAME_DATA')->where([
-                                    ['c_personid', '=', $addr_l[0]],
-                                    ['c_sequence', '=', $addr_l[1]],
-                                    ['c_alt_name_chn', 'like', '%'.$addr_l[2].'%'],
-                                    ['c_alt_name_type_code', '=', $addr_l[3]],
-                                ])->first();
-                            } elseif ($addrCount === 3) {
-                                // Phase 1 相容 (#834)：3-key 格式 (c_personid, c_alt_name_chn, c_alt_name_type_code)
-                                $arr3 = DB::table('ALTNAME_DATA')->where([
-                                    ['c_personid', '=', $addr_l[0]],
-                                    ['c_alt_name_chn', '=', $addr_l[1]],
-                                    ['c_alt_name_type_code', '=', $addr_l[2]],
-                                ])->first();
+                                $arr3 = $altQuery->first();
                             } else {
-                                // 記錄錯誤並跳過此筆資料
                                 \Log::warning("ALTNAME_DATA resource_id 格式不正確: {$resource_id}", [
-                                    'parsed' => $addr_l,
-                                    'expected_count' => '3 or 4',
-                                    'actual_count' => $addrCount,
                                     'operation_id' => $listsArr['data'][$x]['id'] ?? null,
                                 ]);
                                 $arr3 = null;
-
-                                break;
                             }
                             $arr3 = json_encode($arr3);
                             $arr3 = json_decode($arr3, true);
@@ -878,17 +846,19 @@ class OperationsController extends Controller {
         return $segments;
     }
 
+    /**
+     * (#834 Phase 2): 使用 3-key 查詢 ALTNAME_DATA 現行資料列
+     */
     protected function fetchAltnameCurrentRow(array $operation) {
         $decoded = $this->decodeJson($operation['resource_data'] ?? null);
         $decoded = is_array($decoded) ? $decoded : [];
 
         $personId = $decoded['c_personid'] ?? null;
-        $sequence = $decoded['c_sequence'] ?? null;
         $altNameChn = $decoded['c_alt_name_chn'] ?? null;
         $typeCode = $decoded['c_alt_name_type_code'] ?? null;
 
-        if ($personId === null || $sequence === null || $altNameChn === null || $typeCode === null) {
-            // 優先嘗試 query-string 格式（新格式）
+        // 從 resource_id 補齊缺少的欄位
+        if ($personId === null || $altNameChn === null || $typeCode === null) {
             $namedParts = CompositePrimaryKey::parseStoredResourceId(
                 $operation['resource_id'] ?? '',
                 'ALTNAME_DATA'
@@ -898,10 +868,6 @@ class OperationsController extends Controller {
                     $val = $namedParts['c_personid'];
                     $personId = ($val === 'NULL') ? null : (int) $val;
                 }
-                if ($sequence === null && isset($namedParts['c_sequence'])) {
-                    $val = $namedParts['c_sequence'];
-                    $sequence = ($val === 'NULL') ? null : (int) $val;
-                }
                 if ($altNameChn === null && isset($namedParts['c_alt_name_chn'])) {
                     $val = $namedParts['c_alt_name_chn'];
                     $altNameChn = ($val === 'NULL') ? null : $val;
@@ -910,38 +876,9 @@ class OperationsController extends Controller {
                     $val = $namedParts['c_alt_name_type_code'];
                     $typeCode = ($val === 'NULL') ? null : (int) $val;
                 }
-            } else {
-                // 回退到舊格式位置解析（4-key: personid-sequence-alt_name_chn-type_code）
-                $parts = $this->parseCompoundKey($operation['resource_id'] ?? null);
-                if ($personId === null && isset($parts[0]) && is_numeric($parts[0])) {
-                    $personId = (int) $parts[0];
-                }
-                if ($sequence === null && isset($parts[1]) && is_numeric($parts[1])) {
-                    $sequence = (int) $parts[1];
-                }
-                if ($altNameChn === null && isset($parts[2])) {
-                    $altNameChn = $parts[2];
-                }
-                if ($typeCode === null && isset($parts[3]) && is_numeric($parts[3])) {
-                    $typeCode = (int) $parts[3];
-                }
             }
         }
 
-        // NOTE (#834): 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
-        // c_sequence 非 PK。
-
-        // 4-key 查詢：所有欄位皆有值時（相容歷史 4-key resource_id）
-        if ($personId !== null && $sequence !== null && $altNameChn !== null && $typeCode !== null) {
-            return DB::table('ALTNAME_DATA')->where([
-                ['c_personid', '=', $personId],
-                ['c_sequence', '=', $sequence],
-                ['c_alt_name_chn', '=', $altNameChn],
-                ['c_alt_name_type_code', '=', $typeCode],
-            ])->first();
-        }
-
-        // Phase 1 相容 (#834)：c_sequence 未知時，以 DB 3-key 查詢
         if ($personId !== null && $altNameChn !== null && $typeCode !== null) {
             return DB::table('ALTNAME_DATA')->where([
                 ['c_personid', '=', $personId],
@@ -957,10 +894,8 @@ class OperationsController extends Controller {
         $map = [
             'BIOG_MAIN' => ['c_personid'],
             'BIOG_ADDR_DATA' => ['c_personid','c_addr_id','c_addr_type','c_sequence'],
-            // NOTE: 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
-            // c_sequence 非 PK 欄位。此處暫維持 4-key 以相容現有 resource_id 格式，
-            // 待 Phase 2 (#834) 統一切為 3-key。
-            'ALTNAME_DATA' => ['c_personid','c_sequence','c_alt_name_chn','c_alt_name_type_code'],
+            // (#834 Phase 2): 3-key，c_sequence 不參與定位
+            'ALTNAME_DATA' => ['c_personid','c_alt_name_chn','c_alt_name_type_code'],
             'BIOG_TEXT_DATA' => ['c_personid','c_textid','c_role_id'],
             'POSTED_TO_OFFICE_DATA' => ['c_office_id','c_posting_id'],
             'OFFICE_CODES' => ['c_office_id'],

@@ -417,7 +417,7 @@
                         <div class="btn-group float-right">
                             <a href=""
                                onclick="
-                                           let msg = '您真的确定要删除吗？\n\n请确认！';
+                                           let msg = '您真的確定要刪除嗎？\n\n請確認！';
                                            if (confirm(msg)===true){
                                            event.preventDefault();
                                            document.getElementById('delete-form').submit();

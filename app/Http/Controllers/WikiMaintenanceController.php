@@ -171,7 +171,7 @@ class WikiMaintenanceController extends Controller {
     }
 
     public function cancelImport(Request $request, $taskId) {
-        // 设置取消标志
+        // 設定取消标志
         $this->updateProgress($taskId, 0, '用戶已取消導入任務', 'cancelled');
 
         return response()->json([
@@ -319,7 +319,7 @@ class WikiMaintenanceController extends Controller {
                 DB::beginTransaction();
 
                 foreach ($records as $record) {
-                    // 每处理 100 条记录检查一次是否取消
+                    // 每处理 100 筆記錄检查一次是否取消
                     if ($processedCount % 100 == 0 && $this->isTaskCancelled($taskId)) {
                         DB::rollBack();
 

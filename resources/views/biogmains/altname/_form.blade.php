@@ -4,7 +4,7 @@
 
     $isEdit = isset($row);
 
-    // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
+    // 处理編輯模式的数据 - 必须在构建 formAction 之前执行
     if ($isEdit) {
         // $alt 從 Controller 傳來時已經是編碼格式（如 12345-1-測試(slash)別名-1）
         // 分隔符 - 不應該被編碼，所以不能對整個 $alt 調用 unionPKDef()
@@ -79,7 +79,7 @@
                 @if($isEdit && isset($text_str) && $text_str)
                     <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
                 @else
-                    <option value="" selected="selected">请搜索</option>
+                    <option value="" selected="selected">請搜尋</option>
                 @endif
             </select>
         </div>

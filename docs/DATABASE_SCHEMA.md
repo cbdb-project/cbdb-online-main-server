@@ -2348,7 +2348,7 @@
 | `avatar` | varchar(255) | NO | 'avatar5.png' |  |
 | `settings` | longtext | YES | NULL |  |
 | `confirmation_token` | varchar(255) | NO | (NULL) |  |
-| `is_active` | smallint(6) | NO | 0 | 0 未验证， 2 激活邮件， 1 有编辑权限 |
+| `is_active` | smallint(6) | NO | 0 | 0 未验证， 2 激活邮件， 1 有編輯权限 |
 | `is_admin` | smallint(6) | NO | 0 |  |
 | `remember_token` | varchar(100) | YES | NULL |  |
 | `created_at` | timestamp | YES | NULL |  |

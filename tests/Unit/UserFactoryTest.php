@@ -69,11 +69,11 @@ class UserFactoryTest extends TestCase {
     #[Test]
     public function it_can_create_user_with_custom_attributes() {
         $user = User::factory()->create([
-            'name' => '测试用户',
+            'name' => '测试用戶',
             'email' => 'test@example.com',
         ]);
 
-        $this->assertEquals('测试用户', $user->name);
+        $this->assertEquals('测试用戶', $user->name);
         $this->assertEquals('test@example.com', $user->email);
     }
 

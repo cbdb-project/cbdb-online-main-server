@@ -315,7 +315,7 @@ class PrometheusMetricsTest extends TestCase {
         $this->assertStringContainsString('path="/"', $content, '未啟用 include_route_params 時使用實際路徑');
 
         // 警告：这种配置在生产环境中会导致内存泄漏
-        // 建议将 include_route_params 设置为 true
+        // 建议将 include_route_params 設定为 true
     }
 
     #[Test]

@@ -9,7 +9,7 @@ use App\Support\CompositePrimaryKey;
     @include('biogmains.defense')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">别名</h3>
+            <h3 class="card-title">別名</h3>
         </div>
 
         <div class="card-body">
@@ -20,7 +20,7 @@ use App\Support\CompositePrimaryKey;
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查询到{{ $basicinformation->altnames_count }}条记录</caption>
+                <caption>共查詢到{{ $basicinformation->altnames_count }}筆記錄</caption>
                 <thead>
                 <tr>
                     <th>序號</th>
@@ -68,7 +68,7 @@ if ($altTypeLabel === '') {
                                         <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}">edit</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的确定要删除吗？\n\n请确认！';
+                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
                                                        document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code }}').submit();

@@ -97,7 +97,7 @@
                 @if($isEdit && isset($text_str) && $text_str)
                     <option value="{{ $row->c_source }}" selected="selected">{{ $text_str }}</option>
                 @else
-                    <option value="" selected="selected">请搜索</option>
+                    <option value="" selected="selected">請搜尋</option>
                 @endif
             </select>
         </div>
@@ -121,7 +121,7 @@
         <label for="c_natal" class="col-sm-2 col-form-label">娘家地址(c_natal)</label>
         <div class="col-sm-10">
             <select class="form-control select2" name="c_natal">
-                <option disabled value="">请选择</option>
+                <option disabled value="">請選擇</option>
                 <option value="0" {{ ($isEdit && $row->c_natal == 0) ? 'selected' : '' }}>0-否</option>
                 <option value="1" {{ ($isEdit && $row->c_natal == 1) ? 'selected' : '' }}>1-是</option>
             </select>

@@ -3,7 +3,7 @@
     use App\Support\CompositePrimaryKey;
     $isEdit = isset($row);
 
-    // 处理编辑模式的数据 - 必须在构建 formAction 之前执行
+    // 处理編輯模式的数据 - 必须在构建 formAction 之前执行
     if ($isEdit) {
         $row->c_notes = unionPKDef($row->c_notes);
         $row->c_pages = unionPKDef($row->c_pages);

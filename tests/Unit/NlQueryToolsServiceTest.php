@@ -22,7 +22,7 @@ class NlQueryToolsServiceTest extends TestCase {
         // 禁用外键约束检查（SQLite）
         DB::statement('PRAGMA foreign_keys = OFF');
 
-        // 设置测试白名单
+        // 設定测试白名单
         Config::set('codes.tables', [
             'DYNASTIES' => '朝代表',
             'BIOG_MAIN' => '人物主表',

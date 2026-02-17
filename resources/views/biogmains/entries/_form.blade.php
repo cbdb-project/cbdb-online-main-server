@@ -190,7 +190,7 @@
                 @if($isEdit && isset($res['text_str']))
                     <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
                 @else
-                    <option value="{{ $isEdit ? '' : '0' }}" selected="selected">{{ $isEdit ? '请搜索' : '' }}</option>
+                    <option value="{{ $isEdit ? '' : '0' }}" selected="selected">{{ $isEdit ? '請搜尋' : '' }}</option>
                 @endif
             </select>
         </div>

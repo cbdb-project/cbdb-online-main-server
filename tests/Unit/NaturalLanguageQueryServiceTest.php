@@ -18,7 +18,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        // Mock config - 必须在创建服务之前设置
+        // Mock config - 必须在创建服务之前設定
         Config::set('services.gemini.api_key', 'test-api-key');
 
         $this->schemaService = $this->createMock(DatabaseSchemaService::class);

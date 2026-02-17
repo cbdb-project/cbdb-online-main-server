@@ -20,7 +20,7 @@ class WikiImportJobTest extends TestCase {
             'prefix' => '',
         ]);
 
-        // 设置缓存为数组驱动
+        // 設定缓存为数组驱动
         config(['cache.default' => 'array']);
 
         // 创建测试表

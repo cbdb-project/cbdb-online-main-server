@@ -20,7 +20,7 @@ use App\Support\CompositePrimaryKey;
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查询到{{ $basicinformation->assoc_count }}条记录</caption>
+                <caption>共查詢到{{ $basicinformation->assoc_count }}筆記錄</caption>
                 <thead>
                 <tr>
                     <th>序號</th>
@@ -71,7 +71,7 @@ use App\Support\CompositePrimaryKey;
                                         <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.assoc.edit.query', ['id' => $basicinformation->c_personid], $assocPk) }}">edit</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的确定要删除吗？\n\n请确认！';
+                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
                                                        document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_assoc_code."-".$value->pivot->c_assoc_id."-".$value->pivot->c_kin_code."-".$value->pivot->c_kin_id."-".$value->pivot->c_assoc_kin_code."-".$value->pivot->c_assoc_kin_id."-".$value->pivot->c_text_title }}').submit();

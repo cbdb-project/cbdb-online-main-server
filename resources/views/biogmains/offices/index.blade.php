@@ -19,7 +19,7 @@ use App\Support\CompositePrimaryKey;
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查询到{{ $basicinformation->offices_count }}条记录</caption>
+                <caption>共查詢到{{ $basicinformation->offices_count }}筆記錄</caption>
                 <thead>
                 <tr>
                     <th>序號</th>
@@ -60,7 +60,7 @@ use App\Support\CompositePrimaryKey;
                                         <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.edit.query', ['id' => $basicinformation->c_personid], $officePk) }}">edit</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的确定要删除吗？\n\n请确认！';
+                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
                                                    if (confirm(msg)===true){
                                                        event.preventDefault();
                                                        document.getElementById('{{ $officeFormId }}').submit();

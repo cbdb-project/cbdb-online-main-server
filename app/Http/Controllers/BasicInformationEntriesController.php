@@ -240,7 +240,7 @@ class BasicInformationEntriesController extends Controller {
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
                 ['label' => '入仕', 'url' => route('basicinformation.entries.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }
@@ -477,7 +477,7 @@ class BasicInformationEntriesController extends Controller {
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
                 ['label' => '入仕', 'url' => route('basicinformation.entries.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }

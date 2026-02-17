@@ -25,9 +25,14 @@ class CompositePrimaryKey {
         'BIOG_MAIN' => [
             'c_personid',
         ],
+        // ⚠️ ALTNAME_DATA 定位 key 收斂計畫 (#834)
+        // 資料庫 PK 為 3-key: (c_personid, c_alt_name_chn, c_alt_name_type_code)
+        // c_sequence 為一般排序欄位，不參與定位。
+        // 此處暫維持 4-key 以相容歷史 resource_id / URL 格式，
+        // 待 Phase 2 切為 3-key: ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code']
         'ALTNAME_DATA' => [
             'c_personid',
-            'c_sequence',
+            'c_sequence',       // 非 PK，Phase 2 將移除
             'c_alt_name_chn',
             'c_alt_name_type_code',
         ],

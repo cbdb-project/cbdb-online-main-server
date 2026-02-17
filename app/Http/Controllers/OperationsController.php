@@ -876,9 +876,10 @@ class OperationsController extends Controller {
 
         $personId = $decoded['c_personid'] ?? null;
         $sequence = $decoded['c_sequence'] ?? null;
+        $altNameChn = $decoded['c_alt_name_chn'] ?? null;
         $typeCode = $decoded['c_alt_name_type_code'] ?? null;
 
-        if ($personId === null || $sequence === null || $typeCode === null) {
+        if ($personId === null || $sequence === null || $altNameChn === null || $typeCode === null) {
             // 優先嘗試 query-string 格式（新格式）
             $namedParts = CompositePrimaryKey::parseStoredResourceId(
                 $operation['resource_id'] ?? '',
@@ -893,12 +894,16 @@ class OperationsController extends Controller {
                     $val = $namedParts['c_sequence'];
                     $sequence = ($val === 'NULL') ? null : (int) $val;
                 }
+                if ($altNameChn === null && isset($namedParts['c_alt_name_chn'])) {
+                    $val = $namedParts['c_alt_name_chn'];
+                    $altNameChn = ($val === 'NULL') ? null : $val;
+                }
                 if ($typeCode === null && isset($namedParts['c_alt_name_type_code'])) {
                     $val = $namedParts['c_alt_name_type_code'];
                     $typeCode = ($val === 'NULL') ? null : (int) $val;
                 }
             } else {
-                // 回退到舊格式位置解析
+                // 回退到舊格式位置解析（4-key: personid-sequence-alt_name_chn-type_code）
                 $parts = $this->parseCompoundKey($operation['resource_id'] ?? null);
                 if ($personId === null && isset($parts[0]) && is_numeric($parts[0])) {
                     $personId = (int) $parts[0];
@@ -906,19 +911,25 @@ class OperationsController extends Controller {
                 if ($sequence === null && isset($parts[1]) && is_numeric($parts[1])) {
                     $sequence = (int) $parts[1];
                 }
+                if ($altNameChn === null && isset($parts[2])) {
+                    $altNameChn = $parts[2];
+                }
                 if ($typeCode === null && isset($parts[3]) && is_numeric($parts[3])) {
                     $typeCode = (int) $parts[3];
                 }
             }
         }
 
-        if ($personId === null || $sequence === null || $typeCode === null) {
+        // NOTE (#834): 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
+        // c_sequence 非 PK。暫維持 4-key 查詢以相容歷史格式，Phase 2 將統一切為 3-key。
+        if ($personId === null || $sequence === null || $altNameChn === null || $typeCode === null) {
             return null;
         }
 
         return DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $personId],
             ['c_sequence', '=', $sequence],
+            ['c_alt_name_chn', '=', $altNameChn],
             ['c_alt_name_type_code', '=', $typeCode],
         ])->first();
     }
@@ -927,7 +938,10 @@ class OperationsController extends Controller {
         $map = [
             'BIOG_MAIN' => ['c_personid'],
             'BIOG_ADDR_DATA' => ['c_personid','c_addr_id','c_addr_type','c_sequence'],
-            'ALTNAME_DATA' => ['c_personid','c_sequence','c_alt_name_type_code'],
+            // NOTE: 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
+            // c_sequence 非 PK 欄位。此處暫維持 4-key 以相容現有 resource_id 格式，
+            // 待 Phase 2 (#834) 統一切為 3-key。
+            'ALTNAME_DATA' => ['c_personid','c_sequence','c_alt_name_chn','c_alt_name_type_code'],
             'BIOG_TEXT_DATA' => ['c_personid','c_textid','c_role_id'],
             'POSTED_TO_OFFICE_DATA' => ['c_office_id','c_posting_id'],
             'OFFICE_CODES' => ['c_office_id'],

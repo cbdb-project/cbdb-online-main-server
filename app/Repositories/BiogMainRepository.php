@@ -2597,6 +2597,13 @@ class BiogMainRepository {
         return $addr_l;
     }
 
+    /**
+     * 依複合主鍵取得 ALTNAME_DATA 記錄
+     *
+     * NOTE (#834): 資料庫 PK 為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)，
+     * c_sequence 非 PK。此方法暫維持 4-key 查詢以相容歷史格式，
+     * 待 Phase 2 統一切為 3-key。
+     */
     public function altnameById($id) {
         $addr_l = $this->parseAltnameId($id);
 

@@ -30,6 +30,8 @@ class BasicInformationProposalController extends Controller {
         ],
         'altnames' => [
             'table' => 'ALTNAME_DATA',
+            // NOTE (#834): 資料庫 PK 為 3-key，c_sequence 非 PK；
+            // 暫維持 4-key 以相容歷史格式，Phase 2 將移除 c_sequence。
             'key_columns' => ['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'],
             'controller' => 'BasicInformationAltnamesController',
             'route_prefix' => 'basicinformation.altnames',

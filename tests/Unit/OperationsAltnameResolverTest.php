@@ -53,6 +53,7 @@ class OperationsAltnameResolverTest extends TestCase {
             'resource_data' => json_encode([
                 'c_personid' => 123,
                 'c_sequence' => 1,
+                'c_alt_name_chn' => '張-一',
                 'c_alt_name_type_code' => 10,
             ]),
         ];
@@ -129,9 +130,10 @@ class OperationsAltnameResolverTest extends TestCase {
         // $current 和 $fallback 都不含完整 key，迫使 buildKeyConditions 解析 resource_id
         $conditions = $controller->publicBuildKeyConditions($op, [], []);
 
-        $this->assertCount(3, $conditions); // ALTNAME_DATA schema 有 3 個 key columns
+        $this->assertCount(4, $conditions); // ALTNAME_DATA key columns: c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code
         $this->assertSame('123', $conditions['c_personid']);
         $this->assertNull($conditions['c_sequence']); // 'NULL' 應轉為 PHP null
+        $this->assertSame('張三', $conditions['c_alt_name_chn']);
         $this->assertSame('10', $conditions['c_alt_name_type_code']);
 
         Schema::dropIfExists('operations');

@@ -1094,4 +1094,190 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             'row_pk_text' => "c_personid={$person2->c_personid}&c_kin_id={$person1->c_personid}&c_kin_code=303",
         ]);
     }
+
+    #[Test]
+    public function assoc_store_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $request = new \Illuminate\Http\Request([
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_assocship_pair' => 5,
+            'c_kin_code' => 0,
+            'c_kinship_pair' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kinship_pair' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+
+        $repository->assocStoreById($request, $person1->c_personid);
+
+        $logs = DB::table('audit_log')
+            ->where('table_name', 'ASSOC_DATA')
+            ->where('operation', 'INSERT')
+            ->get();
+
+        $this->assertSame(2, $logs->count());
+        $this->assertSame(1, $logs->pluck('operation_id')->unique()->count());
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 4;
+        }));
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 5;
+        }));
+    }
+
+    #[Test]
+    public function assoc_update_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_assoc_id' => $person1->c_personid,
+            'c_assoc_code' => 5,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $request = new \Illuminate\Http\Request([
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 7,
+            'c_assocship_pair' => 8,
+            'c_kin_code' => 0,
+            'c_kinship_pair' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kinship_pair' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+
+        $repository->assocUpdateById(
+            $request,
+            "{$person1->c_personid}-4-{$person2->c_personid}-0-0-0-0-測試文獻-1000",
+            $person1->c_personid
+        );
+
+        $logs = DB::table('audit_log')
+            ->where('table_name', 'ASSOC_DATA')
+            ->where('operation', 'UPDATE')
+            ->get();
+
+        $this->assertSame(2, $logs->count());
+        $this->assertSame(1, $logs->pluck('operation_id')->unique()->count());
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 7;
+        }));
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 8;
+        }));
+    }
+
+    #[Test]
+    public function assoc_delete_writes_audit_log_for_mirrored_row() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_assoc_id' => $person1->c_personid,
+            'c_assoc_code' => 5,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '測試文獻',
+            'c_assoc_first_year' => 1000,
+            'c_source' => 200,
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $repository->assocDeleteById(
+            "{$person1->c_personid}-4-{$person2->c_personid}-0-0-0-0-測試文獻-1000",
+            $person1->c_personid
+        );
+
+        $logs = DB::table('audit_log')
+            ->where('table_name', 'ASSOC_DATA')
+            ->where('operation', 'DELETE')
+            ->get();
+
+        $this->assertSame(2, $logs->count());
+        $this->assertSame(1, $logs->pluck('operation_id')->unique()->count());
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 4;
+        }));
+        $this->assertTrue($logs->contains(function ($log) use ($person1, $person2) {
+            $rowPk = (array) json_decode($log->row_pk, true);
+
+            return ($rowPk['c_personid'] ?? null) == $person2->c_personid
+                && ($rowPk['c_assoc_id'] ?? null) == $person1->c_personid
+                && ($rowPk['c_assoc_code'] ?? null) == 5;
+        }));
+    }
 }

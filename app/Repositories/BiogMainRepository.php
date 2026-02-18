@@ -3100,10 +3100,11 @@ class BiogMainRepository {
             return $data;
         }
 
-        $len = mb_strlen($name, 'utf-8');
+        $normalizedNameForLookup = VariantCharNormalizer::normalize($name);
+        $len = mb_strlen($normalizedNameForLookup, 'utf-8');
         $prefixes = [];
         for ($i = $len; $i >= 1; $i--) {
-            $prefixes[] = mb_substr($name, 0, $i, 'utf-8');
+            $prefixes[] = mb_substr($normalizedNameForLookup, 0, $i, 'utf-8');
         }
 
         $surnameRows = DB::table('pinyin')
@@ -3125,11 +3126,12 @@ class BiogMainRepository {
 
         if ($c_surname_chn != '') {
             $surnameLength = mb_strlen($c_surname_chn, 'utf-8');
+            $c_surname_chn = mb_substr($name, 0, $surnameLength, 'utf-8');
             $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
             $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
-            $c_name = $c_surname.' '.$c_mingzi;
+            $c_name = trim($c_surname.' '.$c_mingzi);
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
             $data['c_mingzi_chn'] = $c_mingzi_chn;

@@ -42,6 +42,7 @@ class AutoPinyinTest extends TestCase {
             ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
             ['lastname_chn' => '歐陽', 'lastname_pinyin' => 'Ouyang'],
             ['lastname_chn' => '林', 'lastname_pinyin' => 'Lin'],
+            ['lastname_chn' => '於', 'lastname_pinyin' => 'Yu'],
         ]);
 
         $this->repository = new BiogMainRepository();
@@ -94,6 +95,7 @@ class AutoPinyinTest extends TestCase {
         $this->assertSame('王', $result['c_surname_chn']);
         $this->assertSame('Wang', $result['c_surname']);
         $this->assertSame('', $result['c_mingzi_chn']);
+        $this->assertSame('Wang', $result['c_name']);
     }
 
     #[Test]
@@ -114,5 +116,15 @@ class AutoPinyinTest extends TestCase {
         $this->assertSame('Lin', $result['c_surname']);
         $this->assertSame('林', $result['c_mingzi_chn']);
         $this->assertSame('Lin Lin', $result['c_name']);
+    }
+
+    #[Test]
+    public function testVariantSurnameCanMatchNormalizedKnownSurname(): void {
+        $result = $this->repository->auto_pinyin(['c_name_chn' => '于慎行']);
+
+        $this->assertSame('于', $result['c_surname_chn']);
+        $this->assertSame('Yu', $result['c_surname']);
+        $this->assertSame('慎行', $result['c_mingzi_chn']);
+        $this->assertStringStartsWith('Yu ', $result['c_name']);
     }
 }

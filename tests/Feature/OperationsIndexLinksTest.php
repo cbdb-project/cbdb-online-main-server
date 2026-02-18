@@ -276,4 +276,78 @@ class OperationsIndexLinksTest extends TestCase {
         $response->assertSee('POSTED_TO_OFFICE_DATA');
         $response->assertSee('POSTED_TO_ADDR_DATA');
     }
+
+    #[Test]
+    public function test_operations_index_renders_composite_rows_for_multi_person_operation(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'multi-person@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 101, 'c_name_chn' => '甲', 'c_name' => 'Jia'],
+            ['c_personid' => 202, 'c_name_chn' => '乙', 'c_name' => 'Yi'],
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_office_id' => 10,
+            'c_posting_id' => 1,
+            'c_personid' => 101,
+            'c_fy_intercalary' => 0,
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 101,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'resource_id' => 'c_office_id=10&c_posting_id=1',
+            'resource_data' => json_encode(['c_office_id' => 10, 'c_posting_id' => 1, 'c_fy_intercalary' => 1], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode(['c_office_id' => 10, 'c_posting_id' => 1, 'c_fy_intercalary' => 0], JSON_UNESCAPED_UNICODE),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $now = now()->format('Y-m-d H:i:s');
+        \Illuminate\Support\Facades\DB::table('audit_log')->insert([
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+                'old_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 2], JSON_UNESCAPED_UNICODE),
+            ],
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=202&c_kin_id=101&c_kin_code=3',
+                'old_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 4], JSON_UNESCAPED_UNICODE),
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertSee('/basicinformation/101/edit', false);
+        $response->assertSee('/basicinformation/202/edit', false);
+        $response->assertSee('rowspan="2"', false);
+        $response->assertSee('主操作');
+        $response->assertSee('連動');
+    }
 }

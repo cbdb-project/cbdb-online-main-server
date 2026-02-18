@@ -71,6 +71,28 @@ if (str_contains($rawResourceId ?? '', '=') && !str_contains($rawResourceId ?? '
 }
 $item->resource_data = unionPKDef($item->resource_data);
 @endphp
+                        @php
+                            $affectedPeople = is_array($item->affected_people ?? null) ? $item->affected_people : [];
+                            if (empty($affectedPeople)) {
+                                if (!empty($item->biogmain) && (int) ($item->c_personid ?? 0) !== 0) {
+                                    $affectedPeople[] = [
+                                        'id' => (int) $item->c_personid,
+                                        'name_chn' => $item->biogmain->c_name_chn ?? '',
+                                        'name' => $item->biogmain->c_name ?? '',
+                                        'is_primary' => true,
+                                    ];
+                                } else {
+                                    $affectedPeople[] = [
+                                        'id' => null,
+                                        'name_chn' => '',
+                                        'name' => '',
+                                        'is_primary' => false,
+                                    ];
+                                }
+                            }
+                            $personRowspan = count($affectedPeople);
+                            $firstPerson = $affectedPeople[0];
+                        @endphp
                         <tr>
                             <td>
                             @php
@@ -103,10 +125,17 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
                                 }
                             @endphp
-                            @if(!$hasPersonLink)
+                            @if(empty($firstPerson['id']))
                                 <span class="text-muted">(本修改不涉及人物)</span>
                             @else
-                                <a href="{{ $personLink }}">{{ $item->biogmain->c_name_chn.' '.$item->biogmain->c_name }}</a>
+                                <a href="/basicinformation/{{ $firstPerson['id'] }}/edit">
+                                    {{ trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) !== '' ? trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) : $firstPerson['id'] }}
+                                </a>
+                                @if($personRowspan > 1)
+                                    <span class="badge badge-secondary" style="margin-left:4px;">
+                                        {{ !empty($firstPerson['is_primary']) ? '主操作' : '連動' }}
+                                    </span>
+                                @endif
                             @endif
                             </td>
                             @php
@@ -123,7 +152,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     ? implode(' / ', $auditTableNames)
                                     : (string) $item->resource;
                             @endphp
-                            <td>
+                            <td rowspan="{{ $personRowspan }}">
                                 {{ $resourceDisplay }}
                             </td>
                             @php
@@ -199,7 +228,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @php
                                     $canCompare = ($hasAuditLogs || $hasDiffContent) && (int)$item->op_type !== 4;
                                 @endphp
-                            <td>
+                            <td rowspan="{{ $personRowspan }}">
                                 @if($isProposal)
                                     <div class="proposal-status" style="margin-bottom:6px;">
                                         @if($reviewStatus === 'approved')
@@ -368,14 +397,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     </div>
                                 @endif
                             </td>
-                            <td>
+                            <td rowspan="{{ $personRowspan }}">
                                 @if($resourceLink)
                                     <a href="{{ $resourceLink }}">{{ $item->resource_id }}</a>
                                 @else
                                     {{ $item->resource_id }}
                                 @endif
                             </td>
-                            <td>
+                            <td rowspan="{{ $personRowspan }}">
                                 @php
                                     $opTypeLabels = [
                                         1 => '1-新增',
@@ -388,7 +417,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @endphp
                                 {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}
                             </td>
-                            <td>{{ $item->user->name }}</td>
+                            <td rowspan="{{ $personRowspan }}">{{ $item->user->name }}</td>
                             @php
                                 $updatedUtc = '';
                                 $updatedDisplay = '';
@@ -407,10 +436,31 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     }
                                 }
                             @endphp
-                            <td class="js-utc-datetime" data-utc="{{ $updatedUtc }}">
+                            <td rowspan="{{ $personRowspan }}" class="js-utc-datetime" data-utc="{{ $updatedUtc }}">
                                 {{ $updatedDisplay }}
                             </td>
                         </tr>
+                        @if($personRowspan > 1)
+                            @for($personIdx = 1; $personIdx < $personRowspan; $personIdx++)
+                                @php
+                                    $relatedPerson = $affectedPeople[$personIdx];
+                                @endphp
+                                <tr>
+                                    <td>
+                                        @if(empty($relatedPerson['id']))
+                                            <span class="text-muted">(本修改不涉及人物)</span>
+                                        @else
+                                            <a href="/basicinformation/{{ $relatedPerson['id'] }}/edit">
+                                                {{ trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) !== '' ? trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) : $relatedPerson['id'] }}
+                                            </a>
+                                            <span class="badge badge-secondary" style="margin-left:4px;">
+                                                {{ !empty($relatedPerson['is_primary']) ? '主操作' : '連動' }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endfor
+                        @endif
                     @endforeach
                 </tbody>
 

@@ -1186,7 +1186,7 @@ class BiogMainRepository {
         $c_autogen_notes = $row->c_autogen_notes;
         $old_kin_id = $row->c_kin_id;
         $old_kin_code = $row->c_kin_code;
-        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment', 'c_kinship_pair']);
+        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment', 'c_kinship_pair', 'c_created_by', 'c_created_date']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];

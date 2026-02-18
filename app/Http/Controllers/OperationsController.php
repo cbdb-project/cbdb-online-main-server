@@ -70,7 +70,12 @@ class OperationsController extends Controller {
             $arr1 = $dataRows[$x]['resource_data'];
             $arr2 = $dataRows[$x]['resource_original'];
             $operationId = (string) ($dataRows[$x]['id'] ?? '');
-            $lists[$x]->setAttribute('audit_logs', $auditLogsByOperation[$operationId] ?? []);
+            $auditLogsForOperation = $auditLogsByOperation[$operationId] ?? [];
+            $lists[$x]->setAttribute('audit_logs', $auditLogsForOperation);
+            $lists[$x]->setAttribute(
+                'affected_person_ids',
+                $this->extractAffectedPersonIds($dataRows[$x], $auditLogsForOperation)
+            );
             //20191225實時比對的程式判斷
             if (!empty($c_personid = $dataRows[$x]['c_personid']) && $dataRows[$x]['resource'] == "BIOG_MAIN") {
                 $arr3 = BiogMain::find($c_personid)->toArray();
@@ -596,6 +601,7 @@ class OperationsController extends Controller {
                 $lists[$x]->setAttribute('resource_diff', null);
             }
         }
+        $this->attachAffectedPeople($lists);
         //echo "<pre><code>";
         //print_r($lists[0]['resource_original']); //成功
         //echo "</code></pre>";
@@ -1108,11 +1114,116 @@ class OperationsController extends Controller {
                 'table_name' => (string) $log->table_name,
                 'operation' => (string) $log->operation,
                 'row_pk_text' => (string) $log->row_pk_text,
+                'row_pk' => $rowPk,
+                'old_data' => $oldData,
+                'new_data' => $newData,
                 'diff' => $this->buildAuditDiff($oldData, $newData, $currentData),
             ];
         }
 
         return $grouped;
+    }
+
+    protected function extractAffectedPersonIds(array $operationRow, array $auditLogs): array {
+        $personIds = [];
+        $pushId = static function ($value) use (&$personIds): void {
+            if ($value === null || $value === '' || !is_numeric($value)) {
+                return;
+            }
+
+            $id = (int) $value;
+            if ($id <= 0) {
+                return;
+            }
+
+            $personIds[] = $id;
+        };
+
+        $pushId($operationRow['c_personid'] ?? null);
+
+        foreach ($auditLogs as $audit) {
+            if (!is_array($audit)) {
+                continue;
+            }
+
+            $tableName = strtoupper(trim((string) ($audit['table_name'] ?? '')));
+            $rowPk = is_array($audit['row_pk'] ?? null) ? $audit['row_pk'] : [];
+            $oldData = is_array($audit['old_data'] ?? null) ? $audit['old_data'] : [];
+            $newData = is_array($audit['new_data'] ?? null) ? $audit['new_data'] : [];
+
+            $pushId($rowPk['c_personid'] ?? null);
+            $pushId($oldData['c_personid'] ?? null);
+            $pushId($newData['c_personid'] ?? null);
+
+            if (in_array($tableName, ['KIN_DATA', 'ASSOC_DATA'], true)) {
+                $pushId($rowPk['c_kin_id'] ?? null);
+                $pushId($oldData['c_kin_id'] ?? null);
+                $pushId($newData['c_kin_id'] ?? null);
+            }
+        }
+
+        $personIds = array_values(array_unique($personIds));
+        sort($personIds);
+
+        return $personIds;
+    }
+
+    protected function attachAffectedPeople($lists): void {
+        $allPersonIds = [];
+        foreach ($lists as $item) {
+            $ids = $item->affected_person_ids ?? [];
+            if (is_array($ids)) {
+                foreach ($ids as $id) {
+                    if (is_numeric($id) && (int) $id > 0) {
+                        $allPersonIds[] = (int) $id;
+                    }
+                }
+            }
+        }
+        $allPersonIds = array_values(array_unique($allPersonIds));
+
+        $peopleMap = [];
+        if (!empty($allPersonIds) && Schema::hasTable('BIOG_MAIN')) {
+            $peopleMap = DB::table('BIOG_MAIN')
+                ->whereIn('c_personid', $allPersonIds)
+                ->get(['c_personid', 'c_name_chn', 'c_name'])
+                ->keyBy('c_personid');
+        }
+
+        foreach ($lists as $item) {
+            $ids = $item->affected_person_ids ?? [];
+            if (!is_array($ids) || empty($ids)) {
+                $item->setAttribute('affected_people', []);
+
+                continue;
+            }
+
+            $primaryId = is_numeric($item->c_personid ?? null) ? (int) $item->c_personid : null;
+            $people = [];
+            foreach ($ids as $id) {
+                if (!is_numeric($id) || (int) $id <= 0) {
+                    continue;
+                }
+                $personId = (int) $id;
+                $person = $peopleMap[$personId] ?? null;
+                $people[] = [
+                    'id' => $personId,
+                    'name_chn' => $person->c_name_chn ?? '',
+                    'name' => $person->c_name ?? '',
+                    'is_primary' => $primaryId !== null && $personId === $primaryId,
+                ];
+            }
+
+            usort($people, function ($a, $b) {
+                if (($a['is_primary'] ?? false) !== ($b['is_primary'] ?? false)) {
+                    return ($a['is_primary'] ?? false) ? -1 : 1;
+                }
+
+                return ($a['id'] ?? 0) <=> ($b['id'] ?? 0);
+            });
+
+            $item->setAttribute('affected_people', $people);
+        }
     }
 
     protected function decodeJsonNullable($payload): ?array {

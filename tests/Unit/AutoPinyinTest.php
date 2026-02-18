@@ -94,4 +94,14 @@ class AutoPinyinTest extends TestCase {
         $this->assertSame('Wang', $result['c_surname']);
         $this->assertSame('', $result['c_mingzi_chn']);
     }
+
+    #[Test]
+    public function testKnownSurnameStillMatchesWhenGivenNameLongerThanTwoChars(): void {
+        $result = $this->repository->auto_pinyin(['c_name_chn' => '王安石傳']);
+
+        $this->assertSame('王', $result['c_surname_chn']);
+        $this->assertSame('Wang', $result['c_surname']);
+        $this->assertSame('安石傳', $result['c_mingzi_chn']);
+        $this->assertSame('Wang ' . $result['c_mingzi'], $result['c_name']);
+    }
 }

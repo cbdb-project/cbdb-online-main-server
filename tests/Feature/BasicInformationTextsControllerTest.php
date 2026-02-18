@@ -136,6 +136,59 @@ class BasicInformationTextsControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testUpdateQueryWritesAuditPayloadWithOperationId(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'texts-update@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_TEXT_DATA')->insert([
+            'c_personid' => 1,
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 9,
+        ]);
+
+        $response = $this->actingAs($user)->put(
+            '/basicinformation/1/texts/update?c_personid=1&c_textid=100&c_role_id=0',
+            [
+                'c_personid' => 1,
+                'c_textid' => 100,
+                'c_role_id' => 0,
+                'c_source' => 200,
+                '__proposal_comment' => 'update-source',
+            ]
+        );
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 1,
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 200,
+        ]);
+
+        $operation = DB::table('operations')->orderByDesc('id')->first();
+        $this->assertNotNull($operation);
+        $this->assertSame(3, (int) $operation->op_type);
+        $this->assertSame('BIOG_TEXT_DATA', $operation->resource);
+
+        $log = DB::table('audit_log')->where('table_name', 'BIOG_TEXT_DATA')->where('operation', 'UPDATE')->first();
+        $this->assertNotNull($log);
+        $this->assertSame((string) $operation->id, $log->operation_id);
+        $this->assertSame('c_personid=1&c_textid=100&c_role_id=0', $log->row_pk_text);
+
+        $oldData = json_decode($log->old_data, true);
+        $newData = json_decode($log->new_data, true);
+        $this->assertSame(9, $oldData['c_source']);
+        $this->assertSame(200, $newData['c_source']);
+    }
+
+    #[Test]
     public function testStoreDuplicateTextShowsErrorAndDoesNotInsertAgain(): void {
         $user = User::create([
             'name' => 'Test User',

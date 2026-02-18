@@ -3,15 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\BiogMainRepository;
-use App\Repositories\OperationRepository;
-use App\Repositories\ToolsRepository;
-use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class BasicInformationTextsController extends Controller {
     /**
@@ -19,18 +14,14 @@ class BasicInformationTextsController extends Controller {
      */
     protected $biogMainRepository;
     protected $table_name;
-    protected $operationRepository;
-    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
+    public function __construct(BiogMainRepository $biogMainRepository) {
         $this->biogMainRepository = $biogMainRepository;
         $this->table_name = 'BIOG_TEXT_DATA';
-        $this->operationRepository = $operationRepository;
-        $this->toolsRepository = $toolsRepository;
         $this->middleware('auth')->except(['index', 'show', 'edit', 'editQuery']);
     }
 
@@ -393,53 +384,12 @@ class BasicInformationTextsController extends Controller {
         // 驗證必填欄位（c_role_id 為可選，預設為 0）
         CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
 
-        // 準備更新資料
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_textid', 'c_role_id']);
-        $data = $this->toolsRepository->timestamp($data);
-
-        // 構建查詢條件（使用 BIOG_TEXT_DATA 表）
         $c_role_id = $pk['c_role_id'] ?? 0;
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_textid']],
-            ['c_role_id', '=', $c_role_id],
-        ];
-
-        // 取得原始資料
-        $ori = DB::table($this->table_name)->where($conditions)->first();
-        if (!$ori) {
+        $legacyId = $pk['c_personid']."-".$pk['c_textid']."-".$c_role_id;
+        $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);
+        if ($newPk === null) {
             abort(404, 'BIOG_TEXT_DATA 記錄不存在');
         }
-
-        // 更新資料
-        DB::table($this->table_name)->where($conditions)->update($data);
-
-        // 記錄操作
-        $newPk = [
-            'c_personid' => $pk['c_personid'],
-            'c_textid' => $data['c_textid'] ?? $pk['c_textid'],
-            'c_role_id' => $data['c_role_id'] ?? $c_role_id,
-        ];
-
-        // 準備要存入 operations 表的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, $this->table_name, CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
-        (new AuditLogService())->write(
-            $this->table_name,
-            'UPDATE',
-            $newPk,
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
 
         flash('Update success @ '.Carbon::now(), 'success');
 

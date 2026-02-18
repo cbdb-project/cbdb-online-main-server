@@ -713,7 +713,7 @@ class CodesControllerTest extends TestCase {
         $this->assertNotFalse(strpos($content, 'value="2020-01-01 00:00:00"', $createdDatePos));
         $this->assertNotFalse(strpos($content, 'readonly', $createdDatePos));
 
-        // c_modified_by 应显示原始值（"previous"）而非当前用户，并且 readonly
+        // c_modified_by 应显示原始值（"previous"）而非当前用戶，并且 readonly
         $modifiedByPos = strpos($content, 'name="c_modified_by"');
         $this->assertNotFalse($modifiedByPos);
         $this->assertNotFalse(strpos($content, 'value="previous"', $modifiedByPos));

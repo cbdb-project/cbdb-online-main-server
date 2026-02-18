@@ -208,7 +208,7 @@ class BasicInformationTextsController extends Controller {
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
                 ['label' => '著述', 'url' => route('basicinformation.texts.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }
@@ -347,7 +347,7 @@ class BasicInformationTextsController extends Controller {
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
                 ['label' => '著述', 'url' => route('basicinformation.texts.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }

@@ -99,7 +99,7 @@ class ManagementController extends Controller {
      */
     public function edit($id) {
         if (!Auth::user()->canManageUsers()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -107,7 +107,7 @@ class ManagementController extends Controller {
         $user = User::find($id);
 
         if (!$user) {
-            flash('用户不存在 @ '.Carbon::now(), 'error');
+            flash('用戶不存在 @ '.Carbon::now(), 'error');
 
             return redirect()->route('manage.index');
         }
@@ -128,7 +128,7 @@ class ManagementController extends Controller {
      */
     public function update(Request $request, $id) {
         if (!Auth::user()->canManageUsers()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -136,12 +136,12 @@ class ManagementController extends Controller {
         $user = User::find($id);
 
         if (!$user) {
-            flash('用户不存在 @ '.Carbon::now(), 'error');
+            flash('用戶不存在 @ '.Carbon::now(), 'error');
 
             return redirect()->route('manage.index');
         }
 
-        // 检查是否要删除用户
+        // 检查是否要删除用戶
         if ($request->has('delete_user') && $request->delete_user == 1) {
             $email = $user->email;
             $user->email = $email . '-' . Carbon::now();
@@ -150,7 +150,7 @@ class ManagementController extends Controller {
             $user->remember_token = '-';
             $user->updated_at = Carbon::now();
             $user->save();
-            flash('用户已删除 @ '.Carbon::now(), 'danger');
+            flash('用戶已刪除 @ '.Carbon::now(), 'danger');
 
             return redirect()->route('manage.index');
         }
@@ -161,12 +161,12 @@ class ManagementController extends Controller {
             'is_admin' => 'required|integer|in:0,1,2,3',
         ]);
 
-        // 更新用户设置
+        // 更新用戶設定
         $user->is_active = $validated['is_active'];
         $user->is_admin = $validated['is_admin'];
         $user->save();
 
-        flash('用户设置已更新 @ '.Carbon::now(), 'success');
+        flash('用戶設定已更新 @ '.Carbon::now(), 'success');
 
         return redirect()->route('manage.index');
     }

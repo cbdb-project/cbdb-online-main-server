@@ -77,7 +77,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_generates_links_for_non_person_code_resources() {
-        // 创建测试用户
+        // 创建测试用戶
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -175,7 +175,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_does_not_generate_links_for_deleted_operations() {
-        // 创建测试用户
+        // 创建测试用戶
         $user = User::create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -202,7 +202,7 @@ class OperationsIndexLinksTest extends TestCase {
 
         $response->assertStatus(200);
 
-        // 验证删除操作不生成编辑链接
+        // 验证删除操作不生成編輯链接
         $response->assertDontSee('/codes/TEXT_CODES/68942/edit', false);
         // 但应该显示 resource_id
         $response->assertSee('68942');

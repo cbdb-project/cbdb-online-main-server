@@ -11,7 +11,7 @@ class EmailController extends Controller {
     public function verify($token) {
         $user = User::where('confirmation_token', $token)->first();
         if (is_null($user)) {
-            flash('用户激活失败，请重新发送激活邮件 '.Carbon::now(), 'error');
+            flash('用戶啟用失敗，請重新發送啟用郵件 '.Carbon::now(), 'error');
 
             return route('/');
         }
@@ -19,7 +19,7 @@ class EmailController extends Controller {
         $user->confirmation_token = Str::random(40);
         $user->save();
         Auth::login($user);
-        flash('用户激活成功 '.Carbon::now(), 'success');
+        flash('用戶啟用成功 '.Carbon::now(), 'success');
 
         return redirect('/home');
     }

@@ -283,7 +283,7 @@ class QueryPlaygroundController extends Controller {
         $useTools = $request->boolean('use_tools', true);
 
         return response()->stream(function () use ($question, $tables, $nlqService, $useTools) {
-            // 设置 SSE 头部
+            // 設定 SSE 头部
             header('Content-Type: text/event-stream');
             header('Cache-Control: no-cache');
             header('X-Accel-Buffering: no'); // 禁用 nginx 缓冲

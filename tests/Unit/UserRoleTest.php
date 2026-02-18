@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class UserRoleTest extends TestCase {
     /**
-     * 测试用户角色常量定义
+     * 测试用戶角色常量定义
      */
     #[Test]
     public function testRoleConstants() {
@@ -19,7 +19,7 @@ class UserRoleTest extends TestCase {
     }
 
     /**
-     * 测试用户状态常量定义
+     * 测试用戶状态常量定义
      */
     #[Test]
     public function testStatusConstants() {
@@ -131,17 +131,17 @@ class UserRoleTest extends TestCase {
     public function testCanManageUsers() {
         $user = new User();
 
-        // 未启用的专家用户
+        // 未启用的专家用戶
         $user->is_active = User::STATUS_INACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertFalse($user->canManageUsers());
 
-        // 已启用的一般用户
+        // 已启用的一般用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_REGULAR;
         $this->assertFalse($user->canManageUsers());
 
-        // 已启用的专家用户
+        // 已启用的专家用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertTrue($user->canManageUsers());
@@ -151,7 +151,7 @@ class UserRoleTest extends TestCase {
         $user->is_admin = User::ROLE_SUPER_ADMIN;
         $this->assertTrue($user->canManageUsers());
 
-        // 已启用的众包用户
+        // 已启用的眾包用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_CROWDSOURCING;
         $this->assertFalse($user->canManageUsers());
@@ -164,12 +164,12 @@ class UserRoleTest extends TestCase {
     public function testCanRestoreOperations() {
         $user = new User();
 
-        // 未启用的专家用户
+        // 未启用的专家用戶
         $user->is_active = User::STATUS_INACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertFalse($user->canRestoreOperations());
 
-        // 已启用的专家用户
+        // 已启用的专家用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertTrue($user->canRestoreOperations());
@@ -187,22 +187,22 @@ class UserRoleTest extends TestCase {
     public function testCanWriteDirectly() {
         $user = new User();
 
-        // 未启用的一般用户
+        // 未启用的一般用戶
         $user->is_active = User::STATUS_INACTIVE;
         $user->is_admin = User::ROLE_REGULAR;
         $this->assertFalse($user->canWriteDirectly());
 
-        // 已启用的一般用户
+        // 已启用的一般用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_REGULAR;
         $this->assertTrue($user->canWriteDirectly());
 
-        // 已启用的专家用户
+        // 已启用的专家用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertTrue($user->canWriteDirectly());
 
-        // 已启用的众包用户（不能直接写入）
+        // 已启用的眾包用戶（不能直接写入）
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_CROWDSOURCING;
         $this->assertFalse($user->canWriteDirectly());
@@ -215,17 +215,17 @@ class UserRoleTest extends TestCase {
     public function testCanRunBatchImport() {
         $user = new User();
 
-        // 未启用的专家用户
+        // 未启用的专家用戶
         $user->is_active = User::STATUS_INACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertFalse($user->canRunBatchImport());
 
-        // 已启用的一般用户
+        // 已启用的一般用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_REGULAR;
         $this->assertFalse($user->canRunBatchImport());
 
-        // 已启用的专家用户
+        // 已启用的专家用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_EXPERT;
         $this->assertTrue($user->canRunBatchImport());
@@ -235,7 +235,7 @@ class UserRoleTest extends TestCase {
         $user->is_admin = User::ROLE_SUPER_ADMIN;
         $this->assertTrue($user->canRunBatchImport());
 
-        // 已启用的众包用户
+        // 已启用的眾包用戶
         $user->is_active = User::STATUS_ACTIVE;
         $user->is_admin = User::ROLE_CROWDSOURCING;
         $this->assertFalse($user->canRunBatchImport());
@@ -255,7 +255,7 @@ class UserRoleTest extends TestCase {
         $this->assertSame('专家', $user->getRoleName());
 
         $user->is_admin = User::ROLE_CROWDSOURCING;
-        $this->assertSame('众包', $user->getRoleName());
+        $this->assertSame('眾包', $user->getRoleName());
 
         $user->is_admin = User::ROLE_SUPER_ADMIN;
         $this->assertSame('系统管理员', $user->getRoleName());

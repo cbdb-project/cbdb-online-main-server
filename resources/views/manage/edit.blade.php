@@ -5,7 +5,7 @@
     <div class="col-md-12">
         <div class="card card-primary">
             <div class="card-header">
-                <h3 class="card-title">编辑用户设置</h3>
+                <h3 class="card-title">編輯用戶設定</h3>
                 <div class="card-tools">
                     <a href="{{ route('manage.index') }}" class="btn btn-sm btn-secondary">
                         <i class="fa fa-arrow-left"></i> 返回列表
@@ -22,13 +22,13 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>用户 ID</label>
+                                <label>用戶 ID</label>
                                 <input type="text" class="form-control" value="{{ $user->id }}" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>用户名</label>
+                                <label>用戶名</label>
                                 <input type="text" class="form-control" value="{{ $user->name }}" readonly>
                             </div>
                         </div>
@@ -66,8 +66,8 @@
 
                     <hr>
 
-                    <!-- 可编辑的设置 -->
-                    <h4>用户设置</h4>
+                    <!-- 可編輯的設定 -->
+                    <h4>用戶設定</h4>
 
                     <div class="row">
                         <div class="col-md-6">
@@ -77,23 +77,23 @@
                                     <option value="1" {{ $user->is_active == 1 ? 'selected' : '' }}>已激活</option>
                                     <option value="0" {{ $user->is_active == 0 ? 'selected' : '' }}>未激活</option>
                                 </select>
-                                <small class="form-text text-muted">未激活的用户无法登录系统</small>
+                                <small class="form-text text-muted">未激活的用戶无法登录系统</small>
                             </div>
                         </div>
 
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="is_admin">用户角色</label>
+                                <label for="is_admin">用戶角色</label>
                                 <select name="is_admin" id="is_admin" class="form-control">
-                                    <option value="0" {{ $user->is_admin == 0 ? 'selected' : '' }}>一般用户</option>
+                                    <option value="0" {{ $user->is_admin == 0 ? 'selected' : '' }}>一般用戶</option>
                                     <option value="1" {{ $user->is_admin == 1 ? 'selected' : '' }}>专家</option>
-                                    <option value="2" {{ $user->is_admin == 2 ? 'selected' : '' }}>众包</option>
+                                    <option value="2" {{ $user->is_admin == 2 ? 'selected' : '' }}>眾包</option>
                                     <option value="3" {{ $user->is_admin == 3 ? 'selected' : '' }}>系统管理员</option>
                                 </select>
                                 <small class="form-text text-muted">
-                                    <strong>一般用户：</strong>基本权限<br>
+                                    <strong>一般用戶：</strong>基本权限<br>
                                     <strong>专家：</strong>拥有管理权限<br>
-                                    <strong>众包：</strong>众包用户权限<br>
+                                    <strong>眾包：</strong>眾包用戶权限<br>
                                     <strong>系统管理员：</strong>最高权限
                                 </small>
                             </div>
@@ -109,10 +109,10 @@
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" name="delete_user" id="delete_user" value="1">
-                                    删除此用户
+                                    删除此用戶
                                 </label>
                                 <small class="form-text text-danger">
-                                    <strong>警告：</strong>勾选此项并保存将会删除该用户账号。此操作不可恢复！
+                                    <strong>警告：</strong>勾选此项并保存将会删除该用戶账号。此操作不可恢复！
                                 </small>
                             </div>
                         </div>
@@ -135,7 +135,7 @@
 <script>
 document.getElementById('delete_user').addEventListener('change', function() {
     if (this.checked) {
-        if (!confirm('您真的确定要删除此用户吗？\n\n此操作不可恢复！\n\n请确认！')) {
+        if (!confirm('您真的确定要删除此用戶吗？\n\n此操作不可恢复！\n\n請確認！')) {
             this.checked = false;
         }
     }
@@ -144,7 +144,7 @@ document.getElementById('delete_user').addEventListener('change', function() {
 document.querySelector('form').addEventListener('submit', function(e) {
     const deleteCheckbox = document.getElementById('delete_user');
     if (deleteCheckbox.checked) {
-        if (!confirm('最后确认：您真的要删除此用户吗？')) {
+        if (!confirm('最后确认：您真的要删除此用戶吗？')) {
             e.preventDefault();
             return false;
         }

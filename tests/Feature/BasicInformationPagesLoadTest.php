@@ -31,14 +31,14 @@ class BasicInformationPagesLoadTest extends TestCase {
             'prefix' => '',
         ]);
 
-        // 设置缓存和 session 为数组驱动
+        // 設定缓存和 session 为数组驱动
         config(['cache.default' => 'array']);
         config(['session.driver' => 'array']);
 
         // 创建测试所需的最小化表结构
         $this->createMinimalTables();
 
-        // 创建测试用户（用于需要认证的页面）
+        // 创建测试用戶（用于需要认证的页面）
         $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -99,7 +99,7 @@ class BasicInformationPagesLoadTest extends TestCase {
             $table->primary(['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
         });
 
-        // 创建 ALTNAME_DATA 表（别名表）
+        // 创建 ALTNAME_DATA 表（別名表）
         Schema::create('ALTNAME_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
             $table->string('c_alt_name', 100)->nullable();
@@ -275,7 +275,7 @@ class BasicInformationPagesLoadTest extends TestCase {
             $table->string('c_addr_desc_chn', 100)->nullable();
         });
 
-        // 创建 ALTNAME_CODES 表（别名类型代码表）
+        // 创建 ALTNAME_CODES 表（別名类型代码表）
         Schema::create('ALTNAME_CODES', function (Blueprint $table) {
             $table->integer('c_name_type_code')->primary();
             $table->string('c_name_type_desc_chn', 100)->nullable();
@@ -474,11 +474,11 @@ class BasicInformationPagesLoadTest extends TestCase {
             'c_notes' => '测试地址',
         ]);
 
-        // 2. 别名数据 (altnames)
+        // 2. 別名数据 (altnames)
         \DB::table('ALTNAME_DATA')->insert([
             'c_personid' => $this->testPersonId,
             'c_alt_name' => 'Test Altname',
-            'c_alt_name_chn' => '测试别名',
+            'c_alt_name_chn' => '測試別名',
             'c_alt_name_type_code' => 1,
             'c_sequence' => 1,
         ]);
@@ -592,7 +592,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试编辑页面：/basicinformation/{id}/edit（未登录可訪問）
+     * 测试編輯页面：/basicinformation/{id}/edit（未登录可訪問）
      */
     #[Test]
     public function test_basicinformation_edit_page_loads_without_authentication() {
@@ -601,7 +601,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试编辑页面：/basicinformation/{id}/edit（登录后可訪問）
+     * 测试編輯页面：/basicinformation/{id}/edit（登录后可訪問）
      */
     #[Test]
     public function test_basicinformation_edit_page_loads() {
@@ -619,7 +619,7 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试别名子页面：/basicinformation/{id}/altnames
+     * 测试別名子页面：/basicinformation/{id}/altnames
      */
     #[Test]
     public function test_basicinformation_altnames_index_loads() {
@@ -636,7 +636,7 @@ class BasicInformationPagesLoadTest extends TestCase {
             'id' => $this->testPersonId,
             'c_personid' => $this->testPersonId,
             'c_sequence' => 1,
-            'c_alt_name_chn' => '测试别名',
+            'c_alt_name_chn' => '測試別名',
             'c_alt_name_type_code' => 1,
         ]));
         $response->assertStatus(200);

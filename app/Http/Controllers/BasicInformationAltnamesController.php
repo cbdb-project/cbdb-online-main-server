@@ -45,11 +45,11 @@ class BasicInformationAltnamesController extends Controller {
         $personLabel = $id . ' - ' . $biogbasicinformation->c_name_chn . ' (' . $biogbasicinformation->c_name . ')';
 
         return view('biogmains.altname.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '别名', 'page_description' => '基本信息表 别名', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => '別名', 'page_description' => '基本信息表 別名', 'breadcrumb_home' => '人物基本資料',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '别名', 'url' => '#'],
+                ['label' => '別名', 'url' => '#'],
             ],
         ]);
     }
@@ -65,11 +65,11 @@ class BasicInformationAltnamesController extends Controller {
 
         return view('biogmains.altname.create', [
             'id' => $id,
-            'page_title' => '别名', 'page_description' => '基本信息表 别名', 'page_url' => '/basicinformation/'.$id.'/altnames', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => '別名', 'page_description' => '基本信息表 別名', 'page_url' => '/basicinformation/'.$id.'/altnames', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '别名', 'url' => route('basicinformation.altnames.index', $id)],
+                ['label' => '別名', 'url' => route('basicinformation.altnames.index', $id)],
                 ['label' => '新增', 'url' => '#'],
             ],
         ]);
@@ -198,15 +198,15 @@ class BasicInformationAltnamesController extends Controller {
         }
 
         return view('biogmains.altname.edit', ['id' => $id, 'row' => $row, 'alt' => $alt, 'text_str' => $text_str,
-            'page_title' => '别名', 'page_description' => '基本信息表 别名',
+            'page_title' => '別名', 'page_description' => '基本信息表 別名',
             'page_url' => '/basicinformation/'.$id.'/altnames',
             'archer' => "<li>編輯</li>",
             'breadcrumb_home' => '人物基本資料',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '别名', 'url' => route('basicinformation.altnames.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '別名', 'url' => route('basicinformation.altnames.index', $id)],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }
@@ -394,16 +394,16 @@ class BasicInformationAltnamesController extends Controller {
             'alt' => null, // 查詢參數模式不需要編碼的主鍵字串
             'text_str' => $text_str,
             'pk' => $pk, // 傳遞複合主鍵供表單使用
-            'page_title' => '别名',
-            'page_description' => '基本信息表 别名',
+            'page_title' => '別名',
+            'page_description' => '基本信息表 別名',
             'page_url' => '/basicinformation/'.$id.'/altnames',
             'archer' => '<li>編輯</li>',
             'breadcrumb_home' => '人物基本資料',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '别名', 'url' => route('basicinformation.altnames.index', $id)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '別名', 'url' => route('basicinformation.altnames.index', $id)],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }

@@ -198,7 +198,7 @@
 
             <div class="content">
                 <div class="title m-b-md">
-                    中國歷代人物傳記 录入系统
+                    中國歷代人物傳記 錄入系統
                 </div>
 
                 <div class="search-box">

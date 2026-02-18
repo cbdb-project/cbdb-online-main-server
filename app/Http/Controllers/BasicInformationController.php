@@ -123,11 +123,11 @@ class BasicInformationController extends Controller {
      */
     public function store(Request $request) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -264,7 +264,7 @@ class BasicInformationController extends Controller {
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $personId)],
-                ['label' => '编辑', 'url' => '#'],
+                ['label' => '編輯', 'url' => '#'],
             ],
         ]);
     }
@@ -278,11 +278,11 @@ class BasicInformationController extends Controller {
      */
     public function update(BasicInformationRequest $request, $id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -347,11 +347,11 @@ class BasicInformationController extends Controller {
     //20190223新增另存功能
     public function saveas($id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -390,11 +390,11 @@ class BasicInformationController extends Controller {
     //20240701新增Duplicate Collateral Info功能
     public function Duplicate_Collateral_Info($id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->canWriteDirectly()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -734,11 +734,11 @@ class BasicInformationController extends Controller {
      */
     public function destroy($id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }

@@ -157,7 +157,7 @@ class User extends Authenticatable {
             case self::ROLE_EXPERT:
                 return '专家';
             case self::ROLE_CROWDSOURCING:
-                return '众包';
+                return '眾包';
             case self::ROLE_REGULAR:
             default:
                 return '一般';

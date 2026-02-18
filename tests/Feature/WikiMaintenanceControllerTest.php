@@ -22,7 +22,7 @@ class WikiMaintenanceControllerTest extends TestCase {
             'prefix' => '',
         ]);
 
-        // 设置缓存为数组驱动
+        // 設定缓存为数组驱动
         config(['cache.default' => 'array']);
 
         // 使用数组驱动避免文件权限问题
@@ -31,7 +31,7 @@ class WikiMaintenanceControllerTest extends TestCase {
         // 创建必要的表结构
         $this->createTestTables();
 
-        // 创建测试用户
+        // 创建测试用戶
         $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -124,7 +124,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     }
 
     /**
-     * 测试未认证用户不能访问 Wiki 维护页面
+     * 测试未认证用戶不能访问 Wiki 维护页面
      */
     #[Test]
     public function test_unauthenticated_user_cannot_access_wiki_maintenance() {
@@ -133,7 +133,7 @@ class WikiMaintenanceControllerTest extends TestCase {
     }
 
     /**
-     * 测试认证用户可以访问 Wiki 维护页面
+     * 测试认证用戶可以访问 Wiki 维护页面
      */
     #[Test]
     public function test_authenticated_user_can_access_wiki_maintenance() {

@@ -550,7 +550,7 @@ class BasicInformationProposalController extends Controller {
         }
 
         if (!Auth::user()->isActive()) {
-            abort(403, '该用户没有权限，请联系管理员');
+            abort(403, '該用戶沒有權限，請聯絡管理員');
         }
     }
 
@@ -563,7 +563,7 @@ class BasicInformationProposalController extends Controller {
         }
 
         if (!Auth::user()->canWriteDirectly()) {
-            abort(403, '该用户没有权限，请联系管理员');
+            abort(403, '該用戶沒有權限，請聯絡管理員');
         }
     }
 

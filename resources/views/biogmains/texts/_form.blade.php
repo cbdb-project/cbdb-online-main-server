@@ -41,7 +41,7 @@
                 @if($isEdit && isset($res['text_str']))
                     <option value="{{ $row->c_source }}" selected="selected">{{ $res['text_str'] }}</option>
                 @else
-                    <option value="" selected="selected">请搜索</option>
+                    <option value="" selected="selected">請搜尋</option>
                 @endif
             </select>
         </div>

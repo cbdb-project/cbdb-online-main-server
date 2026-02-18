@@ -102,7 +102,7 @@
                                     <div class="btn-group">
                                         <a type="button" class="btn btn-sm btn-info" href="{{ route('codes.edit', ['table_name'=>$q, 'id'=>$id_]) }}">修改</a>
                                         <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
-                                           onclick="alert('确认删除');
+                                           onclick="alert('確認刪除');
                                                     event.preventDefault();
                                                    document.getElementById('delete-form-{{ $id_ }}').submit();"
                                            class="btn btn-sm btn-danger">刪除</a>

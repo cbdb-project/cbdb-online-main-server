@@ -25,7 +25,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
             'foreign_key_constraints' => true, // 启用外键约束
         ]);
 
-        // 设置缓存和 session 为数组驱动
+        // 設定缓存和 session 为数组驱动
         config(['cache.default' => 'array']);
         config(['session.driver' => 'array']);
 

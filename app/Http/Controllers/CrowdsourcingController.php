@@ -108,11 +108,11 @@ class CrowdsourcingController extends Controller {
     public function confirm($id) {
         //登入判斷
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -291,11 +291,11 @@ class CrowdsourcingController extends Controller {
 
     public function reject($id) {
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }

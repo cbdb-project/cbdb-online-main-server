@@ -29,14 +29,14 @@ class ManagePagesLoadTest extends TestCase {
             'prefix' => '',
         ]);
 
-        // 设置缓存和 session 为数组驱动
+        // 設定缓存和 session 为数组驱动
         config(['cache.default' => 'array']);
         config(['session.driver' => 'array']);
 
         // 创建测试所需的最小化表结构
         $this->createMinimalTables();
 
-        // 创建测试用户
+        // 创建测试用戶
         $this->createTestUsers();
     }
 
@@ -63,10 +63,10 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 创建测试用户
+     * 创建测试用戶
      */
     protected function createTestUsers() {
-        // 创建管理员用户（用于认证和访问管理页面）
+        // 创建管理员用戶（用于认证和访问管理页面）
         $this->adminUser = User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
@@ -76,18 +76,18 @@ class ManagePagesLoadTest extends TestCase {
             'remember_token' => 'admin_remember_' . time(),
         ]);
 
-        // 创建普通用户（用于在列表中显示）
+        // 创建普通用戶（用于在列表中显示）
         $this->regularUser = User::factory()->create([
             'name' => 'Regular User',
             'email' => 'regular@example.com',
             'institution' => 'Test Institution',
             'is_active' => 1,
-            'is_admin' => 0,  // 普通用户
+            'is_admin' => 0,  // 普通用戶
             'confirmation_token' => 'regular_token_' . time(),
             'remember_token' => 'regular_remember_' . time(),
         ]);
 
-        // 创建一个专家用户
+        // 创建一个专家用戶
         User::factory()->create([
             'name' => 'Expert User',
             'email' => 'expert@example.com',
@@ -97,17 +97,17 @@ class ManagePagesLoadTest extends TestCase {
             'remember_token' => 'expert_remember_' . time(),
         ]);
 
-        // 创建一个众包用户
+        // 创建一个眾包用戶
         User::factory()->create([
             'name' => 'Crowdsource User',
             'email' => 'crowd@example.com',
             'is_active' => 0,
-            'is_admin' => 2,  // 众包
+            'is_admin' => 2,  // 眾包
             'confirmation_token' => 'crowd_token_' . time(),
             'remember_token' => 'crowd_remember_' . time(),
         ]);
 
-        // 创建一个被删除的用户（不应该在列表中显示）
+        // 创建一个被删除的用戶（不应该在列表中显示）
         User::factory()->create([
             'name' => 'Deleted User',
             'email' => 'deleted@example.com-2024-01-01',
@@ -129,7 +129,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试普通用户访问 /manage 会被重定向
+     * 测试普通用戶访问 /manage 会被重定向
      */
     #[Test]
     public function test_manage_index_redirects_non_admin() {
@@ -138,7 +138,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试未认证用户访问 /manage 会被重定向到登录页
+     * 测试未认证用戶访问 /manage 会被重定向到登录页
      */
     #[Test]
     public function test_manage_index_requires_authentication() {
@@ -147,7 +147,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试编辑页面加载：/manage/{id}/edit
+     * 测试編輯页面加载：/manage/{id}/edit
      */
     #[Test]
     public function test_manage_edit_page_loads() {
@@ -155,13 +155,13 @@ class ManagePagesLoadTest extends TestCase {
             ->get("/manage/{$this->regularUser->id}/edit");
 
         $response->assertStatus(200);
-        $response->assertSee('编辑用户设置');
+        $response->assertSee('編輯用戶設定');
         $response->assertSee($this->regularUser->name);
         $response->assertSee($this->regularUser->email);
     }
 
     /**
-     * 测试更新用户激活状态：PUT /manage/{id}
+     * 测试更新用戶激活状态：PUT /manage/{id}
      */
     #[Test]
     public function test_manage_update_active_status() {
@@ -179,7 +179,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试更新用户角色：PUT /manage/{id}
+     * 测试更新用戶角色：PUT /manage/{id}
      */
     #[Test]
     public function test_manage_update_user_role() {
@@ -191,13 +191,13 @@ class ManagePagesLoadTest extends TestCase {
 
         $response->assertRedirect(route('manage.index'));
 
-        // 验证用户类型已改变
+        // 验证用戶类型已改变
         $this->regularUser->refresh();
         $this->assertEquals(1, $this->regularUser->is_admin);
     }
 
     /**
-     * 测试删除用户：PUT /manage/{id} with delete_user
+     * 测试删除用戶：PUT /manage/{id} with delete_user
      */
     #[Test]
     public function test_manage_delete_user() {
@@ -210,7 +210,7 @@ class ManagePagesLoadTest extends TestCase {
 
         $response->assertRedirect(route('manage.index'));
 
-        // 验证用户已被标记为删除
+        // 验证用戶已被标记为删除
         $this->regularUser->refresh();
         $this->assertEquals('-', $this->regularUser->password);
         $this->assertEquals('-', $this->regularUser->confirmation_token);
@@ -218,7 +218,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试非管理员无法访问编辑页面
+     * 测试非管理员无法访问編輯页面
      */
     #[Test]
     public function test_manage_edit_requires_admin() {
@@ -253,7 +253,7 @@ class ManagePagesLoadTest extends TestCase {
     }
 
     /**
-     * 测试更新不存在的用户
+     * 测试更新不存在的用戶
      */
     #[Test]
     public function test_manage_update_nonexistent_user() {

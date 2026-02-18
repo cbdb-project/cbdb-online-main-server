@@ -80,7 +80,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $a = $item->resource;
                                 $id = $item->c_personid;
                                 if ((int) $id !== 0) {
-                                    // 人物链接统一指向编辑页面
+                                    // 人物链接统一指向編輯页面
                                     $personLink = "/basicinformation/{$id}/edit";
 
                                     // 根据资源类型生成查詢參數模式的編輯連結

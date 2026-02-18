@@ -429,13 +429,13 @@ class CodesController extends Controller {
             if ($search !== '' && !empty($searchableColumns)) {
                 $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
                     foreach ($searchableColumns as $column) {
-                        // 对于使用 JOIN 的表，需要将别名转换为原始表达式
+                        // 对于使用 JOIN 的表，需要将別名转换为原始表达式
                         $searchColumn = $column;
                         if ($joinConfig) {
                             $baseAlias = $joinConfig['base_alias'];
                             $selectList = $joinConfig['select'] ?? [];
 
-                            // 查找该列是否是别名，如果是，提取原始表达式
+                            // 查找该列是否是別名，如果是，提取原始表达式
                             $foundOriginalExpr = false;
                             foreach ($selectList as $selectExpr) {
                                 if (strpos($selectExpr, ' as ' . $column) !== false) {
@@ -450,7 +450,7 @@ class CodesController extends Controller {
                                 }
                             }
 
-                            // 如果不是别名且没有表前缀，添加基表别名
+                            // 如果不是別名且没有表前缀，添加基表別名
                             if (!$foundOriginalExpr && !str_contains($column, '.')) {
                                 $searchColumn = $baseAlias . '.' . $column;
                             }
@@ -481,7 +481,7 @@ class CodesController extends Controller {
             $keyColumns = $this->getKeyColumns($table);
             $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
-            // 标记哪些列是通过 JOIN 获得的别名列
+            // 标记哪些列是通过 JOIN 获得的別名列
             $joinedColumns = [];
             if ($joinConfig) {
                 $joinedColumns = $this->getJoinedColumnNames($joinConfig);
@@ -503,7 +503,7 @@ class CodesController extends Controller {
                 'joinedColumns' => $joinedColumns,
             ]);
         } catch (\PDOException $e) {
-            flash('找不到该数据表', 'warning');
+            flash('找不到該資料表', 'warning');
 
             return redirect()->back();
         }
@@ -529,7 +529,7 @@ class CodesController extends Controller {
                 $data = $query->first();
 
                 if (!$data) {
-                    flash('找不到该数据表', 'warning');
+                    flash('找不到該資料表', 'warning');
 
                     return redirect()->back();
                 }
@@ -546,7 +546,7 @@ class CodesController extends Controller {
                     'id' => $compositeId, 'row' => $rowArray,
                     'table' => $table]);
             } catch (\PDOException $e) {
-                flash('找不到该数据表', 'warning');
+                flash('找不到該資料表', 'warning');
 
                 return redirect()->back();
             }
@@ -559,11 +559,11 @@ class CodesController extends Controller {
     public function update(Request $request, $table_name, $id) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -824,11 +824,11 @@ class CodesController extends Controller {
     public function store(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -937,11 +937,11 @@ class CodesController extends Controller {
     public function destroy($table_name, $id) {
         $table = $this->guardTable($table_name);
         if (!Auth::check()) {
-            flash('请登入后编辑 @ '.Carbon::now(), 'error');
+            flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         } elseif (!Auth::user()->isActive()) {
-            flash('该用户没有权限，请联系管理员 @ '.Carbon::now(), 'error');
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -982,7 +982,7 @@ class CodesController extends Controller {
     protected function buildTableHead(string $table, $sampleRow): array {
         $upperTable = strtoupper($table);
         if (isset($this->tableColumnOverrides[$upperTable])) {
-            // 对于有 JOIN 配置的表，直接返回配置的列，因为它们包含别名列
+            // 对于有 JOIN 配置的表，直接返回配置的列，因为它们包含別名列
             if (isset($this->tableJoinConfigurations[$upperTable])) {
                 return $this->tableColumnOverrides[$upperTable];
             }
@@ -1695,8 +1695,7 @@ class CodesController extends Controller {
         $keyColumns = $this->getKeyColumns($table);
         $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
-        // 标记哪些列是通过 JOIN 获得的别名列
-        $upperTable = strtoupper($table);
+        // 标记哪些列是通过 JOIN 获得的別名列        $upperTable = strtoupper($table);
         $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
         $joinedColumns = [];
         if ($joinConfig) {

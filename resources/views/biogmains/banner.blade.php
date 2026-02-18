@@ -18,7 +18,7 @@
         </li>
         <li class="nav-item">
             <a class="nav-link {{ $currentRoute === 'basicinformation.altnames.index' ? 'active' : '' }}" href="{{ route('basicinformation.altnames.index', ['basicinformation' => $basicinformation->c_personid]) }}">
-                <i class="fas fa-id-card"></i> 别名<span class="badge badge-light ml-1">{{ $basicinformation->altnames_count }}</span>
+                <i class="fas fa-id-card"></i> 別名<span class="badge badge-light ml-1">{{ $basicinformation->altnames_count }}</span>
             </a>
         </li>
         <li class="nav-item">

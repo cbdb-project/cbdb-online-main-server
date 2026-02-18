@@ -663,7 +663,7 @@ cat storage/logs/laravel-2025-12-07.log | grep "repair"
 
 ## 相關文件
 
-- [DATABASE.md](DATABASE.md) - 資料庫架構說明
+- [DATABASE.md](../DATABASE.md) - 資料庫架構說明
 - [USER_PRIVILEGES.md](USER_PRIVILEGES.md) - 使用者權限說明
 - [MERGE.md](MERGE.md) - 人物合併工具說明
 

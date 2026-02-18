@@ -322,5 +322,5 @@ A: 檢查以下幾點：
 ## 相關資源
 
 - [Laravel Sanctum 官方文檔](https://laravel.com/docs/10.x/sanctum)
-- [CBDB API 端點文檔](./API_ENDPOINTS.md)（如果有）
+- [CBDB API 端點文檔](../API.md)
 - [用戶管理頁面](/profile)

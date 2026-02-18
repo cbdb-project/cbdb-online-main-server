@@ -608,9 +608,9 @@ SELECT * FROM CBDB__NAME_FTS WHERE id > 799980 ORDER BY id ASC LIMIT 20;
 ## 相關文件
 
 - [NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md](NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md) - 姓名搜尋效能改進方案詳細說明
-- [AGENTS.md](AGENTS.md) - 內部表維護章節
+- [AGENTS.md](../AGENTS.md) - 內部表維護章節
 - [CODES_TABLES.md](CODES_TABLES.md) - 透過 `/codes` 介面檢視內部表（包含游標分頁說明）
-- [DATABASE.md](DATABASE.md) - 資料庫架構說明
+- [DATABASE.md](../DATABASE.md) - 資料庫架構說明
 
 ## 授權與貢獻
 

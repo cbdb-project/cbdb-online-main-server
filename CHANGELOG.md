@@ -160,32 +160,32 @@
 - 頁面底部增加了版本號信息。
 
 ### 查看 CBDB 任意表格功能
-- `/codes` 新增白名單，可供查看 CBDB 表格內容。例如：可於 `/codes/ADDRESSES` 查詢地址主表。詳見 [CODES 介面整合備忘](./CODES.md) 及 [`/codes` 列表白名單說明](./CODES_TABLES.md)。
-  - 关于效能優化方面，参见[`/codes` 介面效能優化說明](./CODES_PERFORMANCE.md)。
+- `/codes` 新增白名單，可供查看 CBDB 表格內容。例如：可於 `/codes/ADDRESSES` 查詢地址主表。詳見 [CODES 介面整合備忘](./docs/CODES.md) 及 [`/codes` 列表白名單說明](./docs/CODES_TABLES.md)。
+  - 关于效能優化方面，参见[`/codes` 介面效能優化說明](./docs/CODES_PERFORMANCE.md)。
   - 支持在表格中搜索任意欄位的功能。
 
 ### 姓名搜索查詢優化
-- 参见[CBDB 姓名搜尋效能改進方案](./NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md)。
-- 管理員专用[FTS 表格維護工具](./NAME_SEARCH_COMMANDS.md)。
+- 参见[CBDB 姓名搜尋效能改進方案](./docs/NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md)。
+- 管理員专用[FTS 表格維護工具](./docs/NAME_SEARCH_COMMANDS.md)。
 
 ### 新增「檢視表」功能，模擬 Access 中的相應檢視表資訊
 - 新增 `/view` 檢視表總覽頁面，可瀏覽所有註冊的 View_* 定義與說明。
-- 新增「檢視表 VIEW」模組，可在 `/view/{key}` 透過設定檔註冊查詢（目前含別名、社會關係、人物地址、社會機構地址、社會機構任職、人物來源、人物著作等資料）；頁面支援搜尋、分頁並內建「顯示 SQL」按鈕，便於比對實際執行的查詢語句。獲悉全部「檢視表」定義，請參閱[檢視表總覽](./VIEWS.md)。
+- 新增「檢視表 VIEW」模組，可在 `/view/{key}` 透過設定檔註冊查詢（目前含別名、社會關係、人物地址、社會機構地址、社會機構任職、人物來源、人物著作等資料）；頁面支援搜尋、分頁並內建「顯示 SQL」按鈕，便於比對實際執行的查詢語句。獲悉全部「檢視表」定義，請參閱[檢視表總覽](./docs/VIEWS.md)。
 - ~~新增「地址層級檢視」(`/view/Addresses`)，直接使用資料庫 `View_Address` 展開地址與最多五層隸屬關係，並在側邊欄加入快速連結。~~（已於 #701 移除）
 - 為防止搜索及 AI 爬蟲拖慢系統性能，目前本功能僅供登錄用戶使用。
 
 ### 提案功能
-- `/codes/*` 與 `/basicinformation/*`（含 BIOG_MAIN 與部分子資源）支援「提交提案」按鈕，可在新增／編輯時先送出提案而不直接寫入資料庫，系統會以 `op_type = 8/9` 於操作紀錄留下待審核紀錄，並於 `/operations` 提供管理員核准／退回按鈕。详情参阅[提案與審核流程参考文档](./APPROVAL_FLOWS.md)。
+- `/codes/*` 與 `/basicinformation/*`（含 BIOG_MAIN 與部分子資源）支援「提交提案」按鈕，可在新增／編輯時先送出提案而不直接寫入資料庫，系統會以 `op_type = 8/9` 於操作紀錄留下待審核紀錄，並於 `/operations` 提供管理員核准／退回按鈕。详情参阅[提案與審核流程参考文档](./docs/APPROVAL_FLOWS.md)。
 - 提案流程新增提案者自助「修改／撤回」功能：待審核或退修的提案可重新編輯並自動重設狀態，若選擇撤回則標記 `cancelled` 並留存原因；列表篩選亦支援顯示「已撤回」。
 - `/operations?proposals_only=1` 篩選列新增「已撤回」選項，並於提案列出提案者／撤回者資訊與動作按鈕，提案者可直接從此頁修改或撤回自己的草稿。
-- 人物信息提案流程已落地；原規劃細節仍可參考[計畫档案](./BIOGMAIN_APPROVAL_FLOWS_PLAN.md)。
+- 人物信息提案流程已落地；原規劃細節仍可參考[計畫档案](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)。
 
 ### 新增管理員工具
 - 「用戶列表」管理介面新增逐筆紀錄修改的功能。
 - 管理員工具新增 `/admin/explainsql`，可輸入只讀 SQL 並檢視 MySQL `EXPLAIN` 查詢計畫。
 - 「操作復原」功能，僅開放活躍管理員使用，還原後會以當前使用者身分寫入 `op_type = 3` 的修改紀錄，並補上 `OperationsRestoreAuthorizeTest` 覆蓋授權與紀錄流程；介面按鈕改為「復原」，提示訊息說明此動作等同自行修改。
-- 管理员专用特定表格的[批量导入功能](./BATCH_UPLOADERS.md)。
-- 管理员专用[Wiki 数据批量维护功能](./WIKI_TASK_MANAGEMENT.md)。
+- 管理员专用特定表格的[批量导入功能](./docs/BATCH_UPLOADERS.md)。
+- 管理员专用[Wiki 数据批量维护功能](./docs/WIKI_TASK_MANAGEMENT.md)。
 
 ### 其他調整
 - ALTNAME_DATA 在 `/operations` 顯示現況時改以 log 中的主鍵（`c_personid`／`c_alt_name_type_code`／`c_alt_name_chn`）查詢，不再依賴 `resource_id` 裡的舊別名，避免別名更新或含 dash 時抓不到現況，並補上 `OperationsAltnameResolverTest` 覆蓋。

@@ -1060,8 +1060,6 @@ protected function newLine($count = 1)
 - [Laravel 8.x 新功能](https://laravel.com/docs/8.x/releases)
 - [Laravel Legacy Factories](https://github.com/laravel/legacy-factories)
 
-### 相關文檔
-- [LARAVEL_7_8_9_UPGRADE_PLAN.md](./LARAVEL_7_8_9_UPGRADE_PLAN.md) - 完整升級路線圖
 
 ## 下一步建議
 
@@ -2264,4 +2262,3 @@ php artisan cache:clear
 - [Laravel 5.6 Release Notes](https://laravel.com/docs/5.6/releases)
 - [Upgrading Passport to 4.x](https://laravel.com/docs/5.6/passport)
 - [Logging Configuration](https://laravel.com/docs/5.6/logging)
-

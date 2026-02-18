@@ -255,9 +255,9 @@ sudo systemctl restart php-fpm
 
 ## 相關資源
 
-- [Migration 編寫指南](.claude/skills/migration-guide.md)
-- [數據庫 Schema 查詢](.claude/skills/database-schema.md)
-- [測試指南](.claude/skills/testing-guide.md)
+- [Migration 編寫指南](../.claude/skills/migration-guide.md)
+- [數據庫 Schema 查詢](../.claude/skills/database-schema.md)
+- [測試指南](../.claude/skills/testing-guide.md)
 - [AGENTS.md](../AGENTS.md) - 專案開發規範
 
 ## 貢獻

@@ -248,8 +248,6 @@ class OfficePostingRepository {
                 }
 
 
-                $this->updateAddr($addressesForInsert, $_id, $_postingid, $currentOfficeId, $c_created_by, $c_created_date);
-
                 $afterRows = DB::table('POSTED_TO_ADDR_DATA')
                     ->where('c_personid', $_id)
                     ->where('c_posting_id', $_postingid)
@@ -607,29 +605,6 @@ class OfficePostingRepository {
                     'c_created_date' => $c_created_date,
                 ]
             );
-        }
-    }
-
-    protected function updateAddr(array $c_addr, $_id, $_postingid, $_officeid, $c_created_by = '', $c_created_date = '') {
-        foreach ($c_addr as $item) {
-            $addr = '';
-            $addr = DB::table('POSTED_TO_ADDR_DATA')->where([
-                ['c_personid', '=', $_id],
-                ['c_posting_id', '=', $_postingid],
-                ['c_office_id', '=', $_officeid],
-                ['c_addr_id', '=', $item],
-            ])->get();
-
-            if (!empty($addr)) {
-                //有資料就更新
-                DB::table('POSTED_TO_ADDR_DATA')->where([
-                    ['c_personid', '=', $_id],
-                    ['c_posting_id', '=', $_postingid],
-                    ['c_office_id', '=', $_officeid],
-                    ['c_addr_id', '=', $item],
-                ])
-                    ->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
-            }
         }
     }
 }

@@ -8,33 +8,33 @@
 
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
 * [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
-* [升級指南](./UPGRADE.md) - Laravel 框架升級記錄
-* [AdminLTE 在 CBDB Online 項目中的使用分析](./ADMINLTE.md)
-* [Proposal / Approval Flows](./APPROVAL_FLOWS.md)
+* [升級指南](./docs/UPGRADE.md) - Laravel 框架升級記錄
+* [AdminLTE 在 CBDB Online 項目中的使用分析](./docs/ADMINLTE.md)
+* [Proposal / Approval Flows](./docs/APPROVAL_FLOWS.md)
 * [CHANGELOG](./CHANGELOG.md)
-* [代碼表格前端實作比較](./CODES.md)
-* [代碼表界面白名單維護](./CODES_TABLES.md)
-* [代碼表界面效能優化](./CODES_PERFORMANCE.md)
-* [Posting/Office 流程備忘](./POSTING_OFFICE.md)
-* [Resource TTS 注意事項](./RESOURCE_TTS_NOTES.md)
-* [使用者權限說明](./USER_PRIVILEGES.md)
+* [代碼表格前端實作比較](./docs/CODES.md)
+* [代碼表界面白名單維護](./docs/CODES_TABLES.md)
+* [代碼表界面效能優化](./docs/CODES_PERFORMANCE.md)
+* [Posting/Office 流程備忘](./docs/POSTING_OFFICE.md)
+* [Resource TTS 注意事項](./docs/RESOURCE_TTS_NOTES.md)
+* [使用者權限說明](./docs/USER_PRIVILEGES.md)
 
 ## 工具使用說明
 
-* 若需批次導入資料，請參考 [BATCH_UPLOADERS](./BATCH_UPLOADERS.md)
-* [CBDB 公共 API v1 說明](./CBDB_PUBLIC_API_V1.md)
-* [單向關係修復工具](./UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)
-* [MERGE 工具說明](./MERGE.md)
-* [檢視表總覽](./VIEWS.md)
-* [Wiki 导入任务管理](./WIKI_TASK_MANAGEMENT.md)
-* [姓名搜索索引管理](./NAME_SEARCH_COMMANDS.md)
+* 若需批次導入資料，請參考 [BATCH_UPLOADERS](./docs/BATCH_UPLOADERS.md)
+* [CBDB 公共 API v1 說明](./docs/CBDB_PUBLIC_API_V1.md)
+* [單向關係修復工具](./docs/UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)
+* [MERGE 工具說明](./docs/MERGE.md)
+* [檢視表總覽](./docs/VIEWS.md)
+* [Wiki 导入任务管理](./docs/WIKI_TASK_MANAGEMENT.md)
+* [姓名搜索索引管理](./docs/NAME_SEARCH_COMMANDS.md)
 * [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到 HuggingFace
 
 ## 技術環境
 
 ### 生產環境
 - **PHP**: 8.2+ (最低 8.2.0，建議 8.4)
-- **Laravel**: 11.47 (已從 10.x 升級，參見 [UPGRADE.md](./UPGRADE.md))
+- **Laravel**: 11.47 (已從 10.x 升級，參見 [UPGRADE.md](./docs/UPGRADE.md))
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
 - **Node.js**: 12.x

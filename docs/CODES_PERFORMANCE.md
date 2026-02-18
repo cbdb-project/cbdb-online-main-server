@@ -186,4 +186,4 @@ SELECT * FROM CBDB__NAME_FTS WHERE id > 0 LIMIT 20;                          -- 
 
 - [CODES_TABLES.md](./CODES_TABLES.md) - 代碼表白名單與游標分頁
 - [NAME_SEARCH_COMMANDS.md](./NAME_SEARCH_COMMANDS.md) - 姓名搜尋索引說明
-- [DATABASE.md](./DATABASE.md) - 資料庫架構說明
+- [DATABASE.md](../DATABASE.md) - 資料庫架構說明

@@ -25,7 +25,7 @@ class CompositePrimaryKey {
         'BIOG_MAIN' => [
             'c_personid',
         ],
-        // ALTNAME_DATA 定位 key (#834 Phase 2)
+        // ALTNAME_DATA 定位 key (#834)
         // 資料庫 PK 為 3-key: (c_personid, c_alt_name_chn, c_alt_name_type_code)
         // c_sequence 為一般排序欄位，不參與定位。
         'ALTNAME_DATA' => [
@@ -118,10 +118,11 @@ class CompositePrimaryKey {
     ];
 
     /**
-     * ALTNAME_DATA 歷史 4-key 格式（Phase 2 向後相容用）
+     * ALTNAME_DATA 歷史 4-key 格式
      *
-     * Phase 1 及之前的 resource_id 使用 4-key 格式（含 c_sequence），
-     * 此常數用於解析歷史 resource_id，解析後會自動 strip c_sequence 返回 3-key。
+     * 2025 年以前的 resource_id 使用 4-key 格式（含 c_sequence），
+     * 此常數用於解析歷史操作紀錄的 resource_id，
+     * 解析後會自動 strip c_sequence 返回當前 3-key 格式。
      *
      * @see https://github.com/cbdb-project/cbdb-online-main-server/issues/834
      */
@@ -432,7 +433,7 @@ class CompositePrimaryKey {
         if (strpos($resourceId, '_._') !== false) {
             $parts = explode('_._', $resourceId);
 
-            // ALTNAME_DATA Phase 2 相容 (#834)：歷史 4-key _._  格式 → strip c_sequence 返回 3-key
+            // #834: 歷史 4-key _._  格式 → strip c_sequence 返回 3-key
             // 必須在通用匹配前處理，否則 4 parts >= 3 expectedCount 會導致錯位
             if (strtoupper($effectiveTable) === 'ALTNAME_DATA' && count($parts) === count(self::ALTNAME_LEGACY_4KEY)) {
                 $parsed4 = array_combine(self::ALTNAME_LEGACY_4KEY, $parts);
@@ -485,7 +486,7 @@ class CompositePrimaryKey {
             return $result2;
         }
 
-        // ALTNAME_DATA Phase 2 相容 (#834)：歷史 4-key dash 格式 → strip c_sequence 返回 3-key
+        // #834: 歷史 4-key dash 格式 → strip c_sequence 返回 3-key
         if (strtoupper($effectiveTable) === 'ALTNAME_DATA') {
             $legacy4key = self::ALTNAME_LEGACY_4KEY;
             $legacy4keyCount = count($legacy4key);

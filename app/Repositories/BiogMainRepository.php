@@ -2661,7 +2661,7 @@ class BiogMainRepository {
     /**
      * 依複合主鍵取得 ALTNAME_DATA 記錄
      *
-     * (#834 Phase 2): 使用 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code) 定位，
+     * 使用 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code) 定位，
      * c_sequence 不參與定位。接受字串或 3-key 關聯陣列。
      *
      * @param string|array $id 複合主鍵字串或 3-key 關聯陣列
@@ -2680,7 +2680,7 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
-        // (#834 Phase 2): 重複檢查使用 3-key，c_sequence 不參與定位
+        // 重複檢查使用 3-key，c_sequence 不參與定位
         $duplicate = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
             ['c_alt_name_chn', '=', $data['c_alt_name_chn']],
@@ -2725,7 +2725,7 @@ class BiogMainRepository {
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         $data = (new ToolsRepository())->timestamp($data);
 
-        // (#834 Phase 2): WHERE 使用 3-key 定位
+        // WHERE 使用 3-key 定位
         $where3key = [
             ['c_personid', '=', $pk['c_personid']],
             ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
@@ -2776,7 +2776,7 @@ class BiogMainRepository {
     public function altnameDeleteById($id, $c_personid) {
         $pk = is_array($id) ? $id : $this->parseAltnameId($id);
 
-        // (#834 Phase 2): WHERE 使用 3-key 定位
+        // WHERE 使用 3-key 定位
         $where3key = [
             ['c_personid', '=', $pk['c_personid']],
             ['c_alt_name_chn', '=', $pk['c_alt_name_chn']],
@@ -2818,44 +2818,18 @@ class BiogMainRepository {
     /**
      * 解析 ALTNAME_DATA 複合主鍵字串為 3-key 關聯陣列
      *
-     * (#834 Phase 2): 返回 3-key 關聯陣列，支援歷史 4-key 與新 3-key 格式。
+     * 支援歷史 4-key 與新 3-key 格式，委派給 CompositePrimaryKey 統一處理。
      *
      * @param string $alt 複合主鍵字串
      * @return array 3-key 關聯陣列 ['c_personid' => ..., 'c_alt_name_chn' => ..., 'c_alt_name_type_code' => ...]
      */
     public function parseAltnameId($alt) {
-        if (strpos($alt, '_._') !== false) {
-            $parts = explode('_._', $alt);
-        } else {
-            $parts = explode("-", $alt);
-            foreach ($parts as $key => $value) {
-                $parts[$key] = $this->unionPKDef_decode($value);
-            }
+        $parsed = CompositePrimaryKey::parseStoredResourceId($alt, 'ALTNAME_DATA');
+        if ($parsed !== null) {
+            return $parsed;
         }
 
-        $count = count($parts);
-        if ($count === 4) {
-            // 歷史 4-key 格式：[c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code]
-            // 忽略 c_sequence (index 1)，返回 3-key
-            return [
-                'c_personid' => $parts[0],
-                'c_alt_name_chn' => $parts[2],
-                'c_alt_name_type_code' => $parts[3],
-            ];
-        } elseif ($count === 3) {
-            // 新 3-key 格式：[c_personid, c_alt_name_chn, c_alt_name_type_code]
-            return [
-                'c_personid' => $parts[0],
-                'c_alt_name_chn' => $parts[1],
-                'c_alt_name_type_code' => $parts[2],
-            ];
-        }
-
-        Log::error("ALTNAME_DATA ID 格式不正確: {$alt}", [
-            'parsed' => $parts,
-            'expected_count' => '3 or 4',
-            'actual_count' => $count,
-        ]);
+        Log::error("ALTNAME_DATA ID 格式不正確: {$alt}");
         abort(400, 'ALTNAME_DATA ID 格式不正確');
     }
 

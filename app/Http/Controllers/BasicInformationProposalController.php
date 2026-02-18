@@ -31,7 +31,6 @@ class BasicInformationProposalController extends Controller {
         ],
         'altnames' => [
             'table' => 'ALTNAME_DATA',
-            // (#834 Phase 2): 3-key，c_sequence 不參與定位
             'key_columns' => ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'],
             'controller' => 'BasicInformationAltnamesController',
             'route_prefix' => 'basicinformation.altnames',

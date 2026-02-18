@@ -162,8 +162,7 @@ class OperationsController extends Controller {
 
                             break;
                         case "ALTNAME_DATA":
-                            // (#834 Phase 2): 使用 CompositePrimaryKey 解析 resource_id（支援歷史 4-key 與新 3-key），
-                            // 返回 3-key 查詢
+                            // 使用 CompositePrimaryKey 解析 resource_id（支援歷史 4-key 與新 3-key），返回 3-key 查詢
                             $parsedAlt = CompositePrimaryKey::parseStoredResourceId($resource_id, 'ALTNAME_DATA');
                             if ($parsedAlt !== null) {
                                 $altQuery = DB::table('ALTNAME_DATA');
@@ -739,7 +738,7 @@ class OperationsController extends Controller {
             }
         }
 
-        // (#834 Phase 3): ALTNAME 跨格式回退
+        // ALTNAME 跨格式回退 (#834)
         // 同一 ALTNAME 行的操作可能以不同格式儲存 resource_id（4-key vs 3-key），
         // 精確匹配會遺漏。透過解析 resource_id 再逐一比對來搜尋前次操作。
         if ($previous === null && $operation->resource === 'ALTNAME_DATA') {
@@ -758,7 +757,7 @@ class OperationsController extends Controller {
     }
 
     /**
-     * (#834 Phase 3): 跨格式搜尋前一筆 ALTNAME 操作
+     * 跨格式搜尋前一筆 ALTNAME 操作 (#834)
      *
      * 先從當前操作的 resource_id 解析出 3-key 值，
      * 再比對歷史操作的 resource_id（解析後）是否指向同一行。
@@ -902,7 +901,7 @@ class OperationsController extends Controller {
     }
 
     /**
-     * (#834 Phase 2): 使用 3-key 查詢 ALTNAME_DATA 現行資料列
+     * 使用 3-key 查詢 ALTNAME_DATA 現行資料列
      */
     protected function fetchAltnameCurrentRow(array $operation) {
         $decoded = $this->decodeJson($operation['resource_data'] ?? null);
@@ -949,7 +948,7 @@ class OperationsController extends Controller {
         $map = [
             'BIOG_MAIN' => ['c_personid'],
             'BIOG_ADDR_DATA' => ['c_personid','c_addr_id','c_addr_type','c_sequence'],
-            // (#834 Phase 2): 3-key，c_sequence 不參與定位
+            // ALTNAME_DATA 使用 3-key，c_sequence 不參與定位 (#834)
             'ALTNAME_DATA' => ['c_personid','c_alt_name_chn','c_alt_name_type_code'],
             'BIOG_TEXT_DATA' => ['c_personid','c_textid','c_role_id'],
             'POSTED_TO_OFFICE_DATA' => ['c_office_id','c_posting_id'],
@@ -982,7 +981,7 @@ class OperationsController extends Controller {
         $previous = isset($result['previous']) ? (array) $result['previous'] : [];
         $personId = $this->resolvePersonId($originalOperation, $restored, $previous);
 
-        // (#834 Phase 3): 正規化 resource_id，確保新紀錄一律使用最新格式
+        // 正規化 resource_id，確保新紀錄一律使用最新格式
         $resourceId = $this->normalizeResourceId(
             $originalOperation->resource,
             $originalOperation->resource_id,
@@ -1001,7 +1000,7 @@ class OperationsController extends Controller {
     }
 
     /**
-     * (#834 Phase 3): 正規化 resource_id
+     * 正規化 resource_id
      *
      * 對於有 resourceKeyColumns 定義的資源，嘗試從 $data 提取 key 欄位
      * 並重建 query-string 格式 resource_id。確保新寫入的操作紀錄一律使用最新格式，

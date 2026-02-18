@@ -826,7 +826,7 @@ class BasicInformationProposalTest extends TestCase {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
-        // (#834 Phase 2): 3-key 中缺少 c_alt_name_type_code
+        // 3-key 中缺少 c_alt_name_type_code
         $response = $this->post(route('basicinformation.proposal.store', [
             'personid' => 1,
             'resource' => 'altnames',

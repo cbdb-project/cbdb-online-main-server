@@ -7,7 +7,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * ALTNAME_DATA 3-key 相容層測試 (#834 Phase 2)
+ * ALTNAME_DATA 3-key 相容層測試 (#834)
  *
  * Schema 已切為 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)。
  * 確保 parseStoredResourceId() 對歷史 4-key resource_id 自動 strip c_sequence 返回 3-key，
@@ -76,7 +76,7 @@ class CompositePrimaryKeyAltnameCompatTest extends TestCase {
 
     #[Test]
     public function test_parse_altname_4key_dot_format_still_works(): void {
-        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key _._  格式 → 相容層自動 strip c_sequence 返回 3-key
         $resourceId = '123_._1_._張三_._10';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 
@@ -131,7 +131,7 @@ class CompositePrimaryKeyAltnameCompatTest extends TestCase {
 
     #[Test]
     public function test_parse_altname_4key_dash_format_still_works(): void {
-        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key dash 格式 → 相容層自動 strip c_sequence 返回 3-key
         $resourceId = '123-1-張三-10';
         $result = CompositePrimaryKey::parseStoredResourceId($resourceId, 'ALTNAME_DATA');
 

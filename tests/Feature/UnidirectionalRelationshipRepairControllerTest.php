@@ -1048,6 +1048,71 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
     }
 
     #[Test]
+    public function kinship_update_does_not_override_created_fields_even_if_request_contains_them() {
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('KINSHIP_CODES')->where('c_kincode', 2)->update([
+            'c_kin_pair1' => 303,
+        ]);
+
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 2,
+            'c_source' => 100,
+            'c_autogen_notes' => 'created-field-lock-test',
+            'c_created_by' => 'Original Creator',
+            'c_created_date' => '2024-01-01 08:00:00',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 303,
+            'c_source' => 100,
+            'c_autogen_notes' => 'created-field-lock-test',
+            'c_created_by' => 'Original Creator Mirror',
+            'c_created_date' => '2024-01-02 08:00:00',
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $repository = app(\App\Repositories\BiogMainRepository::class);
+        $request = new \Illuminate\Http\Request([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 3,
+            'c_kinship_pair' => 301,
+            'c_source' => 100,
+            'c_autogen_notes' => 'created-field-lock-test',
+            // 模擬異常請求：即使傳入空值，也不應覆寫 created 欄位
+            'c_created_by' => '',
+            'c_created_date' => '',
+        ]);
+
+        $repository->kinshipUpdateById($request, $person1->c_personid, "{$person1->c_personid}-{$person2->c_personid}-2");
+
+        $updatedPrimary = DB::table('KIN_DATA')->where([
+            'c_personid' => $person1->c_personid,
+            'c_kin_id' => $person2->c_personid,
+            'c_kin_code' => 3,
+        ])->first();
+        $updatedMirror = DB::table('KIN_DATA')->where([
+            'c_personid' => $person2->c_personid,
+            'c_kin_id' => $person1->c_personid,
+            'c_kin_code' => 301,
+        ])->first();
+
+        $this->assertNotNull($updatedPrimary);
+        $this->assertSame('Original Creator', $updatedPrimary->c_created_by);
+        $this->assertSame('2024-01-01 08:00:00', $updatedPrimary->c_created_date);
+
+        $this->assertNotNull($updatedMirror);
+        $this->assertSame('Original Creator Mirror', $updatedMirror->c_created_by);
+        $this->assertSame('2024-01-02 08:00:00', $updatedMirror->c_created_date);
+    }
+
+    #[Test]
     public function kinship_delete_writes_audit_log_for_mirrored_row() {
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();

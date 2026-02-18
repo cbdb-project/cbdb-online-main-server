@@ -4,23 +4,23 @@
 
 **授權 / License:** [CC BY-NC-SA 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/) (主要授權，詳見 [LICENSE.md](./LICENSE.md))
 
-## 開發指南(2025 更新)
+## 文件導覽（2026 更新）
 
+### 開發指南
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
 * [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
+* [CHANGELOG](./CHANGELOG.md)
+
+### 開發手記
 * [升級指南](./docs/UPGRADE.md) - Laravel 框架升級記錄
 * [AdminLTE 在 CBDB Online 項目中的使用分析](./docs/ADMINLTE.md)
 * [Proposal / Approval Flows](./docs/APPROVAL_FLOWS.md)
-* [CHANGELOG](./CHANGELOG.md)
 * [代碼表格前端實作比較](./docs/CODES.md)
 * [代碼表界面白名單維護](./docs/CODES_TABLES.md)
 * [代碼表界面效能優化](./docs/CODES_PERFORMANCE.md)
 * [Posting/Office 流程備忘](./docs/POSTING_OFFICE.md)
 * [Resource TTS 注意事項](./docs/RESOURCE_TTS_NOTES.md)
 * [使用者權限說明](./docs/USER_PRIVILEGES.md)
-
-## 工具使用說明
-
 * 若需批次導入資料，請參考 [BATCH_UPLOADERS](./docs/BATCH_UPLOADERS.md)
 * [CBDB 公共 API v1 說明](./docs/CBDB_PUBLIC_API_V1.md)
 * [單向關係修復工具](./docs/UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)
@@ -34,10 +34,10 @@
 
 ### 生產環境
 - **PHP**: 8.2+ (最低 8.2.0，建議 8.4)
-- **Laravel**: 11.47 (已從 10.x 升級，參見 [UPGRADE.md](./docs/UPGRADE.md))
+- **Laravel**: 12.x (已從 11.x 升級，參見 [UPGRADE.md](./docs/UPGRADE.md))
 - **數據庫**: MariaDB 10.3.39 (Debian)
 - **Web Server**: Caddy
-- **Node.js**: 12.x
+- **Node.js**: 22.x（建議搭配 npm 10）
 
 ### 前端構建現況
 - 全站已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。
@@ -45,7 +45,7 @@
 - `resources/js/jquery-global.js` 將 jQuery 暴露到全局；Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現。
 - 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
 
-⚠️ **重要**：本專案現已升級到 Laravel 11.47 並要求 PHP 8.2+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。Laravel 11 已完全支持 PHP 8.4。
+⚠️ **重要**：本專案現已升級到 Laravel 12.x 並要求 PHP 8.2+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。Laravel 12 已完全支持 PHP 8.4。
 
 ### 數據庫兼容性原則
 ⚠️ **重要**：為保持未來遷移到其他數據庫實現的靈活性，請遵循以下原則：

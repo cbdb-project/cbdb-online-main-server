@@ -189,6 +189,42 @@ class BasicInformationTextsControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'texts-update-mismatch@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_TEXT_DATA')->insert([
+            'c_personid' => 2,
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 9,
+        ]);
+
+        $response = $this->actingAs($user)->put(
+            '/basicinformation/1/texts/update?c_personid=2&c_textid=100&c_role_id=0',
+            [
+                'c_source' => 200,
+            ]
+        );
+
+        $response->assertStatus(400);
+
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 2,
+            'c_textid' => 100,
+            'c_role_id' => 0,
+            'c_source' => 9,
+        ]);
+        $this->assertDatabaseCount('operations', 0);
+        $this->assertDatabaseCount('audit_log', 0);
+    }
+
+    #[Test]
     public function testStoreDuplicateTextShowsErrorAndDoesNotInsertAgain(): void {
         $user = User::create([
             'name' => 'Test User',

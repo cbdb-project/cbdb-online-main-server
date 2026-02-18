@@ -152,4 +152,44 @@ class BasicInformationAddressesControllerTest extends TestCase {
         $this->assertSame(0, $oldData['c_ly_intercalary']);
         $this->assertSame(1, $newData['c_ly_intercalary']);
     }
+
+    #[Test]
+    public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'addr-update-mismatch@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => 2,
+            'c_addr_id' => 10,
+            'c_addr_type' => 2,
+            'c_sequence' => 1,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_notes' => 'old-note',
+        ]);
+
+        $response = $this->actingAs($user)->put(
+            '/basicinformation/1/addresses/update?c_personid=2&c_addr_id=10&c_addr_type=2&c_sequence=1',
+            [
+                'c_notes' => 'new-note',
+            ]
+        );
+
+        $response->assertStatus(400);
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 2,
+            'c_addr_id' => 10,
+            'c_addr_type' => 2,
+            'c_sequence' => 1,
+            'c_notes' => 'old-note',
+        ]);
+        $this->assertDatabaseCount('operations', 0);
+        $this->assertDatabaseCount('audit_log', 0);
+    }
 }

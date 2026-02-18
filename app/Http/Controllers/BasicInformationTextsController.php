@@ -384,6 +384,10 @@ class BasicInformationTextsController extends Controller {
         // 驗證必填欄位（c_role_id 為可選，預設為 0）
         CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
 
+        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
+
         $c_role_id = $pk['c_role_id'] ?? 0;
         $legacyId = $pk['c_personid']."-".$pk['c_textid']."-".$c_role_id;
         $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);

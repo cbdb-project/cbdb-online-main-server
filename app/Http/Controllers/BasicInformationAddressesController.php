@@ -531,6 +531,10 @@ class BasicInformationAddressesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
+        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
+
         $legacyId = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
         $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
         if ($newPk === null) {

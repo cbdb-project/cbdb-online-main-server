@@ -75,12 +75,8 @@
                 </div>
                 @if(!$readonly)
                     <div class="form-group row">
-                        <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
-                        <div class="col-sm-4">
+                        <div class="col-sm-4 offset-sm-2">
                             <button type="button" id="button_ajax_load" class="btn btn-info">生成拼音</button>
-                        </div>
-                        <label for="button_ajax_load" class="col-sm-2 col-form-label"></label>
-                        <div class="col-sm-4">
                         </div>
                     </div>
                 @endif

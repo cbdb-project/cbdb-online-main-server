@@ -329,7 +329,7 @@ class BasicInformationAltnamesController extends Controller {
     /**
      * 查詢參數模式：編輯別名記錄
      *
-     * URL 格式：/basicinformation/{id}/altnames/edit?c_personid=...&c_sequence=...&c_alt_name_chn=...&c_alt_name_type_code=...
+     * URL 格式：/basicinformation/{id}/altnames/edit?c_personid=...&c_alt_name_chn=...&c_alt_name_type_code=...
      *
      * @param Request $request
      * @param int $id 人物 ID

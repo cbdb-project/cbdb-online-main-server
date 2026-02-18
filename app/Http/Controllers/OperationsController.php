@@ -733,9 +733,58 @@ class OperationsController extends Controller {
             }
         }
 
+        // (#834 Phase 3): ALTNAME 跨格式回退
+        // 同一 ALTNAME 行的操作可能以不同格式儲存 resource_id（4-key vs 3-key），
+        // 精確匹配會遺漏。透過解析 resource_id 再逐一比對來搜尋前次操作。
+        if ($previous === null && $operation->resource === 'ALTNAME_DATA') {
+            $previous = $this->findPreviousAltnameOperation($operation);
+            if ($previous) {
+                $decoded = $this->decodeJson($previous->resource_data);
+                if (!empty($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+
         $original = $this->decodeJson($operation->resource_original);
 
         return $original ?? [];
+    }
+
+    /**
+     * (#834 Phase 3): 跨格式搜尋前一筆 ALTNAME 操作
+     *
+     * 先從當前操作的 resource_id 解析出 3-key 值，
+     * 再比對歷史操作的 resource_id（解析後）是否指向同一行。
+     */
+    protected function findPreviousAltnameOperation(Operation $operation): ?Operation {
+        $parsed = CompositePrimaryKey::parseStoredResourceId(
+            $operation->resource_id ?? '',
+            'ALTNAME_DATA'
+        );
+        if ($parsed === null) {
+            return null;
+        }
+
+        // 以 c_personid 縮小範圍（operations 表直接欄位），
+        // 避免全域掃描導致目標操作超出固定窗口而遺漏。
+        $candidates = Operation::where('resource', 'ALTNAME_DATA')
+            ->where('c_personid', $operation->c_personid)
+            ->where('id', '<', $operation->id)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            $candidateParsed = CompositePrimaryKey::parseStoredResourceId(
+                $candidate->resource_id ?? '',
+                'ALTNAME_DATA'
+            );
+            if ($candidateParsed !== null && $candidateParsed == $parsed) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     protected function decodeJson($payload) {
@@ -927,15 +976,46 @@ class OperationsController extends Controller {
         $previous = isset($result['previous']) ? (array) $result['previous'] : [];
         $personId = $this->resolvePersonId($originalOperation, $restored, $previous);
 
+        // (#834 Phase 3): 正規化 resource_id，確保新紀錄一律使用最新格式
+        $resourceId = $this->normalizeResourceId(
+            $originalOperation->resource,
+            $originalOperation->resource_id,
+            $restored
+        );
+
         $this->operationRepository->store(
             Auth::id(),
             $personId,
             3,
             $originalOperation->resource,
-            $originalOperation->resource_id,
+            $resourceId,
             $restored,
             $previous
         );
+    }
+
+    /**
+     * (#834 Phase 3): 正規化 resource_id
+     *
+     * 對於有 resourceKeyColumns 定義的資源，嘗試從 $data 提取 key 欄位
+     * 並重建 query-string 格式 resource_id。確保新寫入的操作紀錄一律使用最新格式，
+     * 且 resource_id 反映復原後的實際 key 值。
+     */
+    protected function normalizeResourceId(string $resource, string $originalResourceId, array $data): string {
+        $keys = $this->resourceKeyColumns($resource);
+        if (empty($keys)) {
+            return $originalResourceId;
+        }
+
+        $pk = [];
+        foreach ($keys as $col) {
+            if (!array_key_exists($col, $data)) {
+                return $originalResourceId;
+            }
+            $pk[$col] = $data[$col];
+        }
+
+        return CompositePrimaryKey::buildStoredResourceId($pk);
     }
 
     protected function resolvePersonId(Operation $operation, array $restored, array $previous): ?int {

@@ -4,23 +4,23 @@
 
 **授權 / License:** [CC BY-NC-SA 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/) (主要授權，詳見 [LICENSE.md](./LICENSE.md))
 
-## 開發指南(2025 更新)
+## 文件導覽（2026 更新）
 
+### 開發指南
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
 * [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
+* [CHANGELOG](./CHANGELOG.md)
+
+### 開發手記
 * [升級指南](./docs/UPGRADE.md) - Laravel 框架升級記錄
 * [AdminLTE 在 CBDB Online 項目中的使用分析](./docs/ADMINLTE.md)
 * [Proposal / Approval Flows](./docs/APPROVAL_FLOWS.md)
-* [CHANGELOG](./CHANGELOG.md)
 * [代碼表格前端實作比較](./docs/CODES.md)
 * [代碼表界面白名單維護](./docs/CODES_TABLES.md)
 * [代碼表界面效能優化](./docs/CODES_PERFORMANCE.md)
 * [Posting/Office 流程備忘](./docs/POSTING_OFFICE.md)
 * [Resource TTS 注意事項](./docs/RESOURCE_TTS_NOTES.md)
 * [使用者權限說明](./docs/USER_PRIVILEGES.md)
-
-## 工具使用說明
-
 * 若需批次導入資料，請參考 [BATCH_UPLOADERS](./docs/BATCH_UPLOADERS.md)
 * [CBDB 公共 API v1 說明](./docs/CBDB_PUBLIC_API_V1.md)
 * [單向關係修復工具](./docs/UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)

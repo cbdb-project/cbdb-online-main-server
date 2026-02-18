@@ -290,6 +290,91 @@ class OfficeAddressOperationLoggingTest extends TestCase {
     }
 
     #[Test]
+    public function testPartialAddressChangeDoesNotTouchUnchangedAddressTimestamp(): void {
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-06-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 920003,
+            'c_office_id' => 77773,
+            'c_posting_id' => 880003,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_office_id' => 77773,
+            'c_addr_id' => 25,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-06-01 00:00:00',
+            'c_modified_by' => 'Seeder',
+            'c_modified_date' => '2023-06-02 00:00:00',
+        ]);
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_office_id' => 77773,
+            'c_addr_id' => 26,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => '2023-06-01 00:00:00',
+            'c_modified_by' => 'Seeder',
+            'c_modified_date' => '2023-06-03 00:00:00',
+        ]);
+
+        Auth::guard()->setUser(new GenericUser(['id' => 4, 'name' => 'Updater C']));
+
+        $request = new Request([
+            '_id' => 920003,
+            '_postingid' => 880003,
+            '_officeid' => 77773,
+            'c_office_id' => 77773,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [25, 27],
+        ]);
+
+        $repository = new BiogMainRepository();
+        $repository->officeUpdateById($request, 880003, 920003);
+
+        $unchangedAddress = DB::table('POSTED_TO_ADDR_DATA')->where([
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_office_id' => 77773,
+            'c_addr_id' => 25,
+        ])->first();
+
+        $newAddress = DB::table('POSTED_TO_ADDR_DATA')->where([
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_office_id' => 77773,
+            'c_addr_id' => 27,
+        ])->first();
+
+        $this->assertNotNull($unchangedAddress);
+        $this->assertSame('Seeder', $unchangedAddress->c_modified_by);
+        $this->assertSame('2023-06-02 00:00:00', $unchangedAddress->c_modified_date);
+
+        $this->assertNotNull($newAddress);
+        $this->assertSame('Updater C', $newAddress->c_modified_by);
+        $this->assertNotNull($newAddress->c_modified_date);
+
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', [
+            'c_personid' => 920003,
+            'c_posting_id' => 880003,
+            'c_office_id' => 77773,
+            'c_addr_id' => 26,
+        ]);
+    }
+
+    #[Test]
     public function testAddressChangeOnlyTouchesTargetOffice(): void {
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
             'c_personid' => 100000,

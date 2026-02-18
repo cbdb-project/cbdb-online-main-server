@@ -56,6 +56,33 @@ class OperationsController extends Controller {
             }
         }
 
+        // 修改人篩選（支援 user_id 或 name 模糊匹配）
+        $editorFilter = trim($request->input('editor', ''));
+        if ($editorFilter !== '') {
+            $query->whereHas('user', function ($q) use ($editorFilter) {
+                if (ctype_digit($editorFilter)) {
+                    $q->where('id', (int) $editorFilter);
+                } else {
+                    $q->where('name', 'like', '%' . $editorFilter . '%');
+                }
+            });
+        }
+
+        // 修改類型篩選（多選 op_type，僅非 proposals 模式）
+        if (!$proposalsOnly) {
+            $rawOpTypes = $request->input('op_type', []);
+            if (!is_array($rawOpTypes)) {
+                $rawOpTypes = [$rawOpTypes];
+            }
+            $opTypeFilter = array_values(array_intersect(
+                array_filter(array_map('intval', $rawOpTypes)),
+                [1, 2, 3, 4, 8, 9]
+            ));
+            if (!empty($opTypeFilter)) {
+                $query->whereIn('op_type', $opTypeFilter);
+            }
+        }
+
         $lists = $query->orderBy('updated_at', 'desc')->paginate(20);
         $lists->appends($request->except('page'));
         //將物件轉為陣列進行陣列比對

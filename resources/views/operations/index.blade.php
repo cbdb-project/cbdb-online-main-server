@@ -7,38 +7,65 @@ use App\Support\CompositePrimaryKey;
 @include('biogmains.defense')
     <div class="card card-default">
         <div class="card-body">
-            @if(!empty($proposals_only))
-                @php
-                    $statusOptions = [
-                        'pending' => '待審核',
-                        'approved' => '已核准',
-                        'rejected' => '已退修',
-                        'cancelled' => '已撤回',
-                    ];
-                    $selectedStatuses = $status_filters ?? [];
-                @endphp
-                <form method="GET" action="{{ route('operations.index') }}" class="form-inline" style="margin-bottom: 15px;" id="proposal-status-filters">
+            <form method="GET" action="{{ route('operations.index') }}" class="form-inline" style="margin-bottom: 15px;" id="operations-filters">
+                @if(!empty($proposals_only))
                     <input type="hidden" name="proposals_only" value="1">
-                    @foreach($statusOptions as $value => $label)
-                        <label class="checkbox-inline" style="margin-right: 12px;">
-                            <input type="checkbox" name="status[]" value="{{ $value }}" {{ in_array($value, $selectedStatuses, true) ? 'checked' : '' }}>
-                            {{ $label }}
-                        </label>
-                    @endforeach
-                    <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-secondary btn-sm" style="margin-left: 8px;">清除篩選</a>
-                </form>
-                <script>
-                    document.addEventListener('DOMContentLoaded', function () {
-                        var form = document.getElementById('proposal-status-filters');
-                        if (!form) {
-                            return;
-                        }
-                        form.addEventListener('change', function () {
-                            form.submit();
-                        });
-                    });
-                </script>
-            @endif
+                @endif
+
+                {{-- 修改人篩選 --}}
+                <div class="form-group mr-3">
+                    <label class="mr-1">修改人：</label>
+                    <input type="text" name="editor" class="form-control form-control-sm"
+                           placeholder="名稱或 ID" value="{{ request('editor', '') }}" style="width: 150px;">
+                </div>
+
+                @if(!empty($proposals_only))
+                    {{-- 提案狀態篩選 --}}
+                    @php
+                        $statusOptions = [
+                            'pending' => '待審核',
+                            'approved' => '已核准',
+                            'rejected' => '已退修',
+                            'cancelled' => '已撤回',
+                        ];
+                        $selectedStatuses = $status_filters ?? [];
+                    @endphp
+                    <div class="form-group mr-3">
+                        <label class="mr-1">提案狀態：</label>
+                        @foreach($statusOptions as $value => $label)
+                            <label class="form-check-inline mr-2">
+                                <input type="checkbox" name="status[]" value="{{ $value }}" {{ in_array($value, $selectedStatuses, true) ? 'checked' : '' }}>
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                @else
+                    {{-- 修改類型篩選（僅一般模式） --}}
+                    @php
+                        $opTypeOptions = [
+                            1 => '新增',
+                            2 => '整體覆寫',
+                            3 => '修改',
+                            4 => '刪除',
+                        ];
+                        $selectedOpTypes = array_map('intval', (array) request('op_type', []));
+                    @endphp
+                    <div class="form-group mr-3">
+                        <label class="mr-1">修改類型：</label>
+                        @foreach($opTypeOptions as $val => $lbl)
+                            <label class="form-check-inline mr-2">
+                                <input type="checkbox" name="op_type[]" value="{{ $val }}"
+                                       {{ in_array($val, $selectedOpTypes, true) ? 'checked' : '' }}>
+                                {{ $lbl }}
+                            </label>
+                        @endforeach
+                    </div>
+                @endif
+
+                <button type="submit" class="btn btn-primary btn-sm mr-2">篩選</button>
+                <a href="{{ route('operations.index', !empty($proposals_only) ? ['proposals_only' => 1] : []) }}"
+                   class="btn btn-secondary btn-sm">清除篩選</a>
+            </form>
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
                 <thead>

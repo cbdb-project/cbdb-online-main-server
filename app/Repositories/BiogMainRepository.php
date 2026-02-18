@@ -3124,7 +3124,8 @@ class BiogMainRepository {
         }
 
         if ($c_surname_chn != '') {
-            $c_mingzi_chn = str_replace($c_surname_chn, '', $name);
+            $surnameLength = mb_strlen($c_surname_chn, 'utf-8');
+            $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
             $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';

@@ -41,6 +41,7 @@ class AutoPinyinTest extends TestCase {
         DB::table('pinyin')->insert([
             ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
             ['lastname_chn' => '歐陽', 'lastname_pinyin' => 'Ouyang'],
+            ['lastname_chn' => '林', 'lastname_pinyin' => 'Lin'],
         ]);
 
         $this->repository = new BiogMainRepository();
@@ -103,5 +104,15 @@ class AutoPinyinTest extends TestCase {
         $this->assertSame('Wang', $result['c_surname']);
         $this->assertSame('安石傳', $result['c_mingzi_chn']);
         $this->assertSame('Wang ' . $result['c_mingzi'], $result['c_name']);
+    }
+
+    #[Test]
+    public function testRepeatedCharacterNameKeepsGivenNameAfterSurnameSplit(): void {
+        $result = $this->repository->auto_pinyin(['c_name_chn' => '林林']);
+
+        $this->assertSame('林', $result['c_surname_chn']);
+        $this->assertSame('Lin', $result['c_surname']);
+        $this->assertSame('林', $result['c_mingzi_chn']);
+        $this->assertSame('Lin Lin', $result['c_name']);
     }
 }

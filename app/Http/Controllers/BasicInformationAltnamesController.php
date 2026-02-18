@@ -136,7 +136,6 @@ class BasicInformationAltnamesController extends Controller {
 
         flash('Store success @ '.Carbon::now(), 'success');
 
-        // (#834 Phase 2): 使用 3-key 重定向，c_sequence 不參與定位
         $newPk = [
             'c_personid' => $data['c_personid'],
             'c_alt_name_chn' => $data['c_alt_name_chn'],
@@ -242,7 +241,6 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // (#834 Phase 2): 使用 3-key 關聯陣列
             $originalPk = $this->parseAltnameId($alt);
 
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
@@ -311,7 +309,7 @@ class BasicInformationAltnamesController extends Controller {
     /**
      * 解析別名複合主鍵 ID 為 3-key 關聯陣列
      *
-     * (#834 Phase 2): 委派給 Repository，支援歷史 4-key 與新 3-key 格式。
+     * 委派給 Repository，支援歷史 4-key 與新 3-key 格式。
      *
      * @param string $alt 複合主鍵 ID
      * @return array 3-key 關聯陣列 ['c_personid' => ..., 'c_alt_name_chn' => ..., 'c_alt_name_type_code' => ...]
@@ -336,7 +334,6 @@ class BasicInformationAltnamesController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function editQuery(Request $request, $id) {
-        // (#834 Phase 2): 從查詢參數提取 3-key
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
 
@@ -433,7 +430,6 @@ class BasicInformationAltnamesController extends Controller {
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // (#834 Phase 2): 從 URL 查詢字串取得 3-key 原始 PK
             $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
             $originalPk = [];
             foreach ($schema as $field) {
@@ -454,7 +450,6 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // (#834 Phase 2): 從 URL 查詢字串提取 3-key 原始 PK
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $originalPk = [];
         foreach ($schema as $field) {
@@ -534,7 +529,6 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
-        // (#834 Phase 2): 從查詢參數提取 3-key
         $schema = CompositePrimaryKey::SCHEMAS['ALTNAME_DATA'];
         $pk = CompositePrimaryKey::fromRequest($request, $schema);
         CompositePrimaryKey::validateOrFail($pk, 'ALTNAME_DATA');

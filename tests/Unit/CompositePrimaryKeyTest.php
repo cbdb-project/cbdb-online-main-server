@@ -405,7 +405,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_parses_resource_id_with_encoded_slash(): void {
-        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key dash 格式 → 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-張(slash)三-10',
             'ALTNAME_DATA'
@@ -461,7 +461,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_parses_underscore_dot_separator_format(): void {
-        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key _._  格式 → 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345_._1_._張三_._10',
             'ALTNAME_DATA'
@@ -547,7 +547,7 @@ class CompositePrimaryKeyTest extends TestCase {
     /** @test */
     public function it_parses_old_format_with_double_dash(): void {
         // 舊格式：-- 代表欄位值中的 -
-        // 歷史 4-key dash 格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key dash 格式 → 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-張--三-10',
             'ALTNAME_DATA'
@@ -654,7 +654,7 @@ class CompositePrimaryKeyTest extends TestCase {
 
     /** @test */
     public function it_roundtrips_build_and_parse_for_altname(): void {
-        // Phase 2：3-key roundtrip（c_sequence 不參與定位）
+        // 3-key roundtrip（c_sequence 不參與定位）
         $pk = [
             'c_personid' => '12345',
             'c_alt_name_chn' => '張-三',
@@ -767,7 +767,7 @@ class CompositePrimaryKeyTest extends TestCase {
     /** @test */
     public function it_still_parses_underscore_dot_format_with_equals(): void {
         // 確保含 = 但也含 _._ 的格式不會被誤判為 query-string
-        // 歷史 4-key _._  格式 → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key _._  格式 → 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345_._1_._a=b_._10',
             'ALTNAME_DATA'
@@ -786,7 +786,7 @@ class CompositePrimaryKeyTest extends TestCase {
         // 舊格式 resource_id 的欄位值恰好含有 '='（極端邊界情況）
         // parse_str('12345-1-a=b-10') 會產生 ['12345-1-a' => 'b-10']
         // 因為 key 不在 ALTNAME_DATA schema 中，回退到 dash 分隔符解析
-        // 歷史 4-key dash → Phase 2 相容層自動 strip c_sequence 返回 3-key
+        // 歷史 4-key dash → 相容層自動 strip c_sequence 返回 3-key
         $result = CompositePrimaryKey::parseStoredResourceId(
             '12345-1-a=b-10',
             'ALTNAME_DATA'

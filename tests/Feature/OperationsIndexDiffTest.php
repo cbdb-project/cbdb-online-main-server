@@ -170,7 +170,7 @@ BLADE
     }
 
     // -------------------------------------------------------
-    // Phase 1 (#834)：ALTNAME 3-key 舊格式分支差異比對測試
+    // ALTNAME 3-key 舊格式分支差異比對測試 (#834)
     // -------------------------------------------------------
 
     #[Test]
@@ -319,7 +319,7 @@ BLADE
 
     #[Test]
     public function test_operations_index_altname_4key_legacy_still_works(): void {
-        // 確認既有 4-key 舊格式不受 Phase 1 影響
+        // 確認既有 4-key 舊格式不受 3-key 遷移影響
         $this->actingAsAdmin();
         $this->createAltnameTable();
 

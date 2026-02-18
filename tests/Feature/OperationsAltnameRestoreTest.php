@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * (#834 Phase 3): ALTNAME_DATA 操作復原整合測試
+ * ALTNAME_DATA 操作復原整合測試 (#834)
  *
  * 驗證：
  * - 復原更新操作（op_type=3）能正確回復 DB 資料

@@ -69,7 +69,7 @@ class OperationsAltnameResolverTest extends TestCase {
     public function test_fetch_altname_handles_null_sentinel_in_query_string_resource_id(): void {
         // 當 resource_data 缺少欄位，且 resource_id 用新格式包含 NULL sentinel 時，
         // c_sequence=NULL 經解析後為 PHP null。
-        // Phase 1 (#834)：c_sequence 為 null 時改走 3-key 查詢（DB PK），
+        // #834: c_sequence 為 null 時改走 3-key 查詢（DB PK），
         // 因此能正確定位到該筆資料（不論 c_sequence 實際值為何）。
         DB::table('ALTNAME_DATA')->insert([
             'c_personid' => 200,
@@ -96,7 +96,7 @@ class OperationsAltnameResolverTest extends TestCase {
 
         $row = $controller->resolveAltname($operationPayload);
 
-        // Phase 1：c_sequence 為 null → 3-key 回退查詢，以 DB PK 定位
+        // c_sequence 為 null → 3-key 回退查詢，以 DB PK 定位
         // (c_personid=200, c_alt_name_chn=測試, c_alt_name_type_code=5) 能唯一找到該列
         $this->assertNotNull($row);
         $this->assertEquals(200, $row->c_personid);
@@ -106,7 +106,7 @@ class OperationsAltnameResolverTest extends TestCase {
 
     #[Test]
     public function test_build_key_conditions_normalizes_null_sentinel(): void {
-        // (#834 Phase 2): resourceKeyColumns 已切為 3-key，
+        // resourceKeyColumns 已切為 3-key (#834)，
         // 歷史 4-key resource_id 中的 c_sequence 被 parseStoredResourceId 過濾，
         // buildKeyConditions 只返回 3 個 conditions
         Schema::create('operations', function (Blueprint $table) {

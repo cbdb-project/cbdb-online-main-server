@@ -594,7 +594,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $response->assertRedirect();
         $response->assertSessionHas('flash_notification');
 
-        // (#834 Phase 2): 重定向 URL 使用 3-key，不含 c_sequence
+        // 重定向 URL 使用 3-key，不含 c_sequence
         $redirectUrl = $response->headers->get('Location');
         $this->assertStringContainsString('c_personid=1', $redirectUrl);
         $this->assertStringNotContainsString('c_sequence', $redirectUrl);

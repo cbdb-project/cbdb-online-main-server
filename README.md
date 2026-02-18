@@ -30,6 +30,24 @@
 * [姓名搜索索引管理](./docs/NAME_SEARCH_COMMANDS.md)
 * [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到 HuggingFace
 
+### 更多文檔
+* [AdminLTE 4 升級可行性](./docs/ADMINLTE4_UPGRADE_FEASIBILITY.md)
+* [AI 任官自動填充設計](./docs/AI_POSTING_AUTOFILL_DESIGN.md)
+* [API 認證方案](./docs/API_AUTHENTICATION.md)
+* [稽核日誌提案](./docs/AUDIT_LOG_PROPOSAL.md)
+* [人物提案流程計畫](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
+* [BiogMain Repository 重構計畫](./docs/BIOGMAIN_REPOSITORY_REFACTOR_PLAN.md)
+* [複合主鍵 URL 設計](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)
+* [資料庫 Schema（MySQL/SQLite）](./docs/DATABASE_SCHEMA.md)
+* [Laravel Query 審查](./docs/LARAVEL_QUERY_REVIEW.md)
+* [MCP HTTP 介面提案](./docs/MCP_HTTP_INTERFACE_PROPOSAL.md)
+* [MCP 使用指南](./docs/MCP_USER_GUIDE.md)
+* [姓名搜尋效能改進](./docs/NAME_SEARCH_PERFORMANCE_IMPROVEMENT.md)
+* [Prometheus 指標說明](./docs/PROMETHEUS_METRICS.md)
+* [Schema 文檔生成說明](./docs/SCHEMA_DOCS_GENERATION.md)
+* [SQLite 數據發佈流程](./docs/SQLITE_DATA_RELEASE.md)
+* [SQLite 遷移計畫](./docs/SQLITE_MIGRATION_PLAN.md)
+
 ## 技術環境
 
 ### 生產環境

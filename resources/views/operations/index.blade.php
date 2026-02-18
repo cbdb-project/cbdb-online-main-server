@@ -152,8 +152,48 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     ? implode(' / ', $auditTableNames)
                                     : (string) $item->resource;
                             @endphp
+                            @php
+                                $resourceNoteTooltipShort = '';
+                                $hasResourceNoteIcon = false;
+                                $resourceDataForIcon = json_decode($item->resource_data, true);
+                                if (is_array($resourceDataForIcon)) {
+                                    $notesForIcon = [];
+                                    $iconDirectNote = trim((string) ($resourceDataForIcon['__note'] ?? ''));
+                                    if ($iconDirectNote !== '') {
+                                        $notesForIcon[] = '修改說明：'.$iconDirectNote;
+                                    }
+                                    $iconProposalMeta = $resourceDataForIcon['__proposal_meta'] ?? [];
+                                    if (is_array($iconProposalMeta)) {
+                                        $iconProposalComment = trim((string) ($iconProposalMeta['comment'] ?? ''));
+                                        if ($iconProposalComment !== '') {
+                                            $notesForIcon[] = '提案說明：'.$iconProposalComment;
+                                        }
+                                        $iconCancelReason = trim((string) ($iconProposalMeta['cancel_reason'] ?? ''));
+                                        if ($iconCancelReason !== '') {
+                                            $notesForIcon[] = '撤回原因：'.$iconCancelReason;
+                                        }
+                                    }
+                                    $iconReviewComment = trim((string) ($resourceDataForIcon['__review_comment'] ?? ''));
+                                    if ($iconReviewComment !== '') {
+                                        $notesForIcon[] = '審核備註：'.$iconReviewComment;
+                                    }
+                                    if (!empty($notesForIcon)) {
+                                        $hasResourceNoteIcon = true;
+                                        $resourceNoteTooltipShort = mb_strimwidth(implode(' ｜ ', $notesForIcon), 0, 120, '…', 'UTF-8');
+                                    }
+                                }
+                            @endphp
                             <td rowspan="{{ $personRowspan }}">
                                 {{ $resourceDisplay }}
+                                @if($hasResourceNoteIcon)
+                                    <button type="button"
+                                            class="btn btn-link btn-sm text-dark p-0 ml-1 align-baseline js-operation-note-tooltip"
+                                            data-toggle="modal"
+                                            data-target="#operation-notes-{{ $item->id }}"
+                                            data-note-tooltip="{{ $resourceNoteTooltipShort }}">
+                                        <i class="far fa-edit"></i>
+                                    </button>
+                                @endif
                             </td>
                             @php
                                 $diffSource = $item->resource_diff ?? $item->resource_original;
@@ -177,6 +217,28 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $reviewComment = is_array($resourceDataParsed) ? ($resourceDataParsed['__review_comment'] ?? null) : null;
                                 $reviewedBy = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_by'] ?? null) : null;
                                 $reviewedAt = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_at'] ?? null) : null;
+                                $operationNotes = [];
+                                $directNote = is_array($resourceDataParsed) ? trim((string) ($resourceDataParsed['__note'] ?? '')) : '';
+                                if ($directNote !== '') {
+                                    $operationNotes[] = ['label' => '修改說明', 'content' => $directNote];
+                                }
+                                $proposalComment = is_array($proposalMeta) ? trim((string) ($proposalMeta['comment'] ?? '')) : '';
+                                if ($proposalComment !== '') {
+                                    $operationNotes[] = ['label' => '提案說明', 'content' => $proposalComment];
+                                }
+                                $reviewCommentText = trim((string) ($reviewComment ?? ''));
+                                if ($reviewCommentText !== '') {
+                                    $operationNotes[] = ['label' => '審核備註', 'content' => $reviewCommentText];
+                                }
+                                $cancelReasonText = is_array($proposalMeta) ? trim((string) ($proposalMeta['cancel_reason'] ?? '')) : '';
+                                if ($cancelReasonText !== '') {
+                                    $operationNotes[] = ['label' => '撤回原因', 'content' => $cancelReasonText];
+                                }
+                                $hasOperationNotes = !empty($operationNotes);
+                                $noteTooltip = implode(' ｜ ', array_map(function ($note) {
+                                    return ($note['label'] ?? '備註') . '：' . ($note['content'] ?? '');
+                                }, $operationNotes));
+                                $noteTooltipShort = mb_strimwidth($noteTooltip, 0, 120, '…', 'UTF-8');
                                 $submittedDisplay = '';
                                 $submittedUtc = '';
                                 if (!empty($proposalMeta['submitted_at'])) {
@@ -282,7 +344,6 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     {{ $canCompare ? '' : 'disabled' }}>
                                     比較
                                 </button>
-
                                 <div id="myModal{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog">
                                     <div class="modal-content">
@@ -332,6 +393,31 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     </div>
                                   </div>
                                 </div>
+                                @if($hasOperationNotes)
+                                    <div id="operation-notes-{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
+                                      <div class="modal-dialog">
+                                        <div class="modal-content">
+                                          <div class="modal-header">
+                                            <h4 class="modal-title">修改說明</h4>
+                                            <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                          </div>
+                                          <div class="modal-body" style="word-break: break-word;">
+                                            @foreach($operationNotes as $note)
+                                                <div style="margin-bottom: 12px;">
+                                                    @if(($note['label'] ?? '') !== '修改說明')
+                                                        <strong>{{ $note['label'] ?? '備註' }}</strong>
+                                                    @endif
+                                                    <div>{!! nl2br(e($note['content'] ?? '')) !!}</div>
+                                                </div>
+                                            @endforeach
+                                          </div>
+                                          <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                @endif
                                 @if(Auth::check() && Auth::user()->isAdmin() && in_array((int)$item->op_type, [3,4]) && $item->resource !== 'POSTED_TO_ADDR_DATA' && $canCompare)
                                     <form method="post" action="{{ route('operations.restore', $item->id) }}" style="display:inline;">
                                         {{ csrf_field() }}
@@ -506,6 +592,18 @@ document.addEventListener('DOMContentLoaded', function () {
             node.removeAttribute('title');
         }
     });
+
+    if (typeof window.$ !== 'undefined') {
+        window.$('.js-operation-note-tooltip').each(function () {
+            var $el = window.$(this);
+            var tip = $el.attr('data-note-tooltip') || '';
+            $el.tooltip({
+                title: tip,
+                placement: 'top',
+                trigger: 'hover',
+            });
+        });
+    }
 });
 
 </script>

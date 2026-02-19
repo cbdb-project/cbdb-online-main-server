@@ -3089,25 +3089,49 @@ class BiogMainRepository {
     //20230628觸發「自動生成」功能
     public function auto_pinyin($data) {
         $c_surname_chn = $c_surname = $c_mingzi_chn = $c_mingzi = $c_name = '';
-        $name = $data['c_name_chn'];
-        $len = mb_strlen($name, 'utf-8');
+        $name = trim((string) ($data['c_name_chn'] ?? ''));
+        if ($name === '') {
+            $data['c_surname_chn'] = '';
+            $data['c_surname'] = '';
+            $data['c_mingzi_chn'] = '';
+            $data['c_mingzi'] = '';
+            $data['c_name'] = '';
+
+            return $data;
+        }
+
+        $normalizedNameForLookup = VariantCharNormalizer::normalize($name);
+        $len = mb_strlen($normalizedNameForLookup, 'utf-8');
+        $prefixes = [];
         for ($i = $len; $i >= 1; $i--) {
-            $str = mb_substr($name, 0, $i, 'utf-8');
-            $pinyin = DB::table('pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $str)->first();
-            if (!empty($pinyin->lastname_pinyin) && $len - $i <= 2) { //[名]的字長必須是小於等於二
-                $c_surname_chn = $str;
-                $c_surname = $pinyin->lastname_pinyin;
+            $prefixes[] = mb_substr($normalizedNameForLookup, 0, $i, 'utf-8');
+        }
+
+        $surnameRows = DB::table('pinyin')
+            ->select('lastname_chn', 'lastname_pinyin')
+            ->whereIn('lastname_chn', $prefixes)
+            ->get()
+            ->keyBy('lastname_chn');
+
+        // 以最長前綴優先，盡量命中已知姓氏（包含複姓）
+        foreach ($prefixes as $prefix) {
+            $row = $surnameRows->get($prefix);
+            if (!empty($row?->lastname_pinyin)) {
+                $c_surname_chn = $prefix;
+                $c_surname = (string) $row->lastname_pinyin;
 
                 break;
             }
         }
 
         if ($c_surname_chn != '') {
-            $c_mingzi_chn = str_replace($c_surname_chn, '', $name);
+            $surnameLength = mb_strlen($c_surname_chn, 'utf-8');
+            $c_surname_chn = mb_substr($name, 0, $surnameLength, 'utf-8');
+            $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
             $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
-            $c_name = $c_surname.' '.$c_mingzi;
+            $c_name = trim($c_surname.' '.$c_mingzi);
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
             $data['c_mingzi_chn'] = $c_mingzi_chn;

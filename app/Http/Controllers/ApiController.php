@@ -10,7 +10,6 @@ use App\Models\EntryCode;
 use App\Models\EventCode;
 use App\Models\KinshipCode;
 use App\Models\OfficeCode;
-use App\Models\Pinyin;
 use App\Models\SocialInst;
 use App\Models\SocialInstAddr;
 use App\Models\SocialInstCode;
@@ -19,6 +18,7 @@ use App\Models\TextCode;
 use App\Repositories\AddrCodeRepository;
 use App\Repositories\AltCodeRepository;
 use App\Repositories\BiogAddrCodeRepository;
+use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
 use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
@@ -552,18 +552,42 @@ class ApiController extends Controller {
     }
 
     public function searchPinyin(Request $request) {
-        $word = $request->q;
+        $word = trim((string) $request->q);
         if (!empty($word)) {
-            $pinyin = DB::table('pinyin')->select('lastname_pinyin')->where('lastname_chn', 'like', $word)->first();
-            if (!empty($pinyin->lastname_pinyin)) {
-                $res = $pinyin->lastname_pinyin;
+            // 特例 1：例如「（李白妻）」→「(Wife of Li Bai)」
+            if (preg_match('/^\s*[（(]\s*(.+?)\s*妻\s*[）)]\s*$/u', $word, $matches) === 1) {
+                $wifeOf = $this->buildPinyinWord($matches[1] ?? '');
+                $res = '(Wife of '.trim($wifeOf).')';
+                // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
+            } elseif (preg_match('/^(.*?)[（(]\s*(.+?)\s*妻\s*[）)]\s*$/u', $word, $matches) === 1) {
+                $prefix = $this->buildPinyinWord($matches[1] ?? '');
+                $wifeOf = $this->buildPinyinWord($matches[2] ?? '');
+                $res = trim($prefix).' (Wife of '.trim($wifeOf).')';
             } else {
-                $res = ucfirst(Pinyin::getPinyin($word)) ?? '';
+                $res = $this->buildPinyinWord($word);
             }
+
+            // 全角括號轉半角，並確保括號前與文字之間有一個空格
+            $res = str_replace(['（', '）'], ['(', ')'], $res);
+            $res = preg_replace('/\s*\(/u', ' (', $res);
+            $res = preg_replace('/^\s+\(/u', '(', $res);
+            $res = trim($res);
 
             return $res;
         } else {
             return '';
         }
+    }
+
+    private function buildPinyinWord(string $word): string {
+        $word = trim($word);
+        if ($word === '') {
+            return '';
+        }
+
+        $repository = new BiogMainRepository();
+        $result = $repository->auto_pinyin(['c_name_chn' => $word]);
+
+        return trim((string) ($result['c_name'] ?? ''));
     }
 }

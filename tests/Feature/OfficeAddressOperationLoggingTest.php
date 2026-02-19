@@ -510,4 +510,68 @@ class OfficeAddressOperationLoggingTest extends TestCase {
             'c_addr_id' => 500,
         ]);
     }
+
+    #[Test]
+    public function testAddressChangeAuditPayloadUsesSharedOperationId(): void {
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 300000,
+            'c_office_id' => 82001,
+            'c_posting_id' => 777001,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 300000,
+            'c_posting_id' => 777001,
+            'c_office_id' => 82001,
+            'c_addr_id' => 600,
+        ]);
+
+        $request = new Request([
+            '_id' => 300000,
+            '_postingid' => 777001,
+            '_officeid' => 82001,
+            'c_office_id' => 82001,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_source' => 0,
+            'c_addr' => [601],
+        ]);
+
+        $repository = new BiogMainRepository();
+        $repository->officeUpdateById($request, 777001, 300000);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'POSTED_TO_ADDR_DATA')
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($operation);
+
+        $logs = DB::table('audit_log')
+            ->where('table_name', 'POSTED_TO_ADDR_DATA')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertSame(2, $logs->count());
+        $this->assertSame(1, $logs->pluck('operation_id')->unique()->count());
+        $this->assertSame((string) $operation->id, $logs->first()->operation_id);
+
+        $deleteLog = $logs->firstWhere('operation', 'DELETE');
+        $insertLog = $logs->firstWhere('operation', 'INSERT');
+
+        $this->assertNotNull($deleteLog);
+        $this->assertNotNull($insertLog);
+        $this->assertSame('c_addr_id=600&c_office_id=82001&c_posting_id=777001', $deleteLog->row_pk_text);
+        $this->assertSame('c_addr_id=601&c_office_id=82001&c_posting_id=777001', $insertLog->row_pk_text);
+
+        $this->assertNull($insertLog->old_data);
+        $this->assertNull($deleteLog->new_data);
+
+        $insertNewData = json_decode($insertLog->new_data, true);
+        $deleteOldData = json_decode($deleteLog->old_data, true);
+        $this->assertSame(601, $insertNewData['c_addr_id']);
+        $this->assertSame(600, $deleteOldData['c_addr_id']);
+    }
 }

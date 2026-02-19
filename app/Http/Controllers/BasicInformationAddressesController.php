@@ -7,13 +7,9 @@ use App\Models\AddrCode;
 use App\Models\AddressCode;
 use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
-use App\Repositories\OperationRepository;
-use App\Repositories\ToolsRepository;
-use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -22,17 +18,13 @@ class BasicInformationAddressesController extends Controller {
      * @var BiogMainRepository
      */
     protected $biogMainRepository;
-    protected $operationRepository;
-    protected $toolsRepository;
 
     /**
      * TextsController constructor.
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
+    public function __construct(BiogMainRepository $biogMainRepository) {
         $this->biogMainRepository = $biogMainRepository;
-        $this->operationRepository = $operationRepository;
-        $this->toolsRepository = $toolsRepository;
         $this->middleware('auth')->except(['index', 'show', 'edit', 'editQuery']);
     }
 
@@ -539,56 +531,15 @@ class BasicInformationAddressesController extends Controller {
         // 驗證必填欄位
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
 
-        // 準備更新資料
-        $data = $request->all();
-        $comment = $data['__proposal_comment'] ?? null;
-        $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
-        $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
-        $data = $this->toolsRepository->timestamp($data);
+        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
 
-        // 構建查詢條件
-        $conditions = [
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_addr_id', '=', $pk['c_addr_id']],
-            ['c_addr_type', '=', $pk['c_addr_type']],
-            ['c_sequence', '=', $pk['c_sequence']],
-        ];
-
-        // 取得原始資料
-        $ori = DB::table('BIOG_ADDR_DATA')->where($conditions)->first();
-        if (!$ori) {
+        $legacyId = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
+        $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
+        if ($newPk === null) {
             abort(404, 'BIOG_ADDR_DATA 記錄不存在');
         }
-
-        // 更新資料
-        DB::table('BIOG_ADDR_DATA')->where($conditions)->update($data);
-
-        // 記錄操作
-        $newPk = [
-            'c_personid' => $pk['c_personid'],
-            'c_addr_id' => $data['c_addr_id'] ?? $pk['c_addr_id'],
-            'c_addr_type' => $data['c_addr_type'] ?? $pk['c_addr_type'],
-            'c_sequence' => $data['c_sequence'] ?? $pk['c_sequence'],
-        ];
-
-        // 準備存入 operations 的數據，加入註解
-        $operationData = $data;
-        if ($comment) {
-            $operationData['__note'] = $comment;
-        }
-
-        $operation = $this->operationRepository->store(Auth::id(), $id, 3, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId($newPk), $operationData, $ori);
-        (new AuditLogService())->write(
-            'BIOG_ADDR_DATA',
-            'UPDATE',
-            $newPk,
-            (new AuditLogService())->normalizeRow($ori),
-            array_merge((new AuditLogService())->normalizeRow($ori), $data),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
 
         flash('Update success @ '.Carbon::now(), 'success');
 

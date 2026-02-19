@@ -57,8 +57,8 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
 - [~] Integrate `BIOG_MAIN` writes (currently split across `BiogMainRepository` and controller/API paths)
 - [x] Integrate `POSTED_TO_OFFICE_DATA` / `POSTED_TO_ADDR_DATA` writes
 - [x] Integrate remaining `/basicinformation` tables
-- [~] Ensure transactional writes for audit + data changes (partially done; several controller paths still write without single transaction boundary)
-- [~] Add SQLite migration/test coverage in tests (multiple feature tests now create `audit_log`; assertion coverage for audit behavior is still incomplete)
+- [~] Ensure transactional writes for audit + data changes (partially done; major CRUD 已收斂到 repository transaction，仍有少量舊流程待收斂)
+- [~] Add SQLite migration/test coverage in tests (多數核心路徑已有 payload 斷言；仍需補齊剩餘 legacy 入口)
 
 ### Progress Update (2026-02-16)
 - BasicInformation 核心寫入路徑（`BIOG_MAIN`、`ALTNAME_DATA`、`BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`ENTRY_DATA`）已統一改為 Repository 層處理，並在主要 CRUD 路徑寫入 `audit_log`。
@@ -80,14 +80,24 @@ This proposal only targets `/basicinformation` and its 12 subpages. No other mod
   - `tests/Feature/BasicInformationAltnamesControllerTest.php`（新增 `NULL sequence` 提案更新場景）
   - `tests/Feature/BasicInformationTextsControllerTest.php`（新增刪除不存在資料回傳 `404`）
 
+### Progress Update (2026-02-18)
+- `BasicInformationTextsController::updateQuery()`、`BasicInformationAddressesController::updateQuery()` 已改為統一委派 repository（`textUpdateById` / `addrUpdateById`），避免 controller 直接執行 `data -> operations -> audit` 的非交易寫入路徑。
+- `BiogMainRepository::textUpdateById()`、`addrUpdateById()` 已補上主鍵欄位過濾，保持原先查詢參數模式下「不可直接更新主鍵」的行為邊界。
+- `ASSOC_DATA` 鏡像路徑（新增/更新/刪除）已補齊 audit，且正向與鏡像記錄共用同一 `operation_id`。
+- 測試補強（SQLite）：
+  - `tests/Feature/BasicInformationAddressesControllerTest.php`（新增 `updateQuery` 審計 payload + `operation_id` 關聯斷言）
+  - `tests/Feature/BasicInformationTextsControllerTest.php`（新增 `updateQuery` 審計 payload + `operation_id` 關聯斷言）
+  - `tests/Feature/OfficeAddressOperationLoggingTest.php`（新增 `POSTED_TO_ADDR_DATA` 一對多變更 `INSERT/DELETE` 共用 `operation_id` 與 old/new payload 斷言）
+  - `tests/Feature/UnidirectionalRelationshipRepairControllerTest.php`（`KIN_DATA` / `ASSOC_DATA` 鏡像 audit 覆蓋）
+
 ## Known Issues (Current Branch)
-- **Transaction consistency gaps**:
-  - Multiple controller write paths still execute `data write -> operations write -> audit_log write` without wrapping all steps in one DB transaction.
-  - A partial failure can leave data/operations/audit out of sync.
+- **Transaction consistency gaps (remaining legacy paths)**:
+  - `BasicInformationController::Duplicate_Collateral_Info()` 仍是 controller 內大型批次寫入邏輯，雖在 transaction 內，但未完全收斂到 repository/service 層，後續維護與測試成本偏高。
+  - 少量非 `/basicinformation` 模組仍有 controller-centric 寫入路徑，未納入本 proposal 的第一階段收斂範圍。
 - **Test coverage gaps**:
-  - Several feature tests were updated to create `audit_log` schema only, but do not yet assert audit payload correctness (row count, operation type, PK serialization, before/after snapshot).
+  - 主要高風險表已有 payload 斷言，但仍有部分 legacy 入口僅驗證「有寫入」而未完整斷言 `row_pk_text` 與 old/new JSON 結構。
 - **Progress semantics caveat**:
-  - "Integrated" currently means "hooks added on major CRUD paths", not "fully transactional and fully asserted across all legacy entry points".
+  - "Integrated" 目前可視為「核心 CRUD 與高風險鏡像路徑已接入並有審計斷言」，但尚未達成所有歷史入口完全一致。
 
 ## Planned Touchpoints
 - `app/Services/AuditLogService.php`
@@ -195,5 +205,5 @@ If history lookup becomes too slow or volume grows:
 - Consider partitioning in MariaDB for very large volumes.
 
 ## Version
-- Version: 0.5
-- Date: 2026-02-17
+- Version: 0.6
+- Date: 2026-02-18

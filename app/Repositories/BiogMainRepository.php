@@ -573,7 +573,7 @@ class BiogMainRepository {
         $temp_l = explode("-", $id_);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_textid', 'c_role_id']);
         $data = (new ToolsRepository())->timestamp($data);
 
         return DB::transaction(function () use ($id, $temp_l, $data, $comment) {
@@ -2549,7 +2549,7 @@ class BiogMainRepository {
         $addr_l = $this->parseAddrId($addr);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
         $data = (new ToolsRepository())->timestamp($data);

@@ -128,6 +128,19 @@ class SqlTableNameExtractor {
             }
         }
 
+        if ($statement->union) {
+            foreach ($statement->union as $unionEntry) {
+                if (!is_array($unionEntry) || count($unionEntry) < 2) {
+                    continue;
+                }
+
+                $unionStatement = $unionEntry[1] ?? null;
+                if ($unionStatement instanceof SelectStatement) {
+                    $tables = array_merge($tables, $this->extractTablesFromSelectStatement($unionStatement, $cteAliases));
+                }
+            }
+        }
+
         return $tables;
     }
 

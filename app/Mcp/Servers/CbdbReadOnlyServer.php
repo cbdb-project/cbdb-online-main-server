@@ -5,6 +5,7 @@ namespace App\Mcp\Servers;
 use App\Mcp\Tools\GetSampleDataTool;
 use App\Mcp\Tools\GetTableRowByIdTool;
 use App\Mcp\Tools\ListAllowedTablesTool;
+use App\Mcp\Tools\QueryReadOnlySqlTool;
 use App\Mcp\Tools\QueryTableSchemaTool;
 use App\Mcp\Tools\QueryTableTool;
 use Laravel\Mcp\Server;
@@ -22,5 +23,6 @@ class CbdbReadOnlyServer extends Server {
         GetTableRowByIdTool::class,
         GetSampleDataTool::class,
         QueryTableTool::class,
+        QueryReadOnlySqlTool::class,
     ];
 }

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Mcp\ReadOnlyTableQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class AdminExplainSqlController extends Controller {
     protected function ensureAdmin() {
@@ -38,16 +40,13 @@ class AdminExplainSqlController extends Controller {
         $error = null;
         $results = null;
         $columns = [];
+        $service = app(ReadOnlyTableQueryService::class);
 
-        if (strpos($sql, ';') !== false) {
-            $error = '請勿在語句中包含分號。';
-        } else {
-            $firstToken = strtoupper(strtok(ltrim($sql), " \t\n\r"));
-            $allowed = ['SELECT', 'WITH'];
-
-            if (!in_array($firstToken, $allowed, true)) {
-                $error = '僅允許只讀查詢（SELECT / WITH）。';
-            }
+        try {
+            $inspection = $service->inspectReadOnlySql($sql);
+            $sql = $inspection['sql'];
+        } catch (InvalidArgumentException $e) {
+            $error = $e->getMessage();
         }
 
         if (!$error) {

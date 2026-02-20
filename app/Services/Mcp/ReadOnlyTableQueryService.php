@@ -2,12 +2,35 @@
 
 namespace App\Services\Mcp;
 
+use App\Services\SqlTableNameExtractor;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class ReadOnlyTableQueryService {
     private const IDENTIFIER_PATTERN = '/^[A-Za-z0-9_]+$/';
+
+    /**
+     * Forbidden keywords for read-only SQL execution.
+     *
+     * @var string[]
+     */
+    private array $forbiddenKeywords = [
+        'UPDATE', 'DELETE', 'INSERT', 'ALTER', 'DROP', 'TRUNCATE',
+        'CREATE', 'GRANT', 'REVOKE', 'REPLACE', 'LOCK', 'UNLOCK',
+        'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'SET', 'EXECUTE', 'CALL',
+        'SHOW', 'DESCRIBE', 'USE', 'EXPLAIN',
+    ];
+
+    /**
+     * @var string[]
+     */
+    private array $forbiddenPatterns = [
+        '/\bINTO\s+OUTFILE\b/i',
+        '/\bINTO\s+DUMPFILE\b/i',
+        '/\bFOR\s+UPDATE\b/i',
+        '/\bLOCK\s+IN\s+SHARE\s+MODE\b/i',
+    ];
 
     /**
      * @return string[]
@@ -163,6 +186,51 @@ class ReadOnlyTableQueryService {
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function queryReadOnlySql(string $sql, int $limit = 20, int $offset = 0): array {
+        $inspection = $this->inspectReadOnlySql($sql);
+        $normalizedSql = $inspection['sql'];
+        $limit = $this->sanitizeLimit($limit);
+        $offset = $this->sanitizeOffset($offset);
+
+        $rows = DB::select($this->buildPaginatedSql($normalizedSql, $limit, $offset));
+        $normalizedRows = array_map(static fn ($row): array => (array) $row, $rows);
+
+        return [
+            'sql' => $normalizedSql,
+            'tables' => $inspection['tables'],
+            'limit' => $limit,
+            'offset' => $offset,
+            'returned_rows' => count($normalizedRows),
+            'rows' => $normalizedRows,
+        ];
+    }
+
+    /**
+     * @return array{sql:string,tables:string[]}
+     */
+    public function inspectReadOnlySql(string $sql): array {
+        $normalizedSql = $this->normalizeAndValidateReadOnlySql($sql);
+
+        $tablesInQuery = app(SqlTableNameExtractor::class)->extractTableNames($normalizedSql);
+        if ($tablesInQuery === []) {
+            throw new InvalidArgumentException('Could not detect any table names. Please ensure your query is standard SQL.');
+        }
+
+        $normalizedTables = [];
+        foreach ($tablesInQuery as $table) {
+            $normalizedTableName = $this->normalizeAllowedTableName($table);
+            $normalizedTables[$normalizedTableName] = $normalizedTableName;
+        }
+
+        return [
+            'sql' => $normalizedSql,
+            'tables' => array_values($normalizedTables),
+        ];
+    }
+
     private function sanitizeLimit(int $limit): int {
         $maxLimit = (int) config('mcp.cbdb.max_limit', 100);
         if ($limit < 1 || $limit > $maxLimit) {
@@ -178,6 +246,45 @@ class ReadOnlyTableQueryService {
         }
 
         return $offset;
+    }
+
+    private function normalizeAndValidateReadOnlySql(string $sql): string {
+        $normalizedSql = trim($sql);
+        $normalizedSql = rtrim($normalizedSql, "; \t\n\r\0\x0B");
+
+        if ($normalizedSql === '') {
+            throw new InvalidArgumentException('SQL must not be empty');
+        }
+
+        if (strpos($normalizedSql, ';') !== false) {
+            throw new InvalidArgumentException("Multiple SQL statements separated by ';' are not allowed. A single trailing ';' is permitted.");
+        }
+
+        if (!preg_match('/^(SELECT|WITH)\b/i', $normalizedSql)) {
+            throw new InvalidArgumentException('Only SELECT / WITH queries are allowed.');
+        }
+
+        foreach ($this->forbiddenKeywords as $keyword) {
+            if (preg_match('/\b' . preg_quote($keyword, '/') . '\b/i', $normalizedSql)) {
+                throw new InvalidArgumentException("Forbidden keyword detected: {$keyword}");
+            }
+        }
+
+        foreach ($this->forbiddenPatterns as $pattern) {
+            if (preg_match($pattern, $normalizedSql)) {
+                throw new InvalidArgumentException('SQL contains forbidden read-only side-effect clauses.');
+            }
+        }
+
+        return $normalizedSql;
+    }
+
+    private function buildPaginatedSql(string $sql, int $limit, int $offset): string {
+        if (preg_match('/^WITH\b/i', $sql)) {
+            return $sql . " LIMIT {$limit} OFFSET {$offset}";
+        }
+
+        return "SELECT * FROM ({$sql}) AS subquery_wrapper LIMIT {$limit} OFFSET {$offset}";
     }
 
     /**

@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\NaturalLanguageQueryService;
+use App\Services\SqlTableNameExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use PhpMyAdmin\SqlParser\Components\Expression;
-use PhpMyAdmin\SqlParser\Parser;
-use PhpMyAdmin\SqlParser\Statements\SelectStatement;
 
 class QueryPlaygroundController extends Controller {
     public function __construct() {
@@ -64,16 +62,6 @@ class QueryPlaygroundController extends Controller {
             ], 403);
         }
 
-        // Remove trailing semicolons to allow "SELECT ...;"
-        $sql = rtrim($sql, "; \t\n\r\0\x0B");
-
-        // Check for multiple statements (semicolon inside query)
-        if (strpos($sql, ';') !== false) {
-            return response()->json([
-               'error' => "Forbidden character detected: ';'. Multiple statements are not allowed.",
-            ], 403);
-        }
-
         $page = (int) $request->input('page', 1);
         $perPage = 20;
         $offset = ($page - 1) * $perPage;
@@ -93,7 +81,7 @@ class QueryPlaygroundController extends Controller {
         // Add internal allowed tables if not in codes.tables but deemed safe?
         // For now strict adherence to codes.tables as requested.
 
-        $tablesInQuery = $this->extractTableNames($sql);
+        $tablesInQuery = app(SqlTableNameExtractor::class)->extractTableNames($sql);
 
         if (empty($tablesInQuery)) {
             return response()->json([
@@ -153,109 +141,6 @@ class QueryPlaygroundController extends Controller {
                 'error' => 'Database Error: ' . $e->getMessage(),
             ], 500);
         }
-    }
-
-    /**
-     * Extract table names from SQL queries using AST parser.
-     * This correctly handles subqueries, quoted identifiers, and string literals.
-     */
-    protected function extractTableNames($sql) {
-        try {
-            // Parse the SQL using PhpMyAdmin SQL Parser
-            $parser = new Parser($sql);
-
-            $tables = [];
-
-            // Process all statements (usually just one SELECT)
-            foreach ($parser->statements as $statement) {
-                if ($statement instanceof SelectStatement) {
-                    $tables = array_merge($tables, $this->extractTablesFromSelectStatement($statement));
-                }
-            }
-
-            // Check for parser errors
-            if (!empty($parser->errors)) {
-                // If parser fails, return empty array to trigger the "could not detect" error
-                return [];
-            }
-
-            return array_unique($tables);
-        } catch (\Exception $e) {
-            // If parsing fails entirely, return empty array
-            return [];
-        }
-    }
-
-    /**
-     * Recursively extract table names from a SELECT statement and its subqueries.
-     */
-    protected function extractTablesFromSelectStatement(SelectStatement $statement) {
-        $tables = [];
-
-        // Extract from FROM clause
-        if ($statement->from) {
-            foreach ($statement->from as $fromClause) {
-                // Check if this is a subquery (indicated by subquery property or expr starting with '(')
-                if ($fromClause->subquery || (is_string($fromClause->expr) && strpos($fromClause->expr, '(') === 0)) {
-                    // Extract subquery content from parentheses
-                    $subqueryContent = $fromClause->expr;
-                    if (is_string($subqueryContent) && preg_match('/^\((.*)\)$/s', $subqueryContent, $matches)) {
-                        // Parse the subquery
-                        $subqueryParser = new Parser($matches[1]);
-                        foreach ($subqueryParser->statements as $subStatement) {
-                            if ($subStatement instanceof SelectStatement) {
-                                $tables = array_merge($tables, $this->extractTablesFromSelectStatement($subStatement));
-                            }
-                        }
-                    }
-                } elseif ($fromClause->table) {
-                    // Regular table reference
-                    $tableName = $fromClause->table;
-                    if (is_string($tableName)) {
-                        $tableName = trim($tableName, '`\'"');
-                        if (!empty($tableName)) {
-                            $tables[] = $tableName;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Extract from JOIN clauses
-        if ($statement->join) {
-            foreach ($statement->join as $joinClause) {
-                // JOIN clause expr is an Expression object
-                if ($joinClause->expr instanceof Expression) {
-                    $expression = $joinClause->expr;
-
-                    // Check if this is a subquery
-                    if ($expression->subquery || (is_string($expression->expr) && strpos($expression->expr, '(') === 0)) {
-                        // Extract subquery content from parentheses
-                        $subqueryContent = $expression->expr;
-                        if (is_string($subqueryContent) && preg_match('/^\((.*)\)$/s', $subqueryContent, $matches)) {
-                            // Parse the subquery
-                            $subqueryParser = new Parser($matches[1]);
-                            foreach ($subqueryParser->statements as $subStatement) {
-                                if ($subStatement instanceof SelectStatement) {
-                                    $tables = array_merge($tables, $this->extractTablesFromSelectStatement($subStatement));
-                                }
-                            }
-                        }
-                    } elseif ($expression->table) {
-                        // Regular table reference
-                        $tableName = $expression->table;
-                        if (is_string($tableName)) {
-                            $tableName = trim($tableName, '`\'"');
-                            if (!empty($tableName)) {
-                                $tables[] = $tableName;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return $tables;
     }
 
     /**

@@ -239,6 +239,17 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
+    public function it_allows_with_queries_using_whitelisted_tables() {
+        $this->be($this->adminUser);
+
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'WITH allowed_rows AS (SELECT * FROM ALLOWED1) SELECT * FROM allowed_rows',
+        ]);
+
+        $this->assertNotEquals(403, $response->status(), 'Should allow WITH query that only uses whitelisted tables');
+    }
+
+    #[Test]
     public function it_handles_real_world_example_from_issue() {
         $this->be($this->adminUser);
 

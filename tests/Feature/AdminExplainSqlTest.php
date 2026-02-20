@@ -16,6 +16,8 @@ class AdminExplainSqlTest extends TestCase {
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('mcp.cbdb.allowed_tables', ['sample']);
+        config()->set('mcp.cbdb.max_limit', 100);
 
         Schema::create('users', function (Blueprint $table) {
             $table->increments('id');
@@ -102,5 +104,34 @@ class AdminExplainSqlTest extends TestCase {
         $response->assertStatus(200)
             ->assertSee('MySQL EXPLAIN')
             ->assertSee('本次查詢共');
+    }
+
+    #[Test]
+    public function test_explain_rejects_non_allowlisted_tables(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::statement('CREATE TABLE sample (id INTEGER)');
+        DB::statement('CREATE TABLE users2 (id INTEGER)');
+
+        $response = $this->post('/admin/explainsql', [
+            'sql' => 'SELECT * FROM users2',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertSeeText("Table 'users2' is not in allowlist");
+    }
+
+    #[Test]
+    public function test_explain_rejects_non_select_queries(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->post('/admin/explainsql', [
+            'sql' => 'DELETE FROM sample',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertSee('Only SELECT / WITH queries are allowed.');
     }
 }

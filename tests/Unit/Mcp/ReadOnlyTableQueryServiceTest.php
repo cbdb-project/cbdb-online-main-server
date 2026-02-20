@@ -124,4 +124,65 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
         $this->assertSame('sqlite', $result['table_info']['driver']);
         $this->assertNotEmpty($result['columns']);
     }
+
+    #[Test]
+    public function it_executes_read_only_sql_for_allowlisted_tables(): void {
+        $result = $this->service->queryReadOnlySql(
+            "SELECT c_dy, c_dynasty_chn FROM DYNASTIES WHERE status = 'active' ORDER BY c_dy",
+            10,
+            0
+        );
+
+        $this->assertSame(['DYNASTIES'], $result['tables']);
+        $this->assertSame(2, $result['returned_rows']);
+        $this->assertContains('Tang', array_column($result['rows'], 'c_dy'));
+    }
+
+    #[Test]
+    public function it_rejects_non_allowlisted_table_in_read_only_sql(): void {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('not in allowlist');
+
+        $this->service->queryReadOnlySql('SELECT * FROM users');
+    }
+
+    #[Test]
+    public function it_supports_with_query_in_read_only_sql(): void {
+        $result = $this->service->queryReadOnlySql(
+            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy',
+            10,
+            0
+        );
+
+        $this->assertSame(['DYNASTIES'], $result['tables']);
+        $this->assertSame(2, $result['returned_rows']);
+    }
+
+    #[Test]
+    public function it_supports_multiple_ctes_without_treating_aliases_as_tables(): void {
+        $result = $this->service->queryReadOnlySql(
+            'WITH cte_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active"), cte_people AS (SELECT c_personid FROM BIOG_MAIN) SELECT cte_dynasties.c_dy FROM cte_dynasties JOIN cte_people ON 1 = 1 ORDER BY cte_dynasties.c_dy',
+            10,
+            0
+        );
+
+        $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $result['tables']);
+        $this->assertSame(2, $result['returned_rows']);
+    }
+
+    #[Test]
+    public function it_rejects_into_outfile_clause_in_read_only_sql(): void {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('forbidden read-only side-effect clauses');
+
+        $this->service->queryReadOnlySql('SELECT c_dy INTO OUTFILE "x" FROM DYNASTIES');
+    }
+
+    #[Test]
+    public function it_rejects_non_select_read_only_sql(): void {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only SELECT / WITH queries are allowed');
+
+        $this->service->queryReadOnlySql('DELETE FROM DYNASTIES');
+    }
 }

@@ -53,4 +53,11 @@ class SqlTableNameExtractorTest extends TestCase {
 
         $this->assertSame(['DYNASTIES'], $tables);
     }
+
+    #[Test]
+    public function it_extracts_tables_from_union_queries(): void {
+        $tables = $this->extractor->extractTableNames('SELECT * FROM DYNASTIES UNION ALL SELECT * FROM BIOG_MAIN');
+
+        $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $tables);
+    }
 }

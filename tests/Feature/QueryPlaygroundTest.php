@@ -146,6 +146,18 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
+    public function it_blocks_non_whitelisted_tables_in_union_queries() {
+        $this->be($this->adminUser);
+
+        $response = $this->postJson(route('query-playground.run'), [
+            'sql' => 'SELECT * FROM ALLOWED1 UNION ALL SELECT * FROM users',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertStringContainsString('users', strtolower($response->json()['error'] ?? ''));
+    }
+
+    #[Test]
     public function it_blocks_multiple_statements() {
         $this->be($this->adminUser);
 

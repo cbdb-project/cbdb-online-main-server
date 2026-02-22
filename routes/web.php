@@ -26,6 +26,7 @@ Route::get('home', 'HomeController@index')->name('home');
 Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('dashboard');
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
 Route::get('cbdbapi/person', 'CbdbApiController@person');
+Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationController@store')->name('api.v2.mutate.web');
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 

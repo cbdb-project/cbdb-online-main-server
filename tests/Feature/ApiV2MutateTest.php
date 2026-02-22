@@ -146,4 +146,55 @@ class ApiV2MutateTest extends TestCase {
             'op_type' => 3,
         ]);
     }
+
+    #[Test]
+    public function testRejectsAltnameMutationWhenPersonIdDoesNotMatchTargetPk() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 11,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '子止',
+            'c_alt_name' => 'Zi Zhi',
+            'c_alt_name_type_code' => 4,
+            'c_created_by' => 'seed',
+            'c_created_date' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'altnames',
+            'person_id' => 12,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 11,
+                    'c_alt_name_chn' => '子止',
+                    'c_alt_name_type_code' => 4,
+                ],
+            ],
+            'changes' => [
+                'c_sequence' => 9,
+            ],
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'ok' => false,
+            ]);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 11,
+            'c_alt_name_chn' => '子止',
+            'c_alt_name_type_code' => 4,
+            'c_sequence' => 1,
+        ]);
+
+        $this->assertDatabaseMissing('operations', [
+            'resource' => 'ALTNAME_DATA',
+            'c_personid' => 12,
+            'op_type' => 3,
+        ]);
+    }
 }

@@ -92,6 +92,16 @@ class MutationController extends Controller {
             return $this->errorResponse('ALTNAME_DATA 記錄不存在', 404);
         }
 
+        if ((string) ($targetPk['c_personid'] ?? '') !== (string) $personId) {
+            return $this->errorResponse('person_id 與 target.pk.c_personid 不一致', 422, [
+                'person_id' => ['mismatch'],
+            ]);
+        }
+
+        if ((string) ($original->c_personid ?? '') !== (string) $personId) {
+            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
+        }
+
         // 只保留目前可安全從列表快速更新的欄位；未來要開放任意欄位時可擴充白名單/資源規則
         $allowedQuickFields = ['c_sequence'];
         $updateData = array_intersect_key($changes, array_flip($allowedQuickFields));

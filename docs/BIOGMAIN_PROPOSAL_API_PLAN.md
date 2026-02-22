@@ -1,10 +1,14 @@
 # 人物資訊 Proposal API 實作計畫
 
-本文件說明如何在現有「人物資訊提案（proposal）」機制之上，新增可供外部客戶端使用的 API，讓使用者可透過 API 提交人物資料的新增/修改提案（而非直接寫入資料表）。
+本文件說明如何在現有「人物資訊提案（proposal）」機制之上，透過統一變更入口 `/api/v2/mutate`（使用 `mode=proposal`）新增可供外部客戶端使用的 API，讓使用者可透過 API 提交人物資料的新增/修改提案（而非直接寫入資料表）。
 
 - 文檔性質：實作計畫（Plan）
 - 適用範圍：`/basicinformation/*` 模組（BIOG_MAIN 與各子資源）
 - 目標版本：第一版 API（v1）
+
+補充：
+- 本文件聚焦「proposal 提案提交」能力。
+- `/api/v2/mutate` 的整體語義（含 `direct`/`proposal` 邊界）另見 `docs/MUTATE_API_SEMANTICS.md`。
 
 ## 1. 現況摘要（已存在功能）
 
@@ -50,14 +54,19 @@
 1. 不重寫 proposal 核心邏輯
 - 仍以 `BasicInformationProposalController` / `OperationRepository` / `OperationsProposalController` 為核心。
 
-2. API 與 Web 行為一致
+2. 提案 API 與 Web proposal 路徑的業務結果一致
 - 同一資源的欄位預處理（正規化）必須一致，避免 Web 可提案但 API 失敗，或反之。
+- 不要求一定走完全相同的 Controller 路徑，但要求權限、正規化、提案落 `operations` 的結果一致。
 
 3. 優先抽象「正規化層」，不要在 API Controller 複製各資源 Controller 的前置處理
 - 目前 `BasicInformation*Controller` 內存在資源專屬預處理（例如 `ENTRY_DATA` 的 `c_inst_code` 分割、`BIOG_MAIN` 姓名合成）。
 - 若 API 直接呼叫 `BasicInformationProposalController` 而未經這些預處理，行為會不一致。
 
-4. 使用 Sanctum Bearer Token（與現有 API 認證架構一致）
+4. 使用統一 `mutate` 協議承載 proposal（`mode=proposal`）
+- `proposal` 視為 `mutate` 的一種模式，而非獨立的 `propose_mutate` endpoint。
+- `mode` 放在 JSON body，不使用 query string `?mode=...`。
+
+5. 使用 Sanctum Bearer Token（與現有 API 認證架構一致）
 - 參考 `docs/API_AUTHENTICATION.md`
 
 ## 4. 現有程式碼重點（與 API 直接相關）
@@ -89,66 +98,79 @@
 
 ### 5.1 路由設計（建議）
 
-新增於 `routes/api.php`（使用 Sanctum）：
+統一使用：
 
-```php
-Route::middleware(['auth:sanctum'])->prefix('v2/biog-proposals')->group(function () {
-    Route::post('{personid}/{resource}', 'Api\\BiogProposalController@store');   // 新增提案
-    Route::post('{personid}/{resource}/update', 'Api\\BiogProposalController@update'); // 修改提案（以 original_pk 傳遞）
-});
-```
+- `POST /api/v2/mutate`
 
 說明：
 
-1. 使用 `v2` 避免和既有歷史 API 混淆（`routes/api.php` 內已有大量舊 API）。
-2. `update` 採 body 傳 `original_pk`，不走路徑複合主鍵字串，避免編碼歧義。
+1. `proposal` 由 JSON body 的 `mode=proposal` 表示。
+2. `operation` 由 JSON body 指定（如 `create` / `update`）。
+3. 不再另外設計 `/api/v2/biog-proposals/*` 或 `/propose_mutate`。
+4. 使用 `v2` 避免和既有歷史 API 混淆（`routes/api.php` 內已有大量舊 API）。
 
 ### 5.2 API 請求格式（建議）
 
-#### A. 新增提案
+#### A. 新增提案（`operation=create`）
 
-`POST /api/v2/biog-proposals/{personid}/{resource}`
+`POST /api/v2/mutate`
 
 Request JSON：
 
 ```json
 {
-  "payload": {
+  "resource": "altnames",
+  "person_id": 1,
+  "mode": "proposal",
+  "operation": "create",
+  "target": {
+    "pk": {}
+  },
+  "changes": {
     "c_alt_name_chn": "測試別名",
     "c_alt_name_type_code": 1,
     "c_sequence": 1
   },
-  "proposal_comment": "新增別名提案"
+  "meta": {
+    "comment": "新增別名提案"
+  }
 }
 ```
 
-#### B. 修改提案
+#### B. 修改提案（`operation=update`）
 
-`POST /api/v2/biog-proposals/{personid}/{resource}/update`
+`POST /api/v2/mutate`
 
 Request JSON：
 
 ```json
 {
-  "original_pk": {
-    "c_personid": 1,
-    "c_alt_name_chn": "原始別名",
-    "c_alt_name_type_code": 1
+  "resource": "altnames",
+  "person_id": 1,
+  "mode": "proposal",
+  "operation": "update",
+  "target": {
+    "pk": {
+      "c_personid": 1,
+      "c_alt_name_chn": "原始別名",
+      "c_alt_name_type_code": 1
+    }
   },
-  "payload": {
-    "c_alt_name_chn": "原始別名",
-    "c_alt_name_type_code": 1,
+  "changes": {
     "c_alt_name": "Updated Name"
   },
-  "proposal_comment": "修改別名資訊"
+  "meta": {
+    "comment": "修改別名資訊"
+  }
 }
 ```
 
 說明：
 
-1. `original_pk` 用於定位原始資料列（等同 `proposalUpdateWithPk()` 的 `array $originalPk`）。
-2. `payload` 為提案後資料內容。
-3. `proposal_comment` 對應現有 `__proposal_comment`。
+1. `target.pk` 用於定位原始資料列（等同 `proposalUpdateWithPk()` 的 `array $originalPk`）。
+2. `changes` 表示提案中的欄位變更內容；後端可依資源規則轉換為 proposal payload。
+3. `meta.comment` 對應現有 `__proposal_comment`。
+4. `mode` 建議固定放 body，不使用 query string `?mode=proposal`。
 
 ### 5.3 API 回應格式（建議）
 
@@ -191,19 +213,18 @@ Request JSON：
 
 ## 6. 實作架構建議（重點）
 
-## 6.1 新增 API Controller（薄層）
-
-新增 `app/Http/Controllers/Api/BiogProposalController.php`
+## 6.1 在 `MutationController` 增加 `mode=proposal` 分支（薄層）
 
 職責：
 
-1. 驗證 API 認證（`auth:sanctum`）
-2. 驗證請求格式（`payload`、`proposal_comment`、`original_pk`）
+1. 驗證 API 認證（`auth:sanctum` 或與現行 mutate 相容的認證策略）
+2. 驗證請求格式（`resource`、`person_id`、`mode`、`operation`、`target.pk`、`changes`、`meta.comment`）
 3. 呼叫「資源正規化服務」進行預處理
-4. 將資料轉成 `Request` 格式後，委派給 `BasicInformationProposalController`
-5. 把 Web redirect/flash 結果轉為 JSON 回應
+4. 將 `mutate` 請求轉為 proposal service / controller 可用的結構
+5. 依 `operation=create|update` 委派到 proposal 核心邏輯
+6. 把 Web redirect/flash 結果轉為 JSON 回應
 
-不建議在此 Controller 直接複製 `proposalStore` / `proposalUpdate` 邏輯。
+不建議在 `MutationController` 內直接複製 `proposalStore` / `proposalUpdate` 邏輯。
 
 ## 6.2 抽出資源正規化服務（關鍵）
 
@@ -214,7 +235,7 @@ Request JSON：
 用途：
 
 1. 統一處理各資源在提案前的資料預處理
-2. 被 Web Controller 與 API Controller 共用
+2. 被 Web Controller 與 `mutate(mode=proposal)` 共用
 
 介面建議：
 
@@ -252,11 +273,11 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 
 1. 建議方案（較乾淨）
 - 抽出 `BiogProposalService`（或 `BasicInformationProposalService`）
-- `BasicInformationProposalController` 與 `Api\BiogProposalController` 都呼叫 service
+- `BasicInformationProposalController` 與 `MutationController(mode=proposal)` 都呼叫 service
 - service 回傳結構化結果（成功/失敗、operation、錯誤碼）
 
 2. 過渡方案（較快）
-- API Controller 建立子請求呼叫 `BasicInformationProposalController`
+- `MutationController` 建立子請求呼叫 `BasicInformationProposalController`
 - 解析 redirect/flash 成 JSON
 - 缺點：耦合高、測試脆弱
 
@@ -265,8 +286,9 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 ## 7. 與現有權限/認證的整合
 
 1. 認證
-- 使用 `auth:sanctum`
+- 建議使用 `auth:sanctum`
 - 透過 `Authorization: Bearer {token}` 存取
+- 若與既有 `/api/v2/mutate` 採同一路由與雙認證策略（Cookie Session + Bearer Token），需明確文件化並統一錯誤回應格式
 
 2. 提案權限
 - 與 Web 一致：沿用 `ensureCanPropose()`（登入且 `is_active == 1`）
@@ -280,10 +302,10 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 
 ### Phase 1：基礎 API 骨架（可用）
 
-1. 新增 `Api\BiogProposalController`
-2. 新增 API 路由（`/api/v2/biog-proposals/*`）
+1. 在 `MutationController` 新增 `mode=proposal` 分支與 handler 分發
+2. 使用統一路由 `POST /api/v2/mutate`
 3. 先支援 `altnames`、`biogmain` 兩種資源
-4. 直接建立 proposal（op_type 8/9）並回傳 JSON
+4. 建立 proposal（op_type 8/9）並回傳 JSON
 5. 撰寫 Feature tests（API token + JSON）
 
 交付標準：
@@ -297,7 +319,7 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 1. 新增 `BiogProposalPayloadNormalizer`
 2. 將 `entries`、`assoc`、`texts` 等正規化邏輯搬入服務
 3. Web Controller `action=proposal` 分支改用該服務（避免雙軌邏輯）
-4. API Controller 同步使用該服務
+4. `MutationController(mode=proposal)` 同步使用該服務
 
 交付標準：
 
@@ -314,7 +336,7 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 
 新增建議測試檔：
 
-- `tests/Feature/Api/BiogProposalApiTest.php`
+- `tests/Feature/ApiV2MutateProposalTest.php`（或同類命名）
 
 至少涵蓋：
 
@@ -329,7 +351,7 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 
 3. 修改提案
 - `altnames` 成功建立 proposal（`op_type = 9`）
-- `original_pk` 對應不到資料 -> `404`
+- `target.pk` 對應不到資料 -> `404`
 - 無實質變更 -> `422`
 
 4. 正規化一致性（高優先）
@@ -366,12 +388,15 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 - 新增「API 提案提交」段落
 
 2. `docs/API_AUTHENTICATION.md`
-- 新增 `biog-proposals` 使用範例
+- 新增 `/api/v2/mutate`（`mode=proposal`）使用範例
 
 3. `docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md`
 - 在「已落地能力」補充 API 狀態
 
-4. `CHANGELOG.md`
+4. `docs/MUTATE_API_SEMANTICS.md`
+- 與本文件互相引用，說明 `proposal` 是 `mutate` 的一種 `mode`
+
+5. `CHANGELOG.md`
 - 若屬對外功能，補充 API 端點與使用方式
 
 ## 12. 建議的第一個實作切入點（務實版本）
@@ -388,4 +413,3 @@ public function normalizeForProposal(string $resourceType, int $personId, array 
 - 用來驗證「分散正規化邏輯抽出」是否成功
 
 這樣可以在最短時間內建立 API 骨架，同時避免一次擴張到所有資源導致回歸風險過高。
-

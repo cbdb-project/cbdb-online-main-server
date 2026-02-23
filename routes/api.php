@@ -13,7 +13,6 @@
 */
 
 Route::middleware('auth:sanctum')->get('/user', 'Api\UserController@show');
-
 Route::group([], function () {
     Route::match(['get', 'post'], 'name', 'Api\NameController@index');
 });

@@ -33,7 +33,6 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                     @if($canEditSequence)
                         <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
                     @endif
-                    <th>sequence</th>
                     <th>行為</th>
                     <th>財產</th>
                     @auth
@@ -44,9 +43,9 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($basicinformation->possession as $key=>$value)
+                @foreach($basicinformation->possession as $value)
                     <tr>
-                        <td>{{ $key+1 }}</td>
+                        <td>{{ $value->pivot->c_sequence }}</td>
                         @if($canEditSequence)
                         <td data-sequence-demo-col style="display: none;">
                             @php
@@ -75,7 +74,6 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                             </form>
                         </td>
                         @endif
-                        <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->c_possession_act_desc_chn }}</td>
                         <td>{{ $value->pivot->c_possession_desc_chn }}</td>
                         @auth
@@ -197,8 +195,8 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                     return;
                 }
 
-                if (row && row.cells && row.cells[2]) {
-                    row.cells[2].textContent = seqInput.value;
+                if (row && row.cells && row.cells[0]) {
+                    row.cells[0].textContent = seqInput.value;
                 }
                 setStatus(form, '已提交', 'success');
             } catch (error) {

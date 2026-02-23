@@ -2,6 +2,7 @@
 
 @php
 use App\Support\CompositePrimaryKey;
+$canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
 @endphp
 
 @section('content')
@@ -18,17 +19,21 @@ use App\Support\CompositePrimaryKey;
                     <a href="{{ route('basicinformation.altnames.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
                 @endif
             @endauth
-            @include('biogmains.partials.list-order-toolbar', [
-                'targetTableId' => 'altname-list-table',
-                'toolbarLabel' => '別名次序調整',
-            ])
+            @if($canEditSequence)
+                @include('biogmains.partials.list-order-toolbar', [
+                    'targetTableId' => 'altname-list-table',
+                    'toolbarLabel' => '別名次序調整',
+                ])
+            @endif
             <div class="table-responsive">
                 <table id="altname-list-table" class="table table-hover table-sm">
                 <caption>共查詢到{{ $basicinformation->altnames_count }}筆記錄</caption>
                 <thead>
                 <tr>
                     <th>序號</th>
-                    <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
+                    @if($canEditSequence)
+                        <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
+                    @endif
                     <th>別名拼音</th>
                     <th>別名漢字</th>
                     <th>別名類型</th>
@@ -63,6 +68,7 @@ if ($altTypeLabel === '') {
 @endphp
                     <tr>
                         <td>{{ $value->pivot->c_sequence }}</td>
+                        @if($canEditSequence)
                         <td data-sequence-demo-col style="display: none;">
                             @php
                                 $altPk = [
@@ -93,6 +99,7 @@ if ($altTypeLabel === '') {
                                 <small class="text-muted ml-2 d-none js-altname-sequence-status"></small>
                             </form>
                         </td>
+                        @endif
                         <td>{{ $c_alt_name_view }}</td>
                         <td>{{ $c_alt_name_chn_view }}</td>
                         <td>{{ $altTypeLabel }}</td>

@@ -2,6 +2,7 @@
 
 @php
 use App\Support\CompositePrimaryKey;
+$canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
 @endphp
 
 @section('content')
@@ -17,18 +18,21 @@ use App\Support\CompositePrimaryKey;
                     <a href="{{ route('basicinformation.possession.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
                 @endif
             @endauth
-            @include('biogmains.partials.list-order-toolbar', [
-                'targetTableId' => 'possession-list-table',
-                'toolbarLabel' => '財產次序調整',
-            ])
+            @if($canEditSequence)
+                @include('biogmains.partials.list-order-toolbar', [
+                    'targetTableId' => 'possession-list-table',
+                    'toolbarLabel' => '財產次序調整',
+                ])
+            @endif
             <div class="table-responsive">
                 <table id="possession-list-table" class="table table-hover table-sm">
                 <caption>共查詢到{{ $basicinformation->possession_count }}筆記錄</caption>
                 <thead>
                 <tr>
                     <th>序號</th>
-                    <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
-                    <th>sequence</th>
+                    @if($canEditSequence)
+                        <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
+                    @endif
                     <th>行為</th>
                     <th>財產</th>
                     @auth
@@ -39,9 +43,10 @@ use App\Support\CompositePrimaryKey;
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($basicinformation->possession as $key=>$value)
+                @foreach($basicinformation->possession as $value)
                     <tr>
-                        <td>{{ $key+1 }}</td>
+                        <td>{{ $value->pivot->c_sequence }}</td>
+                        @if($canEditSequence)
                         <td data-sequence-demo-col style="display: none;">
                             @php
                             $possessionPk = [
@@ -68,7 +73,7 @@ use App\Support\CompositePrimaryKey;
                                 <small class="text-muted ml-2 d-none js-possession-sequence-status"></small>
                             </form>
                         </td>
-                        <td>{{ $value->pivot->c_sequence }}</td>
+                        @endif
                         <td>{{ $value->c_possession_act_desc_chn }}</td>
                         <td>{{ $value->pivot->c_possession_desc_chn }}</td>
                         @auth
@@ -190,8 +195,8 @@ use App\Support\CompositePrimaryKey;
                     return;
                 }
 
-                if (row && row.cells && row.cells[2]) {
-                    row.cells[2].textContent = seqInput.value;
+                if (row && row.cells && row.cells[0]) {
+                    row.cells[0].textContent = seqInput.value;
                 }
                 setStatus(form, '已提交', 'success');
             } catch (error) {

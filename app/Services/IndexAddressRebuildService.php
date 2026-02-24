@@ -104,6 +104,7 @@ class IndexAddressRebuildService {
                                c_addr_type,
                                MAX(c_sequence) AS c_sequence
                         FROM BIOG_ADDR_DATA
+                        WHERE c_addr_type = {$addrType}
                         GROUP BY c_personid, c_addr_type
                     ) latest
                       ON latest.c_personid = picked.c_personid

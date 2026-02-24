@@ -57,8 +57,8 @@ class IndexYearRebuildService {
             ['01', $this->sqlRule01()],
             ['02', $this->sqlRule02()],
             ['03', $this->sqlRule03(false)],
-            ['29', $this->sqlRule29(false)],
-            ['30', $this->sqlRule29(true)],
+            ['29', $this->sqlRule29Or30(false)],
+            ['30', $this->sqlRule29Or30(true)],
             ['05', $this->sqlEntryRule('040101', 30, '05')],
             ['06', $this->sqlWifeFromEntryRule('040101', 27, '06')],
             ['07', $this->sqlEntryRule('040102', 27, '07')],
@@ -199,7 +199,7 @@ class IndexYearRebuildService {
                   AND {$this->validYearExpr('husband', 'c_index_year')}";
     }
 
-    protected function sqlRule29(bool $female): string {
+    protected function sqlRule29Or30(bool $female): string {
         $femaleValue = $female ? 1 : 0;
         $offset = $female ? 56 : 63;
         $typeCode = $female ? '30' : '29';

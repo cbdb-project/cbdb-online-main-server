@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-02-13 02:42:56
+> 生成時間：2026-02-24 01:37:20
 
 ## 目錄
 
@@ -126,7 +126,7 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_admin_cat_code` | int(11) | NO | (NULL) |  |
+| `c_admin_cat_code` | smallint(6) | NO | (NULL) |  |
 | `c_admin_cat_type_code` | varchar(255) | NO | (NULL) |  |
 
 **索引**:
@@ -341,8 +341,8 @@
 | `c_tertiary_personid` | int(11) | YES | NULL |  |
 | `c_tertiary_type_notes` | longtext | YES | NULL |  |
 | `c_assoc_count` | smallint(6) | NO | 1 |  |
-| `c_sequence` | smallint(6) | YES | NULL |  |
-| `c_assoc_first_year` | smallint(6) | NO | (NULL) |  |
+| `c_sequence` | smallint(6) | YES | 0 |  |
+| `c_assoc_first_year` | smallint(6) | NO | -9999 |  |
 | `c_assoc_last_year` | smallint(6) | YES | NULL |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
@@ -357,7 +357,7 @@
 | `c_litgenre_code` | smallint(6) | YES | NULL |  |
 | `c_occasion_code` | smallint(6) | YES | NULL |  |
 | `c_topic_code` | smallint(6) | YES | NULL |  |
-| `c_inst_code` | smallint(6) | YES | NULL |  |
+| `c_inst_code` | smallint(6) | YES | 0 |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
 | `c_text_title` | varchar(255) | NO | '' |  |
 | `c_assoc_claimer_id` | int(11) | YES | NULL |  |
@@ -474,8 +474,8 @@
 | `c_addr_desc` | varchar(255) | YES | NULL |  |
 | `c_addr_desc_chn` | varchar(255) | YES | NULL |  |
 | `c_addr_note` | varchar(255) | YES | NULL |  |
-| `c_index_addr_rank` | smallint(6) | NO | (NULL) |  |
-| `c_index_addr_default_rank` | smallint(6) | NO | (NULL) |  |
+| `c_index_addr_rank` | smallint(6) | YES | NULL |  |
+| `c_index_addr_default_rank` | smallint(6) | YES | NULL |  |
 
 **索引**:
 
@@ -917,7 +917,7 @@
 | `c_entry_nh_year` | smallint(6) | YES | NULL |  |
 | `c_entry_dy` | smallint(6) | YES | NULL |  |
 | `c_entry_range` | smallint(6) | YES | NULL |  |
-| `c_inst_code` | smallint(6) | NO | (NULL) |  |
+| `c_inst_code` | smallint(6) | NO | 0 |  |
 | `c_inst_name_code` | smallint(6) | NO | 0 |  |
 | `c_exam_field` | varchar(255) | YES | NULL |  |
 | `c_entry_addr_id` | int(11) | YES | NULL |  |
@@ -979,9 +979,9 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_ethnicity_code` | smallint(6) | NO | (NULL) |  |
-| `c_group_code` | smallint(6) | NO | (NULL) |  |
-| `c_subgroup_code` | smallint(6) | NO | (NULL) |  |
-| `c_altname_code` | smallint(6) | NO | (NULL) |  |
+| `c_group_code` | smallint(6) | YES | NULL |  |
+| `c_subgroup_code` | smallint(6) | YES | NULL |  |
+| `c_altname_code` | smallint(6) | YES | NULL |  |
 | `c_name_chn` | varchar(255) | YES | NULL |  |
 | `c_name` | varchar(255) | YES | NULL |  |
 | `c_ethno_legal_cat` | varchar(255) | YES | NULL |  |
@@ -1050,7 +1050,7 @@
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
 | `c_sequence` | smallint(6) | NO | 0 |  |
-| `c_event_code` | smallint(6) | NO | 0 |  |
+| `c_event_code` | smallint(6) | NO | (NULL) |  |
 | `c_role` | varchar(255) | YES | NULL |  |
 | `c_year` | smallint(6) | YES | NULL |  |
 | `c_nh_code` | smallint(6) | YES | NULL |  |
@@ -1457,7 +1457,7 @@
 | `c_occasion_code` | smallint(6) | NO | (NULL) |  |
 | `c_occasion_desc` | varchar(255) | YES | NULL |  |
 | `c_occasion_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_sortorder` | smallint(6) | NO | (NULL) |  |
+| `c_sortorder` | smallint(6) | YES | NULL |  |
 
 **索引**:
 
@@ -1774,7 +1774,7 @@
 | `c_ly_range` | smallint(6) | YES | NULL |  |
 | `c_appt_type_code` | smallint(6) | YES | NULL |  |
 | `c_assume_office_code` | smallint(6) | YES | NULL |  |
-| `c_inst_code` | smallint(6) | YES | NULL |  |
+| `c_inst_code` | smallint(6) | YES | 0 |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
@@ -2260,7 +2260,7 @@
 | `c_part_of_instance_notes` | varchar(255) | YES | NULL |  |
 | `c_pub_country` | smallint(6) | YES | NULL |  |
 | `c_pub_dy` | smallint(6) | YES | NULL |  |
-| `c_pub_year` | varchar(255) | YES | NULL |  |
+| `c_pub_year` | smallint(6) | YES | NULL |  |
 | `c_pub_nh_code` | smallint(6) | YES | NULL |  |
 | `c_pub_nh_year` | smallint(6) | YES | NULL |  |
 | `c_pub_range_code` | smallint(6) | YES | NULL |  |
@@ -2348,7 +2348,7 @@
 | `avatar` | varchar(255) | NO | 'avatar5.png' |  |
 | `settings` | longtext | YES | NULL |  |
 | `confirmation_token` | varchar(255) | NO | (NULL) |  |
-| `is_active` | smallint(6) | NO | 0 | 0 未验证， 2 激活邮件， 1 有編輯权限 |
+| `is_active` | smallint(6) | NO | 0 | 0 未验证， 2 激活邮件， 1 有编辑权限 |
 | `is_admin` | smallint(6) | NO | 0 |  |
 | `remember_token` | varchar(100) | YES | NULL |  |
 | `created_at` | timestamp | YES | NULL |  |
@@ -3614,7 +3614,6 @@
 | `c_category_2` | varchar(255) | YES | NULL |  |
 | `c_category_3` | varchar(255) | YES | NULL |  |
 | `c_category_4` | varchar(255) | YES | NULL |  |
-| `c_office_id_old` | INTEGER | YES | NULL |  |
 
 ---
 
@@ -3733,7 +3732,6 @@
 | `c_personid` | INTEGER | YES | NULL |  |
 | `c_office_id` | INTEGER | NO | (NULL) |  |
 | `c_addr_id` | INTEGER | NO | (NULL) |  |
-| `c_posting_id_old` | INTEGER | YES | NULL |  |
 | `c_created_by` | varchar | YES | (NULL) |  |
 | `c_created_date` | datetime | YES | (NULL) |  |
 | `c_modified_by` | varchar | YES | (NULL) |  |
@@ -3754,7 +3752,6 @@
 | `c_personid` | INTEGER | YES | NULL |  |
 | `c_office_id` | INTEGER | NO | (NULL) |  |
 | `c_posting_id` | INTEGER | NO | (NULL) |  |
-| `c_posting_id_old` | INTEGER | YES | NULL |  |
 | `c_sequence` | INTEGER | YES | NULL |  |
 | `c_firstyear` | INTEGER | YES | NULL |  |
 | `c_fy_nh_code` | INTEGER | YES | NULL |  |
@@ -3802,7 +3799,6 @@
 |------|------|------|--------|------|
 | `c_personid` | INTEGER | YES | NULL |  |
 | `c_posting_id` | INTEGER | NO | (NULL) |  |
-| `c_posting_id_old` | INTEGER | YES | NULL |  |
 | `c_created_by` | varchar | YES | (NULL) |  |
 | `c_created_date` | datetime | YES | (NULL) |  |
 | `c_modified_by` | varchar | YES | (NULL) |  |
@@ -4484,17 +4480,5 @@
 
 ## Schema 差異對比
 
-### 列結構差異（MySQL vs SQLite）
-
-**OFFICE_CODES**:
-- SQLite 有但 MySQL 沒有: `c_office_id_old`
-
-**POSTED_TO_ADDR_DATA**:
-- SQLite 有但 MySQL 沒有: `c_posting_id_old`
-
-**POSTED_TO_OFFICE_DATA**:
-- SQLite 有但 MySQL 沒有: `c_posting_id_old`
-
-**POSTING_DATA**:
-- SQLite 有但 MySQL 沒有: `c_posting_id_old`
+> ✅ 兩個數據庫的 Schema 結構一致
 

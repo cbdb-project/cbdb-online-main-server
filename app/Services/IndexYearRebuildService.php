@@ -173,25 +173,29 @@ class IndexYearRebuildService {
 
     protected function sqlRule03(bool $concubine): string {
         $concubineCodes = $this->concubineKinCodeList();
-        $relationCheck = $concubine
-            ? "IN ($concubineCodes)"
-            : "NOT IN ($concubineCodes)";
         $typeCode = $concubine ? '17' : '03';
+        $reverseConcubineExists = "EXISTS (
+                        SELECT 1
+                        FROM KIN_DATA kd_rev
+                        WHERE kd_rev.c_personid = kd.c_kin_id
+                          AND kd_rev.c_kin_id = kd.c_personid
+                          AND kd_rev.c_kin_code IN ($concubineCodes)
+                    )";
+        $reverseRelationCondition = $concubine
+            ? $reverseConcubineExists
+            : "NOT $reverseConcubineExists";
 
         return "UPDATE BIOG_MAIN wife
                 JOIN KIN_DATA kd
                   ON kd.c_personid = wife.c_personid
                  AND kd.c_kin_code = 134
-                JOIN KIN_DATA kd_rev
-                  ON kd_rev.c_personid = kd.c_kin_id
-                 AND kd_rev.c_kin_id = kd.c_personid
-                 AND kd_rev.c_kin_code $relationCheck
                 JOIN BIOG_MAIN husband
                   ON husband.c_personid = kd.c_kin_id
                 SET wife.c_index_year = husband.c_index_year + 3,
                     wife.c_index_year_type_code = '$typeCode',
                     wife.c_index_year_source_id = husband.c_personid
                 WHERE wife.c_index_year IS NULL
+                  AND $reverseRelationCondition
                   AND {$this->validYearExpr('husband', 'c_index_year')}";
     }
 
@@ -209,34 +213,43 @@ class IndexYearRebuildService {
 
     protected function sqlEntryRule(string $entryType, int $subtractYears, string $typeCode): string {
         return "UPDATE BIOG_MAIN bm
-                JOIN ENTRY_DATA ed
-                  ON ed.c_personid = bm.c_personid
-                JOIN ENTRY_CODE_TYPE_REL ectr
-                  ON ectr.c_entry_code = ed.c_entry_code
-                 AND ectr.c_entry_type = '$entryType'
-                SET bm.c_index_year = ed.c_year - $subtractYears,
+                JOIN (
+                    SELECT ed.c_personid,
+                           MIN(ed.c_year) AS entry_year
+                    FROM ENTRY_DATA ed
+                    JOIN ENTRY_CODE_TYPE_REL ectr
+                      ON ectr.c_entry_code = ed.c_entry_code
+                     AND ectr.c_entry_type = '$entryType'
+                    WHERE ed.c_year > 0
+                    GROUP BY ed.c_personid
+                ) entry_agg
+                  ON entry_agg.c_personid = bm.c_personid
+                SET bm.c_index_year = entry_agg.entry_year - $subtractYears,
                     bm.c_index_year_type_code = '$typeCode'
-                WHERE bm.c_index_year IS NULL
-                  AND ed.c_year > 0";
+                WHERE bm.c_index_year IS NULL";
     }
 
     protected function sqlWifeFromEntryRule(string $entryType, int $subtractYears, string $typeCode): string {
         return "UPDATE BIOG_MAIN wife
-                JOIN KIN_DATA kd
-                  ON kd.c_personid = wife.c_personid
-                 AND kd.c_kin_code = 134
-                JOIN ENTRY_DATA ed
-                  ON ed.c_personid = kd.c_kin_id
-                JOIN ENTRY_CODE_TYPE_REL ectr
-                  ON ectr.c_entry_code = ed.c_entry_code
-                 AND ectr.c_entry_type = '$entryType'
-                JOIN BIOG_MAIN husband
-                  ON husband.c_personid = kd.c_kin_id
-                SET wife.c_index_year = ed.c_year - $subtractYears,
+                JOIN (
+                    SELECT kd.c_personid AS wife_personid,
+                           MIN(ed.c_year) AS entry_year,
+                           MIN(kd.c_kin_id) AS source_personid
+                    FROM KIN_DATA kd
+                    JOIN ENTRY_DATA ed
+                      ON ed.c_personid = kd.c_kin_id
+                    JOIN ENTRY_CODE_TYPE_REL ectr
+                      ON ectr.c_entry_code = ed.c_entry_code
+                     AND ectr.c_entry_type = '$entryType'
+                    WHERE kd.c_kin_code = 134
+                      AND ed.c_year > 0
+                    GROUP BY kd.c_personid
+                ) entry_agg
+                  ON entry_agg.wife_personid = wife.c_personid
+                SET wife.c_index_year = entry_agg.entry_year - $subtractYears,
                     wife.c_index_year_type_code = '$typeCode',
-                    wife.c_index_year_source_id = husband.c_personid
-                WHERE wife.c_index_year IS NULL
-                  AND ed.c_year > 0";
+                    wife.c_index_year_source_id = entry_agg.source_personid
+                WHERE wife.c_index_year IS NULL";
     }
 
     protected function sqlRule11(): string {
@@ -347,25 +360,29 @@ class IndexYearRebuildService {
 
     protected function sqlLoopRuleA(bool $concubine): string {
         $concubineCodes = $this->concubineKinCodeList();
-        $relationCheck = $concubine
-            ? "IN ($concubineCodes)"
-            : "NOT IN ($concubineCodes)";
         $typeSuffix = $concubine ? '18' : '04';
+        $reverseConcubineExists = "EXISTS (
+                        SELECT 1
+                        FROM KIN_DATA kd_rev
+                        WHERE kd_rev.c_personid = kd.c_kin_id
+                          AND kd_rev.c_kin_id = kd.c_personid
+                          AND kd_rev.c_kin_code IN ($concubineCodes)
+                    )";
+        $reverseRelationCondition = $concubine
+            ? $reverseConcubineExists
+            : "NOT $reverseConcubineExists";
 
         return "UPDATE BIOG_MAIN wife
                 JOIN KIN_DATA kd
                   ON kd.c_personid = wife.c_personid
                  AND kd.c_kin_code = 134
-                JOIN KIN_DATA kd_rev
-                  ON kd_rev.c_personid = kd.c_kin_id
-                 AND kd_rev.c_kin_id = kd.c_personid
-                 AND kd_rev.c_kin_code $relationCheck
                 JOIN BIOG_MAIN husband
                   ON husband.c_personid = kd.c_kin_id
                 SET wife.c_index_year = husband.c_index_year + 3,
                     wife.c_index_year_type_code = CONCAT(COALESCE(husband.c_index_year_type_code, ''), '$typeSuffix'),
                     wife.c_index_year_source_id = husband.c_personid
                 WHERE wife.c_index_year IS NULL
+                  AND $reverseRelationCondition
                   AND husband.c_index_year > -400";
     }
 

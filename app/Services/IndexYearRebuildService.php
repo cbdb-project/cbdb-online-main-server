@@ -57,8 +57,8 @@ class IndexYearRebuildService {
             ['01', $this->sqlRule01()],
             ['02', $this->sqlRule02()],
             ['03', $this->sqlRule03(false)],
-            ['29M', $this->sqlRule29(false)],
-            ['29F', $this->sqlRule29(true)],
+            ['29', $this->sqlRule29(false)],
+            ['30', $this->sqlRule29(true)],
             ['05', $this->sqlEntryRule('040101', 30, '05')],
             ['06', $this->sqlWifeFromEntryRule('040101', 27, '06')],
             ['07', $this->sqlEntryRule('040102', 27, '07')],
@@ -202,10 +202,11 @@ class IndexYearRebuildService {
     protected function sqlRule29(bool $female): string {
         $femaleValue = $female ? 1 : 0;
         $offset = $female ? 56 : 63;
+        $typeCode = $female ? '30' : '29';
 
         return "UPDATE BIOG_MAIN bm
                 SET bm.c_index_year = bm.c_deathyear - $offset,
-                    bm.c_index_year_type_code = '29'
+                    bm.c_index_year_type_code = '$typeCode'
                 WHERE bm.c_index_year IS NULL
                   AND {$this->validYearExpr('bm', 'c_deathyear')}
                   AND bm.c_female = $femaleValue";

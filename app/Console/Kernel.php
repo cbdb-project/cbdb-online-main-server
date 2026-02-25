@@ -20,6 +20,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\ManageUser::class,
         \App\Console\Commands\GenerateSchemaDocs::class,
         \App\Console\Commands\RebuildIndexYear::class,
+        \App\Console\Commands\RebuildIndexAddress::class,
     ];
 
     /**

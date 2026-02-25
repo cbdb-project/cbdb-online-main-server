@@ -100,16 +100,16 @@ class IndexYearRebuildService {
             $totalNew = 0;
 
             $loopRules = [
-                ['A', $this->sqlLoopRuleA(false)],
-                ['B', $this->sqlLoopRuleB()],
-                ['C', $this->sqlLoopRuleC()],
-                ['D', $this->sqlLoopRuleD()],
-                ['E', $this->sqlLoopRuleA(true)], // 修正版：妾規則也用 > -400
-                ['F', $this->sqlLoopSiblingRule([125, 165], 'MAX', 2, '20')],
-                ['G', $this->sqlLoopSiblingRule([126, 166], 'MIN', -2, '22')],
-                ['H', $this->sqlLoopSonInLawRule(false, 27, '24')],
-                ['I', $this->sqlLoopSonInLawRule(true, 24, '26')],
-                ['J', $this->sqlLoopRuleJ()],
+                ['04', $this->sqlLoopHusbandPropagationRule(false)],
+                ['12', $this->sqlLoopFatherPropagationRule()],
+                ['14', $this->sqlLoopOldestChildIndexToFatherRule()],
+                ['16', $this->sqlLoopOldestChildIndexToMotherRule()],
+                ['18', $this->sqlLoopHusbandPropagationRule(true)], // 修正版：妾規則也用 > -400
+                ['20', $this->sqlLoopSiblingRule([125, 165], 'MAX', 2, '20')],
+                ['22', $this->sqlLoopSiblingRule([126, 166], 'MIN', -2, '22')],
+                ['24', $this->sqlLoopSonInLawRule(false, 27, '24')],
+                ['26', $this->sqlLoopSonInLawRule(true, 24, '26')],
+                ['28', $this->sqlLoopGrandfatherPropagationRule()],
             ];
 
             foreach ($loopRules as [$ruleCode, $sql]) {
@@ -359,7 +359,7 @@ class IndexYearRebuildService {
                   AND {$this->validYearExpr('grandfather', 'c_birthyear')}";
     }
 
-    protected function sqlLoopRuleA(bool $concubine): string {
+    protected function sqlLoopHusbandPropagationRule(bool $concubine): string {
         $concubineCodes = $this->concubineKinCodeList();
         $typeSuffix = $concubine ? '18' : '04';
         $reverseConcubineExists = "EXISTS (
@@ -387,7 +387,7 @@ class IndexYearRebuildService {
                   AND husband.c_index_year > -400";
     }
 
-    protected function sqlLoopRuleB(): string {
+    protected function sqlLoopFatherPropagationRule(): string {
         return "UPDATE BIOG_MAIN child
                 JOIN KIN_DATA kd
                   ON kd.c_personid = child.c_personid
@@ -401,7 +401,7 @@ class IndexYearRebuildService {
                   AND father.c_index_year > -400";
     }
 
-    protected function sqlLoopRuleC(): string {
+    protected function sqlLoopOldestChildIndexToFatherRule(): string {
         return "UPDATE BIOG_MAIN father
                 JOIN (
                     SELECT kd.c_kin_id AS target_personid,
@@ -418,7 +418,7 @@ class IndexYearRebuildService {
                 WHERE father.c_index_year IS NULL";
     }
 
-    protected function sqlLoopRuleD(): string {
+    protected function sqlLoopOldestChildIndexToMotherRule(): string {
         return "UPDATE BIOG_MAIN mother
                 JOIN (
                     SELECT kd.c_kin_id AS target_personid,
@@ -479,7 +479,7 @@ class IndexYearRebuildService {
                   AND person.c_female = $genderValue";
     }
 
-    protected function sqlLoopRuleJ(): string {
+    protected function sqlLoopGrandfatherPropagationRule(): string {
         return "UPDATE BIOG_MAIN descendant
                 JOIN KIN_DATA kd
                   ON kd.c_personid = descendant.c_personid

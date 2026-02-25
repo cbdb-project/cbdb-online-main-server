@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class RebuildIndexAddress extends Command {
-    protected $signature = 'cbdb:rebuild-index-address';
+    protected $signature = 'cbdb:rebuild-index-address {--show-sql : 輸出每一步實際執行的 SQL}';
 
     protected $description = '全量重建 BIOG_MAIN 的 index address 欄位（MySQL/MariaDB）';
 
@@ -43,8 +43,12 @@ class RebuildIndexAddress extends Command {
         }
 
         $startedAt = microtime(true);
+        $showSql = (bool) $this->option('show-sql');
         $this->info('開始全量重建 BIOG_MAIN index address...');
         $this->line('策略：單一 transaction、按 c_index_addr_rank(<100) 循環、Max(c_sequence) 子查詢聚合、首命中優先');
+        if ($showSql) {
+            $this->line('模式：已開啟 SQL 輸出（每條規則執行前顯示 SQL）');
+        }
 
         try {
             DB::beginTransaction();
@@ -53,6 +57,7 @@ class RebuildIndexAddress extends Command {
                 ->setLogger(function (string $message): void {
                     $this->line($message);
                 })
+                ->setShowSql($showSql)
                 ->rebuild();
 
             DB::commit();

@@ -9,9 +9,16 @@ class IndexAddressRebuildService {
      * @var callable|null
      */
     protected $logger;
+    protected bool $showSql = false;
 
     public function setLogger(?callable $logger): self {
         $this->logger = $logger;
+
+        return $this;
+    }
+
+    public function setShowSql(bool $showSql): self {
+        $this->showSql = $showSql;
 
         return $this;
     }
@@ -86,6 +93,11 @@ class IndexAddressRebuildService {
     }
 
     protected function applyRule(string $label, string $sql): int {
+        if ($this->showSql) {
+            $this->log(sprintf('SQL [%s]:', $label));
+            $this->log($sql);
+        }
+
         $count = DB::affectingStatement($sql);
         $this->log(sprintf('%s -> %d', $label, $count));
 

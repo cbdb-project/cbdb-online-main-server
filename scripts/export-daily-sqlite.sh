@@ -134,6 +134,15 @@ echo "表格數量: ${#TABLES[@]}"
 echo "================================================"
 echo ""
 
+# 導出前先重建索引欄位（寫回來源資料庫）
+echo "預處理：重建 BIOG_MAIN 索引年份..."
+php artisan cbdb:rebuild-index-year --no-interaction
+echo ""
+
+echo "預處理：重建 BIOG_MAIN 索引地址..."
+php artisan cbdb:rebuild-index-address --no-interaction
+echo ""
+
 # 計數器
 TOTAL=${#TABLES[@]}
 CURRENT=0

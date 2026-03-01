@@ -20,7 +20,7 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
         DB::statement('DROP TABLE IF EXISTS BIOG_MAIN');
 
         DB::statement('CREATE TABLE DYNASTIES (c_dy TEXT PRIMARY KEY, c_dynasty_chn TEXT, status TEXT)');
-        DB::statement('CREATE TABLE BIOG_MAIN (c_personid INTEGER PRIMARY KEY, c_name_chn TEXT)');
+        DB::statement('CREATE TABLE BIOG_MAIN (c_personid INTEGER PRIMARY KEY, c_name_chn TEXT, c_dy TEXT, FOREIGN KEY (c_dy) REFERENCES DYNASTIES(c_dy))');
 
         DB::table('DYNASTIES')->insert([
             ['c_dy' => 'Tang', 'c_dynasty_chn' => '唐', 'status' => 'active'],
@@ -29,7 +29,7 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
         ]);
 
         DB::table('BIOG_MAIN')->insert([
-            ['c_personid' => 1, 'c_name_chn' => '張三'],
+            ['c_personid' => 1, 'c_name_chn' => '張三', 'c_dy' => 'Tang'],
         ]);
 
         Config::set('mcp.cbdb.max_limit', 100);
@@ -116,13 +116,17 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
 
     #[Test]
     public function it_returns_sqlite_schema_info(): void {
-        $result = $this->service->queryTableSchema('DYNASTIES');
+        $result = $this->service->queryTableSchema('BIOG_MAIN');
 
-        $this->assertSame('DYNASTIES', $result['table_name']);
+        $this->assertSame('BIOG_MAIN', $result['table_name']);
         $this->assertIsArray($result['columns']);
         $this->assertIsArray($result['indexes']);
+        $this->assertIsArray($result['foreign_keys']);
         $this->assertSame('sqlite', $result['table_info']['driver']);
         $this->assertNotEmpty($result['columns']);
+        $this->assertNotEmpty($result['foreign_keys']);
+        $this->assertSame('c_dy', $result['foreign_keys'][0]->from);
+        $this->assertSame('DYNASTIES', $result['foreign_keys'][0]->table);
     }
 
     #[Test]

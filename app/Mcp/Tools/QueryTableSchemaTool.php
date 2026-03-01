@@ -11,7 +11,7 @@ use Laravel\Mcp\Server\Tool;
 class QueryTableSchemaTool extends Tool {
     public string $name = 'query_table_schema';
 
-    public string $description = 'Get schema, indexes, and table metadata for an allowlisted table.';
+    public string $description = 'Get schema, indexes, foreign keys, and table metadata for an allowlisted table.';
 
     public function schema(JsonSchema $schema): array {
         return [

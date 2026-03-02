@@ -7,6 +7,7 @@ use App\Services\SqlTableNameExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class QueryPlaygroundController extends Controller {
     public function __construct() {
@@ -29,6 +30,16 @@ class QueryPlaygroundController extends Controller {
         }
 
         $initialSql = $request->input('sql', 'SELECT * FROM DYNASTIES');
+        $allowedTables = array_keys(config('codes.tables', []));
+        usort($allowedTables, function ($a, $b) {
+            $aInternal = str_starts_with($a, 'CBDB__');
+            $bInternal = str_starts_with($b, 'CBDB__');
+            if ($aInternal === $bInternal) {
+                return strcmp($a, $b);
+            }
+
+            return $aInternal ? 1 : -1;
+        });
 
         return view('query_playground.index', [
             'page_title' => 'SQL 查詢練習場',
@@ -37,6 +48,82 @@ class QueryPlaygroundController extends Controller {
             'page_url' => route('query-playground.index'),
             'initial_sql' => $initialSql,
             'nl_model' => config('services.gemini.model', 'gemini-3-flash-preview'),
+            'qbe_tables' => array_map(function ($table) {
+                return [
+                    'name' => $table,
+                    'description' => config("codes.tables.{$table}", ''),
+                    'internal' => str_starts_with($table, 'CBDB__'),
+                ];
+            }, $allowedTables),
+        ]);
+    }
+
+    public function qbeSchema(Request $request) {
+        if (!Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        }
+
+        $request->validate([
+            'tables' => 'nullable|array|max:20',
+            'tables.*' => 'string|max:128',
+        ]);
+
+        $allowedTables = array_keys(config('codes.tables', []));
+        $requestedTables = $request->input('tables', []);
+        if (empty($requestedTables)) {
+            $requestedTables = $allowedTables;
+        }
+
+        $resolvedTables = [];
+        foreach ($requestedTables as $requestedTable) {
+            foreach ($allowedTables as $allowedTable) {
+                if (strcasecmp($requestedTable, $allowedTable) === 0) {
+                    $resolvedTables[] = $allowedTable;
+
+                    break;
+                }
+            }
+        }
+
+        $resolvedTables = array_values(array_unique($resolvedTables));
+
+        $schemaBuilder = Schema::getConnection()->getSchemaBuilder();
+        $tableSchemas = [];
+        foreach ($resolvedTables as $tableName) {
+            try {
+                $columns = Schema::getColumnListing($tableName);
+                $columnEntries = [];
+                foreach ($columns as $columnName) {
+                    $columnType = '';
+
+                    try {
+                        $columnType = $schemaBuilder->getColumnType($tableName, $columnName);
+                    } catch (\Throwable $exception) {
+                        // Gracefully degrade when DB driver cannot expose exact type metadata.
+                    }
+
+                    $columnEntries[] = [
+                        'name' => $columnName,
+                        'type' => $columnType,
+                    ];
+                }
+
+                $tableSchemas[$tableName] = [
+                    'description' => config("codes.tables.{$tableName}", ''),
+                    'columns' => $columnEntries,
+                    'error' => null,
+                ];
+            } catch (\Throwable $exception) {
+                $tableSchemas[$tableName] = [
+                    'description' => config("codes.tables.{$tableName}", ''),
+                    'columns' => [],
+                    'error' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'tables' => $tableSchemas,
         ]);
     }
 

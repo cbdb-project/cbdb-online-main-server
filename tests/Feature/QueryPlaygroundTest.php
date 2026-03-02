@@ -330,4 +330,36 @@ class QueryPlaygroundTest extends TestCase {
         // Should allow since both tables are whitelisted (regardless of quoting)
         $this->assertNotEquals(403, $response->status(), 'Should allow quoted whitelisted table identifiers');
     }
+
+    #[Test]
+    public function regular_users_cannot_access_qbe_schema_endpoint() {
+        $this->be($this->regularUser);
+
+        $response = $this->postJson(route('query-playground.schema'), [
+            'tables' => ['DYNASTIES'],
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function expert_users_can_access_qbe_schema_endpoint() {
+        $this->be($this->adminUser);
+
+        $response = $this->postJson(route('query-playground.schema'), [
+            'tables' => ['DYNASTIES', 'NOT_ALLOWED'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'tables' => [
+                'DYNASTIES' => [
+                    'description',
+                    'columns',
+                    'error',
+                ],
+            ],
+        ]);
+        $this->assertArrayNotHasKey('NOT_ALLOWED', $response->json('tables', []));
+    }
 }

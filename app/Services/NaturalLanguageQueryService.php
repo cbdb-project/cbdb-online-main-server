@@ -353,6 +353,7 @@ class NaturalLanguageQueryService {
      */
     protected function buildSystemPrompt(string $schemaPrompt, bool $toolsEnabled): string {
         $toolsHint = '';
+        $maxToolRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 20));
 
         if (!$toolsEnabled) {
             return <<<PROMPT
@@ -411,18 +412,24 @@ PROMPT;
             $toolsHint = <<<TOOLS
 
 **可用工具：**
+- list_allowed_tables(): 列出所有允許查詢的資料表
+- query_table_schema(table_name): 獲取完整表結構（欄位、索引、外鍵、metadata）
+- query_table(table_name, filters?, columns?, limit?, offset?): 查詢表格資料
+- get_table_row_by_id(table_name, id_column, id_value): 依主鍵欄位抓單筆資料
+- query_read_only_sql(sql, limit?, offset?): 執行只讀 SQL（SELECT/WITH）
 - get_table_schema(table_name): 獲取指定表格的詳細結構信息（字段、類型、描述）
 - get_sample_data_for_table(table_name, limit=10): 獲取表格樣例數據
 - get_code_values(code_type): 獲取代碼表值（dynasties, sex, entry_codes, kinship_codes, status_codes, address_types）
 - get_person_ids(person_name, limit=20): 根據人名搜索人物 ID
 
 **使用建議：**
-1. 對於不熟悉的表格，使用 get_table_schema 了解結構
-2. 需要了解實際數據格式時，使用 get_sample_data_for_table
+1. 先用 list_allowed_tables 確認候選表，再用 query_table_schema 檢查欄位與關聯
+2. 需要確認實際值時，用 query_table / get_sample_data_for_table / get_table_row_by_id
 3. 構造 WHERE 條件但不確定代碼值時，使用 get_code_values
 4. 用戶提到具體人名時，使用 get_person_ids 查找 ID
-5. 每次可以同時請求多個工具，並一次取得結果後再繼續推理（最多 20 回合）
-6. 回覆必須是純 JSON，請勿使用任何 Markdown 代碼區塊或額外文字
+5. 生成最終 SQL 前，可先用 query_read_only_sql(limit 小值) 驗證可執行性
+6. 每次可以同時請求多個工具，並一次取得結果後再繼續推理（最多 {$maxToolRounds} 回合）
+7. 回覆必須是純 JSON，請勿使用任何 Markdown 代碼區塊或額外文字
 TOOLS;
         }
 

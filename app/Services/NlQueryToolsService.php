@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Mcp\ReadOnlyTableQueryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -11,9 +12,21 @@ use Illuminate\Support\Facades\Log;
  */
 class NlQueryToolsService {
     protected DatabaseSchemaService $schemaService;
+    protected ?ReadOnlyTableQueryService $readOnlyService;
 
-    public function __construct(DatabaseSchemaService $schemaService) {
+    public function __construct(DatabaseSchemaService $schemaService, ?ReadOnlyTableQueryService $readOnlyService = null) {
         $this->schemaService = $schemaService;
+        $this->readOnlyService = $readOnlyService;
+    }
+
+    protected function readOnlyService(): ReadOnlyTableQueryService {
+        if ($this->readOnlyService instanceof ReadOnlyTableQueryService) {
+            return $this->readOnlyService;
+        }
+
+        $this->readOnlyService = app(ReadOnlyTableQueryService::class);
+
+        return $this->readOnlyService;
     }
 
     /**
@@ -269,6 +282,145 @@ class NlQueryToolsService {
     }
 
     /**
+     * 列出所有可查詢白名單表格（與 MCP list_allowed_tables 對齊）
+     *
+     * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
+     */
+    public function listAllowedTables(): array {
+        try {
+            return [
+                'success' => true,
+                'data' => $this->readOnlyService()->listAllowedTables(),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('列出允許表格失敗', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => "列出允許表格時發生錯誤: {$e->getMessage()}",
+            ];
+        }
+    }
+
+    /**
+     * 獲取完整表格結構（欄位、索引、外鍵、metadata）
+     *
+     * @param string $tableName
+     * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
+     */
+    public function queryTableSchema(string $tableName): array {
+        try {
+            return [
+                'success' => true,
+                'data' => $this->readOnlyService()->queryTableSchema($tableName),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("查詢表格結構失敗: {$tableName}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => "查詢表格結構時發生錯誤: {$e->getMessage()}",
+            ];
+        }
+    }
+
+    /**
+     * 查詢指定表格（可帶 filters/columns/limit/offset）
+     *
+     * @param string $tableName
+     * @param array|string|null $filters
+     * @param array|string|null $columns
+     * @param int $limit
+     * @param int $offset
+     * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
+     */
+    public function queryTable(string $tableName, array|string|null $filters = null, array|string|null $columns = null, int $limit = 10, int $offset = 0): array {
+        try {
+            return [
+                'success' => true,
+                'data' => $this->readOnlyService()->queryTable($tableName, $filters, $columns, $limit, $offset),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("查詢表格資料失敗: {$tableName}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => "查詢表格資料時發生錯誤: {$e->getMessage()}",
+            ];
+        }
+    }
+
+    /**
+     * 依照主鍵欄位抓取單筆資料
+     *
+     * @param string $tableName
+     * @param string $idColumn
+     * @param int|string|float|bool|null $idValue
+     * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
+     */
+    public function getTableRowById(string $tableName, string $idColumn, int|string|float|bool|null $idValue): array {
+        try {
+            return [
+                'success' => true,
+                'data' => $this->readOnlyService()->getTableRowById($tableName, $idColumn, $idValue),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("依主鍵抓取單筆資料失敗: {$tableName}.{$idColumn}", [
+                'id_value' => $idValue,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => "依主鍵抓取單筆資料時發生錯誤: {$e->getMessage()}",
+            ];
+        }
+    }
+
+    /**
+     * 執行只讀 SQL（SELECT / WITH）
+     *
+     * @param string $sql
+     * @param int $limit
+     * @param int $offset
+     * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
+     */
+    public function queryReadOnlySql(string $sql, int $limit = 20, int $offset = 0): array {
+        try {
+            return [
+                'success' => true,
+                'data' => $this->readOnlyService()->queryReadOnlySql($sql, $limit, $offset),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('執行只讀 SQL 失敗', [
+                'sql' => $sql,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => "執行只讀 SQL 時發生錯誤: {$e->getMessage()}",
+            ];
+        }
+    }
+
+    /**
      * 获取所有可用的工具定义（用于 LLM function calling）
      *
      * @return array
@@ -286,8 +438,16 @@ class NlQueryToolsService {
      */
     public function executeTool(string $toolName, array $arguments): array {
         switch ($toolName) {
+            case 'list_allowed_tables':
+                return $this->listAllowedTables();
+
             case 'get_table_schema':
                 return $this->getTableSchema(
+                    $arguments['table_name'] ?? ''
+                );
+
+            case 'query_table_schema':
+                return $this->queryTableSchema(
                     $arguments['table_name'] ?? ''
                 );
 
@@ -295,6 +455,29 @@ class NlQueryToolsService {
                 return $this->getSampleDataForTable(
                     $arguments['table_name'] ?? '',
                     $arguments['limit'] ?? 10
+                );
+
+            case 'query_table':
+                return $this->queryTable(
+                    $arguments['table_name'] ?? '',
+                    $arguments['filters'] ?? null,
+                    $arguments['columns'] ?? null,
+                    (int) ($arguments['limit'] ?? 10),
+                    (int) ($arguments['offset'] ?? 0)
+                );
+
+            case 'get_table_row_by_id':
+                return $this->getTableRowById(
+                    $arguments['table_name'] ?? '',
+                    $arguments['id_column'] ?? '',
+                    $arguments['id_value'] ?? null
+                );
+
+            case 'query_read_only_sql':
+                return $this->queryReadOnlySql(
+                    $arguments['sql'] ?? '',
+                    (int) ($arguments['limit'] ?? 20),
+                    (int) ($arguments['offset'] ?? 0)
                 );
 
             case 'get_code_values':

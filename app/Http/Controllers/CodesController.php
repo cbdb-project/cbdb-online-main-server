@@ -12,7 +12,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 class CodesController extends Controller {
     protected $codesrepostory;
@@ -44,135 +43,6 @@ class CodesController extends Controller {
      */
     protected $tableCopyrightNotes = [
         'CBDB__TRAD_SIMP_MAP' => '此表格數據來自 <a href="https://github.com/BYVoid/OpenCC" target="_blank">OpenCC 項目</a>的字典文件，該文件以 <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache 2.0 License</a> 授權，因此這個表格的授權也是 Apache 2.0，而非 CC BY-NC-SA 4.0 International 授權。',
-    ];
-    /**
-     * Custom column configurations for specific tables.
-     *
-     * @var array<string, array<int, string>>
-     */
-    protected $tableColumnOverrides = [
-        'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
-        'ADDR_CODES' => ['c_addr_id', 'c_name_chn', 'c_name', 'c_firstyear', 'c_lastyear', 'c_admin_type'],
-        'CBDB__NAME_FTS' => [
-            'id',
-            'c_personid',
-            'name_type_code',
-            'name_type_desc',
-            'name_type_desc_chn',
-            'search_term',
-            'full_name',
-            'source',
-            'is_simplified',
-        ],
-        'CBDB__TRAD_SIMP_MAP' => ['trad_char', 'simp_char'],
-        'ADDRESSES' => [
-            'c_addr_id',
-            'c_addr_cbd',
-            'c_name',
-            'c_name_chn',
-            'c_admin_type',
-            'c_firstyear',
-            'c_lastyear',
-            'x_coord',
-            'y_coord',
-            'belongs1_ID',
-            'belongs1_Name',
-            'belongs2_ID',
-            'belongs2_Name',
-            'belongs3_ID',
-            'belongs3_Name',
-            'belongs4_ID',
-            'belongs4_Name',
-            'belongs5_ID',
-            'belongs5_Name',
-        ],
-        'ADMIN_CAT_CODES' => [
-            'c_admin_cat_code',
-            'c_admin_cat_py',
-            'c_admin_cat_hz',
-            'c_admin_cat_trans',
-            'c_notes',
-        ],
-        'ADMIN_CAT_CODE_TYPE_REL' => [
-            'c_admin_cat_code',
-            'admin_cat_name',
-            'c_admin_cat_type_code',
-            'admin_cat_type_name',
-        ],
-        'APPOINTMENT_CODE_TYPE_REL' => [
-            'c_appt_code',
-            'appt_name',
-            'c_appt_type_code',
-            'appt_type_name',
-        ],
-        'ENTRY_CODE_TYPE_REL' => [
-            'c_entry_code',
-            'entry_name',
-            'c_entry_type',
-            'entry_type_name',
-        ],
-        'OFFICE_CODE_TYPE_REL' => [
-            'c_office_id',
-            'office_name',
-            'c_office_tree_id',
-            'office_type_name',
-        ],
-        'ASSOC_CODE_TYPE_REL' => [
-            'c_assoc_code',
-            'assoc_name',
-            'c_assoc_type_code',
-            'assoc_type_name',
-        ],
-        'STATUS_CODE_TYPE_REL' => [
-            'c_status_code',
-            'status_name',
-            'c_status_type_code',
-            'status_type_name',
-        ],
-        'TEXT_BIBLCAT_CODE_TYPE_REL' => [
-            'c_text_cat_code',
-            'text_cat_name',
-            'c_text_cat_type_id',
-            'text_cat_type_name',
-        ],
-        'DYNASTIES' => ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_start', 'c_end', 'c_sort'],
-        'TEXT_INSTANCE_DATA' => [
-            'c_textid',
-            'c_text_edition_id',
-            'c_text_instance_id',
-            'c_instance_title_chn',
-            'c_publisher',
-            'c_print',
-            'c_instance_title',
-        ],
-        'MERGED_PERSON_DATA' => [
-            'c_personid',
-            'c_merged_from_personid',
-            'c_notes',
-            'c_source',
-            'c_pages',
-        ],
-        'OFFICE_CODES' => [
-            'c_office_id',
-            'c_dy',
-            'c_office_chn',
-            'c_office_chn_alt',
-            'c_office_trans',
-        ],
-        'ALTNAME_CODES' => ['c_name_type_code', 'c_name_type_desc_chn', 'c_name_type_desc'],
-        'APPOINTMENT_CODES' => ['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc'],
-        'ASSOC_CODES' => [
-            'c_assoc_code',
-            'c_assoc_pair',
-            'c_assoc_pair2',
-            'c_assoc_desc',
-            'c_assoc_desc_chn',
-            'c_assoc_role_type',
-            'c_sortorder',
-            'c_example',
-        ],
-        'TEXT_CODES' => ['c_textid', 'c_title_chn', 'c_title'],
-        'SOCIAL_INSTITUTION_CODES' => ['c_inst_name_code', 'c_inst_code', 'c_inst_type_code'],
     ];
     /**
      * JOIN configurations for relationship tables.
@@ -415,11 +285,8 @@ class CodesController extends Controller {
                 $query = DB::table($table);
             }
 
-            // 只在没有列配置时才查询样本行，避免不必要的数据库查询
-            $hasColumnConfig = isset($this->tableColumnOverrides[$upperTable]);
-            $sampleRow = $hasColumnConfig ? null : (clone $query)->first();
-
-            $thead = $this->buildTableHead($table, $sampleRow);
+            $sampleRow = (clone $query)->first();
+            $thead = $this->buildTableHead($table, $sampleRow, $joinConfig);
             $searchableColumns = $this->determineSearchableColumns($table, $thead);
 
             // 使用游标分页的大表列表
@@ -979,65 +846,26 @@ class CodesController extends Controller {
         return $columns = Schema::getColumnListing($table_name)[2];
     }
 
-    protected function buildTableHead(string $table, $sampleRow): array {
-        $upperTable = strtoupper($table);
-        if (isset($this->tableColumnOverrides[$upperTable])) {
-            // 对于有 JOIN 配置的表，直接返回配置的列，因为它们包含別名列
-            if (isset($this->tableJoinConfigurations[$upperTable])) {
-                return $this->tableColumnOverrides[$upperTable];
-            }
+    protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
+        $thead = $this->getTableColumns($table);
 
-            // 对于没有 JOIN 的表，与 Schema 进行交集验证
-            $availableColumns = Schema::getColumnListing($table);
-            $overrideColumns = array_values(array_intersect($this->tableColumnOverrides[$upperTable], $availableColumns));
-            if (!empty($overrideColumns)) {
-                return $overrideColumns;
-            }
+        if (!empty($joinConfig)) {
+            $thead = array_merge($thead, $this->getJoinedColumnNames($joinConfig));
         }
 
-        $thead = [];
         if ($sampleRow) {
-            $count = 0;
-            foreach ((array) $sampleRow as $key => $value) {
-                if ($count > 2) {
-                    break;
-                }
-
-                if (
-                    Str::contains($key, 'name') ||
-                    Str::contains($key, 'desc') ||
-                    Str::contains($key, 'code') ||
-                    Str::contains($key, 'id') ||
-                    Str::contains($key, 'sequence') ||
-                    Str::contains($key, 'chn') ||
-                    Str::contains($key, 'dy')
-                ) {
-                    $thead[] = $key;
-                    $count++;
-                }
-            }
-
-            if (empty($thead)) {
-                $thead = array_keys((array) $sampleRow);
-            }
-        } else {
-            $thead = Schema::getColumnListing($table);
+            $thead = array_merge($thead, array_keys((array) $sampleRow));
         }
 
-        return array_values(array_unique($thead));
+        return array_values(array_unique(array_filter($thead)));
     }
 
     protected function determineSearchableColumns(string $table, array $thead): array {
-        $upperTable = strtoupper($table);
-        if (isset($this->tableColumnOverrides[$upperTable])) {
-            return $this->tableColumnOverrides[$upperTable];
-        }
-
         if (!empty($thead)) {
             return $thead;
         }
 
-        return Schema::getColumnListing($table);
+        return $this->getTableColumns($table);
     }
 
     protected function getKeyColumns(string $table): array {
@@ -1162,14 +990,66 @@ class CodesController extends Controller {
      */
     protected function getTableColumns(string $table): array {
         if (!array_key_exists($table, $this->tableColumnsCache)) {
-            try {
-                $this->tableColumnsCache[$table] = Schema::getColumnListing($table);
-            } catch (\Throwable $e) {
-                $this->tableColumnsCache[$table] = [];
-            }
+            $this->tableColumnsCache[$table] = $this->resolveTableColumns($table);
         }
 
         return $this->tableColumnsCache[$table];
+    }
+
+    /**
+     * Resolve table columns from schema builder and fallback to information_schema/PRAGMA.
+     *
+     * @param string $table
+     * @return array<int, string>
+     */
+    protected function resolveTableColumns(string $table): array {
+        try {
+            $columns = Schema::getColumnListing($table);
+            if (!empty($columns)) {
+                return array_values(array_unique($columns));
+            }
+        } catch (\Throwable $e) {
+            // Fall through to DB metadata query.
+        }
+
+        try {
+            $connection = DB::connection();
+            $driver = $connection->getDriverName();
+
+            if ($driver === 'sqlite') {
+                $rows = $connection->select('PRAGMA table_info("'.$table.'")');
+                $columns = [];
+                foreach ($rows as $row) {
+                    $name = (array) $row;
+                    if (!empty($name['name'])) {
+                        $columns[] = $name['name'];
+                    }
+                }
+
+                return array_values(array_unique($columns));
+            }
+
+            $databaseName = $connection->getDatabaseName();
+            if ($databaseName !== null && $databaseName !== '') {
+                $rows = $connection->select(
+                    'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
+                    [$databaseName, $table]
+                );
+                $columns = [];
+                foreach ($rows as $row) {
+                    $name = (array) $row;
+                    if (!empty($name['COLUMN_NAME'])) {
+                        $columns[] = $name['COLUMN_NAME'];
+                    }
+                }
+
+                return array_values(array_unique($columns));
+            }
+        } catch (\Throwable $e) {
+            // Metadata fallback failed.
+        }
+
+        return [];
     }
 
     /**
@@ -1611,10 +1491,8 @@ class CodesController extends Controller {
             }
         }
 
-        // Apply SELECT if specified
-        if (!empty($select)) {
-            $query->select($select);
-        }
+        // Always include all base table columns, then append configured joined aliases.
+        $query->select(array_merge([$baseAlias . '.*'], $select));
 
         return $query;
     }

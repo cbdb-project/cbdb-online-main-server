@@ -371,10 +371,15 @@ class CodesControllerTest extends TestCase {
         $response->assertViewHas('keyColumns', ['c_textid']);
         $response->assertSee('/codes/TEXT_CODES/T001/edit');
         $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
-        $response->assertSee('<th>c_textid</th>', false);
-        $response->assertSee('<th>c_title_chn</th>', false);
-        $response->assertSee('<th>c_title</th>', false);
-        $response->assertDontSee('<th>c_created_by</th>', false);
+        $response->assertSee('c_textid', false);
+        $response->assertSee('badge badge-info ml-1', false);
+        $response->assertSee('PK', false);
+        $response->assertSee('c_title_chn', false);
+        $response->assertSee('c_title', false);
+        $response->assertSee('c_created_by', false);
+        $response->assertSee('c_created_date', false);
+        $response->assertSee('c_modified_by', false);
+        $response->assertSee('c_modified_date', false);
         $response->assertSee('Sample Title CHN');
         $this->assertEmpty($this->operationSpy->calls);
     }

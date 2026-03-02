@@ -55,6 +55,7 @@ class ReadOnlyTableQueryService {
                 'table_name' => $tableName,
                 'columns' => DB::select("PRAGMA table_info(`{$tableName}`)"),
                 'indexes' => DB::select("PRAGMA index_list(`{$tableName}`)"),
+                'foreign_keys' => DB::select("PRAGMA foreign_key_list(`{$tableName}`)"),
                 'table_info' => [
                     'driver' => 'sqlite',
                 ],
@@ -65,6 +66,28 @@ class ReadOnlyTableQueryService {
             'table_name' => $tableName,
             'columns' => DB::select("DESCRIBE `{$tableName}`"),
             'indexes' => DB::select("SHOW INDEX FROM `{$tableName}`"),
+            'foreign_keys' => DB::select(
+                <<<'SQL'
+                SELECT
+                  kcu.CONSTRAINT_NAME,
+                  kcu.COLUMN_NAME,
+                  kcu.REFERENCED_TABLE_NAME,
+                  kcu.REFERENCED_COLUMN_NAME,
+                  rc.UPDATE_RULE,
+                  rc.DELETE_RULE,
+                  kcu.ORDINAL_POSITION
+                FROM information_schema.KEY_COLUMN_USAGE AS kcu
+                LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS AS rc
+                  ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+                 AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                 AND rc.TABLE_NAME = kcu.TABLE_NAME
+                WHERE kcu.TABLE_SCHEMA = DATABASE()
+                  AND kcu.TABLE_NAME = ?
+                  AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
+                SQL,
+                [$tableName]
+            ),
             'table_info' => DB::selectOne(
                 <<<'SQL'
                 SELECT

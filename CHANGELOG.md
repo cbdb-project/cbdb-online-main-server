@@ -3,6 +3,8 @@
 ## 最新更新 (2026-02)
 - 年號下拉選單新增朝代年份排序，優先顯示與人物朝代時間有交集的年號。
 - 地址搜尋 API 改以 `dy_start`/`dy_end` 傳遞朝代起訖年，提升過濾精確度並避免重複查詢朝代資料。
+- `query-playground` 新增 Query by Example（QBE）設計器分頁：支援拖拽欄位、Join/Where/Group By/Order By 組合、SQL 預覽與一鍵執行。
+- 新增 `query-playground/schema` API（僅 expert/admin）提供白名單資料表欄位資訊，供 QBE 設計器動態載入。
 
 ## 近兩個月補充 (2026-01 ~ 2026-02)
 

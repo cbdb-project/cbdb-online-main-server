@@ -1,5 +1,50 @@
 @extends('layouts.dashboard-v3')
 
+@push('styles')
+<style>
+.qbe-column-list {
+    max-height: 420px;
+    overflow-y: auto;
+}
+.qbe-dropzone {
+    min-height: 52px;
+    border: 2px dashed #ced4da;
+    border-radius: 6px;
+    padding: 8px;
+    background: #f8f9fa;
+}
+.qbe-dropzone.is-dragover {
+    border-color: #007bff;
+    background: #e8f2ff;
+}
+.qbe-chip {
+    display: inline-flex;
+    align-items: center;
+    margin: 4px 6px 4px 0;
+    padding: 4px 8px;
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: default;
+}
+.qbe-chip .qbe-remove {
+    border: 0;
+    background: transparent;
+    color: #dc3545;
+    padding: 0 0 0 8px;
+    line-height: 1;
+}
+.qbe-column-item {
+    cursor: grab;
+    user-select: none;
+}
+.qbe-column-item:active {
+    cursor: grabbing;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="row">
     <div class="col-12">
@@ -22,6 +67,11 @@
                     <li class="nav-item">
                         <a class="nav-link" id="nl-tab" data-toggle="tab" href="#nlPanel" role="tab">
                             <i class="fas fa-comment-dots"></i> 自然語言查詢
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="qbe-tab" data-toggle="tab" href="#qbePanel" role="tab">
+                            <i class="fas fa-project-diagram"></i> 查詢設計
                         </a>
                     </li>
                 </ul>
@@ -49,6 +99,102 @@
                             </div>
                             <div id="loadingIndicator" style="display:none;">
                                 <div class="spinner-border text-primary spinner-border-sm" role="status"></div> 查詢中...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QBE Panel -->
+                    <div class="tab-pane fade" id="qbePanel" role="tabpanel">
+                        <div class="alert alert-secondary py-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            拖拽欄位到「選取欄位 / Group By / 排序」區塊，可用 Join + 條件組合建立複雜查詢，最後自動產生 SQL。
+                        </div>
+
+                        <div class="form-row mb-3">
+                            <div class="col-md-5">
+                                <label for="qbeBaseTable">主表</label>
+                                <select id="qbeBaseTable" class="form-control">
+                                    <option value="">請選擇主表</option>
+                                    @foreach(($qbe_tables ?? []) as $table)
+                                        <option value="{{ $table['name'] }}">{{ $table['name'] }} @if($table['description'])- {{ $table['description'] }}@endif</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-7">
+                                <label>Join 設定</label>
+                                <div class="d-flex">
+                                    <button class="btn btn-outline-primary btn-sm" id="btnAddJoin" type="button">
+                                        <i class="fas fa-plus"></i> 新增 Join
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm ml-2" id="btnQbeReset" type="button">
+                                        <i class="fas fa-undo"></i> 重設設計器
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="qbeJoinRows" class="mb-3"></div>
+
+                        <div class="row">
+                            <div class="col-lg-4">
+                                <div class="card card-outline card-info">
+                                    <div class="card-header py-2">
+                                        <h6 class="mb-0">可用欄位（可拖拽）</h6>
+                                    </div>
+                                    <div class="card-body qbe-column-list" id="qbeColumnsPalette">
+                                        <div class="text-muted">請先選擇主表</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-8">
+                                <div class="form-group">
+                                    <label>SELECT 欄位</label>
+                                    <div class="qbe-dropzone" id="qbeSelectDrop"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>WHERE 條件</label>
+                                    <div id="qbeWhereRows" class="mb-2"></div>
+                                    <button class="btn btn-outline-primary btn-sm" type="button" id="btnAddWhere">
+                                        <i class="fas fa-plus"></i> 新增條件
+                                    </button>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>GROUP BY</label>
+                                    <div class="qbe-dropzone" id="qbeGroupByDrop"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>ORDER BY</label>
+                                    <div class="qbe-dropzone" id="qbeOrderByDrop"></div>
+                                </div>
+
+                                <div class="form-row align-items-end">
+                                    <div class="col-sm-3">
+                                        <div class="custom-control custom-checkbox mb-2">
+                                            <input type="checkbox" class="custom-control-input" id="qbeDistinct">
+                                            <label class="custom-control-label" for="qbeDistinct">DISTINCT</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-5">
+                                        <label for="qbeLimit">LIMIT（可留空）</label>
+                                        <input type="number" min="1" class="form-control" id="qbeLimit" placeholder="例如 100">
+                                    </div>
+                                    <div class="col-sm-4 text-right">
+                                        <button class="btn btn-primary" id="btnBuildQbeSql" type="button">
+                                            <i class="fas fa-cogs"></i> 產生 SQL
+                                        </button>
+                                        <button class="btn btn-success ml-1" id="btnBuildAndRunQbeSql" type="button">
+                                            <i class="fas fa-play"></i> 產生並執行
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label for="qbeSqlPreview">QBE 產生 SQL（可手修）</label>
+                                    <textarea id="qbeSqlPreview" class="form-control" rows="6" style="font-family: monospace;"></textarea>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -278,6 +424,16 @@
 onViteReady(function() {
     let currentPage = 1;
     let generatedSqlText = '';
+    const qbeTables = @json($qbe_tables ?? []);
+    const qbeSchemaCache = {};
+    const qbeState = {
+        baseTable: '',
+        joins: [],
+        selectFields: [],
+        where: [],
+        groupBy: [],
+        orderBy: [],
+    };
 
     // Check if initial SQL provided via URL param (already populated in UI by controller), maybe auto-run?
     // User didn't strictly ask for auto-run, but it's often expected. Let's stick to manual run for safety first.
@@ -442,6 +598,472 @@ onViteReady(function() {
             alert('SQL 格式化失敗，請檢查語法是否正確');
         }
     });
+
+    function quoteIdentifier(expression) {
+        return expression
+            .split('.')
+            .map(part => `\`${part.replace(/`/g, '')}\``)
+            .join('.');
+    }
+
+    function loadQbeSchema(tableNames) {
+        const tablesToLoad = (tableNames || []).filter(tableName => tableName && !qbeSchemaCache[tableName]);
+        if (tablesToLoad.length === 0) {
+            return Promise.resolve();
+        }
+
+        return $.ajax({
+            url: "{{ route('query-playground.schema', [], false) }}",
+            method: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                tables: tablesToLoad,
+            },
+        }).then(function(response) {
+            const tablePayload = response.tables || {};
+            Object.keys(tablePayload).forEach(function(tableName) {
+                qbeSchemaCache[tableName] = tablePayload[tableName];
+            });
+        });
+    }
+
+    function getQbeActiveTables() {
+        const tables = [];
+        if (qbeState.baseTable) {
+            tables.push(qbeState.baseTable);
+        }
+        qbeState.joins.forEach(function(joinItem) {
+            if (joinItem.table) {
+                tables.push(joinItem.table);
+            }
+        });
+
+        return [...new Set(tables)];
+    }
+
+    function renderQbeColumnsPalette() {
+        const activeTables = getQbeActiveTables();
+        const $palette = $('#qbeColumnsPalette');
+        if (activeTables.length === 0) {
+            $palette.html('<div class="text-muted">請先選擇主表</div>');
+
+            return;
+        }
+
+        let html = '';
+        activeTables.forEach(function(tableName) {
+            const schema = qbeSchemaCache[tableName];
+            if (!schema) {
+                return;
+            }
+            const columns = schema.columns || [];
+            html += `<div class="mb-2"><strong>${escapeHtml(tableName)}</strong>`;
+            if (schema.description) {
+                html += ` <small class="text-muted">${escapeHtml(schema.description)}</small>`;
+            }
+            html += '</div>';
+            if (columns.length === 0) {
+                html += '<div class="text-muted small mb-3">尚無可用欄位</div>';
+
+                return;
+            }
+            html += '<div class="mb-3">';
+            columns.forEach(function(column) {
+                const expression = `${tableName}.${column.name}`;
+                const label = column.type ? `${column.name} (${column.type})` : column.name;
+                html += `<span class="badge badge-light border mr-1 mb-1 qbe-column-item" draggable="true" data-expression="${escapeHtml(expression)}">${escapeHtml(label)}</span>`;
+            });
+            html += '</div>';
+        });
+
+        $palette.html(html);
+        $('.qbe-column-item').off('dragstart').on('dragstart', function(event) {
+            const expression = String($(this).data('expression') || '');
+            const nativeEvent = event.originalEvent || event;
+            if (!nativeEvent.dataTransfer) {
+                return;
+            }
+            nativeEvent.dataTransfer.effectAllowed = 'copy';
+            // Set both mime types for broader browser compatibility.
+            nativeEvent.dataTransfer.setData('text/plain', expression);
+            nativeEvent.dataTransfer.setData('text', expression);
+        });
+    }
+
+    function renderQbeJoins() {
+        const activeTables = getQbeActiveTables();
+        const options = ['<option value="">請選擇表格</option>'].concat(
+            qbeTables.map(item => `<option value="${item.name}">${item.name}</option>`)
+        ).join('');
+        const fieldOptions = ['<option value="">請先選擇欄位</option>'];
+        activeTables.forEach(function(tableName) {
+            const schema = qbeSchemaCache[tableName];
+            const schemaColumns = schema && schema.columns ? schema.columns : [];
+            schemaColumns.forEach(function(column) {
+                const expr = `${tableName}.${column.name}`;
+                fieldOptions.push(`<option value="${expr}">${expr}</option>`);
+            });
+        });
+        const fieldOptionHtml = fieldOptions.join('');
+
+        let html = '';
+        qbeState.joins.forEach(function(joinItem, index) {
+            html += '<div class="border rounded p-2 mb-2">';
+            html += '<div class="form-row">';
+            html += '<div class="col-md-2">';
+            html += `<select class="form-control form-control-sm qbe-join-type" data-index="${index}">
+                        <option value="INNER JOIN" ${joinItem.type === 'INNER JOIN' ? 'selected' : ''}>INNER</option>
+                        <option value="LEFT JOIN" ${joinItem.type === 'LEFT JOIN' ? 'selected' : ''}>LEFT</option>
+                        <option value="RIGHT JOIN" ${joinItem.type === 'RIGHT JOIN' ? 'selected' : ''}>RIGHT</option>
+                    </select>`;
+            html += '</div>';
+            html += `<div class="col-md-3"><select class="form-control form-control-sm qbe-join-table" data-index="${index}">${options}</select></div>`;
+            html += `<div class="col-md-3"><select class="form-control form-control-sm qbe-join-left" data-index="${index}">${fieldOptionHtml}</select></div>`;
+            html += `<div class="col-md-3"><select class="form-control form-control-sm qbe-join-right" data-index="${index}">${fieldOptionHtml}</select></div>`;
+            html += `<div class="col-md-1 text-right"><button type="button" class="btn btn-sm btn-outline-danger qbe-remove-join" data-index="${index}"><i class="fas fa-times"></i></button></div>`;
+            html += '</div>';
+            html += '</div>';
+        });
+
+        $('#qbeJoinRows').html(html);
+        qbeState.joins.forEach(function(joinItem, index) {
+            $(`#qbeJoinRows .qbe-join-table[data-index="${index}"]`).val(joinItem.table || '');
+            $(`#qbeJoinRows .qbe-join-left[data-index="${index}"]`).val(joinItem.left || '');
+            $(`#qbeJoinRows .qbe-join-right[data-index="${index}"]`).val(joinItem.right || '');
+        });
+    }
+
+    function createQbeChip(expression, type, direction = 'ASC') {
+        const $chip = $('<span class="qbe-chip"></span>');
+        $chip.attr('data-expression', expression);
+        $chip.attr('data-type', type);
+        $chip.text(expression);
+        if (type === 'order') {
+            const $direction = $('<select class="form-control form-control-sm ml-2" style="width:auto;display:inline-block;"></select>');
+            $direction.append(`<option value="ASC" ${direction === 'ASC' ? 'selected' : ''}>ASC</option>`);
+            $direction.append(`<option value="DESC" ${direction === 'DESC' ? 'selected' : ''}>DESC</option>`);
+            $chip.append($direction);
+        }
+        $chip.append('<button type="button" class="qbe-remove" title="移除">×</button>');
+
+        return $chip;
+    }
+
+    function syncQbeDropState() {
+        qbeState.selectFields = [];
+        $('#qbeSelectDrop .qbe-chip').each(function() {
+            qbeState.selectFields.push({expression: $(this).data('expression')});
+        });
+        qbeState.groupBy = [];
+        $('#qbeGroupByDrop .qbe-chip').each(function() {
+            qbeState.groupBy.push({expression: $(this).data('expression')});
+        });
+        qbeState.orderBy = [];
+        $('#qbeOrderByDrop .qbe-chip').each(function() {
+            const direction = $(this).find('select').val() || 'ASC';
+            qbeState.orderBy.push({expression: $(this).data('expression'), direction});
+        });
+    }
+
+    function bindQbeDropzones() {
+        ['#qbeSelectDrop', '#qbeGroupByDrop', '#qbeOrderByDrop'].forEach(function(selector) {
+            const $zone = $(selector);
+            $zone.off('dragover dragleave drop');
+            $zone.on('dragover', function(event) {
+                event.preventDefault();
+                $(this).addClass('is-dragover');
+            });
+            $zone.on('dragleave', function() {
+                $(this).removeClass('is-dragover');
+            });
+            $zone.on('drop', function(event) {
+                event.preventDefault();
+                $(this).removeClass('is-dragover');
+                const nativeEvent = event.originalEvent || event;
+                const dataTransfer = nativeEvent.dataTransfer;
+                if (!dataTransfer) {
+                    return;
+                }
+                const expression = dataTransfer.getData('text/plain') || dataTransfer.getData('text');
+                if (!expression) {
+                    return;
+                }
+
+                const type = selector === '#qbeSelectDrop' ? 'select' : (selector === '#qbeGroupByDrop' ? 'group' : 'order');
+                const hasSameExpression = $(this).find('.qbe-chip').filter(function() {
+                    return String($(this).data('expression')) === expression;
+                }).length > 0;
+                if (hasSameExpression) {
+                    return;
+                }
+                const $chip = createQbeChip(expression, type);
+                $(this).append($chip);
+                bindQbeChipEvents();
+                syncQbeDropState();
+            });
+        });
+    }
+
+    function bindQbeChipEvents() {
+        $('.qbe-chip .qbe-remove').off('click').on('click', function() {
+            $(this).closest('.qbe-chip').remove();
+            syncQbeDropState();
+        });
+        $('#qbeOrderByDrop select').off('change').on('change', function() {
+            syncQbeDropState();
+        });
+    }
+
+    function renderQbeWhereRows() {
+        const fieldOptions = ['<option value="">請選擇欄位</option>'];
+        getQbeActiveTables().forEach(function(tableName) {
+            const tableSchema = qbeSchemaCache[tableName];
+            const tableColumns = tableSchema && tableSchema.columns ? tableSchema.columns : [];
+            tableColumns.forEach(function(column) {
+                const expression = `${tableName}.${column.name}`;
+                fieldOptions.push(`<option value="${expression}">${expression}</option>`);
+            });
+        });
+        const optionHtml = fieldOptions.join('');
+
+        let html = '';
+        qbeState.where.forEach(function(row, index) {
+            html += '<div class="form-row mb-2">';
+            html += '<div class="col-md-2">';
+            if (index === 0) {
+                html += '<input class="form-control form-control-sm" value="WHERE" disabled>';
+            } else {
+                html += `<select class="form-control form-control-sm qbe-where-logic" data-index="${index}">
+                            <option value="AND" ${row.logic === 'AND' ? 'selected' : ''}>AND</option>
+                            <option value="OR" ${row.logic === 'OR' ? 'selected' : ''}>OR</option>
+                        </select>`;
+            }
+            html += '</div>';
+            html += `<div class="col-md-3"><select class="form-control form-control-sm qbe-where-left" data-index="${index}">${optionHtml}</select></div>`;
+            html += `<div class="col-md-2">
+                        <select class="form-control form-control-sm qbe-where-op" data-index="${index}">
+                            <option value="=" ${row.operator === '=' ? 'selected' : ''}>=</option>
+                            <option value="!=" ${row.operator === '!=' ? 'selected' : ''}>!=</option>
+                            <option value=">" ${row.operator === '>' ? 'selected' : ''}>></option>
+                            <option value="<" ${row.operator === '<' ? 'selected' : ''}>&lt;</option>
+                            <option value=">=" ${row.operator === '>=' ? 'selected' : ''}>>=</option>
+                            <option value="<=" ${row.operator === '<=' ? 'selected' : ''}>&lt;=</option>
+                            <option value="LIKE" ${row.operator === 'LIKE' ? 'selected' : ''}>LIKE</option>
+                            <option value="IN" ${row.operator === 'IN' ? 'selected' : ''}>IN</option>
+                        </select>
+                    </div>`;
+            html += `<div class="col-md-4"><input type="text" class="form-control form-control-sm qbe-where-right" data-index="${index}" placeholder="例如: 宋 或 15 或 ('A','B')"></div>`;
+            html += `<div class="col-md-1 text-right"><button type="button" class="btn btn-sm btn-outline-danger qbe-remove-where" data-index="${index}"><i class="fas fa-times"></i></button></div>`;
+            html += '</div>';
+        });
+        $('#qbeWhereRows').html(html);
+        qbeState.where.forEach(function(row, index) {
+            $(`#qbeWhereRows .qbe-where-left[data-index="${index}"]`).val(row.left || '');
+            $(`#qbeWhereRows .qbe-where-right[data-index="${index}"]`).val(row.right || '');
+        });
+    }
+
+    function bindQbeFormEvents() {
+        $('#qbeJoinRows').off('change').on('change', '.qbe-join-type, .qbe-join-table, .qbe-join-left, .qbe-join-right', function() {
+            const index = parseInt($(this).data('index'), 10);
+            const $row = $(this).closest('.border');
+            qbeState.joins[index] = {
+                type: $row.find('.qbe-join-type').val(),
+                table: $row.find('.qbe-join-table').val(),
+                left: $row.find('.qbe-join-left').val(),
+                right: $row.find('.qbe-join-right').val(),
+            };
+
+            const selectedTable = qbeState.joins[index].table;
+            loadQbeSchema(selectedTable ? [selectedTable] : []).then(function() {
+                renderQbeColumnsPalette();
+                renderQbeJoins();
+                renderQbeWhereRows();
+            });
+        });
+        $('#qbeJoinRows').on('click', '.qbe-remove-join', function() {
+            const index = parseInt($(this).data('index'), 10);
+            qbeState.joins.splice(index, 1);
+            renderQbeJoins();
+            renderQbeColumnsPalette();
+            renderQbeWhereRows();
+        });
+
+        $('#qbeWhereRows').off('change keyup').on('change keyup', '.qbe-where-logic, .qbe-where-left, .qbe-where-op, .qbe-where-right', function() {
+            const index = parseInt($(this).data('index'), 10);
+            const $row = $(this).closest('.form-row');
+            qbeState.where[index] = {
+                logic: $row.find('.qbe-where-logic').val() || 'AND',
+                left: $row.find('.qbe-where-left').val() || '',
+                operator: $row.find('.qbe-where-op').val() || '=',
+                right: $row.find('.qbe-where-right').val() || '',
+            };
+        });
+        $('#qbeWhereRows').on('click', '.qbe-remove-where', function() {
+            const index = parseInt($(this).data('index'), 10);
+            qbeState.where.splice(index, 1);
+            renderQbeWhereRows();
+        });
+    }
+
+    function formatSqlLiteral(rawValue, operator) {
+        const value = (rawValue || '').trim();
+        if (!value) {
+            return '';
+        }
+        if (operator === 'IN') {
+            return value.startsWith('(') ? value : `(${value})`;
+        }
+        if (/^[-]?\d+(\.\d+)?$/.test(value)) {
+            return value;
+        }
+        if (/^(NULL)$/i.test(value)) {
+            return 'NULL';
+        }
+        if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
+            return value;
+        }
+
+        return `'${value.replace(/'/g, "''")}'`;
+    }
+
+    function buildSqlFromQbeState() {
+        if (!qbeState.baseTable) {
+            return '';
+        }
+
+        const selectClause = qbeState.selectFields.length > 0
+            ? qbeState.selectFields.map(item => quoteIdentifier(item.expression)).join(', ')
+            : `${quoteIdentifier(qbeState.baseTable)}.*`;
+
+        let sql = `SELECT ${$('#qbeDistinct').is(':checked') ? 'DISTINCT ' : ''}${selectClause}\n`;
+        sql += `FROM ${quoteIdentifier(qbeState.baseTable)}\n`;
+
+        qbeState.joins.forEach(function(joinItem) {
+            if (!joinItem.table || !joinItem.left || !joinItem.right) {
+                return;
+            }
+            sql += `${joinItem.type} ${quoteIdentifier(joinItem.table)} ON ${quoteIdentifier(joinItem.left)} = ${quoteIdentifier(joinItem.right)}\n`;
+        });
+
+        const whereParts = qbeState.where
+            .filter(item => item.left && item.operator && item.right)
+            .map(function(item, index) {
+                const leftExpr = quoteIdentifier(item.left);
+                const rightExpr = formatSqlLiteral(item.right, item.operator);
+                if (!rightExpr) {
+                    return '';
+                }
+
+                return `${index === 0 ? '' : (item.logic || 'AND') + ' '}${leftExpr} ${item.operator} ${rightExpr}`;
+            })
+            .filter(Boolean);
+        if (whereParts.length > 0) {
+            sql += `WHERE ${whereParts.join(' ')}\n`;
+        }
+
+        if (qbeState.groupBy.length > 0) {
+            sql += `GROUP BY ${qbeState.groupBy.map(item => quoteIdentifier(item.expression)).join(', ')}\n`;
+        }
+
+        if (qbeState.orderBy.length > 0) {
+            sql += `ORDER BY ${qbeState.orderBy.map(item => `${quoteIdentifier(item.expression)} ${item.direction || 'ASC'}`).join(', ')}\n`;
+        }
+
+        const limit = parseInt($('#qbeLimit').val(), 10);
+        if (!Number.isNaN(limit) && limit > 0) {
+            sql += `LIMIT ${limit}\n`;
+        }
+
+        return sql.trim();
+    }
+
+    function resetQbeDesigner() {
+        qbeState.baseTable = '';
+        qbeState.joins = [];
+        qbeState.selectFields = [];
+        qbeState.where = [];
+        qbeState.groupBy = [];
+        qbeState.orderBy = [];
+        $('#qbeBaseTable').val('');
+        $('#qbeDistinct').prop('checked', false);
+        $('#qbeLimit').val('');
+        $('#qbeSqlPreview').val('');
+        $('#qbeSelectDrop').empty();
+        $('#qbeGroupByDrop').empty();
+        $('#qbeOrderByDrop').empty();
+        renderQbeJoins();
+        renderQbeWhereRows();
+        renderQbeColumnsPalette();
+    }
+
+    $('#qbeBaseTable').on('change', function() {
+        qbeState.baseTable = $(this).val();
+        const tablesToLoad = getQbeActiveTables();
+        loadQbeSchema(tablesToLoad).then(function() {
+            renderQbeColumnsPalette();
+            renderQbeJoins();
+            renderQbeWhereRows();
+        });
+    });
+
+    $('#btnAddJoin').on('click', function() {
+        qbeState.joins.push({
+            type: 'INNER JOIN',
+            table: '',
+            left: '',
+            right: '',
+        });
+        renderQbeJoins();
+    });
+
+    $('#btnAddWhere').on('click', function() {
+        qbeState.where.push({
+            logic: 'AND',
+            left: '',
+            operator: '=',
+            right: '',
+        });
+        renderQbeWhereRows();
+    });
+
+    $('#btnQbeReset').on('click', function() {
+        resetQbeDesigner();
+    });
+
+    $('#btnBuildQbeSql').on('click', function() {
+        syncQbeDropState();
+        const sql = buildSqlFromQbeState();
+        if (!sql) {
+            alert('請先選擇主表與欄位');
+
+            return;
+        }
+        $('#qbeSqlPreview').val(sql);
+    });
+
+    $('#btnBuildAndRunQbeSql').on('click', function() {
+        syncQbeDropState();
+        const sql = buildSqlFromQbeState();
+        if (!sql) {
+            alert('請先選擇主表與欄位');
+
+            return;
+        }
+        $('#qbeSqlPreview').val(sql);
+        $('#sqlInput').val(sql);
+        $('#sql-tab').tab('show');
+        setTimeout(() => {
+            runQuery(1);
+        }, 200);
+    });
+
+    bindQbeDropzones();
+    bindQbeChipEvents();
+    bindQbeFormEvents();
+    renderQbeJoins();
+    renderQbeWhereRows();
+    renderQbeColumnsPalette();
 
     // Function to display tool calls in a user-friendly format
     function displayToolCalls(toolCalls) {

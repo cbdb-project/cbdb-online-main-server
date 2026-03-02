@@ -49,6 +49,9 @@
                                 @else
                                     {{ $item }}
                                 @endif
+                                @if(in_array($item, $keyColumns, true))
+                                    <span class="badge badge-info ml-1">PK</span>
+                                @endif
                             </th>
                         @endforeach
                         @if($showActions)
@@ -123,7 +126,12 @@
                     <tfoot>
                     <tr>
                         @foreach ($thead as $item)
-                            <th>{{ $item }}</th>
+                            <th>
+                                {{ $item }}
+                                @if(in_array($item, $keyColumns, true))
+                                    <span class="badge badge-info ml-1">PK</span>
+                                @endif
+                            </th>
                         @endforeach
                         @if($showActions)
                             <th style="width: 120px">操作</th>

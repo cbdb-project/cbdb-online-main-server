@@ -17,6 +17,35 @@ return [
         [
             'type' => 'function',
             'function' => [
+                'name' => 'list_allowed_tables',
+                'description' => '列出系統允許查詢的所有資料表。當你不確定可用表格時，優先調用此工具。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [],
+                    'additionalProperties' => false,
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'query_table_schema',
+                'description' => '獲取指定表格的完整 schema（欄位、索引、外鍵與表格 metadata）。適合建立 JOIN 與確認關聯時使用。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'table_name' => [
+                            'type' => 'string',
+                            'description' => 'Allowlisted table name',
+                        ],
+                    ],
+                    'required' => ['table_name'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
                 'name' => 'get_table_schema',
                 'description' => '獲取指定表格的結構信息（字段名、數據類型、描述等）。當你需要了解表格有哪些字段以及它們的含義時使用此工具。',
                 'parameters' => [
@@ -52,6 +81,102 @@ return [
                         ],
                     ],
                     'required' => ['table_name'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'query_table',
+                'description' => '查詢單一表格，可指定 filters、columns、limit、offset。適合先快速驗證欄位值與分佈。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'table_name' => [
+                            'type' => 'string',
+                            'description' => 'Allowlisted table name',
+                        ],
+                        'filters' => [
+                            'type' => ['object', 'string', 'null'],
+                            'description' => '可選過濾條件。可傳 JSON object 或 JSON string。',
+                        ],
+                        'columns' => [
+                            'type' => ['array', 'string', 'null'],
+                            'description' => '可選欄位清單。可傳字串陣列或逗號分隔字串。',
+                            'items' => [
+                                'type' => 'string',
+                            ],
+                        ],
+                        'limit' => [
+                            'type' => 'integer',
+                            'description' => '返回筆數（1-100）',
+                            'minimum' => 1,
+                            'maximum' => 100,
+                            'default' => 10,
+                        ],
+                        'offset' => [
+                            'type' => 'integer',
+                            'description' => '跳過筆數',
+                            'minimum' => 0,
+                            'default' => 0,
+                        ],
+                    ],
+                    'required' => ['table_name'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_table_row_by_id',
+                'description' => '透過指定 id 欄位和值抓取單筆資料，適合快速驗證特定主鍵或代碼值。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'table_name' => [
+                            'type' => 'string',
+                            'description' => 'Allowlisted table name',
+                        ],
+                        'id_column' => [
+                            'type' => 'string',
+                            'description' => 'ID column name',
+                        ],
+                        'id_value' => [
+                            'type' => ['string', 'number', 'boolean', 'null'],
+                            'description' => 'ID value to match',
+                        ],
+                    ],
+                    'required' => ['table_name', 'id_column', 'id_value'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'query_read_only_sql',
+                'description' => '執行只讀 SQL（僅 SELECT/WITH）。適合在最終生成前先用小 limit 驗證查詢是否可執行。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'sql' => [
+                            'type' => 'string',
+                            'description' => 'Read-only SQL (SELECT/WITH only)',
+                        ],
+                        'limit' => [
+                            'type' => 'integer',
+                            'description' => 'Max rows to return (1-100)',
+                            'minimum' => 1,
+                            'maximum' => 100,
+                            'default' => 20,
+                        ],
+                        'offset' => [
+                            'type' => 'integer',
+                            'description' => 'Rows to skip',
+                            'minimum' => 0,
+                            'default' => 0,
+                        ],
+                    ],
+                    'required' => ['sql'],
                 ],
             ],
         ],
@@ -113,7 +238,7 @@ return [
     */
 
     // 最大工具调用次数（防止无限循环）
-    'max_tool_calls' => 20,
+    'max_tool_calls' => (int) env('NL_QUERY_MAX_TOOL_CALLS', 40),
 
     // 工具调用超时时间（秒）
     'timeout' => 10,

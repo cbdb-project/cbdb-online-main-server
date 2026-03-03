@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\DatabaseSchemaService;
+use App\Services\Mcp\ReadOnlyTableQueryService;
 use App\Services\NlQueryToolsService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -157,5 +158,62 @@ class NlQueryToolsServiceTest extends TestCase {
 
         $this->assertTrue($result['success']);
         $this->assertIsArray($result['data']);
+    }
+
+    /** @test */
+    public function it_can_execute_list_allowed_tables_tool(): void {
+        $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
+        $readOnlyService->method('listAllowedTables')
+            ->willReturn(['DYNASTIES', 'BIOG_MAIN']);
+
+        $service = new NlQueryToolsService(new DatabaseSchemaService(), $readOnlyService);
+        $result = $service->executeTool('list_allowed_tables', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(['DYNASTIES', 'BIOG_MAIN'], $result['data']);
+    }
+
+    /** @test */
+    public function it_can_execute_query_table_schema_tool(): void {
+        $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
+        $readOnlyService->method('queryTableSchema')
+            ->with('DYNASTIES')
+            ->willReturn([
+                'table_name' => 'DYNASTIES',
+                'columns' => [],
+                'indexes' => [],
+                'foreign_keys' => [],
+                'table_info' => [],
+            ]);
+
+        $service = new NlQueryToolsService(new DatabaseSchemaService(), $readOnlyService);
+        $result = $service->executeTool('query_table_schema', [
+            'table_name' => 'DYNASTIES',
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('DYNASTIES', $result['data']['table_name']);
+    }
+
+    /** @test */
+    public function it_can_execute_query_read_only_sql_tool(): void {
+        $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
+        $readOnlyService->method('queryReadOnlySql')
+            ->with('SELECT * FROM DYNASTIES', 5, 0)
+            ->willReturn([
+                'sql' => 'SELECT * FROM DYNASTIES',
+                'rows' => [['c_dy' => 1]],
+                'returned_rows' => 1,
+            ]);
+
+        $service = new NlQueryToolsService(new DatabaseSchemaService(), $readOnlyService);
+        $result = $service->executeTool('query_read_only_sql', [
+            'sql' => 'SELECT * FROM DYNASTIES',
+            'limit' => 5,
+            'offset' => 0,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['data']['returned_rows']);
     }
 }

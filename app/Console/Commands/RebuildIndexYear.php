@@ -45,22 +45,18 @@ class RebuildIndexYear extends Command {
         $startedAt = microtime(true);
         $showSql = (bool) $this->option('show-sql');
         $this->info('開始全量重建 BIOG_MAIN index year...');
-        $this->line('策略：單一 transaction、詳細規則統計、重建前清空 c_index_year / type_code / source_id');
+        $this->line('策略：逐條規則各自提交（避免單一大 transaction 鎖表）、詳細規則統計、重建前清空 c_index_year / type_code / source_id');
         if ($showSql) {
             $this->line('模式：已開啟 SQL 輸出（每條規則執行前顯示 SQL）');
         }
 
         try {
-            DB::beginTransaction();
-
             $stats = $service
                 ->setLogger(function (string $message): void {
                     $this->line($message);
                 })
                 ->setShowSql($showSql)
                 ->rebuild();
-
-            DB::commit();
 
             $elapsed = microtime(true) - $startedAt;
             $this->newLine();
@@ -69,11 +65,7 @@ class RebuildIndexYear extends Command {
 
             return 0;
         } catch (Throwable $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
-            }
-
-            $this->error('重建失敗，已回滾 transaction。');
+            $this->error('重建失敗。');
             $this->error($e->getMessage());
 
             return 1;

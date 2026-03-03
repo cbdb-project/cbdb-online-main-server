@@ -14,12 +14,22 @@ class ListAllowedTablesTool extends Tool {
     public string $description = 'List all allowlisted tables that MCP can query.';
 
     public function schema(JsonSchema $schema): array {
-        return [];
+        return [
+            'keyword' => $schema->string()
+                ->description('Optional keyword filter for table names (case-insensitive).'),
+        ];
     }
 
     public function handle(Request $request): Response {
         $service = app(ReadOnlyTableQueryService::class);
         $tables = $service->listAllowedTables();
+        $keyword = trim((string) $request->get('keyword', ''));
+
+        if ($keyword !== '') {
+            $tables = array_values(array_filter($tables, static function ($table) use ($keyword) {
+                return stripos((string) $table, $keyword) !== false;
+            }));
+        }
 
         return Response::text(json_encode([
             'allowed_tables' => $tables,

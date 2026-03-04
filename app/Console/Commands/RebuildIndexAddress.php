@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class RebuildIndexAddress extends Command {
-    protected $signature = 'cbdb:rebuild-index-address {--show-sql : 輸出每一步實際執行的 SQL}';
+    protected $signature = 'cbdb:rebuild-index-address {--show-sql : 輸出每一步實際執行的 SQL} {--batch-size=500 : 依 c_personid 區間分批處理筆數}';
 
     protected $description = '全量重建 BIOG_MAIN 的 index address 欄位（MySQL/MariaDB）';
 
@@ -44,8 +44,9 @@ class RebuildIndexAddress extends Command {
 
         $startedAt = microtime(true);
         $showSql = (bool) $this->option('show-sql');
+        $batchSize = max(1, (int) $this->option('batch-size'));
         $this->info('開始全量重建 BIOG_MAIN index address...');
-        $this->line('策略：逐條規則各自提交（避免單一大 transaction 鎖表）、按 c_index_addr_rank(<100) 循環、Max(c_sequence) 子查詢聚合、首命中優先');
+        $this->line(sprintf('策略：先計算到暫存表，再分批 SWAP 回 BIOG_MAIN（batch-size=%d），避免長時間鎖主表', $batchSize));
         if ($showSql) {
             $this->line('模式：已開啟 SQL 輸出（每條規則執行前顯示 SQL）');
         }
@@ -56,6 +57,7 @@ class RebuildIndexAddress extends Command {
                     $this->line($message);
                 })
                 ->setShowSql($showSql)
+                ->setBatchSize($batchSize)
                 ->rebuild();
 
             $elapsed = microtime(true) - $startedAt;
@@ -94,9 +96,12 @@ class RebuildIndexAddress extends Command {
      */
     protected function renderStats(array $stats, float $elapsed): void {
         $this->line(sprintf('地址類型數（rank<100）：%d', (int) ($stats['addr_type_count'] ?? 0)));
-        $this->line(sprintf('RESET 更新筆數：%d', (int) ($stats['reset'] ?? 0)));
+        $this->line(sprintf('分批大小 / 批次數：%d / %d', (int) ($stats['batch_size'] ?? 0), (int) ($stats['batch_count'] ?? 0)));
+        $this->line(sprintf('暫存表命中筆數：%d', (int) ($stats['staged_count'] ?? 0)));
+        $this->line(sprintf('需清空舊值筆數（無候選）：%d', (int) ($stats['clear_count'] ?? 0)));
+        $this->line(sprintf('SWAP 實際更新筆數：%d', (int) ($stats['swap_updated'] ?? 0)));
 
-        $this->line('每種地址類型更新統計：');
+        $this->line('每種地址類型命中統計：');
         foreach (($stats['per_type_updates'] ?? []) as $row) {
             $this->line(sprintf(
                 '  c_addr_type=%d (rank=%d): %d',
@@ -107,7 +112,7 @@ class RebuildIndexAddress extends Command {
         }
 
         $this->line(sprintf('最終 c_index_addr_id 非空筆數：%d', (int) ($stats['filled_count'] ?? 0)));
-        $this->line(sprintf('總更新筆數（含 reset 與各類型更新次數累計）：%d', (int) ($stats['total_updates'] ?? 0)));
+        $this->line(sprintf('總更新筆數（最終寫回 BIOG_MAIN）：%d', (int) ($stats['total_updates'] ?? 0)));
         $this->line(sprintf('耗時：%.2f 秒', $elapsed));
     }
 }

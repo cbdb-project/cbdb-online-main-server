@@ -21,7 +21,7 @@ return [
                 'description' => '列出系統允許查詢的所有資料表。當你不確定可用表格時，優先調用此工具。',
                 'parameters' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => (object) [],
                     'additionalProperties' => false,
                 ],
             ],

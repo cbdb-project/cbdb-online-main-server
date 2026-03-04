@@ -245,7 +245,12 @@
                                                                                                 @if($toolResult['result']['success'] ?? false)
                                                                                                     <span class="badge badge-success">成功</span>
                                                                                                     @if(isset($toolResult['result']['data']))
-                                                                                                        <small class="text-muted">({{ count($toolResult['result']['data']) }} 筆數據)</small>
+                                                                                                        @php
+                                                                                                            $toolData = $toolResult['result']['data'];
+                                                                                                            $toolRows = is_array($toolData['rows'] ?? null) ? $toolData['rows'] : (is_array($toolData) ? $toolData : []);
+                                                                                                            $toolDataCount = is_numeric($toolData['returned_rows'] ?? null) ? (int) $toolData['returned_rows'] : count($toolRows);
+                                                                                                        @endphp
+                                                                                                        <small class="text-muted">({{ $toolDataCount }} 筆數據)</small>
                                                                                                     @endif
                                                                                                 @else
                                                                                                     <span class="badge badge-danger">失敗</span>

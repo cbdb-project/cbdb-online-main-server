@@ -890,10 +890,10 @@ PROMPT;
                             'Authorization' => 'Bearer ' . $this->apiKey,
                         ])
                         ->post($this->apiEndpoint, $requestData);
+                    // 收到任何 HTTP 回應後，清除先前重試留下的 exception 狀態
+                    $lastException = null;
 
                     if ($response->successful()) {
-                        $lastException = null;
-
                         break;
                     }
 
@@ -917,7 +917,7 @@ PROMPT;
                 }
             }
 
-            if ($lastException !== null) {
+            if ($lastException !== null && $response === null) {
                 throw $lastException;
             }
 

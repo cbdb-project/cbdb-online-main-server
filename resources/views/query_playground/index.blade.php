@@ -1101,17 +1101,24 @@ onViteReady(function() {
             // Display result
             html += '<p class="mt-2 mb-1"><strong>返回結果：</strong></p>';
             if (call.result.success) {
-                const dataCount = call.result.data ? call.result.data.length : 0;
+                const resultSchema = call.result.schema || ((call.result.data && call.result.data.columns) ? call.result.data : null);
+                const parsedData = parseToolResultData(call.result.data);
+                const dataCount = parsedData.count;
                 html += '<span class="badge badge-success">成功</span> ';
-                html += `<span class="text-muted">返回 ${dataCount} 筆數據</span>`;
+                if (resultSchema) {
+                    const columnCount = resultSchema.columns ? resultSchema.columns.length : 0;
+                    html += `<span class="text-muted">返回 ${columnCount} 個欄位</span>`;
+                } else {
+                    html += `<span class="text-muted">返回 ${dataCount} 筆數據</span>`;
 
-                // Show sample data (first 3 records)
-                if (call.result.data && call.result.data.length > 0) {
-                    html += '<div class="mt-2"><small class="text-muted">樣例數據（前 3 筆）：</small></div>';
-                    html += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
-                    const sampleData = call.result.data.slice(0, 3);
-                    html += escapeHtml(JSON.stringify(sampleData, null, 2));
-                    html += '</pre>';
+                    // Show sample data (first 3 records)
+                    if (parsedData.rows.length > 0) {
+                        html += '<div class="mt-2"><small class="text-muted">樣例數據（前 3 筆）：</small></div>';
+                        html += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
+                        const sampleData = parsedData.rows.slice(0, 3);
+                        html += escapeHtml(JSON.stringify(sampleData, null, 2));
+                        html += '</pre>';
+                    }
                 }
             } else {
                 html += '<span class="badge badge-danger">失敗</span> ';
@@ -1149,6 +1156,32 @@ onViteReady(function() {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function parseToolResultData(resultData) {
+        if (!resultData) {
+            return {
+                count: 0,
+                rows: [],
+            };
+        }
+
+        if (Array.isArray(resultData)) {
+            return {
+                count: resultData.length,
+                rows: resultData,
+            };
+        }
+
+        const rows = Array.isArray(resultData.rows) ? resultData.rows : [];
+        const count = typeof resultData.returned_rows === 'number'
+            ? resultData.returned_rows
+            : rows.length;
+
+        return {
+            count: count,
+            rows: rows,
+        };
     }
 
     // Natural Language Query handlers
@@ -1303,6 +1336,8 @@ onViteReady(function() {
                 case 'tool_execution_complete':
                     const toolArguments = data.arguments || (data.result ? data.result.arguments : null) || {};
                     const toolResult = data.result || {};
+                    const resultData = toolResult.data || null;
+                    const resultSchema = toolResult.schema || (resultData && resultData.columns ? resultData : null);
                     let toolHtml = `<p class="mb-1"><strong>調用參數：</strong></p>`;
                     toolHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em;">';
                     toolHtml += escapeHtml(JSON.stringify(toolArguments, null, 2));
@@ -1310,8 +1345,6 @@ onViteReady(function() {
 
                     toolHtml += '<p class="mt-2 mb-1"><strong>返回結果：</strong></p>';
                     if (data.success && toolResult.success) {
-                        const resultSchema = toolResult.schema || null;
-                        const resultData = toolResult.data || null;
                         toolHtml += '<span class="badge badge-success">成功</span> ';
                         if (resultSchema) {
                             const columnCount = resultSchema.columns ? resultSchema.columns.length : 0;
@@ -1323,13 +1356,14 @@ onViteReady(function() {
                             toolHtml += escapeHtml(JSON.stringify(schemaSample, null, 2));
                             toolHtml += '</pre>';
                         } else {
-                            const dataCount = resultData ? resultData.length : 0;
+                            const parsedData = parseToolResultData(resultData);
+                            const dataCount = parsedData.count;
                             toolHtml += `<span class="text-muted">返回 ${dataCount} 筆數據</span>`;
 
-                            if (resultData && resultData.length > 0) {
+                            if (parsedData.rows.length > 0) {
                                 toolHtml += '<div class="mt-2"><small class="text-muted">樣例數據（前 3 筆）：</small></div>';
                                 toolHtml += '<pre style="background: #f9f9f9; padding: 8px; border-radius: 4px; font-size: 0.85em; max-height: 200px; overflow-y: auto;">';
-                                const sampleData = resultData.slice(0, 3);
+                                const sampleData = parsedData.rows.slice(0, 3);
                                 toolHtml += escapeHtml(JSON.stringify(sampleData, null, 2));
                                 toolHtml += '</pre>';
                             }

@@ -304,10 +304,21 @@ class ReadOnlyTableQueryService {
 
     private function buildPaginatedSql(string $sql, int $limit, int $offset): string {
         if (preg_match('/^WITH\b/i', $sql)) {
+            if ($this->hasTrailingLimitOrOffset($sql)) {
+                return $sql;
+            }
+
             return $sql . " LIMIT {$limit} OFFSET {$offset}";
         }
 
         return "SELECT * FROM ({$sql}) AS subquery_wrapper LIMIT {$limit} OFFSET {$offset}";
+    }
+
+    private function hasTrailingLimitOrOffset(string $sql): bool {
+        return preg_match(
+            '/\bLIMIT\s+\d+(?:\s*,\s*\d+)?(?:\s+OFFSET\s+\d+)?\s*$/i',
+            $sql
+        ) === 1;
     }
 
     /**

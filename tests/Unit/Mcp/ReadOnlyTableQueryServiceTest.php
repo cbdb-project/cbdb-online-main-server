@@ -171,6 +171,22 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
     }
 
     #[Test]
+    public function it_keeps_existing_limit_for_with_query(): void {
+        $result = $this->service->queryReadOnlySql(
+            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 1',
+            10,
+            0
+        );
+
+        $this->assertSame(
+            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 1',
+            $result['sql']
+        );
+        $this->assertSame(['DYNASTIES'], $result['tables']);
+        $this->assertSame(1, $result['returned_rows']);
+    }
+
+    #[Test]
     public function it_supports_multiple_ctes_without_treating_aliases_as_tables(): void {
         $result = $this->service->queryReadOnlySql(
             'WITH cte_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active"), cte_people AS (SELECT c_personid FROM BIOG_MAIN) SELECT cte_dynasties.c_dy FROM cte_dynasties JOIN cte_people ON 1 = 1 ORDER BY cte_dynasties.c_dy',

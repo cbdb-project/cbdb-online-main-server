@@ -37,10 +37,10 @@ class IndexAddressRebuildService {
         DB::connection()->disableQueryLog();
 
         $addrTypes = DB::table('BIOG_ADDR_CODES')
-            ->select('c_addr_type', 'c_index_addr_rank')
-            ->whereNotNull('c_index_addr_rank')
-            ->where('c_index_addr_rank', '<', 100)
-            ->orderBy('c_index_addr_rank')
+            ->select('c_addr_type', 'c_index_addr_default_rank')
+            ->whereNotNull('c_index_addr_default_rank')
+            ->where('c_index_addr_default_rank', '<', 100)
+            ->orderBy('c_index_addr_default_rank')
             ->orderBy('c_addr_type')
             ->get();
 
@@ -60,11 +60,11 @@ class IndexAddressRebuildService {
         foreach ($addrTypes as $row) {
             $stats['addr_types'][] = [
                 'c_addr_type' => (int) $row->c_addr_type,
-                'rank' => (int) $row->c_index_addr_rank,
+                'rank' => (int) $row->c_index_addr_default_rank,
             ];
         }
 
-        $this->log(sprintf('載入地址類型優先級：%d 個（c_index_addr_rank < 100）', $stats['addr_type_count']));
+        $this->log(sprintf('載入地址類型優先級：%d 個（c_index_addr_default_rank < 100）', $stats['addr_type_count']));
         $batchRanges = $this->buildBatchRanges($this->batchSize);
         $stats['batch_count'] = count($batchRanges);
         if ($stats['batch_count'] > 0) {
@@ -175,13 +175,13 @@ class IndexAddressRebuildService {
                     sprintf('填充 tmp_biog_best_rank_batch（batch %d/%d: %d-%d）', $index + 1, $stats['batch_count'], $startId, $endId),
                     "INSERT INTO tmp_biog_best_rank_batch (c_personid, best_rank)
                      SELECT latest_ref.c_personid AS c_personid,
-                            MIN(code_ref.c_index_addr_rank) AS best_rank
+                            MIN(code_ref.c_index_addr_default_rank) AS best_rank
                      FROM tmp_biog_addr_latest_ref latest_ref
                      JOIN BIOG_ADDR_CODES code_ref
                        ON code_ref.c_addr_type = latest_ref.c_addr_type
                      WHERE latest_ref.c_personid BETWEEN ? AND ?
-                       AND code_ref.c_index_addr_rank IS NOT NULL
-                       AND code_ref.c_index_addr_rank < 100
+                       AND code_ref.c_index_addr_default_rank IS NOT NULL
+                       AND code_ref.c_index_addr_default_rank < 100
                      GROUP BY latest_ref.c_personid",
                     [$startId, $endId]
                 );
@@ -194,15 +194,15 @@ class IndexAddressRebuildService {
                     sprintf('填充 tmp_biog_best_type_batch（batch %d/%d: %d-%d）', $index + 1, $stats['batch_count'], $startId, $endId),
                     "INSERT INTO tmp_biog_best_type_batch (c_personid, c_index_addr_rank, best_addr_type)
                      SELECT latest_ref.c_personid AS c_personid,
-                            code_ref.c_index_addr_rank AS c_index_addr_rank,
+                            code_ref.c_index_addr_default_rank AS c_index_addr_rank,
                             MIN(latest_ref.c_addr_type) AS best_addr_type
                      FROM tmp_biog_addr_latest_ref latest_ref
                      JOIN BIOG_ADDR_CODES code_ref
                        ON code_ref.c_addr_type = latest_ref.c_addr_type
                      WHERE latest_ref.c_personid BETWEEN ? AND ?
-                       AND code_ref.c_index_addr_rank IS NOT NULL
-                       AND code_ref.c_index_addr_rank < 100
-                     GROUP BY latest_ref.c_personid, code_ref.c_index_addr_rank",
+                       AND code_ref.c_index_addr_default_rank IS NOT NULL
+                       AND code_ref.c_index_addr_default_rank < 100
+                     GROUP BY latest_ref.c_personid, code_ref.c_index_addr_default_rank",
                     [$startId, $endId]
                 );
 
@@ -216,13 +216,13 @@ class IndexAddressRebuildService {
                          SELECT latest.c_personid AS c_personid,
                                 latest.c_addr_id AS c_addr_id,
                                 latest.c_addr_type AS c_addr_type,
-                                current_code.c_index_addr_rank AS c_index_addr_rank
+                                current_code.c_index_addr_default_rank AS c_index_addr_rank
                          FROM tmp_biog_addr_latest latest
                          JOIN BIOG_ADDR_CODES current_code
                            ON current_code.c_addr_type = latest.c_addr_type
                          WHERE latest.c_personid BETWEEN ? AND ?
-                           AND current_code.c_index_addr_rank IS NOT NULL
-                           AND current_code.c_index_addr_rank < 100
+                           AND current_code.c_index_addr_default_rank IS NOT NULL
+                           AND current_code.c_index_addr_default_rank < 100
                      ) cand
                      JOIN tmp_biog_best_rank_batch best_rank_pick
                        ON best_rank_pick.c_personid = cand.c_personid

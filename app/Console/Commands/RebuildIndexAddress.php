@@ -95,7 +95,7 @@ class RebuildIndexAddress extends Command {
      * @param array<string, mixed> $stats
      */
     protected function renderStats(array $stats, float $elapsed): void {
-        $this->line(sprintf('地址類型數（rank<100）：%d', (int) ($stats['addr_type_count'] ?? 0)));
+        $this->line(sprintf('地址類型數（default_rank<100）：%d', (int) ($stats['addr_type_count'] ?? 0)));
         $this->line(sprintf('分批大小 / 批次數：%d / %d', (int) ($stats['batch_size'] ?? 0), (int) ($stats['batch_count'] ?? 0)));
         $this->line(sprintf('暫存表命中筆數：%d', (int) ($stats['staged_count'] ?? 0)));
         $this->line(sprintf('需清空舊值筆數（無候選）：%d', (int) ($stats['clear_count'] ?? 0)));

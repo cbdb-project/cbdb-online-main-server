@@ -171,6 +171,22 @@ class BiogMainNameSearchTest extends TestCase {
                 'c_surname_rm' => null,
                 'c_mingzi_rm' => null,
             ],
+            [
+                'c_personid' => 4001,
+                'c_name_chn' => '蘇無朝',
+                'c_name' => 'Su Wu Chao',
+                'c_surname' => '蘇',
+                'c_mingzi' => '無朝',
+                'c_index_year' => 1001,
+                'c_dy' => null,
+                'c_index_addr_id' => 100,
+                'c_name_proper' => null,
+                'c_name_rm' => null,
+                'c_surname_proper' => null,
+                'c_mingzi_proper' => null,
+                'c_surname_rm' => null,
+                'c_mingzi_rm' => null,
+            ],
         ]);
 
         DB::table('DYNASTIES')->insert([
@@ -202,6 +218,8 @@ class BiogMainNameSearchTest extends TestCase {
             // 蘇轍的倒排記錄
             ['c_personid' => 1002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '蘇轍', 'full_name' => '蘇轍', 'source' => 'biog_main', 'source_key' => 'biog_main:1002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
             ['c_personid' => 1002, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '轍', 'full_name' => '蘇轍', 'source' => 'biog_main', 'source_key' => 'biog_main:1002', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 4001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '蘇無朝', 'full_name' => '蘇無朝', 'source' => 'biog_main', 'source_key' => 'biog_main:4001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+            ['c_personid' => 4001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '無朝', 'full_name' => '蘇無朝', 'source' => 'biog_main', 'source_key' => 'biog_main:4001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
 
             // 王安石的倒排記錄
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '王安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
@@ -268,6 +286,7 @@ class BiogMainNameSearchTest extends TestCase {
         $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(1001, $personIds, '搜尋「蘇」應該包含蘇軾');
         $this->assertContains(1002, $personIds, '搜尋「蘇」應該包含蘇轍');
+        $this->assertContains(4001, $personIds, '搜尋「蘇」應該包含未設定朝代案例');
     }
 
     #[Test]
@@ -317,8 +336,55 @@ class BiogMainNameSearchTest extends TestCase {
 
         // 20251127 修改：空查詢現在也返回 LengthAwarePaginator 對象，與其他查詢保持一致
         $this->assertInstanceOf(LengthAwarePaginator::class, $result);
-        $this->assertGreaterThanOrEqual(3, $result->total());
-        $this->assertGreaterThanOrEqual(3, count($result->items()));
+        $this->assertGreaterThanOrEqual(4, $result->total());
+        $this->assertGreaterThanOrEqual(4, count($result->items()));
+    }
+
+    #[Test]
+    public function test_text_query_can_filter_by_specific_dynasty(): void {
+        $request = new Request(['q' => '蘇', 'c_dy' => 15]);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+        $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int) $id)->toArray();
+
+        $this->assertContains(1001, $personIds);
+        $this->assertContains(1002, $personIds);
+        $this->assertNotContains(4001, $personIds);
+    }
+
+    #[Test]
+    public function test_text_query_can_filter_unknown_dynasty_bucket(): void {
+        $request = new Request(['q' => '蘇', 'c_dy' => '__unknown__']);
+
+        $result = BiogMainRepository::namesByQuery($request, 20);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals(4001, (int) $result->items()[0]->c_personid);
+    }
+
+    #[Test]
+    public function test_dynasty_facets_include_unknown_bucket_and_match_result_total(): void {
+        $request = new Request(['q' => '蘇']);
+        $result = BiogMainRepository::namesByQuery($request, 20);
+        $facets = BiogMainRepository::dynastyFacetsByQuery('蘇');
+
+        $this->assertEquals($result->total(), (int) $facets->sum('count'));
+        $this->assertTrue(
+            $facets->contains(fn ($facet) => (string) $facet->c_dy === '__unknown__' && (int) $facet->count === 1),
+            'Facet 應包含未設定朝代分類'
+        );
+    }
+
+    #[Test]
+    public function test_pagination_links_preserve_dynasty_filter_query_param(): void {
+        $request = new Request(['q' => '蘇', 'c_dy' => '15']);
+        $result = BiogMainRepository::namesByQuery($request, 1);
+        $nextPageUrl = $result
+            ->appends(['q' => $request->q, 'c_dy' => $request->input('c_dy')])
+            ->url(2);
+
+        $this->assertStringContainsString('c_dy=15', $nextPageUrl);
+        $this->assertStringContainsString('q=', $nextPageUrl);
     }
 
     // ===== 倒排索引表測試 =====

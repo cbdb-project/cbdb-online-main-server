@@ -84,15 +84,24 @@ class BasicInformationController extends Controller {
         // 获取查询参数
         $q = $request->input('q', '');
         $num = $request->input('num', 20);
+        $cDy = $request->input('c_dy');
 
         // 使用 Repository 查询数据
         $names = $this->biogMainRepository->namesByQuery($request, $num);
+
+        // 如果有搜尋關鍵字，統計朝代分佈（用於篩選下拉選單）
+        $dynastyFacets = [];
+        if ($q !== '') {
+            $dynastyFacets = BiogMainRepository::dynastyFacetsByQuery($q);
+        }
 
         return view('biogmains.basicinformation.index', [
             'page_title' => '人物基本資料',
             'page_description' => '編輯人物基本資料',
             'names' => $names,
             'q' => $q,
+            'c_dy' => $cDy,
+            'dynastyFacets' => $dynastyFacets,
         ]);
     }
 

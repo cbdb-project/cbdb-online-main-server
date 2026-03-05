@@ -53,6 +53,7 @@ ini_set('max_execution_time', 300);
  */
 class BiogMainRepository {
     use DetectsModelChanges;
+    private const UNKNOWN_DYNASTY_FILTER = '__unknown__';
 
     public function officePostingRepository(): OfficePostingRepository {
         return app(OfficePostingRepository::class);
@@ -343,6 +344,8 @@ class BiogMainRepository {
         if ($temp = $request->num) {
             $num = addslashes($temp);
         }
+        // 朝代篩選參數
+        $cDy = $request->input('c_dy');
         if (!$request->q) {
             //20211112註記，運用每次僅呈現20筆的特性，先快速提供人名資料，再查詢相關的朝代與字、號。
             //20251127修改：改為與其他查詢一致的 LeftJoin 方式，統一返回 Paginator 對象以支持 Blade 模板渲染
@@ -411,8 +414,11 @@ class BiogMainRepository {
                     $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A2.c_alt_name_type_code', '=', 5);
                 })
-                ->where('BIOG_MAIN.c_personid', '=', $request->q)
-                ->groupBy('BIOG_MAIN.c_personid')
+                ->where('BIOG_MAIN.c_personid', '=', $request->q);
+
+            self::applyDynastyFilter($names, $cDy);
+
+            $names = $names->groupBy('BIOG_MAIN.c_personid')
                 ->paginate($num);
             $names->appends(['q' => $request->q])->links();
 
@@ -442,8 +448,14 @@ class BiogMainRepository {
                     $join->on('A2.c_personid', '=', 'BIOG_MAIN.c_personid')
                          ->where('A2.c_alt_name_type_code', '=', 5);
                 })
-                ->whereIn('BIOG_MAIN.c_personid', $personIds)
-                ->groupBy('BIOG_MAIN.c_personid');
+                ->whereIn('BIOG_MAIN.c_personid', $personIds);
+
+            // 朝代篩選
+            if ($cDy) {
+                self::applyDynastyFilter($query, $cDy);
+            }
+
+            $query->groupBy('BIOG_MAIN.c_personid');
 
             // 使用 FIELD() 排序保持匹配質量順序（完整匹配 → 長後綴 → 短後綴）
             $driver = DB::connection()->getDriverName();
@@ -497,6 +509,11 @@ class BiogMainRepository {
                 ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
         });
 
+        // 朝代篩選
+        if ($cDy) {
+            self::applyDynastyFilter($names, $cDy);
+        }
+
         // 使用 FIELD() 排序讓姓氏完全匹配的排在前面
         $driver = DB::connection()->getDriverName();
         if ($driver === 'mysql') {
@@ -514,6 +531,121 @@ class BiogMainRepository {
         $names->appends(['q' => $request->q])->links();
 
         return $names;
+    }
+
+    /**
+     * 根據搜尋關鍵字統計各朝代人數（用於朝代篩選下拉選單）。
+     * 複用 namesByQuery 的搜尋邏輯（倒排索引 → 回退 LIKE），但只做 GROUP BY 統計。
+     *
+     * @return \Illuminate\Support\Collection  每項含 c_dy, c_dynasty_chn, count
+     */
+    public static function dynastyFacetsByQuery(string $q): \Illuminate\Support\Collection {
+        if ($q === '') {
+            return collect();
+        }
+
+        $q = addslashes($q);
+
+        // 純數字：單筆精確查詢，不需要 facet
+        if (ctype_digit($q)) {
+            return collect();
+        }
+
+        // 倒排索引路徑
+        $personIds = DB::table('CBDB__NAME_FTS')
+            ->where('search_term', 'LIKE', $q . '%')
+            ->orderByRaw('LENGTH(search_term) ASC')
+            ->limit(500)
+            ->pluck('c_personid')
+            ->unique()
+            ->toArray();
+
+        if (!empty($personIds)) {
+            $validDynasties = DB::table('BIOG_MAIN')
+                ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+                ->whereIn('BIOG_MAIN.c_personid', $personIds)
+                ->whereNotNull('BIOG_MAIN.c_dy')
+                ->where('BIOG_MAIN.c_dy', '>', 0)
+                ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', DB::raw('COUNT(*) as count'))
+                ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+                ->orderByDesc('count')
+                ->get();
+
+            $unknownCount = DB::table('BIOG_MAIN')
+                ->whereIn('BIOG_MAIN.c_personid', $personIds)
+                ->where(function ($query) {
+                    $query->whereNull('BIOG_MAIN.c_dy')
+                        ->orWhere('BIOG_MAIN.c_dy', '<=', 0);
+                })
+                ->count();
+
+            return self::appendUnknownDynastyFacet($validDynasties, $unknownCount);
+        }
+
+        // 回退 LIKE 路徑
+        $fallbackBaseQuery = DB::table('BIOG_MAIN')
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->where(function ($query) use ($q) {
+                $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
+                    ->orWhere('BIOG_MAIN.c_name', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_personid', $q)
+                    ->orWhere('BIOG_MAIN.c_name_proper', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_name_rm', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $q)
+                    ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $q);
+            });
+
+        $validDynasties = (clone $fallbackBaseQuery)
+            ->whereNotNull('BIOG_MAIN.c_dy')
+            ->where('BIOG_MAIN.c_dy', '>', 0)
+            ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', DB::raw('COUNT(*) as count'))
+            ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+            ->orderByDesc('count')
+            ->get();
+
+        $unknownCount = (clone $fallbackBaseQuery)
+            ->where(function ($query) {
+                $query->whereNull('BIOG_MAIN.c_dy')
+                    ->orWhere('BIOG_MAIN.c_dy', '<=', 0);
+            })
+            ->count();
+
+        return self::appendUnknownDynastyFacet($validDynasties, $unknownCount);
+    }
+
+    private static function applyDynastyFilter($query, $cDy): void {
+        if (!$cDy) {
+            return;
+        }
+
+        if ((string) $cDy === self::UNKNOWN_DYNASTY_FILTER) {
+            $query->where(function ($subQuery) {
+                $subQuery->whereNull('BIOG_MAIN.c_dy')
+                    ->orWhere('BIOG_MAIN.c_dy', '<=', 0);
+            });
+
+            return;
+        }
+
+        $query->where('BIOG_MAIN.c_dy', $cDy);
+    }
+
+    private static function appendUnknownDynastyFacet(\Illuminate\Support\Collection $facets, int $unknownCount): \Illuminate\Support\Collection {
+        if ($unknownCount <= 0) {
+            return $facets;
+        }
+
+        $unknownFacet = (object) [
+            'c_dy' => self::UNKNOWN_DYNASTY_FILTER,
+            'c_dynasty_chn' => '未設定朝代',
+            'count' => $unknownCount,
+        ];
+
+        return $facets->concat([$unknownFacet]);
     }
 
     /**

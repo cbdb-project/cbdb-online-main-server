@@ -8,6 +8,16 @@
                 <form method="GET" action="{{ route('basicinformation.index') }}" class="flex-grow-1 mr-2">
                     <div class="input-group w-100">
                         <input name="q" type="text" class="form-control" placeholder="搜尋人物" aria-label="搜尋人物" value="{{ $q }}">
+                        @if(!empty($dynastyFacets) && count($dynastyFacets) > 0)
+                            <select name="c_dy" class="custom-select" style="max-width: 180px;" onchange="this.form.submit()">
+                                <option value="">全部朝代 ({{ collect($dynastyFacets)->sum('count') }})</option>
+                                @foreach($dynastyFacets as $facet)
+                                    <option value="{{ $facet->c_dy }}" {{ (string)($c_dy ?? '') === (string)$facet->c_dy ? 'selected' : '' }}>
+                                        {{ $facet->c_dynasty_chn }} ({{ $facet->count }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        @endif
                         <div class="input-group-append">
                             <button type="submit" class="btn btn-secondary">
                                 <i class="fas fa-search"></i>
@@ -63,7 +73,7 @@
 
             {{-- 分页 --}}
             <div class="float-right">
-                {{ $names->appends(['q' => $q])->links() }}
+                {{ $names->appends(['q' => $q, 'c_dy' => $c_dy ?? ''])->links() }}
             </div>
         </div>
     </div>

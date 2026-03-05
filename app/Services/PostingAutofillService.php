@@ -117,7 +117,7 @@ class PostingAutofillService {
         $promptContent = file_get_contents($this->promptTemplate);
         $fullPrompt = $promptContent . "\n\n" . $sourceText;
 
-        // 調用 Gemini API
+        // 調用 LLM API
         $response = Http::timeout(30)
             ->withHeaders([
                 'Content-Type' => 'application/json',

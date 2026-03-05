@@ -36,7 +36,7 @@ class NaturalLanguageQueryService {
             return [
                 'success' => false,
                 'sql' => null,
-                'error' => 'Gemini API Key 未配置。请在 .env 文件中设置 GEMINI_API_KEY。',
+                'error' => 'LLM API Key 未配置。请在 .env 文件中设置 GEMINI_API_KEY。',
                 'explanation' => null,
                 'model' => null,
                 'tool_calls' => null,
@@ -93,6 +93,28 @@ class NaturalLanguageQueryService {
             }
 
             if (!$response['success']) {
+                if ($toolsEnabled) {
+                    $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, null, $response['error']);
+                    if ($fallback['success']) {
+                        $result = $fallback['result'];
+                        $result['model'] = $this->model;
+
+                        $logData['llm_response'] = json_encode([
+                            'fallback_non_tool_mode' => true,
+                            'tool_mode_error' => $response['error'],
+                            'fallback_response' => $fallback['raw_response'],
+                        ], JSON_UNESCAPED_UNICODE);
+                        $logData['generated_sql'] = $result['sql'];
+                        $logData['explanation'] = $result['explanation'];
+                        $logData['success'] = $result['success'];
+                        $logData['error_message'] = $result['error'];
+                        $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                        $this->saveLog($logData);
+
+                        return $result;
+                    }
+                }
+
                 $logData['error_message'] = $response['error'];
                 $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
                 $this->saveLog($logData);
@@ -214,19 +236,41 @@ class NaturalLanguageQueryService {
                         }
 
                         if ($round >= $maxRounds) {
+                            $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, $allToolResults, '工具調用次數超過上限');
+                            if ($fallback['success']) {
+                                $result = $fallback['result'];
+                                $result['tool_calls'] = $allToolResults;
+                                $result['model'] = $this->model;
+
+                                $logData['llm_response'] = json_encode([
+                                    'rounds' => $roundsLog,
+                                    'total_rounds' => count($roundsLog),
+                                    'fallback_non_tool_mode' => true,
+                                    'fallback_response' => $fallback['raw_response'],
+                                ], JSON_UNESCAPED_UNICODE);
+                                $logData['generated_sql'] = $result['sql'];
+                                $logData['explanation'] = $result['explanation'];
+                                $logData['success'] = $result['success'];
+                                $logData['error_message'] = $result['error'];
+                                $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                                $this->saveLog($logData);
+
+                                return $result;
+                            }
+
                             $logData['llm_response'] = json_encode([
                                 'rounds' => $roundsLog,
                                 'total_rounds' => count($roundsLog),
                                 'error' => '工具調用次數超過上限',
                             ], JSON_UNESCAPED_UNICODE);
-                            $logData['error_message'] = '工具調用次數超過上限';
+                            $logData['error_message'] = '工具調用次數超過上限，且降級模式也失敗';
                             $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
                             $this->saveLog($logData);
 
                             return [
                                 'success' => false,
                                 'sql' => null,
-                                'error' => '工具調用次數超過上限，請縮小查詢範圍或提供更明確的問題。',
+                                'error' => '工具調用次數超過上限，且降級為非工具模式後仍無法生成 SQL。',
                                 'explanation' => null,
                                 'model' => $this->model,
                                 'tool_calls' => $allToolResults,
@@ -242,12 +286,35 @@ class NaturalLanguageQueryService {
                         }
 
                         if (!$response['success']) {
+                            $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, $allToolResults, $response['error']);
+                            if ($fallback['success']) {
+                                $result = $fallback['result'];
+                                $result['tool_calls'] = $allToolResults;
+                                $result['model'] = $this->model;
+
+                                $logData['llm_response'] = json_encode([
+                                    'rounds' => $roundsLog,
+                                    'total_rounds' => count($roundsLog),
+                                    'fallback_non_tool_mode' => true,
+                                    'tool_mode_error' => $response['error'],
+                                    'fallback_response' => $fallback['raw_response'],
+                                ], JSON_UNESCAPED_UNICODE);
+                                $logData['generated_sql'] = $result['sql'];
+                                $logData['explanation'] = $result['explanation'];
+                                $logData['success'] = $result['success'];
+                                $logData['error_message'] = $result['error'];
+                                $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                                $this->saveLog($logData);
+
+                                return $result;
+                            }
+
                             $logData['llm_response'] = json_encode([
                                 'rounds' => $roundsLog,
                                 'total_rounds' => count($roundsLog),
                                 'error' => $response['error'],
                             ], JSON_UNESCAPED_UNICODE);
-                            $logData['error_message'] = $response['error'];
+                            $logData['error_message'] = $response['error'] . '；降級模式仍失敗';
                             $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
                             $this->saveLog($logData);
 
@@ -762,12 +829,17 @@ PROMPT;
      */
     protected function callLLM(array $messages, array $tools = [], bool $allowToolCalls = false): array {
         try {
+            $maxCompletionTokens = (int) config('services.gemini.max_completion_tokens', 8192);
+            if ($maxCompletionTokens < 256) {
+                $maxCompletionTokens = 256;
+            }
+
             $requestData = [
                 'model' => $this->model,
                 'messages' => $messages,
                 'temperature' => 0.1,
                 'top_p' => 0.95,
-                'max_completion_tokens' => 16384,
+                'max_completion_tokens' => $maxCompletionTokens,
             ];
 
             // 如果提供了工具定义且允许工具调用，添加到请求中
@@ -804,24 +876,64 @@ PROMPT;
                 ];
             }
 
-            $response = Http::timeout(30)
-                ->withHeaders([
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer ' . $this->apiKey,
-                ])
-                ->post($this->apiEndpoint, $requestData);
+            $maxAttempts = 3;
+            $retryDelayMs = 800;
+            $response = null;
+            $lastException = null;
+
+            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                try {
+                    $response = Http::connectTimeout(10)
+                        ->timeout(45)
+                        ->withHeaders([
+                            'Content-Type' => 'application/json',
+                            'Authorization' => 'Bearer ' . $this->apiKey,
+                        ])
+                        ->post($this->apiEndpoint, $requestData);
+                    // 收到任何 HTTP 回應後，清除先前重試留下的 exception 狀態
+                    $lastException = null;
+
+                    if ($response->successful()) {
+                        break;
+                    }
+
+                    if ($this->shouldRetryHttpResponse($response) && $attempt < $maxAttempts) {
+                        usleep($retryDelayMs * 1000);
+
+                        continue;
+                    }
+
+                    break;
+                } catch (\Throwable $exception) {
+                    $lastException = $exception;
+
+                    if ($this->shouldRetryException($exception) && $attempt < $maxAttempts) {
+                        usleep($retryDelayMs * 1000);
+
+                        continue;
+                    }
+
+                    throw $exception;
+                }
+            }
+
+            if ($lastException !== null && $response === null) {
+                throw $lastException;
+            }
 
             if (!$response->successful()) {
-                $errorMessage = $response->json('error.message') ?? $response->body();
-                Log::error('Gemini API 调用失败', [
+                $errorMessage = $this->extractApiErrorMessage($response->json(), $response->body());
+                Log::error('LLM API 调用失败', [
                     'status' => $response->status(),
                     'error' => $errorMessage,
+                    'model' => $this->model,
+                    'endpoint' => $this->apiEndpoint,
                 ]);
 
                 return [
                     'success' => false,
                     'data' => null,
-                    'error' => "Gemini API 调用失败: {$errorMessage}",
+                    'error' => "LLM API 调用失败: {$errorMessage}",
                 ];
             }
 
@@ -846,6 +958,53 @@ PROMPT;
     }
 
     /**
+     * 從第三方 API 回應中抽取可讀錯誤訊息（支援 OpenAI-compatible 與 API Gateway fault 格式）
+     */
+    protected function extractApiErrorMessage(mixed $jsonBody, string $rawBody): string {
+        $json = is_array($jsonBody) ? $jsonBody : [];
+
+        $errorMessage = data_get($json, 'error.message');
+        if (is_string($errorMessage) && $errorMessage !== '') {
+            return $errorMessage;
+        }
+
+        $faultString = data_get($json, 'fault.faultstring');
+        if (is_string($faultString) && $faultString !== '') {
+            $reason = data_get($json, 'fault.detail.reason');
+            $errorCode = data_get($json, 'fault.detail.errorcode');
+            $parts = array_filter([$faultString, $errorCode, $reason], fn ($v) => is_string($v) && $v !== '');
+
+            return implode(' | ', $parts);
+        }
+
+        $fallbackMessage = data_get($json, 'message');
+        if (is_string($fallbackMessage) && $fallbackMessage !== '') {
+            return $fallbackMessage;
+        }
+
+        return mb_substr($rawBody, 0, 2000);
+    }
+
+    protected function shouldRetryHttpResponse($response): bool {
+        if ($response->status() >= 500) {
+            return true;
+        }
+
+        $body = $response->body();
+
+        return stripos($body, 'UnexpectedEOFAtTarget') !== false
+            || stripos($body, 'Unexpected EOF at target') !== false;
+    }
+
+    protected function shouldRetryException(\Throwable $exception): bool {
+        $message = $exception->getMessage();
+
+        return stripos($message, 'timed out') !== false
+            || stripos($message, 'connection') !== false
+            || stripos($message, 'Unexpected EOF at target') !== false;
+    }
+
+    /**
      * 执行工具调用
      *
      * @param array $toolCalls LLM 请求的工具调用
@@ -857,7 +1016,8 @@ PROMPT;
 
         foreach ($toolCalls as $index => $toolCall) {
             $toolName = $toolCall['function']['name'] ?? '';
-            $arguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+            $decodedArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
+            $arguments = is_array($decodedArguments) ? $decodedArguments : [];
             $toolCallId = $toolCall['id'] ?? '';
 
             Log::info('执行工具调用', [
@@ -877,21 +1037,7 @@ PROMPT;
                 ]);
             }
 
-            try {
-                $result = $this->toolsService->executeTool($toolName, $arguments);
-            } catch (\Throwable $e) {
-                Log::error('工具執行失敗', [
-                    'tool' => $toolName,
-                    'arguments' => $arguments,
-                    'error' => $e->getMessage(),
-                ]);
-
-                $result = [
-                    'success' => false,
-                    'data' => null,
-                    'error' => "工具執行時發生錯誤: {$e->getMessage()}",
-                ];
-            }
+            $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback);
 
             $toolResult = [
                 'tool_call_id' => $toolCallId,
@@ -920,8 +1066,263 @@ PROMPT;
         return $results;
     }
 
+    protected function executeToolWithRetry(
+        string $toolName,
+        array $arguments,
+        string $toolCallId,
+        int $index,
+        int $totalTools,
+        ?callable $progressCallback = null
+    ): array {
+        $maxAttempts = 2;
+        $lastResult = [
+            'success' => false,
+            'data' => null,
+            'error' => '工具調用未執行',
+        ];
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $lastResult = $this->toolsService->executeTool($toolName, $arguments);
+            } catch (\Throwable $e) {
+                Log::error('工具執行失敗', [
+                    'tool' => $toolName,
+                    'arguments' => $arguments,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $lastResult = [
+                    'success' => false,
+                    'data' => null,
+                    'error' => "工具執行時發生錯誤: {$e->getMessage()}",
+                ];
+            }
+
+            if (($lastResult['success'] ?? false) === true) {
+                return $lastResult;
+            }
+
+            if (!$this->isRetryableToolFailure($lastResult) || $attempt >= $maxAttempts) {
+                break;
+            }
+
+            if ($progressCallback) {
+                $progressCallback('tool_execution_retry', [
+                    'tool_index' => $index + 1,
+                    'total_tools' => $totalTools,
+                    'tool_name' => $toolName,
+                    'tool_call_id' => $toolCallId,
+                    'arguments' => $arguments,
+                    'attempt' => $attempt + 1,
+                    'message' => sprintf('工具 %s 第 %d 次失敗，正在重試', $toolName, $attempt),
+                ]);
+            }
+
+            usleep(400 * 1000);
+        }
+
+        $fallbackCall = $this->buildFallbackToolCall($toolName, $arguments);
+        if ($fallbackCall !== null) {
+            if ($progressCallback) {
+                $progressCallback('tool_execution_fallback', [
+                    'tool_index' => $index + 1,
+                    'total_tools' => $totalTools,
+                    'tool_name' => $toolName,
+                    'tool_call_id' => $toolCallId,
+                    'fallback_tool_name' => $fallbackCall['tool_name'],
+                    'fallback_arguments' => $fallbackCall['arguments'],
+                    'message' => sprintf('工具 %s 失敗，改用替代工具 %s', $toolName, $fallbackCall['tool_name']),
+                ]);
+            }
+
+            try {
+                $fallbackResult = $this->toolsService->executeTool($fallbackCall['tool_name'], $fallbackCall['arguments']);
+            } catch (\Throwable $e) {
+                $fallbackResult = [
+                    'success' => false,
+                    'data' => null,
+                    'error' => "替代工具執行時發生錯誤: {$e->getMessage()}",
+                ];
+            }
+
+            if (($fallbackResult['success'] ?? false) === true) {
+                $fallbackResult['fallback_from'] = $toolName;
+
+                return $fallbackResult;
+            }
+
+            $lastError = $lastResult['error'] ?? '未知錯誤';
+            $fallbackError = $fallbackResult['error'] ?? '未知錯誤';
+            $lastResult['error'] = "原工具失敗: {$lastError}；替代工具失敗: {$fallbackError}";
+        }
+
+        return $lastResult;
+    }
+
+    protected function isRetryableToolFailure(array $result): bool {
+        if (($result['success'] ?? false) === true) {
+            return false;
+        }
+
+        $error = (string) ($result['error'] ?? '');
+        $nonRetryableKeywords = [
+            '不在允許',
+            '未知的工具',
+            '不能为空',
+            '不能為空',
+            '未知的代碼類型',
+            'does not exist',
+            'Limit must be between',
+        ];
+
+        foreach ($nonRetryableKeywords as $keyword) {
+            if (stripos($error, $keyword) !== false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function buildFallbackToolCall(string $toolName, array $arguments): ?array {
+        if ($toolName === 'query_table') {
+            $tableName = (string) ($arguments['table_name'] ?? '');
+            if ($tableName !== '') {
+                return [
+                    'tool_name' => 'get_sample_data_for_table',
+                    'arguments' => [
+                        'table_name' => $tableName,
+                        'limit' => min((int) ($arguments['limit'] ?? 10), 20),
+                    ],
+                ];
+            }
+        }
+
+        if ($toolName === 'query_table_schema' && !empty($arguments['table_name'])) {
+            return [
+                'tool_name' => 'get_table_schema',
+                'arguments' => [
+                    'table_name' => $arguments['table_name'],
+                ],
+            ];
+        }
+
+        if ($toolName === 'get_table_schema' && !empty($arguments['table_name'])) {
+            return [
+                'tool_name' => 'query_table_schema',
+                'arguments' => [
+                    'table_name' => $arguments['table_name'],
+                ],
+            ];
+        }
+
+        if ($toolName === 'get_table_row_by_id' && !empty($arguments['table_name']) && !empty($arguments['id_column'])) {
+            return [
+                'tool_name' => 'query_table',
+                'arguments' => [
+                    'table_name' => $arguments['table_name'],
+                    'filters' => [
+                        $arguments['id_column'] => $arguments['id_value'] ?? null,
+                    ],
+                    'limit' => 1,
+                    'offset' => 0,
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+    protected function fallbackToNonToolMode(
+        array $messages,
+        ?callable $progressCallback = null,
+        ?array $toolResults = null,
+        ?string $reason = null
+    ): array {
+        if ($progressCallback) {
+            $progressCallback('llm_fallback_start', [
+                'message' => '工具模式失敗，改用非工具模式直接生成 SQL',
+                'reason' => $reason,
+            ]);
+        }
+
+        $fallbackMessages = $this->sanitizeMessagesForNonToolMode($messages);
+        $fallbackMessages[] = [
+            'role' => 'user',
+            'content' => '若工具不可用，請根據既有 schema 資訊直接生成最合理的 SQL，並嚴格返回 JSON。',
+        ];
+
+        $fallbackResponse = $this->callLLM($fallbackMessages, [], false);
+        if (!$fallbackResponse['success']) {
+            if ($progressCallback) {
+                $progressCallback('llm_fallback_failed', [
+                    'message' => '非工具模式生成也失敗',
+                    'reason' => $fallbackResponse['error'],
+                ]);
+            }
+
+            return [
+                'success' => false,
+                'result' => null,
+                'raw_response' => null,
+                'error' => $fallbackResponse['error'],
+            ];
+        }
+
+        $result = $this->parseResponse($fallbackResponse['data']);
+        $result['tool_calls'] = $toolResults;
+
+        if ($progressCallback) {
+            $progressCallback('llm_fallback_complete', [
+                'message' => '已改用非工具模式完成生成',
+                'success' => $result['success'] ?? false,
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'result' => $result,
+            'raw_response' => $fallbackResponse['data'],
+            'error' => null,
+        ];
+    }
+
+    protected function sanitizeMessagesForNonToolMode(array $messages): array {
+        $sanitized = [];
+
+        foreach ($messages as $message) {
+            $role = $message['role'] ?? '';
+            if ($role === 'tool') {
+                continue;
+            }
+
+            if ($role === 'assistant' && isset($message['tool_calls'])) {
+                $plainContent = $message['content'] ?? '';
+                if (!is_string($plainContent) || trim($plainContent) === '') {
+                    continue;
+                }
+
+                $sanitized[] = [
+                    'role' => 'assistant',
+                    'content' => $plainContent,
+                ];
+
+                continue;
+            }
+
+            $sanitized[] = $message;
+        }
+
+        if (empty($sanitized)) {
+            return $messages;
+        }
+
+        return $sanitized;
+    }
+
     /**
-     * 清理 LLM 響應中的冗餘數據（移除 Gemini 的 thought_signature 等內部數據）
+     * 清理 LLM 響應中的冗餘數據（移除供應商附帶的內部 metadata）
      *
      * @param array $response
      * @return array
@@ -929,7 +1330,7 @@ PROMPT;
     protected function cleanLLMResponse(array $response): array {
         if (isset($response['choices'])) {
             foreach ($response['choices'] as &$choice) {
-                // 移除 extra_content（包含 Gemini 的內部思考簽名）
+                // 移除 extra_content（可能包含供應商內部思考簽名等 metadata）
                 if (isset($choice['message']['extra_content'])) {
                     unset($choice['message']['extra_content']);
                 }

@@ -606,6 +606,85 @@ onViteReady(function() {
             .join('.');
     }
 
+    function encodeFieldRef(sourceKey, tableName, columnName) {
+        return `${sourceKey}::${tableName}::${columnName}`;
+    }
+
+    function parseFieldRef(ref) {
+        if (!ref || typeof ref !== 'string') {
+            return null;
+        }
+        const parts = ref.split('::');
+        if (parts.length !== 3) {
+            return null;
+        }
+
+        return {
+            sourceKey: parts[0],
+            tableName: parts[1],
+            columnName: parts[2],
+        };
+    }
+
+    function getQbeTableOccurrences() {
+        const occurrences = [];
+        if (qbeState.baseTable) {
+            occurrences.push({
+                key: 'base',
+                tableName: qbeState.baseTable,
+                label: `主表(${qbeState.baseTable})`,
+            });
+        }
+
+        qbeState.joins.forEach(function(joinItem, index) {
+            if (!joinItem.table) {
+                return;
+            }
+            occurrences.push({
+                key: `join${index}`,
+                tableName: joinItem.table,
+                label: `Join ${index + 1}(${joinItem.table})`,
+            });
+        });
+
+        return occurrences;
+    }
+
+    function buildOccurrenceAliasMap() {
+        const occurrences = getQbeTableOccurrences();
+        const tableCounts = {};
+        occurrences.forEach(function(item) {
+            tableCounts[item.tableName] = (tableCounts[item.tableName] || 0) + 1;
+        });
+
+        const aliasMap = {};
+        let aliasIndex = 0;
+        occurrences.forEach(function(item) {
+            if ((tableCounts[item.tableName] || 0) > 1) {
+                aliasMap[item.key] = `t${aliasIndex}`;
+                aliasIndex++;
+            } else {
+                aliasMap[item.key] = '';
+            }
+        });
+
+        return aliasMap;
+    }
+
+    function renderSqlFieldRef(fieldRef, aliasMap) {
+        const parsed = parseFieldRef(fieldRef);
+        if (!parsed) {
+            return quoteIdentifier(fieldRef);
+        }
+
+        const alias = aliasMap[parsed.sourceKey] || '';
+        if (alias) {
+            return `${quoteIdentifier(alias)}.${quoteIdentifier(parsed.columnName)}`;
+        }
+
+        return `${quoteIdentifier(parsed.tableName)}.${quoteIdentifier(parsed.columnName)}`;
+    }
+
     function loadQbeSchema(tableNames) {
         const tablesToLoad = (tableNames || []).filter(tableName => tableName && !qbeSchemaCache[tableName]);
         if (tablesToLoad.length === 0) {
@@ -642,22 +721,23 @@ onViteReady(function() {
     }
 
     function renderQbeColumnsPalette() {
-        const activeTables = getQbeActiveTables();
+        const occurrences = getQbeTableOccurrences();
         const $palette = $('#qbeColumnsPalette');
-        if (activeTables.length === 0) {
+        if (occurrences.length === 0) {
             $palette.html('<div class="text-muted">請先選擇主表</div>');
 
             return;
         }
 
         let html = '';
-        activeTables.forEach(function(tableName) {
+        occurrences.forEach(function(occurrence) {
+            const tableName = occurrence.tableName;
             const schema = qbeSchemaCache[tableName];
             if (!schema) {
                 return;
             }
             const columns = schema.columns || [];
-            html += `<div class="mb-2"><strong>${escapeHtml(tableName)}</strong>`;
+            html += `<div class="mb-2"><strong>${escapeHtml(occurrence.label)}</strong>`;
             if (schema.description) {
                 html += ` <small class="text-muted">${escapeHtml(schema.description)}</small>`;
             }
@@ -669,9 +749,11 @@ onViteReady(function() {
             }
             html += '<div class="mb-3">';
             columns.forEach(function(column) {
-                const expression = `${tableName}.${column.name}`;
-                const label = column.type ? `${column.name} (${column.type})` : column.name;
-                html += `<span class="badge badge-light border mr-1 mb-1 qbe-column-item" draggable="true" data-expression="${escapeHtml(expression)}">${escapeHtml(label)}</span>`;
+                const expression = encodeFieldRef(occurrence.key, tableName, column.name);
+                const labelPrefix = occurrence.label;
+                const labelSuffix = column.type ? `${column.name} (${column.type})` : column.name;
+                const label = `${labelPrefix}.${labelSuffix}`;
+                html += `<span class="badge badge-light border mr-1 mb-1 qbe-column-item" draggable="true" data-expression="${escapeHtml(expression)}" data-label="${escapeHtml(label)}">${escapeHtml(label)}</span>`;
             });
             html += '</div>';
         });
@@ -679,29 +761,33 @@ onViteReady(function() {
         $palette.html(html);
         $('.qbe-column-item').off('dragstart').on('dragstart', function(event) {
             const expression = String($(this).data('expression') || '');
+            const label = String($(this).data('label') || expression);
             const nativeEvent = event.originalEvent || event;
             if (!nativeEvent.dataTransfer) {
                 return;
             }
             nativeEvent.dataTransfer.effectAllowed = 'copy';
             // Set both mime types for broader browser compatibility.
-            nativeEvent.dataTransfer.setData('text/plain', expression);
-            nativeEvent.dataTransfer.setData('text', expression);
+            const payload = JSON.stringify({expression, label});
+            nativeEvent.dataTransfer.setData('text/plain', payload);
+            nativeEvent.dataTransfer.setData('text', payload);
         });
     }
 
     function renderQbeJoins() {
-        const activeTables = getQbeActiveTables();
+        const occurrences = getQbeTableOccurrences();
         const options = ['<option value="">請選擇表格</option>'].concat(
             qbeTables.map(item => `<option value="${item.name}">${item.name}</option>`)
         ).join('');
         const fieldOptions = ['<option value="">請先選擇欄位</option>'];
-        activeTables.forEach(function(tableName) {
+        occurrences.forEach(function(occurrence) {
+            const tableName = occurrence.tableName;
             const schema = qbeSchemaCache[tableName];
             const schemaColumns = schema && schema.columns ? schema.columns : [];
             schemaColumns.forEach(function(column) {
-                const expr = `${tableName}.${column.name}`;
-                fieldOptions.push(`<option value="${expr}">${expr}</option>`);
+                const expr = encodeFieldRef(occurrence.key, tableName, column.name);
+                const label = `${occurrence.label}.${column.name}`;
+                fieldOptions.push(`<option value="${expr}">${label}</option>`);
             });
         });
         const fieldOptionHtml = fieldOptions.join('');
@@ -734,10 +820,16 @@ onViteReady(function() {
     }
 
     function createQbeChip(expression, type, direction = 'ASC') {
+        let label = expression;
+        const parsed = parseFieldRef(expression);
+        if (parsed) {
+            const occurrence = getQbeTableOccurrences().find(item => item.key === parsed.sourceKey);
+            label = occurrence ? `${occurrence.label}.${parsed.columnName}` : `${parsed.tableName}.${parsed.columnName}`;
+        }
         const $chip = $('<span class="qbe-chip"></span>');
         $chip.attr('data-expression', expression);
         $chip.attr('data-type', type);
-        $chip.text(expression);
+        $chip.text(label);
         if (type === 'order') {
             const $direction = $('<select class="form-control form-control-sm ml-2" style="width:auto;display:inline-block;"></select>');
             $direction.append(`<option value="ASC" ${direction === 'ASC' ? 'selected' : ''}>ASC</option>`);
@@ -784,7 +876,14 @@ onViteReady(function() {
                 if (!dataTransfer) {
                     return;
                 }
-                const expression = dataTransfer.getData('text/plain') || dataTransfer.getData('text');
+                const rawPayload = dataTransfer.getData('text/plain') || dataTransfer.getData('text');
+                let expression = '';
+                try {
+                    const parsedPayload = JSON.parse(rawPayload);
+                    expression = parsedPayload.expression || '';
+                } catch (e) {
+                    expression = rawPayload;
+                }
                 if (!expression) {
                     return;
                 }
@@ -816,12 +915,14 @@ onViteReady(function() {
 
     function renderQbeWhereRows() {
         const fieldOptions = ['<option value="">請選擇欄位</option>'];
-        getQbeActiveTables().forEach(function(tableName) {
+        getQbeTableOccurrences().forEach(function(occurrence) {
+            const tableName = occurrence.tableName;
             const tableSchema = qbeSchemaCache[tableName];
             const tableColumns = tableSchema && tableSchema.columns ? tableSchema.columns : [];
             tableColumns.forEach(function(column) {
-                const expression = `${tableName}.${column.name}`;
-                fieldOptions.push(`<option value="${expression}">${expression}</option>`);
+                const expression = encodeFieldRef(occurrence.key, tableName, column.name);
+                const label = `${occurrence.label}.${column.name}`;
+                fieldOptions.push(`<option value="${expression}">${label}</option>`);
             });
         });
         const optionHtml = fieldOptions.join('');
@@ -932,24 +1033,28 @@ onViteReady(function() {
             return '';
         }
 
+        const aliasMap = buildOccurrenceAliasMap();
+        const baseAlias = aliasMap.base || '';
+
         const selectClause = qbeState.selectFields.length > 0
-            ? qbeState.selectFields.map(item => quoteIdentifier(item.expression)).join(', ')
-            : `${quoteIdentifier(qbeState.baseTable)}.*`;
+            ? qbeState.selectFields.map(item => renderSqlFieldRef(item.expression, aliasMap)).join(', ')
+            : `${baseAlias ? quoteIdentifier(baseAlias) : quoteIdentifier(qbeState.baseTable)}.*`;
 
         let sql = `SELECT ${$('#qbeDistinct').is(':checked') ? 'DISTINCT ' : ''}${selectClause}\n`;
-        sql += `FROM ${quoteIdentifier(qbeState.baseTable)}\n`;
+        sql += `FROM ${quoteIdentifier(qbeState.baseTable)}${baseAlias ? ` AS ${quoteIdentifier(baseAlias)}` : ''}\n`;
 
-        qbeState.joins.forEach(function(joinItem) {
+        qbeState.joins.forEach(function(joinItem, index) {
             if (!joinItem.table || !joinItem.left || !joinItem.right) {
                 return;
             }
-            sql += `${joinItem.type} ${quoteIdentifier(joinItem.table)} ON ${quoteIdentifier(joinItem.left)} = ${quoteIdentifier(joinItem.right)}\n`;
+            const joinAlias = aliasMap[`join${index}`] || '';
+            sql += `${joinItem.type} ${quoteIdentifier(joinItem.table)}${joinAlias ? ` AS ${quoteIdentifier(joinAlias)}` : ''} ON ${renderSqlFieldRef(joinItem.left, aliasMap)} = ${renderSqlFieldRef(joinItem.right, aliasMap)}\n`;
         });
 
         const whereParts = qbeState.where
             .filter(item => item.left && item.operator && item.right)
             .map(function(item, index) {
-                const leftExpr = quoteIdentifier(item.left);
+                const leftExpr = renderSqlFieldRef(item.left, aliasMap);
                 const rightExpr = formatSqlLiteral(item.right, item.operator);
                 if (!rightExpr) {
                     return '';
@@ -963,11 +1068,11 @@ onViteReady(function() {
         }
 
         if (qbeState.groupBy.length > 0) {
-            sql += `GROUP BY ${qbeState.groupBy.map(item => quoteIdentifier(item.expression)).join(', ')}\n`;
+            sql += `GROUP BY ${qbeState.groupBy.map(item => renderSqlFieldRef(item.expression, aliasMap)).join(', ')}\n`;
         }
 
         if (qbeState.orderBy.length > 0) {
-            sql += `ORDER BY ${qbeState.orderBy.map(item => `${quoteIdentifier(item.expression)} ${item.direction || 'ASC'}`).join(', ')}\n`;
+            sql += `ORDER BY ${qbeState.orderBy.map(item => `${renderSqlFieldRef(item.expression, aliasMap)} ${item.direction || 'ASC'}`).join(', ')}\n`;
         }
 
         const limit = parseInt($('#qbeLimit').val(), 10);

@@ -304,8 +304,9 @@ class ReadOnlyTableQueryService {
 
     private function buildPaginatedSql(string $sql, int $limit, int $offset): string {
         if (preg_match('/^WITH\b/i', $sql)) {
-            if ($this->hasTrailingLimitOrOffset($sql)) {
-                return $sql;
+            $paginatedSql = $this->replaceTrailingLimitOrOffset($sql, $limit, $offset);
+            if ($paginatedSql !== null) {
+                return $paginatedSql;
             }
 
             return $sql . " LIMIT {$limit} OFFSET {$offset}";
@@ -314,11 +315,28 @@ class ReadOnlyTableQueryService {
         return "SELECT * FROM ({$sql}) AS subquery_wrapper LIMIT {$limit} OFFSET {$offset}";
     }
 
-    private function hasTrailingLimitOrOffset(string $sql): bool {
-        return preg_match(
-            '/\bLIMIT\s+\d+(?:\s*,\s*\d+)?(?:\s+OFFSET\s+\d+)?\s*$/i',
-            $sql
-        ) === 1;
+    private function replaceTrailingLimitOrOffset(string $sql, int $limit, int $offset): ?string {
+        $pattern = '/\bLIMIT\s+(?:(\d+)\s*,\s*(\d+)|(\d+)(?:\s+OFFSET\s+(\d+))?)\s*$/i';
+        if (preg_match($pattern, $sql, $matches) !== 1) {
+            return null;
+        }
+
+        $existingOffset = 0;
+        $existingLimit = 0;
+
+        if (isset($matches[1], $matches[2]) && $matches[1] !== '' && $matches[2] !== '') {
+            $existingOffset = (int) $matches[1];
+            $existingLimit = (int) $matches[2];
+        } elseif (isset($matches[3]) && $matches[3] !== '') {
+            $existingLimit = (int) $matches[3];
+            $existingOffset = isset($matches[4]) && $matches[4] !== '' ? (int) $matches[4] : 0;
+        }
+
+        $effectiveLimit = min($existingLimit, $limit);
+        $effectiveOffset = $existingOffset + $offset;
+        $replacement = "LIMIT {$effectiveLimit} OFFSET {$effectiveOffset}";
+
+        return preg_replace($pattern, $replacement, $sql, 1);
     }
 
     /**

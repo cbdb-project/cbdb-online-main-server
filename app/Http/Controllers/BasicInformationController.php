@@ -86,14 +86,24 @@ class BasicInformationController extends Controller {
         $num = $request->input('num', 20);
         $cDy = $request->input('c_dy');
 
-        // 使用 Repository 查询数据
-        $names = $this->biogMainRepository->namesByQuery($request, $num);
-
         // 如果有搜尋關鍵字，統計朝代分佈（用於篩選下拉選單）
         $dynastyFacets = [];
         if ($q !== '') {
             $dynastyFacets = BiogMainRepository::dynastyFacetsByQuery($q);
         }
+
+        // 驗證 c_dy 是否在當前查詢的朝代分佈中；若不存在則 redirect 到不帶 c_dy 的乾淨 URL
+        if ($cDy !== null && $cDy !== '' && !empty($dynastyFacets)) {
+            $validDynasties = collect($dynastyFacets)->pluck('c_dy')->map(fn ($v) => (string) $v)->toArray();
+            if (!in_array((string) $cDy, $validDynasties, true)) {
+                $params = $request->only(['q', 'num']);
+
+                return redirect()->route('basicinformation.index', array_filter($params, fn ($v) => $v !== null && $v !== ''));
+            }
+        }
+
+        // 使用 Repository 查询数据
+        $names = $this->biogMainRepository->namesByQuery($request, $num);
 
         return view('biogmains.basicinformation.index', [
             'page_title' => '人物基本資料',

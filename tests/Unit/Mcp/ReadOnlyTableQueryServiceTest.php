@@ -171,19 +171,50 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
     }
 
     #[Test]
-    public function it_keeps_existing_limit_for_with_query(): void {
+    public function it_enforces_service_limit_for_with_query_that_has_existing_limit(): void {
+        DB::table('DYNASTIES')->insert([
+            ['c_dy' => 'A0', 'c_dynasty_chn' => '甲', 'status' => 'active'],
+            ['c_dy' => 'A1', 'c_dynasty_chn' => '乙', 'status' => 'active'],
+            ['c_dy' => 'A2', 'c_dynasty_chn' => '丙', 'status' => 'active'],
+            ['c_dy' => 'A3', 'c_dynasty_chn' => '丁', 'status' => 'active'],
+            ['c_dy' => 'A4', 'c_dynasty_chn' => '戊', 'status' => 'active'],
+        ]);
+
         $result = $this->service->queryReadOnlySql(
-            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 1',
-            10,
+            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 100000',
+            2,
             0
         );
 
         $this->assertSame(
-            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 1',
+            'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy LIMIT 100000',
             $result['sql']
         );
         $this->assertSame(['DYNASTIES'], $result['tables']);
-        $this->assertSame(1, $result['returned_rows']);
+        $this->assertSame(2, $result['returned_rows']);
+    }
+
+    #[Test]
+    public function it_limits_remaining_rows_when_merging_existing_limit_and_offset(): void {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = [
+                'c_dy' => sprintf('Z%02d', $i),
+                'c_dynasty_chn' => '測試',
+                'status' => 'active',
+            ];
+        }
+        DB::table('DYNASTIES')->insert($rows);
+
+        $result = $this->service->queryReadOnlySql(
+            'WITH z_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE c_dy LIKE "Z%") SELECT c_dy FROM z_dynasties ORDER BY c_dy LIMIT 5 OFFSET 10',
+            5,
+            3
+        );
+
+        $this->assertSame(2, $result['returned_rows']);
+        $this->assertSame('Z13', $result['rows'][0]['c_dy']);
+        $this->assertSame('Z14', $result['rows'][1]['c_dy']);
     }
 
     #[Test]

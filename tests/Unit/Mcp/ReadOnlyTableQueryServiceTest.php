@@ -195,6 +195,29 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
     }
 
     #[Test]
+    public function it_limits_remaining_rows_when_merging_existing_limit_and_offset(): void {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = [
+                'c_dy' => sprintf('Z%02d', $i),
+                'c_dynasty_chn' => '測試',
+                'status' => 'active',
+            ];
+        }
+        DB::table('DYNASTIES')->insert($rows);
+
+        $result = $this->service->queryReadOnlySql(
+            'WITH z_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE c_dy LIKE "Z%") SELECT c_dy FROM z_dynasties ORDER BY c_dy LIMIT 5 OFFSET 10',
+            5,
+            3
+        );
+
+        $this->assertSame(2, $result['returned_rows']);
+        $this->assertSame('Z13', $result['rows'][0]['c_dy']);
+        $this->assertSame('Z14', $result['rows'][1]['c_dy']);
+    }
+
+    #[Test]
     public function it_supports_multiple_ctes_without_treating_aliases_as_tables(): void {
         $result = $this->service->queryReadOnlySql(
             'WITH cte_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active"), cte_people AS (SELECT c_personid FROM BIOG_MAIN) SELECT cte_dynasties.c_dy FROM cte_dynasties JOIN cte_people ON 1 = 1 ORDER BY cte_dynasties.c_dy',

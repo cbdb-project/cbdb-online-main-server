@@ -332,7 +332,8 @@ class ReadOnlyTableQueryService {
             $existingOffset = isset($matches[4]) && $matches[4] !== '' ? (int) $matches[4] : 0;
         }
 
-        $effectiveLimit = min($existingLimit, $limit);
+        $remainingRows = max(0, $existingLimit - $offset);
+        $effectiveLimit = min($limit, $remainingRows);
         $effectiveOffset = $existingOffset + $offset;
         $replacement = "LIMIT {$effectiveLimit} OFFSET {$effectiveOffset}";
 

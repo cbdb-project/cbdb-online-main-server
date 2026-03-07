@@ -635,6 +635,114 @@ class BasicInformationProposalTest extends TestCase {
     }
 
     #[Test]
+    public function testOfficeProposalUpdateAllowsAddressOnlyChanges() {
+        $this->createOfficeTables();
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 8,
+            'c_office_id' => 888,
+            'c_sequence' => 1,
+            'c_source' => 123,
+            'c_pages' => 'p.1',
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原官名',
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 8,
+            'c_office_id' => 888,
+            'c_addr_id' => 10,
+        ]);
+
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.update', [
+            'personid' => 1,
+            'resource' => 'offices',
+            'id' => '888-8',
+        ]), [
+            'c_office_id' => 888,
+            'c_posting_id' => 8,
+            'c_sequence' => 1,
+            'c_source' => 123,
+            'c_pages' => 'p.1',
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原官名',
+            'c_addr' => [11],
+            '__proposal_comment' => '只改地址',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'POSTED_TO_OFFICE_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame([11], $payload['__proposal_aux']['c_addr'] ?? null);
+    }
+
+    #[Test]
+    public function testEventProposalUpdateAllowsAddressOnlyChanges() {
+        $this->createEventTables();
+
+        DB::table('EVENTS_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 5,
+            'c_event_code' => 99,
+            'c_source' => 123,
+            'c_intercalary' => 0,
+            'c_notes' => '原事件',
+        ]);
+
+        DB::table('EVENTS_ADDR')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 5,
+            'c_event_code' => 99,
+            'c_addr_id' => 20,
+        ]);
+
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.update', [
+            'personid' => 1,
+            'resource' => 'events',
+            'id' => '1-5-99',
+        ]), [
+            'c_sequence' => 5,
+            'c_event_code' => 99,
+            'c_source' => 123,
+            'c_intercalary' => 0,
+            'c_notes' => '原事件',
+            'c_addr_id' => [21],
+            '__proposal_comment' => '只改事件地址',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'EVENTS_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame([21], $payload['__proposal_aux']['c_addr_id'] ?? null);
+    }
+
+    #[Test]
     public function testApproveCreateProposalInsertsRow() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);

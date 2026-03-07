@@ -261,7 +261,7 @@ class BasicInformationProposalController extends Controller {
 
         // 檢查是否有實際修改
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
-        if ($diff === null) {
+        if ($diff === null && !$this->hasAuxiliaryChanges($table, $conditions, $originalRow, $auxiliaryPayload)) {
             flash('提案失敗：未偵測到任何修改內容。', 'warning');
 
             return redirect()->back()->withInput();
@@ -483,6 +483,108 @@ class BasicInformationProposalController extends Controller {
         }
 
         return [$data, $auxiliary];
+    }
+
+    protected function hasAuxiliaryChanges(string $table, array $conditions, array $originalRow, array $auxiliaryPayload): bool {
+        if ($auxiliaryPayload === []) {
+            return false;
+        }
+
+        return match ($table) {
+            'POSTED_TO_OFFICE_DATA' => $this->hasOfficeAddressChanges($conditions, $originalRow, $auxiliaryPayload),
+            'EVENTS_DATA' => $this->hasEventAddressChanges($conditions, $originalRow, $auxiliaryPayload),
+            'KIN_DATA' => $this->hasKinshipPairChanges($originalRow, $auxiliaryPayload),
+            'ASSOC_DATA' => $this->hasAssocPairChanges($originalRow, $auxiliaryPayload),
+            default => false,
+        };
+    }
+
+    protected function hasOfficeAddressChanges(array $conditions, array $originalRow, array $auxiliaryPayload): bool {
+        $incomingAddr = array_key_exists('c_addr', $auxiliaryPayload)
+            ? (array) $auxiliaryPayload['c_addr']
+            : (($auxiliaryPayload['c_addr_cleared'] ?? '0') === '1' ? [] : null);
+
+        if ($incomingAddr === null) {
+            return false;
+        }
+
+        $currentAddr = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $originalRow['c_personid'] ?? $conditions['c_personid'] ?? null)
+            ->where('c_posting_id', $originalRow['c_posting_id'] ?? $conditions['c_posting_id'] ?? null)
+            ->pluck('c_addr_id')
+            ->all();
+
+        return $this->normalizeSelectionList($incomingAddr) !== $this->normalizeSelectionList($currentAddr);
+    }
+
+    protected function hasEventAddressChanges(array $conditions, array $originalRow, array $auxiliaryPayload): bool {
+        if (!array_key_exists('c_addr_id', $auxiliaryPayload)) {
+            return false;
+        }
+
+        $incomingAddr = (array) $auxiliaryPayload['c_addr_id'];
+        $currentAddr = DB::table('EVENTS_ADDR')
+            ->where('c_personid', $originalRow['c_personid'] ?? $conditions['c_personid'] ?? null)
+            ->where('c_sequence', $originalRow['c_sequence'] ?? $conditions['c_sequence'] ?? null)
+            ->where('c_event_code', $originalRow['c_event_code'] ?? $conditions['c_event_code'] ?? null)
+            ->pluck('c_addr_id')
+            ->all();
+
+        return $this->normalizeSelectionList($incomingAddr) !== $this->normalizeSelectionList($currentAddr);
+    }
+
+    protected function hasKinshipPairChanges(array $originalRow, array $auxiliaryPayload): bool {
+        if (!array_key_exists('c_kinship_pair', $auxiliaryPayload)) {
+            return false;
+        }
+
+        $currentPair = DB::table('KIN_DATA')
+            ->where('c_personid', $originalRow['c_kin_id'] ?? null)
+            ->where('c_kin_id', $originalRow['c_personid'] ?? null)
+            ->where('c_autogen_notes', $originalRow['c_autogen_notes'] ?? null)
+            ->value('c_kin_code');
+
+        return (int) ($auxiliaryPayload['c_kinship_pair'] ?? 0) !== (int) ($currentPair ?? 0);
+    }
+
+    protected function hasAssocPairChanges(array $originalRow, array $auxiliaryPayload): bool {
+        $pairKeys = ['c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair'];
+        if (array_intersect($pairKeys, array_keys($auxiliaryPayload)) === []) {
+            return false;
+        }
+
+        $mirrorRow = DB::table('ASSOC_DATA')
+            ->where('c_personid', $originalRow['c_assoc_id'] ?? null)
+            ->where('c_assoc_id', $originalRow['c_personid'] ?? null)
+            ->where('c_text_title', $originalRow['c_text_title'] ?? '')
+            ->where('c_assoc_first_year', $originalRow['c_assoc_first_year'] ?? '-9999')
+            ->first();
+
+        $current = [
+            'c_assocship_pair' => (int) ($mirrorRow->c_assoc_code ?? 0),
+            'c_kinship_pair' => (int) ($mirrorRow->c_kin_code ?? 0),
+            'c_assoc_kinship_pair' => (int) ($mirrorRow->c_assoc_kin_code ?? 0),
+        ];
+
+        foreach ($pairKeys as $key) {
+            if (array_key_exists($key, $auxiliaryPayload) && (int) $auxiliaryPayload[$key] !== $current[$key]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function normalizeSelectionList(array $values): array {
+        $normalized = array_map(static function ($value) {
+            $value = (int) $value;
+
+            return $value === -999 ? 0 : $value;
+        }, $values);
+
+        sort($normalized);
+
+        return array_values(array_unique($normalized));
     }
 
     protected function getTableColumns(string $table): array {

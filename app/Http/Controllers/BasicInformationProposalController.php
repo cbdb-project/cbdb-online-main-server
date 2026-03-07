@@ -11,11 +11,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class BasicInformationProposalController extends Controller {
     protected $biogMainRepository;
     protected $operationRepository;
+    protected array $tableColumnCache = [];
 
     /**
      * 資源配置數組
@@ -140,7 +142,8 @@ class BasicInformationProposalController extends Controller {
         $optionalKeyColumns = $config['optional_key_columns'] ?? [];
 
         // 提取表單數據
-        $payload = $this->extractFormData($request);
+        $formData = $this->extractFormData($request);
+        [$payload, $auxiliaryPayload] = $this->splitFormDataByTable($table, $formData);
         $payload['c_personid'] = $personid;
         $payload = $this->assignSingleNumericPrimaryKeyIfNeeded($table, $keyColumns, $payload);
 
@@ -178,7 +181,8 @@ class BasicInformationProposalController extends Controller {
             $personid,
             $payload,
             [],
-            $meta
+            $meta,
+            $auxiliaryPayload
         );
 
         if ($operation) {
@@ -251,7 +255,8 @@ class BasicInformationProposalController extends Controller {
         }
 
         // 提取表單數據
-        $payload = $this->extractFormData($request);
+        $formData = $this->extractFormData($request);
+        [$payload, $auxiliaryPayload] = $this->splitFormDataByTable($table, $formData);
         $payload['c_personid'] = $personid;
 
         // 檢查是否有實際修改
@@ -273,7 +278,8 @@ class BasicInformationProposalController extends Controller {
             $personid,
             $payload,
             $originalRow,
-            $meta
+            $meta,
+            $auxiliaryPayload
         );
 
         if ($operation) {
@@ -346,11 +352,15 @@ class BasicInformationProposalController extends Controller {
         $personId,
         $data,
         $original,
-        $meta
+        $meta,
+        array $auxiliaryPayload = []
     ) {
         $resourceId = $this->buildCompositeId($keyColumns, $data);
 
         $resourceData = $data;
+        if ($auxiliaryPayload !== []) {
+            $resourceData['__proposal_aux'] = $auxiliaryPayload;
+        }
         $resourceData['__proposal_meta'] = $meta;
         $resourceData['__review_status'] = 'pending';
         $resourceData['__key_columns'] = $keyColumns;
@@ -447,6 +457,40 @@ class BasicInformationProposalController extends Controller {
      */
     protected function extractFormData(Request $request) {
         return Arr::except($request->all(), ['_token', '_method', 'action', '__proposal_comment']);
+    }
+
+    protected function splitFormDataByTable(string $table, array $payload): array {
+        if (!Schema::hasTable($table)) {
+            return [$payload, []];
+        }
+
+        $columns = array_flip($this->getTableColumns($table));
+        $data = [];
+        $auxiliary = [];
+
+        foreach ($payload as $key => $value) {
+            if (!is_string($key)) {
+                $data[$key] = $value;
+
+                continue;
+            }
+
+            if (isset($columns[$key])) {
+                $data[$key] = $value;
+            } else {
+                $auxiliary[$key] = $value;
+            }
+        }
+
+        return [$data, $auxiliary];
+    }
+
+    protected function getTableColumns(string $table): array {
+        if (!array_key_exists($table, $this->tableColumnCache)) {
+            $this->tableColumnCache[$table] = Schema::getColumnListing($table);
+        }
+
+        return $this->tableColumnCache[$table];
     }
 
     /**

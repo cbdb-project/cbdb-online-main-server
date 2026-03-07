@@ -243,6 +243,105 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testApproveUpdateProposalAllowsCompositePrimaryKeyChange(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'Before',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'code_id' => 'UP',
+            'code_sub' => '03',
+            'description' => 'After PK changed',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource_id' => 'UP_._02',
+            'resource_data' => $resourceData,
+            'resource_original' => [
+                'code_id' => 'UP',
+                'code_sub' => '02',
+                'description' => 'Before',
+            ],
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '允許修改主鍵欄位',
+        ]);
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseMissing('TEST_CODES', [
+            'code_id' => 'UP',
+            'code_sub' => '02',
+        ]);
+        $this->assertDatabaseHas('TEST_CODES', [
+            'code_id' => 'UP',
+            'code_sub' => '03',
+            'description' => 'After PK changed',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+    }
+
+    #[Test]
+    public function testApproveUpdateProposalReadbackUsesUnchangedOriginalKeyRepresentation(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'Before',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'code_id' => 'UP',
+            'code_sub' => '2',
+            'description' => 'After normalize-equal key',
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource_id' => 'UP_._02',
+            'resource_data' => $resourceData,
+            'resource_original' => [
+                'code_id' => 'UP',
+                'code_sub' => '02',
+                'description' => 'Before',
+            ],
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('提案已核准並套用至資料表', $flash[0]['message'] ?? '');
+
+        $this->assertDatabaseHas('TEST_CODES', [
+            'code_id' => 'UP',
+            'code_sub' => '02',
+            'description' => 'After normalize-equal key',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+    }
+
+    #[Test]
     public function testRejectProposalUpdatesStatus() {
         $admin = $this->makeAdmin();
         $this->actingAs($admin);

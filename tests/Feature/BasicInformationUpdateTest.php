@@ -59,7 +59,7 @@ class BasicInformationUpdateTest extends TestCase {
             $table->string('c_surname_rm')->nullable();
             $table->string('c_mingzi_rm')->nullable();
             $table->text('c_notes')->nullable();
-            $table->integer('c_female')->default(0);
+            $table->integer('c_female')->nullable()->default(0);
             $table->integer('c_by_intercalary')->default(0);
             $table->integer('c_dy_intercalary')->default(0);
             $table->string('c_created_by')->nullable();
@@ -387,5 +387,84 @@ class BasicInformationUpdateTest extends TestCase {
             ->where('c_personid', $personId)
             ->value('c_modified_date');
         $this->assertNull($modifiedDate);
+    }
+
+    /**
+     * 測試性別欄位可更新為 NULL，且以真正的 null 寫入
+     */
+    #[Test]
+    public function testUpdateGenderToNullPersistsAsDatabaseNull() {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'null-gender@example.com',
+            'password' => Hash::make('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Auth::login($user);
+
+        $personId = 4;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '趙六',
+            'c_name' => 'Zhao Liu',
+            'c_surname_chn' => '趙',
+            'c_surname' => 'Zhao',
+            'c_mingzi_chn' => '六',
+            'c_mingzi' => 'Liu',
+            'c_name_proper' => 'Liu Zhao',
+            'c_name_rm' => 'Liu Zhao',
+            'c_surname_proper' => 'Zhao',
+            'c_mingzi_proper' => 'Liu',
+            'c_surname_rm' => 'Zhao',
+            'c_mingzi_rm' => 'Liu',
+            'c_notes' => 'Original notes',
+            'c_female' => 1,
+            'c_by_intercalary' => 0,
+            'c_dy_intercalary' => 0,
+            'c_created_by' => 'Test User',
+            'c_created_date' => '2024-01-01 00:00:00',
+            'c_modified_by' => null,
+            'c_modified_date' => null,
+        ]);
+
+        $request = new Request([
+            '_method' => 'PUT',
+            '_token' => 'test-token',
+            'c_surname_chn' => '趙',
+            'c_surname' => 'Zhao',
+            'c_mingzi_chn' => '六',
+            'c_mingzi' => 'Liu',
+            'c_name_proper' => 'Liu Zhao',
+            'c_surname_proper' => 'Zhao',
+            'c_mingzi_proper' => 'Liu',
+            'c_surname_rm' => 'Zhao',
+            'c_mingzi_rm' => 'Liu',
+            'c_notes' => 'Original notes',
+            'c_female' => 'NULL',
+            'c_by_intercalary' => '0',
+            'c_dy_intercalary' => '0',
+        ]);
+
+        $repository = new BiogMainRepository();
+        $result = $repository->updateById($request, $personId);
+
+        $this->assertFalse($result['no_changes']);
+        $this->assertNull(DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_female'));
+
+        $operation = DB::table('operations')
+            ->where('c_personid', $personId)
+            ->where('resource', 'BIOG_MAIN')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($operation);
+        $this->assertNull(json_decode($operation->resource_data, true)['c_female']);
+
+        $auditLog = DB::table('audit_log')->latest('id')->first();
+        $this->assertNotNull($auditLog);
+        $this->assertNull(json_decode($auditLog->new_data, true)['c_female']);
     }
 }

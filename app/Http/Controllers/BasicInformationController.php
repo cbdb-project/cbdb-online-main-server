@@ -320,7 +320,10 @@ class BasicInformationController extends Controller {
             $data['c_name_rm'] = trim(($data['c_mingzi_rm'] ?? '') . ' ' . ($data['c_surname_rm'] ?? ''));
 
             // 數據類型轉換
-            $data['c_female'] = (int)($data['c_female'] ?? 0);
+            $female = $data['c_female'] ?? null;
+            $data['c_female'] = ($female === null || $female === '' || $female === 'NULL')
+                ? null
+                : (int) $female;
             $data['c_by_intercalary'] = (int)($data['c_by_intercalary'] ?? 0);
             $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary'] ?? 0);
 

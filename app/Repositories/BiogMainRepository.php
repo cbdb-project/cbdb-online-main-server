@@ -252,7 +252,10 @@ class BiogMainRepository {
         $data['c_name'] = $c_name;
         $data['c_name_proper'] = $c_name_proper; // 自動由外文姓名組合生成
         $data['c_name_rm'] = $c_name_rm; // 自動由外文羅馬字轉寫姓名組合生成
-        $data['c_female'] = (int)($data['c_female']);
+        $female = $data['c_female'] ?? null;
+        $data['c_female'] = ($female === null || $female === '' || $female === 'NULL')
+            ? null
+            : (int) $female;
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
 

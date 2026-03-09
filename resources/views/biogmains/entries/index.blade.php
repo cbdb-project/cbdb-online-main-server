@@ -25,6 +25,7 @@ use App\Support\CompositePrimaryKey;
                     <th>序號</th>
                     <th>sequence</th>
                     <th>入仕法</th>
+                    <th>入仕年</th>
                     @auth
                         @if(Auth::user()->isActive())
                             <th style="width: 120px">操作</th>
@@ -38,6 +39,13 @@ use App\Support\CompositePrimaryKey;
                         <td>{{ $key+1 }}</td>
                         <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->c_entry_desc_chn }}</td>
+                        <td>
+                            @if($value->pivot->c_year && $value->pivot->c_year != 0)
+                                {{ $value->pivot->c_year }}
+                            @elseif($value->pivot->c_entry_nh_id && $value->pivot->c_entry_nh_id != 0)
+                                {{ $nianhaoMap[$value->pivot->c_entry_nh_id] ?? '' }}{{ $value->pivot->c_entry_nh_year ? $value->pivot->c_entry_nh_year . '年' : '' }}
+                            @endif
+                        </td>
                         @auth
                             @if(Auth::user()->isActive())
                                 <td>

@@ -189,6 +189,8 @@ class BasicInformationPagesLoadTest extends TestCase {
             $table->integer('c_year')->nullable();
             $table->integer('c_inst_code')->nullable();
             $table->integer('c_inst_name_code')->nullable();
+            $table->smallInteger('c_entry_nh_id')->nullable();
+            $table->smallInteger('c_entry_nh_year')->nullable();
             $table->text('c_notes')->nullable();
             $table->timestamps();
             $table->primary(['c_personid', 'c_entry_code', 'c_sequence']);
@@ -421,6 +423,14 @@ class BasicInformationPagesLoadTest extends TestCase {
             'c_entry_code' => 1,
             'c_entry_desc_chn' => '进士',
         ]);
+        \DB::table('ENTRY_CODES')->insert([
+            'c_entry_code' => 2,
+            'c_entry_desc_chn' => '举人',
+        ]);
+        \DB::table('ENTRY_CODES')->insert([
+            'c_entry_code' => 3,
+            'c_entry_desc_chn' => '贡生',
+        ]);
 
         \DB::table('STATUS_CODES')->insert([
             'c_status_code' => 1,
@@ -514,11 +524,29 @@ class BasicInformationPagesLoadTest extends TestCase {
         ]);
 
         // 6. 入词数据 (entries)
+        // 6a. 有西元年的入仕
         \DB::table('ENTRY_DATA')->insert([
             'c_personid' => $this->testPersonId,
             'c_entry_code' => 1,
             'c_sequence' => 1,
+            'c_year' => 1351,
             'c_notes' => '测试入词',
+        ]);
+        // 6b. 無西元年，有年號 fallback
+        \DB::table('ENTRY_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_entry_code' => 2,
+            'c_sequence' => 2,
+            'c_year' => 0,
+            'c_entry_nh_id' => 1,
+            'c_entry_nh_year' => 3,
+        ]);
+        // 6c. 無西元年、無年號
+        \DB::table('ENTRY_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_entry_code' => 3,
+            'c_sequence' => 3,
+            'c_year' => 0,
         ]);
 
         // 7. 事件数据 (events)
@@ -676,6 +704,44 @@ class BasicInformationPagesLoadTest extends TestCase {
     public function test_basicinformation_entries_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
         $response->assertStatus(200);
+    }
+
+    /**
+     * 測試入仕年欄位：有西元年時直接顯示
+     */
+    #[Test]
+    public function test_entries_index_shows_calendar_year() {
+        $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
+        $response->assertStatus(200);
+        $response->assertSee('1351');
+    }
+
+    /**
+     * 測試入仕年欄位：無西元年但有年號時顯示年號 fallback
+     */
+    #[Test]
+    public function test_entries_index_shows_nianhao_fallback() {
+        $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
+        $response->assertStatus(200);
+        $response->assertSee('测试年号');
+        $response->assertSee('3年');
+    }
+
+    /**
+     * 測試入仕年欄位：無西元年也無年號時，入仕年 td 內容為空白
+     */
+    #[Test]
+    public function test_entries_index_no_year_shows_empty() {
+        $response = $this->get("/basicinformation/{$this->testPersonId}/entries");
+        $response->assertStatus(200);
+        $response->assertSee('贡生');
+        // 驗證「貢生」所在行的入仕年 td 為空白（入仕法 td 後緊接入仕年 td）
+        $html = $response->getContent();
+        $this->assertMatchesRegularExpression(
+            '/<td>\s*贡生\s*<\/td>\s*<td>\s*<\/td>/s',
+            $html,
+            '無年份的入仕記錄，入仕年欄位應為空'
+        );
     }
 
     /**

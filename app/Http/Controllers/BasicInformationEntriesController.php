@@ -58,7 +58,28 @@ class BasicInformationEntriesController extends Controller {
             // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
         }
 
+        // 收集所有年號 ID，批量查詢年號名稱
+        $nianhaoMap = collect();
+
+        try {
+            if ($biogbasicinformation && $biogbasicinformation->entries->isNotEmpty()) {
+                $nianhaoIds = $biogbasicinformation->entries
+                    ->pluck('pivot.c_entry_nh_id')
+                    ->filter(fn ($v) => $v && $v != 0)
+                    ->unique()
+                    ->values();
+                if ($nianhaoIds->isNotEmpty()) {
+                    $nianhaoMap = DB::table('NIAN_HAO')
+                        ->whereIn('c_nianhao_id', $nianhaoIds)
+                        ->pluck('c_nianhao_chn', 'c_nianhao_id');
+                }
+            }
+        } catch (\Exception $e) {
+            // 測試環境或最小化 schema 可能缺少 NIAN_HAO 表，降級為不顯示年號
+        }
+
         return view('biogmains.entries.index', ['basicinformation' => $biogbasicinformation,
+            'nianhaoMap' => $nianhaoMap,
             'page_title' => '入仕', 'page_description' => '基本信息表 入仕', 'breadcrumb_home' => '人物基本資料',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],

@@ -104,7 +104,7 @@ class BiogMain extends Model {
     }
 
     public function entries() {
-        return $this->belongsToMany('App\Models\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'c_kin_code', 'c_kin_id', 'c_assoc_code', 'c_assoc_id', 'c_year', 'c_inst_code', 'c_inst_name_code')->orderBy('c_sequence');
+        return $this->belongsToMany('App\Models\EntryCode', 'ENTRY_DATA', 'c_personid', 'c_entry_code')->withPivot('c_sequence', 'c_kin_code', 'c_kin_id', 'c_assoc_code', 'c_assoc_id', 'c_year', 'c_inst_code', 'c_inst_name_code', 'c_entry_nh_id', 'c_entry_nh_year')->orderBy('c_sequence');
     }
 
     public function statuses() {

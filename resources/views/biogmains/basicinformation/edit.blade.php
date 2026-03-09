@@ -117,8 +117,8 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_name_chn" class="col-sm-2 col-form-label">姓名(中)</label>
-                    <div class="col-sm-10">
+                    <div class="col-12 col-xl-3 mb-3 mb-xl-0">
+                        <label for="c_name_chn" class="col-form-label">姓名 (c_name_chn)</label>
                         <input type="text" name="c_name_chn" class="form-control" readonly
                                value="{{ $basicinformation->c_name_chn }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -126,10 +126,8 @@
                             <small class="text-muted">此欄位由「姓」和「名」自動合併生成，無需手動填寫</small>
                         </span>
                     </div>
-                </div>
-                <div class="form-group row">
-                    <label for="c_name" class="col-sm-2 col-form-label">姓名(拼音)</label>
-                    <div class="col-sm-10">
+                    <div class="col-12 col-xl-3 mb-3 mb-xl-0">
+                        <label for="c_name" class="col-form-label">姓名拼音 (c_name)</label>
                         <input type="text" name="c_name" class="form-control" readonly
                                value="{{ $basicinformation->c_name }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -137,10 +135,8 @@
                             <small class="text-muted">此欄位由「Xing」和「Ming」自動合併生成，無需手動填寫</small>
                         </span>
                     </div>
-                </div>
-                <div class="form-group row">
-                    <label for="c_name_proper" class="col-sm-2 col-form-label">外文全名</label>
-                    <div class="col-sm-10">
+                    <div class="col-12 col-xl-3 mb-3 mb-xl-0">
+                        <label for="c_name_proper" class="col-form-label">外文全名 (c_name_proper)</label>
                         <input type="text" name="c_name_proper" class="form-control" readonly
                                value="{{ $basicinformation->c_name_proper }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -148,10 +144,8 @@
                             <small class="text-muted">此欄位由「外文名」和「外文姓」自動合併生成（名+姓順序），無需手動填寫</small>
                         </span>
                     </div>
-                </div>
-                <div class="form-group row">
-                    <label for="c_name_rm" class="col-sm-2 col-form-label">外文羅馬字轉寫姓名</label>
-                    <div class="col-sm-10">
+                    <div class="col-12 col-xl-3">
+                        <label for="c_name_rm" class="col-form-label">外文羅馬字轉寫姓名 (c_name_rm)</label>
                         <input type="text" name="c_name_rm" class="form-control" readonly
                                value="{{ $basicinformation->c_name_rm }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -161,30 +155,32 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_female" class="col-sm-2 col-form-label">性别（原female）</label>
+                    <label for="c_female" class="col-sm-2 col-form-label">性別 (c_female)</label>
                     <div class="col-sm-4">
+                        @php($selectedFemale = old('c_female', $basicinformation->c_female))
                         <select class="form-control select2" name="c_female" {{ $disabled }}>
-                            <option value="0"></option>
-                            <option value="0" {{ $basicinformation->c_female == 0? 'selected': '' }}>0-男
+                            <option value="NULL" {{ $selectedFemale === null || $selectedFemale === '' || $selectedFemale === 'NULL' ? 'selected' : '' }}>NULL-未詳
                             </option>
-                            <option value="1" {{ $basicinformation->c_female == 1? 'selected': '' }}>1-女
+                            <option value="0" {{ (string) $selectedFemale === '0' ? 'selected' : '' }}>0-男
+                            </option>
+                            <option value="1" {{ (string) $selectedFemale === '1' ? 'selected' : '' }}>1-女
                             </option>
                         </select>
                     </div>
-                    <label for="c_ethnicity_code" class="col-sm-2 col-form-label">種族/部族</label>
+                    <label for="c_ethnicity_code" class="col-sm-2 col-form-label">種族/部族 (c_ethnicity_code)</label>
                     <div class="col-sm-4">
                         <select-vue name="c_ethnicity_code" model="ethnicity" selected="{{ $basicinformation->c_ethnicity_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_dy" class="col-sm-2 col-form-label">朝代(dy)</label>
+                    <label for="c_dy" class="col-sm-2 col-form-label">朝代 (c_dy)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_dy" model="dynasty" selected="{{ $basicinformation->c_dy }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
 
                 <div class="form-group row">
-                    <label for="c_firstyear" class="col-sm-2 col-form-label">生年(birth year)</label>
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">生年 (c_birthyear)</label>
                     <x-inline-time-fields
                         yearName="c_birthyear"
                         :yearValue="$basicinformation->c_birthyear"
@@ -208,7 +204,7 @@
                     />
                 </div>
                 <div class="form-group row">
-                    <label for="c_firstyear" class="col-sm-2 col-form-label">卒年(death year)</label>
+                    <label for="c_firstyear" class="col-sm-2 col-form-label">卒年 (c_deathyear)</label>
                     <x-inline-time-fields
                         yearName="c_deathyear"
                         :yearValue="$basicinformation->c_deathyear"
@@ -232,8 +228,8 @@
                     />
                 </div>
                 <div class="form-group row">
-                    <label for="c_index_year" class="col-sm-2 col-form-label">指數年(index year)</label>
-                    <div class="col-sm-10">
+                    <div class="col-12 col-xl-4 mb-3 mb-xl-0">
+                        <label for="c_index_year" class="col-form-label">指數年 (c_index_year)</label>
                         <input type="number" name="c_index_year" class="form-control @error('c_index_year') is-invalid @enderror" readonly
                                value="{{ $basicinformation->c_index_year }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -244,11 +240,8 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
-                </div>
-                <div class="form-group row">
-                    <label for="c_index_year_type_code"
-                           class="col-sm-2 col-form-label">指數年推算方法(c_index_year_type_code)</label>
-                    <div class="col-sm-4">
+                    <div class="col-12 col-xl-4 mb-3 mb-xl-0">
+                        <label for="c_index_year_type_code" class="col-form-label">指數年推算方法 (c_index_year_type_code)</label>
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_year_type_code }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -256,9 +249,8 @@
                             <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
                         </span>
                     </div>
-                    <label for="c_index_year_source_id"
-                           class="col-sm-2 col-form-label">指數年推算來源(c_index_year_source_id)</label>
-                    <div class="col-sm-4">
+                    <div class="col-12 col-xl-4">
+                        <label for="c_index_year_source_id" class="col-form-label">指數年推算來源 (c_index_year_source_id)</label>
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_year_source_id }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -268,9 +260,8 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_index_addr_id"
-                           class="col-sm-2 col-form-label">指數地址(index_addr)</label>
-                    <div class="col-sm-4">
+                    <div class="col-12 col-xl-6 mb-3 mb-xl-0">
+                        <label for="c_index_addr_id" class="col-form-label">指數地址 (c_index_addr_id)</label>
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_addr_id }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -278,9 +269,8 @@
                             <small class="text-muted">此欄位由算法定期自動計算生成，無需手動填寫</small>
                         </span>
                     </div>
-                    <label for="c_index_addr_type_code"
-                           class="col-sm-2 col-form-label">指數地址類型(index_addr_type)</label>
-                    <div class="col-sm-4">
+                    <div class="col-12 col-xl-6">
+                        <label for="c_index_addr_type_code" class="col-form-label">指數地址類型 (c_index_addr_type_code)</label>
                         <input type="text" name="" class="form-control" readonly
                                value="{{ $basicinformation->c_index_addr_type_code }}"
                                style="background-color: #f5f5f5; cursor: not-allowed;">
@@ -290,7 +280,7 @@
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_death_age" class="col-sm-2 col-form-label">享年(death_age)</label>
+                    <label for="c_death_age" class="col-sm-2 col-form-label">享年 (c_death_age)</label>
                     <div class="col-sm-4">
                         <input type="number" name="c_death_age" class="form-control @error('c_death_age') is-invalid @enderror"
                                value="{{ $basicinformation->c_death_age }}" {{ $disabled }}>
@@ -298,7 +288,7 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
-                    <label for="c_death_age_range" class="col-sm-2 col-form-label">范围(c_death_age_range)</label>
+                    <label for="c_death_age_range" class="col-sm-2 col-form-label">範圍 (c_death_age_range)</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_death_age_range" id="c_death_age_range" {{ $disabled }}>
                             {{--<option value="null"></option>--}}
@@ -315,7 +305,7 @@
                 </div>
                 <div class="form-group row">
                     <label for="c_fl_earliest_year"
-                           class="col-sm-2 col-form-label">在世始年(fl_earliest_year)</label>
+                           class="col-sm-2 col-form-label">在世始年 (c_fl_earliest_year)</label>
                     <x-inline-time-fields
                         yearName="c_fl_earliest_year"
                         :yearValue="$basicinformation->c_fl_earliest_year"
@@ -327,13 +317,13 @@
                         :showLunarPlaceholder="true"
                         notesName="c_fl_ey_notes"
                         :notesValue="$basicinformation->c_fl_ey_notes"
-                        notesLabel="在世始年註"
+                        notesLabel="在世始年註 (c_fl_ey_notes)"
                         :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
                     <label for="c_fl_latest_year"
-                           class="col-sm-2 col-form-label">在世終年(fl_latest_year)</label>
+                           class="col-sm-2 col-form-label">在世終年 (c_fl_latest_year)</label>
                     <x-inline-time-fields
                         yearName="c_fl_latest_year"
                         :yearValue="$basicinformation->c_fl_latest_year"
@@ -345,24 +335,24 @@
                         :showLunarPlaceholder="true"
                         notesName="c_fl_ly_notes"
                         :notesValue="$basicinformation->c_fl_ly_notes"
-                        notesLabel="在世終年註"
+                        notesLabel="在世終年註 (c_fl_ly_notes)"
                         :disabled="$readonly"
                     />
                 </div>
                 <div class="form-group row">
-                    <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望(choronym_code)</label>
+                    <label for="c_choronym_code" class="col-sm-2 col-form-label">郡望 (c_choronym_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_choronym_code" model="choronym" selected="{{ $basicinformation->c_choronym_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_household_status_code" class="col-sm-2 col-form-label">戶籍(c_household_status)</label>
+                    <label for="c_household_status_code" class="col-sm-2 col-form-label">戶籍 (c_household_status_code)</label>
                     <div class="col-sm-10">
                         <select-vue name="c_household_status_code" model="household" selected="{{ $basicinformation->c_household_status_code }}" :disabled="{{ $readonly ? 'true' : 'false' }}"></select-vue>
                     </div>
                 </div>
                 <div class="form-group row">
-                    <label for="c_notes" class="col-sm-2 col-form-label">註</label>
+                    <label for="c_notes" class="col-sm-2 col-form-label">註 (c_notes)</label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="c_notes" id="" cols="30"
                                   rows="5" {{ $disabled }}>{{ $basicinformation->c_notes }}</textarea>

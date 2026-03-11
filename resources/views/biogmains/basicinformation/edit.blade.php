@@ -467,7 +467,7 @@
             window.initLunarValidation();
         }
 
-        function indexYear() {
+        window.indexYear = function() {
             let birth = $('input[name=c_birthyear]').val();
             let death = $('input[name=c_deathyear]').val();
             if(birth && death){
@@ -477,8 +477,7 @@
                 let indexyear = deathage > 60 ? parseInt(birth) + 60 : death;
                 $('input[name=c_index_year]').val(indexyear);
             }
-            // let index =
-        }
+        };
     });
     </script>
 <!-- Javascript -->

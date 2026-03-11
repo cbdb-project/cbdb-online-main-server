@@ -603,8 +603,8 @@ function initEraConversion() {
             // 直接使用年號 ID 進行轉換（使用 code 而非字串）
             convertNianhaoIdToYear(nianhaoId, nhYear).then(result => {
                 if (result.success) {
-                    // 填充公元年份
-                    $yearInput.val(result.year);
+                    // 填充公元年份並觸發 change 事件，以通知表單髒值檢測
+                    $yearInput.val(result.year).trigger('change');
 
                     // 顯示成功提示
                     showConversionSuccess($btn, `公元 ${result.year} 年`, '將年號轉換為公元年份');
@@ -674,10 +674,10 @@ async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, n
             $nhSelect.val(nianhaoId).trigger('change');
         }
 
-        // 填充年號年數輸入框
+        // 填充年號年數輸入框並觸發 change 事件，以通知表單髒值檢測
         const $nhYearInput = $container.find(`input[name="${nhYearName}"]`);
         if ($nhYearInput.length) {
-            $nhYearInput.val(yearNum);
+            $nhYearInput.val(yearNum).trigger('change');
         }
 
         // 顯示成功提示

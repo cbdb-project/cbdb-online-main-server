@@ -371,12 +371,25 @@ class BasicInformationSourcesController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串提取原始 PK（用於定位記錄）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body，
+        // 當使用者修改了 c_textid 或 c_pages 時，表單的新值會覆蓋原始 PK
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $pk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $pk[$field] = $value;
+            }
+        }
 
         // 驗證必填欄位（c_pages 為可選）
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
+
+        // 檢查路徑人物 ID 與查詢主鍵是否一致
+        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
 
         // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
         $c_pages = $pk['c_pages'] ?? '';
@@ -385,6 +398,10 @@ class BasicInformationSourcesController extends Controller {
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
+
+        if (empty($data)) {
+            abort(404, 'BIOG_SOURCE_DATA 記錄不存在');
+        }
 
         flash('Update success @ '.Carbon::now(), 'success');
 

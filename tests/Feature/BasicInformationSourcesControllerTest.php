@@ -80,6 +80,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_SOURCE_DATA');
+        Schema::dropIfExists('users');
         parent::tearDown();
     }
 
@@ -271,5 +272,143 @@ class BasicInformationSourcesControllerTest extends TestCase {
         $this->assertSame('to delete', $payload['c_notes']);
         $this->assertSame('Creator User', $payload['c_created_by']);
         $this->assertNotNull($payload['c_created_date']);
+    }
+
+    // ─── updateQuery controller-level feature tests ───
+
+    /**
+     * 建立 users 表供 HTTP feature test 使用
+     */
+    private function createUsersTable(): void {
+        if (!Schema::hasTable('users')) {
+            Schema::create('users', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('name');
+                $table->string('email')->unique();
+                $table->string('password');
+                $table->string('confirmation_token')->nullable();
+                $table->smallInteger('is_active')->default(0);
+                $table->smallInteger('is_admin')->default(0);
+                $table->rememberToken();
+                $table->timestamps();
+            });
+        }
+    }
+
+    private function createWriterUser(): User {
+        $this->createUsersTable();
+
+        return User::create([
+            'name' => 'Writer User',
+            'email' => 'writer@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'token',
+            'is_active' => 1,
+            'is_admin' => User::ROLE_EXPERT,
+        ]);
+    }
+
+    private function seedSourceRow(int $personid, int $textid, string $pages, string $notes = ''): void {
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            'c_personid' => $personid,
+            'c_textid' => $textid,
+            'c_pages' => $pages,
+            'c_notes' => $notes,
+            'c_main_source' => 0,
+            'c_self_bio' => 0,
+            'c_created_by' => 'Seeder',
+            'c_created_date' => now(),
+        ]);
+    }
+
+    #[Test]
+    public function updateQuery_changing_c_pages_succeeds(): void {
+        $this->actingAs($this->createWriterUser());
+
+        $this->seedSourceRow(100, 200, 'old-page');
+
+        // 查詢參數帶原始 PK，表單 body 帶新的 c_pages
+        $response = $this->patch(
+            route('basicinformation.sources.update.query', ['id' => 100])
+            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 200, 'c_pages' => 'old-page']),
+            [
+                'c_textid' => 200,
+                'c_pages' => 'new-page',
+                'c_notes' => '',
+                'c_main_source' => 0,
+                'c_self_bio' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+
+        // 舊記錄已被更新為新的 c_pages
+        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 200,
+            'c_pages' => 'old-page',
+        ]);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 200,
+            'c_pages' => 'new-page',
+        ]);
+    }
+
+    #[Test]
+    public function updateQuery_changing_c_textid_succeeds(): void {
+        $this->actingAs($this->createWriterUser());
+
+        $this->seedSourceRow(100, 300, 'page1');
+
+        // 查詢參數帶原始 c_textid=300，表單 body 帶新的 c_textid=400
+        $response = $this->patch(
+            route('basicinformation.sources.update.query', ['id' => 100])
+            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 300, 'c_pages' => 'page1']),
+            [
+                'c_textid' => 400,
+                'c_pages' => 'page1',
+                'c_notes' => '',
+                'c_main_source' => 0,
+                'c_self_bio' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 300,
+        ]);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 400,
+            'c_pages' => 'page1',
+        ]);
+    }
+
+    #[Test]
+    public function updateQuery_personid_mismatch_returns_400(): void {
+        $this->actingAs($this->createWriterUser());
+
+        $this->seedSourceRow(100, 200, 'p1');
+
+        // 路徑 id=100，但查詢參數 c_personid=999
+        $response = $this->patch(
+            route('basicinformation.sources.update.query', ['id' => 100])
+            .'?'.http_build_query(['c_personid' => 999, 'c_textid' => 200, 'c_pages' => 'p1']),
+            [
+                'c_textid' => 200,
+                'c_pages' => 'p1',
+                'c_notes' => '',
+                'c_main_source' => 0,
+                'c_self_bio' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertStatus(400);
     }
 }

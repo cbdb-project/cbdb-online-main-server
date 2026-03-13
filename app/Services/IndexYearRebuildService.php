@@ -167,6 +167,44 @@ class IndexYearRebuildService {
         return "(($alias.$yearColumn <> 0) OR ($alias.$yearColumn = 0 AND $alias.c_dy IN ($dynasties)))";
     }
 
+    protected function offsetExpr(string $baseExpr, int $delta): string {
+        if ($delta === 0) {
+            return $baseExpr;
+        }
+
+        return $delta > 0 ? "$baseExpr + $delta" : "$baseExpr - " . abs($delta);
+    }
+
+    protected function buildAggregateSourceSubquery(
+        string $targetPersonExpr,
+        string $sourceValueExpr,
+        string $sourcePersonExpr,
+        string $fromClause,
+        string $whereClause,
+        string $aggFn
+    ): string {
+        return "SELECT chosen.target_personid,
+                       chosen.base_value,
+                       MIN(chosen.source_personid) AS source_personid
+                FROM (
+                    SELECT $targetPersonExpr AS target_personid,
+                           $sourceValueExpr AS base_value,
+                           $sourcePersonExpr AS source_personid
+                    $fromClause
+                    WHERE $whereClause
+                ) chosen
+                JOIN (
+                    SELECT $targetPersonExpr AS target_personid,
+                           $aggFn($sourceValueExpr) AS base_value
+                    $fromClause
+                    WHERE $whereClause
+                    GROUP BY $targetPersonExpr
+                ) extrema
+                  ON extrema.target_personid = chosen.target_personid
+                 AND extrema.base_value = chosen.base_value
+                GROUP BY chosen.target_personid, chosen.base_value";
+    }
+
     protected function sqlRule01(): string {
         return "UPDATE BIOG_MAIN bm
                 SET bm.c_index_year = bm.c_birthyear,
@@ -280,36 +318,48 @@ class IndexYearRebuildService {
     }
 
     protected function sqlAggregateRule13(): string {
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_kin_id',
+            'child.c_birthyear',
+            'child.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN child
+                      ON child.c_personid = kd.c_personid",
+            "kd.c_kin_code = 75
+                      AND {$this->validYearExpr('child', 'c_birthyear')}",
+            'MIN'
+        );
+
         return "UPDATE BIOG_MAIN father
                 JOIN (
-                    SELECT kd.c_kin_id AS target_personid,
-                           MIN(child.c_birthyear) - 30 AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN child
-                      ON child.c_personid = kd.c_personid
-                    WHERE kd.c_kin_code = 75
-                      AND {$this->validYearExpr('child', 'c_birthyear')}
-                    GROUP BY kd.c_kin_id
+                    $agg
                 ) agg ON agg.target_personid = father.c_personid
-                SET father.c_index_year = agg.calc_year,
-                    father.c_index_year_type_code = '13'
+                SET father.c_index_year = agg.base_value - 30,
+                    father.c_index_year_type_code = '13',
+                    father.c_index_year_source_id = agg.source_personid
                 WHERE father.c_index_year IS NULL";
     }
 
     protected function sqlAggregateRule15(): string {
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_kin_id',
+            'child.c_birthyear',
+            'child.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN child
+                      ON child.c_personid = kd.c_personid",
+            "kd.c_kin_code = 111
+                      AND {$this->validYearExpr('child', 'c_birthyear')}",
+            'MIN'
+        );
+
         return "UPDATE BIOG_MAIN mother
                 JOIN (
-                    SELECT kd.c_kin_id AS target_personid,
-                           MIN(child.c_birthyear) - 27 AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN child
-                      ON child.c_personid = kd.c_personid
-                    WHERE kd.c_kin_code = 111
-                      AND {$this->validYearExpr('child', 'c_birthyear')}
-                    GROUP BY kd.c_kin_id
+                    $agg
                 ) agg ON agg.target_personid = mother.c_personid
-                SET mother.c_index_year = agg.calc_year,
-                    mother.c_index_year_type_code = '15'
+                SET mother.c_index_year = agg.base_value - 27,
+                    mother.c_index_year_type_code = '15',
+                    mother.c_index_year_source_id = agg.source_personid
                 WHERE mother.c_index_year IS NULL";
     }
 
@@ -318,41 +368,49 @@ class IndexYearRebuildService {
      */
     protected function sqlAggregateSiblingRule(array $kinCodes, string $aggFn, int $delta, string $typeCode): string {
         $kinList = implode(',', $kinCodes);
-        $yearExpr = $aggFn === 'MAX' ? 'MAX(sib.c_birthyear)' : 'MIN(sib.c_birthyear)';
-        $calcExpr = $delta >= 0 ? "$yearExpr + $delta" : "$yearExpr - " . abs($delta);
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_personid',
+            'sib.c_birthyear',
+            'sib.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN sib
+                      ON sib.c_personid = kd.c_kin_id",
+            "kd.c_kin_code IN ($kinList)
+                      AND {$this->validYearExpr('sib', 'c_birthyear')}",
+            $aggFn
+        );
 
         return "UPDATE BIOG_MAIN person
                 JOIN (
-                    SELECT kd.c_personid AS target_personid,
-                           $calcExpr AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN sib
-                      ON sib.c_personid = kd.c_kin_id
-                    WHERE kd.c_kin_code IN ($kinList)
-                      AND {$this->validYearExpr('sib', 'c_birthyear')}
-                    GROUP BY kd.c_personid
+                    $agg
                 ) agg ON agg.target_personid = person.c_personid
-                SET person.c_index_year = agg.calc_year,
-                    person.c_index_year_type_code = '$typeCode'
+                SET person.c_index_year = {$this->offsetExpr('agg.base_value', $delta)},
+                    person.c_index_year_type_code = '$typeCode',
+                    person.c_index_year_source_id = agg.source_personid
                 WHERE person.c_index_year IS NULL";
     }
 
     protected function sqlAggregateSonInLawRule(bool $femaleTarget, int $subtractYears, string $typeCode): string {
         $genderValue = $femaleTarget ? 1 : 0;
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_personid',
+            'soninlaw.c_birthyear',
+            'soninlaw.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN soninlaw
+                      ON soninlaw.c_personid = kd.c_kin_id",
+            "kd.c_kin_code IN (181,201,224,332)
+                      AND {$this->validYearExpr('soninlaw', 'c_birthyear')}",
+            'MIN'
+        );
 
         return "UPDATE BIOG_MAIN person
                 JOIN (
-                    SELECT kd.c_personid AS target_personid,
-                           MIN(soninlaw.c_birthyear) - $subtractYears AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN soninlaw
-                      ON soninlaw.c_personid = kd.c_kin_id
-                    WHERE kd.c_kin_code IN (181,201,224,332)
-                      AND {$this->validYearExpr('soninlaw', 'c_birthyear')}
-                    GROUP BY kd.c_personid
+                    $agg
                 ) agg ON agg.target_personid = person.c_personid
-                SET person.c_index_year = agg.calc_year,
-                    person.c_index_year_type_code = '$typeCode'
+                SET person.c_index_year = agg.base_value - $subtractYears,
+                    person.c_index_year_type_code = '$typeCode',
+                    person.c_index_year_source_id = agg.source_personid
                 WHERE person.c_index_year IS NULL
                   AND person.c_female = $genderValue";
     }
@@ -414,36 +472,48 @@ class IndexYearRebuildService {
     }
 
     protected function sqlLoopOldestChildIndexToFatherRule(): string {
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_kin_id',
+            'child.c_index_year',
+            'child.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN child
+                      ON child.c_personid = kd.c_personid",
+            "kd.c_kin_code = 75
+                      AND child.c_index_year > -400",
+            'MIN'
+        );
+
         return "UPDATE BIOG_MAIN father
                 JOIN (
-                    SELECT kd.c_kin_id AS target_personid,
-                           MIN(child.c_index_year) - 30 AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN child
-                      ON child.c_personid = kd.c_personid
-                    WHERE kd.c_kin_code = 75
-                      AND child.c_index_year > -400
-                    GROUP BY kd.c_kin_id
+                    $agg
                 ) agg ON agg.target_personid = father.c_personid
-                SET father.c_index_year = agg.calc_year,
-                    father.c_index_year_type_code = '14'
+                SET father.c_index_year = agg.base_value - 30,
+                    father.c_index_year_type_code = '14',
+                    father.c_index_year_source_id = agg.source_personid
                 WHERE father.c_index_year IS NULL";
     }
 
     protected function sqlLoopOldestChildIndexToMotherRule(): string {
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_kin_id',
+            'child.c_index_year',
+            'child.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN child
+                      ON child.c_personid = kd.c_personid",
+            "kd.c_kin_code = 111
+                      AND child.c_index_year > -400",
+            'MIN'
+        );
+
         return "UPDATE BIOG_MAIN mother
                 JOIN (
-                    SELECT kd.c_kin_id AS target_personid,
-                           MIN(child.c_index_year) - 27 AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN child
-                      ON child.c_personid = kd.c_personid
-                    WHERE kd.c_kin_code = 111
-                      AND child.c_index_year > -400
-                    GROUP BY kd.c_kin_id
+                    $agg
                 ) agg ON agg.target_personid = mother.c_personid
-                SET mother.c_index_year = agg.calc_year,
-                    mother.c_index_year_type_code = '16'
+                SET mother.c_index_year = agg.base_value - 27,
+                    mother.c_index_year_type_code = '16',
+                    mother.c_index_year_source_id = agg.source_personid
                 WHERE mother.c_index_year IS NULL";
     }
 
@@ -452,41 +522,49 @@ class IndexYearRebuildService {
      */
     protected function sqlLoopSiblingRule(array $kinCodes, string $aggFn, int $delta, string $typeCode): string {
         $kinList = implode(',', $kinCodes);
-        $yearExpr = $aggFn === 'MAX' ? 'MAX(sib.c_index_year)' : 'MIN(sib.c_index_year)';
-        $calcExpr = $delta >= 0 ? "$yearExpr + $delta" : "$yearExpr - " . abs($delta);
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_personid',
+            'sib.c_index_year',
+            'sib.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN sib
+                      ON sib.c_personid = kd.c_kin_id",
+            "kd.c_kin_code IN ($kinList)
+                      AND sib.c_index_year > -400",
+            $aggFn
+        );
 
         return "UPDATE BIOG_MAIN person
                 JOIN (
-                    SELECT kd.c_personid AS target_personid,
-                           $calcExpr AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN sib
-                      ON sib.c_personid = kd.c_kin_id
-                    WHERE kd.c_kin_code IN ($kinList)
-                      AND sib.c_index_year > -400
-                    GROUP BY kd.c_personid
+                    $agg
                 ) agg ON agg.target_personid = person.c_personid
-                SET person.c_index_year = agg.calc_year,
-                    person.c_index_year_type_code = '$typeCode'
+                SET person.c_index_year = {$this->offsetExpr('agg.base_value', $delta)},
+                    person.c_index_year_type_code = '$typeCode',
+                    person.c_index_year_source_id = agg.source_personid
                 WHERE person.c_index_year IS NULL";
     }
 
     protected function sqlLoopSonInLawRule(bool $femaleTarget, int $subtractYears, string $typeCode): string {
         $genderValue = $femaleTarget ? 1 : 0;
+        $agg = $this->buildAggregateSourceSubquery(
+            'kd.c_personid',
+            'soninlaw.c_index_year',
+            'soninlaw.c_personid',
+            "FROM KIN_DATA kd
+                    JOIN BIOG_MAIN soninlaw
+                      ON soninlaw.c_personid = kd.c_kin_id",
+            "kd.c_kin_code IN (181,201,224,332)
+                      AND soninlaw.c_index_year > -400",
+            'MIN'
+        );
 
         return "UPDATE BIOG_MAIN person
                 JOIN (
-                    SELECT kd.c_personid AS target_personid,
-                           MIN(soninlaw.c_index_year) - $subtractYears AS calc_year
-                    FROM KIN_DATA kd
-                    JOIN BIOG_MAIN soninlaw
-                      ON soninlaw.c_personid = kd.c_kin_id
-                    WHERE kd.c_kin_code IN (181,201,224,332)
-                      AND soninlaw.c_index_year > -400
-                    GROUP BY kd.c_personid
+                    $agg
                 ) agg ON agg.target_personid = person.c_personid
-                SET person.c_index_year = agg.calc_year,
-                    person.c_index_year_type_code = '$typeCode'
+                SET person.c_index_year = agg.base_value - $subtractYears,
+                    person.c_index_year_type_code = '$typeCode',
+                    person.c_index_year_source_id = agg.source_personid
                 WHERE person.c_index_year IS NULL
                   AND person.c_female = $genderValue";
     }

@@ -1266,6 +1266,7 @@ class OperationsController extends Controller {
             return [];
         }
 
+        $allowEditLink = (int) ($item->op_type ?? 0) !== Operation::TYPE_DELETE;
         $targets = [];
         $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
         foreach ($auditLogs as $audit) {
@@ -1296,7 +1297,9 @@ class OperationsController extends Controller {
 
             $targets[$personId] = [
                 'resource_id' => $personResourceId,
-                'resource_link' => CompositePrimaryKey::buildResourceEditUrl($resource, $personResourceId, $personId),
+                'resource_link' => $allowEditLink
+                    ? CompositePrimaryKey::buildResourceEditUrl($resource, $personResourceId, $personId)
+                    : null,
             ];
         }
 
@@ -1307,7 +1310,9 @@ class OperationsController extends Controller {
             if (!isset($targets[$primaryId])) {
                 $targets[$primaryId] = [
                     'resource_id' => $primaryResourceId,
-                    'resource_link' => CompositePrimaryKey::buildResourceEditUrl($resource, $primaryResourceId, $primaryId),
+                    'resource_link' => $allowEditLink
+                        ? CompositePrimaryKey::buildResourceEditUrl($resource, $primaryResourceId, $primaryId)
+                        : null,
                 ];
             }
         }

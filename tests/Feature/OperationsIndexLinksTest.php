@@ -604,4 +604,69 @@ class OperationsIndexLinksTest extends TestCase {
         $response->assertSee('c_assoc_code：301');
         $response->assertSee('c_assoc_code：302');
     }
+
+    #[Test]
+    public function test_operations_index_does_not_render_person_specific_resource_links_for_deleted_kin_data(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'deleted-kin-links@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 101, 'c_name_chn' => '甲', 'c_name' => 'Jia'],
+            ['c_personid' => 202, 'c_name_chn' => '乙', 'c_name' => 'Yi'],
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 101,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+            'resource_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+            'resource_original' => null,
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $now = now()->format('Y-m-d H:i:s');
+        \Illuminate\Support\Facades\DB::table('audit_log')->insert([
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'DELETE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+                'old_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'new_data' => null,
+            ],
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'DELETE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=202&c_kin_id=101&c_kin_code=3',
+                'old_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'new_data' => null,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertDontSee('/basicinformation/101/kinship/edit?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
+        $response->assertDontSee('/basicinformation/202/kinship/edit?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
+        $response->assertSee('無資源頁面');
+    }
 }

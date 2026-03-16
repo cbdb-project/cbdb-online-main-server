@@ -3,6 +3,33 @@ use App\Support\CompositePrimaryKey;
 @endphp
 @extends('layouts.dashboard-v3')
 
+@section('css')
+<style>
+    .operations-action-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .operations-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        padding: 0.3rem 0.8rem;
+        box-shadow: none;
+    }
+
+    .operations-action-form {
+        margin: 0;
+    }
+</style>
+@endsection
+
 @section('content')
 @include('biogmains.defense')
     <div class="card card-default">
@@ -72,9 +99,9 @@ use App\Support\CompositePrimaryKey;
                 <tr>
                     <th>人物</th>
                     <th>修改資源</th>
+                    <th>資源定位</th>
                     <th>修改值</th>
-                    <th>資源 TTS</th>
-                    <th>修改類型</th>
+                    <th>操作類型</th>
                     <th>修改人</th>
                     <th>修改時間</th>
                 </tr>
@@ -84,18 +111,27 @@ use App\Support\CompositePrimaryKey;
                         $codeTableKeys = array_keys(config('codes.tables', []));
                         $codeTables = array_map('strtoupper', $codeTableKeys);
                     @endphp
-                    @foreach($lists as $item)
+@foreach($lists as $item)
 @php
 $rawResourceId = $item->resource_id;
-// 用於顯示：偵測格式後轉換（處理 Blade 模板衝突）
-if (str_contains($rawResourceId ?? '', '=') && !str_contains($rawResourceId ?? '', '_._')) {
-    // 新格式（query-string）：解碼後以 - 分隔顯示值
-    parse_str($rawResourceId, $parsedQs);
-    $displayValues = implode('-', array_values($parsedQs));
-    $item->resource_id = str_replace(['{{', '}}'], ['{ {', '} }'], $displayValues);
-} else {
-    $item->resource_id = unionPKDef($item->resource_id);
-}
+$formatResourceDescription = static function ($resourceName, $resourceId) {
+    if (!is_string($resourceId) || trim($resourceId) === '') {
+        return '';
+    }
+
+    $parsedResourceId = CompositePrimaryKey::parseStoredResourceId($resourceId, (string) $resourceName);
+    if (is_array($parsedResourceId) && !empty($parsedResourceId)) {
+        $parts = [];
+        foreach ($parsedResourceId as $column => $value) {
+            $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+        }
+
+        return implode("\n", $parts);
+    }
+
+    return unionPKDef_decode_for_convert(unionPKDef($resourceId));
+};
+$resourceDescription = $formatResourceDescription($item->resource, (string) $rawResourceId);
 $item->resource_data = unionPKDef($item->resource_data);
 @endphp
                         @php
@@ -137,7 +173,6 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         $resourceSpecificLink = CompositePrimaryKey::buildResourceEditUrl($a, $rawResourceId, $id);
                                     }
                                 }
-                                $item->resource_id = unionPKDef_decode_for_convert($item->resource_id);
                                 $item->resource_data = unionPKDef_decode_for_convert($item->resource_data);
                                 $hasPersonLink = $personLink && !empty($item->biogmain);
                                 $isCodeResource = in_array(strtoupper($item->resource), $codeTables, true);
@@ -151,6 +186,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 elseif ($isCodeResource && $item->op_type != 4) {
                                     $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
                                 }
+                                $showPerPersonResourceButtons = in_array(strtoupper($item->resource), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
                             @endphp
                             @if(empty($firstPerson['id']))
                                 <span class="text-muted">(本修改不涉及人物)</span>
@@ -222,6 +258,20 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     </button>
                                 @endif
                             </td>
+                            @if($showPerPersonResourceButtons)
+                                <td>
+                                    @if(!empty($firstPerson['resource_link']))
+                                        <a href="{{ $firstPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                    @else
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                    @endif
+                                    @if(!empty($firstPerson['resource_id']))
+                                        <div class="small text-muted mt-1" style="word-break: break-all;">
+                                            {!! nl2br(e($formatResourceDescription($item->resource, (string) $firstPerson['resource_id']))) !!}
+                                        </div>
+                                    @endif
+                                </td>
+                            @endif
                             @php
                                 $diffSource = $item->resource_diff ?? $item->resource_original;
                                 $hasAuditLogs = !empty($auditLogs);
@@ -316,8 +366,22 @@ $item->resource_data = unionPKDef($item->resource_data);
                             @endphp
                                 @php
                                     $canCompare = ($hasAuditLogs || $hasDiffContent) && (int)$item->op_type !== 4;
-                                @endphp
-                            <td rowspan="{{ $personRowspan }}">
+                            @endphp
+                            @if(!$showPerPersonResourceButtons)
+                                <td rowspan="{{ $personRowspan }}">
+                                    @if($resourceLink)
+                                        <a href="{{ $resourceLink }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                    @else
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                    @endif
+                                    @if($resourceDescription !== '')
+                                        <div class="small text-muted mt-1" style="word-break: break-all;">
+                                            {!! nl2br(e($resourceDescription)) !!}
+                                        </div>
+                                    @endif
+                                </td>
+                            @endif
+                            <td rowspan="{{ $personRowspan }}" style="max-width: 28rem; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                 @if($isProposal)
                                     <div class="proposal-status" style="margin-bottom:6px;">
                                         @if($reviewStatus === 'approved')
@@ -366,11 +430,22 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @endif
                                     </div>
                                 @endif
-                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal{{ $item->id }}">內容快照</button>
-                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#myModal-mapping{{ $item->id }}"
-                                    {{ $canCompare ? '' : 'disabled' }}>
-                                    比較
-                                </button>
+                                <div class="operations-action-list">
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-sm operations-action-btn"
+                                            data-toggle="modal"
+                                            data-target="#myModal{{ $item->id }}">
+                                        <span>內容快照</span>
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-info btn-sm operations-action-btn"
+                                            data-toggle="modal"
+                                            data-target="#myModal-mapping{{ $item->id }}"
+                                            {{ $canCompare ? '' : 'disabled' }}>
+                                        <i class="fas fa-code-compare" aria-hidden="true"></i>
+                                        <span>比較</span>
+                                    </button>
+                                </div>
                                 <div id="myModal{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog">
                                     <div class="modal-content">
@@ -446,42 +521,47 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     </div>
                                 @endif
                                 @if(Auth::check() && Auth::user()->isAdmin() && in_array((int)$item->op_type, [3,4]) && $item->resource !== 'POSTED_TO_ADDR_DATA' && $canCompare)
-                                    <form method="post" action="{{ route('operations.restore', $item->id) }}" style="display:inline;">
+                                    <form method="post" action="{{ route('operations.restore', $item->id) }}" class="operations-action-form">
                                         {{ csrf_field() }}
-                                        <button type="submit" class="btn btn-warning"
+                                        <button type="submit" class="btn btn-outline-warning btn-sm operations-action-btn"
                                             onclick="return confirm('將以你的名義對該資源進行一次修改，恢復至本次改動之前，是否繼續？');">
+                                            <i class="fas fa-history" aria-hidden="true"></i>
                                             復原
                                         </button>
                                     </form>
                                 @endif
                                 @if($canEditProposal)
-                                    <div class="proposal-actions" style="margin-top:8px;">
+                                    <div class="operations-action-list">
                                         <a href="{{ route('codes.proposals.edit', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
-                                           class="btn btn-secondary btn-sm">
+                                           class="btn btn-outline-secondary btn-sm operations-action-btn">
+                                            <i class="far fa-pen-to-square" aria-hidden="true"></i>
                                             修改提案
                                         </a>
                                         <form method="post"
                                               action="{{ route('codes.proposals.cancel', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
-                                              style="display:inline;">
+                                              class="operations-action-form">
                                             {{ csrf_field() }}
                                             {{ method_field('DELETE') }}
-                                            <button type="submit" class="btn btn-warning btn-sm"
+                                            <button type="submit" class="btn btn-outline-warning btn-sm operations-action-btn"
                                                     onclick="return confirm('確定要撤回此提案？');">
+                                                <i class="fas fa-ban" aria-hidden="true"></i>
                                                 撤回提案
                                             </button>
                                         </form>
                                     </div>
                                 @endif
                                 @if($isProposal && Auth::check() && Auth::user()->canManageUsers() && $reviewStatus === 'pending')
-                                    <div class="proposal-actions" style="margin-top:8px;">
-                                        <form method="post" action="{{ route('operations.proposals.approve', $item->id) }}" style="display:inline;">
+                                    <div class="operations-action-list">
+                                        <form method="post" action="{{ route('operations.proposals.approve', $item->id) }}" class="operations-action-form">
                                             {{ csrf_field() }}
                                             <input type="hidden" name="review_comment" value="">
-                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('確定核准此提案並寫入資料表？');">
+                                            <button type="submit" class="btn btn-outline-success btn-sm operations-action-btn" onclick="return confirm('確定核准此提案並寫入資料表？');">
+                                                <i class="fas fa-check" aria-hidden="true"></i>
                                                 核准
                                             </button>
                                         </form>
-                                        <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#proposal-reject-{{ $item->id }}">
+                                        <button type="button" class="btn btn-outline-danger btn-sm operations-action-btn" data-toggle="modal" data-target="#proposal-reject-{{ $item->id }}">
+                                            <i class="fas fa-reply" aria-hidden="true"></i>
                                             退修
                                         </button>
                                     </div>
@@ -511,13 +591,6 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @endif
                             </td>
                             <td rowspan="{{ $personRowspan }}">
-                                @if($resourceLink)
-                                    <a href="{{ $resourceLink }}">{{ $item->resource_id }}</a>
-                                @else
-                                    {{ $item->resource_id }}
-                                @endif
-                            </td>
-                            <td rowspan="{{ $personRowspan }}">
                                 @php
                                     $opTypeLabels = [
                                         1 => '1-新增',
@@ -530,7 +603,13 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @endphp
                                 {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}
                             </td>
-                            <td rowspan="{{ $personRowspan }}">{{ $item->user->name }}</td>
+                            <td rowspan="{{ $personRowspan }}">
+                                @if(Auth::check())
+                                    {{ $item->user->name ?? ('User ' . $item->user_id) }}
+                                @else
+                                    {{ 'User ' . $item->user_id }}
+                                @endif
+                            </td>
                             @php
                                 $updatedUtc = '';
                                 $updatedDisplay = '';
@@ -571,6 +650,20 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             </span>
                                         @endif
                                     </td>
+                                    @if($showPerPersonResourceButtons)
+                                        <td>
+                                            @if(!empty($relatedPerson['resource_link']))
+                                                <a href="{{ $relatedPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                            @else
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                            @endif
+                                            @if(!empty($relatedPerson['resource_id']))
+                                                <div class="small text-muted mt-1" style="word-break: break-all;">
+                                                    {!! nl2br(e($formatResourceDescription($item->resource, (string) $relatedPerson['resource_id']))) !!}
+                                                </div>
+                                            @endif
+                                        </td>
+                                    @endif
                                 </tr>
                             @endfor
                         @endif

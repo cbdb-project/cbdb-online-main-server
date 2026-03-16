@@ -54,6 +54,11 @@ class OperationsController extends Controller {
                     }
                 });
             }
+        } else {
+            $query->whereNotIn('op_type', [
+                Operation::TYPE_PROPOSAL_CREATE,
+                Operation::TYPE_PROPOSAL_UPDATE,
+            ]);
         }
 
         // 修改人篩選（支援 user_id 或 name 模糊匹配）
@@ -1225,6 +1230,7 @@ class OperationsController extends Controller {
             }
 
             $primaryId = is_numeric($item->c_personid ?? null) ? (int) $item->c_personid : null;
+            $resourceTargets = $this->resolveAffectedPeopleResourceTargets($item);
             $people = [];
             foreach ($ids as $id) {
                 if (!is_numeric($id) || (int) $id <= 0) {
@@ -1237,6 +1243,8 @@ class OperationsController extends Controller {
                     'name_chn' => $person->c_name_chn ?? '',
                     'name' => $person->c_name ?? '',
                     'is_primary' => $primaryId !== null && $personId === $primaryId,
+                    'resource_id' => $resourceTargets[$personId]['resource_id'] ?? null,
+                    'resource_link' => $resourceTargets[$personId]['resource_link'] ?? null,
                 ];
             }
 
@@ -1250,6 +1258,61 @@ class OperationsController extends Controller {
 
             $item->setAttribute('affected_people', $people);
         }
+    }
+
+    protected function resolveAffectedPeopleResourceTargets($item): array {
+        $resource = strtoupper((string) ($item->resource ?? ''));
+        if (!in_array($resource, ['KIN_DATA', 'ASSOC_DATA'], true)) {
+            return [];
+        }
+
+        $targets = [];
+        $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
+        foreach ($auditLogs as $audit) {
+            if (!is_array($audit)) {
+                continue;
+            }
+
+            $tableName = strtoupper(trim((string) ($audit['table_name'] ?? '')));
+            if ($tableName !== $resource) {
+                continue;
+            }
+
+            $rowPk = is_array($audit['row_pk'] ?? null) ? $audit['row_pk'] : [];
+            $personId = $rowPk['c_personid'] ?? null;
+            if (!is_numeric($personId) || (int) $personId <= 0) {
+                continue;
+            }
+            $personId = (int) $personId;
+
+            $personResourceId = trim((string) ($audit['row_pk_text'] ?? ''));
+            if ($personResourceId === '' && !empty($rowPk)) {
+                $personResourceId = CompositePrimaryKey::buildStoredResourceId($rowPk);
+            }
+
+            if ($personResourceId === '') {
+                continue;
+            }
+
+            $targets[$personId] = [
+                'resource_id' => $personResourceId,
+                'resource_link' => CompositePrimaryKey::buildResourceEditUrl($resource, $personResourceId, $personId),
+            ];
+        }
+
+        $primaryId = $item->c_personid ?? null;
+        $primaryResourceId = trim((string) ($item->resource_id ?? ''));
+        if (is_numeric($primaryId) && (int) $primaryId > 0 && $primaryResourceId !== '') {
+            $primaryId = (int) $primaryId;
+            if (!isset($targets[$primaryId])) {
+                $targets[$primaryId] = [
+                    'resource_id' => $primaryResourceId,
+                    'resource_link' => CompositePrimaryKey::buildResourceEditUrl($resource, $primaryResourceId, $primaryId),
+                ];
+            }
+        }
+
+        return $targets;
     }
 
     protected function decodeJsonNullable($payload): ?array {

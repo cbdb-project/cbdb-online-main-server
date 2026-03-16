@@ -206,6 +206,29 @@ class OperationsIndexFilterTest extends TestCase {
         $this->assertSame(Operation::TYPE_PROPOSAL_CREATE, $opTypes[0]);
     }
 
+    #[Test]
+    public function default_operations_index_hides_proposals(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        $this->makeOperation($user, Operation::TYPE_CREATE, [
+            'resource_data' => json_encode(['c_name_chn' => '一般操作'], JSON_UNESCAPED_UNICODE),
+        ]);
+        $this->makeOperation($user, Operation::TYPE_PROPOSAL_CREATE, [
+            'resource_data' => json_encode([
+                'c_name_chn' => '提案操作',
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['submitted_by' => 'Admin', 'submitted_at' => now()->format('Y-m-d H:i:s')],
+            ], JSON_UNESCAPED_UNICODE),
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $opTypes = $this->listOpTypes($response);
+        $this->assertCount(1, $opTypes);
+        $this->assertSame(Operation::TYPE_CREATE, $opTypes[0]);
+    }
+
     // ── proposals 模式 status + editor 組合 ──
 
     #[Test]

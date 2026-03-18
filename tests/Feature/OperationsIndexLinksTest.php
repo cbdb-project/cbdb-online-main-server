@@ -59,6 +59,24 @@ class OperationsIndexLinksTest extends TestCase {
             $table->integer('c_fy_intercalary')->nullable();
         });
 
+        Schema::create('KIN_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->integer('c_kin_id');
+            $table->integer('c_kin_code');
+        });
+
+        Schema::create('ASSOC_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->integer('c_assoc_code');
+            $table->integer('c_assoc_id');
+            $table->integer('c_kin_code');
+            $table->integer('c_kin_id');
+            $table->integer('c_assoc_kin_code');
+            $table->integer('c_assoc_kin_id');
+            $table->string('c_text_title')->nullable();
+            $table->integer('c_assoc_first_year')->nullable();
+        });
+
         Schema::create('audit_log', function ($table) {
             $table->bigIncrements('id');
             $table->dateTime('occurred_at');
@@ -106,6 +124,9 @@ class OperationsIndexLinksTest extends TestCase {
 
         // 验证页面包含正确的链接
         $response->assertSee('/codes/TEXT_CODES/68942/edit', false);
+        $response->assertSee('查閱');
+        $response->assertDontSee('>68942</a>', false);
+        $response->assertSee('overflow-wrap: anywhere;', false);
         $response->assertSee('(本修改不涉及人物)');
     }
 
@@ -204,8 +225,38 @@ class OperationsIndexLinksTest extends TestCase {
 
         // 验证删除操作不生成編輯链接
         $response->assertDontSee('/codes/TEXT_CODES/68942/edit', false);
+        $response->assertSee('無資源頁面');
         // 但应该显示 resource_id
         $response->assertSee('68942');
+    }
+
+    #[Test]
+    public function test_operations_index_hides_editor_full_name_for_guests(): void {
+        $user = User::create([
+            'name' => 'Hidden Editor',
+            'email' => 'guest-hidden@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'guest-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'TEXT_CODES',
+            'resource_id' => '68942',
+            'resource_data' => json_encode(['c_textid' => 68942, 'c_text_name' => 'Guest Visible']),
+            'resource_original' => json_encode(['c_textid' => 68942, 'c_text_name' => 'Old Text']),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $response = $this->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertSee('User ' . $user->id);
+        $response->assertDontSee('Hidden Editor');
     }
 
     #[Test]
@@ -349,5 +400,273 @@ class OperationsIndexLinksTest extends TestCase {
         $response->assertSee('rowspan="2"', false);
         $response->assertSee('主操作');
         $response->assertSee('連動');
+    }
+
+    #[Test]
+    public function test_operations_index_renders_person_specific_resource_links_for_kin_data(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'kin-links@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 101, 'c_name_chn' => '甲', 'c_name' => 'Jia'],
+            ['c_personid' => 202, 'c_name_chn' => '乙', 'c_name' => 'Yi'],
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('KIN_DATA')->insert([
+            ['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1],
+            ['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3],
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 101,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+            'resource_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 2], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $now = now()->format('Y-m-d H:i:s');
+        \Illuminate\Support\Facades\DB::table('audit_log')->insert([
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+                'old_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 2], JSON_UNESCAPED_UNICODE),
+            ],
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=202&c_kin_id=101&c_kin_code=3',
+                'old_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 4], JSON_UNESCAPED_UNICODE),
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertSee('/basicinformation/101/kinship/edit?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
+        $response->assertSee('/basicinformation/202/kinship/edit?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
+        $response->assertSee('c_personid：101<br', false);
+        $response->assertSee('c_personid：101');
+        $response->assertSee('c_kin_code：3');
+    }
+
+    #[Test]
+    public function test_operations_index_renders_person_specific_resource_links_for_assoc_data(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'assoc-links@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 101, 'c_name_chn' => '甲', 'c_name' => 'Jia'],
+            ['c_personid' => 202, 'c_name_chn' => '乙', 'c_name' => 'Yi'],
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('ASSOC_DATA')->insert([
+            [
+                'c_personid' => 101,
+                'c_assoc_code' => 301,
+                'c_assoc_id' => 202,
+                'c_kin_code' => 0,
+                'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0,
+                'c_assoc_kin_id' => 0,
+                'c_text_title' => '測試文獻',
+                'c_assoc_first_year' => 1100,
+            ],
+            [
+                'c_personid' => 202,
+                'c_assoc_code' => 302,
+                'c_assoc_id' => 101,
+                'c_kin_code' => 0,
+                'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0,
+                'c_assoc_kin_id' => 0,
+                'c_text_title' => '測試文獻',
+                'c_assoc_first_year' => 1100,
+            ],
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 101,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => 'c_personid=101&c_assoc_code=301&c_assoc_id=202&c_kin_code=0&c_kin_id=0&c_assoc_kin_code=0&c_assoc_kin_id=0&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+            'resource_data' => json_encode([
+                'c_personid' => 101,
+                'c_assoc_code' => 301,
+                'c_assoc_id' => 202,
+                'c_kin_code' => 0,
+                'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0,
+                'c_assoc_kin_id' => 0,
+                'c_text_title' => '測試文獻',
+                'c_assoc_first_year' => 1101,
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode([
+                'c_personid' => 101,
+                'c_assoc_code' => 301,
+                'c_assoc_id' => 202,
+                'c_kin_code' => 0,
+                'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0,
+                'c_assoc_kin_id' => 0,
+                'c_text_title' => '測試文獻',
+                'c_assoc_first_year' => 1100,
+            ], JSON_UNESCAPED_UNICODE),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $now = now()->format('Y-m-d H:i:s');
+        \Illuminate\Support\Facades\DB::table('audit_log')->insert([
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'ASSOC_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode([
+                    'c_personid' => 101,
+                    'c_assoc_code' => 301,
+                    'c_assoc_id' => 202,
+                    'c_kin_code' => 0,
+                    'c_kin_id' => 0,
+                    'c_assoc_kin_code' => 0,
+                    'c_assoc_kin_id' => 0,
+                    'c_text_title' => '測試文獻',
+                    'c_assoc_first_year' => 1100,
+                ], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=101&c_assoc_code=301&c_assoc_id=202&c_kin_code=0&c_kin_id=0&c_assoc_kin_code=0&c_assoc_kin_id=0&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+                'old_data' => json_encode(['c_assoc_first_year' => 1100], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_assoc_first_year' => 1101], JSON_UNESCAPED_UNICODE),
+            ],
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'ASSOC_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode([
+                    'c_personid' => 202,
+                    'c_assoc_code' => 302,
+                    'c_assoc_id' => 101,
+                    'c_kin_code' => 0,
+                    'c_kin_id' => 0,
+                    'c_assoc_kin_code' => 0,
+                    'c_assoc_kin_id' => 0,
+                    'c_text_title' => '測試文獻',
+                    'c_assoc_first_year' => 1100,
+                ], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=202&c_assoc_code=302&c_assoc_id=101&c_kin_code=0&c_kin_id=0&c_assoc_kin_code=0&c_assoc_kin_id=0&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+                'old_data' => json_encode(['c_assoc_first_year' => 1100], JSON_UNESCAPED_UNICODE),
+                'new_data' => json_encode(['c_assoc_first_year' => 1101], JSON_UNESCAPED_UNICODE),
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertSee('/basicinformation/101/assoc/edit?c_personid=101&amp;c_assoc_code=301&amp;c_assoc_id=202', false);
+        $response->assertSee('/basicinformation/202/assoc/edit?c_personid=202&amp;c_assoc_code=302&amp;c_assoc_id=101', false);
+        $response->assertSee('c_assoc_code：301');
+        $response->assertSee('c_assoc_code：302');
+    }
+
+    #[Test]
+    public function test_operations_index_does_not_render_person_specific_resource_links_for_deleted_kin_data(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'deleted-kin-links@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 101, 'c_name_chn' => '甲', 'c_name' => 'Jia'],
+            ['c_personid' => 202, 'c_name_chn' => '乙', 'c_name' => 'Yi'],
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 101,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+            'resource_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+            'resource_original' => null,
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $now = now()->format('Y-m-d H:i:s');
+        \Illuminate\Support\Facades\DB::table('audit_log')->insert([
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'DELETE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=101&c_kin_id=202&c_kin_code=1',
+                'old_data' => json_encode(['c_personid' => 101, 'c_kin_id' => 202, 'c_kin_code' => 1], JSON_UNESCAPED_UNICODE),
+                'new_data' => null,
+            ],
+            [
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'table_name' => 'KIN_DATA',
+                'operation' => 'DELETE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $user->id,
+                'operation_id' => (string) $operation->id,
+                'row_pk' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_personid=202&c_kin_id=101&c_kin_code=3',
+                'old_data' => json_encode(['c_personid' => 202, 'c_kin_id' => 101, 'c_kin_code' => 3], JSON_UNESCAPED_UNICODE),
+                'new_data' => null,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertDontSee('/basicinformation/101/kinship/edit?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
+        $response->assertDontSee('/basicinformation/202/kinship/edit?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
+        $response->assertSee('無資源頁面');
     }
 }

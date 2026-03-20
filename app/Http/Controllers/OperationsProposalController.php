@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class OperationsProposalController extends Controller {
     protected $operationRepository;
@@ -86,7 +88,25 @@ class OperationsProposalController extends Controller {
                     $opType === Operation::TYPE_PROPOSAL_CREATE
                 );
             });
+        } catch (ValidationException $e) {
+            $messages = $e->validator->errors()->all();
+            $detail = implode('；', $messages);
+            Log::warning('提案核准失敗（驗證錯誤）', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'errors' => $messages,
+            ]);
+            flash('審核失敗：'.$detail, 'error');
+
+            return redirect()->back();
         } catch (\Throwable $e) {
+            Log::error('提案核准失敗', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile().':'.$e->getLine(),
+            ]);
             flash('審核失敗：'.$e->getMessage(), 'error');
 
             return redirect()->back();

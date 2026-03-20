@@ -332,6 +332,21 @@ class OperationsProposalController extends Controller {
         array $auxiliaryPayload
     ): array {
         $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
+
+        // 更新提案：officeUpdateById() 需要表單隱藏欄位 _id, _postingid, _officeid 來定位原始記錄。
+        // 早期提案可能未將這些欄位存入 __proposal_aux，需從 $original 補齊。
+        if ((int) $operation->op_type !== Operation::TYPE_PROPOSAL_CREATE) {
+            if (!isset($auxiliaryPayload['_id'])) {
+                $auxiliaryPayload['_id'] = $personId;
+            }
+            if (!isset($auxiliaryPayload['_postingid'])) {
+                $auxiliaryPayload['_postingid'] = $original['c_posting_id'] ?? $data['c_posting_id'] ?? null;
+            }
+            if (!isset($auxiliaryPayload['_officeid'])) {
+                $auxiliaryPayload['_officeid'] = $original['c_office_id'] ?? null;
+            }
+        }
+
         $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {

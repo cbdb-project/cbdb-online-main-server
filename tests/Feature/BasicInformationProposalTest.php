@@ -1837,4 +1837,111 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertNotNull($officeRow);
         $this->assertEquals(300, $officeRow->c_office_id, '交易回滾後 c_office_id 應維持原值');
     }
+
+    #[Test]
+    public function testApproveOfficeUpdateProposalWithoutProposalAuxStillWorks() {
+        $this->createOfficeTables();
+        $this->app->instance(BiogMainRepository::class, new BiogMainRepository());
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 700,
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 700,
+            'c_office_id' => 12356,
+            'c_sequence' => 0,
+            'c_source' => 32038,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原始備註',
+            'c_created_by' => 'load',
+            'c_created_date' => '2013-09-23 00:00:00',
+        ]);
+
+        $originalRow = [
+            'c_personid' => 1,
+            'c_posting_id' => 700,
+            'c_office_id' => 12356,
+            'c_sequence' => 0,
+            'c_source' => 32038,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原始備註',
+            'c_created_by' => 'load',
+            'c_created_date' => '2013-09-23 00:00:00',
+            'c_modified_by' => null,
+            'c_modified_date' => null,
+            'c_pages' => null,
+        ];
+
+        // 模擬早期提案：沒有 __proposal_aux（c_office_id 從 12356 改為 10539）
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_UPDATE;
+        $operation->resource = 'POSTED_TO_OFFICE_DATA';
+        $operation->resource_id = 'c_office_id=10539&c_posting_id=700';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_posting_id' => 700,
+            'c_office_id' => 10539,
+            'c_sequence' => 0,
+            'c_source' => 32038,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '修改後備註',
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => [
+                'action' => 'update',
+                'resource_type' => 'offices',
+                'table' => 'POSTED_TO_OFFICE_DATA',
+                'submitted_by' => 'Test User',
+                'submitted_at' => '2026-03-19 13:40:00',
+                'comment' => '測試無 __proposal_aux 的情況',
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode($originalRow, JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '同意',
+        ]);
+
+        $response->assertRedirect();
+
+        // 驗證無錯誤
+        $flash = session('flash_notification', collect())->toArray();
+        if (!empty($flash)) {
+            $this->assertStringNotContainsString('審核失敗', $flash[0]['message'] ?? '', '核准應該成功，實際錯誤：'.($flash[0]['message'] ?? ''));
+        }
+
+        // 驗證 c_office_id 已更新為 10539
+        $updatedRow = DB::table('POSTED_TO_OFFICE_DATA')
+            ->where('c_posting_id', 700)
+            ->first();
+
+        $this->assertNotNull($updatedRow, '更新後的記錄應存在');
+        $this->assertEquals(10539, $updatedRow->c_office_id, 'c_office_id 應更新為 10539');
+        $this->assertSame('修改後備註', $updatedRow->c_notes, 'c_notes 應更新');
+
+        // 驗證提案狀態已改為 approved
+        $operation->refresh();
+        $proposalData = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $proposalData['__review_status'] ?? null);
+    }
 }

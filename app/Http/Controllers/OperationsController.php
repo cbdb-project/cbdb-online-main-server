@@ -701,7 +701,16 @@ class OperationsController extends Controller {
     protected function restoreUpdate(Operation $operation) {
         $table = $operation->resource;
         $current = $this->decodeJson($operation->resource_data);
-        $target = $this->getPreviousSnapshot($operation);
+
+        // 優先使用 resource_original（操作時保存的原始快照），因為它是最準確的「修改前」狀態。
+        // 當主鍵欄位（如 c_office_id）有變動時，用 resource_id 去搜尋前一筆操作的 resource_data
+        // 可能找到的是「更早之前同 resource_id」的操作（主鍵值相同但不是本次的直接前身），
+        // 導致復原到錯誤的狀態。
+        // getPreviousSnapshot 僅在 resource_original 為空時作為回退方案。
+        $target = $this->decodeJson($operation->resource_original);
+        if (empty($target)) {
+            $target = $this->getPreviousSnapshot($operation);
+        }
         if (empty($target)) {
             throw new \RuntimeException('找不到可恢復的資料內容');
         }
@@ -757,9 +766,12 @@ class OperationsController extends Controller {
     }
 
     protected function getPreviousSnapshot(Operation $operation) {
+        // 排除提案操作（op_type 8/9），因為提案的 resource_data 存的是「修改後的值」，
+        // 不是「修改前的快照」，用於復原會導致恢復到修改後的狀態（等於沒復原）。
         $previous = Operation::where('resource', $operation->resource)
             ->where('resource_id', $operation->resource_id)
             ->where('id', '<', $operation->id)
+            ->whereNotIn('op_type', [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE])
             ->orderBy('id', 'desc')
             ->first();
 

@@ -82,7 +82,7 @@ class BasicInformationController extends Controller {
      */
     public function index(Request $request) {
         // 获取查询参数
-        $q = $request->input('q', '');
+        $q = $request->input('q', '') ?? '';
         $num = $request->input('num', 20);
         $cDy = $request->input('c_dy');
 

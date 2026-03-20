@@ -601,6 +601,24 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
+     * 回歸測試：翻頁時 q 為空字串（ConvertEmptyStringsToNull 會轉為 null）不應 500
+     */
+    #[Test]
+    public function test_basicinformation_index_with_empty_query_and_pagination() {
+        $response = $this->get('/basicinformation?q=&page=2');
+        $response->assertStatus(200);
+    }
+
+    /**
+     * 回歸測試：不帶 q 參數直接翻頁不應 500
+     */
+    #[Test]
+    public function test_basicinformation_index_without_query_param_and_pagination() {
+        $response = $this->get('/basicinformation?page=2');
+        $response->assertStatus(200);
+    }
+
+    /**
      * 测试创建页面：/basicinformation/create
      */
     #[Test]

@@ -343,7 +343,7 @@ class BiogMainRepository {
      */
     public static function namesByQuery(Request $request, $num = 20) {
         //20220303增加addslashes()防禦查詢參數
-        $request->q = addslashes($request->q);
+        $request->q = addslashes($request->q ?? '');
         if ($temp = $request->num) {
             $num = addslashes($temp);
         }

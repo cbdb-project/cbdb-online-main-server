@@ -119,7 +119,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
                     '',
                     1,
                     'SOCIAL_INSTITUTION_ADDR',
-                    $instCode . '-' . $row['addr_id'],
+                    $instCode . '_._' . $row['addr_id'],
                     $addrPayload
                 );
 

@@ -228,6 +228,8 @@ class CodesController extends Controller {
         'CBDB__NAME_FTS' => ['id'],
         'CBDB__TRAD_SIMP_MAP' => ['trad_char'],
         'POSSESSION_DATA' => ['c_possession_record_id'],
+        'SOCIAL_INSTITUTION_CODES' => ['c_inst_code'],
+        'SOCIAL_INSTITUTION_ADDR' => ['c_inst_code', 'c_inst_addr_id'],
         'TEXT_CODES' => ['c_textid'],
     ];
     /**
@@ -395,8 +397,22 @@ class CodesController extends Controller {
                 }
                 $data = $query->first();
 
+                // 舊版操作紀錄可能以 '-' 分隔複合鍵（如 "4005-7531"），
+                // 若以標準 '_._' 分隔找不到，嘗試用 '-' 重新解析
+                if (!$data && count($keyColumns) > 1
+                    && !str_contains($id, '_._') && str_contains($id, '-')) {
+                    $fallbackConditions = $this->buildConditionsFromId($keyColumns, str_replace('-', '_._', $id));
+                    if (count($fallbackConditions) > count($conditions)) {
+                        $fallbackQuery = DB::table($table);
+                        foreach ($fallbackConditions as $col => $val) {
+                            $fallbackQuery->where($col, $val);
+                        }
+                        $data = $fallbackQuery->first();
+                    }
+                }
+
                 if (!$data) {
-                    flash('找不到該資料表', 'warning');
+                    flash('找不到該筆資料', 'warning');
 
                     return redirect()->back();
                 }

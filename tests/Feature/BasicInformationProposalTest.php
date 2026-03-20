@@ -1581,4 +1581,260 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertNotEmpty($flash);
         $this->assertStringContainsString('已有其他新增提案', $flash[0]['message'] ?? '');
     }
+
+    #[Test]
+    public function testApproveOfficeUpdateProposalUsesDirectWorkflowAndWritesData() {
+        $this->createOfficeTables();
+        $this->app->instance(BiogMainRepository::class, new BiogMainRepository());
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        // 建立既有的 POSTING_DATA 和 POSTED_TO_OFFICE_DATA 記錄
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 500,
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 500,
+            'c_office_id' => 100,
+            'c_sequence' => 1,
+            'c_source' => 50,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原始記錄',
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 500,
+            'c_office_id' => 100,
+            'c_addr_id' => 5,
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        // 原始記錄（提案提交時的快照）
+        $originalRow = [
+            'c_personid' => 1,
+            'c_posting_id' => 500,
+            'c_office_id' => 100,
+            'c_sequence' => 1,
+            'c_source' => 50,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '原始記錄',
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+            'c_modified_by' => null,
+            'c_modified_date' => null,
+            'c_pages' => null,
+        ];
+
+        // 模擬提案：修改 c_office_id 從 100 → 200，修改備註
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_UPDATE;
+        $operation->resource = 'POSTED_TO_OFFICE_DATA';
+        $operation->resource_id = 'c_office_id=200&c_posting_id=500';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_posting_id' => 500,
+            'c_office_id' => 200,
+            'c_sequence' => 1,
+            'c_source' => 50,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '修改後備註',
+            '__proposal_aux' => [
+                '_id' => 1,
+                '_postingid' => 500,
+                '_officeid' => 100,
+            ],
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => [
+                'action' => 'update',
+                'resource_type' => 'offices',
+                'table' => 'POSTED_TO_OFFICE_DATA',
+                'submitted_by' => 'Test User',
+                'submitted_at' => '2026-03-19 13:40:00',
+                'comment' => '測試修改提案',
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode($originalRow, JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '同意修改',
+        ]);
+
+        $response->assertRedirect();
+
+        // 驗證 flash 訊息不包含錯誤
+        $flash = session('flash_notification', collect())->toArray();
+        if (!empty($flash)) {
+            $this->assertStringNotContainsString('審核失敗', $flash[0]['message'] ?? '', '核准應該成功，實際錯誤：' . ($flash[0]['message'] ?? ''));
+        }
+
+        // 驗證資料已寫入：c_office_id 應改為 200，備註應改為「修改後備註」
+        $updatedRow = DB::table('POSTED_TO_OFFICE_DATA')
+            ->where('c_posting_id', 500)
+            ->first();
+
+        $this->assertNotNull($updatedRow, '更新後的記錄應存在');
+        $this->assertEquals(200, $updatedRow->c_office_id, 'c_office_id 應更新為 200');
+        $this->assertSame('修改後備註', $updatedRow->c_notes, 'c_notes 應更新');
+
+        // 驗證提案狀態已改為 approved
+        $operation->refresh();
+        $proposalData = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $proposalData['__review_status'] ?? null);
+    }
+
+    #[Test]
+    public function testApproveOfficeUpdateProposalShowsValidationErrorOnAddressConflict() {
+        $this->createOfficeTables();
+        $this->app->instance(BiogMainRepository::class, new BiogMainRepository());
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        // 建立既有記錄
+        DB::table('POSTING_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_office_id' => 300,
+            'c_sequence' => 1,
+            'c_source' => 0,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '',
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        // 地址記錄在舊 office_id=300 下
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_office_id' => 300,
+            'c_addr_id' => 7,
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        // 在目標 office_id=400 下預先插入衝突的地址記錄
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_office_id' => 400,
+            'c_addr_id' => 7,
+            'c_created_by' => 'conflict',
+            'c_created_date' => '2025-01-01 00:00:00',
+        ]);
+
+        $originalRow = [
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_office_id' => 300,
+            'c_sequence' => 1,
+            'c_source' => 0,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '',
+            'c_created_by' => 'seed',
+            'c_created_date' => '2025-01-01 00:00:00',
+            'c_modified_by' => null,
+            'c_modified_date' => null,
+            'c_pages' => null,
+        ];
+
+        // 提案把 c_office_id 從 300 改為 400，會導致地址衝突
+        $operation = new Operation();
+        $operation->user_id = 100;
+        $operation->c_personid = 1;
+        $operation->op_type = Operation::TYPE_PROPOSAL_UPDATE;
+        $operation->resource = 'POSTED_TO_OFFICE_DATA';
+        $operation->resource_id = 'c_office_id=400&c_posting_id=600';
+        $operation->resource_data = json_encode([
+            'c_personid' => 1,
+            'c_posting_id' => 600,
+            'c_office_id' => 400,
+            'c_sequence' => 1,
+            'c_source' => 0,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_notes' => '',
+            '__proposal_aux' => [
+                '_id' => 1,
+                '_postingid' => 600,
+                '_officeid' => 300,
+                'c_addr' => [7],
+                'c_addr_cleared' => '0',
+            ],
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => [
+                'action' => 'update',
+                'resource_type' => 'offices',
+                'table' => 'POSTED_TO_OFFICE_DATA',
+                'submitted_by' => 'Test User',
+                'submitted_at' => '2026-03-19 10:00:00',
+                'comment' => '會觸發地址衝突',
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        $operation->resource_original = json_encode($originalRow, JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '核准',
+        ]);
+
+        $response->assertRedirect();
+
+        // 驗證 flash 包含具體的驗證錯誤訊息（非泛用的 "The given data was invalid."）
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash, '應有 flash 錯誤訊息');
+        $this->assertStringContainsString('審核失敗', $flash[0]['message'] ?? '');
+        $this->assertStringContainsString('無法修改官名', $flash[0]['message'] ?? '', '應顯示具體的地址衝突訊息，而非泛用錯誤');
+
+        // 驗證提案狀態仍為 pending（交易已回滾）
+        $operation->refresh();
+        $proposalData = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $proposalData['__review_status'] ?? null);
+
+        // 驗證原始資料未被修改（無部分寫入）
+        $officeRow = DB::table('POSTED_TO_OFFICE_DATA')
+            ->where('c_posting_id', 600)
+            ->first();
+        $this->assertNotNull($officeRow);
+        $this->assertEquals(300, $officeRow->c_office_id, '交易回滾後 c_office_id 應維持原值');
+    }
 }

@@ -512,14 +512,21 @@ class BasicInformationAddressesController extends Controller {
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_ADDR_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $originalPk[$field] = $value;
+            }
+        }
 
         if ($action === 'proposal') {
             // 使用新的查詢參數模式，直接傳遞主鍵陣列
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
-                ->proposalUpdateWithPk($request, $id, 'addresses', $pk);
+                ->proposalUpdateWithPk($request, $id, 'addresses', $originalPk);
         }
 
         if (!Auth::user()->canWriteDirectly()) {
@@ -529,13 +536,13 @@ class BasicInformationAddressesController extends Controller {
         }
 
         // 驗證必填欄位
-        CompositePrimaryKey::validateOrFail($pk, 'BIOG_ADDR_DATA');
+        CompositePrimaryKey::validateOrFail($originalPk, 'BIOG_ADDR_DATA');
 
-        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+        if ((string) ($originalPk['c_personid'] ?? '') !== (string) $id) {
             abort(400, '路徑人物 ID 與查詢主鍵不一致');
         }
 
-        $legacyId = $pk['c_personid']."-".$pk['c_addr_id']."-".$pk['c_addr_type']."-".$pk['c_sequence'];
+        $legacyId = $originalPk['c_personid']."-".$originalPk['c_addr_id']."-".$originalPk['c_addr_type']."-".$originalPk['c_sequence'];
         $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
         if ($newPk === null) {
             abort(404, 'BIOG_ADDR_DATA 記錄不存在');

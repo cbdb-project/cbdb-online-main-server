@@ -524,15 +524,22 @@ class BasicInformationOfficesController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['POSTED_TO_OFFICE_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $originalPk[$field] = $value;
+            }
+        }
 
         // 驗證必填欄位
-        CompositePrimaryKey::validateOrFail($pk, 'POSTED_TO_OFFICE_DATA');
+        CompositePrimaryKey::validateOrFail($originalPk, 'POSTED_TO_OFFICE_DATA');
 
         // 構建舊格式 ID（格式：c_office_id-c_posting_id）
-        $id_ = $pk['c_office_id'].'-'.$pk['c_posting_id'];
+        $id_ = $originalPk['c_office_id'].'-'.$originalPk['c_posting_id'];
 
         try {
             $result = $this->biogMainRepository->officeUpdateById($request, $id_, $id);

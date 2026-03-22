@@ -366,13 +366,20 @@ class BasicInformationTextsController extends Controller {
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['TEXT_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $originalPk[$field] = $value;
+            }
+        }
 
         if ($action === 'proposal') {
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
-                ->proposalUpdateWithPk($request, $id, 'texts', $pk);
+                ->proposalUpdateWithPk($request, $id, 'texts', $originalPk);
         }
 
         if (!Auth::user()->canWriteDirectly()) {
@@ -382,14 +389,14 @@ class BasicInformationTextsController extends Controller {
         }
 
         // 驗證必填欄位（c_role_id 為可選，預設為 0）
-        CompositePrimaryKey::validateOrFail($pk, 'TEXT_DATA', ['c_role_id']);
+        CompositePrimaryKey::validateOrFail($originalPk, 'TEXT_DATA', ['c_role_id']);
 
-        if ((string) ($pk['c_personid'] ?? '') !== (string) $id) {
+        if ((string) ($originalPk['c_personid'] ?? '') !== (string) $id) {
             abort(400, '路徑人物 ID 與查詢主鍵不一致');
         }
 
-        $c_role_id = $pk['c_role_id'] ?? 0;
-        $legacyId = $pk['c_personid']."-".$pk['c_textid']."-".$c_role_id;
+        $c_role_id = $originalPk['c_role_id'] ?? 0;
+        $legacyId = $originalPk['c_personid']."-".$originalPk['c_textid']."-".$c_role_id;
         $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);
         if ($newPk === null) {
             abort(404, 'BIOG_TEXT_DATA 記錄不存在');

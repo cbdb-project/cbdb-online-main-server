@@ -343,22 +343,8 @@ class BasicInformationAssocController extends Controller {
             }
         }
 
-        // 構建舊格式 ID（用於 Repository）
-        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
-        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
-        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
-        $id_ = $pk['c_personid']."-".
-               ($pk['c_assoc_code'] ?? '0')."-".
-               ($pk['c_assoc_id'] ?? '0')."-".
-               ($pk['c_kin_code'] ?? '0')."-".
-               ($pk['c_kin_id'] ?? '0')."-".
-               ($pk['c_assoc_kin_code'] ?? '0')."-".
-               ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '')."-".
-               $assocFirstYearEncoded;
-
-        $res = $this->biogMainRepository->assocById($id_);
+        // 直接使用 PK 陣列查詢，避免舊格式編碼/解碼的解析問題
+        $res = $this->biogMainRepository->assocByPk($pk);
 
         // 處理 personLabel
         $personLabel = $id;
@@ -463,45 +449,41 @@ class BasicInformationAssocController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+        // 與 proposal 分支寫法一致，避免表單 body 中的新 PK 值覆蓋原始值
         $schema = CompositePrimaryKey::SCHEMAS['ASSOC_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $originalPk[$field] = $value;
+            }
+        }
 
         // 驗證必填欄位（ASSOC_DATA 有較多可選欄位）
         $optional = ['c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
-        CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
+        CompositePrimaryKey::validateOrFail($originalPk, 'ASSOC_DATA', $optional);
 
-        // 構建舊格式 ID
-        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
-        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
-        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
-        $id_ = $pk['c_personid']."-".
-               ($pk['c_assoc_code'] ?? '0')."-".
-               ($pk['c_assoc_id'] ?? '0')."-".
-               ($pk['c_kin_code'] ?? '0')."-".
-               ($pk['c_kin_id'] ?? '0')."-".
-               ($pk['c_assoc_kin_code'] ?? '0')."-".
-               ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '')."-".
-               $assocFirstYearEncoded;
+        if ((string) ($originalPk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
 
-        // 使用 Repository 更新
-        $data = $this->biogMainRepository->assocUpdateById($request, $id_, $id);
+        // 使用原始 PK 查找舊記錄並更新
+        $data = $this->biogMainRepository->assocUpdateByPk($request, $originalPk, $id);
 
         flash('Update success @ '.Carbon::now(), 'success');
 
-        // 重定向到新的查詢參數格式
+        // 重定向到新的查詢參數格式（使用更新後的值）
         $newPk = [
             'c_personid' => $id,
-            'c_assoc_code' => $data['c_assoc_code'] ?? $pk['c_assoc_code'],
-            'c_assoc_id' => $data['c_assoc_id'] ?? $pk['c_assoc_id'],
-            'c_kin_code' => $data['c_kin_code'] ?? $pk['c_kin_code'] ?? '0',
-            'c_kin_id' => $data['c_kin_id'] ?? $pk['c_kin_id'] ?? '0',
-            'c_assoc_kin_code' => $data['c_assoc_kin_code'] ?? $pk['c_assoc_kin_code'] ?? '0',
-            'c_assoc_kin_id' => $data['c_assoc_kin_id'] ?? $pk['c_assoc_kin_id'] ?? '0',
-            'c_text_title' => $data['c_text_title'] ?? $pk['c_text_title'] ?? '',
-            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? $pk['c_assoc_first_year'] ?? '',
+            'c_assoc_code' => $data['c_assoc_code'] ?? $originalPk['c_assoc_code'],
+            'c_assoc_id' => $data['c_assoc_id'] ?? $originalPk['c_assoc_id'],
+            'c_kin_code' => $data['c_kin_code'] ?? $originalPk['c_kin_code'] ?? '0',
+            'c_kin_id' => $data['c_kin_id'] ?? $originalPk['c_kin_id'] ?? '0',
+            'c_assoc_kin_code' => $data['c_assoc_kin_code'] ?? $originalPk['c_assoc_kin_code'] ?? '0',
+            'c_assoc_kin_id' => $data['c_assoc_kin_id'] ?? $originalPk['c_assoc_kin_id'] ?? '0',
+            'c_text_title' => $data['c_text_title'] ?? $originalPk['c_text_title'] ?? '',
+            'c_assoc_first_year' => $data['c_assoc_first_year'] ?? $originalPk['c_assoc_first_year'] ?? '',
         ];
 
         return redirect(CompositePrimaryKey::buildUrl(
@@ -538,22 +520,8 @@ class BasicInformationAssocController extends Controller {
         $optional = ['c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
         CompositePrimaryKey::validateOrFail($pk, 'ASSOC_DATA', $optional);
 
-        // 構建舊格式 ID
-        // 格式：c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
-        // 注意：c_assoc_first_year 可能包含負號（如 -9999），需要編碼為 (minus) 避免解析錯誤
-        $assocFirstYear = $pk['c_assoc_first_year'] ?? '-9999';
-        $assocFirstYearEncoded = str_replace('-', '(minus)', $assocFirstYear);
-        $id_ = $pk['c_personid']."-".
-               ($pk['c_assoc_code'] ?? '0')."-".
-               ($pk['c_assoc_id'] ?? '0')."-".
-               ($pk['c_kin_code'] ?? '0')."-".
-               ($pk['c_kin_id'] ?? '0')."-".
-               ($pk['c_assoc_kin_code'] ?? '0')."-".
-               ($pk['c_assoc_kin_id'] ?? '0')."-".
-               ($pk['c_text_title'] ?? '')."-".
-               $assocFirstYearEncoded;
-
-        $this->biogMainRepository->assocDeleteById($id_, $id);
+        // 直接使用 PK 陣列查詢，避免舊格式編碼/解碼的解析問題
+        $this->biogMainRepository->assocDeleteByPk($pk, $id);
 
         flash('Delete success @ '.Carbon::now(), 'success');
 

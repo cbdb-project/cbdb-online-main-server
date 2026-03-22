@@ -361,15 +361,26 @@ class BasicInformationKinshipController extends Controller {
             return redirect()->back();
         }
 
-        // 從查詢參數提取複合主鍵
+        // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）
+        // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body
         $schema = CompositePrimaryKey::SCHEMAS['KIN_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $originalPk = [];
+        foreach ($schema as $field) {
+            $value = $request->query($field);
+            if ($value !== null) {
+                $originalPk[$field] = $value;
+            }
+        }
 
         // 驗證必填欄位
-        CompositePrimaryKey::validateOrFail($pk, 'KIN_DATA');
+        CompositePrimaryKey::validateOrFail($originalPk, 'KIN_DATA');
+
+        if ((string) ($originalPk['c_personid'] ?? '') !== (string) $id) {
+            abort(400, '路徑人物 ID 與查詢主鍵不一致');
+        }
 
         // 構建舊格式 ID（格式：c_personid-c_kin_id-c_kin_code）
-        $id_ = $pk['c_personid'].'-'.$pk['c_kin_id'].'-'.$pk['c_kin_code'];
+        $id_ = $originalPk['c_personid'].'-'.$originalPk['c_kin_id'].'-'.$originalPk['c_kin_code'];
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->kinshipUpdateById($request, $id, $id_);

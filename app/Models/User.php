@@ -128,6 +128,15 @@ class User extends Authenticatable {
     }
 
     /**
+     * 检查用户是否可以查看審計日誌（活跃的专家或系统管理员）
+     *
+     * @return bool
+     */
+    public function canViewAuditLogs(): bool {
+        return $this->isActive() && $this->isAdmin();
+    }
+
+    /**
      * 检查用户是否可以直接写入数据（活跃且非众包用户）
      *
      * @return bool

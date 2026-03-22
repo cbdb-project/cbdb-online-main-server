@@ -10,7 +10,7 @@
         && !empty($basicinformation->c_personid)
         && !empty($historyConfig['tables'])
         && Auth::check()
-        && Auth::user()->canRestoreOperations()
+        && Auth::user()->canViewAuditLogs()
     ) {
         $historyUrl = route('admin.audit-logs', [
             'c_personid' => $basicinformation->c_personid,

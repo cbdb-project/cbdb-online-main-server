@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Schema;
 
 class AdminAuditLogController extends Controller {
     /**
-     * Audit Log 列表（僅 Super Admin）
+     * Audit Log 列表（僅活躍管理員）
      */
     public function index(Request $request) {
-        if (!Auth::user()->canRestoreOperations()) {
+        if (!Auth::check() || !Auth::user()->canViewAuditLogs()) {
             abort(403, '此功能僅限活躍管理員使用');
         }
 

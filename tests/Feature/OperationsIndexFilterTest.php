@@ -63,6 +63,18 @@ class OperationsIndexFilterTest extends TestCase {
             $table->integer('c_kin_code');
         });
 
+        Schema::create('ASSOC_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->integer('c_assoc_code');
+            $table->integer('c_assoc_id');
+            $table->integer('c_kin_code');
+            $table->integer('c_kin_id');
+            $table->integer('c_assoc_kin_code');
+            $table->integer('c_assoc_kin_id');
+            $table->string('c_text_title')->nullable();
+            $table->integer('c_assoc_first_year')->nullable();
+        });
+
         Schema::create('audit_log', function ($table) {
             $table->bigIncrements('id');
             $table->dateTime('occurred_at');
@@ -287,6 +299,48 @@ class OperationsIndexFilterTest extends TestCase {
         ]);
 
         $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=kinship');
+
+        $response->assertStatus(200);
+        $this->assertSame([$matching->id], $this->listOperationIds($response));
+    }
+
+    #[Test]
+    public function history_filter_matches_legacy_mirrored_kinship_changes_via_resource_id(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        $matching = $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 2002,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=2002&c_kin_id=1001&c_kin_code=300',
+        ]);
+        $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 3003,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=3003&c_kin_id=4004&c_kin_code=300',
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=kinship');
+
+        $response->assertStatus(200);
+        $this->assertSame([$matching->id], $this->listOperationIds($response));
+    }
+
+    #[Test]
+    public function history_filter_matches_legacy_mirrored_assoc_changes_via_resource_id(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        $matching = $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 2002,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => 'c_personid=2002&c_assoc_code=301&c_assoc_id=1001&c_kin_code=0&c_kin_id=1001&c_assoc_kin_code=0&c_assoc_kin_id=1001&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+        ]);
+        $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 3003,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => 'c_personid=3003&c_assoc_code=301&c_assoc_id=4004&c_kin_code=0&c_kin_id=4004&c_assoc_kin_code=0&c_assoc_kin_id=4004&c_text_title=%E5%85%B6%E4%BB%96%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=assoc');
 
         $response->assertStatus(200);
         $this->assertSame([$matching->id], $this->listOperationIds($response));

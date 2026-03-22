@@ -1372,6 +1372,22 @@ class OperationsController extends Controller {
                     ->whereIn('resource', $tables);
             });
 
+            $mirrorFallbackTables = $this->historyLegacyMirrorFallbackTables($tables);
+            if (!empty($mirrorFallbackTables)) {
+                $historyQuery->orWhere(function ($mirrorQuery) use ($personId, $mirrorFallbackTables) {
+                    foreach ($mirrorFallbackTables as $table => $keys) {
+                        $mirrorQuery->orWhere(function ($tableQuery) use ($personId, $table, $keys) {
+                            $tableQuery->where('resource', $table)
+                                ->where(function ($resourceIdQuery) use ($personId, $keys) {
+                                    foreach ($keys as $key) {
+                                        $this->appendResourceIdPersonKeyLike($resourceIdQuery, $key, $personId);
+                                    }
+                                });
+                        });
+                    }
+                });
+            }
+
             if (!Schema::hasTable('audit_log')) {
                 return;
             }
@@ -1388,6 +1404,23 @@ class OperationsController extends Controller {
                     });
             });
         });
+    }
+
+    protected function historyLegacyMirrorFallbackTables(array $tables): array {
+        $definitions = [
+            'KIN_DATA' => ['c_kin_id'],
+            'ASSOC_DATA' => ['c_assoc_id', 'c_kin_id', 'c_assoc_kin_id'],
+        ];
+
+        $resolved = [];
+        foreach ($tables as $table) {
+            $tableName = strtoupper(trim((string) $table));
+            if (isset($definitions[$tableName])) {
+                $resolved[$tableName] = $definitions[$tableName];
+            }
+        }
+
+        return $resolved;
     }
 
     protected function appendAuditPersonIdLike($query, string $column, int $personId): void {
@@ -1417,6 +1450,20 @@ class OperationsController extends Controller {
             foreach ($patterns as $pattern) {
                 $columnQuery->orWhere($column, 'like', $pattern);
             }
+        });
+    }
+
+    protected function appendResourceIdPersonKeyLike($query, string $key, int $personId): void {
+        $needle = trim($key) . '=' . $personId;
+        if ($needle === '=' . $personId) {
+            return;
+        }
+
+        $query->orWhere(function ($resourceIdQuery) use ($needle) {
+            $resourceIdQuery->where('resource_id', $needle)
+                ->orWhere('resource_id', 'like', $needle . '&%')
+                ->orWhere('resource_id', 'like', '%&' . $needle)
+                ->orWhere('resource_id', 'like', '%&' . $needle . '&%');
         });
     }
 

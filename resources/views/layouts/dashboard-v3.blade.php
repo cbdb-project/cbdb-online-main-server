@@ -335,15 +335,25 @@
 
             @php
                 $canViewQueryDetails = Auth::check() && Auth::user()->isAdmin();
+                $pageBottomActions = trim($__env->yieldPushContent('page-bottom-actions'));
             @endphp
 
-            @if(!empty($queryProfileSummary['count']))
-                <p class="text-muted" style="margin-top: 20px;">
-                    本次查詢共 {{ $queryProfileSummary['count'] }} 筆，耗時 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms
-                    @if($canViewQueryDetails)
-                        <a href="#" data-toggle="modal" data-target="#query-profile-modal" style="margin-left: 8px;">查看詳細</a>
+            @if(!empty($queryProfileSummary['count']) || $pageBottomActions !== '')
+                <div class="d-flex flex-wrap justify-content-between align-items-center" style="margin-top: 20px; gap: 12px;">
+                    <div class="text-muted">
+                        @if(!empty($queryProfileSummary['count']))
+                            本次查詢共 {{ $queryProfileSummary['count'] }} 筆，耗時 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms
+                            @if($canViewQueryDetails)
+                                <a href="#" data-toggle="modal" data-target="#query-profile-modal" style="margin-left: 8px;">查看詳細</a>
+                            @endif
+                        @endif
+                    </div>
+                    @if($pageBottomActions !== '')
+                        <div class="d-flex align-items-center">
+                            {!! $pageBottomActions !!}
+                        </div>
                     @endif
-                </p>
+                </div>
             @endif
         </section>
         <!-- /.content -->

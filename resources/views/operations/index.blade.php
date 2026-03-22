@@ -34,9 +34,18 @@ use App\Support\CompositePrimaryKey;
 @include('biogmains.defense')
     <div class="card card-default">
         <div class="card-body">
+            @if(!empty($history_context))
+                <div class="alert alert-info py-2 px-3">
+                    正在顯示人物 {{ $history_context['person_id'] }} 的「{{ $history_context['label'] }}」歷史記錄。
+                </div>
+            @endif
             <form method="GET" action="{{ route('operations.index') }}" class="form-inline" style="margin-bottom: 15px;" id="operations-filters">
                 @if(!empty($proposals_only))
                     <input type="hidden" name="proposals_only" value="1">
+                @endif
+                @if(!empty($history_context))
+                    <input type="hidden" name="c_personid" value="{{ $history_context['person_id'] }}">
+                    <input type="hidden" name="history_page" value="{{ $history_context['page'] }}">
                 @endif
 
                 {{-- 修改人篩選 --}}
@@ -90,7 +99,13 @@ use App\Support\CompositePrimaryKey;
                 @endif
 
                 <button type="submit" class="btn btn-primary btn-sm mr-2">篩選</button>
-                <a href="{{ route('operations.index', !empty($proposals_only) ? ['proposals_only' => 1] : []) }}"
+                <a href="{{ route('operations.index', array_merge(
+                    !empty($proposals_only) ? ['proposals_only' => 1] : [],
+                    !empty($history_context) ? [
+                        'c_personid' => $history_context['person_id'],
+                        'history_page' => $history_context['page'],
+                    ] : [],
+                )) }}"
                    class="btn btn-secondary btn-sm">清除篩選</a>
             </form>
             <div class="table-responsive">

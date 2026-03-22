@@ -135,6 +135,7 @@ if ($altTypeLabel === '') {
             </div>
         </div>
     </div>
+    @include('biogmains.history-button')
 @endsection
 
 @push('scripts')

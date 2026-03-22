@@ -9,7 +9,17 @@
             </div>
 
             <div class="card-body">
+                @if(!empty($history_context))
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        正在顯示人物 {{ $history_context['person_id'] }} 的「{{ $history_context['label'] }}」審計日誌。
+                    </div>
+                @endif
                 <form method="GET" action="{{ route('admin.audit-logs') }}" class="mb-3">
+                    @if(!empty($history_context))
+                        <input type="hidden" name="c_personid" value="{{ $history_context['person_id'] }}">
+                        <input type="hidden" name="history_page" value="{{ $history_context['page'] }}">
+                    @endif
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
@@ -73,7 +83,10 @@
                                 <i class="fas fa-search"></i> 搜尋
                             </button>
                             @if(($filters['search'] ?? '') || ($filters['table_name'] ?? '') || ($filters['operation'] ?? '') || ($filters['actor_type'] ?? '') || ($filters['actor_id'] ?? ''))
-                                <a href="{{ route('admin.audit-logs') }}" class="btn btn-secondary ml-1">
+                                <a href="{{ route('admin.audit-logs', !empty($history_context) ? [
+                                    'c_personid' => $history_context['person_id'],
+                                    'history_page' => $history_context['page'],
+                                ] : []) }}" class="btn btn-secondary ml-1">
                                     <i class="fas fa-times"></i> 清除
                                 </a>
                             @endif

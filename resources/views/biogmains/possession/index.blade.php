@@ -112,6 +112,7 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
         </div>
     </div>
 
+    @include('biogmains.history-button')
 @endsection
 
 @push('scripts')

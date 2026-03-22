@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\BasicInformationHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,15 +13,20 @@ class AdminAuditLogController extends Controller {
      * Audit Log 列表（僅 Super Admin）
      */
     public function index(Request $request) {
-        if (!Auth::user()->isSuperAdmin()) {
-            abort(403, '此功能僅限超級管理員使用');
+        if (!Auth::user()->canRestoreOperations()) {
+            abort(403, '此功能僅限活躍管理員使用');
         }
 
         if (!Schema::hasTable('audit_log')) {
             abort(404, 'audit_log 資料表尚未建立');
         }
 
+        $historyContext = $this->resolveHistoryContext($request);
         $query = DB::table('audit_log');
+
+        if ($historyContext !== null) {
+            $this->applyHistoryFilter($query, $historyContext);
+        }
 
         if ($request->filled('table_name')) {
             $query->where('table_name', $request->input('table_name'));
@@ -70,6 +76,7 @@ class AdminAuditLogController extends Controller {
             'logs' => $logs,
             'table_names' => $tableNames,
             'actor_types' => $actorTypes,
+            'history_context' => $historyContext,
             'filters' => [
                 'search' => $request->input('search'),
                 'table_name' => $request->input('table_name'),
@@ -78,5 +85,70 @@ class AdminAuditLogController extends Controller {
                 'actor_id' => $request->input('actor_id'),
             ],
         ]);
+    }
+
+    protected function resolveHistoryContext(Request $request): ?array {
+        $personId = trim((string) $request->input('c_personid', ''));
+        if ($personId === '' || !ctype_digit($personId) || (int) $personId <= 0) {
+            return null;
+        }
+
+        $historyConfig = BasicInformationHistory::resolveFromPage($request->input('history_page'));
+        if ($historyConfig === null || empty($historyConfig['tables'])) {
+            return null;
+        }
+
+        return [
+            'person_id' => (int) $personId,
+            'page' => $historyConfig['page'],
+            'tables' => $historyConfig['tables'],
+            'label' => $historyConfig['label'],
+        ];
+    }
+
+    protected function applyHistoryFilter($query, array $historyContext): void {
+        $personId = (int) ($historyContext['person_id'] ?? 0);
+        $tables = BasicInformationHistory::normalizeTables((array) ($historyContext['tables'] ?? []));
+
+        if ($personId <= 0 || empty($tables)) {
+            return;
+        }
+
+        $query->whereIn('table_name', $tables)
+            ->where(function ($personQuery) use ($personId) {
+                foreach (['row_pk_text', 'row_pk', 'old_data', 'new_data'] as $column) {
+                    $this->appendAuditPersonIdLike($personQuery, $column, $personId);
+                }
+            });
+    }
+
+    protected function appendAuditPersonIdLike($query, string $column, int $personId): void {
+        if ($column === 'row_pk_text') {
+            $query->orWhere(function ($columnQuery) use ($column, $personId) {
+                $columnQuery->where($column, 'c_personid=' . $personId)
+                    ->orWhere($column, 'like', 'c_personid=' . $personId . '&%')
+                    ->orWhere($column, 'like', '%&c_personid=' . $personId)
+                    ->orWhere($column, 'like', '%&c_personid=' . $personId . '&%');
+            });
+
+            return;
+        }
+
+        $patterns = [
+            '%"c_personid":' . $personId . ',%',
+            '%"c_personid":' . $personId . '}%',
+            '%"c_personid": ' . $personId . ',%',
+            '%"c_personid": ' . $personId . '}%',
+            '%"c_personid":"' . $personId . '",%',
+            '%"c_personid":"' . $personId . '"}%',
+            '%"c_personid": "' . $personId . '",%',
+            '%"c_personid": "' . $personId . '"}%',
+        ];
+
+        $query->orWhere(function ($columnQuery) use ($column, $patterns) {
+            foreach ($patterns as $pattern) {
+                $columnQuery->orWhere($column, 'like', $pattern);
+            }
+        });
     }
 }

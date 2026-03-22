@@ -95,4 +95,5 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
         </div>
     </div>
 
+    @include('biogmains.history-button')
 @endsection

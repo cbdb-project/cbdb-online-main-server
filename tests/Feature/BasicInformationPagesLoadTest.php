@@ -16,12 +16,19 @@ use Tests\TestCase;
  */
 class BasicInformationPagesLoadTest extends TestCase {
     protected $user;
+    protected $adminUser;
     protected $testPersonId = 99999;
 
     protected function setUp(): void {
         parent::setUp();
 
         $this->withoutMiddleware(\App\Http\Middleware\PrometheusMetrics::class);
+
+        $compiledViewPath = sys_get_temp_dir() . '/cbdb-test-views-basicinformation-pages';
+        if (!is_dir($compiledViewPath)) {
+            mkdir($compiledViewPath, 0777, true);
+        }
+        config(['view.compiled' => $compiledViewPath]);
 
         // 使用 in-memory SQLite 数据库
         config()->set('database.default', 'sqlite');
@@ -45,6 +52,14 @@ class BasicInformationPagesLoadTest extends TestCase {
             'is_active' => 1,
             'is_admin' => 0,
             'confirmation_token' => 'test_token_' . time(),
+        ]);
+
+        $this->adminUser = User::factory()->create([
+            'name' => 'Audit Admin',
+            'email' => 'audit-admin@example.com',
+            'is_active' => 1,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+            'confirmation_token' => 'test_admin_token_' . time(),
         ]);
 
         // 灌入测试数据
@@ -620,6 +635,15 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     /**
+     * 測試索引頁在空查詢參數被轉成 null 時仍可正常載入
+     */
+    #[Test]
+    public function test_basicinformation_index_page_loads_with_empty_query_params_and_large_page(): void {
+        $response = $this->get('/basicinformation?q=&c_dy=&page=32773');
+        $response->assertStatus(200);
+    }
+
+    /**
      * 测试创建页面：/basicinformation/create
      */
     #[Test]
@@ -654,6 +678,34 @@ class BasicInformationPagesLoadTest extends TestCase {
     public function test_basicinformation_edit_page_loads() {
         $response = $this->actingAs($this->user)->get("/basicinformation/{$this->testPersonId}/edit");
         $response->assertStatus(200);
+    }
+
+    #[Test]
+    public function test_basicinformation_tabbed_pages_render_history_button(): void {
+        $pages = [
+            "/basicinformation/{$this->testPersonId}/edit" => 'basic',
+            "/basicinformation/{$this->testPersonId}/addresses" => 'addresses',
+            "/basicinformation/{$this->testPersonId}/altnames" => 'altnames',
+            "/basicinformation/{$this->testPersonId}/texts" => 'texts',
+            "/basicinformation/{$this->testPersonId}/offices" => 'offices',
+            "/basicinformation/{$this->testPersonId}/assoc" => 'assoc',
+            "/basicinformation/{$this->testPersonId}/entries" => 'entries',
+            "/basicinformation/{$this->testPersonId}/events" => 'events',
+            "/basicinformation/{$this->testPersonId}/kinship" => 'kinship',
+            "/basicinformation/{$this->testPersonId}/statuses" => 'statuses',
+            "/basicinformation/{$this->testPersonId}/possession" => 'possession',
+            "/basicinformation/{$this->testPersonId}/socialinst" => 'socialinst',
+            "/basicinformation/{$this->testPersonId}/sources" => 'sources',
+        ];
+
+        foreach ($pages as $url => $expectedPage) {
+            $response = $this->actingAs($this->adminUser)->get($url);
+            $response->assertStatus(200);
+            $response->assertSeeText('查看本頁歷史記錄');
+            $response->assertSee('c_personid=' . $this->testPersonId, false);
+            $response->assertSee('/admin/audit-logs', false);
+            $response->assertSee('history_page=' . $expectedPage, false);
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -48,6 +49,18 @@ class OperationsIndexFilterTest extends TestCase {
             $table->string('c_name_chn')->nullable();
             $table->string('c_name')->nullable();
             $table->timestamps();
+        });
+
+        Schema::create('ALTNAME_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->string('c_alt_name_chn')->nullable();
+            $table->integer('c_alt_name_type_code')->nullable();
+        });
+
+        Schema::create('KIN_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->integer('c_kin_id');
+            $table->integer('c_kin_code');
         });
 
         Schema::create('audit_log', function ($table) {
@@ -98,6 +111,11 @@ class OperationsIndexFilterTest extends TestCase {
     /** 取出 viewData('lists') 中所有 op_type */
     private function listOpTypes($response): array {
         return $response->viewData('lists')->pluck('op_type')->map(fn ($v) => (int) $v)->all();
+    }
+
+    /** 取出 viewData('lists') 中所有 operation id */
+    private function listOperationIds($response): array {
+        return $response->viewData('lists')->pluck('id')->map(fn ($v) => (int) $v)->all();
     }
 
     // ── editor 篩選 ──
@@ -204,6 +222,74 @@ class OperationsIndexFilterTest extends TestCase {
         $opTypes = $this->listOpTypes($response);
         $this->assertCount(1, $opTypes);
         $this->assertSame(Operation::TYPE_PROPOSAL_CREATE, $opTypes[0]);
+    }
+
+    #[Test]
+    public function history_filter_matches_current_person_page_by_resource_and_person(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        $matching = $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 1001,
+            'resource' => 'ALTNAME_DATA',
+            'resource_id' => 'c_personid=1001&c_alt_name_chn=%E6%B8%AC%E8%A9%A6&c_alt_name_type_code=1',
+        ]);
+        $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 1001,
+            'resource' => 'BIOG_TEXT_DATA',
+        ]);
+        $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 2002,
+            'resource' => 'ALTNAME_DATA',
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=altnames');
+
+        $response->assertStatus(200);
+        $this->assertSame([$matching->id], $this->listOperationIds($response));
+    }
+
+    #[Test]
+    public function history_filter_matches_mirrored_person_changes_via_audit_log(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        $matching = $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 2002,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=2002&c_kin_id=1001&c_kin_code=300',
+        ]);
+        $this->makeOperation($user, Operation::TYPE_UPDATE, [
+            'c_personid' => 3003,
+            'resource' => 'KIN_DATA',
+            'resource_id' => 'c_personid=3003&c_kin_id=4004&c_kin_code=300',
+        ]);
+
+        DB::table('audit_log')->insert([
+            'occurred_at' => now(),
+            'created_at' => now(),
+            'table_name' => 'KIN_DATA',
+            'operation' => 'UPDATE',
+            'actor_type' => 'user',
+            'actor_id' => (string) $user->id,
+            'operation_id' => (string) $matching->id,
+            'row_pk' => json_encode([
+                'c_kin_id' => 2002,
+                'c_kin_code' => 300,
+            ], JSON_UNESCAPED_UNICODE),
+            'row_pk_text' => 'c_personid=1001&c_kin_id=2002&c_kin_code=300',
+            'old_data' => json_encode([
+                'c_kin_id' => 2002,
+                'c_kin_code' => 300,
+            ], JSON_UNESCAPED_UNICODE),
+            'new_data' => json_encode([
+                'c_kin_id' => 2002,
+                'c_kin_code' => 301,
+            ], JSON_UNESCAPED_UNICODE),
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=kinship');
+
+        $response->assertStatus(200);
+        $this->assertSame([$matching->id], $this->listOperationIds($response));
     }
 
     #[Test]

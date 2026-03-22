@@ -171,6 +171,32 @@
                                             ];
                                         }
                                         $diffSource = !empty($diffRows) ? ['rows' => $diffRows] : null;
+                                        $formatPkDescription = static function ($tableName, $rowPkText, $rowPkData) {
+                                            $rowPkText = trim((string) $rowPkText);
+                                            if ($rowPkText !== '') {
+                                                $parsedRowPk = \App\Support\CompositePrimaryKey::parseStoredResourceId($rowPkText, (string) $tableName);
+                                                if (is_array($parsedRowPk) && !empty($parsedRowPk)) {
+                                                    $parts = [];
+                                                    foreach ($parsedRowPk as $column => $value) {
+                                                        $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+                                                    }
+
+                                                    return implode("\n", $parts);
+                                                }
+                                            }
+
+                                            if (is_array($rowPkData) && !empty($rowPkData)) {
+                                                $parts = [];
+                                                foreach ($rowPkData as $column => $value) {
+                                                    $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+                                                }
+
+                                                return implode("\n", $parts);
+                                            }
+
+                                            return $rowPkText;
+                                        };
+                                        $pkDescription = $formatPkDescription($log->table_name, $log->row_pk_text ?? '', $rowPk);
                                     @endphp
                                     <tr>
                                         <td>{{ $log->id }}</td>
@@ -229,9 +255,10 @@
                                             <small class="text-muted">{{ $log->actor_id }}</small>
                                         </td>
                                         <td>
-                                            <div class="text-monospace">{{ $log->row_pk_text }}</div>
-                                            @if($rowPk)
-                                                <small class="text-muted">{{ json_encode($rowPk, JSON_UNESCAPED_UNICODE) }}</small>
+                                            @if($pkDescription !== '')
+                                                <div class="text-monospace">{!! nl2br(e($pkDescription)) !!}</div>
+                                            @else
+                                                <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td class="text-monospace">{{ $log->operation_id }}</td>

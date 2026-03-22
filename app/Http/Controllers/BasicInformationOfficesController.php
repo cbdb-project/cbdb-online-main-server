@@ -267,6 +267,11 @@ class BasicInformationOfficesController extends Controller {
             return redirect()->back();
         }
 
+        // 另存新檔：以表單目前的資料建立新記錄
+        if ($request->input('action') === 'saveas') {
+            return $this->storeSaveAs($request, $id);
+        }
+
         //return $request;
         //修改結束
         try {
@@ -371,6 +376,33 @@ class BasicInformationOfficesController extends Controller {
             'office' => $_id,
     ]);
     */
+    }
+
+    /**
+     * 以表單目前的資料另存為新記錄（由 update 方法的 action=saveas 觸發）。
+     */
+    private function storeSaveAs(Request $request, $id) {
+        // 移除編輯表單的隱藏欄位，這些不是資料庫欄位
+        $request->request->remove('_method');
+        $request->request->remove('_id');
+        $request->request->remove('_postingid');
+        $request->request->remove('_officeid');
+
+        $_id = $this->biogMainRepository->officeStoreById($request, $id);
+        flash('另存新檔成功 @ '.Carbon::now(), 'success');
+
+        $newPk = CompositePrimaryKey::parseStoredResourceId($_id, 'POSTED_TO_OFFICE_DATA');
+        if ($newPk === null) {
+            \Log::error('officeStoreById（另存）返回的 resource_id 無法解析', ['resource_id' => $_id]);
+
+            return redirect(route('basicinformation.offices.index', $id, false));
+        }
+
+        return redirect(CompositePrimaryKey::buildUrl(
+            'basicinformation.offices.edit.query',
+            ['id' => $id],
+            $newPk
+        ));
     }
 
     /**
@@ -522,6 +554,11 @@ class BasicInformationOfficesController extends Controller {
             flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
+        }
+
+        // 另存新檔：以表單目前的資料建立新記錄
+        if ($action === 'saveas') {
+            return $this->storeSaveAs($request, $id);
         }
 
         // 從 URL 查詢字串取得原始 PK（而非表單提交的新值）

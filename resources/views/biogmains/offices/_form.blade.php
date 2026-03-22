@@ -279,7 +279,9 @@
                         <i class="fa fa-save"></i> 直接儲存
                     </button>
                     @if($isEdit)
-                        <a href="../../../../basicinformation/{{ $row->c_personid }}/offices/{{ $row->c_office_id.'-'.$row->c_posting_id }}/saveas" class="btn btn-success" style="margin-left:40px;">save as</a>
+                        <button type="submit" name="action" value="saveas" class="btn btn-success" style="margin-left:40px;">
+                            <i class="fa fa-copy"></i> 另存新檔
+                        </button>
                     @endif
                 @endif
 

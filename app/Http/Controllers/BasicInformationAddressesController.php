@@ -543,6 +543,7 @@ class BasicInformationAddressesController extends Controller {
         }
 
         $legacyId = $originalPk['c_personid']."-".$originalPk['c_addr_id']."-".$originalPk['c_addr_type']."-".$originalPk['c_sequence'];
+
         try {
             $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
         } catch (\InvalidArgumentException $e) {

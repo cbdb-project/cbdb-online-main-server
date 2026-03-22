@@ -403,6 +403,7 @@ class BasicInformationTextsController extends Controller {
 
         $c_role_id = $originalPk['c_role_id'] ?? 0;
         $legacyId = $originalPk['c_personid']."-".$originalPk['c_textid']."-".$c_role_id;
+
         try {
             $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);
         } catch (\InvalidArgumentException $e) {

@@ -1994,6 +1994,80 @@ class BiogMainRepository {
                 $c_text_title = $temp_l[7] ?? '';
             }
         }
+        if (!$row) {
+            abort(404, '找不到指定的社會關係記錄');
+        }
+
+        return $this->assocBuildResult($row);
+    }
+
+    /**
+     * 使用複合主鍵陣列直接查詢社會關係記錄
+     *
+     * 避免舊格式 ID 字串的編碼/解碼，直接以 PK 欄位值查詢資料庫。
+     *
+     * @param array $pk 複合主鍵欄位陣列
+     * @return array 包含 row 與相關顯示資料的陣列
+     */
+    public function assocByPk(array $pk) {
+        $where = [];
+        $fields = ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        foreach ($fields as $field) {
+            if (isset($pk[$field]) && $pk[$field] !== '') {
+                $where[] = [$field, '=', $pk[$field]];
+            } else {
+                // 對於未提供的可選欄位使用預設值
+                $defaults = [
+                    'c_kin_code' => '0', 'c_kin_id' => '0',
+                    'c_assoc_kin_code' => '0', 'c_assoc_kin_id' => '0',
+                    'c_text_title' => '', 'c_assoc_first_year' => '-9999',
+                ];
+                if (isset($defaults[$field])) {
+                    $where[] = [$field, '=', $defaults[$field]];
+                }
+            }
+        }
+
+        $row = DB::table('ASSOC_DATA')->where($where)->first();
+
+        if (!$row) {
+            abort(404, '找不到指定的社會關係記錄');
+        }
+
+        return $this->assocBuildResult($row);
+    }
+
+    /**
+     * 從 PK 陣列建立 ASSOC_DATA 的 WHERE 條件
+     *
+     * @param array $pk 複合主鍵欄位陣列
+     * @return array WHERE 條件陣列
+     */
+    private function buildAssocWhereFromPk(array $pk): array {
+        $fields = ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        $defaults = [
+            'c_kin_code' => '0', 'c_kin_id' => '0',
+            'c_assoc_kin_code' => '0', 'c_assoc_kin_id' => '0',
+            'c_text_title' => '', 'c_assoc_first_year' => '-9999',
+        ];
+        $where = [];
+        foreach ($fields as $field) {
+            $value = $pk[$field] ?? ($defaults[$field] ?? null);
+            if ($value !== null) {
+                $where[] = [$field, '=', $value];
+            }
+        }
+
+        return $where;
+    }
+
+    /**
+     * 從 ASSOC_DATA 記錄建立編輯頁面所需的結果陣列
+     *
+     * @param object $row ASSOC_DATA 記錄
+     * @return array 包含 row 與相關顯示資料的陣列
+     */
+    private function assocBuildResult($row) {
         $text_str = null;
         if ($row->c_source || $row->c_source === 0) {
             $text_ = TextCode::find($row->c_source);
@@ -2128,6 +2202,25 @@ class BiogMainRepository {
             'tertiary_personid' => $tertiary_personid, 'assoc_claimer_id' => $assoc_claimer_id, 'addr_id' => $addr_id, 'inst_code' => $inst_code, 'kinship_pair' => $kinship_pair, 'assoc_kinship_pair' => $assoc_kinship_pair];
     }
 
+    /**
+     * 使用複合主鍵陣列更新社會關係記錄
+     *
+     * @param Request $request HTTP 請求
+     * @param array $pk 複合主鍵欄位陣列
+     * @param int|string $c_personid 人物 ID
+     * @return array 更新後的資料
+     */
+    public function assocUpdateByPk(Request $request, array $pk, $c_personid) {
+        $whereConditions = $this->buildAssocWhereFromPk($pk);
+        $row = DB::table('ASSOC_DATA')->where($whereConditions)->first();
+
+        if (!$row) {
+            abort(404, '找不到指定的社會關係記錄');
+        }
+
+        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
+    }
+
     public function assocUpdateById(Request $request, $id, $c_personid) {
         $auditLog = new AuditLogService();
         //20200709聯合主鍵保留字弱點防禦函式
@@ -2209,6 +2302,33 @@ class BiogMainRepository {
             return [];
         }
 
+        $whereConditions = [
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $c_text_title],
+            ['c_assoc_first_year', '=', $c_assoc_first_year],
+        ];
+
+        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
+    }
+
+    /**
+     * 執行社會關係更新的共用邏輯
+     *
+     * @param Request $request HTTP 請求
+     * @param array $whereConditions WHERE 條件陣列
+     * @param object $row 原始記錄
+     * @param int|string $c_personid 人物 ID
+     * @return array 更新後的資料
+     */
+    private function assocPerformUpdate(Request $request, array $whereConditions, $row, $c_personid) {
+        $auditLog = new AuditLogService();
+
         $data = $request->all();
         $data = $this->formatSelect($data);
         $assoc_pair = $data['c_assocship_pair'];
@@ -2229,19 +2349,8 @@ class BiogMainRepository {
 
         $ori_data = $data;
 
-        DB::transaction(function () use (&$ori_data, $c_personid, $temp_l, $c_text_title, $c_assoc_first_year, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog) {
-            DB::table('ASSOC_DATA')->where([
-                ['c_personid', '=', $temp_l[0]],
-                ['c_assoc_code', '=', $temp_l[1]],
-                ['c_assoc_id', '=', $temp_l[2]],
-                //20191028進行聯合主鍵的擴充修改
-                ['c_kin_code', '=', $temp_l[3]],
-                ['c_kin_id', '=', $temp_l[4]],
-                ['c_assoc_kin_code', '=', $temp_l[5]],
-                ['c_assoc_kin_id', '=', $temp_l[6]],
-                ['c_text_title', '=', $c_text_title],
-                ['c_assoc_first_year', '=', $c_assoc_first_year],
-            ])->update($data);
+        DB::transaction(function () use (&$ori_data, $c_personid, $whereConditions, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog) {
+            DB::table('ASSOC_DATA')->where($whereConditions)->update($data);
 
             // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
             $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 3, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
@@ -2415,6 +2524,23 @@ class BiogMainRepository {
         return $ori_Data;
     }
 
+    /**
+     * 使用複合主鍵陣列刪除社會關係記錄
+     *
+     * @param array $pk 複合主鍵欄位陣列
+     * @param int|string $c_personid 人物 ID
+     */
+    public function assocDeleteByPk(array $pk, $c_personid) {
+        $whereConditions = $this->buildAssocWhereFromPk($pk);
+        $row = DB::table('ASSOC_DATA')->where($whereConditions)->first();
+
+        if (!$row) {
+            abort(404, '找不到指定的社會關係記錄');
+        }
+
+        $this->assocPerformDelete($whereConditions, $row, $c_personid);
+    }
+
     public function assocDeleteById($id, $c_personid) {
         $auditLog = new AuditLogService();
         //20200709聯合主鍵保留字弱點防禦函式
@@ -2496,7 +2622,32 @@ class BiogMainRepository {
             return;
         }
 
-        DB::transaction(function () use ($id, $c_personid, $temp_l, $c_text_title, $c_assoc_first_year, $row, $auditLog) {
+        $whereConditions = [
+            ['c_personid', '=', $temp_l[0]],
+            ['c_assoc_code', '=', $temp_l[1]],
+            ['c_assoc_id', '=', $temp_l[2]],
+            ['c_kin_code', '=', $temp_l[3]],
+            ['c_kin_id', '=', $temp_l[4]],
+            ['c_assoc_kin_code', '=', $temp_l[5]],
+            ['c_assoc_kin_id', '=', $temp_l[6]],
+            ['c_text_title', '=', $c_text_title],
+            ['c_assoc_first_year', '=', $c_assoc_first_year],
+        ];
+
+        $this->assocPerformDelete($whereConditions, $row, $c_personid);
+    }
+
+    /**
+     * 執行社會關係刪除的共用邏輯
+     *
+     * @param array $whereConditions WHERE 條件陣列
+     * @param object $row 原始記錄
+     * @param int|string $c_personid 人物 ID
+     */
+    private function assocPerformDelete(array $whereConditions, $row, $c_personid) {
+        $auditLog = new AuditLogService();
+
+        DB::transaction(function () use ($c_personid, $whereConditions, $row, $auditLog) {
             // 修正：查找配對記錄時使用多層次策略
             // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
             // 2. 否則使用 paired c_assoc_code 來精確匹配
@@ -2543,17 +2694,7 @@ class BiogMainRepository {
                 }
             }
 
-            DB::table('ASSOC_DATA')->where([
-                ['c_personid', '=', $temp_l[0]],
-                ['c_assoc_code', '=', $temp_l[1]],
-                ['c_assoc_id', '=', $temp_l[2]],
-                ['c_kin_code', '=', $temp_l[3]],
-                ['c_kin_id', '=', $temp_l[4]],
-                ['c_assoc_kin_code', '=', $temp_l[5]],
-                ['c_assoc_kin_id', '=', $temp_l[6]],
-                ['c_text_title', '=', $c_text_title],
-                ['c_assoc_first_year', '=', $c_assoc_first_year],
-            ])->delete();
+            DB::table('ASSOC_DATA')->where($whereConditions)->delete();
 
             $assocResourceId = CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $row->c_personid,
@@ -2623,10 +2764,9 @@ class BiogMainRepository {
             } elseif ($reverseDeleteSkipReason !== null) {
                 Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
                     'reason' => $reverseDeleteSkipReason,
-                    'forward_id' => $id,
-                    'c_personid' => $temp_l[0] ?? null,
-                    'c_assoc_id' => $temp_l[2] ?? null,
-                    'c_assoc_code' => $temp_l[1] ?? null,
+                    'c_personid' => $row->c_personid,
+                    'c_assoc_id' => $row->c_assoc_id,
+                    'c_assoc_code' => $row->c_assoc_code,
                     'c_kin_id' => $row->c_kin_id,
                     'c_assoc_kin_id' => $row->c_assoc_kin_id,
                 ]);

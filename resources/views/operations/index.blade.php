@@ -234,11 +234,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $resourceNoteTooltipShort = '';
                                 $hasResourceNoteIcon = false;
                                 $resourceDataForIcon = json_decode($item->resource_data, true);
+                                $summaryNoteLabel = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true)
+                                    ? '提案說明'
+                                    : '修改說明';
                                 if (is_array($resourceDataForIcon)) {
                                     $notesForIcon = [];
                                     $iconDirectNote = trim((string) ($resourceDataForIcon['__note'] ?? ''));
                                     if ($iconDirectNote !== '') {
-                                        $notesForIcon[] = '修改說明：'.$iconDirectNote;
+                                        $notesForIcon[] = $summaryNoteLabel . '：' . $iconDirectNote;
                                     }
                                     $iconProposalMeta = $resourceDataForIcon['__proposal_meta'] ?? [];
                                     if (is_array($iconProposalMeta)) {
@@ -309,10 +312,12 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $reviewComment = is_array($resourceDataParsed) ? ($resourceDataParsed['__review_comment'] ?? null) : null;
                                 $reviewedBy = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_by'] ?? null) : null;
                                 $reviewedAt = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_at'] ?? null) : null;
+                                $isProposal = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true);
+                                $primaryNoteLabel = $isProposal ? '提案說明' : '修改說明';
                                 $operationNotes = [];
                                 $directNote = is_array($resourceDataParsed) ? trim((string) ($resourceDataParsed['__note'] ?? '')) : '';
                                 if ($directNote !== '') {
-                                    $operationNotes[] = ['label' => '修改說明', 'content' => $directNote];
+                                    $operationNotes[] = ['label' => $primaryNoteLabel, 'content' => $directNote];
                                 }
                                 $proposalComment = is_array($proposalMeta) ? trim((string) ($proposalMeta['comment'] ?? '')) : '';
                                 if ($proposalComment !== '') {
@@ -368,7 +373,6 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     }
                                 }
                                 $cancelledBy = $proposalMeta['cancelled_by'] ?? null;
-                                $isProposal = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true);
                                 $submittedById = $proposalMeta['submitted_by_id'] ?? null;
                                 $isProposalOwner = Auth::check() && $submittedById !== null && (int) Auth::id() === (int) $submittedById;
                                 $canEditProposal = $isProposalOwner && in_array($reviewStatus, ['pending', 'rejected'], true);
@@ -511,17 +515,17 @@ $item->resource_data = unionPKDef($item->resource_data);
                                   </div>
                                 </div>
                                 @if($hasOperationNotes)
-                                    <div id="operation-notes-{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
+                                        <div id="operation-notes-{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                       <div class="modal-dialog">
                                         <div class="modal-content">
                                           <div class="modal-header">
-                                            <h4 class="modal-title">修改說明</h4>
+                                            <h4 class="modal-title">{{ $primaryNoteLabel }}</h4>
                                             <button type="button" class="close" data-dismiss="modal">&times;</button>
                                           </div>
                                           <div class="modal-body" style="word-break: break-word;">
                                             @foreach($operationNotes as $note)
                                                 <div style="margin-bottom: 12px;">
-                                                    @if(($note['label'] ?? '') !== '修改說明')
+                                                    @if(($note['label'] ?? '') !== $primaryNoteLabel)
                                                         <strong>{{ $note['label'] ?? '備註' }}</strong>
                                                     @endif
                                                     <div>{!! nl2br(e($note['content'] ?? '')) !!}</div>

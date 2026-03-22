@@ -361,4 +361,40 @@ class OperationsIndexFilterTest extends TestCase {
         $data = json_decode($lists[0]->resource_data, true);
         $this->assertSame('pending', $data['__review_status']);
     }
+
+    #[Test]
+    public function proposals_view_labels_direct_note_as_proposal_note(): void {
+        $user = $this->makeUser('Admin', 'admin@example.com');
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1001,
+            'c_name_chn' => '測試人物',
+            'c_name' => 'Test Person',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->makeOperation($user, Operation::TYPE_PROPOSAL_UPDATE, [
+            'c_personid' => 1001,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => 'c_personid=1001',
+            'resource_data' => json_encode([
+                'c_name_chn' => '提案人物',
+                '__note' => '這是提案說明',
+                '__review_status' => 'pending',
+                '__proposal_meta' => [
+                    'submitted_by' => 'Admin',
+                    'submitted_by_id' => $user->id,
+                    'submitted_at' => now()->format('Y-m-d H:i:s'),
+                ],
+            ], JSON_UNESCAPED_UNICODE),
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations?proposals_only=1');
+
+        $response->assertStatus(200);
+        $response->assertSeeText('提案說明');
+        $response->assertSeeText('這是提案說明');
+        $response->assertDontSeeText('修改說明');
+    }
 }

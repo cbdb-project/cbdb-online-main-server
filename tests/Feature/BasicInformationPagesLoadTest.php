@@ -174,6 +174,7 @@ class BasicInformationPagesLoadTest extends TestCase {
             $table->integer('c_assoc_kin_id')->default(0);
             $table->string('c_text_title', 255)->nullable();
             $table->integer('c_assoc_first_year')->default(-9999);
+            $table->integer('c_sequence')->default(0);
             $table->timestamps();
         });
 

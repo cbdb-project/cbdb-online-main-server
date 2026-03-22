@@ -708,7 +708,7 @@ class BiogMainRepository {
         $temp_l = explode("-", $id_);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_textid', 'c_role_id']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid']);
         $data = (new ToolsRepository())->timestamp($data);
 
         return DB::transaction(function () use ($id, $temp_l, $data, $comment) {
@@ -720,6 +720,26 @@ class BiogMainRepository {
 
             if (!$ori) {
                 return null;
+            }
+
+            // 若主鍵欄位有變動，檢查新主鍵是否與既有記錄衝突
+            $newTextid = $data['c_textid'] ?? $ori->c_textid;
+            $newRoleId = $data['c_role_id'] ?? $ori->c_role_id;
+            $pkChanged = (string) $newTextid !== (string) $ori->c_textid
+                      || (string) $newRoleId !== (string) $ori->c_role_id;
+
+            if ($pkChanged) {
+                $conflict = DB::table('BIOG_TEXT_DATA')->where([
+                    ['c_personid', '=', $temp_l[0]],
+                    ['c_textid', '=', $newTextid],
+                    ['c_role_id', '=', $newRoleId],
+                ])->exists();
+
+                if ($conflict) {
+                    throw new \InvalidArgumentException(
+                        '目標著述代碼與著述角色的組合已存在，請使用不同的值。'
+                    );
+                }
             }
 
             DB::table('BIOG_TEXT_DATA')->where([
@@ -2824,7 +2844,7 @@ class BiogMainRepository {
         $addr_l = $this->parseAddrId($addr);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
         $data = (new ToolsRepository())->timestamp($data);
@@ -2839,6 +2859,27 @@ class BiogMainRepository {
 
             if (!$ori) {
                 return null;
+            }
+
+            // 若主鍵欄位有變動，檢查新主鍵是否與既有記錄衝突
+            $newAddrType = $data['c_addr_type'] ?? $ori->c_addr_type;
+            $newSequence = $data['c_sequence'] ?? $ori->c_sequence;
+            $pkChanged = (string) $newAddrType !== (string) $ori->c_addr_type
+                      || (string) $newSequence !== (string) $ori->c_sequence;
+
+            if ($pkChanged) {
+                $conflict = DB::table('BIOG_ADDR_DATA')->where([
+                    ['c_personid', '=', $addr_l[0]],
+                    ['c_addr_id', '=', $addr_l[1]],
+                    ['c_addr_type', '=', $newAddrType],
+                    ['c_sequence', '=', $newSequence],
+                ])->exists();
+
+                if ($conflict) {
+                    throw new \InvalidArgumentException(
+                        '目標地址類別與遷徙次序的組合已存在，請使用不同的值。'
+                    );
+                }
             }
 
             DB::table('BIOG_ADDR_DATA')->where([

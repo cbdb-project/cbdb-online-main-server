@@ -543,7 +543,13 @@ class BasicInformationAddressesController extends Controller {
         }
 
         $legacyId = $originalPk['c_personid']."-".$originalPk['c_addr_id']."-".$originalPk['c_addr_type']."-".$originalPk['c_sequence'];
-        $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
+        try {
+            $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $legacyId);
+        } catch (\InvalidArgumentException $e) {
+            flash($e->getMessage(), 'error');
+
+            return redirect()->back()->withInput();
+        }
         if ($newPk === null) {
             abort(404, 'BIOG_ADDR_DATA 記錄不存在');
         }

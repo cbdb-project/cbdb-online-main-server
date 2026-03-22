@@ -125,11 +125,12 @@ class BiogMain extends Model {
 
     public function assoc() {
         return $this->belongsToMany('App\Models\AssocCode', 'ASSOC_DATA', 'c_personid', 'c_assoc_code')
-            ->withPivot('c_personid', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year');
+            ->withPivot('c_personid', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year')
+            ->orderByPivot('c_sequence');
     }
 
     public function assoc_name() {
-        return $this->belongsToMany('App\Models\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn' ,'c_sequence']);
+        return $this->belongsToMany('App\Models\BiogMain', 'ASSOC_DATA', 'c_personid', 'c_assoc_id')->select(['c_name', 'c_name_chn' ,'c_sequence'])->orderByPivot('c_sequence');
     }
 
     public function possession() {

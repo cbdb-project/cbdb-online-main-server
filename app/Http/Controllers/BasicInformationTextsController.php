@@ -253,7 +253,13 @@ class BasicInformationTextsController extends Controller {
         }
 
         // 使用 Repository 進行更新（內含事務與審計）
-        $newPk = $this->biogMainRepository->textUpdateById($request, $id, $id_);
+        try {
+            $newPk = $this->biogMainRepository->textUpdateById($request, $id, $id_);
+        } catch (\InvalidArgumentException $e) {
+            flash($e->getMessage(), 'error');
+
+            return redirect()->back()->withInput();
+        }
         if (!$newPk) {
             abort(404, 'BIOG_TEXT_DATA 記錄不存在');
         }
@@ -397,7 +403,13 @@ class BasicInformationTextsController extends Controller {
 
         $c_role_id = $originalPk['c_role_id'] ?? 0;
         $legacyId = $originalPk['c_personid']."-".$originalPk['c_textid']."-".$c_role_id;
-        $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);
+        try {
+            $newPk = $this->biogMainRepository->textUpdateById($request, $id, $legacyId);
+        } catch (\InvalidArgumentException $e) {
+            flash($e->getMessage(), 'error');
+
+            return redirect()->back()->withInput();
+        }
         if ($newPk === null) {
             abort(404, 'BIOG_TEXT_DATA 記錄不存在');
         }

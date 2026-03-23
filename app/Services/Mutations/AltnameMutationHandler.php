@@ -7,7 +7,6 @@ use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class AltnameMutationHandler extends AbstractMutationHandler {

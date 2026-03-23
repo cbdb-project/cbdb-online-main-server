@@ -61,6 +61,7 @@ class BiogSourceRepository {
             foreach (self::KEY_COLUMNS as $column) {
                 if (!array_key_exists($column, $targetPk)) {
                     $errors['target.pk.'.$column][] = 'required';
+
                     continue;
                 }
 
@@ -284,6 +285,7 @@ class BiogSourceRepository {
     protected function normalizeTextId($value): int {
         $normalized = (int) $value;
 
+        // Select2 在前端會把 id=0 的選項轉成 -999，API 需沿用既有 sources 流程將其還原為 0。
         return $normalized === -999 ? 0 : $normalized;
     }
 

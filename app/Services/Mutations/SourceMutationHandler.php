@@ -64,7 +64,7 @@ class SourceMutationHandler extends AbstractMutationHandler {
             }
         }
 
-        $comment = is_string($meta['comment'] ?? null) ? trim((string) $meta['comment']) : '';
+        $comment = is_string($meta['comment'] ?? null) ? trim($meta['comment']) : '';
 
         if ($mode === 'proposal') {
             $result = $operation === 'create'

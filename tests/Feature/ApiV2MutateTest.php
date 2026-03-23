@@ -286,7 +286,7 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
-    public function testBearerTokenUserCanCreateSourceProposalViaApiV2Mutate() {
+    public function testSourceProposalCreateWithBearerTokenAuthentication() {
         $this->seedTextCode();
         $user = $this->makeUser(email: 'token-user@example.com');
         $token = $user->createToken('api-test')->plainTextToken;
@@ -541,8 +541,6 @@ class ApiV2MutateTest extends TestCase {
 
     #[Test]
     public function testInvalidBearerTokenIsRejectedBeforeMutationHandling() {
-        $this->seedTextCode();
-
         $response = $this->withHeaders([
             'Authorization' => 'Bearer invalid-token',
         ])->postJson('/api/v2/mutate', $this->sourceCreatePayload());

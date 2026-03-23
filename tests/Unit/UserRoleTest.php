@@ -181,6 +181,34 @@ class UserRoleTest extends TestCase {
     }
 
     /**
+     * 测试 canViewAuditLogs() 方法
+     */
+    #[Test]
+    public function testCanViewAuditLogs() {
+        $user = new User();
+
+        // 未启用的专家用戶
+        $user->is_active = User::STATUS_INACTIVE;
+        $user->is_admin = User::ROLE_EXPERT;
+        $this->assertFalse($user->canViewAuditLogs());
+
+        // 已启用的专家用戶
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_EXPERT;
+        $this->assertTrue($user->canViewAuditLogs());
+
+        // 已启用的系统管理员
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_SUPER_ADMIN;
+        $this->assertTrue($user->canViewAuditLogs());
+
+        // 已启用的一般用戶
+        $user->is_active = User::STATUS_ACTIVE;
+        $user->is_admin = User::ROLE_REGULAR;
+        $this->assertFalse($user->canViewAuditLogs());
+    }
+
+    /**
      * 测试 canWriteDirectly() 方法
      */
     #[Test]

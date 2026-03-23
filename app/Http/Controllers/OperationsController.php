@@ -8,6 +8,7 @@ use App\Models\OfficeCodeTypeRel;
 use App\Models\OfficeTypeTree;
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
+use App\Support\BasicInformationHistory;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class OperationsController extends Controller {
 
     public function index(Request $request) {
         $proposalsOnly = filter_var($request->input('proposals_only', false), FILTER_VALIDATE_BOOLEAN);
+        $historyContext = $this->resolveHistoryContext($request);
 
         $query = Operation::where('crowdsourcing_status', 0);
         $statusFilters = [];
@@ -86,6 +88,10 @@ class OperationsController extends Controller {
             if (!empty($opTypeFilter)) {
                 $query->whereIn('op_type', $opTypeFilter);
             }
+        }
+
+        if ($historyContext !== null) {
+            $this->applyHistoryFilter($query, $historyContext);
         }
 
         $lists = $query->orderBy('updated_at', 'desc')->paginate(20);
@@ -649,6 +655,7 @@ class OperationsController extends Controller {
             'page_url' => $pageUrl,
             'proposals_only' => $proposalsOnly,
             'status_filters' => $statusFilters,
+            'history_context' => $historyContext,
         ]);
     }
 
@@ -1330,6 +1337,134 @@ class OperationsController extends Controller {
         }
 
         return $targets;
+    }
+
+    protected function resolveHistoryContext(Request $request): ?array {
+        $personId = trim((string) $request->input('c_personid', ''));
+        if ($personId === '' || !ctype_digit($personId) || (int) $personId <= 0) {
+            return null;
+        }
+
+        $historyConfig = BasicInformationHistory::resolveFromPage($request->input('history_page'));
+        if ($historyConfig === null || empty($historyConfig['tables'])) {
+            return null;
+        }
+
+        return [
+            'person_id' => (int) $personId,
+            'page' => $historyConfig['page'],
+            'tables' => $historyConfig['tables'],
+            'label' => $historyConfig['label'],
+        ];
+    }
+
+    protected function applyHistoryFilter($query, array $historyContext): void {
+        $personId = (int) ($historyContext['person_id'] ?? 0);
+        $tables = BasicInformationHistory::normalizeTables((array) ($historyContext['tables'] ?? []));
+
+        if ($personId <= 0 || empty($tables)) {
+            return;
+        }
+
+        $query->where(function ($historyQuery) use ($personId, $tables) {
+            $historyQuery->where(function ($legacyQuery) use ($personId, $tables) {
+                $legacyQuery->where('c_personid', $personId)
+                    ->whereIn('resource', $tables);
+            });
+
+            $mirrorFallbackTables = $this->historyLegacyMirrorFallbackTables($tables);
+            if (!empty($mirrorFallbackTables)) {
+                $historyQuery->orWhere(function ($mirrorQuery) use ($personId, $mirrorFallbackTables) {
+                    foreach ($mirrorFallbackTables as $table => $keys) {
+                        $mirrorQuery->orWhere(function ($tableQuery) use ($personId, $table, $keys) {
+                            $tableQuery->where('resource', $table)
+                                ->where(function ($resourceIdQuery) use ($personId, $keys) {
+                                    foreach ($keys as $key) {
+                                        $this->appendResourceIdPersonKeyLike($resourceIdQuery, $key, $personId);
+                                    }
+                                });
+                        });
+                    }
+                });
+            }
+
+            if (!Schema::hasTable('audit_log')) {
+                return;
+            }
+
+            $historyQuery->orWhereExists(function ($auditQuery) use ($personId, $tables) {
+                $auditQuery->select(DB::raw(1))
+                    ->from('audit_log')
+                    ->whereColumn('audit_log.operation_id', 'operations.id')
+                    ->whereIn('audit_log.table_name', $tables)
+                    ->where(function ($personQuery) use ($personId) {
+                        foreach (['row_pk_text', 'row_pk', 'old_data', 'new_data'] as $column) {
+                            $this->appendAuditPersonIdLike($personQuery, $column, $personId);
+                        }
+                    });
+            });
+        });
+    }
+
+    protected function historyLegacyMirrorFallbackTables(array $tables): array {
+        $definitions = [
+            'KIN_DATA' => ['c_kin_id'],
+            'ASSOC_DATA' => ['c_assoc_id', 'c_kin_id', 'c_assoc_kin_id'],
+        ];
+
+        $resolved = [];
+        foreach ($tables as $table) {
+            $tableName = strtoupper(trim((string) $table));
+            if (isset($definitions[$tableName])) {
+                $resolved[$tableName] = $definitions[$tableName];
+            }
+        }
+
+        return $resolved;
+    }
+
+    protected function appendAuditPersonIdLike($query, string $column, int $personId): void {
+        if ($column === 'row_pk_text') {
+            $query->orWhere(function ($columnQuery) use ($column, $personId) {
+                $columnQuery->where($column, 'c_personid=' . $personId)
+                    ->orWhere($column, 'like', 'c_personid=' . $personId . '&%')
+                    ->orWhere($column, 'like', '%&c_personid=' . $personId)
+                    ->orWhere($column, 'like', '%&c_personid=' . $personId . '&%');
+            });
+
+            return;
+        }
+
+        $patterns = [
+            '%"c_personid":' . $personId . ',%',
+            '%"c_personid":' . $personId . '}%',
+            '%"c_personid": ' . $personId . ',%',
+            '%"c_personid": ' . $personId . '}%',
+            '%"c_personid":"' . $personId . '",%',
+            '%"c_personid":"' . $personId . '"}%',
+            '%"c_personid": "' . $personId . '",%',
+            '%"c_personid": "' . $personId . '"}%',
+        ];
+
+        $query->orWhere(function ($columnQuery) use ($column, $patterns) {
+            foreach ($patterns as $pattern) {
+                $columnQuery->orWhere($column, 'like', $pattern);
+            }
+        });
+    }
+
+    protected function appendResourceIdPersonKeyLike($query, string $key, int $personId): void {
+        $needle = trim($key) . '=' . $personId;
+        if ($needle === '=' . $personId) {
+            return;
+        }
+
+        $query->orWhere(function ($resourceIdQuery) use ($needle) {
+            $resourceIdQuery->where('resource_id', $needle)
+                ->orWhere('resource_id', 'like', $needle . '&%')
+                ->orWhere('resource_id', 'like', '%&' . $needle)
+                ->orWhere('resource_id', 'like', '%&' . $needle . '&%');
+        });
     }
 
     protected function decodeJsonNullable($payload): ?array {

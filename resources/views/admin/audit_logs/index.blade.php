@@ -9,7 +9,17 @@
             </div>
 
             <div class="card-body">
+                @if(!empty($history_context))
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        正在顯示人物 {{ $history_context['person_id'] }} 的「{{ $history_context['label'] }}」審計日誌。
+                    </div>
+                @endif
                 <form method="GET" action="{{ route('admin.audit-logs') }}" class="mb-3">
+                    @if(!empty($history_context))
+                        <input type="hidden" name="c_personid" value="{{ $history_context['person_id'] }}">
+                        <input type="hidden" name="history_page" value="{{ $history_context['page'] }}">
+                    @endif
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
@@ -73,7 +83,10 @@
                                 <i class="fas fa-search"></i> 搜尋
                             </button>
                             @if(($filters['search'] ?? '') || ($filters['table_name'] ?? '') || ($filters['operation'] ?? '') || ($filters['actor_type'] ?? '') || ($filters['actor_id'] ?? ''))
-                                <a href="{{ route('admin.audit-logs') }}" class="btn btn-secondary ml-1">
+                                <a href="{{ route('admin.audit-logs', !empty($history_context) ? [
+                                    'c_personid' => $history_context['person_id'],
+                                    'history_page' => $history_context['page'],
+                                ] : []) }}" class="btn btn-secondary ml-1">
                                     <i class="fas fa-times"></i> 清除
                                 </a>
                             @endif
@@ -158,6 +171,32 @@
                                             ];
                                         }
                                         $diffSource = !empty($diffRows) ? ['rows' => $diffRows] : null;
+                                        $formatPkDescription = static function ($tableName, $rowPkText, $rowPkData) {
+                                            $rowPkText = trim((string) $rowPkText);
+                                            if ($rowPkText !== '') {
+                                                $parsedRowPk = \App\Support\CompositePrimaryKey::parseStoredResourceId($rowPkText, (string) $tableName);
+                                                if (is_array($parsedRowPk) && !empty($parsedRowPk)) {
+                                                    $parts = [];
+                                                    foreach ($parsedRowPk as $column => $value) {
+                                                        $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+                                                    }
+
+                                                    return implode("\n", $parts);
+                                                }
+                                            }
+
+                                            if (is_array($rowPkData) && !empty($rowPkData)) {
+                                                $parts = [];
+                                                foreach ($rowPkData as $column => $value) {
+                                                    $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+                                                }
+
+                                                return implode("\n", $parts);
+                                            }
+
+                                            return $rowPkText;
+                                        };
+                                        $pkDescription = $formatPkDescription($log->table_name, $log->row_pk_text ?? '', $rowPk);
                                     @endphp
                                     <tr>
                                         <td>{{ $log->id }}</td>
@@ -216,9 +255,10 @@
                                             <small class="text-muted">{{ $log->actor_id }}</small>
                                         </td>
                                         <td>
-                                            <div class="text-monospace">{{ $log->row_pk_text }}</div>
-                                            @if($rowPk)
-                                                <small class="text-muted">{{ json_encode($rowPk, JSON_UNESCAPED_UNICODE) }}</small>
+                                            @if($pkDescription !== '')
+                                                <div class="text-monospace">{!! nl2br(e($pkDescription)) !!}</div>
+                                            @else
+                                                <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td class="text-monospace">{{ $log->operation_id }}</td>

@@ -85,4 +85,5 @@ use App\Support\CompositePrimaryKey;
         </div>
     </div>
 
+    @include('biogmains.history-button')
 @endsection

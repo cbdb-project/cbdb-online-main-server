@@ -437,6 +437,7 @@
             @endif
         </div>
     </div>
+    @include('biogmains.history-button')
 @endsection
 @section('js')
     <script>

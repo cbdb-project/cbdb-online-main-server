@@ -46,6 +46,11 @@ class ApiSearchPinyinTest extends TestCase {
 
     #[Test]
     public function search_pinyin_converts_wife_pattern_to_wife_of_english_phrase(): void {
+        DB::table('pinyin')->insert([
+            'lastname_chn' => '李',
+            'lastname_pinyin' => 'Li',
+        ]);
+
         $response = $this->get('/api/select/search/pinyin?q=（李白妻）');
 
         $response->assertOk();
@@ -67,5 +72,47 @@ class ApiSearchPinyinTest extends TestCase {
         $response->assertOk();
         $content = trim($response->getContent());
         $this->assertStringStartsWith('Wang ', $content);
+    }
+
+    #[Test]
+    public function search_pinyin_converts_supported_relationship_patterns_to_english_phrases(): void {
+        DB::table('pinyin')->insert([
+            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
+        ]);
+
+        $cases = [
+            '（李白母）' => 'Mother of Li Bai',
+            '（王安石女）' => 'Daughter of Wang Anshi',
+            '（李白妾）' => 'Concubine of Li Bai',
+            '（王安石媳）' => 'Daughter-in-law of Wang Anshi',
+            '（李白妹）' => 'Younger Sister of Li Bai',
+            '（王安石姐）' => 'Elder Sister of Wang Anshi',
+            '（李白姊）' => 'Elder Sister of Li Bai',
+        ];
+
+        foreach ($cases as $query => $expectedPhrase) {
+            $response = $this->get('/api/select/search/pinyin?q='.urlencode($query));
+
+            $response->assertOk();
+            $content = trim($response->getContent());
+
+            $this->assertSame('('.$expectedPhrase.')', $content);
+        }
+    }
+
+    #[Test]
+    public function search_pinyin_converts_prefixed_relationship_patterns_to_english_phrases(): void {
+        DB::table('pinyin')->insert([
+            ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],
+            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+        ]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('宗氏（李白母）'));
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+
+        $this->assertSame('Zong Shi (Mother of Li Bai)', $content);
     }
 }

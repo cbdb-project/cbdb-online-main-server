@@ -46,7 +46,7 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#f8f9fa' }}>
-                            {['人物 ID', '姓名', '朝代', '索引年', '索引年類型', '性別', '索引地址', '入仕地址', '入仕筆數', '操作'].map((heading) => (
+                            {['人物 ID', '姓名', '朝代', '指數年', '指數年類型', '性別', '索引地址', '入仕地址', '入仕筆數', '操作'].map((heading) => (
                                 <th key={heading} style={headerCellStyle}>{heading}</th>
                             ))}
                         </tr>

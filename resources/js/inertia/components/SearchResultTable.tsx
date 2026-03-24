@@ -58,7 +58,7 @@ export default function SearchResultTable({ rows, pagination, onPageChange }: Pr
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#f8f9fa' }}>
-                            {['人物 ID', '姓名', '朝代', '索引年', '索引年類型', '性別', '索引地址', '入仕地址', '入仕代碼', '入仕方式', '入仕年', '年號', '範圍', '考試等第', '父母狀態', '來源', '備註', '任官備註', '操作'].map((heading) => (
+                            {['人物 ID', '姓名', '朝代', '指數年', '指數年類型', '性別', '索引地址', '入仕地址', '入仕代碼', '入仕方式', '入仕年', '年號', '範圍', '考試等第', '父母狀態', '來源', '備註', '任官備註', '操作'].map((heading) => (
                                 <th key={heading} style={headerCellStyle}>{heading}</th>
                             ))}
                         </tr>

@@ -385,6 +385,7 @@ export default function Index() {
 
     const selectedTypeLabel = findSelectedTypeLabel(entryTypes, filters.type_id);
     const errorMessages = collectErrorMessages(queryErrors);
+    const displayErrorMessages = errorMessages.filter((message) => message !== resultsError);
     const selectedCodePreview = formatCodePreview(filters.entry_codes, allKnownCodes);
     const selectedPlacePreview = formatPlacePreview(selectedPlaces, filters.include_sub_units);
     const selectedDynastyPreview = formatDynastyPreview(filters.dynasty_codes, dynasties);
@@ -433,7 +434,7 @@ export default function Index() {
                                 onClick={() => setActiveDialog('places')}
                             />
                             <FilterSummaryTile
-                                label="索引年"
+                                label="指數年"
                                 value={filters.use_index_year_range ? `${filters.index_year_from ?? '-200'} 至 ${filters.index_year_to ?? '1911'}` : '不限'}
                                 onClick={() => setActiveDialog('indexYear')}
                             />
@@ -455,7 +456,7 @@ export default function Index() {
                 {(resultsError || errorMessages.length > 0) && (
                     <div style={workspaceErrorStackStyle}>
                         {resultsError && <div style={errorBoxStyle}>{resultsError}</div>}
-                        {errorMessages.map((message) => (
+                        {displayErrorMessages.map((message) => (
                             <div key={message} style={errorBoxStyle}>{message}</div>
                         ))}
                     </div>
@@ -648,7 +649,7 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'indexYear'}
-                title="設定索引年範圍"
+                title="設定指數年範圍"
                 width={620}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -663,7 +664,7 @@ export default function Index() {
                             disabled={!filters.use_index_year_range && filters.index_year_from === null && filters.index_year_to === null}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空索引年
+                            清空指數年
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
                             完成
@@ -678,7 +679,7 @@ export default function Index() {
                             checked={filters.use_index_year_range}
                             onChange={(event) => updateFilter('use_index_year_range', event.target.checked)}
                         />
-                        啟用索引年範圍
+                        啟用指數年範圍
                     </label>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <input
@@ -1264,8 +1265,10 @@ const summaryItemStyle: React.CSSProperties = {
 const filterSummaryTileStyle: React.CSSProperties = {
     ...summaryItemStyle,
     width: '100%',
+    minWidth: 0,
     textAlign: 'left',
     cursor: 'pointer',
+    whiteSpace: 'normal',
 };
 
 const summaryLabelStyle: React.CSSProperties = {
@@ -1280,6 +1283,7 @@ const summaryValueStyle: React.CSSProperties = {
     fontSize: '0.92rem',
     color: '#111827',
     fontWeight: 600,
+    overflowWrap: 'anywhere',
 };
 
 const filterSummaryDetailStyle: React.CSSProperties = {
@@ -1287,6 +1291,7 @@ const filterSummaryDetailStyle: React.CSSProperties = {
     fontSize: '0.78rem',
     color: '#6b7280',
     lineHeight: 1.4,
+    overflowWrap: 'anywhere',
 };
 
 const summaryActionButtonStyle: React.CSSProperties = {
@@ -1339,6 +1344,7 @@ const checkboxLabelStyle: React.CSSProperties = {
 
 const checkboxListStyle: React.CSSProperties = {
     display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 8,
     maxHeight: 320,
     overflowY: 'auto',

@@ -612,4 +612,260 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
         $this->assertNotNull($record);
     }
+
+    // ========================================================
+    // 括號正規化相關測試
+    // ========================================================
+
+    /**
+     * 新增別名時，全角括號應自動轉為半角（中文欄位），拼音欄位應加空格
+     */
+    #[Test]
+    public function testStoreNormalizesFullwidthBrackets(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'bracket-store@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        $response = $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '升卿（一作陞卿）',
+            'c_alt_name' => 'Shengqing(Yizuoshengqing)',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+
+        // 中文欄位：僅全角→半角，不加空格
+        $record = DB::table('ALTNAME_DATA')
+            ->where('c_personid', 1)
+            ->first();
+
+        $this->assertNotNull($record);
+        $this->assertSame('升卿(一作陞卿)', $record->c_alt_name_chn);
+        // 拼音欄位：全角→半角 + 空格
+        $this->assertSame('Shengqing (Yizuoshengqing)', $record->c_alt_name);
+    }
+
+    /**
+     * 更新別名時，拼音欄位的括號應正規化
+     */
+    #[Test]
+    public function testUpdateQueryNormalizesPinyinBrackets(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'bracket-update@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '升卿(一作陞卿)',
+            'c_alt_name' => 'Shengqing(Yizuoshengqing)',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_alt_name_chn=' . urlencode('升卿(一作陞卿)') . '&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '升卿(一作陞卿)',
+                'c_alt_name' => 'Shengqing(Yizuoshengqing)',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 0,
+            ]
+        );
+
+        $response->assertRedirect();
+
+        $record = DB::table('ALTNAME_DATA')
+            ->where('c_personid', 1)
+            ->first();
+
+        $this->assertNotNull($record);
+        $this->assertSame('Shengqing (Yizuoshengqing)', $record->c_alt_name);
+    }
+
+    /**
+     * 更新別名時，正規化後若與既有同類型別名重複，應攔截並提示
+     */
+    #[Test]
+    public function testUpdateQueryBlocksBracketConflict(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'bracket-conflict@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        // 已有一筆半角括號的記錄
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '升卿(一作陞卿)',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        // 再插入一筆全角括號的記錄（模擬歷史遺留資料）
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 2,
+            'c_alt_name_chn' => '升卿（一作陞卿）',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        // 嘗試更新全角那筆的 c_source（不改 c_alt_name_chn）
+        // 但正規化會把全角→半角，導致與既有半角記錄 PK 衝突
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_alt_name_chn=' . urlencode('升卿（一作陞卿）') . '&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 2,
+                'c_alt_name_chn' => '升卿（一作陞卿）',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 99,
+            ]
+        );
+
+        // 應被攔截並重定向回去，附帶錯誤訊息
+        $response->assertRedirect();
+        $response->assertSessionHas('flash_notification');
+
+        // 原始記錄不應被修改
+        $this->assertEquals(2, DB::table('ALTNAME_DATA')->where('c_personid', 1)->count());
+    }
+
+    /**
+     * 更新別名時，只改 c_alt_name_type_code 導致 PK 衝突也應攔截
+     */
+    #[Test]
+    public function testUpdateQueryBlocksTypeCodeConflict(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'type-conflict@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        DB::table('ALTNAME_CODES')->insert([
+            'c_name_type_code' => 4,
+            'c_name_type_desc_chn' => '字',
+        ]);
+
+        DB::table('ALTNAME_CODES')->insert([
+            'c_name_type_code' => 5,
+            'c_name_type_desc_chn' => '號',
+        ]);
+
+        // 同名 type 4
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '子美',
+            'c_alt_name_type_code' => '4',
+            'c_source' => 0,
+        ]);
+
+        // 同名 type 5
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 2,
+            'c_alt_name_chn' => '子美',
+            'c_alt_name_type_code' => '5',
+            'c_source' => 0,
+        ]);
+
+        // 把 type 4 改成 type 5 → 撞 PK
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_alt_name_chn=' . urlencode('子美') . '&c_alt_name_type_code=4',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '子美',
+                'c_alt_name_type_code' => '5',
+                'c_source' => 0,
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('flash_notification');
+
+        // 兩筆記錄都不應被修改
+        $this->assertEquals(2, DB::table('ALTNAME_DATA')->where('c_personid', 1)->count());
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '子美',
+            'c_alt_name_type_code' => '4',
+        ]);
+    }
+
+    /**
+     * 新增別名時，正規化後若與既有記錄重複，應攔截
+     */
+    #[Test]
+    public function testStoreBlocksBracketConflict(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'bracket-store-conflict@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        // 已有半角括號記錄
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '升卿(一作陞卿)',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        // 嘗試新增全角括號的同名記錄 → 正規化後 PK 相同
+        $response = $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 2,
+            'c_alt_name_chn' => '升卿（一作陞卿）',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertRedirect();
+        // 不應新增成功
+        $this->assertEquals(1, DB::table('ALTNAME_DATA')->where('c_personid', 1)->count());
+    }
 }

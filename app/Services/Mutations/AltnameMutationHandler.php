@@ -72,6 +72,9 @@ class AltnameMutationHandler extends AbstractMutationHandler {
             return $this->errorResponse('更新失敗：'.$e->getMessage(), 500);
         }
 
+        if ($newPk === 'bracket_conflict') {
+            return $this->errorResponse('此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。', 409);
+        }
         if (!$newPk) {
             return $this->errorResponse('ALTNAME_DATA 記錄不存在', 404);
         }

@@ -666,9 +666,13 @@ class BasicInformationOfficesController extends Controller {
             ];
             $submittedData = $request->only($relevantFields);
 
+            $personId = $request->input('c_personid') ?? $request->route('id') ?? $request->input('_id');
+
             DB::table('ai_fill_logs')
                 ->where('id', $logId)
                 ->where('user_id', Auth::id())
+                ->where('category', 'posting')
+                ->where('c_personid', $personId)
                 ->update([
                     'user_submitted' => json_encode($submittedData, JSON_UNESCAPED_UNICODE),
                     'submitted_at' => now(),

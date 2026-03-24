@@ -33,14 +33,25 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="category">類別</label>
+                                <select class="form-control" id="category" name="category">
+                                    <option value="">全部類別</option>
+                                    <option value="posting" {{ ($filters['category'] ?? '') === 'posting' ? 'selected' : '' }}>任官</option>
+                                    <option value="assoc" {{ ($filters['category'] ?? '') === 'assoc' ? 'selected' : '' }}>社會關係</option>
+                                    <option value="status" {{ ($filters['category'] ?? '') === 'status' ? 'selected' : '' }}>社會區分</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
                             <div class="form-group">
                                 <label>&nbsp;</label>
                                 <div>
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-search"></i> 搜尋
                                     </button>
-                                    @if(($filters['search'] ?? '') || ($filters['user_id'] ?? ''))
+                                    @if(($filters['search'] ?? '') || ($filters['user_id'] ?? '') || ($filters['category'] ?? ''))
                                         <a href="{{ route('admin.ai-fill-logs') }}" class="btn btn-secondary ml-1">
                                             <i class="fas fa-times"></i> 清除
                                         </a>
@@ -70,12 +81,16 @@
                             $statistics = $aiMatched['statistics'] ?? null;
                             $cardBorderClass = $log->user_submitted ? 'border-success' : 'border-info';
                             $cardHeaderClass = $log->user_submitted ? 'bg-success' : 'bg-info';
+                            $categoryLabels = ['posting' => '任官', 'assoc' => '社會關係', 'status' => '社會區分'];
+                            $categoryBadgeClasses = ['posting' => 'badge-primary', 'assoc' => 'badge-info', 'status' => 'badge-warning'];
+                            $logCategory = $log->category ?? 'posting';
                         @endphp
                         <div class="card mb-3 {{ $cardBorderClass }}">
                             <div class="card-header {{ $cardHeaderClass }}">
                                 <div class="d-flex justify-content-between align-items-center flex-wrap">
                                     <div>
                                         <strong>#{{ $log->id }}</strong>
+                                        <span class="badge {{ $categoryBadgeClasses[$logCategory] ?? 'badge-secondary' }} ml-2">{{ $categoryLabels[$logCategory] ?? $logCategory }}</span>
                                         <span class="ml-2">
                                             <i class="fas fa-user"></i>
                                             {{ $log->user_name ?? '未知用戶' }}
@@ -85,9 +100,19 @@
                                         </span>
                                         <span class="ml-2">
                                             <i class="fas fa-id-badge"></i>
-                                            <a href="{{ route('basicinformation.edit', $log->c_personid) }}" class="text-white" target="_blank">
-                                                人物 #{{ $log->c_personid }}
-                                            </a>
+                                            @if($logCategory === 'assoc')
+                                                <a href="{{ route('basicinformation.assoc.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
+                                                    人物 #{{ $log->c_personid }}
+                                                </a>
+                                            @elseif($logCategory === 'status')
+                                                <a href="{{ route('basicinformation.statuses.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
+                                                    人物 #{{ $log->c_personid }}
+                                                </a>
+                                            @else
+                                                <a href="{{ route('basicinformation.offices.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
+                                                    人物 #{{ $log->c_personid }}
+                                                </a>
+                                            @endif
                                         </span>
                                         <span class="ml-2">
                                             <i class="fas fa-clock"></i>

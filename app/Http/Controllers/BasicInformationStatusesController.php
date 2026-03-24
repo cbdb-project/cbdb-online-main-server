@@ -136,8 +136,15 @@ class BasicInformationStatusesController extends Controller {
 
             return redirect()->back();
         }
+        $aiFillLogId = $request->input('ai_fill_log_id');
+        $request->request->remove('ai_fill_log_id');
+
         $data = $this->biogMainRepository->statuseStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
+
+        if ($aiFillLogId) {
+            $this->updateAiFillLog($aiFillLogId, $request);
+        }
 
         // 使用新的查詢參數模式重定向
         $newPk = [
@@ -413,10 +420,17 @@ class BasicInformationStatusesController extends Controller {
         // 構建舊格式 ID（格式：c_personid-c_sequence-c_status_code）
         $id_ = $originalPk['c_personid'].'-'.$originalPk['c_sequence'].'-'.$originalPk['c_status_code'];
 
+        $aiFillLogId = $request->input('ai_fill_log_id');
+        $request->request->remove('ai_fill_log_id');
+
         // 使用 Repository 更新
         $data = $this->biogMainRepository->statuseUpdateById($request, $id_, $id);
 
         flash('Update success @ '.Carbon::now(), 'success');
+
+        if ($aiFillLogId) {
+            $this->updateAiFillLog($aiFillLogId, $request);
+        }
 
         // 重定向到新的查詢參數格式
         $newPk = [
@@ -466,5 +480,35 @@ class BasicInformationStatusesController extends Controller {
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.statuses.index', ['basicinformation' => $id]);
+    }
+
+    /**
+     * 更新 AI 填充日誌，記錄用戶實際提交的數據
+     */
+    private function updateAiFillLog(int $logId, Request $request): void {
+        try {
+            $relevantFields = [
+                'c_status_code', 'c_sequence', 'c_supplement',
+                'c_firstyear', 'c_fy_nh_code', 'c_fy_nh_year', 'c_fy_range',
+                'c_lastyear', 'c_ly_nh_code', 'c_ly_nh_year', 'c_ly_range',
+                'c_source', 'c_pages', 'c_notes',
+            ];
+            $submittedData = $request->only($relevantFields);
+
+            $personId = $request->input('c_personid') ?? $request->route('id');
+
+            DB::table('ai_fill_logs')
+                ->where('id', $logId)
+                ->where('user_id', Auth::id())
+                ->where('category', 'status')
+                ->where('c_personid', $personId)
+                ->update([
+                    'user_submitted' => json_encode($submittedData, JSON_UNESCAPED_UNICODE),
+                    'submitted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Exception $e) {
+            \Log::warning('[AI Fill Log] 更新用戶提交數據失敗: ' . $e->getMessage());
+        }
     }
 }

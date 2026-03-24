@@ -27,6 +27,7 @@
         {{ method_field('PATCH') }}
     @endif
     {{ csrf_field() }}
+    <input type="hidden" name="ai_fill_log_id" id="ai-fill-log-id" value="">
 
     <x-forms.person-id-display :personId="$id" />
 
@@ -364,6 +365,56 @@
     </div>
 </form>
 
+{{-- AI 智能識別社會關係代碼（已啟用用戶 + Gemini API 已配置） --}}
+@if(config('services.gemini.api_key') && auth()->check() && auth()->user()->isActive())
+    <div class="card card-info mt-3" id="ai-code-lookup-section">
+        <div class="card-header d-flex align-items-center">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-magic"></i> AI 智能識別社會關係代碼
+            </h3>
+            <a class="ml-3 text-white" style="font-size: 0.85em; opacity: 0.85; cursor: pointer;"
+               data-toggle="collapse" href="#ai-code-privacy-notice" role="button" aria-expanded="false">
+                <i class="fas fa-exclamation-triangle"></i> 重要提示：數據收集與第三方服務
+            </a>
+        </div>
+        <div class="collapse" id="ai-code-privacy-notice">
+            <div class="alert alert-warning mb-0 rounded-0 border-left-0 border-right-0" style="font-size: 0.9em;">
+                <p class="mb-2">使用智能識別功能即表示您理解並同意：</p>
+                <ul class="mb-0">
+                    <li>您輸入的文本及 AI 識別結果將被記錄用於研究與改進</li>
+                    <li>您的文本將發送至第三方 AI 服務進行處理</li>
+                    <li>AI 識別結果僅供參考，請務必核實後再提交</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label for="ai-code-query">輸入描述（AI 將從 ASSOC_CODES 中識別相關代碼）</label>
+                <textarea class="form-control" id="ai-code-query" rows="3"
+                          placeholder="例如：為釋顯達作塔記"></textarea>
+                <small class="form-text text-muted">AI 會語義理解您的描述，從社會關係代碼表中找出最相關的代碼</small>
+            </div>
+            <button type="button" class="btn btn-info" id="btn-ai-code-lookup">
+                <i class="fas fa-bolt"></i> AI 智能識別
+            </button>
+            <span class="ml-3" id="ai-code-status"></span>
+
+            {{-- 候選結果區 --}}
+            <div id="ai-code-results" style="display:none;" class="mt-3">
+                <h6><i class="fas fa-check-circle text-success"></i> 候選代碼（點擊填入表單）</h6>
+                <div id="ai-code-candidates" class="mb-3"></div>
+
+                <div id="ai-code-not-found" style="display:none;">
+                    <h6 class="text-warning"><i class="fas fa-exclamation-triangle"></i> 表中未找到對應的概念</h6>
+                    <div id="ai-code-not-found-list"></div>
+                </div>
+
+                <div id="ai-code-summary" class="alert alert-light mt-2" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+@endif
+
 @section('js')
     <script>
     onViteReady(function() {
@@ -536,6 +587,122 @@
                 alert('更新[出處]與[頁數/條目]成功');
             });
         });
+        // === AI 智能識別社會關係代碼 ===
+        @if(config('services.gemini.api_key') && auth()->check() && auth()->user()->isActive())
+        $('#btn-ai-code-lookup').on('click', function() {
+            var query = $('#ai-code-query').val().trim();
+            if (!query) {
+                alert('請輸入描述文字');
+                return;
+            }
+
+            var $btn = $(this);
+            var $status = $('#ai-code-status');
+            $btn.prop('disabled', true);
+            $status.html('<i class="fas fa-spinner fa-spin"></i> AI 識別中，請稍候...');
+            $('#ai-code-results').hide();
+
+            $.ajax({
+                url: '{{ route("ai.code-lookup.suggest", [], false) }}',
+                method: 'POST',
+                data: {
+                    query: query,
+                    table: 'ASSOC_CODES',
+                    person_id: {{ $id }},
+                    route_name: '{{ Route::currentRouteName() ?? "" }}',
+                    route_url: window.location.pathname,
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false);
+                    $status.text('');
+                    if (response.ai_fill_log_id) {
+                        $('#ai-fill-log-id').val(response.ai_fill_log_id);
+                    }
+                    renderCodeResults(response.data);
+                },
+                error: function(xhr) {
+                    $btn.prop('disabled', false);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.error) || '識別失敗';
+                    $status.html('<span class="text-danger"><i class="fas fa-times-circle"></i> ' + msg + '</span>');
+                }
+            });
+        });
+
+        function renderCodeResults(data) {
+            var $results = $('#ai-code-results');
+            var $candidates = $('#ai-code-candidates');
+            var $notFound = $('#ai-code-not-found');
+            var $notFoundList = $('#ai-code-not-found-list');
+            var $summary = $('#ai-code-summary');
+
+            $candidates.empty();
+            $notFoundList.empty();
+
+            // 渲染候選代碼按鈕
+            if (data.matched_codes && data.matched_codes.length > 0) {
+                data.matched_codes.forEach(function(code) {
+                    var btnClass = code.relevance === '高' ? 'btn-success' : (code.relevance === '中' ? 'btn-warning' : 'btn-secondary');
+                    var $btn = $('<button type="button" class="btn ' + btnClass + ' m-1"></button>');
+                    $btn.html('<strong>' + code.code_id + '</strong> ' + code.desc_chn + ' <small>(' + code.desc_en + ')</small>');
+                    $btn.attr('title', code.reason);
+                    $btn.data('code', code);
+                    $btn.on('click', function() {
+                        applyAssocCode($(this).data('code'));
+                    });
+                    $candidates.append($btn);
+
+                    // 顯示成對關係資訊
+                    if (code.paired_codes && code.paired_codes.length > 0) {
+                        var pairText = code.paired_codes.map(function(p) {
+                            return p.code_id + ' ' + p.desc_chn + ' (' + p.desc_en + ')';
+                        }).join(', ');
+                        $candidates.append('<small class="d-block text-muted ml-2 mb-1"><i class="fas fa-exchange-alt"></i> 成對：' + pairText + '</small>');
+                    }
+                });
+            } else {
+                $candidates.html('<span class="text-muted">未找到匹配的代碼</span>');
+            }
+
+            // 渲染未找到的概念
+            if (data.not_found && data.not_found.length > 0) {
+                $notFoundList.html(data.not_found.map(function(item) {
+                    return '<span class="badge badge-light mr-1">' + item + '</span>';
+                }).join(''));
+                $notFound.show();
+            } else {
+                $notFound.hide();
+            }
+
+            // 渲染總結
+            if (data.summary) {
+                $summary.text(data.summary).show();
+            } else {
+                $summary.hide();
+            }
+
+            $results.show();
+        }
+
+        function applyAssocCode(code) {
+            // 填入 c_assoc_code
+            var $select = $('select.c_assoc_code');
+            $select.empty();
+            $select.append(new Option(code.code_id + ' ' + code.desc_chn + ' ' + code.desc_en, code.code_id, true, true));
+            $select.trigger('change');
+
+            // 觸發成對關係更新
+            assocship_pair();
+
+            // 標記已填充
+            $select.closest('.form-group').find('label').css('color', '#28a745');
+
+            // 滾動到 c_assoc_code 欄位
+            $('html, body').animate({
+                scrollTop: $select.closest('.form-group').offset().top - 100
+            }, 300);
+        }
+        @endif
     });
     </script>
 @endsection

@@ -258,6 +258,9 @@ Route::middleware('auth')->group(function () {
     // AI 智能填充任官信息
     Route::post('api/ai/posting/extract', 'AiPostingAutofillController@extract')->name('ai.posting.extract');
 
+    // AI 智能識別代碼（社會關係 / 社會區分）
+    Route::post('api/ai/code-lookup/suggest', 'CodeLookupController@suggest')->name('ai.code-lookup.suggest');
+
     // AI 填充日誌（管理員工具）
     Route::get('admin/ai-fill-logs', 'AiFillLogController@index')->name('admin.ai-fill-logs');
     Route::get('admin/audit-logs', 'AdminAuditLogController@index')->name('admin.audit-logs');

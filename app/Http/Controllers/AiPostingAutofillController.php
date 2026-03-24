@@ -67,6 +67,7 @@ class AiPostingAutofillController extends Controller {
             $logId = DB::table('ai_fill_logs')->insertGetId([
                 'user_id' => Auth::id(),
                 'c_personid' => $personId,
+                'category' => 'posting',
                 'route_name' => $request->input('route_name') ?? '',
                 'route_url' => $request->input('route_url') ?? '',
                 'source_text' => $sourceText,

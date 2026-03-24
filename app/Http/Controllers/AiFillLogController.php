@@ -38,6 +38,11 @@ class AiFillLogController extends Controller {
             $query->where('ai_fill_logs.user_id', $request->input('user_id'));
         }
 
+        // 類別篩選
+        if ($request->filled('category')) {
+            $query->where('ai_fill_logs.category', $request->input('category'));
+        }
+
         $query->orderBy('ai_fill_logs.created_at', 'desc');
 
         $logs = $query->paginate(20)->withQueryString();
@@ -48,8 +53,11 @@ class AiFillLogController extends Controller {
             if ($log->ai_matched && $log->user_submitted) {
                 $aiMatched = json_decode($log->ai_matched, true);
                 $userSubmitted = json_decode($log->user_submitted, true);
+                $logCat = $log->category ?? 'posting';
                 if (is_array($aiMatched) && is_array($userSubmitted)) {
-                    $log->comparison_rows = $this->buildComparisonRows($aiMatched, $userSubmitted);
+                    $log->comparison_rows = ($logCat === 'assoc' || $logCat === 'status')
+                        ? $this->buildCodeComparisonRows($aiMatched, $userSubmitted, $logCat)
+                        : $this->buildComparisonRows($aiMatched, $userSubmitted);
                 }
             }
         }
@@ -74,6 +82,7 @@ class AiFillLogController extends Controller {
             'filters' => [
                 'search' => $request->input('search'),
                 'user_id' => $request->input('user_id'),
+                'category' => $request->input('category'),
             ],
         ]);
     }
@@ -281,5 +290,67 @@ class AiFillLogController extends Controller {
         }
 
         return $str;
+    }
+
+    /**
+     * 建構代碼查詢（assoc/status）的 AI 匹配結果與用戶提交數據的比較列表
+     *
+     * 每個 AI 候選代碼獨立一行，用戶選中的標綠。
+     */
+    private function buildCodeComparisonRows(array $aiMatched, array $userSubmitted, string $category): array {
+        if ($category === 'assoc') {
+            $codeField = 'c_assoc_code';
+            $codeTable = 'ASSOC_CODES';
+            $codePk = 'c_assoc_code';
+            $codeDescChn = 'c_assoc_desc_chn';
+            $codeDescEn = 'c_assoc_desc';
+        } else {
+            $codeField = 'c_status_code';
+            $codeTable = 'STATUS_CODES';
+            $codePk = 'c_status_code';
+            $codeDescChn = 'c_status_desc_chn';
+            $codeDescEn = 'c_status_desc';
+        }
+
+        $userCodeValue = (string) ($userSubmitted[$codeField] ?? '');
+
+        $rows = [];
+
+        // 每個 AI 候選代碼獨立一行
+        $matchedCodes = $aiMatched['matched_codes'] ?? [];
+        foreach ($matchedCodes as $i => $code) {
+            $codeId = (string) $code['code_id'];
+            $isSelected = ($codeId === $userCodeValue);
+            $aiText = $codeId . ' ' . ($code['desc_chn'] ?? '') . ' (' . ($code['desc_en'] ?? '') . ')';
+            $reason = $code['reason'] ?? '';
+            if ($reason !== '') {
+                $aiText .= ' — ' . $reason;
+            }
+
+            $rows[] = [
+                'field' => $i === 0 ? 'AI 候選代碼' : '',
+                'field_key' => $codeField . '_' . $i,
+                'ai_value' => $aiText,
+                'ai_type' => $code['relevance'] === '高' ? 'matched' : 'suggested',
+                'user_value' => $isSelected ? '✔ 已選用' : '',
+                'matches' => $isSelected,
+            ];
+        }
+
+        // 若用戶選了一個不在 AI 候選中的代碼
+        $aiCodeIds = array_map(fn ($c) => (string) $c['code_id'], $matchedCodes);
+        if ($userCodeValue !== '' && $userCodeValue !== '0' && !in_array($userCodeValue, $aiCodeIds, true)) {
+            $codeText = DB::table($codeTable)->where($codePk, $userCodeValue)->value($codeDescChn);
+            $rows[] = [
+                'field' => '',
+                'field_key' => $codeField . '_user',
+                'ai_value' => '',
+                'ai_type' => 'empty',
+                'user_value' => $userCodeValue . ($codeText ? ' (' . $codeText . ')' : '') . ' — 手動選擇（非 AI 候選）',
+                'matches' => false,
+            ];
+        }
+
+        return $rows;
     }
 }

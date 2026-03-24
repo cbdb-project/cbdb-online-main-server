@@ -36,22 +36,22 @@ class SourceMutationHandler extends AbstractMutationHandler {
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
-        $existing = $this->biogSourceRepository->findByPk($targetPk);
         if ($operation === 'create') {
+            $data = $this->biogSourceRepository->buildCreatePayload($personId, $targetPk, $changes);
+            $existing = $this->biogSourceRepository->findByPk($data);
             if ($existing) {
                 return $this->errorResponse('BIOG_SOURCE_DATA 記錄已存在', 409, [
                     'target.pk' => ['duplicate'],
                 ]);
             }
 
-            if ($this->biogSourceRepository->hasPendingCreateProposal($targetPk)) {
+            if ($this->biogSourceRepository->hasPendingCreateProposal($data)) {
                 return $this->errorResponse('相同主鍵已有待審核提案', 409, [
                     'target.pk' => ['pending_proposal_exists'],
                 ]);
             }
-
-            $data = $this->biogSourceRepository->buildCreatePayload($personId, $targetPk, $changes);
         } else {
+            $existing = $this->biogSourceRepository->findByPk($targetPk);
             if (!$existing) {
                 return $this->errorResponse('BIOG_SOURCE_DATA 記錄不存在', 404);
             }

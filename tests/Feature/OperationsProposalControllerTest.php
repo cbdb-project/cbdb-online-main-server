@@ -75,9 +75,28 @@ class OperationsProposalControllerTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->dateTime('c_modified_date')->nullable();
         });
+
+        Schema::dropIfExists('ENTRY_DATA');
+        Schema::create('ENTRY_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_entry_code');
+            $table->integer('c_sequence');
+            $table->integer('c_kin_code');
+            $table->integer('c_assoc_code');
+            $table->integer('c_kin_id');
+            $table->integer('c_year');
+            $table->integer('c_assoc_id');
+            $table->integer('c_inst_code');
+            $table->integer('c_inst_name_code');
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+        });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('ENTRY_DATA');
         Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('TEST_SINGLE');
         Schema::dropIfExists('TEST_CODES');
@@ -296,6 +315,64 @@ class OperationsProposalControllerTest extends TestCase {
             'c_notes' => 'Approved source',
             'c_main_source' => 1,
         ]);
+
+        $row = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', 138841],
+            ['c_textid', '=', 99999],
+            ['c_pages', '=', ''],
+        ])->first();
+        $this->assertSame('admin', $row->c_created_by);
+        $this->assertNotNull($row->c_created_date);
+    }
+
+    #[Test]
+    public function testApproveCreateEntryProposalSetsCreatedAuditFields() {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'c_personid' => 138841,
+            'c_entry_code' => 39,
+            'c_sequence' => 1,
+            'c_kin_code' => 0,
+            'c_assoc_code' => 0,
+            'c_kin_id' => 0,
+            'c_year' => 1351,
+            'c_assoc_id' => 0,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            '__key_columns' => ['c_personid', 'c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s')],
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ENTRY_DATA',
+            'resource_id' => 'entry-proposal',
+            'resource_data' => $resourceData,
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+
+        $response->assertRedirect();
+
+        $row = DB::table('ENTRY_DATA')->where([
+            ['c_personid', '=', 138841],
+            ['c_entry_code', '=', 39],
+            ['c_sequence', '=', 1],
+            ['c_kin_code', '=', 0],
+            ['c_assoc_code', '=', 0],
+            ['c_kin_id', '=', 0],
+            ['c_year', '=', 1351],
+            ['c_assoc_id', '=', 0],
+            ['c_inst_code', '=', 0],
+            ['c_inst_name_code', '=', 0],
+        ])->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('admin', $row->c_created_by);
+        $this->assertNotNull($row->c_created_date);
     }
 
     #[Test]

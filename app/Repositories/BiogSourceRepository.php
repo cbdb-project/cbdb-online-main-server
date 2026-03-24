@@ -307,7 +307,7 @@ class BiogSourceRepository {
     }
 
     protected function buildProposalResourceIds(array $pk): array {
-        $normalized = $this->normalizePk($pk);
+        $normalized = $this->extractPk($this->normalizePk($pk));
         $resourceIds = [
             CompositePrimaryKey::buildStoredResourceId($normalized),
         ];

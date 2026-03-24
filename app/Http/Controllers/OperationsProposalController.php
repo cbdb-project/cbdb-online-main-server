@@ -487,6 +487,7 @@ class OperationsProposalController extends Controller {
 
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
+        $data = $this->enforceAuditFieldsForCreate($table, $data);
 
         if (!$this->hasKeyValues($keyColumns, $data, $this->optionalKeyColumnsForTable($table))) {
             throw new \RuntimeException('缺少主鍵欄位，無法新增資料。');
@@ -526,6 +527,7 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('缺少原始資料，無法更新。');
         }
 
+        $data = $this->enforceAuditFieldsForUpdate($table, $data, $original);
         $conditions = $this->buildKeyConditions($keyColumns, $original);
 
         // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
@@ -652,6 +654,50 @@ class OperationsProposalController extends Controller {
         }
 
         return $row;
+    }
+
+    protected function enforceAuditFieldsForCreate(string $table, array $data): array {
+        $columns = $this->getTableColumnMap($table);
+        if ($columns === null) {
+            return $data;
+        }
+
+        $now = Carbon::now();
+
+        if (isset($columns['c_created_by']) && (!array_key_exists('c_created_by', $data) || trim((string) ($data['c_created_by'] ?? '')) === '') && Auth::check()) {
+            $data['c_created_by'] = Auth::user()->name ?? Auth::id();
+        }
+
+        if (isset($columns['c_created_date']) && (!array_key_exists('c_created_date', $data) || $data['c_created_date'] === null || trim((string) $data['c_created_date']) === '')) {
+            $data['c_created_date'] = $now;
+        }
+
+        return $data;
+    }
+
+    protected function enforceAuditFieldsForUpdate(string $table, array $data, array $original): array {
+        $columns = $this->getTableColumnMap($table);
+        if ($columns === null) {
+            return $data;
+        }
+
+        $now = Carbon::now();
+
+        if (isset($columns['c_modified_by']) && (!array_key_exists('c_modified_by', $data) || trim((string) ($data['c_modified_by'] ?? '')) === '') && Auth::check()) {
+            $data['c_modified_by'] = Auth::user()->name ?? Auth::id();
+        }
+
+        if (isset($columns['c_modified_date']) && (!array_key_exists('c_modified_date', $data) || $data['c_modified_date'] === null || trim((string) $data['c_modified_date']) === '')) {
+            $data['c_modified_date'] = $now;
+        }
+
+        foreach (['c_created_by', 'c_created_date'] as $field) {
+            if (isset($columns[$field]) && array_key_exists($field, $original) && !array_key_exists($field, $data)) {
+                $data[$field] = $original[$field];
+            }
+        }
+
+        return $data;
     }
 
     protected function buildKeyConditions(array $keyColumns, array $row): array {

@@ -26,7 +26,7 @@ class SourceMutationHandler extends AbstractMutationHandler {
         }
 
         try {
-            CompositePrimaryKey::validateOrFail($targetPk, 'BIOG_SOURCE_DATA');
+            CompositePrimaryKey::validateOrFail($targetPk, 'BIOG_SOURCE_DATA', ['c_pages']);
         } catch (\Throwable $e) {
             return $this->errorResponse('主鍵格式不正確', 422, ['pk' => [$e->getMessage()]]);
         }

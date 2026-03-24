@@ -23,6 +23,8 @@ class BiogSourceRepository {
     }
 
     public function findByPk(array $pk): ?array {
+        $pk = $this->normalizePk($pk);
+
         $row = DB::table(self::RESOURCE)
             ->where('c_personid', $pk['c_personid'])
             ->where('c_textid', $pk['c_textid'])
@@ -35,9 +37,7 @@ class BiogSourceRepository {
     public function validateMutation(int $personId, array $targetPk, array $changes, string $operation): array {
         $errors = [];
 
-        if (!array_key_exists('c_personid', $changes)) {
-            $errors['changes.c_personid'][] = 'required';
-        } elseif ((string) $changes['c_personid'] !== (string) $personId) {
+        if (array_key_exists('c_personid', $changes) && (string) $changes['c_personid'] !== (string) $personId) {
             $errors['changes.c_personid'][] = 'mismatch';
         }
 
@@ -52,9 +52,9 @@ class BiogSourceRepository {
             $errors['c_textid'][] = 'invalid';
         }
 
-        $pages = $changes['c_pages'] ?? $targetPk['c_pages'] ?? null;
-        if (!is_string($pages) || trim($pages) === '') {
-            $errors['c_pages'][] = 'required';
+        $pages = $changes['c_pages'] ?? $targetPk['c_pages'] ?? '';
+        if (is_array($pages) || is_object($pages)) {
+            $errors['c_pages'][] = 'invalid';
         }
 
         if ($operation === 'update') {
@@ -119,11 +119,11 @@ class BiogSourceRepository {
     }
 
     public function hasPendingCreateProposal(array $pk): bool {
-        $resourceId = CompositePrimaryKey::buildStoredResourceId($pk);
+        $resourceIds = $this->buildProposalResourceIds($pk);
 
         return DB::table('operations')
             ->where('resource', self::RESOURCE)
-            ->where('resource_id', $resourceId)
+            ->whereIn('resource_id', $resourceIds)
             ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
             ->get()
             ->contains(function ($operation) {
@@ -192,6 +192,7 @@ class BiogSourceRepository {
     }
 
     public function updateDirect(int $personId, array $targetPk, array $data, array $existing): array {
+        $targetPk = $this->normalizePk($targetPk);
         $data['c_modified_by'] = Auth::user()->name ?? Auth::id();
         $data['c_modified_date'] = Carbon::now();
 
@@ -287,6 +288,37 @@ class BiogSourceRepository {
 
         // Select2 在前端會把 id=0 的選項轉成 -999，API 需沿用既有 sources 流程將其還原為 0。
         return $normalized === -999 ? 0 : $normalized;
+    }
+
+    protected function normalizePk(array $pk): array {
+        $normalized = $pk;
+
+        if (array_key_exists('c_personid', $normalized) && $normalized['c_personid'] !== null && $normalized['c_personid'] !== '') {
+            $normalized['c_personid'] = (int) $normalized['c_personid'];
+        }
+
+        if (array_key_exists('c_textid', $normalized) && $normalized['c_textid'] !== null && $normalized['c_textid'] !== '') {
+            $normalized['c_textid'] = $this->normalizeTextId($normalized['c_textid']);
+        }
+
+        $normalized['c_pages'] = (string) ($normalized['c_pages'] ?? '');
+
+        return $normalized;
+    }
+
+    protected function buildProposalResourceIds(array $pk): array {
+        $normalized = $this->normalizePk($pk);
+        $resourceIds = [
+            CompositePrimaryKey::buildStoredResourceId($normalized),
+        ];
+
+        if ($normalized['c_pages'] === '') {
+            $legacyNullEncoded = $normalized;
+            $legacyNullEncoded['c_pages'] = null;
+            $resourceIds[] = CompositePrimaryKey::buildStoredResourceId($legacyNullEncoded);
+        }
+
+        return array_values(array_unique($resourceIds));
     }
 
     protected function normalizeBooleanFlag($value): int {

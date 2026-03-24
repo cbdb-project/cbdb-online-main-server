@@ -332,6 +332,107 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testSourceProposalCreateDoesNotRequireChangesPersonId() {
+        $this->seedTextCode();
+        $user = $this->makeUser(email: 'no-change-person@example.com');
+        $this->actingAs($user);
+
+        $payload = $this->sourceCreatePayload();
+        unset($payload['changes']['c_personid']);
+
+        $response = $this->postJson('/api/v2/mutate', $payload);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'resource' => 'sources',
+                'mode' => 'proposal',
+                'operation' => 'create',
+            ]);
+
+        $operation = DB::table('operations')->where('resource', 'BIOG_SOURCE_DATA')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->first();
+        $resourceData = json_decode($operation->resource_data, true);
+
+        $this->assertSame(138841, $resourceData['c_personid']);
+    }
+
+    #[Test]
+    public function testSourceProposalCreateAllowsEmptyPages() {
+        $this->seedTextCode();
+        $user = $this->makeUser(email: 'empty-pages@example.com');
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v2/mutate', $this->sourceCreatePayload([
+            'target' => [
+                'pk' => [
+                    'c_pages' => '',
+                ],
+            ],
+            'changes' => [
+                'c_pages' => '',
+            ],
+        ]));
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'result' => [
+                    'pk' => [
+                        'c_pages' => '',
+                    ],
+                    'status' => 'proposal_created',
+                ],
+            ]);
+
+        $operation = DB::table('operations')->where('resource', 'BIOG_SOURCE_DATA')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->first();
+        $this->assertSame('c_personid=138841&c_textid=99999&c_pages=', $operation->resource_id);
+    }
+
+    #[Test]
+    public function testSourceProposalCreateDetectsLegacyNullEncodedPendingProposalForEmptyPages() {
+        $this->seedTextCode();
+        $user = $this->makeUser(email: 'legacy-empty-pages@example.com');
+        $this->actingAs($user);
+
+        DB::table('operations')->insert([
+            'user_id' => $user->id,
+            'c_personid' => 138841,
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'BIOG_SOURCE_DATA',
+            'resource_id' => 'c_personid=138841&c_textid=99999&c_pages=NULL',
+            'resource_data' => json_encode([
+                'c_personid' => 138841,
+                'c_textid' => 99999,
+                'c_pages' => '',
+                'c_notes' => '舊提案',
+                '__key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+                '__review_status' => 'pending',
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => null,
+            'crowdsourcing_status' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->sourceCreatePayload([
+            'target' => [
+                'pk' => [
+                    'c_pages' => '',
+                ],
+            ],
+            'changes' => [
+                'c_pages' => '',
+            ],
+        ]));
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'ok' => false,
+                'message' => '相同主鍵已有待審核提案',
+            ]);
+    }
+
+    #[Test]
     public function testSourceProposalCreateRequiresAuthentication() {
         $this->seedTextCode();
 
@@ -360,6 +461,39 @@ class ApiV2MutateTest extends TestCase {
         ]);
 
         $response = $this->postJson('/api/v2/mutate', $this->sourceCreatePayload());
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'ok' => false,
+                'message' => 'BIOG_SOURCE_DATA 記錄已存在',
+            ]);
+    }
+
+    #[Test]
+    public function testSourceProposalCreateTreatsSelect2ZeroTextIdAliasAsDuplicateCompositePrimaryKey() {
+        $this->seedTextCode(0);
+        $user = $this->makeUser(email: 'zero-text-duplicate@example.com');
+        $this->actingAs($user);
+
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            'c_personid' => 138841,
+            'c_textid' => 0,
+            'c_pages' => '張忠墓誌',
+            'c_notes' => '既有資料',
+            'c_main_source' => 0,
+            'c_self_bio' => 0,
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->sourceCreatePayload([
+            'target' => [
+                'pk' => [
+                    'c_textid' => -999,
+                ],
+            ],
+            'changes' => [
+                'c_textid' => -999,
+            ],
+        ]));
 
         $response->assertStatus(409)
             ->assertJson([
@@ -470,6 +604,64 @@ class ApiV2MutateTest extends TestCase {
             'resource' => 'BIOG_SOURCE_DATA',
             'c_personid' => 138841,
             'op_type' => Operation::TYPE_UPDATE,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectSourceUpdateSupportsSelect2ZeroTextIdAliasWithoutChangesPersonId() {
+        $this->seedTextCode(0);
+        $user = $this->makeUser(email: 'zero-text-update@example.com');
+        $this->actingAs($user);
+
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            'c_personid' => 138841,
+            'c_textid' => 0,
+            'c_pages' => '',
+            'c_notes' => '舊備註',
+            'c_main_source' => 0,
+            'c_self_bio' => 0,
+            'c_created_by' => 'seed',
+            'c_created_date' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'sources',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 138841,
+                    'c_textid' => -999,
+                    'c_pages' => '',
+                ],
+            ],
+            'changes' => [
+                'c_notes' => '新備註',
+                'c_main_source' => 1,
+                'c_self_bio' => 0,
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'result' => [
+                    'status' => 'updated',
+                    'pk' => [
+                        'c_personid' => 138841,
+                        'c_textid' => 0,
+                        'c_pages' => '',
+                    ],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 138841,
+            'c_textid' => 0,
+            'c_pages' => '',
+            'c_notes' => '新備註',
+            'c_main_source' => 1,
         ]);
     }
 

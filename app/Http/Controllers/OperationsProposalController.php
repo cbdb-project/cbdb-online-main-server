@@ -60,7 +60,8 @@ class OperationsProposalController extends Controller {
             return redirect()->back();
         }
 
-        $data = $this->sanitizePayload($payload, $table);
+        $data = $this->normalizeRowForTable($table, $this->sanitizePayload($payload, $table));
+        $original = $this->normalizeRowForTable($table, $original);
         $auxiliaryPayload = $this->extractAuxiliaryPayload($payload, $table);
         $comment = trim((string) $request->input('review_comment', ''));
 
@@ -487,7 +488,7 @@ class OperationsProposalController extends Controller {
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
 
-        if (!$this->hasKeyValues($keyColumns, $data)) {
+        if (!$this->hasKeyValues($keyColumns, $data, $this->optionalKeyColumnsForTable($table))) {
             throw new \RuntimeException('缺少主鍵欄位，無法新增資料。');
         }
 
@@ -621,14 +622,36 @@ class OperationsProposalController extends Controller {
         return trim((string) $left) === trim((string) $right);
     }
 
-    protected function hasKeyValues(array $keyColumns, array $row): bool {
+    protected function hasKeyValues(array $keyColumns, array $row, array $optionalColumns = []): bool {
         foreach ($keyColumns as $column) {
+            if (in_array($column, $optionalColumns, true)) {
+                continue;
+            }
+
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }
         }
 
         return true;
+    }
+
+    protected function optionalKeyColumnsForTable(string $table): array {
+        return $table === 'BIOG_SOURCE_DATA' ? ['c_pages'] : [];
+    }
+
+    protected function normalizeRowForTable(string $table, array $row): array {
+        if ($table !== 'BIOG_SOURCE_DATA') {
+            return $row;
+        }
+
+        $row['c_pages'] = (string) ($row['c_pages'] ?? '');
+
+        if (array_key_exists('c_textid', $row) && $row['c_textid'] !== null && $row['c_textid'] !== '') {
+            $row['c_textid'] = (int) $row['c_textid'] === -999 ? 0 : (int) $row['c_textid'];
+        }
+
+        return $row;
     }
 
     protected function buildKeyConditions(array $keyColumns, array $row): array {

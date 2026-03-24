@@ -61,9 +61,24 @@ class OperationsProposalControllerTest extends TestCase {
             $table->integer('id');
             $table->string('description')->nullable();
         });
+
+        Schema::dropIfExists('BIOG_SOURCE_DATA');
+        Schema::create('BIOG_SOURCE_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_textid');
+            $table->string('c_pages');
+            $table->text('c_notes')->nullable();
+            $table->integer('c_main_source')->default(0);
+            $table->integer('c_self_bio')->default(0);
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+        });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('TEST_SINGLE');
         Schema::dropIfExists('TEST_CODES');
         Schema::dropIfExists('operations');
@@ -239,6 +254,47 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertDatabaseHas('operations', [
             'resource' => 'TEST_CODES',
             'op_type' => Operation::TYPE_UPDATE,
+        ]);
+    }
+
+    #[Test]
+    public function testApproveCreateProposalAllowsEmptySourcePages() {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $resourceData = [
+            'c_personid' => 138841,
+            'c_textid' => 99999,
+            'c_pages' => '',
+            'c_notes' => 'Approved source',
+            'c_main_source' => 1,
+            'c_self_bio' => 0,
+            '__key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['submitted_by' => 'tester', 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s')],
+        ];
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'BIOG_SOURCE_DATA',
+            'resource_id' => 'c_personid=138841&c_textid=99999&c_pages=',
+            'resource_data' => $resourceData,
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+
+        $response->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null);
+
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 138841,
+            'c_textid' => 99999,
+            'c_pages' => '',
+            'c_notes' => 'Approved source',
+            'c_main_source' => 1,
         ]);
     }
 

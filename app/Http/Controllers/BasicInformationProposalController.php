@@ -146,6 +146,7 @@ class BasicInformationProposalController extends Controller {
         [$payload, $auxiliaryPayload] = $this->splitFormDataByTable($table, $formData);
         $payload['c_personid'] = $personid;
         $payload = $this->assignSingleNumericPrimaryKeyIfNeeded($table, $keyColumns, $payload);
+        $payload = $this->normalizePayloadForTable($table, $payload);
 
         // 驗證主鍵完整性
         if (!$this->hasPrimaryKeyValues($keyColumns, $payload, $optionalKeyColumns)) {
@@ -258,6 +259,7 @@ class BasicInformationProposalController extends Controller {
         $formData = $this->extractFormData($request);
         [$payload, $auxiliaryPayload] = $this->splitFormDataByTable($table, $formData);
         $payload['c_personid'] = $personid;
+        $payload = $this->normalizePayloadForTable($table, $payload);
 
         // 檢查是否有實際修改
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
@@ -355,7 +357,7 @@ class BasicInformationProposalController extends Controller {
         $meta,
         array $auxiliaryPayload = []
     ) {
-        $resourceId = $this->buildCompositeId($keyColumns, $data);
+        $resourceId = $this->buildCompositeId($keyColumns, $data, $table);
 
         $resourceData = $data;
         if ($auxiliaryPayload !== []) {
@@ -382,11 +384,11 @@ class BasicInformationProposalController extends Controller {
      * 使用 query-string 格式（http_build_query），與 CompositePrimaryKey::buildStoredResourceId() 一致，
      * 所有特殊字符（中文、連字符等）自動 URL 編碼，消除舊 dash 分隔符的解析歧義。
      */
-    protected function buildCompositeId($keyColumns, $data) {
+    protected function buildCompositeId($keyColumns, $data, ?string $table = null) {
         $pk = [];
         foreach ($keyColumns as $column) {
             $value = $data[$column] ?? null;
-            if ($value === '') {
+            if ($value === '' && !$this->shouldPreserveEmptyKeyValue($table, $column)) {
                 $value = null;
             }
             $pk[$column] = $value;
@@ -483,6 +485,24 @@ class BasicInformationProposalController extends Controller {
         }
 
         return [$data, $auxiliary];
+    }
+
+    protected function normalizePayloadForTable(string $table, array $payload): array {
+        if ($table !== 'BIOG_SOURCE_DATA') {
+            return $payload;
+        }
+
+        $payload['c_pages'] = (string) ($payload['c_pages'] ?? '');
+
+        if (array_key_exists('c_textid', $payload) && $payload['c_textid'] !== null && $payload['c_textid'] !== '') {
+            $payload['c_textid'] = (int) $payload['c_textid'] === -999 ? 0 : (int) $payload['c_textid'];
+        }
+
+        return $payload;
+    }
+
+    protected function shouldPreserveEmptyKeyValue(?string $table, string $column): bool {
+        return $table === 'BIOG_SOURCE_DATA' && $column === 'c_pages';
     }
 
     protected function hasAuxiliaryChanges(string $table, array $conditions, array $originalRow, array $auxiliaryPayload): bool {
@@ -656,7 +676,14 @@ class BasicInformationProposalController extends Controller {
         }
 
         // 新格式（query-string）
-        $resourceId = $this->buildCompositeId($keyColumns, $data);
+        $resourceId = $this->buildCompositeId($keyColumns, $data, $table);
+        $candidateIds = [$resourceId];
+
+        if ($table === 'BIOG_SOURCE_DATA' && (($data['c_pages'] ?? '') === '')) {
+            $legacyNullEncoded = $data;
+            $legacyNullEncoded['c_pages'] = null;
+            $candidateIds[] = $this->buildCompositeId($keyColumns, $legacyNullEncoded, null);
+        }
 
         // 舊格式（dash 分隔 + bare minus 編碼），用於匹配歷史 pending 提案
         $legacyParts = [];
@@ -668,7 +695,6 @@ class BasicInformationProposalController extends Controller {
         }
         $legacyResourceId = implode('-', $legacyParts);
 
-        $candidateIds = [$resourceId];
         if ($legacyResourceId !== $resourceId) {
             $candidateIds[] = $legacyResourceId;
         }

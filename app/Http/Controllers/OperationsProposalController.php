@@ -60,7 +60,8 @@ class OperationsProposalController extends Controller {
             return redirect()->back();
         }
 
-        $data = $this->sanitizePayload($payload, $table);
+        $data = $this->normalizeRowForTable($table, $this->sanitizePayload($payload, $table));
+        $original = $this->normalizeRowForTable($table, $original);
         $auxiliaryPayload = $this->extractAuxiliaryPayload($payload, $table);
         $comment = trim((string) $request->input('review_comment', ''));
 
@@ -486,8 +487,9 @@ class OperationsProposalController extends Controller {
 
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
+        $data = $this->enforceAuditFieldsForCreate($table, $data);
 
-        if (!$this->hasKeyValues($keyColumns, $data)) {
+        if (!$this->hasKeyValues($keyColumns, $data, $this->optionalKeyColumnsForTable($table))) {
             throw new \RuntimeException('缺少主鍵欄位，無法新增資料。');
         }
 
@@ -525,6 +527,7 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('缺少原始資料，無法更新。');
         }
 
+        $data = $this->enforceAuditFieldsForUpdate($table, $data, $original);
         $conditions = $this->buildKeyConditions($keyColumns, $original);
 
         // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
@@ -621,14 +624,80 @@ class OperationsProposalController extends Controller {
         return trim((string) $left) === trim((string) $right);
     }
 
-    protected function hasKeyValues(array $keyColumns, array $row): bool {
+    protected function hasKeyValues(array $keyColumns, array $row, array $optionalColumns = []): bool {
         foreach ($keyColumns as $column) {
+            if (in_array($column, $optionalColumns, true)) {
+                continue;
+            }
+
             if (!array_key_exists($column, $row) || $row[$column] === null || $row[$column] === '') {
                 return false;
             }
         }
 
         return true;
+    }
+
+    protected function optionalKeyColumnsForTable(string $table): array {
+        return $table === 'BIOG_SOURCE_DATA' ? ['c_pages'] : [];
+    }
+
+    protected function normalizeRowForTable(string $table, array $row): array {
+        if ($table !== 'BIOG_SOURCE_DATA') {
+            return $row;
+        }
+
+        $row['c_pages'] = (string) ($row['c_pages'] ?? '');
+
+        if (array_key_exists('c_textid', $row) && $row['c_textid'] !== null && $row['c_textid'] !== '') {
+            $row['c_textid'] = (int) $row['c_textid'] === -999 ? 0 : (int) $row['c_textid'];
+        }
+
+        return $row;
+    }
+
+    protected function enforceAuditFieldsForCreate(string $table, array $data): array {
+        $columns = $this->getTableColumnMap($table);
+        if ($columns === null) {
+            return $data;
+        }
+
+        $now = Carbon::now();
+
+        if (isset($columns['c_created_by']) && (!array_key_exists('c_created_by', $data) || trim((string) ($data['c_created_by'] ?? '')) === '') && Auth::check()) {
+            $data['c_created_by'] = Auth::user()->name ?? Auth::id();
+        }
+
+        if (isset($columns['c_created_date']) && (!array_key_exists('c_created_date', $data) || $data['c_created_date'] === null || trim((string) $data['c_created_date']) === '')) {
+            $data['c_created_date'] = $now;
+        }
+
+        return $data;
+    }
+
+    protected function enforceAuditFieldsForUpdate(string $table, array $data, array $original): array {
+        $columns = $this->getTableColumnMap($table);
+        if ($columns === null) {
+            return $data;
+        }
+
+        $now = Carbon::now();
+
+        if (isset($columns['c_modified_by']) && (!array_key_exists('c_modified_by', $data) || trim((string) ($data['c_modified_by'] ?? '')) === '') && Auth::check()) {
+            $data['c_modified_by'] = Auth::user()->name ?? Auth::id();
+        }
+
+        if (isset($columns['c_modified_date']) && (!array_key_exists('c_modified_date', $data) || $data['c_modified_date'] === null || trim((string) $data['c_modified_date']) === '')) {
+            $data['c_modified_date'] = $now;
+        }
+
+        foreach (['c_created_by', 'c_created_date'] as $field) {
+            if (isset($columns[$field]) && array_key_exists($field, $original) && !array_key_exists($field, $data)) {
+                $data[$field] = $original[$field];
+            }
+        }
+
+        return $data;
     }
 
     protected function buildKeyConditions(array $keyColumns, array $row): array {

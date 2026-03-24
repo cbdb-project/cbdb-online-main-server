@@ -666,6 +666,62 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectSourceUpdateAcceptsNormalizedKeyAliasInChanges() {
+        $this->seedTextCode(0);
+        $user = $this->makeUser(email: 'zero-text-full-key@example.com');
+        $this->actingAs($user);
+
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            'c_personid' => 138841,
+            'c_textid' => 0,
+            'c_pages' => '',
+            'c_notes' => '舊備註',
+            'c_main_source' => 0,
+            'c_self_bio' => 0,
+            'c_created_by' => 'seed',
+            'c_created_date' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'sources',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 138841,
+                    'c_textid' => 0,
+                    'c_pages' => '',
+                ],
+            ],
+            'changes' => [
+                'c_personid' => 138841,
+                'c_textid' => -999,
+                'c_pages' => '',
+                'c_notes' => '新備註',
+                'c_main_source' => 1,
+                'c_self_bio' => 0,
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'result' => [
+                    'status' => 'updated',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 138841,
+            'c_textid' => 0,
+            'c_pages' => '',
+            'c_notes' => '新備註',
+            'c_main_source' => 1,
+        ]);
+    }
+
+    #[Test]
     public function testSourceProposalUpdateCreatesPendingOperationWithoutChangingData() {
         $this->seedTextCode();
         $user = $this->makeUser(email: 'proposal-update@example.com');

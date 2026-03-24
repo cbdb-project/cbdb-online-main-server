@@ -65,7 +65,10 @@ class BiogSourceRepository {
                     continue;
                 }
 
-                if (array_key_exists($column, $changes) && (string) $changes[$column] !== (string) $targetPk[$column]) {
+                if (
+                    array_key_exists($column, $changes)
+                    && $this->normalizeKeyColumnValue($column, $changes[$column]) !== $this->normalizeKeyColumnValue($column, $targetPk[$column])
+                ) {
                     $errors['changes.'.$column][] = 'immutable';
                 }
             }
@@ -345,6 +348,15 @@ class BiogSourceRepository {
         }
 
         return trim((string) $value);
+    }
+
+    protected function normalizeKeyColumnValue(string $column, $value): string {
+        return match ($column) {
+            'c_personid' => (string) (int) $value,
+            'c_textid' => (string) $this->normalizeTextId($value),
+            'c_pages' => trim((string) ($value ?? '')),
+            default => (string) $value,
+        };
     }
 
     protected function extractPk(array $data): array {

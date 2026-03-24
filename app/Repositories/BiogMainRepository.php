@@ -1341,7 +1341,7 @@ class BiogMainRepository {
         $c_autogen_notes = $row->c_autogen_notes;
         $old_kin_id = $row->c_kin_id;
         $old_kin_code = $row->c_kin_code;
-        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment', 'c_kinship_pair', 'c_created_by', 'c_created_date']);
+        $data = Arr::except($data, ['_token', '_method', 'action', '__proposal_comment', 'c_kinship_pair', 'c_created_by', 'c_created_date', 'ai_fill_log_id']);
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
@@ -2364,7 +2364,7 @@ class BiogMainRepository {
         $old_c_assocship_pair1 = $old_c_assocship_pair['c_assoc_pair'] ?? null;
         $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'] ?? null;
 
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair', 'ai_fill_log_id']);
         $data = (new ToolsRepository())->timestamp($data);
 
         $ori_data = $data;
@@ -2462,7 +2462,7 @@ class BiogMainRepository {
         $kin_pair = $data['c_kinship_pair'];
         $assoc_kin_pair = $data['c_assoc_kinship_pair'];
         $data['c_personid'] = $id;
-        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair']);
+        $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair', 'ai_fill_log_id']);
 
         #20250417「社會關係始年」缺省值製作，若「社會關係始年」為空，則自動填充為-9999。
         if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。

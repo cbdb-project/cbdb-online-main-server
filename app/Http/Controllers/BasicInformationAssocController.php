@@ -181,8 +181,15 @@ class BasicInformationAssocController extends Controller {
         }
         //return $request;
         //修改結束
+        $aiFillLogId = $request->input('ai_fill_log_id');
+        $request->request->remove('ai_fill_log_id');
+
         $data = $this->biogMainRepository->assocStoreById($request, $id);
         flash('Store success @ '.Carbon::now(), 'success');
+
+        if ($aiFillLogId) {
+            $this->updateAiFillLog($aiFillLogId, $request);
+        }
 
         // 使用新的查詢參數模式重定向
         $newPk = [
@@ -468,10 +475,17 @@ class BasicInformationAssocController extends Controller {
             abort(400, '路徑人物 ID 與查詢主鍵不一致');
         }
 
+        $aiFillLogId = $request->input('ai_fill_log_id');
+        $request->request->remove('ai_fill_log_id');
+
         // 使用原始 PK 查找舊記錄並更新
         $data = $this->biogMainRepository->assocUpdateByPk($request, $originalPk, $id);
 
         flash('Update success @ '.Carbon::now(), 'success');
+
+        if ($aiFillLogId) {
+            $this->updateAiFillLog($aiFillLogId, $request);
+        }
 
         // 重定向到新的查詢參數格式（使用更新後的值）
         $newPk = [
@@ -526,5 +540,36 @@ class BasicInformationAssocController extends Controller {
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.assoc.index', ['basicinformation' => $id]);
+    }
+
+    /**
+     * 更新 AI 填充日誌，記錄用戶實際提交的數據
+     */
+    private function updateAiFillLog(int $logId, Request $request): void {
+        try {
+            $relevantFields = [
+                'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
+                'c_assoc_kin_code', 'c_assoc_kin_id', 'c_sequence',
+                'c_assoc_first_year', 'c_assoc_last_year',
+                'c_source', 'c_pages', 'c_notes',
+                'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair',
+            ];
+            $submittedData = $request->only($relevantFields);
+
+            $personId = $request->input('c_personid') ?? $request->route('id');
+
+            DB::table('ai_fill_logs')
+                ->where('id', $logId)
+                ->where('user_id', Auth::id())
+                ->where('category', 'assoc')
+                ->where('c_personid', $personId)
+                ->update([
+                    'user_submitted' => json_encode($submittedData, JSON_UNESCAPED_UNICODE),
+                    'submitted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Exception $e) {
+            \Log::warning('[AI Fill Log] 更新用戶提交數據失敗: ' . $e->getMessage());
+        }
     }
 }

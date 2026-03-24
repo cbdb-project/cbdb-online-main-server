@@ -30,6 +30,7 @@ use App\Repositories\Concerns\DetectsModelChanges;
 
 //20210625建安修改
 use App\Services\AuditLogService;
+use App\Services\BracketNormalizer;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -252,6 +253,10 @@ class BiogMainRepository {
         $data['c_name'] = $c_name;
         $data['c_name_proper'] = $c_name_proper; // 自動由外文姓名組合生成
         $data['c_name_rm'] = $c_name_rm; // 自動由外文羅馬字轉寫姓名組合生成
+
+        // 括號正規化：全角轉半角、括號前後補空格
+        $data = BracketNormalizer::normalizeBiogMain($data);
+
         $female = $data['c_female'] ?? null;
         $data['c_female'] = ($female === null || $female === '' || $female === 'NULL')
             ? null
@@ -316,6 +321,8 @@ class BiogMainRepository {
         $data = $request->all();
         $data = (new ToolsRepository())->timestamp($data, true);
         $data = $this->auto_pinyin($data);
+        // 括號正規化：全角轉半角、括號前後補空格
+        $data = BracketNormalizer::normalizeBiogMain($data);
 
         return DB::transaction(function () use ($data) {
             $flight = BiogMain::create($data);
@@ -2996,6 +3003,8 @@ class BiogMainRepository {
         $data = $request->all();
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment']);
         $data['c_personid'] = $id;
+        // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
+        $data = BracketNormalizer::normalizeAltname($data);
         // 重複檢查使用 3-key，c_sequence 不參與定位
         $duplicate = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
@@ -3039,6 +3048,26 @@ class BiogMainRepository {
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
+        $data = BracketNormalizer::normalizeAltname($data);
+
+        // 計算更新後的 3-key，若與原 PK 不同則檢查是否會與既有記錄衝突
+        $newPk3 = [
+            'c_personid' => $pk['c_personid'],
+            'c_alt_name_chn' => $data['c_alt_name_chn'] ?? $pk['c_alt_name_chn'],
+            'c_alt_name_type_code' => $data['c_alt_name_type_code'] ?? $pk['c_alt_name_type_code'],
+        ];
+        if ($newPk3 !== $pk) {
+            $conflict = DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $newPk3['c_personid']],
+                ['c_alt_name_chn', '=', $newPk3['c_alt_name_chn']],
+                ['c_alt_name_type_code', '=', $newPk3['c_alt_name_type_code']],
+            ])->first();
+            if ($conflict) {
+                return 'bracket_conflict';
+            }
+        }
+
         $data = (new ToolsRepository())->timestamp($data);
 
         // WHERE 使用 3-key 定位

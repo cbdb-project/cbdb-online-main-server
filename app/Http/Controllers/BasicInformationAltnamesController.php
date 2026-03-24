@@ -6,6 +6,7 @@ use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -100,6 +101,9 @@ class BasicInformationAltnamesController extends Controller {
             'c_alt_name_type_code' => ($request->input('c_alt_name_type_code') == -999) ? '0' : ($request->input('c_alt_name_type_code') ?? '0'),
             'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
         ]);
+
+        // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
+        BracketNormalizer::normalizeRequest($request, BracketNormalizer::ALTNAME_CHN_FIELDS, BracketNormalizer::ALTNAME_PINYIN_FIELDS);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');
@@ -237,6 +241,9 @@ class BasicInformationAltnamesController extends Controller {
             'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
         ]);
 
+        // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
+        BracketNormalizer::normalizeRequest($request, BracketNormalizer::ALTNAME_CHN_FIELDS, BracketNormalizer::ALTNAME_PINYIN_FIELDS);
+
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
@@ -257,6 +264,11 @@ class BasicInformationAltnamesController extends Controller {
         // 使用 Repository 進行更新（內含事務與審計，且修復 LIKE 謂詞風險）
         $ori = $this->biogMainRepository->altnameById($alt);
         $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $alt);
+        if ($newPk === 'bracket_conflict') {
+            flash('此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
         if (!$newPk) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
@@ -426,6 +438,9 @@ class BasicInformationAltnamesController extends Controller {
             return redirect()->back();
         }
 
+        // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
+        BracketNormalizer::normalizeRequest($request, BracketNormalizer::ALTNAME_CHN_FIELDS, BracketNormalizer::ALTNAME_PINYIN_FIELDS);
+
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
@@ -470,6 +485,11 @@ class BasicInformationAltnamesController extends Controller {
         // 保留原始請求資料供索引差異判斷
         $data = $request->all();
         $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $originalPk);
+        if ($newPk === 'bracket_conflict') {
+            flash('此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
         if (!$newPk) {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }

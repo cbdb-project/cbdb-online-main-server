@@ -13,6 +13,7 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\AuditLogService;
+use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -319,6 +320,9 @@ class BasicInformationController extends Controller {
             $data['c_name'] = trim(($data['c_surname'] ?? '') . ' ' . ($data['c_mingzi'] ?? ''));
             $data['c_name_proper'] = trim(($data['c_mingzi_proper'] ?? '') . ' ' . ($data['c_surname_proper'] ?? ''));
             $data['c_name_rm'] = trim(($data['c_mingzi_rm'] ?? '') . ' ' . ($data['c_surname_rm'] ?? ''));
+
+            // 括號正規化：全角轉半角、括號前後補空格
+            $data = BracketNormalizer::normalizeBiogMain($data);
 
             // 數據類型轉換
             $female = $data['c_female'] ?? null;

@@ -72,5 +72,6 @@ class Kernel extends HttpKernel {
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         // 20200909建安新增
         'cors' => \App\Http\Middleware\Cors::class,
+        'inertia' => \App\Http\Middleware\HandleInertiaRequests::class,
     ];
 }

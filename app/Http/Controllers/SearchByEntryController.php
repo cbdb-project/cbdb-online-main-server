@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class SearchByEntryController extends Controller {
     /**
@@ -65,7 +68,7 @@ class SearchByEntryController extends Controller {
     }
 
     /**
-     * 執行搜索查詢
+     * 執行搜索查詢（Blade 版）
      */
     public function search(Request $request) {
         $request->validate([
@@ -81,7 +84,90 @@ class SearchByEntryController extends Controller {
         $yearTo = $request->input('year_to');
         $addrId = $request->input('addr_id');
 
-        // 構建查詢
+        $query = $this->buildEntrySearchQuery($entryCodes, $yearFrom, $yearTo, $addrId);
+
+        // 執行查詢並分頁
+        $results = $query
+            ->paginate(50)
+            ->appends($request->all());
+
+        return view('search-by.entry.results', compact('results'));
+    }
+
+    /**
+     * Inertia 版按入仕查詢頁面
+     */
+    public function appIndex(Request $request): InertiaResponse {
+        $request->validate([
+            'entry_codes' => 'nullable|array',
+            'entry_codes.*' => 'integer',
+            'year_from' => 'nullable|integer|lte:year_to',
+            'year_to' => 'nullable|integer',
+            'addr_id' => 'nullable|integer',
+            'type_id' => 'nullable|string',
+        ]);
+
+        $entryCodes = $request->input('entry_codes', []);
+        $yearFrom = $request->input('year_from');
+        $yearTo = $request->input('year_to');
+        $addrId = $request->input('addr_id');
+        $typeId = $request->input('type_id');
+
+        // 載入入仕類型
+        $entryTypes = DB::table('ENTRY_TYPES')
+            ->select(
+                'c_entry_type',
+                'c_entry_type_desc',
+                'c_entry_type_desc_chn',
+                'c_entry_type_parent_id',
+                'c_entry_type_level',
+                'c_entry_type_sortorder'
+            )
+            ->orderBy('c_entry_type_sortorder')
+            ->orderBy('c_entry_type')
+            ->get();
+
+        // 若有 type_id，預載該類型的 entry codes
+        $preloadedCodes = [];
+        if ($typeId) {
+            $preloadedCodes = DB::table('ENTRY_CODES as ec')
+                ->join('ENTRY_CODE_TYPE_REL as rel', 'ec.c_entry_code', '=', 'rel.c_entry_code')
+                ->where('rel.c_entry_type', $typeId)
+                ->select('ec.c_entry_code', 'ec.c_entry_desc', 'ec.c_entry_desc_chn')
+                ->orderBy('ec.c_entry_code')
+                ->get();
+        }
+
+        // 判斷是否有搜尋條件
+        $hasConditions = !empty($entryCodes) || $yearFrom !== null || $yearTo !== null || $addrId !== null;
+
+        $results = null;
+        if ($hasConditions) {
+            $query = $this->buildEntrySearchQuery($entryCodes, $yearFrom, $yearTo, $addrId);
+            $results = $query->paginate(50)->appends($request->except('page'));
+        }
+
+        return Inertia::render('SearchByEntry/Index', [
+            'entryTypes' => $entryTypes,
+            'preloadedCodes' => $preloadedCodes,
+            'results' => $results,
+            'filters' => [
+                'entry_codes' => array_map('intval', $entryCodes),
+                'year_from' => $yearFrom !== null ? (int) $yearFrom : null,
+                'year_to' => $yearTo !== null ? (int) $yearTo : null,
+                'addr_id' => $addrId !== null ? (int) $addrId : null,
+                'type_id' => $typeId,
+            ],
+            'pageUrl' => route('app.search-by.entry.index', [], false),
+            'typesEndpoint' => route('search-by.entry.types', [], false),
+            'codesEndpoint' => route('search-by.entry.codes', [], false),
+        ]);
+    }
+
+    /**
+     * 構建入仕搜尋查詢（共用邏輯）
+     */
+    private function buildEntrySearchQuery(array $entryCodes, ?int $yearFrom, ?int $yearTo, ?int $addrId): Builder {
         $query = DB::table('ENTRY_DATA as ed')
             ->join('BIOG_MAIN as bm', 'ed.c_personid', '=', 'bm.c_personid')
             ->join('ENTRY_CODES as ec', 'ed.c_entry_code', '=', 'ec.c_entry_code')
@@ -105,12 +191,10 @@ class SearchByEntryController extends Controller {
                 'ed.c_sequence'
             );
 
-        // 過濾：入仕代碼
         if (!empty($entryCodes)) {
             $query->whereIn('ed.c_entry_code', $entryCodes);
         }
 
-        // 過濾：年份範圍
         if ($yearFrom !== null) {
             $query->where('ed.c_year', '>=', $yearFrom);
         }
@@ -118,18 +202,10 @@ class SearchByEntryController extends Controller {
             $query->where('ed.c_year', '<=', $yearTo);
         }
 
-        // 過濾：地址
         if ($addrId !== null) {
             $query->where('ed.c_entry_addr_id', $addrId);
         }
 
-        // 執行查詢並分頁
-        $results = $query
-            ->orderBy('bm.c_index_year')
-            ->orderBy('bm.c_personid')
-            ->paginate(50)
-            ->appends($request->all());
-
-        return view('search-by.entry.results', compact('results'));
+        return $query->orderBy('bm.c_index_year')->orderBy('bm.c_personid');
     }
 }

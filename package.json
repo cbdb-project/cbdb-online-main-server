@@ -7,6 +7,8 @@
     "prod": "vite build"
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vue/compiler-sfc": "^3.5.12",
     "axios": "^1.8.2",
@@ -18,15 +20,20 @@
     "resolve-url-loader": "^5.0.0",
     "sass": "^1.79.4",
     "sass-loader": "^12.1.0",
+    "typescript": "^6.0.2",
     "vite": "^7.2.4",
     "vue": "^3.0.0"
   },
   "dependencies": {
+    "@inertiajs/react": "^2.3.18",
     "@ttskch/select2-bootstrap4-theme": "^1.5.2",
+    "@vitejs/plugin-react": "^4.7.0",
     "admin-lte": "^3.2.0",
     "cn-era": "^0.4.1",
     "datatables.net": "^1.13.8",
     "datatables.net-bs4": "^2.3.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "sql-formatter": "^15.6.12"
   },
   "engines": {

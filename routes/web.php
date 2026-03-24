@@ -225,6 +225,11 @@ Route::middleware('auth')->group(function () {
     Route::get('search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('search-by.entry.codes');
     Route::get('search-by/entry/search', 'SearchByEntryController@search')->name('search-by.entry.search');
 
+    // Inertia + React 版按入仕查詢（PoC）
+    Route::get('app/search-by/entry', 'SearchByEntryController@appIndex')
+        ->middleware('inertia')
+        ->name('app.search-by.entry.index');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

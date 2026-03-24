@@ -554,18 +554,7 @@ class ApiController extends Controller {
     public function searchPinyin(Request $request) {
         $word = trim((string) $request->q);
         if (!empty($word)) {
-            // 特例 1：例如「（李白妻）」→「(Wife of Li Bai)」
-            if (preg_match('/^\s*[（(]\s*(.+?)\s*妻\s*[）)]\s*$/u', $word, $matches) === 1) {
-                $wifeOf = $this->buildPinyinWord($matches[1] ?? '');
-                $res = '(Wife of '.trim($wifeOf).')';
-                // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
-            } elseif (preg_match('/^(.*?)[（(]\s*(.+?)\s*妻\s*[）)]\s*$/u', $word, $matches) === 1) {
-                $prefix = $this->buildPinyinWord($matches[1] ?? '');
-                $wifeOf = $this->buildPinyinWord($matches[2] ?? '');
-                $res = trim($prefix).' (Wife of '.trim($wifeOf).')';
-            } else {
-                $res = $this->buildPinyinWord($word);
-            }
+            $res = $this->buildRelationshipPinyin($word) ?? $this->buildPinyinWord($word);
 
             // 全角括號轉半角，並確保括號前與文字之間有一個空格
             $res = str_replace(['（', '）'], ['(', ')'], $res);
@@ -589,5 +578,41 @@ class ApiController extends Controller {
         $result = $repository->auto_pinyin(['c_name_chn' => $word]);
 
         return trim((string) ($result['c_name'] ?? ''));
+    }
+
+    private function buildRelationshipPinyin(string $word): ?string {
+        $titlesPattern = implode('|', array_map('preg_quote', array_keys($this->relationshipPhrases())));
+
+        // 特例 1：例如「（李白妻）」→「(Wife of Li Bai)」
+        if (preg_match('/^\s*[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
+            $target = $this->buildPinyinWord($matches[1] ?? '');
+            $phrase = $this->relationshipPhrases()[$matches[2]] ?? null;
+
+            return $phrase ? '('.$phrase.' '.trim($target).')' : null;
+        }
+
+        // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
+        if (preg_match('/^(.*?)[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
+            $prefix = $this->buildPinyinWord($matches[1] ?? '');
+            $target = $this->buildPinyinWord($matches[2] ?? '');
+            $phrase = $this->relationshipPhrases()[$matches[3]] ?? null;
+
+            return $phrase ? trim($prefix).' ('.$phrase.' '.trim($target).')' : null;
+        }
+
+        return null;
+    }
+
+    private function relationshipPhrases(): array {
+        return [
+            '妻' => 'Wife of',
+            '母' => 'Mother of',
+            '女' => 'Daughter of',
+            '妾' => 'Concubine of',
+            '媳' => 'Daughter-in-law of',
+            '妹' => 'Younger Sister of',
+            '姐' => 'Elder Sister of',
+            '姊' => 'Elder Sister of',
+        ];
     }
 }

@@ -28,7 +28,7 @@ export default function SelectedCodeChips({ selectedCodes, allCodes, onRemove }:
                             padding: '2px 8px',
                             backgroundColor: '#007bff',
                             color: '#fff',
-                            borderRadius: 12,
+                            borderRadius: 4,
                             fontSize: '0.75rem',
                         }}
                     >

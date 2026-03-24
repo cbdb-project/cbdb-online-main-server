@@ -30,7 +30,7 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
                         disabled={codes.length === 0}
                         style={{
                             padding: '2px 10px', marginRight: 4, fontSize: '0.8rem', cursor: 'pointer',
-                            border: '1px solid #007bff', borderRadius: 3, backgroundColor: 'transparent', color: '#007bff',
+                            border: '1px solid #007bff', borderRadius: 4, backgroundColor: 'transparent', color: '#007bff',
                         }}
                     >
                         全選
@@ -41,7 +41,7 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
                         disabled={codes.length === 0}
                         style={{
                             padding: '2px 10px', fontSize: '0.8rem', cursor: 'pointer',
-                            border: '1px solid #6c757d', borderRadius: 3, backgroundColor: 'transparent', color: '#6c757d',
+                            border: '1px solid #6c757d', borderRadius: 4, backgroundColor: 'transparent', color: '#6c757d',
                         }}
                     >
                         取消全選

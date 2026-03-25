@@ -994,6 +994,11 @@ function buildQueryString(payload: Record<string, unknown>) {
             return;
         }
 
+        if (typeof value === 'boolean') {
+            params.set(key, value ? '1' : '0');
+            return;
+        }
+
         params.set(key, String(value));
     });
 

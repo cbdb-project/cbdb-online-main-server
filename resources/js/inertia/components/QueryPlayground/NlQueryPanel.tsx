@@ -62,33 +62,62 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
 
                 const decoder = new TextDecoder();
                 let buffer = '';
+                let currentEvent = '';
+                let currentData = '';
+
+                const flushEvent = () => {
+                    if (!currentEvent || !currentData) {
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(currentData);
+                        handleStreamEvent(currentEvent, parsed);
+                    } catch {
+                        // Ignore malformed JSON
+                    }
+
+                    currentEvent = '';
+                    currentData = '';
+                };
+
+                const processLine = (line: string) => {
+                    const normalizedLine = line.replace(/\r$/, '');
+
+                    if (normalizedLine.startsWith('event: ')) {
+                        currentEvent = normalizedLine.slice(7).trim();
+                    } else if (normalizedLine.startsWith('data: ')) {
+                        const dataLine = normalizedLine.slice(6);
+                        currentData = currentData ? `${currentData}\n${dataLine}` : dataLine;
+                    } else if (normalizedLine === '') {
+                        flushEvent();
+                    }
+                };
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (value) {
+                        buffer += decoder.decode(value, { stream: !done });
+                    }
 
-                    buffer += decoder.decode(value, { stream: true });
+                    if (done) {
+                        buffer += decoder.decode();
+                    }
+
                     const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-
-                    let eventName = '';
-                    let eventData = '';
+                    const remainingLine = lines.pop() || '';
+                    buffer = done ? '' : remainingLine;
 
                     for (const line of lines) {
-                        if (line.startsWith('event: ')) {
-                            eventName = line.slice(7).trim();
-                        } else if (line.startsWith('data: ')) {
-                            eventData = line.slice(6);
-                        } else if (line === '' && eventName && eventData) {
-                            try {
-                                const parsed = JSON.parse(eventData);
-                                handleStreamEvent(eventName, parsed);
-                            } catch {
-                                // Ignore malformed JSON
-                            }
-                            eventName = '';
-                            eventData = '';
+                        processLine(line);
+                    }
+
+                    if (done) {
+                        if (remainingLine) {
+                            processLine(remainingLine);
                         }
+                        flushEvent();
+                        break;
                     }
                 }
             } catch (err) {

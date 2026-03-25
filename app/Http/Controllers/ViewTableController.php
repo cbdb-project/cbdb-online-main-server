@@ -2,12 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ViewTableService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class ViewTableController extends Controller {
+    public function __construct(
+        private readonly ViewTableService $viewTableService
+    ) {
+    }
+
     public function index() {
         $definitions = Config::get('view_tables', []);
 
@@ -83,7 +91,7 @@ class ViewTableController extends Controller {
         $debugQuery->limit($perPage)->offset(($currentPage - 1) * $perPage);
         $debugSql = $debugQuery->toSql();
         $debugBindings = $debugQuery->getBindings();
-        $debugRenderedSql = $this->renderSql($debugSql, $debugBindings);
+        $debugRenderedSql = $this->viewTableService->formatSql($debugSql, $debugBindings);
 
         $rows = $builder->paginate($perPage)->appends($request->except('page'));
 
@@ -105,25 +113,44 @@ class ViewTableController extends Controller {
         ]);
     }
 
-    protected function renderSql(string $sql, array $bindings): string {
-        if (empty($bindings)) {
-            return $sql;
+    public function appIndex(): InertiaResponse {
+        $views = $this->viewTableService->listDefinitions()
+            ->map(function ($view) {
+                return [
+                    ...$view,
+                    'app_url' => route('app.view.show', ['key' => $view['key']], false),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return Inertia::render('ViewTables/List', [
+            'views' => $views,
+            'listUrl' => route('app.view.index', [], false),
+        ]);
+    }
+
+    public function appShow(Request $request, string $key): InertiaResponse {
+        $data = $this->viewTableService->buildViewData($key, $request);
+
+        if ($data === null) {
+            abort(404);
         }
 
-        $preparedBindings = array_map(function ($binding) {
-            if ($binding === null) {
-                return 'NULL';
-            }
-            if (is_bool($binding)) {
-                return $binding ? '1' : '0';
-            }
-            if (is_int($binding) || is_float($binding)) {
-                return (string) $binding;
-            }
+        $data['pageUrl'] = route('app.view.show', ['key' => $data['key']], false);
+        $data['listUrl'] = route('app.view.index', [], false);
+        $data['availableViews'] = $this->viewTableService->listDefinitions()
+            ->map(function ($view) {
+                return [
+                    'key' => $view['key'],
+                    'title' => $view['title'],
+                    'primary_alias' => $view['primary_alias'],
+                    'app_url' => route('app.view.show', ['key' => $view['key']], false),
+                ];
+            })
+            ->values()
+            ->all();
 
-            return "'" . str_replace("'", "''", $binding) . "'";
-        }, $bindings);
-
-        return Str::replaceArray('?', $preparedBindings, $sql);
+        return Inertia::render('ViewTables/Show', $data);
     }
 }

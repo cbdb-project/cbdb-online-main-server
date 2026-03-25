@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class LoginController extends Controller {
     /*
@@ -36,7 +37,14 @@ class LoginController extends Controller {
         $this->middleware('guest')->except('logout');
     }
 
+    public function showLoginForm(Request $request) {
+        $this->storeIntendedRedirect($request);
+
+        return view('auth.login');
+    }
+
     public function login(Request $request) {
+        $this->storeIntendedRedirect($request);
         $this->validateLogin($request);
 
         // If the class is using the ThrottlesLogins trait, we can automatically throttle
@@ -83,5 +91,41 @@ class LoginController extends Controller {
         // 使用 intended() 方法，如果 session 中有原始 URL，則重定向到該 URL
         // 否則重定向到默認的 /home
         return redirect()->intended($this->redirectTo)->getTargetUrl();
+    }
+
+    protected function storeIntendedRedirect(Request $request): void {
+        $redirect = $request->input('redirect');
+
+        if (!is_string($redirect)) {
+            return;
+        }
+
+        $redirect = trim($redirect);
+
+        if ($redirect === '' || !$this->isSafeRedirectPath($redirect)) {
+            return;
+        }
+
+        $request->session()->put('url.intended', $redirect);
+    }
+
+    protected function isSafeRedirectPath(string $redirect): bool {
+        if (!Str::startsWith($redirect, '/') || Str::startsWith($redirect, '//')) {
+            return false;
+        }
+
+        $path = parse_url($redirect, PHP_URL_PATH);
+
+        if (!is_string($path) || $path === '') {
+            return false;
+        }
+
+        foreach (['/login', '/register', '/password'] as $prefix) {
+            if ($path === $prefix || Str::startsWith($path, $prefix . '/')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

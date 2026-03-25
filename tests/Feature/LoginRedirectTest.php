@@ -3,10 +3,17 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Auth\LoginController;
+use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LoginRedirectTest extends TestCase {
+    protected function setUp(): void {
+        parent::setUp();
+
+        $this->withoutMiddleware(\App\Http\Middleware\PrometheusMetrics::class);
+    }
+
     /**
      * 測試：redirectPath() 方法應該使用 intended URL
      */
@@ -68,5 +75,39 @@ class LoginRedirectTest extends TestCase {
 
         // 應該重定向到登錄頁面
         $response->assertRedirect('/login');
+    }
+
+    /**
+     * 測試：手動打開登入頁時可保存公開頁面的回跳 URL
+     */
+    #[Test]
+    public function test_show_login_form_stores_safe_redirect_in_session() {
+        $controller = new LoginController();
+        $request = Request::create('/login', 'GET', [
+            'redirect' => '/basicinformation/4/edit?foo=bar',
+        ]);
+        $request->setLaravelSession(app('session.store'));
+
+        $controller->showLoginForm($request);
+
+        $this->assertSame('/basicinformation/4/edit?foo=bar', session('url.intended'));
+    }
+
+    /**
+     * 測試：登入頁不接受外部或危險的回跳 URL
+     */
+    #[Test]
+    public function test_show_login_form_ignores_unsafe_redirects() {
+        $controller = new LoginController();
+        session()->put('url.intended', '/dashboard');
+
+        $request = Request::create('/login', 'GET', [
+            'redirect' => 'https://example.com/phishing',
+        ]);
+        $request->setLaravelSession(app('session.store'));
+
+        $controller->showLoginForm($request);
+
+        $this->assertSame('/dashboard', session('url.intended'));
     }
 }

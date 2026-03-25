@@ -11,7 +11,7 @@ export default function AppShell({ children }: AppShellProps) {
                 <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>CBDB 中國歷代人物傳記資料庫</h1>
                 <a href="/" style={{ color: '#adb5bd', textDecoration: 'none', fontSize: '0.875rem' }}>← 返回首頁</a>
             </header>
-            <main style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+            <main style={{ padding: 0, margin: 0 }}>
                 {children}
             </main>
         </div>

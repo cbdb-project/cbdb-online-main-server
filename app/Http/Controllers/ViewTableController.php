@@ -114,9 +114,18 @@ class ViewTableController extends Controller {
     }
 
     public function appIndex(): InertiaResponse {
+        $views = $this->viewTableService->listDefinitions()
+            ->map(function ($view) {
+                return [
+                    ...$view,
+                    'app_url' => route('app.view.show', ['key' => $view['key']], false),
+                ];
+            })
+            ->values()
+            ->all();
+
         return Inertia::render('ViewTables/List', [
-            'views' => $this->viewTableService->listDefinitions(),
-            'listUrl' => route('app.view.index', [], false),
+            'views' => $views,
         ]);
     }
 
@@ -129,6 +138,17 @@ class ViewTableController extends Controller {
 
         $data['pageUrl'] = route('app.view.show', ['key' => $data['key']], false);
         $data['listUrl'] = route('app.view.index', [], false);
+        $data['availableViews'] = $this->viewTableService->listDefinitions()
+            ->map(function ($view) {
+                return [
+                    'key' => $view['key'],
+                    'title' => $view['title'],
+                    'primary_alias' => $view['primary_alias'],
+                    'app_url' => route('app.view.show', ['key' => $view['key']], false),
+                ];
+            })
+            ->values()
+            ->all();
 
         return Inertia::render('ViewTables/Show', $data);
     }

@@ -188,6 +188,12 @@
                     </a>
                     <ul class="nav nav-treeview">
                         <li class="nav-item">
+                            <a href="{{ route('app.view.index') }}" class="nav-link">
+                                <i class="nav-icon fas fa-layer-group"></i>
+                                <p>檢視表總覽（新版）</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="{{ route('view.index') }}" class="nav-link {{ $activePage == '檢視表總覽' ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-list-ul"></i>
                                 <p>檢視表總覽</p>

@@ -25,6 +25,7 @@ class ViewTableService {
                 'title' => Arr::get($definition, 'title', $key),
                 'description' => Arr::get($definition, 'description', ''),
                 'aliases' => $aliases,
+                'column_count' => count(Arr::get($definition, 'columns', [])),
             ];
         })->sortBy(function ($item) {
             return Str::lower($item['primary_alias']);
@@ -121,6 +122,9 @@ class ViewTableService {
             'columns' => $columns,
             'rows' => $rows,
             'key' => $effectiveKey,
+            'primary_alias' => ($definition['aliases'][0] ?? ('View_' . Str::studly(str_replace('-', '_', $effectiveKey)))),
+            'aliases' => Arr::get($definition, 'aliases', []),
+            'column_count' => count($columns),
             'filters' => [
                 'search' => $search ?: '',
             ],

@@ -1234,6 +1234,7 @@ const workspaceStyle: React.CSSProperties = {
     display: 'grid',
     gap: 16,
     minWidth: 0,
+    padding: '16px 20px 24px',
 };
 
 const workspaceErrorStackStyle: React.CSSProperties = {
@@ -1272,6 +1273,10 @@ const filterSummaryTileStyle: React.CSSProperties = {
 };
 
 const summaryLabelStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    minHeight: '2.2em',
+    lineHeight: 1.2,
     fontSize: '0.72rem',
     letterSpacing: '0.02em',
     color: '#6b7280',

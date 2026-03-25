@@ -336,7 +336,6 @@ return [
             'c_created_date' => '建立時間',
             'c_modified_by' => '最後修改者',
             'c_modified_date' => '最後修改時間',
-            'c_self_bio' => '是否自述',
         ],
         'page_size' => 20,
     ],

@@ -497,7 +497,6 @@ class ViewTableQueries {
                 'bm.c_created_date',
                 'bm.c_modified_by',
                 'bm.c_modified_date',
-                'bm.c_self_bio',
             ])
             ->leftJoin('INDEXYEAR_TYPE_CODES as indexyear_codes', 'indexyear_codes.c_index_year_type_code', '=', 'bm.c_index_year_type_code')
             ->leftJoin('TEXT_CODES as index_source', 'index_source.c_textid', '=', 'bm.c_index_year_source_id')

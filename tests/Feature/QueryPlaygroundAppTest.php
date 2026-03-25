@@ -64,6 +64,15 @@ class QueryPlaygroundAppTest extends TestCase {
     }
 
     #[Test]
+    public function app_playground_includes_csrf_meta_tag_for_react_requests() {
+        $this->be($this->adminUser);
+        $response = $this->get(route('app.query-playground.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('<meta name="csrf-token" content="', false);
+    }
+
+    #[Test]
     public function app_playground_returns_inertia_page() {
         $this->be($this->adminUser);
         $response = $this->get(route('app.query-playground.index'));

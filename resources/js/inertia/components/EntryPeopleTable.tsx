@@ -1,7 +1,7 @@
 import React from 'react';
 import PaginationControls, { PaginationData } from './PaginationControls';
 
-export interface ResultRow {
+export interface EntryPersonRow {
     c_personid: number;
     c_name_chn: string | null;
     c_name: string | null;
@@ -13,36 +13,24 @@ export interface ResultRow {
     c_index_addr_name: string | null;
     c_index_addr_chn: string | null;
     c_index_year_type_label: string | null;
-    c_entry_code: number;
-    c_entry_desc_chn: string | null;
-    c_entry_desc: string | null;
-    c_year: number | null;
-    c_sequence: number | null;
     c_entry_addr_id: number | null;
     c_entry_addr_name: string | null;
     c_entry_addr_chn: string | null;
-    c_entry_nianhao_label: string | null;
-    c_entry_nh_year: number | null;
-    c_entry_range_label: string | null;
-    c_exam_rank: string | null;
-    c_parental_status_label: string | null;
-    c_source_label: string | null;
-    c_notes: string | null;
-    c_posting_notes: string | null;
     c_sex_label: string | null;
+    entry_count: number;
 }
 
 interface Props {
-    rows: ResultRow[];
-    pagination: PaginationData<ResultRow>;
+    rows: EntryPersonRow[];
+    pagination: PaginationData<EntryPersonRow>;
     onPageChange: (page: number) => void;
 }
 
-export default function SearchResultTable({ rows, pagination, onPageChange }: Props) {
+export default function EntryPeopleTable({ rows, pagination, onPageChange }: Props) {
     if (rows.length === 0) {
         return (
             <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
-                無符合條件的入仕記錄
+                無符合條件的人物摘要
             </div>
         );
     }
@@ -50,7 +38,7 @@ export default function SearchResultTable({ rows, pagination, onPageChange }: Pr
     return (
         <div>
             <div style={{ marginBottom: 12, color: '#6c757d', fontSize: '0.875rem' }}>
-                共找到 <strong>{pagination.total}</strong> 筆入仕記錄
+                共找到 <strong>{pagination.total}</strong> 位人物
                 （顯示第 {pagination.from ?? 0} - {pagination.to ?? 0} 筆）
             </div>
 
@@ -58,14 +46,14 @@ export default function SearchResultTable({ rows, pagination, onPageChange }: Pr
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#f8f9fa' }}>
-                            {['人物 ID', '姓名', '朝代', '指數年', '指數年類型', '性別', '索引地址', '入仕地址', '入仕代碼', '入仕方式', '入仕年', '年號', '範圍', '考試等第', '父母狀態', '來源', '備註', '任官備註', '操作'].map((heading) => (
+                            {['人物 ID', '姓名', '朝代', '指數年', '指數年類型', '性別', '索引地址', '入仕地址', '入仕筆數', '操作'].map((heading) => (
                                 <th key={heading} style={headerCellStyle}>{heading}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((row, index) => (
-                            <tr key={`${row.c_personid}-${row.c_entry_code}-${row.c_sequence}-${index}`} style={{ borderBottom: '1px solid #dee2e6' }}>
+                        {rows.map((row) => (
+                            <tr key={row.c_personid} style={{ borderBottom: '1px solid #dee2e6' }}>
                                 <td style={cellStyle}>{row.c_personid}</td>
                                 <td style={cellStyle}>
                                     <div>{row.c_name_chn || '—'}</div>
@@ -77,18 +65,7 @@ export default function SearchResultTable({ rows, pagination, onPageChange }: Pr
                                 <td style={cellStyle}>{row.c_sex_label ?? '—'}</td>
                                 <td style={cellStyle}>{row.c_index_addr_chn ?? row.c_index_addr_name ?? '—'}</td>
                                 <td style={cellStyle}>{row.c_entry_addr_chn ?? row.c_entry_addr_name ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_entry_code}</td>
-                                <td style={cellStyle}>{row.c_entry_desc_chn ?? row.c_entry_desc ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_year ?? '—'}</td>
-                                <td style={cellStyle}>
-                                    {row.c_entry_nianhao_label ? `${row.c_entry_nianhao_label}${row.c_entry_nh_year ? ` ${row.c_entry_nh_year}年` : ''}` : '—'}
-                                </td>
-                                <td style={cellStyle}>{row.c_entry_range_label ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_exam_rank ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_parental_status_label ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_source_label ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_notes ?? '—'}</td>
-                                <td style={cellStyle}>{row.c_posting_notes ?? '—'}</td>
+                                <td style={cellStyle}>{row.entry_count}</td>
                                 <td style={cellStyle}>
                                     <a
                                         href={`/basicinformation/${row.c_personid}`}

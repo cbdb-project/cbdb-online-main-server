@@ -219,16 +219,17 @@ Route::middleware('auth')->group(function () {
     Route::delete('api-tokens/{tokenId}', 'ApiTokenController@destroy')->name('api-tokens.destroy');
     Route::delete('api-tokens', 'ApiTokenController@destroyAll')->name('api-tokens.destroy-all');
 
-    // 按入仕查詢
-    Route::get('search-by/entry', 'SearchByEntryController@index')->name('search-by.entry.index');
-    Route::get('search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('search-by.entry.types');
-    Route::get('search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('search-by.entry.codes');
-    Route::get('search-by/entry/search', 'SearchByEntryController@search')->name('search-by.entry.search');
-
-    // Inertia + React 版按入仕查詢（PoC）
+    // 按入仕查詢（Inertia + React）
+    Route::get('search-by/entry', 'SearchByEntryController@index')
+        ->middleware('inertia')
+        ->name('search-by.entry.index');
     Route::get('app/search-by/entry', 'SearchByEntryController@appIndex')
         ->middleware('inertia')
         ->name('app.search-by.entry.index');
+    Route::get('search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('search-by.entry.types');
+    Route::get('search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('search-by.entry.codes');
+    Route::get('search-by/entry/places', 'SearchByEntryController@getPlaces')->name('search-by.entry.places');
+    Route::get('search-by/entry/query', 'SearchByEntryController@query')->name('search-by.entry.query');
 
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');

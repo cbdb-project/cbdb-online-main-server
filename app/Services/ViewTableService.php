@@ -144,8 +144,17 @@ class ViewTableService {
 
     /**
      * 將 SQL 中的 ? 佔位符替換為實際的 binding 值。
+     *
+     * @see renderSql() 的別名，供 Controller 呼叫使用。
      */
-    protected function renderSql(string $sql, array $bindings): string {
+    public function formatSql(string $sql, array $bindings): string {
+        return $this->renderSql($sql, $bindings);
+    }
+
+    /**
+     * 將 SQL 中的 ? 佔位符替換為實際的 binding 值。
+     */
+    public function renderSql(string $sql, array $bindings): string {
         if (empty($bindings)) {
             return $sql;
         }

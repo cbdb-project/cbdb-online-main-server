@@ -91,7 +91,7 @@ class ViewTableController extends Controller {
         $debugQuery->limit($perPage)->offset(($currentPage - 1) * $perPage);
         $debugSql = $debugQuery->toSql();
         $debugBindings = $debugQuery->getBindings();
-        $debugRenderedSql = $this->renderSql($debugSql, $debugBindings);
+        $debugRenderedSql = $this->viewTableService->formatSql($debugSql, $debugBindings);
 
         $rows = $builder->paginate($perPage)->appends($request->except('page'));
 
@@ -131,27 +131,5 @@ class ViewTableController extends Controller {
         $data['listUrl'] = route('app.view.index', [], false);
 
         return Inertia::render('ViewTables/Show', $data);
-    }
-
-    protected function renderSql(string $sql, array $bindings): string {
-        if (empty($bindings)) {
-            return $sql;
-        }
-
-        $preparedBindings = array_map(function ($binding) {
-            if ($binding === null) {
-                return 'NULL';
-            }
-            if (is_bool($binding)) {
-                return $binding ? '1' : '0';
-            }
-            if (is_int($binding) || is_float($binding)) {
-                return (string) $binding;
-            }
-
-            return "'" . str_replace("'", "''", $binding) . "'";
-        }, $bindings);
-
-        return Str::replaceArray('?', $preparedBindings, $sql);
     }
 }

@@ -23,13 +23,48 @@ interface WhereCondition {
     value: string;
 }
 
+interface JoinConfig {
+    table: string;
+    alias: string;
+    type: string;
+    leftColumn: string;
+    operator: string;
+    rightColumn: string;
+}
+
 interface Props {
     tables: QbeTable[];
     schemaEndpoint: string;
     onGenerateSql: (sql: string) => void;
 }
 
+interface QbeDraftState {
+    baseTable: string;
+    selectedColumns: string[];
+    whereConditions: WhereCondition[];
+    groupByColumns: string[];
+    orderByColumns: { column: string; direction: 'ASC' | 'DESC' }[];
+    distinct: boolean;
+    limit: string;
+    joins: JoinConfig[];
+}
+
+interface PersistedQbeDraft {
+    version: number;
+    savedAt: string;
+    state: QbeDraftState;
+}
+
+interface QbeHistoryEntry {
+    id: string;
+    savedAt: string;
+    state: QbeDraftState;
+}
+
 const OPERATORS = ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'NOT LIKE', 'IN', 'IS NULL', 'IS NOT NULL'];
+const QBE_DRAFT_STORAGE_KEY = 'query-playground:qbe:draft:v1';
+const QBE_HISTORY_STORAGE_KEY = 'query-playground:qbe:history:v1';
+const QBE_MAX_HISTORY_ENTRIES = 8;
 
 export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Props) {
     const [baseTable, setBaseTable] = useState('');
@@ -46,7 +81,12 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
     const [limit, setLimit] = useState('');
 
     // Join state
-    const [joins, setJoins] = useState<{ table: string; type: string; on: string }[]>([]);
+    const [joins, setJoins] = useState<JoinConfig[]>([]);
+    const [historyEntries, setHistoryEntries] = useState<QbeHistoryEntry[]>([]);
+    const [selectedHistoryId, setSelectedHistoryId] = useState('');
+    const [persistenceNotice, setPersistenceNotice] = useState('');
+    const [lastSavedAt, setLastSavedAt] = useState('');
+    const hasRestoredDraftRef = useRef(false);
 
     const availableColumns: ColumnInfo[] = (() => {
         const cols: ColumnInfo[] = [];
@@ -55,7 +95,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         }
         joins.forEach((j) => {
             if (schemas[j.table]) {
-                schemas[j.table].columns.forEach((c) => cols.push({ name: `${j.table}.${c.name}`, type: c.type }));
+                const referenceName = getJoinReference(j);
+                schemas[j.table].columns.forEach((c) => cols.push({ name: `${referenceName}.${c.name}`, type: c.type }));
             }
         });
         return cols;
@@ -96,7 +137,107 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         }
     }, [baseTable, joins, fetchSchema]);
 
+    const buildDraftState = useCallback((): QbeDraftState => ({
+        baseTable,
+        selectedColumns,
+        whereConditions,
+        groupByColumns,
+        orderByColumns,
+        distinct,
+        limit,
+        joins,
+    }), [baseTable, selectedColumns, whereConditions, groupByColumns, orderByColumns, distinct, limit, joins]);
+
+    const applyDraftState = useCallback((draft: QbeDraftState) => {
+        setBaseTable(draft.baseTable || '');
+        setSelectedColumns(draft.selectedColumns || []);
+        setWhereConditions(draft.whereConditions || []);
+        setGroupByColumns(draft.groupByColumns || []);
+        setOrderByColumns(draft.orderByColumns || []);
+        setDistinct(Boolean(draft.distinct));
+        setLimit(draft.limit || '');
+        setJoins(draft.joins || []);
+    }, []);
+
+    useEffect(() => {
+        if (hasRestoredDraftRef.current) {
+            return;
+        }
+
+        const storedDraft = readPersistedDraft();
+        const storedHistory = readPersistedHistory();
+        setHistoryEntries(storedHistory);
+        setSelectedHistoryId(storedHistory[0]?.id || '');
+
+        if (storedDraft && !isEmptyDraftState(storedDraft.state)) {
+            applyDraftState(storedDraft.state);
+            setLastSavedAt(storedDraft.savedAt);
+            setPersistenceNotice(`已還原 ${formatSavedAt(storedDraft.savedAt)} 的 QBE 草稿`);
+        }
+
+        hasRestoredDraftRef.current = true;
+    }, [applyDraftState]);
+
+    useEffect(() => {
+        if (!hasRestoredDraftRef.current) {
+            return;
+        }
+
+        const draftState = buildDraftState();
+        if (isEmptyDraftState(draftState)) {
+            clearPersistedDraft();
+            setLastSavedAt('');
+            return;
+        }
+
+        const savedAt = new Date().toISOString();
+        const timeoutId = window.setTimeout(() => {
+            persistDraftState({
+                version: 1,
+                savedAt,
+                state: draftState,
+            });
+            setLastSavedAt(savedAt);
+        }, 250);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [buildDraftState]);
+
+    const saveHistorySnapshot = useCallback((reason: 'manual' | 'reset' | 'generate') => {
+        const draftState = buildDraftState();
+        if (isEmptyDraftState(draftState)) {
+            return;
+        }
+
+        const fingerprint = buildDraftFingerprint(draftState);
+        const savedAt = new Date().toISOString();
+        const entry: QbeHistoryEntry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            savedAt,
+            state: draftState,
+        };
+
+        const nextHistory = [
+            entry,
+            ...historyEntries.filter((historyEntry) => buildDraftFingerprint(historyEntry.state) !== fingerprint),
+        ].slice(0, QBE_MAX_HISTORY_ENTRIES);
+
+        setHistoryEntries(nextHistory);
+        setSelectedHistoryId(entry.id);
+        persistHistoryEntries(nextHistory);
+        setPersistenceNotice(
+            reason === 'manual'
+                ? `已保存目前版本（${formatSavedAt(savedAt)}）`
+                : reason === 'generate'
+                    ? `已保存產生 SQL 前的版本（${formatSavedAt(savedAt)}）`
+                    : `已保存重設前的版本（${formatSavedAt(savedAt)}）`,
+        );
+    }, [buildDraftState, historyEntries]);
+
     const handleBaseTableChange = (tableName: string) => {
+        if (baseTable && baseTable !== tableName && !isEmptyDraftState(buildDraftState())) {
+            saveHistorySnapshot('reset');
+        }
         setBaseTable(tableName);
         setSelectedColumns([]);
         setWhereConditions([]);
@@ -120,12 +261,50 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
     };
 
     const addJoin = () => {
-        setJoins([...joins, { table: '', type: 'INNER JOIN', on: '' }]);
+        setJoins([...joins, { table: '', alias: '', type: 'INNER JOIN', leftColumn: '', operator: '=', rightColumn: '' }]);
     };
 
-    const updateJoin = (index: number, field: string, value: string) => {
+    const updateJoin = (index: number, field: keyof JoinConfig, value: string) => {
         const updated = [...joins];
-        updated[index] = { ...updated[index], [field]: value };
+        const currentJoin = updated[index];
+        const previousReference = getJoinReference(currentJoin);
+        let nextJoin: JoinConfig = { ...currentJoin, [field]: value };
+
+        if (field === 'table') {
+            if (!value) {
+                nextJoin = { ...nextJoin, alias: '', leftColumn: '', rightColumn: '' };
+            } else if (!nextJoin.alias.trim() && requiresJoinAlias(value, baseTable, updated, index)) {
+                nextJoin = { ...nextJoin, alias: buildJoinAlias(value, baseTable, updated, index) };
+            }
+        } else if (field === 'alias' && !value.trim() && requiresJoinAlias(nextJoin.table, baseTable, updated, index)) {
+            nextJoin = { ...nextJoin, alias: buildJoinAlias(nextJoin.table, baseTable, updated, index) };
+        }
+
+        const nextReference = getJoinReference(nextJoin);
+        updated[index] = nextJoin;
+
+        if (field === 'table' || field === 'alias') {
+            if (previousReference && nextReference && previousReference !== nextReference) {
+                setSelectedColumns((prev) => prev.map((column) => replaceQualifiedReference(column, previousReference, nextReference)));
+                setWhereConditions((prev) => prev.map((condition) => ({
+                    ...condition,
+                    column: replaceQualifiedReference(condition.column, previousReference, nextReference),
+                })));
+                setGroupByColumns((prev) => prev.map((column) => replaceQualifiedReference(column, previousReference, nextReference)));
+                setOrderByColumns((prev) => prev.map((orderBy) => ({
+                    ...orderBy,
+                    column: replaceQualifiedReference(orderBy.column, previousReference, nextReference),
+                })));
+                updated.forEach((join, joinIndex) => {
+                    updated[joinIndex] = {
+                        ...join,
+                        leftColumn: replaceQualifiedReference(join.leftColumn, previousReference, nextReference),
+                        rightColumn: replaceQualifiedReference(join.rightColumn, previousReference, nextReference),
+                    };
+                });
+            }
+        }
+
         setJoins(updated);
         if (field === 'table' && value) {
             fetchSchema([value]);
@@ -142,6 +321,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
 
     const generateSql = () => {
         if (!baseTable) return;
+        saveHistorySnapshot('generate');
 
         const selectPart = selectedColumns.length > 0
             ? (distinct ? 'SELECT DISTINCT ' : 'SELECT ') + selectedColumns.join(', ')
@@ -149,8 +329,9 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
 
         let fromPart = `FROM ${baseTable}`;
         joins.forEach((j) => {
-            if (j.table && j.on) {
-                fromPart += `\n  ${j.type} ${j.table} ON ${j.on}`;
+            if (j.table && j.leftColumn && j.rightColumn) {
+                const aliasClause = j.alias.trim() ? ` AS ${j.alias.trim()}` : '';
+                fromPart += `\n  ${j.type} ${j.table}${aliasClause} ON ${j.leftColumn} ${j.operator} ${j.rightColumn}`;
             }
         });
 
@@ -188,11 +369,82 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         onGenerateSql(sql);
     };
 
+    const restoreSelectedHistory = () => {
+        const entry = historyEntries.find((historyEntry) => historyEntry.id === selectedHistoryId);
+        if (!entry) {
+            return;
+        }
+
+        applyDraftState(entry.state);
+        persistDraftState({
+            version: 1,
+            savedAt: entry.savedAt,
+            state: entry.state,
+        });
+        setLastSavedAt(entry.savedAt);
+        setPersistenceNotice(`已還原 ${formatSavedAt(entry.savedAt)} 的版本`);
+    };
+
+    const clearSavedQbeHistory = () => {
+        clearPersistedDraft();
+        clearPersistedHistory();
+        setHistoryEntries([]);
+        setSelectedHistoryId('');
+        setLastSavedAt('');
+        setPersistenceNotice('已清除 QBE 草稿與歷史紀錄');
+    };
+
     const nonInternalTables = tables.filter((t) => !t.internal);
     const internalTables = tables.filter((t) => t.internal);
 
     return (
         <div>
+            <div style={{
+                marginBottom: 16,
+                padding: 12,
+                borderRadius: 6,
+                border: '1px solid #d6d8db',
+                backgroundColor: '#f8f9fa',
+            }}>
+                <div style={{ fontSize: '0.85rem', color: '#495057', marginBottom: 8 }}>
+                    QBE 草稿會自動保存在目前瀏覽器，離開頁面後可回來繼續編輯。
+                    {lastSavedAt ? ` 最近保存：${formatSavedAt(lastSavedAt)}` : ''}
+                </div>
+                {persistenceNotice && (
+                    <div style={{ fontSize: '0.8rem', color: '#0c5460', marginBottom: 8 }}>
+                        {persistenceNotice}
+                    </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button onClick={() => saveHistorySnapshot('manual')} style={smallBtnStyle}>
+                        保存目前版本
+                    </button>
+                    <select
+                        value={selectedHistoryId}
+                        onChange={(e) => setSelectedHistoryId(e.target.value)}
+                        style={{ ...selectStyle, minWidth: 260 }}
+                        disabled={historyEntries.length === 0}
+                    >
+                        <option value="">{historyEntries.length === 0 ? '-- 尚無歷史版本 --' : '-- 選擇歷史版本 --'}</option>
+                        {historyEntries.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                                {formatSavedAt(entry.savedAt)}{entry.state.baseTable ? ` — ${entry.state.baseTable}` : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={restoreSelectedHistory}
+                        disabled={!selectedHistoryId}
+                        style={{ ...smallBtnStyle, opacity: selectedHistoryId ? 1 : 0.6 }}
+                    >
+                        還原版本
+                    </button>
+                    <button onClick={clearSavedQbeHistory} style={removeBtnStyle}>
+                        清除草稿與歷史
+                    </button>
+                </div>
+            </div>
+
             {/* Base table selection */}
             <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>主表 (Base Table)</label>
@@ -255,11 +507,43 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                 </select>
                                 <input
                                     type="text"
-                                    value={join.on}
-                                    onChange={(e) => updateJoin(i, 'on', e.target.value)}
-                                    placeholder="ON 條件，例如 A.id = B.id"
-                                    style={{ ...inputStyle, flex: 2, minWidth: 200 }}
+                                    value={join.alias}
+                                    onChange={(e) => updateJoin(i, 'alias', e.target.value)}
+                                    placeholder="別名，例如 ALTNAME_DATA_2"
+                                    style={{ ...inputStyle, flex: '0 0 180px' }}
                                 />
+                                <select
+                                    value={join.leftColumn}
+                                    onChange={(e) => updateJoin(i, 'leftColumn', e.target.value)}
+                                    style={{ ...selectStyle, flex: 1, minWidth: 180 }}
+                                >
+                                    <option value="">-- 左欄位 --</option>
+                                    {availableColumns.map((col) => (
+                                        <option key={`left-${i}-${col.name}`} value={col.name}>{col.name}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={join.operator}
+                                    onChange={(e) => updateJoin(i, 'operator', e.target.value)}
+                                    style={{ ...selectStyle, flex: '0 0 110px' }}
+                                >
+                                    <option value="=">=</option>
+                                    <option value="!=">!=</option>
+                                    <option value="<">&lt;</option>
+                                    <option value=">">&gt;</option>
+                                    <option value="<=">&lt;=</option>
+                                    <option value=">=">&gt;=</option>
+                                </select>
+                                <select
+                                    value={join.rightColumn}
+                                    onChange={(e) => updateJoin(i, 'rightColumn', e.target.value)}
+                                    style={{ ...selectStyle, flex: 1, minWidth: 180 }}
+                                >
+                                    <option value="">-- 右欄位 --</option>
+                                    {availableColumns.map((col) => (
+                                        <option key={`right-${i}-${col.name}`} value={col.name}>{col.name}</option>
+                                    ))}
+                                </select>
                                 <button onClick={() => removeJoin(i)} style={removeBtnStyle}>✕</button>
                             </div>
                         ))}
@@ -447,6 +731,167 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
             )}
         </div>
     );
+}
+
+function getJoinReference(join: JoinConfig): string {
+    return join.alias.trim() || join.table;
+}
+
+function requiresJoinAlias(table: string, baseTable: string, joins: JoinConfig[], currentIndex: number): boolean {
+    if (!table) {
+        return false;
+    }
+
+    const usedReferences = [
+        baseTable,
+        ...joins
+            .filter((_, index) => index !== currentIndex)
+            .map((join) => getJoinReference(join))
+            .filter(Boolean),
+    ];
+
+    return usedReferences.includes(table);
+}
+
+function buildJoinAlias(table: string, baseTable: string, joins: JoinConfig[], currentIndex: number): string {
+    const usedReferences = new Set([
+        baseTable,
+        ...joins
+            .filter((_, index) => index !== currentIndex)
+            .map((join) => getJoinReference(join))
+            .filter(Boolean),
+    ]);
+
+    let suffix = 2;
+    let alias = `${table}_${suffix}`;
+    while (usedReferences.has(alias)) {
+        suffix += 1;
+        alias = `${table}_${suffix}`;
+    }
+
+    return alias;
+}
+
+function replaceQualifiedReference(column: string, previousReference: string, nextReference: string): string {
+    if (!column.startsWith(`${previousReference}.`)) {
+        return column;
+    }
+
+    return `${nextReference}.${column.slice(previousReference.length + 1)}`;
+}
+
+function isEmptyDraftState(state: QbeDraftState): boolean {
+    return !state.baseTable
+        && state.selectedColumns.length === 0
+        && state.whereConditions.length === 0
+        && state.groupByColumns.length === 0
+        && state.orderByColumns.length === 0
+        && state.joins.length === 0
+        && !state.distinct
+        && !state.limit;
+}
+
+function buildDraftFingerprint(state: QbeDraftState): string {
+    return JSON.stringify(state);
+}
+
+function persistDraftState(payload: PersistedQbeDraft): void {
+    const storage = getQbeStorage();
+    if (!storage) {
+        return;
+    }
+
+    storage.setItem(QBE_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function readPersistedDraft(): PersistedQbeDraft | null {
+    const storage = getQbeStorage();
+    if (!storage) {
+        return null;
+    }
+
+    const raw = storage.getItem(QBE_DRAFT_STORAGE_KEY);
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as PersistedQbeDraft;
+        if (parsed?.version !== 1 || !parsed?.state) {
+            return null;
+        }
+
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+function clearPersistedDraft(): void {
+    const storage = getQbeStorage();
+    storage?.removeItem(QBE_DRAFT_STORAGE_KEY);
+}
+
+function persistHistoryEntries(entries: QbeHistoryEntry[]): void {
+    const storage = getQbeStorage();
+    if (!storage) {
+        return;
+    }
+
+    storage.setItem(QBE_HISTORY_STORAGE_KEY, JSON.stringify(entries));
+}
+
+function readPersistedHistory(): QbeHistoryEntry[] {
+    const storage = getQbeStorage();
+    if (!storage) {
+        return [];
+    }
+
+    const raw = storage.getItem(QBE_HISTORY_STORAGE_KEY);
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as QbeHistoryEntry[];
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed.filter((entry) => entry?.id && entry?.savedAt && entry?.state);
+    } catch {
+        return [];
+    }
+}
+
+function clearPersistedHistory(): void {
+    const storage = getQbeStorage();
+    storage?.removeItem(QBE_HISTORY_STORAGE_KEY);
+}
+
+function getQbeStorage(): Storage | null {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    return window.sessionStorage;
+}
+
+function formatSavedAt(savedAt: string): string {
+    const date = new Date(savedAt);
+    if (Number.isNaN(date.getTime())) {
+        return savedAt;
+    }
+
+    return date.toLocaleString('zh-TW', {
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
 }
 
 const labelStyle: React.CSSProperties = {

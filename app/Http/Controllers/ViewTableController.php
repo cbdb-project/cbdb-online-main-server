@@ -126,6 +126,7 @@ class ViewTableController extends Controller {
 
         return Inertia::render('ViewTables/List', [
             'views' => $views,
+            'listUrl' => route('app.view.index', [], false),
         ]);
     }
 

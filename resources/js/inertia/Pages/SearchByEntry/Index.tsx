@@ -1377,6 +1377,8 @@ const dividerStyle: React.CSSProperties = {
 
 const textInputStyle: React.CSSProperties = {
     width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     padding: '7px 10px',
     border: '1px solid #ced4da',
     borderRadius: 4,

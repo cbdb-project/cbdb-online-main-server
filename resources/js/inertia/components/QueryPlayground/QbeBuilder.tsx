@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 
 interface QbeTable {
     name: string;
@@ -61,10 +61,13 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         return cols;
     })();
 
+    const schemasRef = useRef(schemas);
+    schemasRef.current = schemas;
+
     const fetchSchema = useCallback(async (tableNames: string[]) => {
         if (tableNames.length === 0) return;
         // Only fetch tables not already loaded
-        const toFetch = tableNames.filter((t) => !schemas[t]);
+        const toFetch = tableNames.filter((t) => !schemasRef.current[t]);
         if (toFetch.length === 0) return;
 
         setLoadingSchema(true);
@@ -84,11 +87,11 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         } finally {
             setLoadingSchema(false);
         }
-    }, [schemas, schemaEndpoint]);
+    }, [schemaEndpoint]);
 
     useEffect(() => {
         if (baseTable) {
-            const allTables = [baseTable, ...joins.map((j) => j.table)];
+            const allTables = [baseTable, ...joins.map((j) => j.table).filter(Boolean)];
             fetchSchema(allTables);
         }
     }, [baseTable, joins, fetchSchema]);

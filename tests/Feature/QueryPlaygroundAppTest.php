@@ -9,8 +9,8 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class QueryPlaygroundAppTest extends TestCase {
-    protected $adminUser;
-    protected $regularUser;
+    protected User $adminUser;
+    protected User $regularUser;
 
     protected function setUp(): void {
         parent::setUp();

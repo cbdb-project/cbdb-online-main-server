@@ -15,8 +15,8 @@ class QueryPlaygroundService {
         $allowedTables = array_keys(config('codes.tables', []));
 
         usort($allowedTables, function ($a, $b) {
-            $aInternal = str_starts_with($a, 'CBDB__');
-            $bInternal = str_starts_with($b, 'CBDB__');
+            $aInternal = self::isInternalTable($a);
+            $bInternal = self::isInternalTable($b);
             if ($aInternal === $bInternal) {
                 return strcmp($a, $b);
             }
@@ -28,9 +28,13 @@ class QueryPlaygroundService {
             return [
                 'name' => $table,
                 'description' => config("codes.tables.{$table}", ''),
-                'internal' => str_starts_with($table, 'CBDB__'),
+                'internal' => self::isInternalTable($table),
             ];
         }, $allowedTables);
+    }
+
+    private static function isInternalTable(string $table): bool {
+        return str_starts_with($table, 'CBDB__');
     }
 
     /**

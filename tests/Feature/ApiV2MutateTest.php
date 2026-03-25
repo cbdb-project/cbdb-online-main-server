@@ -14,6 +14,10 @@ class ApiV2MutateTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
+        config()->set('app.env', 'testing');
+        $this->app['env'] = 'testing';
+        config()->set('prometheus.enabled', false);
+        config()->set('prometheus.storage_adapter', 'memory');
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
         DB::purge('sqlite');
@@ -24,6 +28,7 @@ class ApiV2MutateTest extends TestCase {
         $this->createSanctumTables();
         $this->createOperationsTable();
         $this->createAuditLogTable();
+        $this->createBiogMainTable();
         $this->createAltnameTable();
         $this->createSourceTable();
         $this->createTextCodesTable();
@@ -33,6 +38,7 @@ class ApiV2MutateTest extends TestCase {
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('ALTNAME_DATA');
+        Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('personal_access_tokens');
@@ -96,6 +102,33 @@ class ApiV2MutateTest extends TestCase {
             $table->string('row_pk_text', 512)->nullable();
             $table->longText('old_data')->nullable();
             $table->longText('new_data')->nullable();
+        });
+    }
+
+    protected function createBiogMainTable(): void {
+        Schema::create('BIOG_MAIN', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->string('c_name_chn')->nullable();
+            $table->string('c_name')->nullable();
+            $table->string('c_name_proper')->nullable();
+            $table->string('c_name_rm')->nullable();
+            $table->string('c_surname_chn')->nullable();
+            $table->string('c_mingzi_chn')->nullable();
+            $table->string('c_surname')->nullable();
+            $table->string('c_mingzi')->nullable();
+            $table->string('c_surname_proper')->nullable();
+            $table->string('c_mingzi_proper')->nullable();
+            $table->string('c_surname_rm')->nullable();
+            $table->string('c_mingzi_rm')->nullable();
+            $table->integer('c_female')->nullable();
+            $table->integer('c_by_intercalary')->default(0);
+            $table->integer('c_dy_intercalary')->default(0);
+            $table->integer('c_index_year')->nullable();
+            $table->integer('c_death_age')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
         });
     }
 
@@ -184,6 +217,170 @@ class ApiV2MutateTest extends TestCase {
         ];
 
         return array_replace_recursive($payload, $overrides);
+    }
+
+    protected function seedBiogMain(array $overrides = []): void {
+        DB::table('BIOG_MAIN')->insert(array_replace([
+            'c_personid' => 138841,
+            'c_name_chn' => '張忠',
+            'c_name' => 'Zhang Zhong',
+            'c_name_proper' => 'Zhong Zhang',
+            'c_name_rm' => 'Chung Chang',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '忠',
+            'c_surname' => 'Zhang',
+            'c_mingzi' => 'Zhong',
+            'c_surname_proper' => 'Zhang',
+            'c_mingzi_proper' => 'Zhong',
+            'c_surname_rm' => 'Chang',
+            'c_mingzi_rm' => 'Chung',
+            'c_female' => 0,
+            'c_by_intercalary' => 0,
+            'c_dy_intercalary' => 0,
+            'c_index_year' => 1084,
+            'c_death_age' => 60,
+            'c_created_by' => 'seed',
+            'c_created_date' => now(),
+        ], $overrides));
+    }
+
+    #[Test]
+    public function testDirectBiogMainUpdateCanPatchSingleFieldAndWritesAuditInfo() {
+        $user = $this->makeUser(email: 'biog-main-single@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 138841,
+                ],
+            ],
+            'changes' => [
+                'c_surname_chn' => '章',
+            ],
+            'meta' => [
+                'comment' => '單欄位修正',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'resource' => 'basicinformation',
+                'mode' => 'direct',
+                'operation' => 'update',
+                'result' => [
+                    'pk' => [
+                        'c_personid' => 138841,
+                    ],
+                    'updated_fields' => ['c_surname_chn'],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname_chn' => '章',
+            'c_name_chn' => '章忠',
+        ]);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'BIOG_MAIN',
+            'c_personid' => 138841,
+            'op_type' => Operation::TYPE_UPDATE,
+        ]);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('c_personid', 138841)
+            ->first();
+
+        $resourceData = json_decode($operation->resource_data, true);
+        $resourceOriginal = json_decode($operation->resource_original, true);
+
+        $this->assertSame('章', $resourceData['c_surname_chn']);
+        $this->assertSame('章忠', $resourceData['c_name_chn']);
+        $this->assertSame('單欄位修正', $resourceData['__note']);
+        $this->assertSame('張', $resourceOriginal['c_surname_chn']);
+        $this->assertSame('張忠', $resourceOriginal['c_name_chn']);
+
+        $audit = DB::table('audit_log')->where('table_name', 'BIOG_MAIN')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('UPDATE', $audit->operation);
+        $this->assertSame('c_personid=138841', $audit->row_pk_text);
+
+        $oldData = json_decode($audit->old_data, true);
+        $newData = json_decode($audit->new_data, true);
+
+        $this->assertSame('張', $oldData['c_surname_chn']);
+        $this->assertSame('章', $newData['c_surname_chn']);
+        $this->assertSame('張忠', $oldData['c_name_chn']);
+        $this->assertSame('章忠', $newData['c_name_chn']);
+    }
+
+    #[Test]
+    public function testDirectBiogMainUpdateCanPatchMultipleFields() {
+        $user = $this->makeUser(email: 'biog-main-multi@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'biogmain',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 138841,
+                ],
+            ],
+            'changes' => [
+                'c_surname_chn' => '李',
+                'c_mingzi_chn' => '安',
+                'c_surname' => 'Li',
+                'c_mingzi' => 'An',
+                'c_female' => 1,
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'resource' => 'basicinformation',
+                'mode' => 'direct',
+                'operation' => 'update',
+                'result' => [
+                    'updated_fields' => [
+                        'c_surname_chn',
+                        'c_mingzi_chn',
+                        'c_surname',
+                        'c_mingzi',
+                        'c_female',
+                    ],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname_chn' => '李',
+            'c_mingzi_chn' => '安',
+            'c_name_chn' => '李安',
+            'c_surname' => 'Li',
+            'c_mingzi' => 'An',
+            'c_name' => 'Li An',
+            'c_female' => 1,
+        ]);
+
+        $audit = DB::table('audit_log')->where('table_name', 'BIOG_MAIN')->first();
+        $newData = json_decode($audit->new_data, true);
+
+        $this->assertSame('李安', $newData['c_name_chn']);
+        $this->assertSame('Li An', $newData['c_name']);
+        $this->assertSame(1, $newData['c_female']);
     }
 
     #[Test]

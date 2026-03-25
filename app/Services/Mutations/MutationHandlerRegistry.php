@@ -9,11 +9,13 @@ class MutationHandlerRegistry {
     protected array $handlers;
 
     public function __construct(
+        BiogMainMutationHandler $biogMainHandler,
         AltnameMutationHandler $altnameHandler,
         PossessionMutationHandler $possessionHandler,
         SourceMutationHandler $sourceHandler
     ) {
         $this->handlers = [
+            $biogMainHandler,
             $altnameHandler,
             $possessionHandler,
             $sourceHandler,

@@ -289,10 +289,12 @@ class BiogMainRepository {
         }
 
         //20190531判別是否為眾包用戶
+        $operation = null;
+
         if (Auth::user()->isCrowdsourcingUser()) {
-            (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $operationData, $ori, 2);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $operationData, $ori, 2);
         } else {
-            DB::transaction(function () use ($data, $operationData, $id, $biogbasicinformation, $ori) {
+            DB::transaction(function () use ($data, $operationData, $id, $biogbasicinformation, $ori, &$operation) {
                 $biogbasicinformation->update($data);
                 $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_MAIN', $biogbasicinformation->c_personid, $operationData, $ori);
 
@@ -314,6 +316,7 @@ class BiogMainRepository {
 
         return [
             'no_changes' => false,
+            'operation_id' => isset($operation) && $operation ? $operation->id : null,
         ];
     }
 

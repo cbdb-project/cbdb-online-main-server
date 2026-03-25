@@ -420,6 +420,7 @@ export default function Index() {
                                 label="入仕類型與代碼"
                                 value={selectedTypeLabel || '不限'}
                                 detail={selectedCodePreview}
+                                size="large"
                                 onClick={() => setActiveDialog('entry')}
                             />
                             <FilterSummaryTile
@@ -431,6 +432,7 @@ export default function Index() {
                                 label="地點"
                                 value={selectedPlaces.length > 0 ? `${selectedPlaces.length} 項` : '不限'}
                                 detail={selectedPlacePreview}
+                                size="large"
                                 onClick={() => setActiveDialog('places')}
                             />
                             <FilterSummaryTile
@@ -807,18 +809,20 @@ function FilterSummaryTile({
     label,
     value,
     detail,
+    size = 'normal',
     onClick,
 }: {
     label: string;
     value: string;
     detail?: string;
+    size?: 'normal' | 'large';
     onClick: () => void;
 }) {
     return (
-        <button type="button" onClick={onClick} style={filterSummaryTileStyle}>
+        <button type="button" onClick={onClick} style={filterSummaryTileStyle(size)}>
             <div style={summaryLabelStyle}>{label}</div>
             <div style={summaryValueStyle}>{value}</div>
-            {detail && <div style={filterSummaryDetailStyle}>{detail}</div>}
+            <div style={filterSummaryDetailStyle}>{detail || '\u00A0'}</div>
         </button>
     );
 }
@@ -1252,7 +1256,7 @@ const workspaceSummaryCardStyle: React.CSSProperties = {
 
 const summaryGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
     gap: 10,
 };
 
@@ -1263,19 +1267,25 @@ const summaryItemStyle: React.CSSProperties = {
     border: '1px solid #e4ebf2',
 };
 
-const filterSummaryTileStyle: React.CSSProperties = {
-    ...summaryItemStyle,
-    width: '100%',
-    minWidth: 0,
-    textAlign: 'left',
-    cursor: 'pointer',
-    whiteSpace: 'normal',
-};
+function filterSummaryTileStyle(size: 'normal' | 'large'): React.CSSProperties {
+    return {
+        ...summaryItemStyle,
+        width: '100%',
+        minWidth: 0,
+        textAlign: 'left',
+        cursor: 'pointer',
+        whiteSpace: 'normal',
+        display: 'grid',
+        gridTemplateRows: '2.3em 2.4em minmax(2.8em, auto)',
+        alignContent: 'start',
+        gridColumn: size === 'large' ? 'span 2' : 'span 1',
+    };
+}
 
 const summaryLabelStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'flex-start',
-    minHeight: '2.2em',
+    minHeight: '2.3em',
     lineHeight: 1.2,
     fontSize: '0.72rem',
     letterSpacing: '0.02em',
@@ -1289,6 +1299,7 @@ const summaryValueStyle: React.CSSProperties = {
     color: '#111827',
     fontWeight: 600,
     overflowWrap: 'anywhere',
+    alignSelf: 'start',
 };
 
 const filterSummaryDetailStyle: React.CSSProperties = {
@@ -1297,6 +1308,8 @@ const filterSummaryDetailStyle: React.CSSProperties = {
     color: '#6b7280',
     lineHeight: 1.4,
     overflowWrap: 'anywhere',
+    minHeight: '2.8em',
+    alignSelf: 'start',
 };
 
 const summaryActionButtonStyle: React.CSSProperties = {

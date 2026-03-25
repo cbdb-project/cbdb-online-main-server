@@ -231,6 +231,14 @@ Route::middleware('auth')->group(function () {
     Route::get('search-by/entry/places', 'SearchByEntryController@getPlaces')->name('search-by.entry.places');
     Route::get('search-by/entry/query', 'SearchByEntryController@query')->name('search-by.entry.query');
 
+    // 檢視表（Inertia + React）
+    Route::get('app/view', 'ViewTableController@appIndex')
+        ->middleware('inertia')
+        ->name('app.view.index');
+    Route::get('app/view/{key}', 'ViewTableController@appShow')
+        ->middleware('inertia')
+        ->name('app.view.show');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

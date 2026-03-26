@@ -705,6 +705,7 @@ class PersonBrowserService {
             $row['addresses'] = $addrs->map(function ($a) {
                 return ($a->addr_chn ?? '') . ($a->addr ? ' / ' . $a->addr : '');
             })->implode('；');
+
             return $row;
         });
 
@@ -730,6 +731,7 @@ class PersonBrowserService {
         if ($female === null || $female === '') {
             return '';
         }
+
         return ((int) $female === 1) ? '女' : '男';
     }
 
@@ -741,6 +743,7 @@ class PersonBrowserService {
         if (!$row) {
             return (string) $code;
         }
+
         return ($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao ?? '');
     }
 }

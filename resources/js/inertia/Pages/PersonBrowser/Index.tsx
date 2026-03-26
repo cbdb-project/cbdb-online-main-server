@@ -12,6 +12,8 @@ interface PageProps {
     searchEndpoint: string;
     summaryEndpoint: string;
     tabEndpoint: string;
+    mutateEndpoint: string;
+    pinyinEndpoint: string;
     initialPersonId: number | null;
     initialKeyword: string;
     initialTab: string;
@@ -22,6 +24,8 @@ export default function PersonBrowserIndex() {
         searchEndpoint,
         summaryEndpoint,
         tabEndpoint,
+        mutateEndpoint,
+        pinyinEndpoint,
         initialPersonId,
         initialKeyword,
         initialTab,
@@ -40,6 +44,7 @@ export default function PersonBrowserIndex() {
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState(initialTab || 'basic_info');
+    const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
 
     const isInitialMount = useRef(true);
 
@@ -120,6 +125,11 @@ export default function PersonBrowserIndex() {
         [activeTab, keyword, updateUrl],
     );
 
+    const handleBasicInfoSaved = useCallback(() => {
+        setSummaryRefreshKey((prev) => prev + 1);
+        doSearch(keyword, page);
+    }, [doSearch, keyword, page]);
+
     // ── Load summary when selectedId changes ──
     useEffect(() => {
         if (!selectedId) {
@@ -142,7 +152,7 @@ export default function PersonBrowserIndex() {
                 setSummary(null);
             })
             .finally(() => setSummaryLoading(false));
-    }, [selectedId, summaryEndpoint]);
+    }, [selectedId, summaryEndpoint, summaryRefreshKey]);
 
     // ── Tab change ──
     const handleTabChange = useCallback(
@@ -212,6 +222,9 @@ export default function PersonBrowserIndex() {
                             personId={selectedId}
                             activeTab={activeTab}
                             tabEndpoint={tabEndpoint}
+                            mutateEndpoint={mutateEndpoint}
+                            pinyinEndpoint={pinyinEndpoint}
+                            onBasicInfoSaved={handleBasicInfoSaved}
                         />
                     </div>
                 </div>

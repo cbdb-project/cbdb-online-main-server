@@ -436,6 +436,26 @@ class PersonBrowserService {
                     ],
                 ],
             ],
+            'form' => [
+                'person_id' => $personId,
+                'fields' => $this->buildBasicInfoFormFields(
+                    $row,
+                    $household,
+                    $birthNH,
+                    $deathNH,
+                    $birthRange,
+                    $deathRange,
+                    $deathAgeRange,
+                    $birthGanzhi,
+                    $deathGanzhi,
+                    $flEarliestNH,
+                    $flLatestNH,
+                    $indexYearTypeCode,
+                    $indexYearTypeChn,
+                    $indexYearTypeEng,
+                    $indexYearSource
+                ),
+            ],
         ];
     }
 
@@ -911,5 +931,190 @@ class PersonBrowserService {
         }
 
         return ((int) $value === 1) ? '閏月' : '平月';
+    }
+
+    private function buildBasicInfoFormFields(
+        array $row,
+        array $household,
+        string $birthNH,
+        string $deathNH,
+        string $birthRange,
+        string $deathRange,
+        string $deathAgeRange,
+        string $birthGanzhi,
+        string $deathGanzhi,
+        string $flEarliestNH,
+        string $flLatestNH,
+        string $indexYearTypeCode,
+        string $indexYearTypeChn,
+        string $indexYearTypeEng,
+        string $indexYearSource
+    ): array {
+        return [
+            'c_personid' => $this->basicInfoFormField('c_personid', 'Person ID (c_personid)', $row['c_personid'] ?? '', 'text', false, [
+                'send_on_save' => false,
+            ]),
+
+            'c_surname_chn' => $this->basicInfoFormField('c_surname_chn', '中文姓 (c_surname_chn)', $row['c_surname_chn'] ?? ''),
+            'c_mingzi_chn' => $this->basicInfoFormField('c_mingzi_chn', '中文名 (c_mingzi_chn)', $row['c_mingzi_chn'] ?? ''),
+            'c_name_chn' => $this->basicInfoFormField('c_name_chn', '中文姓名 (c_name_chn)', $row['c_name_chn'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+            ]),
+
+            'c_surname' => $this->basicInfoFormField('c_surname', '拼音姓 (c_surname)', $row['c_surname'] ?? ''),
+            'c_mingzi' => $this->basicInfoFormField('c_mingzi', '拼音名 (c_mingzi)', $row['c_mingzi'] ?? ''),
+            'c_name' => $this->basicInfoFormField('c_name', '拼音姓名 (c_name)', $row['c_name'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+            ]),
+
+            'c_surname_proper' => $this->basicInfoFormField('c_surname_proper', '外文姓 (c_surname_proper)', $row['c_surname_proper'] ?? ''),
+            'c_mingzi_proper' => $this->basicInfoFormField('c_mingzi_proper', '外文名 (c_mingzi_proper)', $row['c_mingzi_proper'] ?? ''),
+            'c_name_proper' => $this->basicInfoFormField('c_name_proper', '外文姓名 (c_name_proper)', $row['c_name_proper'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+            ]),
+
+            'c_surname_rm' => $this->basicInfoFormField('c_surname_rm', '外文羅馬字轉寫姓 (c_surname_rm)', $row['c_surname_rm'] ?? ''),
+            'c_mingzi_rm' => $this->basicInfoFormField('c_mingzi_rm', '外文羅馬字轉寫名 (c_mingzi_rm)', $row['c_mingzi_rm'] ?? ''),
+            'c_name_rm' => $this->basicInfoFormField('c_name_rm', '外文羅馬字轉寫姓名 (c_name_rm)', $row['c_name_rm'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+            ]),
+
+            'c_female' => $this->basicInfoFormField('c_female', '性別 (c_female)', $row['c_female'] ?? '', 'enum', true, [
+                'display_value' => $this->genderLabel($row['c_female'] ?? null),
+                'options' => [
+                    ['value' => '', 'label' => 'NULL-未詳'],
+                    ['value' => '0', 'label' => '0-男'],
+                    ['value' => '1', 'label' => '1-女'],
+                ],
+            ]),
+            'c_ethnicity_code' => $this->basicInfoFormField('c_ethnicity_code', '種族/部族 (c_ethnicity_code)', $row['c_ethnicity_code'] ?? '', 'enum', true, [
+                'display_value' => trim(($row['c_ethnicity_chn'] ?? '').' / '.($row['c_ethnicity'] ?? ''), ' /'),
+                'enum_model' => 'ethnicity',
+            ]),
+            'c_dy' => $this->basicInfoFormField('c_dy', '朝代 (c_dy)', $row['c_dy'] ?? '', 'enum', true, [
+                'display_value' => trim(($row['c_dynasty_chn'] ?? '').' / '.($row['c_dynasty'] ?? ''), ' /'),
+                'enum_model' => 'dynasty',
+            ]),
+
+            'c_birthyear' => $this->basicInfoFormField('c_birthyear', '年份 (c_birthyear)', $row['c_birthyear'] ?? '', 'number'),
+            'c_by_nh_code' => $this->basicInfoFormField('c_by_nh_code', '年號 (c_by_nh_code)', $row['c_by_nh_code'] ?? '', 'enum', true, [
+                'display_value' => $birthNH,
+                'enum_model' => 'nianhao',
+                'id_key' => 'c_nianhao_id',
+            ]),
+            'c_by_nh_year' => $this->basicInfoFormField('c_by_nh_year', '年號年 (c_by_nh_year)', $row['c_by_nh_year'] ?? '', 'number'),
+            'c_by_range' => $this->basicInfoFormField('c_by_range', '範圍 (c_by_range)', $row['c_by_range'] ?? '', 'enum', true, [
+                'display_value' => $birthRange,
+                'enum_model' => 'range',
+                'id_key' => 'c_range_code',
+            ]),
+            'c_by_intercalary' => $this->basicInfoFormField('c_by_intercalary', '閏月 (c_by_intercalary)', (string) ($row['c_by_intercalary'] ?? '0'), 'checkbox', true, [
+                'display_value' => $this->intercalaryLabel($row['c_by_intercalary'] ?? null),
+            ]),
+            'c_by_month' => $this->basicInfoFormField('c_by_month', '月份 (c_by_month)', $row['c_by_month'] ?? '', 'number'),
+            'c_by_day' => $this->basicInfoFormField('c_by_day', '日期 (c_by_day)', $row['c_by_day'] ?? '', 'number'),
+            'c_by_day_gz' => $this->basicInfoFormField('c_by_day_gz', '日干支 (c_by_day_gz)', $row['c_by_day_gz'] ?? '', 'enum', true, [
+                'display_value' => $birthGanzhi,
+                'enum_model' => 'ganzhi',
+                'id_key' => 'c_ganzhi_code',
+            ]),
+
+            'c_deathyear' => $this->basicInfoFormField('c_deathyear', '年份 (c_deathyear)', $row['c_deathyear'] ?? '', 'number'),
+            'c_dy_nh_code' => $this->basicInfoFormField('c_dy_nh_code', '年號 (c_dy_nh_code)', $row['c_dy_nh_code'] ?? '', 'enum', true, [
+                'display_value' => $deathNH,
+                'enum_model' => 'nianhao',
+                'id_key' => 'c_nianhao_id',
+            ]),
+            'c_dy_nh_year' => $this->basicInfoFormField('c_dy_nh_year', '年號年 (c_dy_nh_year)', $row['c_dy_nh_year'] ?? '', 'number'),
+            'c_dy_range' => $this->basicInfoFormField('c_dy_range', '範圍 (c_dy_range)', $row['c_dy_range'] ?? '', 'enum', true, [
+                'display_value' => $deathRange,
+                'enum_model' => 'range',
+                'id_key' => 'c_range_code',
+            ]),
+            'c_dy_intercalary' => $this->basicInfoFormField('c_dy_intercalary', '閏月 (c_dy_intercalary)', (string) ($row['c_dy_intercalary'] ?? '0'), 'checkbox', true, [
+                'display_value' => $this->intercalaryLabel($row['c_dy_intercalary'] ?? null),
+            ]),
+            'c_dy_month' => $this->basicInfoFormField('c_dy_month', '月份 (c_dy_month)', $row['c_dy_month'] ?? '', 'number'),
+            'c_dy_day' => $this->basicInfoFormField('c_dy_day', '日期 (c_dy_day)', $row['c_dy_day'] ?? '', 'number'),
+            'c_dy_day_gz' => $this->basicInfoFormField('c_dy_day_gz', '日干支 (c_dy_day_gz)', $row['c_dy_day_gz'] ?? '', 'enum', true, [
+                'display_value' => $deathGanzhi,
+                'enum_model' => 'ganzhi',
+                'id_key' => 'c_ganzhi_code',
+            ]),
+
+            'c_death_age' => $this->basicInfoFormField('c_death_age', '享年 (c_death_age)', $row['c_death_age'] ?? '', 'number'),
+            'c_death_age_range' => $this->basicInfoFormField('c_death_age_range', '享年範圍 (c_death_age_range)', $row['c_death_age_range'] ?? '', 'enum', true, [
+                'display_value' => $deathAgeRange,
+                'enum_model' => 'range',
+                'id_key' => 'c_range_code',
+            ]),
+
+            'c_index_year' => $this->basicInfoFormField('c_index_year', 'Index Year (c_index_year)', $row['c_index_year'] ?? '', 'number', false, [
+                'derived' => true,
+                'send_on_save' => true,
+            ]),
+            'c_index_year_type_code' => $this->basicInfoFormField('c_index_year_type_code', 'Index Year Type (c_index_year_type_code)', $indexYearTypeCode, 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+                'display_value' => trim($indexYearTypeChn.' / '.$indexYearTypeEng, ' /'),
+            ]),
+            'c_index_year_source_id' => $this->basicInfoFormField('c_index_year_source_id', 'Index Year Source (c_index_year_source_id)', $row['c_index_year_source_id'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+                'display_value' => $indexYearSource,
+            ]),
+            'c_index_addr_id' => $this->basicInfoFormField('c_index_addr_id', 'Index Address (c_index_addr_id)', $row['c_index_addr_id'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+                'display_value' => trim(($row['index_addr_chn'] ?? '').' / '.($row['index_addr'] ?? ''), ' /'),
+            ]),
+            'c_index_addr_type_code' => $this->basicInfoFormField('c_index_addr_type_code', 'Index Address Type (c_index_addr_type_code)', $row['c_index_addr_type_code'] ?? '', 'text', false, [
+                'derived' => true,
+                'send_on_save' => false,
+            ]),
+
+            'c_fl_earliest_year' => $this->basicInfoFormField('c_fl_earliest_year', '公元年份 (c_fl_earliest_year)', $row['c_fl_earliest_year'] ?? '', 'number'),
+            'c_fl_ey_nh_code' => $this->basicInfoFormField('c_fl_ey_nh_code', '年號 (c_fl_ey_nh_code)', $row['c_fl_ey_nh_code'] ?? '', 'enum', true, [
+                'display_value' => $flEarliestNH,
+                'enum_model' => 'nianhao',
+                'id_key' => 'c_nianhao_id',
+            ]),
+            'c_fl_ey_nh_year' => $this->basicInfoFormField('c_fl_ey_nh_year', '年號年 (c_fl_ey_nh_year)', $row['c_fl_ey_nh_year'] ?? '', 'number'),
+            'c_fl_ey_notes' => $this->basicInfoFormField('c_fl_ey_notes', '備註 (c_fl_ey_notes)', $row['c_fl_ey_notes'] ?? '', 'textarea'),
+
+            'c_fl_latest_year' => $this->basicInfoFormField('c_fl_latest_year', '公元年份 (c_fl_latest_year)', $row['c_fl_latest_year'] ?? '', 'number'),
+            'c_fl_ly_nh_code' => $this->basicInfoFormField('c_fl_ly_nh_code', '年號 (c_fl_ly_nh_code)', $row['c_fl_ly_nh_code'] ?? '', 'enum', true, [
+                'display_value' => $flLatestNH,
+                'enum_model' => 'nianhao',
+                'id_key' => 'c_nianhao_id',
+            ]),
+            'c_fl_ly_nh_year' => $this->basicInfoFormField('c_fl_ly_nh_year', '年號年 (c_fl_ly_nh_year)', $row['c_fl_ly_nh_year'] ?? '', 'number'),
+            'c_fl_ly_notes' => $this->basicInfoFormField('c_fl_ly_notes', '備註 (c_fl_ly_notes)', $row['c_fl_ly_notes'] ?? '', 'textarea'),
+
+            'c_choronym_code' => $this->basicInfoFormField('c_choronym_code', '郡望 (c_choronym_code)', $row['c_choronym_code'] ?? '', 'enum', true, [
+                'display_value' => trim(($row['c_choronym_chn'] ?? '').' / '.($row['c_choronym'] ?? ''), ' /'),
+                'enum_model' => 'choronym',
+            ]),
+            'c_household_status_code' => $this->basicInfoFormField('c_household_status_code', '戶籍 (c_household_status_code)', $row['c_household_status_code'] ?? '', 'enum', true, [
+                'display_value' => trim(($household['chn'] ?? '').' / '.($household['eng'] ?? ''), ' /'),
+                'enum_model' => 'household',
+            ]),
+            'c_notes' => $this->basicInfoFormField('c_notes', '備註 (c_notes)', $row['c_notes'] ?? '', 'textarea'),
+        ];
+    }
+
+    private function basicInfoFormField(string $key, string $label, $value, string $input = 'text', bool $editable = true, array $extra = []): array {
+        return array_merge([
+            'key' => $key,
+            'label' => $label,
+            'value' => $value,
+            'input' => $input,
+            'editable' => $editable,
+            'send_on_save' => $editable,
+        ], $extra);
     }
 }

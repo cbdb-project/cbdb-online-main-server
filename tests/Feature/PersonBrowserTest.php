@@ -724,6 +724,8 @@ class PersonBrowserTest extends TestCase {
                 ->has('searchEndpoint')
                 ->has('summaryEndpoint')
                 ->has('tabEndpoint')
+                ->where('mutateEndpoint', route('api.v2.mutate.web', [], false))
+                ->where('pinyinEndpoint', '/api/select/search/pinyin')
         );
     }
 
@@ -873,8 +875,24 @@ class PersonBrowserTest extends TestCase {
         $response->assertOk();
         $response->assertJsonStructure([
             'sections' => [['title', 'fields']],
+            'form' => [
+                'person_id',
+                'fields' => [
+                    'c_surname_chn',
+                    'c_female',
+                    'c_by_nh_code',
+                    'c_index_year',
+                    'c_notes',
+                ],
+            ],
         ]);
         $sections = collect($response->json('sections'))->keyBy('title');
+
+        $this->assertSame('text', $response->json('form.fields.c_surname_chn.input'));
+        $this->assertTrue($response->json('form.fields.c_female.editable'));
+        $this->assertSame('enum', $response->json('form.fields.c_by_nh_code.input'));
+        $this->assertFalse($response->json('form.fields.c_index_year.editable'));
+        $this->assertTrue($response->json('form.fields.c_index_year.send_on_save'));
 
         $this->assertSame('漢', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（中文）'));
         $this->assertSame('Han', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（英文）'));

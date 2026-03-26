@@ -33,13 +33,15 @@ export default function TabContentLoader({ personId, activeTab, tabEndpoint }: P
     // lazy load
     useEffect(() => {
         if (!personId || !activeTab) return;
-        if (cache[activeTab]?.data || cache[activeTab]?.loading) return;
+        if (cache[activeTab]) return;
 
         const url = tabEndpoint
             .replace('__PERSON_ID__', String(personId))
             .replace('__TAB_KEY__', activeTab);
 
         setCache((prev) => ({ ...prev, [activeTab]: { loading: true, error: null, data: null } }));
+
+        const controller = new AbortController();
 
         fetch(url)
             .then((res) => {
@@ -49,13 +51,32 @@ export default function TabContentLoader({ personId, activeTab, tabEndpoint }: P
             .then((data) => {
                 setCache((prev) => ({ ...prev, [activeTab]: { loading: false, error: null, data } }));
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    return;
+                }
+
+                const message = err instanceof Error ? err.message : '載入失敗';
+
                 setCache((prev) => ({
                     ...prev,
-                    [activeTab]: { loading: false, error: err.message || '載入失敗', data: null },
+                    [activeTab]: { loading: false, error: message, data: null },
                 }));
             });
+
+        return () => {
+            controller.abort();
+        };
     }, [personId, activeTab, tabEndpoint, cache]);
+
+    const retryActiveTab = () => {
+        setCache((prev) => {
+            const next = { ...prev };
+            delete next[activeTab];
+
+            return next;
+        });
+    };
 
     if (!personId) {
         return <div style={msgStyle}>請先選擇人物</div>;
@@ -68,7 +89,14 @@ export default function TabContentLoader({ personId, activeTab, tabEndpoint }: P
     }
 
     if (state.error) {
-        return <div style={{ ...msgStyle, color: '#dc3545' }}>載入失敗：{state.error}</div>;
+        return (
+            <div style={{ ...msgStyle, color: '#dc3545' }}>
+                <div>載入失敗：{state.error}</div>
+                <button type="button" style={retryButtonStyle} onClick={retryActiveTab}>
+                    重新載入
+                </button>
+            </div>
+        );
     }
 
     // Render based on tab type
@@ -87,4 +115,14 @@ const msgStyle: React.CSSProperties = {
     textAlign: 'center',
     color: '#6c757d',
     fontSize: '0.875rem',
+};
+
+const retryButtonStyle: React.CSSProperties = {
+    marginTop: 12,
+    padding: '6px 12px',
+    border: '1px solid #dc3545',
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    color: '#dc3545',
+    cursor: 'pointer',
 };

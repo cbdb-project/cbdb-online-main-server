@@ -243,10 +243,10 @@ class PersonBrowserService {
                 'DYNASTIES.c_dynasty',
                 'ADDR_CODES.c_name_chn AS index_addr_chn',
                 'ADDR_CODES.c_name AS index_addr',
-                'ETH.c_ethnicity_chn',
-                'ETH.c_ethnicity',
+                'ETH.c_name_chn AS c_ethnicity_chn',
+                'ETH.c_name AS c_ethnicity',
                 'CHR.c_choronym_chn',
-                'CHR.c_choronym',
+                'CHR.c_choronym_desc AS c_choronym',
             ])
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
@@ -333,13 +333,13 @@ class PersonBrowserService {
                 'ALTNAME_DATA.c_alt_name_chn',
                 'ALTNAME_DATA.c_alt_name',
                 'ALTNAME_DATA.c_alt_name_type_code',
-                'ATC.c_alt_name_type_desc_chn',
-                'ATC.c_alt_name_type_desc',
+                'ATC.c_name_type_desc_chn AS c_alt_name_type_desc_chn',
+                'ATC.c_name_type_desc AS c_alt_name_type_desc',
                 'ALTNAME_DATA.c_source',
                 'ALTNAME_DATA.c_pages',
                 'ALTNAME_DATA.c_notes',
             ])
-            ->leftJoin('ALTNAME_CODES AS ATC', 'ATC.c_alt_name_type_code', '=', 'ALTNAME_DATA.c_alt_name_type_code')
+            ->leftJoin('ALTNAME_CODES AS ATC', 'ATC.c_name_type_code', '=', 'ALTNAME_DATA.c_alt_name_type_code')
             ->where('ALTNAME_DATA.c_personid', $personId)
             ->orderBy('ALTNAME_DATA.c_alt_name_type_code')
             ->get();
@@ -398,8 +398,8 @@ class PersonBrowserService {
                 'TEXT_CODES.c_title_chn',
                 'TEXT_CODES.c_title',
                 'TEXT_CODES.c_text_year',
-                'TEXT_ROLE_CODES.c_role_chn',
-                'TEXT_ROLE_CODES.c_role',
+                'TEXT_ROLE_CODES.c_role_desc_chn AS c_role_chn',
+                'TEXT_ROLE_CODES.c_role_desc AS c_role',
                 'BIOG_TEXT_DATA.c_textid',
                 'BIOG_TEXT_DATA.c_role_id',
             ])
@@ -478,8 +478,8 @@ class PersonBrowserService {
     private function tabEvents(int $personId): array {
         $rows = DB::table('EVENTS_DATA')
             ->select([
-                'EVENT_CODES.c_event_desc_chn',
-                'EVENT_CODES.c_event_desc',
+                'EVENT_CODES.c_event_name_chn AS c_event_desc_chn',
+                'EVENT_CODES.c_event_name AS c_event_desc',
                 'EVENTS_DATA.c_sequence',
                 'EVENTS_DATA.c_year',
                 'EVENTS_DATA.c_month',
@@ -613,8 +613,10 @@ class PersonBrowserService {
             ->select([
                 'POSSESSION_ACT_CODES.c_possession_act_desc_chn',
                 'POSSESSION_ACT_CODES.c_possession_act_desc',
-                'POSSESSION_DATA.c_firstyear',
-                'POSSESSION_DATA.c_lastyear',
+                'POSSESSION_DATA.c_possession_desc_chn',
+                'POSSESSION_DATA.c_possession_desc',
+                'POSSESSION_DATA.c_quantity',
+                'POSSESSION_DATA.c_possession_yr',
                 'POSSESSION_DATA.c_source',
                 'POSSESSION_DATA.c_pages',
                 'POSSESSION_DATA.c_notes',
@@ -627,8 +629,10 @@ class PersonBrowserService {
             'columns' => [
                 'c_possession_act_desc_chn' => '行為（中文）',
                 'c_possession_act_desc' => '行為（英文）',
-                'c_firstyear' => '始年',
-                'c_lastyear' => '終年',
+                'c_possession_desc_chn' => '財產（中文）',
+                'c_possession_desc' => '財產（英文）',
+                'c_quantity' => '數量',
+                'c_possession_yr' => '年份',
                 'c_source' => '出處',
                 'c_pages' => '頁碼',
                 'c_notes' => '備註',
@@ -641,15 +645,15 @@ class PersonBrowserService {
         $rows = DB::table('BIOG_INST_DATA')
             ->select([
                 'BIOG_INST_CODES.c_bi_role_chn',
-                'BIOG_INST_CODES.c_bi_role',
-                'SOCIAL_INSTITUTION_DATA.c_inst_name_chn',
-                'SOCIAL_INSTITUTION_DATA.c_inst_name',
+                'BIOG_INST_CODES.c_bi_role_desc AS c_bi_role',
+                'INST_NAMES.c_inst_name_hz AS c_inst_name_chn',
+                'INST_NAMES.c_inst_name_py AS c_inst_name',
                 'BIOG_INST_DATA.c_source',
                 'BIOG_INST_DATA.c_pages',
                 'BIOG_INST_DATA.c_notes',
             ])
             ->leftJoin('BIOG_INST_CODES', 'BIOG_INST_CODES.c_bi_role_code', '=', 'BIOG_INST_DATA.c_bi_role_code')
-            ->leftJoin('SOCIAL_INSTITUTION_DATA', 'SOCIAL_INSTITUTION_DATA.c_inst_code', '=', 'BIOG_INST_DATA.c_inst_code')
+            ->leftJoin('SOCIAL_INSTITUTION_NAME_CODES AS INST_NAMES', 'INST_NAMES.c_inst_name_code', '=', 'BIOG_INST_DATA.c_inst_name_code')
             ->where('BIOG_INST_DATA.c_personid', $personId)
             ->get();
 
@@ -671,7 +675,7 @@ class PersonBrowserService {
         $rows = DB::table('POSTED_TO_OFFICE_DATA')
             ->select([
                 'OFFICE_CODES.c_office_chn',
-                'OFFICE_CODES.c_office',
+                'OFFICE_CODES.c_office_trans AS c_office',
                 'POSTED_TO_OFFICE_DATA.c_posting_id',
                 'POSTED_TO_OFFICE_DATA.c_sequence',
                 'POSTED_TO_OFFICE_DATA.c_firstyear',

@@ -107,8 +107,8 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS ALTNAME_CODES (
                 c_alt_name_type_code INTEGER PRIMARY KEY,
-                c_alt_name_type_desc VARCHAR(255),
-                c_alt_name_type_desc_chn VARCHAR(255)
+                c_name_type_desc VARCHAR(255),
+                c_name_type_desc_chn VARCHAR(255)
             )
         ');
 
@@ -153,8 +153,8 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS TEXT_ROLE_CODES (
                 c_role_id INTEGER PRIMARY KEY,
-                c_role VARCHAR(255),
-                c_role_chn VARCHAR(255)
+                c_role_desc VARCHAR(255),
+                c_role_desc_chn VARCHAR(255)
             )
         ');
 
@@ -207,8 +207,8 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS EVENT_CODES (
                 c_event_code INTEGER PRIMARY KEY,
-                c_event_desc VARCHAR(255),
-                c_event_desc_chn VARCHAR(255)
+                c_event_name VARCHAR(255),
+                c_event_name_chn VARCHAR(255)
             )
         ');
 
@@ -277,9 +277,13 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS POSSESSION_DATA (
                 c_personid INT,
+                c_possession_record_id INT,
+                c_sequence INT,
                 c_possession_act_code INT,
-                c_firstyear SMALLINT,
-                c_lastyear SMALLINT,
+                c_possession_desc VARCHAR(255),
+                c_possession_desc_chn VARCHAR(255),
+                c_quantity VARCHAR(255),
+                c_possession_yr SMALLINT,
                 c_source INT,
                 c_pages VARCHAR(255),
                 c_notes TEXT
@@ -297,6 +301,7 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS BIOG_INST_DATA (
                 c_personid INT,
+                c_inst_name_code INT,
                 c_bi_role_code INT,
                 c_inst_code INT,
                 c_source INT,
@@ -308,16 +313,16 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS BIOG_INST_CODES (
                 c_bi_role_code INTEGER PRIMARY KEY,
-                c_bi_role VARCHAR(255),
+                c_bi_role_desc VARCHAR(255),
                 c_bi_role_chn VARCHAR(255)
             )
         ');
 
         DB::statement('
-            CREATE TABLE IF NOT EXISTS SOCIAL_INSTITUTION_DATA (
-                c_inst_code INTEGER PRIMARY KEY,
-                c_inst_name VARCHAR(255),
-                c_inst_name_chn VARCHAR(255)
+            CREATE TABLE IF NOT EXISTS SOCIAL_INSTITUTION_NAME_CODES (
+                c_inst_name_code INTEGER PRIMARY KEY,
+                c_inst_name_hz VARCHAR(255),
+                c_inst_name_py VARCHAR(255)
             )
         ');
 
@@ -338,8 +343,8 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS OFFICE_CODES (
                 c_office_id INTEGER PRIMARY KEY,
-                c_office VARCHAR(255),
-                c_office_chn VARCHAR(255)
+                c_office_chn VARCHAR(255),
+                c_office_trans VARCHAR(255)
             )
         ');
 
@@ -377,15 +382,15 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS ETHNICITY_TRIBE_CODES (
                 c_ethnicity_code INTEGER PRIMARY KEY,
-                c_ethnicity VARCHAR(255),
-                c_ethnicity_chn VARCHAR(255)
+                c_name VARCHAR(255),
+                c_name_chn VARCHAR(255)
             )
         ');
 
         DB::statement('
             CREATE TABLE IF NOT EXISTS CHORONYM_CODES (
                 c_choronym_code INTEGER PRIMARY KEY,
-                c_choronym VARCHAR(255),
+                c_choronym_desc VARCHAR(255),
                 c_choronym_chn VARCHAR(255)
             )
         ');
@@ -399,6 +404,19 @@ class PersonBrowserTest extends TestCase {
 
         DB::table('ADDR_CODES')->insert([
             ['c_addr_id' => 100, 'c_name' => 'Chang An', 'c_name_chn' => '長安'],
+            ['c_addr_id' => 101, 'c_name' => 'Luoyang', 'c_name_chn' => '洛陽'],
+        ]);
+
+        DB::table('ETHNICITY_TRIBE_CODES')->insert([
+            ['c_ethnicity_code' => 10, 'c_name' => 'Han', 'c_name_chn' => '漢'],
+        ]);
+
+        DB::table('CHORONYM_CODES')->insert([
+            ['c_choronym_code' => 20, 'c_choronym_desc' => 'Longxi', 'c_choronym_chn' => '隴西'],
+        ]);
+
+        DB::table('OFFICE_CODES')->insert([
+            ['c_office_id' => 30, 'c_office_chn' => '翰林學士', 'c_office_trans' => 'Hanlin Academician'],
         ]);
 
         DB::table('BIOG_MAIN')->insert([
@@ -418,6 +436,8 @@ class PersonBrowserTest extends TestCase {
                 'c_index_year' => 742,
                 'c_dy' => 1,
                 'c_index_addr_id' => 100,
+                'c_ethnicity_code' => 10,
+                'c_choronym_code' => 20,
             ],
             [
                 'c_personid' => 2,
@@ -435,6 +455,8 @@ class PersonBrowserTest extends TestCase {
                 'c_index_year' => 755,
                 'c_dy' => 1,
                 'c_index_addr_id' => null,
+                'c_ethnicity_code' => null,
+                'c_choronym_code' => null,
             ],
             [
                 'c_personid' => 3,
@@ -452,6 +474,8 @@ class PersonBrowserTest extends TestCase {
                 'c_index_year' => 1057,
                 'c_dy' => 2,
                 'c_index_addr_id' => null,
+                'c_ethnicity_code' => null,
+                'c_choronym_code' => null,
             ],
         ]);
 
@@ -463,8 +487,8 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('ALTNAME_CODES')->insert([
-            ['c_alt_name_type_code' => 4, 'c_alt_name_type_desc' => 'Zi', 'c_alt_name_type_desc_chn' => '字'],
-            ['c_alt_name_type_code' => 5, 'c_alt_name_type_desc' => 'Hao', 'c_alt_name_type_desc_chn' => '號'],
+            ['c_alt_name_type_code' => 4, 'c_name_type_desc' => 'Zi', 'c_name_type_desc_chn' => '字'],
+            ['c_alt_name_type_code' => 5, 'c_name_type_desc' => 'Hao', 'c_name_type_desc_chn' => '號'],
         ]);
 
         DB::table('CBDB__NAME_FTS')->insert([
@@ -478,8 +502,34 @@ class PersonBrowserTest extends TestCase {
             ['c_personid' => 1, 'c_textid' => 1, 'c_pages' => '10-20', 'c_notes' => 'main source', 'c_main_source' => 1, 'c_self_bio' => 0],
         ]);
 
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            [
+                'c_personid' => 1,
+                'c_office_id' => 30,
+                'c_posting_id' => 1,
+                'c_sequence' => 1,
+                'c_firstyear' => 744,
+                'c_lastyear' => 745,
+                'c_source' => null,
+                'c_pages' => '12a',
+                'c_notes' => 'served briefly',
+            ],
+        ]);
+
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            ['c_personid' => 1, 'c_addr_id' => 101, 'c_posting_id' => 1, 'c_office_id' => 30],
+        ]);
+
         DB::table('TEXT_CODES')->insert([
             ['c_textid' => 1, 'c_title' => 'New Tang Book', 'c_title_chn' => '新唐書', 'c_text_year' => 1060],
+        ]);
+
+        DB::table('TEXT_ROLE_CODES')->insert([
+            ['c_role_id' => 1, 'c_role_desc' => 'Author', 'c_role_desc_chn' => '作者'],
+        ]);
+
+        DB::table('BIOG_TEXT_DATA')->insert([
+            ['c_personid' => 1, 'c_textid' => 1, 'c_role_id' => 1],
         ]);
 
         DB::table('ENTRY_DATA')->insert([
@@ -488,6 +538,64 @@ class PersonBrowserTest extends TestCase {
 
         DB::table('ENTRY_CODES')->insert([
             ['c_entry_code' => 1, 'c_entry_desc' => 'Imperial Decree', 'c_entry_desc_chn' => '詔除'],
+        ]);
+
+        DB::table('EVENT_CODES')->insert([
+            ['c_event_code' => 1, 'c_event_name' => 'Banquet', 'c_event_name_chn' => '宴集'],
+        ]);
+
+        DB::table('EVENTS_DATA')->insert([
+            [
+                'c_personid' => 1,
+                'c_event_code' => 1,
+                'c_sequence' => 1,
+                'c_year' => 744,
+                'c_month' => 3,
+                'c_day' => 15,
+                'c_source' => 1,
+                'c_pages' => '22b',
+                'c_notes' => 'court banquet',
+            ],
+        ]);
+
+        DB::table('POSSESSION_ACT_CODES')->insert([
+            ['c_possession_act_code' => 1, 'c_possession_act_desc' => 'Owned', 'c_possession_act_desc_chn' => '擁有'],
+        ]);
+
+        DB::table('POSSESSION_DATA')->insert([
+            [
+                'c_personid' => 1,
+                'c_possession_record_id' => 1,
+                'c_sequence' => 1,
+                'c_possession_act_code' => 1,
+                'c_possession_desc' => 'Books',
+                'c_possession_desc_chn' => '書籍',
+                'c_quantity' => '20',
+                'c_possession_yr' => 744,
+                'c_source' => 1,
+                'c_pages' => '31a',
+                'c_notes' => 'personal library',
+            ],
+        ]);
+
+        DB::table('BIOG_INST_CODES')->insert([
+            ['c_bi_role_code' => 1, 'c_bi_role_desc' => 'Member', 'c_bi_role_chn' => '成員'],
+        ]);
+
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->insert([
+            ['c_inst_name_code' => 1, 'c_inst_name_hz' => '青蓮詩社', 'c_inst_name_py' => 'Qinglian Poetry Society'],
+        ]);
+
+        DB::table('BIOG_INST_DATA')->insert([
+            [
+                'c_personid' => 1,
+                'c_inst_name_code' => 1,
+                'c_inst_code' => 1,
+                'c_bi_role_code' => 1,
+                'c_source' => 1,
+                'c_pages' => '41b',
+                'c_notes' => 'local circle',
+            ],
         ]);
 
         DB::table('KIN_DATA')->insert([
@@ -668,6 +776,21 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonStructure([
             'sections' => [['title', 'fields']],
         ]);
+        $response->assertJsonPath('sections.2.fields.3.value', '漢');
+        $response->assertJsonPath('sections.2.fields.4.value', 'Han');
+        $response->assertJsonPath('sections.2.fields.5.value', '隴西');
+        $response->assertJsonPath('sections.2.fields.6.value', 'Longxi');
+    }
+
+    #[Test]
+    public function test_tab_postings_returns_office_names_and_addresses(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'postings']));
+
+        $response->assertOk();
+        $response->assertJsonPath('rows.0.c_office_chn', '翰林學士');
+        $response->assertJsonPath('rows.0.c_office', 'Hanlin Academician');
+        $response->assertJsonPath('rows.0.addresses', '洛陽 / Luoyang');
     }
 
     #[Test]
@@ -681,6 +804,53 @@ class PersonBrowserTest extends TestCase {
             'rows',
         ]);
         $this->assertCount(2, $response->json('rows'));
+        $response->assertJsonPath('rows.0.c_alt_name_type_desc_chn', '字');
+        $response->assertJsonPath('rows.0.c_alt_name_type_desc', 'Zi');
+    }
+
+    #[Test]
+    public function test_tab_texts_returns_role_labels(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'texts']));
+
+        $response->assertOk();
+        $response->assertJsonPath('rows.0.c_title_chn', '新唐書');
+        $response->assertJsonPath('rows.0.c_role_chn', '作者');
+        $response->assertJsonPath('rows.0.c_role', 'Author');
+    }
+
+    #[Test]
+    public function test_tab_events_returns_event_labels(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'events']));
+
+        $response->assertOk();
+        $response->assertJsonPath('rows.0.c_event_desc_chn', '宴集');
+        $response->assertJsonPath('rows.0.c_event_desc', 'Banquet');
+    }
+
+    #[Test]
+    public function test_tab_possessions_returns_real_schema_fields(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'possessions']));
+
+        $response->assertOk();
+        $response->assertJsonPath('rows.0.c_possession_act_desc_chn', '擁有');
+        $response->assertJsonPath('rows.0.c_possession_desc_chn', '書籍');
+        $response->assertJsonPath('rows.0.c_quantity', '20');
+        $response->assertJsonPath('rows.0.c_possession_yr', 744);
+    }
+
+    #[Test]
+    public function test_tab_social_institutions_returns_name_codes_data(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'social_institutions']));
+
+        $response->assertOk();
+        $response->assertJsonPath('rows.0.c_bi_role_chn', '成員');
+        $response->assertJsonPath('rows.0.c_bi_role', 'Member');
+        $response->assertJsonPath('rows.0.c_inst_name_chn', '青蓮詩社');
+        $response->assertJsonPath('rows.0.c_inst_name', 'Qinglian Poetry Society');
     }
 
     #[Test]

@@ -384,6 +384,82 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testProposalBiogMainUpdateCreatesPendingOperationWithoutChangingRow() {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-main-proposal@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 138841,
+                ],
+            ],
+            'changes' => [
+                'c_surname_chn' => '章',
+                'c_surname' => 'Zhang',
+            ],
+            'meta' => [
+                'comment' => '提案修正姓氏',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'resource' => 'basicinformation',
+                'mode' => 'proposal',
+                'operation' => 'update',
+                'result' => [
+                    'pk' => [
+                        'c_personid' => 138841,
+                    ],
+                    'updated_fields' => [
+                        'c_surname_chn',
+                        'c_surname',
+                    ],
+                    'status' => 'proposal_updated',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname_chn' => '張',
+            'c_name_chn' => '張忠',
+        ]);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'BIOG_MAIN',
+            'c_personid' => 138841,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+        ]);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+
+        $payload = json_decode($operation->resource_data, true);
+        $original = json_decode($operation->resource_original, true);
+
+        $this->assertSame('c_personid=138841', $operation->resource_id);
+        $this->assertSame('章', $payload['c_surname_chn']);
+        $this->assertSame('章忠', $payload['c_name_chn']);
+        $this->assertSame('pending', $payload['__review_status']);
+        $this->assertSame('update', $payload['__proposal_meta']['action']);
+        $this->assertSame('biogmain', $payload['__proposal_meta']['resource_type']);
+        $this->assertSame('提案修正姓氏', $payload['__proposal_meta']['comment']);
+        $this->assertSame('張', $original['c_surname_chn']);
+        $this->assertSame('張忠', $original['c_name_chn']);
+
+        $this->assertDatabaseCount('audit_log', 0);
+    }
+
+    #[Test]
     public function testSessionAuthenticatedUserCanMutateAltnameSequenceViaApiV2Mutate() {
         $user = $this->makeUser();
         $this->actingAs($user);

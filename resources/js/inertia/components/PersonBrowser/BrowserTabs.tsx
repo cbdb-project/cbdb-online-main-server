@@ -13,6 +13,11 @@ interface Props {
 }
 
 export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Props) {
+    const handleTabClick = (event: React.MouseEvent<HTMLButtonElement>, key: string) => {
+        event.currentTarget.blur();
+        onTabChange(key);
+    };
+
     return (
         <div style={barStyle}>
             {tabs.map((t) => {
@@ -22,8 +27,9 @@ export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Pr
                     <button
                         type="button"
                         key={t.key}
+                        onPointerDown={(event) => event.preventDefault()}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => onTabChange(t.key)}
+                        onClick={(event) => handleTabClick(event, t.key)}
                         style={{
                             ...tabStyle,
                             ...(isActive ? activeTabStyle : {}),
@@ -50,10 +56,15 @@ const barStyle: React.CSSProperties = {
 };
 
 const tabStyle: React.CSSProperties = {
+    all: 'unset',
     padding: '8px 12px',
     fontSize: '0.8125rem',
-    border: 'none',
-    borderBottom: '2px solid transparent',
+    borderStyle: 'solid',
+    borderWidth: '0 0 2px 0',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'transparent',
     marginBottom: -2,
     background: 'none',
     cursor: 'pointer',
@@ -62,10 +73,18 @@ const tabStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
+    outline: 'none',
+    boxShadow: 'none',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    WebkitTapHighlightColor: 'transparent',
 };
 
 const activeTabStyle: React.CSSProperties = {
     borderBottomColor: '#007bff',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderLeftColor: 'transparent',
     color: '#007bff',
     fontWeight: 600,
 };

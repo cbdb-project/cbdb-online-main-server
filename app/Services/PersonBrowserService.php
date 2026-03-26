@@ -845,7 +845,7 @@ class PersonBrowserService {
 
     private function genderLabel($female): string {
         if ($female === null || $female === '') {
-            return '';
+            return '未詳';
         }
 
         return ((int) $female === 1) ? '女' : '男';

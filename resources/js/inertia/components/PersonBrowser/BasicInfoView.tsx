@@ -53,37 +53,60 @@ function renderSection(section: Section) {
 
 function renderNameSection(section: Section) {
     const fields = fieldMap(section);
+    const groups = [
+        {
+            title: '中文',
+            items: [
+                ['中文姓', fields['中文姓']],
+                ['中文名', fields['中文名']],
+                ['中文姓名', fields['姓名']],
+            ] as Array<[string, FieldValue]>,
+        },
+        {
+            title: '拼音',
+            items: [
+                ['拼音姓', fields['Xing']],
+                ['拼音名', fields['Ming']],
+                ['拼音姓名', fields['姓名拼音']],
+            ] as Array<[string, FieldValue]>,
+        },
+        {
+            title: '外文',
+            items: [
+                ['外文姓', fields['外文姓']],
+                ['外文名', fields['外文名']],
+                ['外文姓名', fields['外文全名']],
+            ] as Array<[string, FieldValue]>,
+        },
+        {
+            title: '外文羅馬字轉寫',
+            items: [
+                ['外文羅馬字轉寫姓', fields['外文羅馬字轉寫姓']],
+                ['外文羅馬字轉寫名', fields['外文羅馬字轉寫名']],
+                ['外文羅馬字轉寫姓名', fields['外文羅馬字轉寫姓名']],
+            ] as Array<[string, FieldValue]>,
+        },
+    ];
 
     return (
         <>
             <SectionHeading title={section.title} badge={badgeLabel('Person ID', fields['Person ID'])} />
-            <div style={nameIntroGridStyle}>
-                <div style={pairedCardStyle}>
-                    <div style={pairRowStyle}>
-                        <ReadOnlyField label="姓" value={fields['中文姓']} />
-                        <ReadOnlyField label="名" value={fields['中文名']} />
+            <div style={nameGroupGridStyle}>
+                {groups.map((group) => (
+                    <div key={group.title} style={nameGroupCardStyle}>
+                        <div style={nameGroupTitleStyle}>{group.title}</div>
+                        <div style={stackedFieldGroupStyle}>
+                            {group.items.map(([label, value], index) => (
+                                <ReadOnlyField
+                                    key={label}
+                                    label={label}
+                                    value={value}
+                                    derived={index === group.items.length - 1}
+                                />
+                            ))}
+                        </div>
                     </div>
-                    <div style={pairRowStyle}>
-                        <ReadOnlyField label="Xing" value={fields['Xing']} />
-                        <ReadOnlyField label="Ming" value={fields['Ming']} />
-                    </div>
-                </div>
-                <div style={pairedCardStyle}>
-                    <div style={pairRowStyle}>
-                        <ReadOnlyField label="外文姓" value={fields['外文姓']} />
-                        <ReadOnlyField label="外文名" value={fields['外文名']} />
-                    </div>
-                    <div style={pairRowStyle}>
-                        <ReadOnlyField label="外文羅馬字轉寫姓" value={fields['外文羅馬字轉寫姓']} />
-                        <ReadOnlyField label="外文羅馬字轉寫名" value={fields['外文羅馬字轉寫名']} />
-                    </div>
-                </div>
-            </div>
-            <div style={derivedGridStyle}>
-                <ReadOnlyField label="姓名" value={fields['姓名']} muted />
-                <ReadOnlyField label="姓名拼音" value={fields['姓名拼音']} muted />
-                <ReadOnlyField label="外文全名" value={fields['外文全名']} muted />
-                <ReadOnlyField label="外文羅馬字轉寫姓名" value={fields['外文羅馬字轉寫姓名']} muted />
+                ))}
             </div>
         </>
     );
@@ -160,14 +183,16 @@ function renderIndexSection(section: Section) {
     return (
         <>
             <SectionHeading title={section.title} />
-            <div style={indexHeroGridStyle}>
-                <ReadOnlyField label="Index Year" value={fields['Index Year']} emphasis />
-                <ReadOnlyField label="Index Year Type (c_index_year_type_code)" value={indexYearType} />
-            </div>
-            <div style={compactGridStyle}>
-                <ReadOnlyField label="Index Year Source" value={fields['Index Year Source']} fullWidth />
-                <ReadOnlyField label="Index Address" value={indexAddress} />
-                <ReadOnlyField label="Index Address Type" value={fields['Index Address Type']} />
+            <div style={indexSectionStackStyle}>
+                <div style={indexYearRowStyle}>
+                    <ReadOnlyField label="Index Year" value={fields['Index Year']} derived />
+                    <ReadOnlyField label="Index Year Type (c_index_year_type_code)" value={indexYearType} derived />
+                    <ReadOnlyField label="Index Year Source" value={fields['Index Year Source']} derived />
+                </div>
+                <div style={indexAddressRowStyle}>
+                    <ReadOnlyField label="Index Address" value={indexAddress} derived />
+                    <ReadOnlyField label="Index Address Type" value={fields['Index Address Type']} derived />
+                </div>
             </div>
         </>
     );
@@ -265,6 +290,7 @@ function ReadOnlyField({
     muted = false,
     subtle = false,
     emphasis = false,
+    derived = false,
 }: {
     label: string;
     value: FieldValue;
@@ -272,6 +298,7 @@ function ReadOnlyField({
     muted?: boolean;
     subtle?: boolean;
     emphasis?: boolean;
+    derived?: boolean;
 }) {
     return (
         <div
@@ -287,6 +314,7 @@ function ReadOnlyField({
                     ...(muted ? mutedValueBoxStyle : {}),
                     ...(subtle ? subtleValueBoxStyle : {}),
                     ...(emphasis ? emphasisValueBoxStyle : {}),
+                    ...(derived ? derivedValueBoxStyle : {}),
                 }}
             >
                 {displayValue(value)}
@@ -372,30 +400,28 @@ const sectionBadgeStyle: React.CSSProperties = {
     fontWeight: 700,
 };
 
-const nameIntroGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: 16,
-    marginBottom: 16,
-};
-
-const pairedCardStyle: React.CSSProperties = {
-    padding: 16,
-    border: '1px solid #e4eaf1',
-    borderRadius: 10,
-    backgroundColor: '#f9fbfd',
-};
-
-const pairRowStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 14,
-};
-
-const derivedGridStyle: React.CSSProperties = {
+const nameGroupGridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: 14,
+    gap: 16,
+};
+
+const nameGroupCardStyle: React.CSSProperties = {
+    padding: 0,
+};
+
+const nameGroupTitleStyle: React.CSSProperties = {
+    fontSize: '0.8rem',
+    fontWeight: 700,
+    color: '#48627d',
+    marginBottom: 12,
+    textAlign: 'center',
+};
+
+const stackedFieldGroupStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
 };
 
 const compactGridStyle: React.CSSProperties = {
@@ -404,11 +430,22 @@ const compactGridStyle: React.CSSProperties = {
     gap: 14,
 };
 
-const indexHeroGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+const indexSectionStackStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
     gap: 14,
-    marginBottom: 14,
+};
+
+const indexYearRowStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 14,
+};
+
+const indexAddressRowStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 14,
 };
 
 const timelineGridStyle: React.CSSProperties = {
@@ -419,10 +456,7 @@ const timelineGridStyle: React.CSSProperties = {
 };
 
 const timelineCardStyle: React.CSSProperties = {
-    border: '1px solid #e4eaf1',
-    borderRadius: 10,
-    backgroundColor: '#fbfcfe',
-    padding: 16,
+    padding: 0,
 };
 
 const timelineTitleStyle: React.CSSProperties = {
@@ -430,6 +464,7 @@ const timelineTitleStyle: React.CSSProperties = {
     fontWeight: 700,
     color: '#35516b',
     marginBottom: 12,
+    textAlign: 'center',
 };
 
 const timelineItemsGridStyle: React.CSSProperties = {
@@ -451,45 +486,59 @@ const fieldLabelStyle: React.CSSProperties = {
     fontWeight: 700,
     color: '#667788',
     marginBottom: 6,
+    textAlign: 'center',
 };
 
 const fieldValueBoxStyle: React.CSSProperties = {
     minHeight: 42,
-    padding: '10px 12px',
+    padding: '0 12px',
     borderRadius: 8,
-    border: '1px solid #d7dee7',
+    border: '1px solid #cfd7e2',
     backgroundColor: '#fff',
     color: '#1f2d3d',
-    lineHeight: 1.5,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    lineHeight: 1.35,
     wordBreak: 'break-word',
+    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)',
 };
 
 const mutedValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#f4f7fa',
-    borderColor: '#dbe3ec',
+    backgroundColor: '#f8fafc',
+    borderColor: '#d5dee8',
 };
 
 const subtleValueBoxStyle: React.CSSProperties = {
     backgroundColor: '#fffdf7',
-    borderColor: '#eadfb4',
+    borderColor: '#ddd3aa',
 };
 
 const emphasisValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#eef5fb',
-    borderColor: '#c8daea',
-    fontSize: '1.05rem',
+    backgroundColor: '#f1f6fb',
+    borderColor: '#c7d8ea',
+    fontSize: '1rem',
+    fontWeight: 700,
+};
+
+const derivedValueBoxStyle: React.CSSProperties = {
+    backgroundColor: '#f4f8fb',
+    borderColor: '#bfcfdf',
+    color: '#18344d',
     fontWeight: 700,
 };
 
 const notesBoxStyle: React.CSSProperties = {
     padding: '14px 16px',
-    borderRadius: 10,
-    border: '1px solid #dadfc7',
-    backgroundColor: '#fffdf7',
+    borderRadius: 8,
+    border: '1px solid #cfd7e2',
+    backgroundColor: '#fff',
     color: '#2a3642',
     lineHeight: 1.7,
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
+    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)',
 };
 
 const emptyStyle: React.CSSProperties = {

@@ -128,7 +128,7 @@ class PersonBrowserService {
             ->get()
             ->groupBy('c_alt_name_type_code');
 
-        // index year type 描述
+        // index year type 描述（取前兩碼對照 INDEXYEAR_TYPE_CODES，與 BiogMainRepository::byPersonId 一致）
         $indexYearTypeDesc = null;
         if (!empty($row['c_index_year_type_code'])) {
             $code = substr((string) $row['c_index_year_type_code'], 0, 2);

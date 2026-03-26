@@ -8,6 +8,7 @@ interface Props {
     tabEndpoint: string;
     mutateEndpoint: string;
     pinyinEndpoint: string;
+    canEditBasicInfo: boolean;
     onBasicInfoSaved?: () => void;
     onBasicInfoEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
@@ -29,6 +30,7 @@ export default function TabContentLoader({
     tabEndpoint,
     mutateEndpoint,
     pinyinEndpoint,
+    canEditBasicInfo,
     onBasicInfoSaved,
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
@@ -130,6 +132,7 @@ export default function TabContentLoader({
                 personId={personId}
                 mutateEndpoint={mutateEndpoint}
                 pinyinEndpoint={pinyinEndpoint}
+                canEdit={canEditBasicInfo}
                 onEditorStateChange={onBasicInfoEditorStateChange}
                 onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
                 onSaved={() => {

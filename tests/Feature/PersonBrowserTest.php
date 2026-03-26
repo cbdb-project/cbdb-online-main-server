@@ -726,6 +726,7 @@ class PersonBrowserTest extends TestCase {
                 ->has('tabEndpoint')
                 ->where('mutateEndpoint', route('api.v2.mutate.web', [], false))
                 ->where('pinyinEndpoint', '/api/select/search/pinyin')
+                ->where('canEditBasicInfo', true)
         );
     }
 
@@ -737,6 +738,7 @@ class PersonBrowserTest extends TestCase {
         $response->assertInertia(
             fn (Assert $page) => $page
                 ->component('PersonBrowser/Index')
+                ->where('canEditBasicInfo', true)
                 ->where('initialPersonId', null)
                 ->where('initialKeyword', '')
                 ->where('initialTab', 'basic_info')

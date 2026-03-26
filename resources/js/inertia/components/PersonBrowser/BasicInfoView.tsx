@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface Props {
     sections: Section[];
@@ -6,6 +6,7 @@ interface Props {
     personId: number;
     mutateEndpoint: string;
     pinyinEndpoint: string;
+    canEdit?: boolean;
     onSaved?: () => void;
     onEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterSaveHandler?: ((handler: (() => Promise<boolean>) | null) => void) | undefined;
@@ -60,10 +61,12 @@ export default function BasicInfoView({
     personId,
     mutateEndpoint,
     pinyinEndpoint,
+    canEdit = false,
     onSaved,
     onEditorStateChange,
     onRegisterSaveHandler,
 }: Props) {
+    const panelRef = useRef<HTMLDivElement | null>(null);
     const [editing, setEditing] = useState(false);
     const [formState, setFormState] = useState<FormState>({});
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -75,6 +78,10 @@ export default function BasicInfoView({
     const initialState = useMemo(() => buildInitialState(form), [form]);
     const dirty = useMemo(
         () => hasFormChanges(form, initialState, formState),
+        [form, initialState, formState],
+    );
+    const dirtyFields = useMemo(
+        () => buildDirtyFieldSet(form, initialState, formState),
         [form, initialState, formState],
     );
 
@@ -120,6 +127,10 @@ export default function BasicInfoView({
     }
 
     const beginEdit = () => {
+        if (!canEdit) {
+            return;
+        }
+
         setEditing(true);
         setFormState(initialState);
         setFieldErrors({});
@@ -161,11 +172,7 @@ export default function BasicInfoView({
                 fetchPinyinValue(pinyinEndpoint, formState.c_mingzi_chn ?? ''),
             ]);
 
-            setFormState((prev) => applyDerivedFields({
-                ...prev,
-                c_surname: surname,
-                c_mingzi: mingzi,
-            }));
+            setFormState((prev) => applyGeneratedPinyin(prev, initialState, surname, mingzi));
             setMessage('生成拼音已完成。');
         } catch (err) {
             setError(err instanceof Error ? err.message : '生成拼音失敗');
@@ -223,6 +230,7 @@ export default function BasicInfoView({
             return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : '儲存失敗');
+            scrollPanelToTop(panelRef);
             return false;
         } finally {
             setSaving(false);
@@ -234,7 +242,7 @@ export default function BasicInfoView({
     }, [editing, onRegisterSaveHandler, save]);
 
     return (
-        <div style={{
+        <div ref={panelRef} style={{
             ...panelStyle,
             ...(editing ? editingPanelStyle : {}),
         }}
@@ -246,11 +254,11 @@ export default function BasicInfoView({
                         {editing ? <div style={editingHintStyle}>編輯模式：可修改欄位已切換為高亮輸入框</div> : null}
                     </div>
                     <div style={toolbarButtonGroupStyle}>
-                        {!editing ? (
+                        {!editing && canEdit ? (
                             <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
                                 編輯基本信息
                             </button>
-                        ) : (
+                        ) : editing ? (
                             <>
                                 <button
                                     type="button"
@@ -269,7 +277,7 @@ export default function BasicInfoView({
                                     {saving ? '儲存中…' : '整頁儲存'}
                                 </button>
                             </>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             ) : null}
@@ -280,6 +288,7 @@ export default function BasicInfoView({
             {editing && form ? renderEditor(
                 form.fields,
                 formState,
+                dirtyFields,
                 fieldErrors,
                 updateField,
                 generatePinyin,
@@ -302,6 +311,7 @@ export default function BasicInfoView({
 function renderEditor(
     fields: Record<string, FormField>,
     values: FormState,
+    dirtyFields: Set<string>,
     errors: FieldErrors,
     onChange: (key: string, value: string) => void,
     onGeneratePinyin?: () => void,
@@ -323,6 +333,7 @@ function renderEditor(
                         ]}
                         allFields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                         footer={onGeneratePinyin ? (
@@ -347,6 +358,7 @@ function renderEditor(
                         ]}
                         allFields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
@@ -359,6 +371,7 @@ function renderEditor(
                         ]}
                         allFields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
@@ -371,9 +384,32 @@ function renderEditor(
                         ]}
                         allFields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
+                </div>
+            </div>
+
+            <div style={sectionWithDividerStyle}>
+                <SectionHeading title="基本屬性" />
+                <div style={editorCompactGridStyle}>
+                    {[
+                        'c_female',
+                        'c_dy',
+                        'c_ethnicity_code',
+                        'c_choronym_code',
+                        'c_household_status_code',
+                    ].map((key) => (
+                        <EditorField
+                            key={key}
+                            field={fields[key]}
+                            value={values[key] ?? ''}
+                            dirty={dirtyFields.has(key)}
+                            error={errors[key]}
+                            onChange={onChange}
+                        />
+                    ))}
                 </div>
             </div>
 
@@ -394,6 +430,7 @@ function renderEditor(
                         ]}
                         fields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
@@ -411,69 +448,14 @@ function renderEditor(
                         ]}
                         fields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
                 </div>
                 <div style={editorCompactGridStyle}>
-                    <EditorField field={fields.c_death_age} value={values.c_death_age ?? ''} error={errors.c_death_age} onChange={onChange} />
-                    <EditorField field={fields.c_death_age_range} value={values.c_death_age_range ?? ''} error={errors.c_death_age_range} onChange={onChange} />
-                </div>
-            </div>
-
-            <div style={sectionWithDividerStyle}>
-                <SectionHeading title="基本屬性" />
-                <div style={editorCompactGridStyle}>
-                    {[
-                        'c_female',
-                        'c_dy',
-                        'c_ethnicity_code',
-                        'c_choronym_code',
-                        'c_household_status_code',
-                    ].map((key) => (
-                        <EditorField
-                            key={key}
-                            field={fields[key]}
-                            value={values[key] ?? ''}
-                            error={errors[key]}
-                            onChange={onChange}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            <div style={sectionWithDividerStyle}>
-                <SectionHeading title="指數資料" />
-                <div style={indexSectionStackStyle}>
-                    <div style={indexYearRowStyle}>
-                        {[
-                            'c_index_year',
-                            'c_index_year_type_code',
-                            'c_index_year_source_id',
-                        ].map((key) => (
-                            <EditorField
-                                key={key}
-                                field={fields[key]}
-                                value={values[key] ?? ''}
-                                error={errors[key]}
-                                onChange={onChange}
-                            />
-                        ))}
-                    </div>
-                    <div style={indexAddressRowStyle}>
-                        {[
-                            'c_index_addr_id',
-                            'c_index_addr_type_code',
-                        ].map((key) => (
-                            <EditorField
-                                key={key}
-                                field={fields[key]}
-                                value={values[key] ?? ''}
-                                error={errors[key]}
-                                onChange={onChange}
-                            />
-                        ))}
-                    </div>
+                    <EditorField field={fields.c_death_age} value={values.c_death_age ?? ''} dirty={dirtyFields.has('c_death_age')} error={errors.c_death_age} onChange={onChange} />
+                    <EditorField field={fields.c_death_age_range} value={values.c_death_age_range ?? ''} dirty={dirtyFields.has('c_death_age_range')} error={errors.c_death_age_range} onChange={onChange} />
                 </div>
             </div>
 
@@ -490,6 +472,7 @@ function renderEditor(
                         ]}
                         fields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
@@ -503,6 +486,7 @@ function renderEditor(
                         ]}
                         fields={fields}
                         values={values}
+                        dirtyFields={dirtyFields}
                         errors={errors}
                         onChange={onChange}
                     />
@@ -514,10 +498,69 @@ function renderEditor(
                 <EditorField
                     field={fields.c_notes}
                     value={values.c_notes ?? ''}
+                    dirty={dirtyFields.has('c_notes')}
                     error={errors.c_notes}
                     onChange={onChange}
                     fullWidth
                 />
+            </div>
+
+            <div style={sectionWithDividerStyle}>
+                <SectionHeading title="指數資料" />
+                <div style={indexSectionStackStyle}>
+                    <div style={indexYearRowStyle}>
+                        {[
+                            'c_index_year',
+                            'c_index_year_type_code',
+                            'c_index_year_source_id',
+                        ].map((key) => (
+                            <EditorField
+                                key={key}
+                                field={fields[key]}
+                                value={values[key] ?? ''}
+                                dirty={dirtyFields.has(key)}
+                                error={errors[key]}
+                                onChange={onChange}
+                            />
+                        ))}
+                    </div>
+                    <div style={indexAddressRowStyle}>
+                        {[
+                            'c_index_addr_id',
+                            'c_index_addr_type_code',
+                        ].map((key) => (
+                            <EditorField
+                                key={key}
+                                field={fields[key]}
+                                value={values[key] ?? ''}
+                                dirty={dirtyFields.has(key)}
+                                error={errors[key]}
+                                onChange={onChange}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div style={sectionWithDividerStyle}>
+                <SectionHeading title="建立 / 修改資訊" />
+                <div style={editorCompactGridStyle}>
+                    {[
+                        'c_created_by',
+                        'c_created_date',
+                        'c_modified_by',
+                        'c_modified_date',
+                    ].map((key) => (
+                        <EditorField
+                            key={key}
+                            field={fields[key]}
+                            value={values[key] ?? ''}
+                            dirty={dirtyFields.has(key)}
+                            error={errors[key]}
+                            onChange={onChange}
+                        />
+                    ))}
+                </div>
             </div>
 
             <div style={editorBottomBarStyle}>
@@ -540,6 +583,7 @@ function EditorGroup({
     fields,
     allFields,
     values,
+    dirtyFields,
     errors,
     onChange,
     footer,
@@ -548,6 +592,7 @@ function EditorGroup({
     fields: string[];
     allFields: Record<string, FormField>;
     values: FormState;
+    dirtyFields: Set<string>;
     errors: FieldErrors;
     onChange: (key: string, value: string) => void;
     footer?: React.ReactNode;
@@ -561,6 +606,7 @@ function EditorGroup({
                         key={key}
                         field={allFields[key]}
                         value={values[key] ?? ''}
+                        dirty={dirtyFields.has(key)}
                         error={errors[key]}
                         onChange={onChange}
                     />
@@ -576,6 +622,7 @@ function EditorTimelineCard({
     fieldKeys,
     fields,
     values,
+    dirtyFields,
     errors,
     onChange,
 }: {
@@ -583,6 +630,7 @@ function EditorTimelineCard({
     fieldKeys: string[];
     fields: Record<string, FormField>;
     values: FormState;
+    dirtyFields: Set<string>;
     errors: FieldErrors;
     onChange: (key: string, value: string) => void;
 }) {
@@ -595,6 +643,7 @@ function EditorTimelineCard({
                         key={key}
                         field={fields[key]}
                         value={values[key] ?? ''}
+                        dirty={dirtyFields.has(key)}
                         error={errors[key]}
                         onChange={onChange}
                         fullWidth={key.endsWith('_notes')}
@@ -608,12 +657,14 @@ function EditorTimelineCard({
 function EditorField({
     field,
     value,
+    dirty = false,
     error,
     onChange,
     fullWidth = false,
 }: {
     field?: FormField;
     value: string;
+    dirty?: boolean;
     error?: string[];
     onChange: (key: string, value: string) => void;
     fullWidth?: boolean;
@@ -629,6 +680,7 @@ function EditorField({
                 value={field.derived ? value : (field.display_value ?? value)}
                 fullWidth={fullWidth}
                 derived
+                dirty={dirty}
             />
         );
     }
@@ -640,8 +692,8 @@ function EditorField({
                 ...(fullWidth ? fullWidthStyle : {}),
             }}
         >
-            <div style={fieldLabelStyle}>{field.label}</div>
-            {renderInputControl(field, value, onChange)}
+            <div style={{ ...fieldLabelStyle, ...(dirty ? dirtyFieldLabelStyle : {}) }}>{field.label}</div>
+            {renderInputControl(field, value, onChange, dirty)}
             {error && error.length > 0 ? <div style={fieldErrorStyle}>{error[0]}</div> : null}
         </div>
     );
@@ -651,12 +703,16 @@ function renderInputControl(
     field: FormField,
     value: string,
     onChange: (key: string, value: string) => void,
+    dirty = false,
 ) {
     if (field.input === 'textarea') {
         return (
             <textarea
                 value={value}
-                style={textareaStyle}
+                style={{
+                    ...textareaStyle,
+                    ...(dirty ? dirtyInputStyle : {}),
+                }}
                 rows={field.key === 'c_notes' ? 5 : 3}
                 onChange={(event) => onChange(field.key, event.target.value)}
             />
@@ -668,6 +724,7 @@ function renderInputControl(
             <EnumAutocompleteField
                 field={field}
                 value={value}
+                dirty={dirty}
                 onChange={(next) => onChange(field.key, next)}
             />
         );
@@ -675,7 +732,10 @@ function renderInputControl(
 
     if (field.input === 'checkbox') {
         return (
-            <label style={checkboxWrapStyle}>
+            <label style={{
+                ...checkboxWrapStyle,
+                ...(dirty ? dirtyInputStyle : {}),
+            }}>
                 <input
                     type="checkbox"
                     checked={value === '1'}
@@ -691,7 +751,10 @@ function renderInputControl(
         <input
             type={field.input === 'number' ? 'number' : 'text'}
             value={value}
-            style={inputStyle}
+            style={{
+                ...inputStyle,
+                ...(dirty ? dirtyInputStyle : {}),
+            }}
             onChange={(event) => onChange(field.key, event.target.value)}
         />
     );
@@ -700,10 +763,12 @@ function renderInputControl(
 function EnumAutocompleteField({
     field,
     value,
+    dirty = false,
     onChange,
 }: {
     field: FormField;
     value: string;
+    dirty?: boolean;
     onChange: (value: string) => void;
 }) {
     const localOptions = useMemo(() => field.options ?? [], [field.options]);
@@ -759,7 +824,10 @@ function EnumAutocompleteField({
             <input
                 type="text"
                 value={query}
-                style={inputStyle}
+                style={{
+                    ...inputStyle,
+                    ...(dirty ? dirtyInputStyle : {}),
+                }}
                 onFocus={() => setOpen(true)}
                 onBlur={() => {
                     window.setTimeout(() => {
@@ -828,6 +896,8 @@ function renderReadOnlySection(section: Section) {
             return renderActiveYearsSection(section);
         case '備註':
             return renderNotesSection(section);
+        case '建立 / 修改資訊':
+            return renderAuditSection(section);
         default:
             return renderFallbackSection(section);
     }
@@ -1023,6 +1093,22 @@ function renderNotesSection(section: Section) {
     );
 }
 
+function renderAuditSection(section: Section) {
+    const fields = fieldMap(section);
+
+    return (
+        <>
+            <SectionHeading title={section.title} />
+            <div style={compactGridStyle}>
+                <ReadOnlyField label="Created By (c_created_by)" value={fields['Created By']} />
+                <ReadOnlyField label="Created Date (c_created_date)" value={fields['Created Date']} />
+                <ReadOnlyField label="Modified By (c_modified_by)" value={fields['Modified By']} />
+                <ReadOnlyField label="Modified Date (c_modified_date)" value={fields['Modified Date']} />
+            </div>
+        </>
+    );
+}
+
 function renderFallbackSection(section: Section) {
     return (
         <>
@@ -1075,6 +1161,7 @@ function ReadOnlyField({
     subtle = false,
     emphasis = false,
     derived = false,
+    dirty = false,
 }: {
     label: string;
     value: FieldValue;
@@ -1083,6 +1170,7 @@ function ReadOnlyField({
     subtle?: boolean;
     emphasis?: boolean;
     derived?: boolean;
+    dirty?: boolean;
 }) {
     return (
         <div
@@ -1091,7 +1179,7 @@ function ReadOnlyField({
                 ...(fullWidth ? fullWidthStyle : {}),
             }}
         >
-            <div style={fieldLabelStyle}>{label}</div>
+            <div style={{ ...fieldLabelStyle, ...(dirty ? dirtyFieldLabelStyle : {}) }}>{label}</div>
             <div
                 style={{
                     ...fieldValueBoxStyle,
@@ -1099,6 +1187,7 @@ function ReadOnlyField({
                     ...(subtle ? subtleValueBoxStyle : {}),
                     ...(emphasis ? emphasisValueBoxStyle : {}),
                     ...(derived ? derivedValueBoxStyle : {}),
+                    ...(dirty ? dirtyValueBoxStyle : {}),
                 }}
             >
                 {displayValue(value)}
@@ -1128,6 +1217,16 @@ function hasFormChanges(form: BasicInfoForm | null | undefined, initialState: Fo
     return Object.keys(form.fields).some((key) => (initialState[key] ?? '') !== (currentState[key] ?? ''));
 }
 
+function buildDirtyFieldSet(form: BasicInfoForm | null | undefined, initialState: FormState, currentState: FormState): Set<string> {
+    if (!form?.fields) {
+        return new Set();
+    }
+
+    return new Set(
+        Object.keys(form.fields).filter((key) => (initialState[key] ?? '') !== (currentState[key] ?? '')),
+    );
+}
+
 function applyDerivedFields(next: FormState): FormState {
     const updated = { ...next };
 
@@ -1145,6 +1244,22 @@ function applyDerivedFields(next: FormState): FormState {
     }
 
     return updated;
+}
+
+function applyGeneratedPinyin(prev: FormState, initialState: FormState, surname: string, mingzi: string): FormState {
+    const next = applyDerivedFields({
+        ...prev,
+        c_surname: surname,
+        c_mingzi: mingzi,
+    });
+
+    ['c_surname', 'c_mingzi', 'c_name'].forEach((key) => {
+        if ((next[key] ?? '') === (initialState[key] ?? '')) {
+            next[key] = initialState[key] ?? '';
+        }
+    });
+
+    return next;
 }
 
 function buildSaveChanges(form: BasicInfoForm, values: FormState): Record<string, string | null> {
@@ -1351,6 +1466,15 @@ function joinDisplayValues(left: FieldValue, right: FieldValue) {
     }
 
     return parts.join(' / ');
+}
+
+function scrollPanelToTop(panelRef: React.RefObject<HTMLDivElement | null>) {
+    window.requestAnimationFrame(() => {
+        panelRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    });
 }
 
 const modelIdKeyMap: Record<string, string> = {
@@ -1608,6 +1732,10 @@ const fieldLabelStyle: React.CSSProperties = {
     textOverflow: 'ellipsis',
 };
 
+const dirtyFieldLabelStyle: React.CSSProperties = {
+    color: '#8a5a15',
+};
+
 const fieldValueBoxStyle: React.CSSProperties = {
     minHeight: 42,
     padding: '0 12px',
@@ -1758,6 +1886,18 @@ const derivedValueBoxStyle: React.CSSProperties = {
     borderColor: '#bfcfdf',
     color: '#18344d',
     fontWeight: 700,
+};
+
+const dirtyValueBoxStyle: React.CSSProperties = {
+    backgroundColor: '#fff5db',
+    borderColor: '#d3a342',
+    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(211, 163, 66, 0.16)',
+};
+
+const dirtyInputStyle: React.CSSProperties = {
+    backgroundColor: '#fff7e4',
+    borderColor: '#d3a342',
+    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(211, 163, 66, 0.18)',
 };
 
 const notesBoxStyle: React.CSSProperties = {

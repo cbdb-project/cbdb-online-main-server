@@ -15,6 +15,7 @@ interface PageProps {
     tabEndpoint: string;
     mutateEndpoint: string;
     pinyinEndpoint: string;
+    canEditBasicInfo: boolean;
     initialPersonId: number | null;
     initialKeyword: string;
     initialTab: string;
@@ -27,6 +28,7 @@ export default function PersonBrowserIndex() {
         tabEndpoint,
         mutateEndpoint,
         pinyinEndpoint,
+        canEditBasicInfo,
         initialPersonId,
         initialKeyword,
         initialTab,
@@ -332,6 +334,7 @@ export default function PersonBrowserIndex() {
                             tabEndpoint={tabEndpoint}
                             mutateEndpoint={mutateEndpoint}
                             pinyinEndpoint={pinyinEndpoint}
+                            canEditBasicInfo={canEditBasicInfo}
                             onBasicInfoSaved={handleBasicInfoSaved}
                             onBasicInfoEditorStateChange={setBasicInfoEditorState}
                             onRegisterBasicInfoSaveHandler={registerBasicInfoSaveHandler}

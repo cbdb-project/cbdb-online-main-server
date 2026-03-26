@@ -367,6 +367,20 @@ class PersonBrowserService {
                     ],
                 ],
                 [
+                    'title' => '基本屬性',
+                    'fields' => [
+                        ['label' => '性別', 'value' => $this->genderLabel($row['c_female'] ?? null)],
+                        ['label' => '朝代（中文）', 'value' => $row['c_dynasty_chn'] ?? ''],
+                        ['label' => '朝代（英文）', 'value' => $row['c_dynasty'] ?? ''],
+                        ['label' => '族裔（中文）', 'value' => $row['c_ethnicity_chn'] ?? ''],
+                        ['label' => '族裔（英文）', 'value' => $row['c_ethnicity'] ?? ''],
+                        ['label' => '郡望（中文）', 'value' => $row['c_choronym_chn'] ?? ''],
+                        ['label' => '郡望（英文）', 'value' => $row['c_choronym'] ?? ''],
+                        ['label' => '戶籍（中文）', 'value' => $household['chn']],
+                        ['label' => '戶籍（英文）', 'value' => $household['eng']],
+                    ],
+                ],
+                [
                     'title' => '生卒年',
                     'fields' => [
                         ['label' => '出生年', 'value' => $row['c_birthyear'] ?? ''],
@@ -390,33 +404,6 @@ class PersonBrowserService {
                     ],
                 ],
                 [
-                    'title' => '基本屬性',
-                    'fields' => [
-                        ['label' => '性別', 'value' => $this->genderLabel($row['c_female'] ?? null)],
-                        ['label' => '朝代（中文）', 'value' => $row['c_dynasty_chn'] ?? ''],
-                        ['label' => '朝代（英文）', 'value' => $row['c_dynasty'] ?? ''],
-                        ['label' => '族裔（中文）', 'value' => $row['c_ethnicity_chn'] ?? ''],
-                        ['label' => '族裔（英文）', 'value' => $row['c_ethnicity'] ?? ''],
-                        ['label' => '郡望（中文）', 'value' => $row['c_choronym_chn'] ?? ''],
-                        ['label' => '郡望（英文）', 'value' => $row['c_choronym'] ?? ''],
-                        ['label' => '戶籍（中文）', 'value' => $household['chn']],
-                        ['label' => '戶籍（英文）', 'value' => $household['eng']],
-                    ],
-                ],
-                [
-                    'title' => '指數資料',
-                    'fields' => [
-                        ['label' => 'Index Year', 'value' => $row['c_index_year'] ?? ''],
-                        ['label' => 'Index Year Type', 'value' => $indexYearTypeCode],
-                        ['label' => 'Index Year Type（中文）', 'value' => $indexYearTypeChn],
-                        ['label' => 'Index Year Type（英文）', 'value' => $indexYearTypeEng],
-                        ['label' => 'Index Year Source', 'value' => $indexYearSource],
-                        ['label' => 'Index Address（中文）', 'value' => $row['index_addr_chn'] ?? ''],
-                        ['label' => 'Index Address（英文）', 'value' => $row['index_addr'] ?? ''],
-                        ['label' => 'Index Address Type', 'value' => $row['c_index_addr_type_code'] ?? ''],
-                    ],
-                ],
-                [
                     'title' => '活動年份',
                     'fields' => [
                         ['label' => '在世始年', 'value' => $row['c_fl_earliest_year'] ?? ''],
@@ -433,6 +420,28 @@ class PersonBrowserService {
                     'title' => '備註',
                     'fields' => [
                         ['label' => '備註', 'value' => $row['c_notes'] ?? ''],
+                    ],
+                ],
+                [
+                    'title' => '指數資料',
+                    'fields' => [
+                        ['label' => 'Index Year', 'value' => $row['c_index_year'] ?? ''],
+                        ['label' => 'Index Year Type', 'value' => $indexYearTypeCode],
+                        ['label' => 'Index Year Type（中文）', 'value' => $indexYearTypeChn],
+                        ['label' => 'Index Year Type（英文）', 'value' => $indexYearTypeEng],
+                        ['label' => 'Index Year Source', 'value' => $indexYearSource],
+                        ['label' => 'Index Address（中文）', 'value' => $row['index_addr_chn'] ?? ''],
+                        ['label' => 'Index Address（英文）', 'value' => $row['index_addr'] ?? ''],
+                        ['label' => 'Index Address Type', 'value' => $row['c_index_addr_type_code'] ?? ''],
+                    ],
+                ],
+                [
+                    'title' => '建立 / 修改資訊',
+                    'fields' => [
+                        ['label' => 'Created By', 'value' => $row['c_created_by'] ?? ''],
+                        ['label' => 'Created Date', 'value' => $row['c_created_date'] ?? ''],
+                        ['label' => 'Modified By', 'value' => $row['c_modified_by'] ?? ''],
+                        ['label' => 'Modified Date', 'value' => $row['c_modified_date'] ?? ''],
                     ],
                 ],
             ],
@@ -1104,6 +1113,18 @@ class PersonBrowserService {
                 'enum_model' => 'household',
             ]),
             'c_notes' => $this->basicInfoFormField('c_notes', '備註 (c_notes)', $row['c_notes'] ?? '', 'textarea'),
+            'c_created_by' => $this->basicInfoFormField('c_created_by', 'Created By (c_created_by)', $row['c_created_by'] ?? '', 'text', false, [
+                'send_on_save' => false,
+            ]),
+            'c_created_date' => $this->basicInfoFormField('c_created_date', 'Created Date (c_created_date)', $row['c_created_date'] ?? '', 'text', false, [
+                'send_on_save' => false,
+            ]),
+            'c_modified_by' => $this->basicInfoFormField('c_modified_by', 'Modified By (c_modified_by)', $row['c_modified_by'] ?? '', 'text', false, [
+                'send_on_save' => false,
+            ]),
+            'c_modified_date' => $this->basicInfoFormField('c_modified_date', 'Modified Date (c_modified_date)', $row['c_modified_date'] ?? '', 'text', false, [
+                'send_on_save' => false,
+            ]),
         ];
     }
 

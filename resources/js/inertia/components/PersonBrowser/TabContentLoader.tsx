@@ -1,0 +1,90 @@
+import React, { useEffect, useState, useRef } from 'react';
+import BasicInfoView from './BasicInfoView';
+import RepeatedFormCards from './RepeatedFormCards';
+
+interface Props {
+    personId: number | null;
+    activeTab: string;
+    tabEndpoint: string;
+}
+
+interface TabState {
+    loading: boolean;
+    error: string | null;
+    data: unknown;
+}
+
+/**
+ * 根據 activeTab 和 personId lazy load 對應 tab 資料。
+ * 已載入的 tab 資料會快取（同一 personId 不重複請求）。
+ */
+export default function TabContentLoader({ personId, activeTab, tabEndpoint }: Props) {
+    const [cache, setCache] = useState<Record<string, TabState>>({});
+    const prevPersonRef = useRef<number | null>(null);
+
+    // 人物切換時清空快取
+    useEffect(() => {
+        if (prevPersonRef.current !== personId) {
+            setCache({});
+            prevPersonRef.current = personId;
+        }
+    }, [personId]);
+
+    // lazy load
+    useEffect(() => {
+        if (!personId || !activeTab) return;
+        if (cache[activeTab]?.data || cache[activeTab]?.loading) return;
+
+        const url = tabEndpoint
+            .replace('__PERSON_ID__', String(personId))
+            .replace('__TAB_KEY__', activeTab);
+
+        setCache((prev) => ({ ...prev, [activeTab]: { loading: true, error: null, data: null } }));
+
+        fetch(url)
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                setCache((prev) => ({ ...prev, [activeTab]: { loading: false, error: null, data } }));
+            })
+            .catch((err) => {
+                setCache((prev) => ({
+                    ...prev,
+                    [activeTab]: { loading: false, error: err.message || '載入失敗', data: null },
+                }));
+            });
+    }, [personId, activeTab, tabEndpoint, cache]);
+
+    if (!personId) {
+        return <div style={msgStyle}>請先選擇人物</div>;
+    }
+
+    const state = cache[activeTab];
+
+    if (!state || state.loading) {
+        return <div style={msgStyle}>載入中…</div>;
+    }
+
+    if (state.error) {
+        return <div style={{ ...msgStyle, color: '#dc3545' }}>載入失敗：{state.error}</div>;
+    }
+
+    // Render based on tab type
+    if (activeTab === 'basic_info') {
+        const basicData = state.data as { sections?: Array<{ title: string; fields: Array<{ label: string; value: unknown }> }> };
+        return <BasicInfoView sections={basicData?.sections || []} />;
+    }
+
+    // All other tabs: repeated-form cards
+    const listData = state.data as { columns?: Record<string, string>; rows?: Record<string, unknown>[] };
+    return <RepeatedFormCards columns={listData?.columns || {}} rows={listData?.rows || []} />;
+}
+
+const msgStyle: React.CSSProperties = {
+    padding: 24,
+    textAlign: 'center',
+    color: '#6c757d',
+    fontSize: '0.875rem',
+};

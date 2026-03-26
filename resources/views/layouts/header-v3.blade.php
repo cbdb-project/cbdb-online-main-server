@@ -42,7 +42,7 @@
 
         @if (Auth::guest())
             <li class="nav-item">
-                <a href="{{ route('login') }}" class="nav-link">Login</a>
+                <a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}" class="nav-link">Login</a>
             </li>
             <li class="nav-item">
                 <a href="{{ route('register') }}" class="nav-link">Register</a>

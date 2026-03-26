@@ -41,6 +41,7 @@
                     <h1 class="h5 text-center mb-4">歡迎回來 · Welcome back</h1>
                     <form action="{{ route('login') }}" method="post" novalidate>
                         {{ csrf_field() }}
+                        <input type="hidden" name="redirect" value="{{ old('redirect', request('redirect', session('url.intended'))) }}">
                         <div class="form-group mb-3">
                             <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
                             <input type="email" id="email" name="email" value="{{ old('email') }}" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" placeholder="name@example.com / 電子郵件" required>

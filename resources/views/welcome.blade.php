@@ -190,7 +190,7 @@
                         <a href="{{ url('home') }}">Home</a>
                     @else
                         <a href="{{ url('home') }}">Guest</a>
-                        <a href="{{ url('login') }}">Login</a>
+                        <a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}">Login</a>
                         <a href="{{ url('register') }}">Register</a>
                     @endauth
                 </div>

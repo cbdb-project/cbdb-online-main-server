@@ -66,7 +66,6 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
                 <Field label="朝代" value={summary.dynasty_chn} />
                 <Field label="生卒年" value={lifespan} />
                 <Field label="Index Year" value={summary.c_index_year != null ? String(summary.c_index_year) : ''} />
-                <Field label="Index Year Type" value={summary.index_year_type} />
                 <Field label="Index Address" value={summary.index_addr_chn} />
                 {summary.alt_name_zi && <Field label="字" value={summary.alt_name_zi} />}
                 {summary.alt_name_hao && <Field label="號" value={summary.alt_name_hao} />}

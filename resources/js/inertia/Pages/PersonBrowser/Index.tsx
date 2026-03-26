@@ -115,10 +115,9 @@ export default function PersonBrowserIndex() {
     const handleSelect = useCallback(
         (personId: number) => {
             setSelectedId(personId);
-            setActiveTab('basic_info');
-            updateUrl({ person_id: personId, keyword, tab: 'basic_info' });
+            updateUrl({ person_id: personId, keyword, tab: activeTab });
         },
-        [keyword, updateUrl],
+        [activeTab, keyword, updateUrl],
     );
 
     // ── Load summary when selectedId changes ──

@@ -7,6 +7,8 @@ interface Props {
     mutateEndpoint: string;
     pinyinEndpoint: string;
     onSaved?: () => void;
+    onEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
+    onRegisterSaveHandler?: ((handler: (() => Promise<boolean>) | null) => void) | undefined;
 }
 
 interface Section {
@@ -59,6 +61,8 @@ export default function BasicInfoView({
     mutateEndpoint,
     pinyinEndpoint,
     onSaved,
+    onEditorStateChange,
+    onRegisterSaveHandler,
 }: Props) {
     const [editing, setEditing] = useState(false);
     const [formState, setFormState] = useState<FormState>({});
@@ -69,6 +73,10 @@ export default function BasicInfoView({
     const [generatingPinyin, setGeneratingPinyin] = useState(false);
 
     const initialState = useMemo(() => buildInitialState(form), [form]);
+    const dirty = useMemo(
+        () => hasFormChanges(form, initialState, formState),
+        [form, initialState, formState],
+    );
 
     useEffect(() => {
         setEditing(false);
@@ -94,6 +102,18 @@ export default function BasicInfoView({
             void fetchEnumOptions(model);
         });
     }, [editing, form]);
+
+    useEffect(() => {
+        onEditorStateChange?.({
+            editing,
+            dirty: editing && dirty,
+        });
+    }, [dirty, editing, onEditorStateChange]);
+
+    useEffect(() => () => {
+        onRegisterSaveHandler?.(null);
+        onEditorStateChange?.({ editing: false, dirty: false });
+    }, [onEditorStateChange, onRegisterSaveHandler]);
 
     if ((!sections || sections.length === 0) && !form) {
         return <div style={emptyStyle}>無基本資料</div>;
@@ -154,9 +174,9 @@ export default function BasicInfoView({
         }
     };
 
-    const save = async () => {
+    const save = async (): Promise<boolean> => {
         if (!form) {
-            return;
+            return false;
         }
 
         setSaving(true);
@@ -200,12 +220,18 @@ export default function BasicInfoView({
             setEditing(false);
             setMessage('基本信息已儲存。');
             onSaved?.();
+            return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : '儲存失敗');
+            return false;
         } finally {
             setSaving(false);
         }
     };
+
+    useEffect(() => {
+        onRegisterSaveHandler?.(editing ? save : null);
+    }, [editing, onRegisterSaveHandler, save]);
 
     return (
         <div style={{
@@ -1094,6 +1120,14 @@ function buildInitialState(form?: BasicInfoForm | null): FormState {
     return applyDerivedFields(next);
 }
 
+function hasFormChanges(form: BasicInfoForm | null | undefined, initialState: FormState, currentState: FormState): boolean {
+    if (!form?.fields) {
+        return false;
+    }
+
+    return Object.keys(form.fields).some((key) => (initialState[key] ?? '') !== (currentState[key] ?? ''));
+}
+
 function applyDerivedFields(next: FormState): FormState {
     const updated = { ...next };
 
@@ -1569,6 +1603,9 @@ const fieldLabelStyle: React.CSSProperties = {
     color: '#667788',
     marginBottom: 6,
     textAlign: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
 };
 
 const fieldValueBoxStyle: React.CSSProperties = {

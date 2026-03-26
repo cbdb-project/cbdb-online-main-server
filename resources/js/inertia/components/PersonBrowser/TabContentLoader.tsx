@@ -9,6 +9,8 @@ interface Props {
     mutateEndpoint: string;
     pinyinEndpoint: string;
     onBasicInfoSaved?: () => void;
+    onBasicInfoEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
+    onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
 }
 
 interface TabState {
@@ -28,6 +30,8 @@ export default function TabContentLoader({
     mutateEndpoint,
     pinyinEndpoint,
     onBasicInfoSaved,
+    onBasicInfoEditorStateChange,
+    onRegisterBasicInfoSaveHandler,
 }: Props) {
     const [cache, setCache] = useState<Record<string, TabState>>({});
     const prevPersonRef = useRef<number | null>(null);
@@ -126,6 +130,8 @@ export default function TabContentLoader({
                 personId={personId}
                 mutateEndpoint={mutateEndpoint}
                 pinyinEndpoint={pinyinEndpoint}
+                onEditorStateChange={onBasicInfoEditorStateChange}
+                onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
                 onSaved={() => {
                     retryActiveTab();
                     onBasicInfoSaved?.();

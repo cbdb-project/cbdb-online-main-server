@@ -239,6 +239,19 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')
         ->name('app.view.show');
 
+    // 人物瀏覽工作台（Inertia + React）
+    Route::get('app/person-browser', 'PersonBrowserController@index')
+        ->middleware('inertia')
+        ->name('app.person-browser.index');
+    Route::get('app/person-browser/search', 'PersonBrowserController@search')
+        ->name('app.person-browser.search');
+    Route::get('app/person-browser/people/{personId}/summary', 'PersonBrowserController@summary')
+        ->where('personId', '[0-9]+')
+        ->name('app.person-browser.summary');
+    Route::get('app/person-browser/people/{personId}/tabs/{tabKey}', 'PersonBrowserController@tab')
+        ->where('personId', '[0-9]+')
+        ->name('app.person-browser.tab');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

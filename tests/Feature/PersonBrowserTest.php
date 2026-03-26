@@ -14,6 +14,8 @@ class PersonBrowserTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
+        $this->withoutMiddleware(\App\Http\Middleware\PrometheusMetrics::class);
+
         $this->createTestTables();
         $this->user = User::factory()->create([
             'is_active' => 1,
@@ -126,7 +128,7 @@ class PersonBrowserTest extends TestCase {
 
         DB::statement('
             CREATE TABLE IF NOT EXISTS ALTNAME_CODES (
-                c_alt_name_type_code INTEGER PRIMARY KEY,
+                c_name_type_code INTEGER PRIMARY KEY,
                 c_name_type_desc VARCHAR(255),
                 c_name_type_desc_chn VARCHAR(255)
             )
@@ -483,91 +485,93 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('BIOG_MAIN')->insert([
-            [
-                'c_personid' => 1,
-                'c_name' => 'Li Bai',
-                'c_name_chn' => '李白',
-                'c_name_proper' => 'Li Bai',
-                'c_name_rm' => 'Li Bai',
-                'c_surname' => 'Li',
-                'c_surname_chn' => '李',
-                'c_mingzi' => 'Bai',
-                'c_mingzi_chn' => '白',
-                'c_female' => 0,
-                'c_birthyear' => 701,
-                'c_by_nh_code' => 1,
-                'c_by_nh_year' => 2,
-                'c_by_range' => 1,
-                'c_by_intercalary' => 0,
-                'c_by_month' => 3,
-                'c_by_day' => 15,
-                'c_by_day_gz' => 1,
-                'c_deathyear' => 762,
-                'c_dy_nh_code' => 2,
-                'c_dy_nh_year' => 1,
-                'c_dy_range' => 2,
-                'c_dy_intercalary' => 1,
-                'c_dy_month' => 8,
-                'c_dy_day' => 9,
-                'c_dy_day_gz' => 2,
-                'c_death_age' => 61,
-                'c_death_age_range' => 1,
-                'c_fl_earliest_year' => 725,
-                'c_fl_ey_nh_code' => 1,
-                'c_fl_ey_nh_year' => 5,
-                'c_fl_ey_notes' => '初見活動年份',
-                'c_fl_latest_year' => 762,
-                'c_fl_ly_nh_code' => 2,
-                'c_fl_ly_nh_year' => 1,
-                'c_fl_ly_notes' => '最後活動年份',
-                'c_index_year' => 742,
-                'c_index_year_type_code' => '01',
-                'c_index_year_source_id' => 2,
-                'c_dy' => 1,
-                'c_index_addr_id' => 100,
-                'c_ethnicity_code' => 10,
-                'c_household_status_code' => 1,
-                'c_choronym_code' => 20,
-                'c_notes' => '人物總註',
-            ],
-            [
-                'c_personid' => 2,
-                'c_name' => 'Du Fu',
-                'c_name_chn' => '杜甫',
-                'c_name_proper' => 'Du Fu',
-                'c_name_rm' => 'Du Fu',
-                'c_surname' => 'Du',
-                'c_surname_chn' => '杜',
-                'c_mingzi' => 'Fu',
-                'c_mingzi_chn' => '甫',
-                'c_female' => 0,
-                'c_birthyear' => 712,
-                'c_deathyear' => 770,
-                'c_index_year' => 755,
-                'c_dy' => 1,
-                'c_index_addr_id' => null,
-                'c_ethnicity_code' => null,
-                'c_choronym_code' => null,
-            ],
-            [
-                'c_personid' => 3,
-                'c_name' => 'Su Shi',
-                'c_name_chn' => '蘇軾',
-                'c_name_proper' => 'Su Shi',
-                'c_name_rm' => 'Su Shi',
-                'c_surname' => 'Su',
-                'c_surname_chn' => '蘇',
-                'c_mingzi' => 'Shi',
-                'c_mingzi_chn' => '軾',
-                'c_female' => 0,
-                'c_birthyear' => 1037,
-                'c_deathyear' => 1101,
-                'c_index_year' => 1057,
-                'c_dy' => 2,
-                'c_index_addr_id' => null,
-                'c_ethnicity_code' => null,
-                'c_choronym_code' => null,
-            ],
+            'c_personid' => 1,
+            'c_name' => 'Li Bai',
+            'c_name_chn' => '李白',
+            'c_name_proper' => 'Li Bai',
+            'c_name_rm' => 'Li Bai',
+            'c_surname' => 'Li',
+            'c_surname_chn' => '李',
+            'c_mingzi' => 'Bai',
+            'c_mingzi_chn' => '白',
+            'c_female' => 0,
+            'c_birthyear' => 701,
+            'c_by_nh_code' => 1,
+            'c_by_nh_year' => 2,
+            'c_by_range' => 1,
+            'c_by_intercalary' => 0,
+            'c_by_month' => 3,
+            'c_by_day' => 15,
+            'c_by_day_gz' => 1,
+            'c_deathyear' => 762,
+            'c_dy_nh_code' => 2,
+            'c_dy_nh_year' => 1,
+            'c_dy_range' => 2,
+            'c_dy_intercalary' => 1,
+            'c_dy_month' => 8,
+            'c_dy_day' => 9,
+            'c_dy_day_gz' => 2,
+            'c_death_age' => 61,
+            'c_death_age_range' => 1,
+            'c_fl_earliest_year' => 725,
+            'c_fl_ey_nh_code' => 1,
+            'c_fl_ey_nh_year' => 5,
+            'c_fl_ey_notes' => '初見活動年份',
+            'c_fl_latest_year' => 762,
+            'c_fl_ly_nh_code' => 2,
+            'c_fl_ly_nh_year' => 1,
+            'c_fl_ly_notes' => '最後活動年份',
+            'c_index_year' => 742,
+            'c_index_year_type_code' => '01',
+            'c_index_year_source_id' => 2,
+            'c_dy' => 1,
+            'c_index_addr_id' => 100,
+            'c_ethnicity_code' => 10,
+            'c_household_status_code' => 1,
+            'c_choronym_code' => 20,
+            'c_notes' => '人物總註',
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 2,
+            'c_name' => 'Du Fu',
+            'c_name_chn' => '杜甫',
+            'c_name_proper' => 'Du Fu',
+            'c_name_rm' => 'Du Fu',
+            'c_surname' => 'Du',
+            'c_surname_chn' => '杜',
+            'c_mingzi' => 'Fu',
+            'c_mingzi_chn' => '甫',
+            'c_female' => 0,
+            'c_birthyear' => 712,
+            'c_deathyear' => 770,
+            'c_index_year' => 755,
+            'c_dy' => 1,
+            'c_index_addr_id' => null,
+            'c_ethnicity_code' => null,
+            'c_household_status_code' => null,
+            'c_choronym_code' => null,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 3,
+            'c_name' => 'Su Shi',
+            'c_name_chn' => '蘇軾',
+            'c_name_proper' => 'Su Shi',
+            'c_name_rm' => 'Su Shi',
+            'c_surname' => 'Su',
+            'c_surname_chn' => '蘇',
+            'c_mingzi' => 'Shi',
+            'c_mingzi_chn' => '軾',
+            'c_female' => 0,
+            'c_birthyear' => 1037,
+            'c_deathyear' => 1101,
+            'c_index_year' => 1057,
+            'c_dy' => 2,
+            'c_index_addr_id' => null,
+            'c_ethnicity_code' => null,
+            'c_household_status_code' => null,
+            'c_choronym_code' => null,
         ]);
 
         DB::table('ALTNAME_DATA')->insert([
@@ -578,8 +582,8 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('ALTNAME_CODES')->insert([
-            ['c_alt_name_type_code' => 4, 'c_name_type_desc' => 'Zi', 'c_name_type_desc_chn' => '字'],
-            ['c_alt_name_type_code' => 5, 'c_name_type_desc' => 'Hao', 'c_name_type_desc_chn' => '號'],
+            ['c_name_type_code' => 4, 'c_name_type_desc' => 'Zi', 'c_name_type_desc_chn' => '字'],
+            ['c_name_type_code' => 5, 'c_name_type_desc' => 'Hao', 'c_name_type_desc_chn' => '號'],
         ]);
 
         DB::table('CBDB__NAME_FTS')->insert([
@@ -870,22 +874,27 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonStructure([
             'sections' => [['title', 'fields']],
         ]);
-        $response->assertJsonPath('sections.2.fields.3.value', '漢');
-        $response->assertJsonPath('sections.2.fields.4.value', 'Han');
-        $response->assertJsonPath('sections.2.fields.5.value', '隴西');
-        $response->assertJsonPath('sections.2.fields.6.value', 'Longxi');
-        $response->assertJsonPath('sections.2.fields.7.value', '編戶');
-        $response->assertJsonPath('sections.3.fields.3.value', '約 / circa');
-        $response->assertJsonPath('sections.3.fields.7.value', '甲子 / jia zi');
-        $response->assertJsonPath('sections.3.fields.15.value', '約 / circa');
-        $response->assertJsonPath('sections.4.fields.1.value', '01');
-        $response->assertJsonPath('sections.4.fields.2.value', '約年');
-        $response->assertJsonPath('sections.4.fields.3.value', 'Approximate year');
-        $response->assertJsonPath('sections.4.fields.4.value', '2 杜甫');
-        $response->assertJsonPath('sections.5.fields.0.value', 725);
-        $response->assertJsonPath('sections.5.fields.3.value', '初見活動年份');
-        $response->assertJsonPath('sections.5.fields.7.value', '最後活動年份');
-        $response->assertJsonPath('sections.6.fields.0.value', '人物總註');
+        $sections = collect($response->json('sections'))->keyBy('title');
+
+        $this->assertSame('漢', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（中文）'));
+        $this->assertSame('Han', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（英文）'));
+        $this->assertSame('隴西', $this->basicInfoFieldValue($sections->get('基本屬性'), '郡望（中文）'));
+        $this->assertSame('Longxi', $this->basicInfoFieldValue($sections->get('基本屬性'), '郡望（英文）'));
+        $this->assertSame('編戶', $this->basicInfoFieldValue($sections->get('基本屬性'), '戶籍（中文）'));
+
+        $this->assertSame('約 / circa', $this->basicInfoFieldValue($sections->get('生卒年'), '出生年範圍'));
+        $this->assertSame('甲子 / jia zi', $this->basicInfoFieldValue($sections->get('生卒年'), '出生日時干支'));
+        $this->assertSame('約 / circa', $this->basicInfoFieldValue($sections->get('生卒年'), '享年範圍'));
+
+        $this->assertSame('01', $this->basicInfoFieldValue($sections->get('指數資料'), 'Index Year Type'));
+        $this->assertSame('約年', $this->basicInfoFieldValue($sections->get('指數資料'), 'Index Year Type（中文）'));
+        $this->assertSame('Approximate year', $this->basicInfoFieldValue($sections->get('指數資料'), 'Index Year Type（英文）'));
+        $this->assertSame('2 杜甫', $this->basicInfoFieldValue($sections->get('指數資料'), 'Index Year Source'));
+
+        $this->assertSame(725, $this->basicInfoFieldValue($sections->get('活動年份'), '在世始年'));
+        $this->assertSame('初見活動年份', $this->basicInfoFieldValue($sections->get('活動年份'), '在世始年註'));
+        $this->assertSame('最後活動年份', $this->basicInfoFieldValue($sections->get('活動年份'), '在世終年註'));
+        $this->assertSame('人物總註', $this->basicInfoFieldValue($sections->get('備註'), '備註'));
     }
 
     #[Test]
@@ -1017,5 +1026,17 @@ class PersonBrowserTest extends TestCase {
 
             $response->assertOk();
         }
+    }
+
+    private function basicInfoFieldValue(?array $section, string $label): mixed {
+        $this->assertIsArray($section, 'Missing basic info section: ' . $label);
+
+        foreach (($section['fields'] ?? []) as $field) {
+            if (($field['label'] ?? null) === $label) {
+                return $field['value'] ?? null;
+            }
+        }
+
+        $this->fail('Missing basic info field: ' . $label);
     }
 }

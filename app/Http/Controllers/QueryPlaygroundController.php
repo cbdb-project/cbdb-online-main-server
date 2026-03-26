@@ -3,15 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Services\NaturalLanguageQueryService;
+use App\Services\QueryPlaygroundService;
 use App\Services\SqlTableNameExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class QueryPlaygroundController extends Controller {
-    public function __construct() {
+    protected QueryPlaygroundService $playgroundService;
+
+    public function __construct(QueryPlaygroundService $playgroundService) {
         $this->middleware('auth');
+        $this->playgroundService = $playgroundService;
     }
 
     /**
@@ -30,16 +35,7 @@ class QueryPlaygroundController extends Controller {
         }
 
         $initialSql = $request->input('sql', 'SELECT * FROM DYNASTIES');
-        $allowedTables = array_keys(config('codes.tables', []));
-        usort($allowedTables, function ($a, $b) {
-            $aInternal = str_starts_with($a, 'CBDB__');
-            $bInternal = str_starts_with($b, 'CBDB__');
-            if ($aInternal === $bInternal) {
-                return strcmp($a, $b);
-            }
-
-            return $aInternal ? 1 : -1;
-        });
+        $qbeTables = $this->playgroundService->getQbeTables();
 
         return view('query_playground.index', [
             'page_title' => 'SQL 查詢練習場',
@@ -48,14 +44,23 @@ class QueryPlaygroundController extends Controller {
             'page_url' => route('query-playground.index'),
             'initial_sql' => $initialSql,
             'nl_model' => config('services.gemini.model', 'gemini-3-flash-preview'),
-            'qbe_tables' => array_map(function ($table) {
-                return [
-                    'name' => $table,
-                    'description' => config("codes.tables.{$table}", ''),
-                    'internal' => str_starts_with($table, 'CBDB__'),
-                ];
-            }, $allowedTables),
+            'qbe_tables' => $qbeTables,
         ]);
+    }
+
+    /**
+     * Inertia + React 版本的 Query Playground 主頁。
+     */
+    public function appIndex(Request $request): InertiaResponse {
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Unauthorized. Expert access required.');
+        }
+
+        $props = $this->playgroundService->buildPageProps(
+            $request->input('sql')
+        );
+
+        return Inertia::render('QueryPlayground/Index', $props);
     }
 
     public function qbeSchema(Request $request) {
@@ -68,59 +73,12 @@ class QueryPlaygroundController extends Controller {
             'tables.*' => 'string|max:128',
         ]);
 
-        $allowedTables = array_keys(config('codes.tables', []));
         $requestedTables = $request->input('tables', []);
         if (empty($requestedTables)) {
-            $requestedTables = $allowedTables;
+            $requestedTables = array_keys(config('codes.tables', []));
         }
 
-        $resolvedTables = [];
-        foreach ($requestedTables as $requestedTable) {
-            foreach ($allowedTables as $allowedTable) {
-                if (strcasecmp($requestedTable, $allowedTable) === 0) {
-                    $resolvedTables[] = $allowedTable;
-
-                    break;
-                }
-            }
-        }
-
-        $resolvedTables = array_values(array_unique($resolvedTables));
-
-        $schemaBuilder = Schema::getConnection()->getSchemaBuilder();
-        $tableSchemas = [];
-        foreach ($resolvedTables as $tableName) {
-            try {
-                $columns = Schema::getColumnListing($tableName);
-                $columnEntries = [];
-                foreach ($columns as $columnName) {
-                    $columnType = '';
-
-                    try {
-                        $columnType = $schemaBuilder->getColumnType($tableName, $columnName);
-                    } catch (\Throwable $exception) {
-                        // Gracefully degrade when DB driver cannot expose exact type metadata.
-                    }
-
-                    $columnEntries[] = [
-                        'name' => $columnName,
-                        'type' => $columnType,
-                    ];
-                }
-
-                $tableSchemas[$tableName] = [
-                    'description' => config("codes.tables.{$tableName}", ''),
-                    'columns' => $columnEntries,
-                    'error' => null,
-                ];
-            } catch (\Throwable $exception) {
-                $tableSchemas[$tableName] = [
-                    'description' => config("codes.tables.{$tableName}", ''),
-                    'columns' => [],
-                    'error' => $exception->getMessage(),
-                ];
-            }
-        }
+        $tableSchemas = $this->playgroundService->getTableSchemas($requestedTables);
 
         return response()->json([
             'tables' => $tableSchemas,

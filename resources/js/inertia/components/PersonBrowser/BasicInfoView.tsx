@@ -57,33 +57,33 @@ function renderNameSection(section: Section) {
         {
             title: '中文',
             items: [
-                ['中文姓', fields['中文姓']],
-                ['中文名', fields['中文名']],
-                ['中文姓名', fields['姓名']],
+                ['中文姓 (c_surname_chn)', fields['中文姓']],
+                ['中文名 (c_mingzi_chn)', fields['中文名']],
+                ['中文姓名 (c_name_chn)', fields['姓名']],
             ] as Array<[string, FieldValue]>,
         },
         {
             title: '拼音',
             items: [
-                ['拼音姓', fields['Xing']],
-                ['拼音名', fields['Ming']],
-                ['拼音姓名', fields['姓名拼音']],
+                ['拼音姓 (c_surname)', fields['Xing']],
+                ['拼音名 (c_mingzi)', fields['Ming']],
+                ['拼音姓名 (c_name)', fields['姓名拼音']],
             ] as Array<[string, FieldValue]>,
         },
         {
             title: '外文',
             items: [
-                ['外文姓', fields['外文姓']],
-                ['外文名', fields['外文名']],
-                ['外文姓名', fields['外文全名']],
+                ['外文姓 (c_surname_proper)', fields['外文姓']],
+                ['外文名 (c_mingzi_proper)', fields['外文名']],
+                ['外文姓名 (c_name_proper)', fields['外文全名']],
             ] as Array<[string, FieldValue]>,
         },
         {
             title: '外文羅馬字轉寫',
             items: [
-                ['外文羅馬字轉寫姓', fields['外文羅馬字轉寫姓']],
-                ['外文羅馬字轉寫名', fields['外文羅馬字轉寫名']],
-                ['外文羅馬字轉寫姓名', fields['外文羅馬字轉寫姓名']],
+                ['外文羅馬字轉寫姓 (c_surname_rm)', fields['外文羅馬字轉寫姓']],
+                ['外文羅馬字轉寫名 (c_mingzi_rm)', fields['外文羅馬字轉寫名']],
+                ['外文羅馬字轉寫姓名 (c_name_rm)', fields['外文羅馬字轉寫姓名']],
             ] as Array<[string, FieldValue]>,
         },
     ];
@@ -122,33 +122,33 @@ function renderLifeSection(section: Section) {
                 <TimelineCard
                     title="生年"
                     items={[
-                        ['年份', fields['出生年']],
-                        ['年號', fields['出生年號']],
-                        ['年號年', fields['出生年號年']],
-                        ['範圍', fields['出生年範圍']],
-                        ['閏月', fields['出生閏月']],
-                        ['月份', fields['出生月']],
-                        ['日期', fields['出生日']],
-                        ['日干支', fields['出生日時干支']],
+                        ['年份 (c_birthyear)', fields['出生年']],
+                        ['年號 (c_by_nh_code)', fields['出生年號']],
+                        ['年號年 (c_by_nh_year)', fields['出生年號年']],
+                        ['範圍 (c_by_range)', fields['出生年範圍']],
+                        ['閏月 (c_by_intercalary)', fields['出生閏月']],
+                        ['月份 (c_by_month)', fields['出生月']],
+                        ['日期 (c_by_day)', fields['出生日']],
+                        ['日干支 (c_by_day_gz)', fields['出生日時干支']],
                     ]}
                 />
                 <TimelineCard
                     title="卒年"
                     items={[
-                        ['年份', fields['死亡年']],
-                        ['年號', fields['死亡年號']],
-                        ['年號年', fields['死亡年號年']],
-                        ['範圍', fields['死亡年範圍']],
-                        ['閏月', fields['死亡閏月']],
-                        ['月份', fields['死亡月']],
-                        ['日期', fields['死亡日']],
-                        ['日干支', fields['死亡日時干支']],
+                        ['年份 (c_deathyear)', fields['死亡年']],
+                        ['年號 (c_dy_nh_code)', fields['死亡年號']],
+                        ['年號年 (c_dy_nh_year)', fields['死亡年號年']],
+                        ['範圍 (c_dy_range)', fields['死亡年範圍']],
+                        ['閏月 (c_dy_intercalary)', fields['死亡閏月']],
+                        ['月份 (c_dy_month)', fields['死亡月']],
+                        ['日期 (c_dy_day)', fields['死亡日']],
+                        ['日干支 (c_dy_day_gz)', fields['死亡日時干支']],
                     ]}
                 />
             </div>
             <div style={compactGridStyle}>
-                <ReadOnlyField label="享年" value={fields['享年']} />
-                <ReadOnlyField label="享年範圍" value={fields['享年範圍']} />
+                <ReadOnlyField label="享年 (c_death_age)" value={fields['享年']} />
+                <ReadOnlyField label="享年範圍 (c_death_age_range)" value={fields['享年範圍']} />
             </div>
         </>
     );
@@ -157,11 +157,11 @@ function renderLifeSection(section: Section) {
 function renderPropertySection(section: Section) {
     const fields = fieldMap(section);
     const mergedFields = [
-        { label: '性別', value: fields['性別'] },
-        { label: '朝代', value: joinDisplayValues(fields['朝代（中文）'], fields['朝代（英文）']) },
-        { label: '族裔', value: joinDisplayValues(fields['族裔（中文）'], fields['族裔（英文）']) },
-        { label: '郡望', value: joinDisplayValues(fields['郡望（中文）'], fields['郡望（英文）']) },
-        { label: '戶籍', value: joinDisplayValues(fields['戶籍（中文）'], fields['戶籍（英文）']) },
+        { label: '性別 (c_female)', value: fields['性別'] },
+        { label: '朝代 (c_dynasty_chn / c_dynasty)', value: joinDisplayValues(fields['朝代（中文）'], fields['朝代（英文）']) },
+        { label: '族裔 (c_ethnicity_chn / c_ethnicity)', value: joinDisplayValues(fields['族裔（中文）'], fields['族裔（英文）']) },
+        { label: '郡望 (c_choronym_chn / c_choronym)', value: joinDisplayValues(fields['郡望（中文）'], fields['郡望（英文）']) },
+        { label: '戶籍 (c_household_status_code)', value: joinDisplayValues(fields['戶籍（中文）'], fields['戶籍（英文）']) },
     ];
     return (
         <>
@@ -185,13 +185,13 @@ function renderIndexSection(section: Section) {
             <SectionHeading title={section.title} />
             <div style={indexSectionStackStyle}>
                 <div style={indexYearRowStyle}>
-                    <ReadOnlyField label="Index Year" value={fields['Index Year']} derived />
+                    <ReadOnlyField label="Index Year (c_index_year)" value={fields['Index Year']} derived />
                     <ReadOnlyField label="Index Year Type (c_index_year_type_code)" value={indexYearType} derived />
-                    <ReadOnlyField label="Index Year Source" value={fields['Index Year Source']} derived />
+                    <ReadOnlyField label="Index Year Source (c_index_year_source_id)" value={fields['Index Year Source']} derived />
                 </div>
                 <div style={indexAddressRowStyle}>
-                    <ReadOnlyField label="Index Address" value={indexAddress} derived />
-                    <ReadOnlyField label="Index Address Type" value={fields['Index Address Type']} derived />
+                    <ReadOnlyField label="Index Address (c_index_addr_id)" value={indexAddress} derived />
+                    <ReadOnlyField label="Index Address Type (c_index_addr_type_code)" value={fields['Index Address Type']} derived />
                 </div>
             </div>
         </>
@@ -208,18 +208,18 @@ function renderActiveYearsSection(section: Section) {
                 <TimelineCard
                     title="在世始年 (c_fl_earliest_year)"
                     items={[
-                        ['公元年份', fields['在世始年']],
-                        ['年號', fields['在世始年號']],
-                        ['年號年', fields['在世始年號年']],
+                        ['公元年份 (c_fl_earliest_year)', fields['在世始年']],
+                        ['年號 (c_fl_ey_nh_code)', fields['在世始年號']],
+                        ['年號年 (c_fl_ey_nh_year)', fields['在世始年號年']],
                     ]}
                     note={fields['在世始年註']}
                 />
                 <TimelineCard
                     title="在世終年 (c_fl_latest_year)"
                     items={[
-                        ['公元年份', fields['在世終年']],
-                        ['年號', fields['在世終年號']],
-                        ['年號年', fields['在世終年號年']],
+                        ['公元年份 (c_fl_latest_year)', fields['在世終年']],
+                        ['年號 (c_fl_ly_nh_code)', fields['在世終年號']],
+                        ['年號年 (c_fl_ly_nh_year)', fields['在世終年號年']],
                     ]}
                     note={fields['在世終年註']}
                 />
@@ -234,6 +234,7 @@ function renderNotesSection(section: Section) {
     return (
         <>
             <SectionHeading title={section.title} />
+            <div style={notesLabelStyle}>備註 (c_notes)</div>
             <div style={notesBoxStyle}>{displayValue(fields['備註'])}</div>
         </>
     );
@@ -277,7 +278,7 @@ function TimelineCard({
                 {items.map(([label, value]) => (
                     <ReadOnlyField key={label} label={label} value={value} />
                 ))}
-                {note !== undefined ? <ReadOnlyField label="備註" value={note} fullWidth subtle /> : null}
+                {note !== undefined ? <ReadOnlyField label={`${title.includes('始') ? '備註 (c_fl_ey_notes)' : '備註 (c_fl_ly_notes)'}`} value={note} fullWidth subtle /> : null}
             </div>
         </div>
     );
@@ -486,7 +487,7 @@ const fieldLabelStyle: React.CSSProperties = {
     fontWeight: 700,
     color: '#667788',
     marginBottom: 6,
-    textAlign: 'center',
+    textAlign: 'left',
 };
 
 const fieldValueBoxStyle: React.CSSProperties = {
@@ -539,6 +540,14 @@ const notesBoxStyle: React.CSSProperties = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)',
+};
+
+const notesLabelStyle: React.CSSProperties = {
+    fontSize: '0.77rem',
+    fontWeight: 700,
+    color: '#667788',
+    marginBottom: 6,
+    textAlign: 'left',
 };
 
 const emptyStyle: React.CSSProperties = {

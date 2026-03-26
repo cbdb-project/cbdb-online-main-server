@@ -19,24 +19,14 @@ class PersonBrowserService {
         $perPage = max(1, min($perPage, 100));
         $page = max(1, $page);
 
-        $baseSelect = [
-            'BIOG_MAIN.c_personid',
-            'BIOG_MAIN.c_name_chn',
-            'BIOG_MAIN.c_name',
-            'DYNASTIES.c_dynasty_chn',
-            'BIOG_MAIN.c_index_year',
-            'ADDR_CODES.c_name_chn AS index_addr_chn',
-        ];
-
-        $query = DB::table('BIOG_MAIN')
-            ->select($baseSelect)
-            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
-            ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id');
+        $idQuery = DB::table('BIOG_MAIN')
+            ->select('BIOG_MAIN.c_personid');
 
         if ($q !== '') {
             if (ctype_digit($q)) {
                 // 純數字：精確 personid 查詢
-                $query->where('BIOG_MAIN.c_personid', '=', (int) $q);
+                $idQuery->where('BIOG_MAIN.c_personid', '=', (int) $q)
+                    ->orderBy('BIOG_MAIN.c_personid', 'ASC');
             } else {
                 // 先嘗試倒排索引
                 $ftsIds = DB::table('CBDB__NAME_FTS')
@@ -49,28 +39,70 @@ class PersonBrowserService {
                     ->toArray();
 
                 if (!empty($ftsIds)) {
-                    $query->whereIn('BIOG_MAIN.c_personid', $ftsIds);
+                    $idQuery->whereIn('BIOG_MAIN.c_personid', $ftsIds)
+                        ->orderByRaw($this->buildIdOrderCase('BIOG_MAIN.c_personid', $ftsIds));
                 } else {
                     // 回退：多欄位 LIKE 搜尋
-                    $query->where(function ($sub) use ($q) {
+                    $idQuery->where(function ($sub) use ($q) {
                         $sub->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
                             ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $q . '%')
                             ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
                             ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
                             ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $q . '%')
                             ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $q . '%');
-                    });
+                    })
+                        ->orderBy('BIOG_MAIN.c_personid', 'ASC');
                 }
             }
+        } else {
+            $idQuery->orderBy('BIOG_MAIN.c_personid', 'DESC');
         }
 
-        $query->groupBy('BIOG_MAIN.c_personid')
-            ->orderBy('BIOG_MAIN.c_personid', 'ASC');
+        $paginator = $idQuery->paginate($perPage, ['BIOG_MAIN.c_personid'], 'page', $page);
+        $pageIds = collect($paginator->items())
+            ->map(fn ($row) => (int) $row->c_personid)
+            ->values()
+            ->all();
 
-        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        if (empty($pageIds)) {
+            return [
+                'data' => [],
+                'pagination' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ];
+        }
+
+        $baseSelect = [
+            'BIOG_MAIN.c_personid',
+            'BIOG_MAIN.c_name_chn',
+            'BIOG_MAIN.c_name',
+            'DYNASTIES.c_dynasty_chn',
+            'BIOG_MAIN.c_index_year',
+            'ADDR_CODES.c_name_chn AS index_addr_chn',
+        ];
+
+        $rows = DB::table('BIOG_MAIN')
+            ->select($baseSelect)
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
+            ->whereIn('BIOG_MAIN.c_personid', $pageIds)
+            ->get()
+            ->map(fn ($row) => (array) $row)
+            ->values()
+            ->all();
+
+        $orderMap = array_flip($pageIds);
+        usort($rows, function (array $left, array $right) use ($orderMap) {
+            return ($orderMap[(int) $left['c_personid']] ?? PHP_INT_MAX)
+                <=> ($orderMap[(int) $right['c_personid']] ?? PHP_INT_MAX);
+        });
 
         return [
-            'data' => collect($paginator->items())->map(fn ($row) => (array) $row)->values()->all(),
+            'data' => $rows,
             'pagination' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
@@ -78,6 +110,26 @@ class PersonBrowserService {
                 'total' => $paginator->total(),
             ],
         ];
+    }
+
+    private function buildIdOrderCase(string $column, array $ids): string {
+        $normalized = array_values(array_map('intval', $ids));
+
+        if (empty($normalized)) {
+            return sprintf('%s ASC', $column);
+        }
+
+        $cases = [];
+        foreach ($normalized as $index => $id) {
+            $cases[] = sprintf('WHEN %d THEN %d', $id, $index);
+        }
+
+        return sprintf(
+            'CASE %s %s ELSE %d END',
+            $column,
+            implode(' ', $cases),
+            count($normalized)
+        );
     }
 
     /**
@@ -243,6 +295,8 @@ class PersonBrowserService {
                 'DYNASTIES.c_dynasty',
                 'ADDR_CODES.c_name_chn AS index_addr_chn',
                 'ADDR_CODES.c_name AS index_addr',
+                'INDEX_SOURCE_PERSON.c_name_chn AS index_year_source_name_chn',
+                'INDEX_SOURCE_PERSON.c_name AS index_year_source_name',
                 'ETH.c_name_chn AS c_ethnicity_chn',
                 'ETH.c_name AS c_ethnicity',
                 'CHR.c_choronym_chn',
@@ -250,6 +304,7 @@ class PersonBrowserService {
             ])
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
+            ->leftJoin('BIOG_MAIN AS INDEX_SOURCE_PERSON', 'INDEX_SOURCE_PERSON.c_personid', '=', 'BIOG_MAIN.c_index_year_source_id')
             ->leftJoin('ETHNICITY_TRIBE_CODES AS ETH', 'ETH.c_ethnicity_code', '=', 'BIOG_MAIN.c_ethnicity_code')
             ->leftJoin('CHORONYM_CODES AS CHR', 'CHR.c_choronym_code', '=', 'BIOG_MAIN.c_choronym_code')
             ->where('BIOG_MAIN.c_personid', $personId)
@@ -264,6 +319,32 @@ class PersonBrowserService {
         // 年號對照
         $birthNH = $this->lookupNianHao($row['c_by_nh_code'] ?? null);
         $deathNH = $this->lookupNianHao($row['c_dy_nh_code'] ?? null);
+        $flEarliestNH = $this->lookupNianHao($row['c_fl_ey_nh_code'] ?? null);
+        $flLatestNH = $this->lookupNianHao($row['c_fl_ly_nh_code'] ?? null);
+        $birthRange = $this->lookupYearRange($row['c_by_range'] ?? null);
+        $deathRange = $this->lookupYearRange($row['c_dy_range'] ?? null);
+        $deathAgeRange = $this->lookupYearRange($row['c_death_age_range'] ?? null);
+        $birthGanzhi = $this->lookupGanzhi($row['c_by_day_gz'] ?? null);
+        $deathGanzhi = $this->lookupGanzhi($row['c_dy_day_gz'] ?? null);
+        $household = $this->lookupHouseholdStatus($row['c_household_status_code'] ?? null);
+        $indexYearTypeCode = (string) ($row['c_index_year_type_code'] ?? '');
+        $simplifiedIndexYearTypeCode = $indexYearTypeCode !== '' ? substr($indexYearTypeCode, 0, 2) : '';
+        $indexYearTypeChn = '';
+        $indexYearTypeEng = '';
+        if ($simplifiedIndexYearTypeCode !== '') {
+            $indexYearTypeRow = DB::table('INDEXYEAR_TYPE_CODES')
+                ->where('c_index_year_type_code', $simplifiedIndexYearTypeCode)
+                ->first();
+            if ($indexYearTypeRow) {
+                $indexYearTypeChn = $indexYearTypeRow->c_index_year_type_hz ?? '';
+                $indexYearTypeEng = $indexYearTypeRow->c_index_year_type_desc ?? '';
+            }
+        }
+        $indexYearSource = '';
+        if (!empty($row['c_index_year_source_id'])) {
+            $sourceLabel = $row['index_year_source_name_chn'] ?: ($row['index_year_source_name'] ?? '');
+            $indexYearSource = trim($row['c_index_year_source_id'] . ' ' . $sourceLabel);
+        }
 
         return [
             'sections' => [
@@ -289,10 +370,21 @@ class PersonBrowserService {
                         ['label' => '出生年', 'value' => $row['c_birthyear'] ?? ''],
                         ['label' => '出生年號', 'value' => $birthNH],
                         ['label' => '出生年號年', 'value' => $row['c_by_nh_year'] ?? ''],
+                        ['label' => '出生年範圍', 'value' => $birthRange],
+                        ['label' => '出生閏月', 'value' => $this->intercalaryLabel($row['c_by_intercalary'] ?? null)],
+                        ['label' => '出生月', 'value' => $row['c_by_month'] ?? ''],
+                        ['label' => '出生日', 'value' => $row['c_by_day'] ?? ''],
+                        ['label' => '出生日時干支', 'value' => $birthGanzhi],
                         ['label' => '死亡年', 'value' => $row['c_deathyear'] ?? ''],
                         ['label' => '死亡年號', 'value' => $deathNH],
                         ['label' => '死亡年號年', 'value' => $row['c_dy_nh_year'] ?? ''],
+                        ['label' => '死亡年範圍', 'value' => $deathRange],
+                        ['label' => '死亡閏月', 'value' => $this->intercalaryLabel($row['c_dy_intercalary'] ?? null)],
+                        ['label' => '死亡月', 'value' => $row['c_dy_month'] ?? ''],
+                        ['label' => '死亡日', 'value' => $row['c_dy_day'] ?? ''],
+                        ['label' => '死亡日時干支', 'value' => $deathGanzhi],
                         ['label' => '享年', 'value' => $row['c_death_age'] ?? ''],
+                        ['label' => '享年範圍', 'value' => $deathAgeRange],
                     ],
                 ],
                 [
@@ -305,22 +397,40 @@ class PersonBrowserService {
                         ['label' => '族裔（英文）', 'value' => $row['c_ethnicity'] ?? ''],
                         ['label' => '郡望（中文）', 'value' => $row['c_choronym_chn'] ?? ''],
                         ['label' => '郡望（英文）', 'value' => $row['c_choronym'] ?? ''],
+                        ['label' => '戶籍（中文）', 'value' => $household['chn']],
+                        ['label' => '戶籍（英文）', 'value' => $household['eng']],
                     ],
                 ],
                 [
-                    'title' => '索引資料',
+                    'title' => '指數資料',
                     'fields' => [
                         ['label' => 'Index Year', 'value' => $row['c_index_year'] ?? ''],
-                        ['label' => 'Index Year Type', 'value' => $row['c_index_year_type_code'] ?? ''],
+                        ['label' => 'Index Year Type', 'value' => $indexYearTypeCode],
+                        ['label' => 'Index Year Type（中文）', 'value' => $indexYearTypeChn],
+                        ['label' => 'Index Year Type（英文）', 'value' => $indexYearTypeEng],
+                        ['label' => 'Index Year Source', 'value' => $indexYearSource],
                         ['label' => 'Index Address（中文）', 'value' => $row['index_addr_chn'] ?? ''],
                         ['label' => 'Index Address（英文）', 'value' => $row['index_addr'] ?? ''],
+                        ['label' => 'Index Address Type', 'value' => $row['c_index_addr_type_code'] ?? ''],
+                    ],
+                ],
+                [
+                    'title' => '活動年份',
+                    'fields' => [
+                        ['label' => '在世始年', 'value' => $row['c_fl_earliest_year'] ?? ''],
+                        ['label' => '在世始年號', 'value' => $flEarliestNH],
+                        ['label' => '在世始年號年', 'value' => $row['c_fl_ey_nh_year'] ?? ''],
+                        ['label' => '在世始年註', 'value' => $row['c_fl_ey_notes'] ?? ''],
+                        ['label' => '在世終年', 'value' => $row['c_fl_latest_year'] ?? ''],
+                        ['label' => '在世終年號', 'value' => $flLatestNH],
+                        ['label' => '在世終年號年', 'value' => $row['c_fl_ly_nh_year'] ?? ''],
+                        ['label' => '在世終年註', 'value' => $row['c_fl_ly_notes'] ?? ''],
                     ],
                 ],
                 [
                     'title' => '備註',
                     'fields' => [
                         ['label' => '備註', 'value' => $row['c_notes'] ?? ''],
-                        ['label' => '自傳', 'value' => $row['c_self_bio'] ?? ''],
                     ],
                 ],
             ],
@@ -749,5 +859,55 @@ class PersonBrowserService {
         }
 
         return ($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao ?? '');
+    }
+
+    private function lookupYearRange($code): string {
+        if (empty($code)) {
+            return '';
+        }
+
+        $row = DB::table('YEAR_RANGE_CODES')->where('c_range_code', $code)->first();
+        if (!$row) {
+            return (string) $code;
+        }
+
+        return trim(($row->c_approx_chn ?? '') . ' / ' . ($row->c_approx ?? ''), ' /');
+    }
+
+    private function lookupGanzhi($code): string {
+        if (empty($code)) {
+            return '';
+        }
+
+        $row = DB::table('GANZHI_CODES')->where('c_ganzhi_code', $code)->first();
+        if (!$row) {
+            return (string) $code;
+        }
+
+        return trim(($row->c_ganzhi_chn ?? '') . ' / ' . ($row->c_ganzhi_py ?? ''), ' /');
+    }
+
+    private function lookupHouseholdStatus($code): array {
+        if (empty($code)) {
+            return ['chn' => '', 'eng' => ''];
+        }
+
+        $row = DB::table('HOUSEHOLD_STATUS_CODES')->where('c_household_status_code', $code)->first();
+        if (!$row) {
+            return ['chn' => (string) $code, 'eng' => ''];
+        }
+
+        return [
+            'chn' => $row->c_household_status_desc_chn ?? '',
+            'eng' => $row->c_household_status_desc ?? '',
+        ];
+    }
+
+    private function intercalaryLabel($value): string {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return ((int) $value === 1) ? '閏月' : '平月';
     }
 }

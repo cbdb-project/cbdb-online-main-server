@@ -23,14 +23,16 @@ export default function BasicInfoView({ sections }: Props) {
         <div style={containerStyle}>
             {sections.map((section, i) => (
                 <div key={i} style={sectionStyle}>
-                    <h4 style={sectionTitleStyle}>{section.title}</h4>
-                    <div style={fieldsGridStyle}>
+                    <div style={sectionHeaderStyle}>
+                        <h4 style={sectionTitleStyle}>{section.title}</h4>
+                    </div>
+                    <div style={section.title === '備註' ? fullWidthGridStyle : fieldsGridStyle}>
                         {section.fields.map((f, j) => (
-                            <div key={j} style={fieldRowStyle}>
-                                <span style={labelStyle}>{f.label}</span>
-                                <span style={valueStyle}>
+                            <div key={j} style={fieldCardStyle(f.label)}>
+                                <div style={labelStyle}>{f.label}</div>
+                                <div style={valueStyle}>
                                     {f.value != null && f.value !== '' ? String(f.value) : '—'}
-                                </span>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -48,44 +50,69 @@ const containerStyle: React.CSSProperties = {
 
 const sectionStyle: React.CSSProperties = {
     backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
-    borderRadius: 6,
+    border: '1px solid #d8dde3',
+    borderRadius: 10,
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     overflow: 'hidden',
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+    padding: '12px 16px 0',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
     margin: 0,
-    padding: '8px 14px',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    backgroundColor: '#f8f9fa',
-    borderBottom: '1px solid #dee2e6',
+    fontSize: '1rem',
+    fontWeight: 700,
+    color: '#22313f',
 };
 
 const fieldsGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: 0,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+    padding: 16,
 };
 
-const fieldRowStyle: React.CSSProperties = {
-    display: 'flex',
-    padding: '6px 14px',
-    borderBottom: '1px solid #f0f0f0',
-    fontSize: '0.8125rem',
-    gap: 8,
+const fullWidthGridStyle: React.CSSProperties = {
+    ...fieldsGridStyle,
+    gridTemplateColumns: '1fr',
+};
+
+const fieldCardBaseStyle: React.CSSProperties = {
+    border: '1px solid #e5e9ef',
+    borderRadius: 8,
+    backgroundColor: '#fafbfd',
+    padding: '12px 14px',
+    minHeight: 74,
 };
 
 const labelStyle: React.CSSProperties = {
-    color: '#6c757d',
-    minWidth: 120,
-    flexShrink: 0,
+    color: '#6b7280',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+    marginBottom: 6,
 };
 
 const valueStyle: React.CSSProperties = {
-    color: '#212529',
+    color: '#1f2937',
+    fontSize: '0.95rem',
+    lineHeight: 1.5,
     wordBreak: 'break-word',
 };
+
+function fieldCardStyle(label: string): React.CSSProperties {
+    if (label.includes('註') || label.includes('備註')) {
+        return {
+            ...fieldCardBaseStyle,
+            gridColumn: '1 / -1',
+            backgroundColor: '#fffdf7',
+        };
+    }
+
+    return fieldCardBaseStyle;
+}
 
 const emptyStyle: React.CSSProperties = {
     padding: 24,

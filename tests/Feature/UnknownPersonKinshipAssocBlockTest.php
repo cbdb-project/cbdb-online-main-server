@@ -145,14 +145,7 @@ class UnknownPersonKinshipAssocBlockTest extends TestCase {
         // 非「未詳」人物不應被此驗證攔截（會因為 Repository 找不到記錄而失敗，但不是未詳錯誤）
         $admin = $this->makeAdmin();
 
-        // Mock BiogMainRepository 以避免資料庫操作
-        $this->app->instance(BiogMainRepository::class, \Mockery::mock(BiogMainRepository::class, function ($mock) {
-            $mock->shouldReceive('kinshipStoreById')->andReturn([
-                'c_personid' => 123,
-                'c_kin_id' => 1,
-                'c_kin_code' => 1,
-            ]);
-        }));
+        $this->mockKinshipRepository();
 
         $response = $this->actingAs($admin)->post(
             route('basicinformation.kinship.store', ['basicinformation' => 123]),
@@ -250,20 +243,7 @@ class UnknownPersonKinshipAssocBlockTest extends TestCase {
     public function assoc_store_allows_non_unknown_person(): void {
         $admin = $this->makeAdmin();
 
-        // Mock BiogMainRepository 以避免資料庫操作
-        $this->app->instance(BiogMainRepository::class, \Mockery::mock(BiogMainRepository::class, function ($mock) {
-            $mock->shouldReceive('assocStoreById')->andReturn([
-                'c_personid' => 123,
-                'c_assoc_code' => 1,
-                'c_assoc_id' => 1,
-                'c_kin_code' => 0,
-                'c_kin_id' => 0,
-                'c_assoc_kin_code' => 0,
-                'c_assoc_kin_id' => 0,
-                'c_text_title' => '',
-                'c_assoc_first_year' => '',
-            ]);
-        }));
+        $this->mockAssocRepository();
 
         $response = $this->actingAs($admin)->post(
             route('basicinformation.assoc.store', ['basicinformation' => 123]),
@@ -277,5 +257,31 @@ class UnknownPersonKinshipAssocBlockTest extends TestCase {
 
         // 不應顯示「未詳」錯誤訊息
         $this->assertStringNotContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    private function mockKinshipRepository(): void {
+        $this->app->instance(BiogMainRepository::class, \Mockery::mock(BiogMainRepository::class, function ($mock) {
+            $mock->shouldReceive('kinshipStoreById')->andReturn([
+                'c_personid' => 123,
+                'c_kin_id' => 1,
+                'c_kin_code' => 1,
+            ]);
+        }));
+    }
+
+    private function mockAssocRepository(): void {
+        $this->app->instance(BiogMainRepository::class, \Mockery::mock(BiogMainRepository::class, function ($mock) {
+            $mock->shouldReceive('assocStoreById')->andReturn([
+                'c_personid' => 123,
+                'c_assoc_code' => 1,
+                'c_assoc_id' => 1,
+                'c_kin_code' => 0,
+                'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0,
+                'c_assoc_kin_id' => 0,
+                'c_text_title' => '',
+                'c_assoc_first_year' => '',
+            ]);
+        }));
     }
 }

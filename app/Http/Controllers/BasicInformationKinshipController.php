@@ -231,8 +231,11 @@ class BasicInformationKinshipController extends Controller {
             return redirect()->back();
         }
 
-        $kinId = ($request->input('c_kin_id') == -999) ? 0 : (int) ($request->input('c_kin_id') ?? -1);
-        if ($kinId === 0) {
+        $request->merge([
+            'c_kin_id' => ($request->input('c_kin_id') == -999) ? '0' : ($request->input('c_kin_id') ?? '0'),
+        ]);
+
+        if ((int) $request->input('c_kin_id') === 0) {
             flash('不能將「未詳」人物加為親屬。', 'error');
 
             return redirect()->back();

@@ -13,6 +13,9 @@ on:
       - main
       - develop
 
+permissions:
+  contents: read
+
 jobs:
   cs-check:
     runs-on: ubuntu-latest

@@ -1235,14 +1235,6 @@ function applyDerivedFields(next: FormState): FormState {
     updated.c_name_proper = joinWithSpace(updated.c_mingzi_proper, updated.c_surname_proper);
     updated.c_name_rm = joinWithSpace(updated.c_mingzi_rm, updated.c_surname_rm);
 
-    const birthYear = parseInteger(updated.c_birthyear);
-    const deathYear = parseInteger(updated.c_deathyear);
-    if (birthYear !== null && deathYear !== null && deathYear >= birthYear) {
-        const deathAge = deathYear - birthYear + 1;
-        updated.c_death_age = String(deathAge);
-        updated.c_index_year = String(deathAge > 60 ? birthYear + 60 : deathYear);
-    }
-
     return updated;
 }
 
@@ -1428,16 +1420,6 @@ function findMatchingOption(options: EnumOption[], query: string): EnumOption | 
 
 function fieldMap(section: Section): Record<string, FieldValue> {
     return Object.fromEntries(section.fields.map((field) => [field.label, field.value]));
-}
-
-function parseInteger(value?: string): number | null {
-    if (value == null || value.trim() === '') {
-        return null;
-    }
-
-    const parsed = Number.parseInt(value, 10);
-
-    return Number.isNaN(parsed) ? null : parsed;
 }
 
 function displayValue(value: FieldValue) {

@@ -742,6 +742,7 @@ class PersonBrowserTest extends TestCase {
                 ->where('initialPersonId', null)
                 ->where('initialKeyword', '')
                 ->where('initialTab', 'basic_info')
+                ->where('initialPage', 1)
                 ->has('tabKeys', 13)
         );
     }
@@ -749,7 +750,7 @@ class PersonBrowserTest extends TestCase {
     #[Test]
     public function test_person_browser_accepts_initial_query_params(): void {
         $response = $this->actingAs($this->user)->get(
-            route('app.person-browser.index') . '?person_id=1&keyword=李白&tab=alt_names'
+            route('app.person-browser.index') . '?person_id=1&keyword=李白&tab=alt_names&page=3'
         );
 
         $response->assertOk();
@@ -759,6 +760,7 @@ class PersonBrowserTest extends TestCase {
                 ->where('initialPersonId', 1)
                 ->where('initialKeyword', '李白')
                 ->where('initialTab', 'alt_names')
+                ->where('initialPage', 3)
         );
     }
 

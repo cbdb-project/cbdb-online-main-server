@@ -149,6 +149,12 @@ class BasicInformationAssocController extends Controller {
             return redirect()->back();
         }
 
+        if ((int) $request->input('c_assoc_id') === 0) {
+            flash('不能將「未詳」人物加為社會關係對象。', 'error');
+
+            return redirect()->back();
+        }
+
         // 數據預處理：分割 c_inst_code
         // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
         $temp = explode("-", $request->input('c_inst_code', ''));
@@ -275,6 +281,12 @@ class BasicInformationAssocController extends Controller {
 
         if ((int) $id === 0) {
             flash('「未詳」人物不能修改社會關係記錄。', 'error');
+
+            return redirect()->back();
+        }
+
+        if ((int) $request->input('c_assoc_id') === 0) {
+            flash('不能將「未詳」人物加為社會關係對象。', 'error');
 
             return redirect()->back();
         }
@@ -425,6 +437,12 @@ class BasicInformationAssocController extends Controller {
 
         if ((int) $id === 0) {
             flash('「未詳」人物不能修改社會關係記錄。', 'error');
+
+            return redirect()->back();
+        }
+
+        if ((int) $request->input('c_assoc_id') === 0) {
+            flash('不能將「未詳」人物加為社會關係對象。', 'error');
 
             return redirect()->back();
         }

@@ -284,4 +284,156 @@ class UnknownPersonKinshipAssocBlockTest extends TestCase {
             ]);
         }));
     }
+
+    // =====================================================================
+    // 雙向限制：其他人不能以「未詳」人物為親屬目標
+    // =====================================================================
+
+    #[Test]
+    public function kinship_store_blocks_unknown_target_kin_direct(): void {
+        $admin = $this->makeAdmin();
+
+        $response = $this->actingAs($admin)->post(
+            route('basicinformation.kinship.store', ['basicinformation' => 123]),
+            [
+                'c_kin_id' => 0,
+                'c_kin_code' => 1,
+                'c_source' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function kinship_store_blocks_unknown_target_kin_proposal(): void {
+        $user = $this->makeActiveUser();
+
+        $response = $this->actingAs($user)->post(
+            route('basicinformation.kinship.store', ['basicinformation' => 123]),
+            [
+                'c_kin_id' => 0,
+                'c_kin_code' => 1,
+                'c_source' => 0,
+                'action' => 'proposal',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function kinship_update_query_blocks_unknown_target_kin_direct(): void {
+        $admin = $this->makeAdmin();
+
+        $response = $this->actingAs($admin)->patch(
+            route('basicinformation.kinship.update.query', ['id' => 123])
+            . '?c_personid=123&c_kin_id=1&c_kin_code=1',
+            [
+                'c_kin_id' => 0,
+                'c_kin_code' => 1,
+                'c_source' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function kinship_update_query_blocks_unknown_target_kin_proposal(): void {
+        $user = $this->makeActiveUser();
+
+        $response = $this->actingAs($user)->patch(
+            route('basicinformation.kinship.update.query', ['id' => 123])
+            . '?c_personid=123&c_kin_id=1&c_kin_code=1',
+            [
+                'c_kin_id' => 0,
+                'c_kin_code' => 1,
+                'c_source' => 0,
+                'action' => 'proposal',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function assoc_store_blocks_unknown_target_assoc_direct(): void {
+        $admin = $this->makeAdmin();
+
+        $response = $this->actingAs($admin)->post(
+            route('basicinformation.assoc.store', ['basicinformation' => 123]),
+            [
+                'c_assoc_code' => 1,
+                'c_assoc_id' => 0,
+                'c_inst_code' => '0',
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function assoc_store_blocks_unknown_target_assoc_proposal(): void {
+        $user = $this->makeActiveUser();
+
+        $response = $this->actingAs($user)->post(
+            route('basicinformation.assoc.store', ['basicinformation' => 123]),
+            [
+                'c_assoc_code' => 1,
+                'c_assoc_id' => 0,
+                'c_inst_code' => '0',
+                'action' => 'proposal',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function assoc_update_query_blocks_unknown_target_assoc_direct(): void {
+        $admin = $this->makeAdmin();
+
+        $response = $this->actingAs($admin)->patch(
+            route('basicinformation.assoc.update.query', ['id' => 123])
+            . '?c_personid=123&c_assoc_code=1&c_assoc_id=1',
+            [
+                'c_assoc_code' => 1,
+                'c_assoc_id' => 0,
+                'c_inst_code' => '0',
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
+
+    #[Test]
+    public function assoc_update_query_blocks_unknown_target_assoc_proposal(): void {
+        $user = $this->makeActiveUser();
+
+        $response = $this->actingAs($user)->patch(
+            route('basicinformation.assoc.update.query', ['id' => 123])
+            . '?c_personid=123&c_assoc_code=1&c_assoc_id=1',
+            [
+                'c_assoc_code' => 1,
+                'c_assoc_id' => 0,
+                'c_inst_code' => '0',
+                'action' => 'proposal',
+            ]
+        );
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('未詳', session('flash_notification.0.message') ?? '');
+    }
 }

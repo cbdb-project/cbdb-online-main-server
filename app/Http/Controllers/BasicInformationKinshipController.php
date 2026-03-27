@@ -128,6 +128,12 @@ class BasicInformationKinshipController extends Controller {
             'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
         ]);
 
+        if ((int) $request->input('c_kin_id') === 0) {
+            flash('不能將「未詳」人物加為親屬。', 'error');
+
+            return redirect()->back();
+        }
+
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
@@ -221,6 +227,13 @@ class BasicInformationKinshipController extends Controller {
 
         if ((int) $id === 0) {
             flash('「未詳」人物不能修改親屬記錄。', 'error');
+
+            return redirect()->back();
+        }
+
+        $kinId = ($request->input('c_kin_id') == -999) ? 0 : (int) ($request->input('c_kin_id') ?? -1);
+        if ($kinId === 0) {
+            flash('不能將「未詳」人物加為親屬。', 'error');
 
             return redirect()->back();
         }
@@ -354,6 +367,12 @@ class BasicInformationKinshipController extends Controller {
             'c_kin_id' => ($request->input('c_kin_id') == -999) ? '0' : ($request->input('c_kin_id') ?? '0'),
             'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
         ]);
+
+        if ((int) $request->input('c_kin_id') === 0) {
+            flash('不能將「未詳」人物加為親屬。', 'error');
+
+            return redirect()->back();
+        }
 
         // 檢查動作類型
         $action = $request->input('action', 'save');

@@ -278,9 +278,9 @@ class PostingAutofillService {
             ]);
         }
 
-        // 1. 官名匹配（posting_str）
-        if (!empty($aiData['posting_str'])) {
-            $officeMatch = $this->fuzzyMatchOffice($aiData['posting_str'], $effectiveDynasty);
+        // 1. 官名匹配（title_str）
+        if (!empty($aiData['title_str'])) {
+            $officeMatch = $this->fuzzyMatchOffice($aiData['title_str'], $effectiveDynasty);
             if ($officeMatch) {
                 // 根據匹配類型決定是確認匹配還是建議
                 if ($officeMatch['match_type'] === 'exact') {
@@ -288,22 +288,22 @@ class PostingAutofillService {
                     $matched['c_office_id'] = [
                         'value' => $officeMatch['id'],
                         'text' => $officeMatch['text'],
-                        'ai_extracted' => $aiData['posting_str'],
+                        'ai_extracted' => $aiData['title_str'],
                     ];
                 } else {
                     // 模糊匹配 → 黃色（建議）
                     $suggested['c_office_id'] = [
                         'value' => $officeMatch['id'],
                         'text' => $officeMatch['text'],
-                        'ai_extracted' => $aiData['posting_str'],
-                        'search_query' => $aiData['posting_str'],
+                        'ai_extracted' => $aiData['title_str'],
+                        'search_query' => $aiData['title_str'],
                     ];
                 }
             } else {
                 // 完全找不到 → 黃色（建議）
                 $suggested['c_office_id'] = [
-                    'ai_extracted' => $aiData['posting_str'],
-                    'search_query' => $aiData['posting_str'],
+                    'ai_extracted' => $aiData['title_str'],
+                    'search_query' => $aiData['title_str'],
                 ];
             }
         } else {
@@ -920,7 +920,7 @@ class PostingAutofillService {
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'posting_str' => ['type' => 'string'],
+                            'title_str' => ['type' => 'string'],
                             'addr_str' => [
                                 'type' => ['object', 'null'],
                                 'properties' => [
@@ -952,7 +952,7 @@ class PostingAutofillService {
                             'c_assume_office_code' => ['type' => ['integer', 'null']],
                         ],
                         'required' => [
-                            'posting_str',
+                            'title_str',
                             'addr_str',
                             'c_firstyear',
                             'c_fy_nh_code',

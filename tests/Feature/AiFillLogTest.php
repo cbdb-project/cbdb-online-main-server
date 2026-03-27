@@ -77,7 +77,7 @@ class AiFillLogTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知縣',
+                                        'title_str' => '知縣',
                                         'addr_str' => null,
                                         'c_firstyear' => 1723,
                                         'c_fy_nh_code' => '雍正',
@@ -149,7 +149,7 @@ class AiFillLogTest extends TestCase {
             'route_name' => 'basicinformation.offices.create',
             'route_url' => '/basicinformation/1/offices/create',
             'source_text' => '雍正元年正月初三知新城縣',
-            'ai_raw' => json_encode(['posting_str' => '知縣']),
+            'ai_raw' => json_encode(['title_str' => '知縣']),
             'ai_matched' => json_encode([
                 'matched_fields' => ['c_firstyear' => ['value' => 1723, 'text' => '1723']],
                 'suggested_fields' => [],

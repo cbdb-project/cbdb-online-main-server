@@ -1064,7 +1064,7 @@ class PersonBrowserService {
 
             'c_index_year' => $this->basicInfoFormField('c_index_year', 'Index Year (c_index_year)', $row['c_index_year'] ?? '', 'number', false, [
                 'derived' => true,
-                'send_on_save' => true,
+                'send_on_save' => false,
             ]),
             'c_index_year_type_code' => $this->basicInfoFormField('c_index_year_type_code', 'Index Year Type (c_index_year_type_code)', $indexYearTypeCode, 'text', false, [
                 'derived' => true,

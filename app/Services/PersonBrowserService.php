@@ -620,7 +620,7 @@ class PersonBrowserService {
         $kinIds = $rows->pluck('c_kin_id')->filter()->unique()->values()->all();
         $assocIds = $rows->pluck('c_assoc_id')->filter()->unique()->values()->all();
         $allPersonIds = array_unique(array_merge($kinIds, $assocIds));
-        $personNames = [];
+        $personNames = collect();
         if (!empty($allPersonIds)) {
             $personNames = DB::table('BIOG_MAIN')
                 ->select(['c_personid', 'c_name_chn', 'c_name'])
@@ -631,7 +631,7 @@ class PersonBrowserService {
 
         // 查找親屬關係描述
         $kinCodes = $rows->pluck('c_kin_code')->filter()->unique()->values()->all();
-        $kinLabels = [];
+        $kinLabels = collect();
         if (!empty($kinCodes)) {
             $kinLabels = DB::table('KINSHIP_CODES')
                 ->select(['c_kincode', 'c_kinrel_chn', 'c_kinrel'])
@@ -642,7 +642,7 @@ class PersonBrowserService {
 
         // 查找社會關係描述
         $assocCodes = $rows->pluck('c_assoc_code')->filter()->unique()->values()->all();
-        $assocLabels = [];
+        $assocLabels = collect();
         if (!empty($assocCodes)) {
             $assocLabels = DB::table('ASSOC_CODES')
                 ->select(['c_assoc_code', 'c_assoc_desc_chn', 'c_assoc_desc'])
@@ -656,8 +656,8 @@ class PersonBrowserService {
             'items' => $rows->map(function ($r) use ($personNames, $kinLabels, $assocLabels) {
                 $kinSummary = null;
                 if (!empty($r->c_kin_id)) {
-                    $kinPerson = $personNames[$r->c_kin_id] ?? null;
-                    $kinLabel = $kinLabels[$r->c_kin_code] ?? null;
+                    $kinPerson = $personNames->get($r->c_kin_id);
+                    $kinLabel = $kinLabels->get($r->c_kin_code);
                     $parts = [];
                     if ($kinLabel) {
                         $parts[] = $kinLabel->c_kinrel_chn ?? $kinLabel->c_kinrel ?? '';
@@ -670,8 +670,8 @@ class PersonBrowserService {
 
                 $assocSummary = null;
                 if (!empty($r->c_assoc_id)) {
-                    $assocPerson = $personNames[$r->c_assoc_id] ?? null;
-                    $assocLabel = $assocLabels[$r->c_assoc_code] ?? null;
+                    $assocPerson = $personNames->get($r->c_assoc_id);
+                    $assocLabel = $assocLabels->get($r->c_assoc_code);
                     $parts = [];
                     if ($assocLabel) {
                         $parts[] = $assocLabel->c_assoc_desc_chn ?? $assocLabel->c_assoc_desc ?? '';

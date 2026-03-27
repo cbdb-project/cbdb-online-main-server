@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface InstitutionItem {
     role_code: number | null;
@@ -32,26 +33,8 @@ export default function InstitutionsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="機構"
-                        value={
-                            item.inst_name_chn
-                                ? item.inst_name
-                                    ? `${item.inst_name_chn}（${item.inst_name}）`
-                                    : item.inst_name_chn
-                                : item.inst_name
-                        }
-                    />
-                    <MetaRow
-                        label="角色"
-                        value={
-                            item.role_chn
-                                ? item.role
-                                    ? `${item.role_chn}（${item.role}）`
-                                    : item.role_chn
-                                : item.role
-                        }
-                    />
+                    <MetaRow label="機構" value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
+                    <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />

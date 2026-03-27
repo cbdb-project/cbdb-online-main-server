@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 
 interface StatusItem {
     sequence: number | null;
@@ -32,16 +33,7 @@ export default function StatusesTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="身份"
-                        value={
-                            item.status_chn
-                                ? item.status
-                                    ? `${item.status_chn}（${item.status}）`
-                                    : item.status_chn
-                                : item.status
-                        }
-                    />
+                    <MetaRow label="身份" value={formatBilingualLabel(item.status_chn, item.status)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
@@ -51,13 +43,6 @@ export default function StatusesTab({ data }: Props) {
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
     );
-}
-
-function formatYearRange(first: number | null, last: number | null): string | null {
-    if (first && last) return `${first}–${last}`;
-    if (first) return `${first}–`;
-    if (last) return `–${last}`;
-    return null;
 }
 
 const containerStyle: React.CSSProperties = {

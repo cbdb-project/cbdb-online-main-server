@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface EntryItem {
     sequence: number | null;
@@ -32,16 +33,7 @@ export default function EntriesTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="入仕方式"
-                        value={
-                            item.entry_desc_chn
-                                ? item.entry_desc
-                                    ? `${item.entry_desc_chn}（${item.entry_desc}）`
-                                    : item.entry_desc_chn
-                                : item.entry_desc
-                        }
-                    />
+                    <MetaRow label="入仕方式" value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="親屬關聯" value={item.kin_summary} />
                     <MetaRow label="社會關聯" value={item.assoc_summary} />

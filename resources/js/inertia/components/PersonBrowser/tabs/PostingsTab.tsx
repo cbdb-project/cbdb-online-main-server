@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface PostingItem {
     sequence: number | null;
@@ -36,16 +37,7 @@ export default function PostingsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="官名"
-                        value={
-                            item.office_chn
-                                ? item.office
-                                    ? `${item.office_chn}（${item.office}）`
-                                    : item.office_chn
-                                : item.office
-                        }
-                    />
+                    <MetaRow label="官名" value={formatBilingualLabel(item.office_chn, item.office)} />
                     <MetaRow label="任期" value={item.tenure_summary} />
                     <MetaRow label="地址" value={item.address_summary} />
                     <MetaRow label="出處" value={item.source_id} />

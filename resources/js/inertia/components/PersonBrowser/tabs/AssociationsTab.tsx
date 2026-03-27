@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
 
 interface AssociationItem {
     assoc_code: number | null;
@@ -34,16 +35,7 @@ export default function AssociationsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="關係"
-                        value={
-                            item.assoc_desc_chn
-                                ? item.assoc_desc
-                                    ? `${item.assoc_desc_chn}（${item.assoc_desc}）`
-                                    : item.assoc_desc_chn
-                                : item.assoc_desc
-                        }
-                    />
+                    <MetaRow label="關係" value={formatBilingualLabel(item.assoc_desc_chn, item.assoc_desc)} />
                     <MetaRow
                         label="關聯人物"
                         value={formatPersonLabel(item.assoc_person_id, item.assoc_person_name_chn, item.assoc_person_name)}
@@ -57,22 +49,6 @@ export default function AssociationsTab({ data }: Props) {
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
     );
-}
-
-function formatPersonLabel(id: number | null, nameChn: string | null, name: string | null): string | null {
-    if (!id) return null;
-    const parts: string[] = [];
-    if (nameChn) parts.push(nameChn);
-    if (name) parts.push(name);
-    const label = parts.join(' / ') || String(id);
-    return `[${id}] ${label}`;
-}
-
-function formatYearRange(first: number | null, last: number | null): string | null {
-    if (first && last) return `${first}–${last}`;
-    if (first) return `${first}–`;
-    if (last) return `–${last}`;
-    return null;
 }
 
 const containerStyle: React.CSSProperties = {

@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface TextItem {
     text_id: number | null;
@@ -30,27 +31,9 @@ export default function TextsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="著作"
-                        value={
-                            item.title_chn
-                                ? item.title
-                                    ? `${item.title_chn}（${item.title}）`
-                                    : item.title_chn
-                                : item.title
-                        }
-                    />
+                    <MetaRow label="著作" value={formatBilingualLabel(item.title_chn, item.title)} />
                     <MetaRow label="年份" value={item.year} />
-                    <MetaRow
-                        label="角色"
-                        value={
-                            item.role_chn
-                                ? item.role
-                                    ? `${item.role_chn}（${item.role}）`
-                                    : item.role_chn
-                                : item.role
-                        }
-                    />
+                    <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

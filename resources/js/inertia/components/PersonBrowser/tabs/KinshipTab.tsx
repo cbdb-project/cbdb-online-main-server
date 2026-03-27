@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel, formatPersonLabel } from '../shared/formatters';
 
 interface KinshipItem {
     kin_code: number | null;
@@ -36,16 +37,7 @@ export default function KinshipTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="關係"
-                        value={
-                            item.relation_chn
-                                ? item.relation
-                                    ? `${item.relation_chn}（${item.relation}）`
-                                    : item.relation_chn
-                                : item.relation
-                        }
-                    />
+                    <MetaRow label="關係" value={formatBilingualLabel(item.relation_chn, item.relation)} />
                     <MetaRow
                         label="親屬"
                         value={formatPersonLabel(item.kin_person_id, item.kin_person_name_chn, item.kin_person_name)}
@@ -58,15 +50,6 @@ export default function KinshipTab({ data }: Props) {
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
     );
-}
-
-function formatPersonLabel(id: number | null, nameChn: string | null, name: string | null): string | null {
-    if (!id) return null;
-    const parts: string[] = [];
-    if (nameChn) parts.push(nameChn);
-    if (name) parts.push(name);
-    const label = parts.join(' / ') || String(id);
-    return `[${id}] ${label}`;
 }
 
 const containerStyle: React.CSSProperties = {

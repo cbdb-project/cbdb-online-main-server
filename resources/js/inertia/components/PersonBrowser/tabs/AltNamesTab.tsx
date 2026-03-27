@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface AltNameItem {
     sequence: number | null;
@@ -32,26 +33,8 @@ export default function AltNamesTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="別名"
-                        value={
-                            item.name_chn
-                                ? item.name
-                                    ? `${item.name_chn}（${item.name}）`
-                                    : item.name_chn
-                                : item.name
-                        }
-                    />
-                    <MetaRow
-                        label="類型"
-                        value={
-                            item.type_label_chn
-                                ? item.type_label
-                                    ? `${item.type_label_chn}（${item.type_label}）`
-                                    : item.type_label_chn
-                                : item.type_label
-                        }
-                    />
+                    <MetaRow label="別名" value={formatBilingualLabel(item.name_chn, item.name)} />
+                    <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />

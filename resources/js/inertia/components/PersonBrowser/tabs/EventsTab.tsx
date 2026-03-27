@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface EventItem {
     sequence: number | null;
@@ -34,16 +35,7 @@ export default function EventsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="事件"
-                        value={
-                            item.event_chn
-                                ? item.event
-                                    ? `${item.event_chn}（${item.event}）`
-                                    : item.event_chn
-                                : item.event
-                        }
-                    />
+                    <MetaRow label="事件" value={formatBilingualLabel(item.event_chn, item.event)} />
                     <MetaRow label="日期" value={item.date_summary} />
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />

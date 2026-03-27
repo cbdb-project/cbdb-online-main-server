@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface SourceItem {
     text_id: number | null;
@@ -31,16 +32,7 @@ export default function SourcesTab({ data }: Props) {
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
                     <div style={headerStyle}>
-                        <MetaRow
-                            label="書名"
-                            value={
-                                item.title_chn
-                                    ? item.title
-                                        ? `${item.title_chn}（${item.title}）`
-                                        : item.title_chn
-                                    : item.title
-                            }
-                        />
+                        <MetaRow label="書名" value={formatBilingualLabel(item.title_chn, item.title)} />
                         <div style={badgesStyle}>
                             {item.is_main_source && <span style={badgeMainStyle}>主出處</span>}
                             {item.is_self_bio && <span style={badgeBioStyle}>自傳</span>}

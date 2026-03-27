@@ -4,6 +4,7 @@ import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
+import { formatBilingualLabel } from '../shared/formatters';
 
 interface PossessionItem {
     act_code: number | null;
@@ -33,26 +34,8 @@ export default function PossessionsTab({ data }: Props) {
         <div style={containerStyle}>
             {pageItems.map((item, i) => (
                 <TabCard key={i}>
-                    <MetaRow
-                        label="財產"
-                        value={
-                            item.desc_chn
-                                ? item.desc
-                                    ? `${item.desc_chn}（${item.desc}）`
-                                    : item.desc_chn
-                                : item.desc
-                        }
-                    />
-                    <MetaRow
-                        label="行為"
-                        value={
-                            item.act_chn
-                                ? item.act
-                                    ? `${item.act_chn}（${item.act}）`
-                                    : item.act_chn
-                                : item.act
-                        }
-                    />
+                    <MetaRow label="財產" value={formatBilingualLabel(item.desc_chn, item.desc)} />
+                    <MetaRow label="行為" value={formatBilingualLabel(item.act_chn, item.act)} />
                     <MetaRow label="數量" value={item.quantity} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="出處" value={item.source_id} />

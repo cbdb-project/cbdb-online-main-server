@@ -12,13 +12,15 @@ class MutationHandlerRegistry {
         BiogMainMutationHandler $biogMainHandler,
         AltnameMutationHandler $altnameHandler,
         PossessionMutationHandler $possessionHandler,
-        SourceMutationHandler $sourceHandler
+        SourceMutationHandler $sourceHandler,
+        NianHaoMutationHandler $nianHaoHandler
     ) {
         $this->handlers = [
             $biogMainHandler,
             $altnameHandler,
             $possessionHandler,
             $sourceHandler,
+            $nianHaoHandler,
         ];
     }
 

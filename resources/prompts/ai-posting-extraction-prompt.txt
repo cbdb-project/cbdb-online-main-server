@@ -14,7 +14,7 @@ Return exactly one JSON object with the following structure:
 {
   "postings": [
     {
-      "posting_str": "",
+      "title_str": "",
       "addr_str": {
         "full_text": "",
         "parent": null,
@@ -50,7 +50,7 @@ Return exactly one JSON object with the following structure:
 * If a value is **not mentioned, unknown, or cannot be reliably inferred**, set it to **`null`**.
 * The only exception is:
 
-  * `posting_str` is **required** and must be a non-empty string for each posting.
+  * `title_str` is **required** and must be a non-empty string for each posting.
 
 If **no posting information** can be extracted at all, return:
 
@@ -66,13 +66,17 @@ If **no posting information** can be extracted at all, return:
 
 For each posting in `postings`, fill the following fields:
 
-1. **posting_str** (required)
+1. **title_str** (required)
 
    * Type: string (never `null`)
-   * The official title in **traditional Chinese**.
+   * The official title (官職名稱) in **traditional Chinese** — **only the title itself, nothing else**.
    * Normalize aberrant, abbreviated, or informal titles to the **standard official title** when possible.
    * Do **not** include appointment markers like 守、權、試、兼、贈、封, etc.; those are encoded only in `c_appt_code`.
-   * Do **not** include any address information; those are encoded only in `addr_str`.
+   * Do **not** include any address or location information (地名); those are encoded only in `addr_str`.
+   * In particular, when the source text contains a pattern like `<地名><官職>` (e.g., "康定軍主簿"), you must **separate** the place name into `addr_str` and put **only** the title in `title_str`.
+     - Example: "康定軍主簿" → `"title_str": "主簿"`, `"addr_str": {"full_text": "康定軍", ...}`
+     - Example: "奉國軍簽判" → `"title_str": "簽判"`, `"addr_str": {"full_text": "奉國軍", ...}`
+     - Example: "泉州知州" → `"title_str": "知州"`, `"addr_str": {"full_text": "泉州", ...}`
 
 2. **addr_str**
 
@@ -114,6 +118,13 @@ For each posting in `postings`, fill the following fields:
         → Example: "新城縣" → `"name": "新城", "admin_type": "縣"`
         → Example: "保定府" → `"name": "保定", "admin_type": "府"`
         → Example: "西安府" → `"name": "西安", "admin_type": "府"`
+      * For names ending with **軍** or **監** (military/supervisory administrative units):
+        → **ALWAYS** extract the admin suffix separately
+        → Example: "康定軍" → `"name": "康定", "admin_type": "軍"`
+        → Example: "奉國軍" → `"name": "奉國", "admin_type": "軍"`
+        → Example: "永興軍" → `"name": "永興", "admin_type": "軍"`
+        → Example: "安豐軍" → `"name": "安豐", "admin_type": "軍"`
+        → Example: "西京監" → `"name": "西京", "admin_type": "監"`
       * For **2-character names** ending with 州/府:
         → The last character is likely part of the place name itself
         → Example: "涿州" → `"name": "涿州", "admin_type": "州"`
@@ -293,7 +304,7 @@ For each posting in `postings`, fill the following fields:
 ### 3. Additional rules
 
 * Extract **all distinct postings** in the passage. For promotions, transfers, or multiple appointments, create **one posting object per distinct position**.
-* When the passage describes cumulative promotions without dates, still record each posting with `posting_str` and `addr_str` (if any), and leave all unknown date-related or type-related fields as `null`.
+* When the passage describes cumulative promotions without dates, still record each posting with `title_str` and `addr_str` (if any), and leave all unknown date-related or type-related fields as `null`.
 * Do **not** output any fields other than those specified.
 * The final answer must be **valid JSON** and must consist **only** of the JSON object described above (no leading/trailing characters, no comments, no formatting outside JSON).
 

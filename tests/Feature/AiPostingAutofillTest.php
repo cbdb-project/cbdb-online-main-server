@@ -132,7 +132,7 @@ class AiPostingAutofillTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知縣',
+                                        'title_str' => '知縣',
                                         'addr_str' => '新城',
                                         'c_firstyear' => 1723,
                                         'c_fy_nh_code' => '雍正',
@@ -236,7 +236,7 @@ class AiPostingAutofillTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知縣',
+                                        'title_str' => '知縣',
                                         'addr_str' => ['full_text' => '新城', 'parent' => '陝西', 'name' => '新城', 'admin_type' => '縣'],
                                         'c_firstyear' => 1723, // 清朝
                                         'c_fy_nh_code' => '雍正',
@@ -296,7 +296,7 @@ class AiPostingAutofillTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知府',
+                                        'title_str' => '知府',
                                         'addr_str' => ['full_text' => '杭州', 'parent' => '浙江', 'name' => '杭州', 'admin_type' => '府'],
                                         'c_firstyear' => 1573, // 明朝
                                         'c_fy_nh_code' => '萬曆',
@@ -354,7 +354,7 @@ class AiPostingAutofillTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知府',
+                                        'title_str' => '知府',
                                         'addr_str' => ['full_text' => '南京', 'parent' => '應天', 'name' => '南京', 'admin_type' => '府'],
                                         'c_firstyear' => 1367, // 元朝
                                         'c_fy_nh_code' => '至正',
@@ -417,7 +417,7 @@ class AiPostingAutofillTest extends TestCase {
                             'content' => json_encode([
                                 'postings' => [
                                     [
-                                        'posting_str' => '知府',
+                                        'title_str' => '知府',
                                         'addr_str' => ['full_text' => '應天', 'parent' => null, 'name' => '應天', 'admin_type' => '府'],
                                         'c_firstyear' => 1368, // 邊界年份：同時屬於元和明
                                         'c_fy_nh_code' => null,

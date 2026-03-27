@@ -51,7 +51,7 @@ sequenceDiagram
     User->>Frontend: 點擊「AI 智能填充」
     Frontend->>API: POST /api/ai/extract-posting
     API->>AI: 調用 Gemini（使用 ai-posting-extraction-prompt.txt）
-    AI-->>API: 返回 JSON（posting_str, addr_str, 日期等）
+    AI-->>API: 返回 JSON（title_str, addr_str, 日期等）
     API->>DB: 模糊搜索官名、地名、社會機構
     API-->>Frontend: 返回填充建議（含匹配狀態）
     Frontend->>User: 顯示填充結果（綠色/黃色標記）
@@ -332,19 +332,19 @@ class PostingAutofillService {
         $suggested = [];
         $empty = [];
 
-        // 1. 官名匹配（posting_str）
-        if (!empty($aiData['posting_str'])) {
-            $officeMatch = $this->fuzzyMatchOffice($aiData['posting_str']);
+        // 1. 官名匹配（title_str）
+        if (!empty($aiData['title_str'])) {
+            $officeMatch = $this->fuzzyMatchOffice($aiData['title_str']);
             if ($officeMatch) {
                 $matched['c_office_id'] = [
                     'value' => $officeMatch['id'],
                     'text' => $officeMatch['text'],
-                    'ai_extracted' => $aiData['posting_str'],
+                    'ai_extracted' => $aiData['title_str'],
                 ];
             } else {
                 $suggested['c_office_id'] = [
-                    'ai_extracted' => $aiData['posting_str'],
-                    'search_query' => $aiData['posting_str'],
+                    'ai_extracted' => $aiData['title_str'],
+                    'search_query' => $aiData['title_str'],
                 ];
             }
         } else {
@@ -468,7 +468,7 @@ class PostingAutofillService {
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'posting_str' => ['type' => 'string'],
+                            'title_str' => ['type' => 'string'],
                             'addr_str' => ['type' => ['string', 'null']],
                             'c_firstyear' => ['type' => ['integer', 'null']],
                             'c_fy_nh_code' => ['type' => ['string', 'null']],
@@ -489,7 +489,7 @@ class PostingAutofillService {
                             'c_appt_code' => ['type' => ['integer', 'null']],
                             'c_assume_office_code' => ['type' => ['integer', 'null']],
                         ],
-                        'required' => ['posting_str'],
+                        'required' => ['title_str'],
                         'additionalProperties' => false,
                     ],
                 ],

@@ -62,12 +62,7 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
         $data = BracketNormalizer::normalizeAltname($data);
 
         // -999 → 0 轉換
-        if (array_key_exists('c_alt_name_type_code', $data) && $data['c_alt_name_type_code'] == -999) {
-            $data['c_alt_name_type_code'] = '0';
-        }
-        if (array_key_exists('c_source', $data) && $data['c_source'] == -999) {
-            $data['c_source'] = '0';
-        }
+        $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
 
         return $data;
     }
@@ -110,6 +105,13 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
         return $response;
     }
 
+    /**
+     * 更新後同步名字搜尋索引
+     *
+     * 當別名的中文名稱（c_alt_name_chn）或類型代碼（c_alt_name_type_code）
+     * 發生變更時，需從全文索引（CBDB__NAME_FTS）移除舊條目並重新索引新條目，
+     * 以確保搜尋結果的正確性。
+     */
     protected function syncAltnameIndexAfterUpdate(object $original, array $changes, array $targetPk): void {
         if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;

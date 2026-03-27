@@ -54,12 +54,7 @@ class StatusMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
     protected function preprocessUpdateData(array $data): array {
         // -999 → 0 轉換
-        if (array_key_exists('c_status_code', $data) && $data['c_status_code'] == -999) {
-            $data['c_status_code'] = '0';
-        }
-        if (array_key_exists('c_source', $data) && $data['c_source'] == -999) {
-            $data['c_source'] = '0';
-        }
+        $data = $this->normalizeSentinelValues($data, ['c_status_code', 'c_source']);
 
         return $data;
     }

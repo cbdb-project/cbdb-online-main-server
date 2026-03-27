@@ -70,12 +70,10 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
     protected function preprocessUpdateData(array $data): array {
         // -999 → 0 轉換
-        $zeroFields = ['c_entry_code', 'c_entry_addr_id', 'c_kin_code', 'c_assoc_code', 'c_inst_code', 'c_source'];
-        foreach ($zeroFields as $field) {
-            if (array_key_exists($field, $data) && $data[$field] == -999) {
-                $data[$field] = '0';
-            }
-        }
+        $data = $this->normalizeSentinelValues($data, [
+            'c_entry_code', 'c_entry_addr_id', 'c_kin_code',
+            'c_assoc_code', 'c_inst_code', 'c_source',
+        ]);
 
         return $data;
     }

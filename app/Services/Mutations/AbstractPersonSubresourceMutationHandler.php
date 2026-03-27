@@ -313,6 +313,25 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         return $data;
     }
 
+    /**
+     * 將指定欄位中的 -999 轉換為 '0'
+     *
+     * CBDB 前端編輯頁面以 -999 表示「未選擇」或「不適用」，
+     * 在存入資料庫前需統一轉換為 '0'。
+     *
+     * @param array $data 待處理的資料陣列
+     * @param array $fields 需要轉換的欄位名稱列表
+     */
+    protected function normalizeSentinelValues(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data) && $data[$field] == -999) {
+                $data[$field] = '0';
+            }
+        }
+
+        return $data;
+    }
+
     /** 判斷是否有實際有效變更 */
     protected function hasEffectiveChanges(array $originalArray, array $updateData): bool {
         foreach ($updateData as $field => $value) {

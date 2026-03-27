@@ -57,12 +57,7 @@ class AddressMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
     protected function preprocessUpdateData(array $data): array {
         // -999 → 0 轉換
-        if (array_key_exists('c_addr_id', $data) && $data['c_addr_id'] == -999) {
-            $data['c_addr_id'] = '0';
-        }
-        if (array_key_exists('c_source', $data) && $data['c_source'] == -999) {
-            $data['c_source'] = '0';
-        }
+        $data = $this->normalizeSentinelValues($data, ['c_addr_id', 'c_source']);
 
         // 布林欄位轉 int
         if (array_key_exists('c_fy_intercalary', $data)) {

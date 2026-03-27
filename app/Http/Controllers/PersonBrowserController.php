@@ -20,11 +20,16 @@ class PersonBrowserController extends Controller {
      * 人物瀏覽工作台主頁面（Inertia）。
      */
     public function index(Request $request): InertiaResponse {
+        $user = $request->user();
+
         return Inertia::render('PersonBrowser/Index', [
             'tabKeys' => PersonBrowserService::validTabKeys(),
             'searchEndpoint' => route('app.person-browser.search', [], false),
             'summaryEndpoint' => route('app.person-browser.summary', ['personId' => '__PERSON_ID__'], false),
             'tabEndpoint' => route('app.person-browser.tab', ['personId' => '__PERSON_ID__', 'tabKey' => '__TAB_KEY__'], false),
+            'mutateEndpoint' => route('api.v2.mutate.web', [], false),
+            'pinyinEndpoint' => '/api/select/search/pinyin',
+            'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'initialPersonId' => $request->input('person_id') ? (int) $request->input('person_id') : null,
             'initialKeyword' => $request->input('keyword', ''),
             'initialTab' => $request->input('tab', 'basic_info'),

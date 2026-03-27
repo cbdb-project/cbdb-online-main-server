@@ -26,6 +26,17 @@ interface Props {
 }
 
 export default function PeopleList({ people, pagination, selectedId, loading, onSelect, onPageChange }: Props) {
+    const handleCardClick = (event: React.MouseEvent<HTMLDivElement>, personId: number) => {
+        const target = event.currentTarget as HTMLDivElement & { blur?: () => void };
+        target.blur?.();
+        onSelect(personId);
+    };
+
+    const handlePagerClick = (event: React.MouseEvent<HTMLButtonElement>, page: number) => {
+        event.currentTarget.blur();
+        onPageChange(page);
+    };
+
     if (loading) {
         return <div style={msgStyle}>載入中…</div>;
     }
@@ -42,22 +53,30 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                         key={p.c_personid}
                         style={{
                             ...itemStyle,
-                            backgroundColor: p.c_personid === selectedId ? '#e8f0fe' : undefined,
-                            borderLeft: p.c_personid === selectedId ? '3px solid #007bff' : '3px solid transparent',
+                            ...(p.c_personid === selectedId ? selectedItemStyle : {}),
                         }}
-                        onClick={() => onSelect(p.c_personid)}
+                        onPointerDown={(event) => event.preventDefault()}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => handleCardClick(event, p.c_personid)}
                     >
-                        <div style={nameRowStyle}>
-                            <span style={idStyle}>#{p.c_personid}</span>
-                            <strong style={chnNameStyle}>{p.c_name_chn || '—'}</strong>
+                        <div style={topRowStyle}>
+                            <span style={idBadgeStyle}>#{p.c_personid}</span>
+                            <div style={nameBlockStyle}>
+                                <strong style={chnNameStyle}>{p.c_name_chn || '—'}</strong>
+                                {p.c_name && <span style={romanNameStyle}>{p.c_name}</span>}
+                            </div>
                         </div>
-                        <div style={subStyle}>
-                            {p.c_name && <span>{p.c_name}</span>}
-                            {p.c_dynasty_chn && <span style={tagStyle}>{p.c_dynasty_chn}</span>}
-                        </div>
-                        <div style={subStyle}>
-                            {p.c_index_year != null && <span>Index Year: {p.c_index_year}</span>}
-                            {p.index_addr_chn && <span style={{ marginLeft: 8 }}>{p.index_addr_chn}</span>}
+                        <div style={secondaryRowStyle}>
+                            <div style={secondaryLeftStyle}>
+                                <span>{p.c_dynasty_chn || '—'}</span>
+                                {p.c_index_year != null && (
+                                    <>
+                                        <span style={separatorStyle}>/</span>
+                                        <span>{p.c_index_year}</span>
+                                    </>
+                                )}
+                            </div>
+                            <div style={secondaryRightStyle}>{p.index_addr_chn || ''}</div>
                         </div>
                     </div>
                 ))}
@@ -67,7 +86,9 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                 <div style={pagerStyle}>
                     <button
                         disabled={pagination.current_page <= 1}
-                        onClick={() => onPageChange(pagination.current_page - 1)}
+                        onPointerDown={(event) => event.preventDefault()}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => handlePagerClick(event, pagination.current_page - 1)}
                         style={pagerBtnStyle}
                     >
                         ‹ 上頁
@@ -77,7 +98,9 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                     </span>
                     <button
                         disabled={pagination.current_page >= pagination.last_page}
-                        onClick={() => onPageChange(pagination.current_page + 1)}
+                        onPointerDown={(event) => event.preventDefault()}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => handlePagerClick(event, pagination.current_page + 1)}
                         style={pagerBtnStyle}
                     >
                         下頁 ›
@@ -101,42 +124,101 @@ const listStyle: React.CSSProperties = {
 };
 
 const itemStyle: React.CSSProperties = {
-    padding: '8px 10px',
-    borderBottom: '1px solid #eee',
+    margin: '8px 10px 0',
+    padding: '12px 14px',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderTopColor: '#e5e9ef',
+    borderRightColor: '#e5e9ef',
+    borderBottomColor: '#e5e9ef',
+    borderLeftColor: '#e5e9ef',
+    borderRadius: 10,
+    backgroundColor: '#fff',
     cursor: 'pointer',
-    transition: 'background-color 0.15s',
+    transition: 'background-color 0.15s, border-color 0.15s, box-shadow 0.15s',
+    outline: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    userSelect: 'none',
 };
 
-const nameRowStyle: React.CSSProperties = {
+const selectedItemStyle: React.CSSProperties = {
+    backgroundColor: '#eef5ff',
+    borderTopColor: '#bfd7f5',
+    borderRightColor: '#bfd7f5',
+    borderBottomColor: '#bfd7f5',
+    borderLeftColor: '#bfd7f5',
+    boxShadow: '0 2px 6px rgba(0, 123, 255, 0.08)',
+};
+
+const topRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+};
+
+const idBadgeStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 8px',
+    borderRadius: 999,
+    backgroundColor: '#f1f4f8',
+    color: '#607080',
+    fontSize: '0.74rem',
+    fontWeight: 700,
+    letterSpacing: '0.01em',
+    flexShrink: 0,
+};
+
+const nameBlockStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'baseline',
-    gap: 6,
-};
-
-const idStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    color: '#6c757d',
-    minWidth: 50,
+    justifyContent: 'flex-start',
+    gap: 8,
+    minWidth: 0,
+    flexWrap: 'wrap',
+    textAlign: 'left',
 };
 
 const chnNameStyle: React.CSSProperties = {
-    fontSize: '0.9375rem',
+    fontSize: '1rem',
+    color: '#1f2d3d',
 };
 
-const subStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    color: '#6c757d',
-    marginTop: 2,
+const romanNameStyle: React.CSSProperties = {
+    fontSize: '0.78rem',
+    color: '#667788',
+    maxWidth: '100%',
+    wordBreak: 'break-word',
+};
+
+const secondaryRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+    color: '#516170',
+    fontSize: '0.75rem',
 };
 
-const tagStyle: React.CSSProperties = {
-    backgroundColor: '#e9ecef',
-    borderRadius: 3,
-    padding: '0 4px',
-    fontSize: '0.6875rem',
+const secondaryLeftStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+};
+
+const secondaryRightStyle: React.CSSProperties = {
+    color: '#6b7785',
+    textAlign: 'right',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+};
+
+const separatorStyle: React.CSSProperties = {
+    color: '#a0acb8',
 };
 
 const pagerStyle: React.CSSProperties = {
@@ -150,12 +232,23 @@ const pagerStyle: React.CSSProperties = {
 };
 
 const pagerBtnStyle: React.CSSProperties = {
+    all: 'unset',
     padding: '3px 10px',
-    border: '1px solid #ced4da',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderTopColor: '#ced4da',
+    borderRightColor: '#ced4da',
+    borderBottomColor: '#ced4da',
+    borderLeftColor: '#ced4da',
     borderRadius: 4,
     backgroundColor: '#fff',
     cursor: 'pointer',
     fontSize: '0.8125rem',
+    outline: 'none',
+    boxShadow: 'none',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    WebkitTapHighlightColor: 'transparent',
 };
 
 const pagerInfoStyle: React.CSSProperties = {

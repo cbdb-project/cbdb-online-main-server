@@ -6,12 +6,16 @@ import PeopleList, { PersonListItem, Pagination } from '../../components/PersonB
 import PersonSummaryPanel, { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
 import BrowserTabs, { TAB_DEFINITIONS } from '../../components/PersonBrowser/BrowserTabs';
 import TabContentLoader from '../../components/PersonBrowser/TabContentLoader';
+import SelectionDialog from '../../components/SelectionDialog';
 
 interface PageProps {
     tabKeys: string[];
     searchEndpoint: string;
     summaryEndpoint: string;
     tabEndpoint: string;
+    mutateEndpoint: string;
+    pinyinEndpoint: string;
+    canEditBasicInfo: boolean;
     initialPersonId: number | null;
     initialKeyword: string;
     initialTab: string;
@@ -22,6 +26,9 @@ export default function PersonBrowserIndex() {
         searchEndpoint,
         summaryEndpoint,
         tabEndpoint,
+        mutateEndpoint,
+        pinyinEndpoint,
+        canEditBasicInfo,
         initialPersonId,
         initialKeyword,
         initialTab,
@@ -40,8 +47,14 @@ export default function PersonBrowserIndex() {
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState(initialTab || 'basic_info');
+    const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
+    const [basicInfoEditorState, setBasicInfoEditorState] = useState({ editing: false, dirty: false });
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+    const [savingBeforeNavigate, setSavingBeforeNavigate] = useState(false);
 
     const isInitialMount = useRef(true);
+    const basicInfoSaveHandlerRef = useRef<(() => Promise<boolean>) | null>(null);
+    const pendingNavigationRef = useRef<(() => void) | null>(null);
 
     // ── URL sync ──
     const updateUrl = useCallback(
@@ -115,11 +128,30 @@ export default function PersonBrowserIndex() {
     const handleSelect = useCallback(
         (personId: number) => {
             setSelectedId(personId);
-            setActiveTab('basic_info');
-            updateUrl({ person_id: personId, keyword, tab: 'basic_info' });
+            updateUrl({ person_id: personId, keyword, tab: activeTab });
         },
-        [keyword, updateUrl],
+        [activeTab, keyword, updateUrl],
     );
+
+    const handleBasicInfoSaved = useCallback(() => {
+        setSummaryRefreshKey((prev) => prev + 1);
+        doSearch(keyword, page);
+    }, [doSearch, keyword, page]);
+
+    const registerBasicInfoSaveHandler = useCallback((handler: (() => Promise<boolean>) | null) => {
+        basicInfoSaveHandlerRef.current = handler;
+    }, []);
+
+    const runOrWarnUnsaved = useCallback((action: () => void) => {
+        if (basicInfoEditorState.dirty) {
+            pendingNavigationRef.current = action;
+            setShowUnsavedDialog(true);
+
+            return;
+        }
+
+        action();
+    }, [basicInfoEditorState.dirty]);
 
     // ── Load summary when selectedId changes ──
     useEffect(() => {
@@ -143,15 +175,17 @@ export default function PersonBrowserIndex() {
                 setSummary(null);
             })
             .finally(() => setSummaryLoading(false));
-    }, [selectedId, summaryEndpoint]);
+    }, [selectedId, summaryEndpoint, summaryRefreshKey]);
 
     // ── Tab change ──
     const handleTabChange = useCallback(
         (tab: string) => {
-            setActiveTab(tab);
-            updateUrl({ person_id: selectedId, keyword, tab });
+            runOrWarnUnsaved(() => {
+                setActiveTab(tab);
+                updateUrl({ person_id: selectedId, keyword, tab });
+            });
         },
-        [selectedId, keyword, updateUrl],
+        [selectedId, keyword, runOrWarnUnsaved, updateUrl],
     );
 
     // ── Initial load ──
@@ -165,6 +199,26 @@ export default function PersonBrowserIndex() {
     // ── Browser back/forward ──
     useEffect(() => {
         const onPop = () => {
+            if (basicInfoEditorState.dirty) {
+                window.history.pushState({}, '', window.location.href);
+                pendingNavigationRef.current = () => {
+                    const params = new URLSearchParams(window.location.search);
+                    const pid = params.get('person_id');
+                    const kw = params.get('keyword') || '';
+                    const tab = params.get('tab') || 'basic_info';
+                    const pg = parseInt(params.get('page') || '1', 10);
+                    setKeyword(kw);
+                    setPage(pg);
+                    setActiveTab(tab);
+                    if (pid) setSelectedId(parseInt(pid, 10));
+                    else setSelectedId(null);
+                    doSearch(kw, pg);
+                };
+                setShowUnsavedDialog(true);
+
+                return;
+            }
+
             const params = new URLSearchParams(window.location.search);
             const pid = params.get('person_id');
             const kw = params.get('keyword') || '';
@@ -179,21 +233,86 @@ export default function PersonBrowserIndex() {
         };
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
-    }, [doSearch]);
+    }, [basicInfoEditorState.dirty, doSearch]);
+
+    useEffect(() => {
+        const onBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!basicInfoEditorState.dirty) {
+                return;
+            }
+
+            event.preventDefault();
+            event.returnValue = '';
+        };
+
+        window.addEventListener('beforeunload', onBeforeUnload);
+
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [basicInfoEditorState.dirty]);
+
+    const handleSaveAndContinue = useCallback(async () => {
+        const saveHandler = basicInfoSaveHandlerRef.current;
+        if (!saveHandler) {
+            setShowUnsavedDialog(false);
+            pendingNavigationRef.current?.();
+            pendingNavigationRef.current = null;
+
+            return;
+        }
+
+        setSavingBeforeNavigate(true);
+        const ok = await saveHandler();
+        setSavingBeforeNavigate(false);
+
+        if (!ok) {
+            return;
+        }
+
+        setShowUnsavedDialog(false);
+        pendingNavigationRef.current?.();
+        pendingNavigationRef.current = null;
+    }, []);
+
+    const handleDiscardAndContinue = useCallback(() => {
+        setShowUnsavedDialog(false);
+        pendingNavigationRef.current?.();
+        pendingNavigationRef.current = null;
+    }, []);
+
+    const handleStayOnPage = useCallback(() => {
+        setShowUnsavedDialog(false);
+        pendingNavigationRef.current = null;
+    }, []);
+
+    const guardedHandleSearch = useCallback((q: string) => {
+        runOrWarnUnsaved(() => handleSearch(q));
+    }, [handleSearch, runOrWarnUnsaved]);
+
+    const guardedHandleClear = useCallback(() => {
+        runOrWarnUnsaved(handleClear);
+    }, [handleClear, runOrWarnUnsaved]);
+
+    const guardedHandlePageChange = useCallback((p: number) => {
+        runOrWarnUnsaved(() => handlePageChange(p));
+    }, [handlePageChange, runOrWarnUnsaved]);
+
+    const guardedHandleSelect = useCallback((personId: number) => {
+        runOrWarnUnsaved(() => handleSelect(personId));
+    }, [handleSelect, runOrWarnUnsaved]);
 
     return (
         <AppShell>
             <div style={wrapperStyle}>
                 {/* Left sidebar */}
                 <aside style={sidebarStyle}>
-                    <PeopleSearchPanel keyword={keyword} onSearch={handleSearch} onClear={handleClear} />
+                    <PeopleSearchPanel keyword={keyword} onSearch={guardedHandleSearch} onClear={guardedHandleClear} />
                     <PeopleList
                         people={people}
                         pagination={pagination}
                         selectedId={selectedId}
                         loading={listLoading}
-                        onSelect={handleSelect}
-                        onPageChange={handlePageChange}
+                        onSelect={guardedHandleSelect}
+                        onPageChange={guardedHandlePageChange}
                     />
                 </aside>
 
@@ -213,10 +332,51 @@ export default function PersonBrowserIndex() {
                             personId={selectedId}
                             activeTab={activeTab}
                             tabEndpoint={tabEndpoint}
+                            mutateEndpoint={mutateEndpoint}
+                            pinyinEndpoint={pinyinEndpoint}
+                            canEditBasicInfo={canEditBasicInfo}
+                            onBasicInfoSaved={handleBasicInfoSaved}
+                            onBasicInfoEditorStateChange={setBasicInfoEditorState}
+                            onRegisterBasicInfoSaveHandler={registerBasicInfoSaveHandler}
                         />
                     </div>
                 </div>
             </div>
+
+            <SelectionDialog
+                isOpen={showUnsavedDialog}
+                title="尚有未保存修改"
+                description={basicInfoEditorState.dirty
+                    ? '目前的人物基本信息仍在編輯中，且有未保存修改。你可以先儲存，再切換到其他人物或頁籤。'
+                    : '目前仍停留在編輯模式。若不需要保留本次編輯，可直接離開。'}
+                width={560}
+                onClose={handleStayOnPage}
+                footer={(
+                    <>
+                        <button type="button" style={dialogSecondaryButtonStyle} onClick={handleStayOnPage}>
+                            留在本頁
+                        </button>
+                        <button type="button" style={dialogNeutralButtonStyle} onClick={handleDiscardAndContinue}>
+                            不儲存並離開
+                        </button>
+                        <button
+                            type="button"
+                            style={dialogPrimaryButtonStyle}
+                            onClick={() => {
+                                void handleSaveAndContinue();
+                            }}
+                            disabled={savingBeforeNavigate || !basicInfoEditorState.dirty}
+                        >
+                            {savingBeforeNavigate ? '儲存中…' : '儲存並繼續'}
+                        </button>
+                    </>
+                )}
+            >
+                <div style={dialogBodyTextStyle}>
+                    左側切換人物、右側切換頁籤、搜尋與翻頁都會離開目前編輯中的資料。
+                    {basicInfoEditorState.dirty ? '如果你希望保留這次修改，請先儲存。' : '如果只是誤入編輯模式，也可以直接離開。'}
+                </div>
+            </SelectionDialog>
         </AppShell>
     );
 }
@@ -253,4 +413,39 @@ const tabContentStyle: React.CSSProperties = {
     flex: 1,
     overflowY: 'auto',
     padding: 16,
+};
+
+const dialogBodyTextStyle: React.CSSProperties = {
+    color: '#475569',
+    lineHeight: 1.7,
+};
+
+const dialogPrimaryButtonStyle: React.CSSProperties = {
+    borderRadius: 8,
+    padding: '8px 14px',
+    border: '1px solid #255f93',
+    backgroundColor: '#255f93',
+    color: '#fff',
+    fontWeight: 700,
+    cursor: 'pointer',
+};
+
+const dialogSecondaryButtonStyle: React.CSSProperties = {
+    borderRadius: 8,
+    padding: '8px 14px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#fff',
+    color: '#475569',
+    fontWeight: 700,
+    cursor: 'pointer',
+};
+
+const dialogNeutralButtonStyle: React.CSSProperties = {
+    borderRadius: 8,
+    padding: '8px 14px',
+    border: '1px solid #d7c3c3',
+    backgroundColor: '#fff7f7',
+    color: '#9f2f2f',
+    fontWeight: 700,
+    cursor: 'pointer',
 };

@@ -25,7 +25,7 @@ export default function RepeatedFormCards({ columns, rows }: Props) {
                         if (val == null || val === '') return null;
                         return (
                             <div key={key} style={fieldStyle}>
-                                <span style={labelStyle}>{label}</span>
+                                <span style={labelStyle}>{formatColumnLabel(label, key)}</span>
                                 <span style={valueStyle}>{String(val)}</span>
                             </div>
                         );
@@ -34,6 +34,10 @@ export default function RepeatedFormCards({ columns, rows }: Props) {
             ))}
         </div>
     );
+}
+
+function formatColumnLabel(label: string, key: string): string {
+    return `${label} (${key})`;
 }
 
 const containerStyle: React.CSSProperties = {

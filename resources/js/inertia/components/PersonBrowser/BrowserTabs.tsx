@@ -13,6 +13,11 @@ interface Props {
 }
 
 export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Props) {
+    const handleTabClick = (event: React.MouseEvent<HTMLButtonElement>, key: string) => {
+        event.currentTarget.blur();
+        onTabChange(key);
+    };
+
     return (
         <div style={barStyle}>
             {tabs.map((t) => {
@@ -20,8 +25,11 @@ export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Pr
                 const count = counts[t.key];
                 return (
                     <button
+                        type="button"
                         key={t.key}
-                        onClick={() => onTabChange(t.key)}
+                        onPointerDown={(event) => event.preventDefault()}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => handleTabClick(event, t.key)}
                         style={{
                             ...tabStyle,
                             ...(isActive ? activeTabStyle : {}),
@@ -48,10 +56,15 @@ const barStyle: React.CSSProperties = {
 };
 
 const tabStyle: React.CSSProperties = {
+    all: 'unset',
     padding: '8px 12px',
     fontSize: '0.8125rem',
-    border: 'none',
-    borderBottom: '2px solid transparent',
+    borderStyle: 'solid',
+    borderWidth: '0 0 2px 0',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'transparent',
     marginBottom: -2,
     background: 'none',
     cursor: 'pointer',
@@ -60,10 +73,18 @@ const tabStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
+    outline: 'none',
+    boxShadow: 'none',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    WebkitTapHighlightColor: 'transparent',
 };
 
 const activeTabStyle: React.CSSProperties = {
     borderBottomColor: '#007bff',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderLeftColor: 'transparent',
     color: '#007bff',
     fontWeight: 600,
 };
@@ -80,16 +101,16 @@ const badgeStyle: React.CSSProperties = {
 
 export const TAB_DEFINITIONS: TabDef[] = [
     { key: 'basic_info', label: '基本資料' },
-    { key: 'alt_names', label: '別名' },
     { key: 'addresses', label: '地址' },
+    { key: 'alt_names', label: '別名' },
     { key: 'texts', label: '著述' },
-    { key: 'sources', label: '出處' },
+    { key: 'postings', label: '官名' },
     { key: 'entries', label: '入仕' },
     { key: 'events', label: '事件' },
     { key: 'statuses', label: '社會區分' },
-    { key: 'associations', label: '社會關係' },
     { key: 'kinship', label: '親屬' },
+    { key: 'associations', label: '社會關係' },
     { key: 'possessions', label: '財產' },
     { key: 'social_institutions', label: '社交機構' },
-    { key: 'postings', label: '官名' },
+    { key: 'sources', label: '出處' },
 ];

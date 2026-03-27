@@ -6,6 +6,12 @@ interface Props {
     personId: number | null;
     activeTab: string;
     tabEndpoint: string;
+    mutateEndpoint: string;
+    pinyinEndpoint: string;
+    canEditBasicInfo: boolean;
+    onBasicInfoSaved?: () => void;
+    onBasicInfoEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
+    onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
 }
 
 interface TabState {
@@ -18,7 +24,17 @@ interface TabState {
  * 根據 activeTab 和 personId lazy load 對應 tab 資料。
  * 已載入的 tab 資料會快取（同一 personId 不重複請求）。
  */
-export default function TabContentLoader({ personId, activeTab, tabEndpoint }: Props) {
+export default function TabContentLoader({
+    personId,
+    activeTab,
+    tabEndpoint,
+    mutateEndpoint,
+    pinyinEndpoint,
+    canEditBasicInfo,
+    onBasicInfoSaved,
+    onBasicInfoEditorStateChange,
+    onRegisterBasicInfoSaveHandler,
+}: Props) {
     const [cache, setCache] = useState<Record<string, TabState>>({});
     const prevPersonRef = useRef<number | null>(null);
 
@@ -101,8 +117,30 @@ export default function TabContentLoader({ personId, activeTab, tabEndpoint }: P
 
     // Render based on tab type
     if (activeTab === 'basic_info') {
-        const basicData = state.data as { sections?: Array<{ title: string; fields: Array<{ label: string; value: unknown }> }> };
-        return <BasicInfoView sections={basicData?.sections || []} />;
+        const basicData = state.data as {
+            sections?: Array<{ title: string; fields: Array<{ label: string; value: unknown }> }>;
+            form?: {
+                person_id: number;
+                fields: Record<string, unknown>;
+            };
+        };
+
+        return (
+            <BasicInfoView
+                sections={basicData?.sections || []}
+                form={basicData?.form || null}
+                personId={personId}
+                mutateEndpoint={mutateEndpoint}
+                pinyinEndpoint={pinyinEndpoint}
+                canEdit={canEditBasicInfo}
+                onEditorStateChange={onBasicInfoEditorStateChange}
+                onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
+                onSaved={() => {
+                    retryActiveTab();
+                    onBasicInfoSaved?.();
+                }}
+            />
+        );
     }
 
     // All other tabs: repeated-form cards

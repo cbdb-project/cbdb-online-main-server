@@ -49,28 +49,44 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
             ? `${summary.c_birthyear ?? '?'} – ${summary.c_deathyear ?? '?'}`
             : '';
 
+    const secondaryNames = [summary.c_name, summary.c_name_rm]
+        .filter((value, index, array) => value && array.indexOf(value) === index) as string[];
+
     return (
         <div style={boxStyle}>
             <div style={headerStyle}>
-                <div style={mainNameStyle}>
-                    {summary.c_name_chn || '—'}
-                    <span style={idBadgeStyle}>#{summary.c_personid}</span>
-                </div>
-                {summary.c_name && <div style={engNameStyle}>{summary.c_name}</div>}
-                {summary.c_name_rm && summary.c_name_rm !== summary.c_name && (
-                    <div style={engNameStyle}>{summary.c_name_rm}</div>
+                <div style={mainNameStyle}>{summary.c_name_chn || '—'}</div>
+                {secondaryNames.length > 0 && (
+                    <div style={secondaryNameBlockStyle}>
+                        {secondaryNames.map((name) => (
+                            <div key={name} style={secondaryNameStyle}>{name}</div>
+                        ))}
+                    </div>
                 )}
+                <div style={metaRowStyle}>
+                    <MutedMeta label="CBDB ID (c_personid)" value={`#${summary.c_personid}`} />
+                    <MutedMeta label="性別 (c_female)" value={summary.gender} />
+                    <MutedMeta label="朝代 (c_dy)" value={summary.dynasty_chn} />
+                    <MutedMeta label="Index Address (c_index_addr_id)" value={summary.index_addr_chn} />
+                </div>
             </div>
             <div style={gridStyle}>
-                <Field label="性別" value={summary.gender} />
-                <Field label="朝代" value={summary.dynasty_chn} />
-                <Field label="生卒年" value={lifespan} />
-                <Field label="Index Year" value={summary.c_index_year != null ? String(summary.c_index_year) : ''} />
-                <Field label="Index Year Type" value={summary.index_year_type} />
-                <Field label="Index Address" value={summary.index_addr_chn} />
-                {summary.alt_name_zi && <Field label="字" value={summary.alt_name_zi} />}
-                {summary.alt_name_hao && <Field label="號" value={summary.alt_name_hao} />}
+                <Field label="生卒年 (c_birthyear / c_deathyear)" value={lifespan} />
+                <Field label="Index Year (c_index_year)" value={summary.c_index_year != null ? String(summary.c_index_year) : ''} />
+                {summary.alt_name_zi && <Field label="字 (ALTNAME_DATA.c_alt_name_chn)" value={summary.alt_name_zi} />}
+                {summary.alt_name_hao && <Field label="號 (ALTNAME_DATA.c_alt_name_chn)" value={summary.alt_name_hao} />}
             </div>
+        </div>
+    );
+}
+
+function MutedMeta({ label, value }: { label: string; value: string | null | undefined }) {
+    if (!value) return null;
+
+    return (
+        <div style={mutedMetaStyle}>
+            <span style={mutedMetaLabelStyle}>{label}</span>
+            <span style={mutedMetaValueStyle}>{value}</span>
         </div>
     );
 }
@@ -87,52 +103,79 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 const boxStyle: React.CSSProperties = {
     borderBottom: '1px solid #dee2e6',
-    padding: '12px 16px',
-    minHeight: 60,
+    padding: '16px 18px 14px',
+    minHeight: 72,
+    backgroundColor: '#fcfdff',
 };
 
 const headerStyle: React.CSSProperties = {
-    marginBottom: 8,
+    marginBottom: 12,
 };
 
 const mainNameStyle: React.CSSProperties = {
-    fontSize: '1.25rem',
+    fontSize: '1.65rem',
     fontWeight: 700,
+    color: '#17293b',
+    lineHeight: 1.2,
+};
+
+const secondaryNameBlockStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'baseline',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: '4px 12px',
+    marginTop: 4,
 };
 
-const idBadgeStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    color: '#6c757d',
-    fontWeight: 400,
+const secondaryNameStyle: React.CSSProperties = {
+    fontSize: '0.98rem',
+    color: '#667788',
+    lineHeight: 1.35,
 };
 
-const engNameStyle: React.CSSProperties = {
-    fontSize: '0.875rem',
-    color: '#495057',
+const metaRowStyle: React.CSSProperties = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px 16px',
+    marginTop: 10,
 };
 
 const gridStyle: React.CSSProperties = {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '4px 16px',
+    gap: '6px 18px',
 };
 
 const fieldStyle: React.CSSProperties = {
     display: 'flex',
-    gap: 4,
-    fontSize: '0.8125rem',
+    gap: 5,
+    fontSize: '0.92rem',
+    alignItems: 'baseline',
 };
 
 const fieldLabelStyle: React.CSSProperties = {
-    color: '#6c757d',
+    color: '#677786',
     whiteSpace: 'nowrap',
 };
 
 const fieldValueStyle: React.CSSProperties = {
-    color: '#212529',
+    color: '#203142',
+    fontWeight: 600,
+};
+
+const mutedMetaStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: 5,
+    fontSize: '0.9rem',
+};
+
+const mutedMetaLabelStyle: React.CSSProperties = {
+    color: '#8090a0',
+    whiteSpace: 'nowrap',
+};
+
+const mutedMetaValueStyle: React.CSSProperties = {
+    color: '#566678',
 };
 
 const msgStyle: React.CSSProperties = {

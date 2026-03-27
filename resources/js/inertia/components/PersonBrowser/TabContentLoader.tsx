@@ -1,6 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import BasicInfoView from './BasicInfoView';
-import RepeatedFormCards from './RepeatedFormCards';
+import AltNamesTab from './tabs/AltNamesTab';
+import AddressesTab from './tabs/AddressesTab';
+import EntriesTab from './tabs/EntriesTab';
+import StatusesTab from './tabs/StatusesTab';
+import EventsTab from './tabs/EventsTab';
+import AssociationsTab from './tabs/AssociationsTab';
+import PossessionsTab from './tabs/PossessionsTab';
+import SourcesTab from './tabs/SourcesTab';
+import TextsTab from './tabs/TextsTab';
+import PostingsTab from './tabs/PostingsTab';
+import InstitutionsTab from './tabs/InstitutionsTab';
+import KinshipTab from './tabs/KinshipTab';
 
 interface Props {
     personId: number | null;
@@ -19,6 +30,24 @@ interface TabState {
     error: string | null;
     data: unknown;
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+type TypedTabComponent = React.ComponentType<{ data: any }>;
+
+const TAB_COMPONENTS: Record<string, TypedTabComponent> = {
+    alt_names: AltNamesTab,
+    addresses: AddressesTab,
+    entries: EntriesTab,
+    statuses: StatusesTab,
+    events: EventsTab,
+    associations: AssociationsTab,
+    possessions: PossessionsTab,
+    sources: SourcesTab,
+    texts: TextsTab,
+    postings: PostingsTab,
+    social_institutions: InstitutionsTab,
+    kinship: KinshipTab,
+};
 
 /**
  * 根據 activeTab 和 personId lazy load 對應 tab 資料。
@@ -115,7 +144,7 @@ export default function TabContentLoader({
         );
     }
 
-    // Render based on tab type
+    // basic_info: 專門 view（含編輯功能）
     if (activeTab === 'basic_info') {
         const basicData = state.data as {
             sections?: Array<{ title: string; fields: Array<{ label: string; value: unknown }> }>;
@@ -143,9 +172,14 @@ export default function TabContentLoader({
         );
     }
 
-    // All other tabs: repeated-form cards
-    const listData = state.data as { columns?: Record<string, string>; rows?: Record<string, unknown>[] };
-    return <RepeatedFormCards columns={listData?.columns || {}} rows={listData?.rows || []} />;
+    // 其他 tabs：使用各自的 typed component
+    const TabComponent = TAB_COMPONENTS[activeTab];
+    if (TabComponent) {
+        return <TabComponent data={state.data} />;
+    }
+
+    // Fallback（不應出現，但作為安全後備）
+    return <div style={msgStyle}>未支援的分頁：{activeTab}</div>;
 }
 
 const msgStyle: React.CSSProperties = {

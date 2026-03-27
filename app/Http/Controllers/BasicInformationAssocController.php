@@ -143,6 +143,12 @@ class BasicInformationAssocController extends Controller {
             return redirect()->back();
         }
 
+        if ((int) $id === 0) {
+            flash('「未詳」人物不能新增社會關係記錄。', 'error');
+
+            return redirect()->back();
+        }
+
         // 數據預處理：分割 c_inst_code
         // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
         $temp = explode("-", $request->input('c_inst_code', ''));
@@ -263,6 +269,12 @@ class BasicInformationAssocController extends Controller {
     public function update(Request $request, $id, $id_) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        if ((int) $id === 0) {
+            flash('「未詳」人物不能修改社會關係記錄。', 'error');
 
             return redirect()->back();
         }
@@ -407,6 +419,12 @@ class BasicInformationAssocController extends Controller {
 
         if (!Auth::user()->isActive()) {
             flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        if ((int) $id === 0) {
+            flash('「未詳」人物不能修改社會關係記錄。', 'error');
 
             return redirect()->back();
         }

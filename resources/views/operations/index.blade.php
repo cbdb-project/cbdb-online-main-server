@@ -199,7 +199,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 }
                                 // 对于代码表资源（无论是否涉及人物），如果没有特定资源链接，则使用 codes 路由
                                 elseif ($isCodeResource && $item->op_type != 4) {
-                                    $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $originalResourceId], false);
+                                    $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($item->resource, $originalResourceId);
+                                    $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $codeRouteId], false);
                                 }
                                 $showPerPersonResourceButtons = in_array(strtoupper($item->resource), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
                             @endphp

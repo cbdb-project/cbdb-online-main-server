@@ -985,4 +985,14 @@ class CompositePrimaryKeyTest extends TestCase {
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
     }
+
+    /** @test */
+    public function it_normalizes_single_key_query_string_resource_id_for_code_route(): void {
+        $result = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute(
+            'NIAN_HAO',
+            'c_nianhao_id=464'
+        );
+
+        $this->assertSame('464', $result);
+    }
 }

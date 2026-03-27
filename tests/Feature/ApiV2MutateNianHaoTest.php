@@ -237,6 +237,38 @@ class ApiV2MutateNianHaoTest extends TestCase {
     }
 
     #[Test]
+    public function testNianHaoUpdateAlwaysStoresPersonIdAsZero(): void {
+        $user = $this->makeUser(email: 'nianhao-personid@example.com');
+        $this->actingAs($user);
+        $this->seedNianHao();
+
+        // 呼叫端傳入任意 person_id，應被忽略
+        $this->postJson('/api/v2/mutate', $this->nianhaoUpdatePayload([
+            'person_id' => 99999,
+        ]));
+
+        $operation = DB::table('operations')->where('resource', 'NIAN_HAO')->first();
+        $this->assertNotNull($operation);
+        $this->assertSame(0, $operation->c_personid);
+    }
+
+    #[Test]
+    public function testProposalNianHaoUpdateAlwaysStoresPersonIdAsZero(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'nianhao-proposal-pid@example.com');
+        $this->actingAs($user);
+        $this->seedNianHao();
+
+        $this->postJson('/api/v2/mutate', $this->nianhaoUpdatePayload([
+            'mode' => 'proposal',
+            'person_id' => 12345,
+        ]));
+
+        $operation = DB::table('operations')->where('resource', 'NIAN_HAO')->first();
+        $this->assertNotNull($operation);
+        $this->assertSame(0, $operation->c_personid);
+    }
+
+    #[Test]
     public function testDirectNianHaoUpdateWithCommentIncludesNoteInOperation(): void {
         $user = $this->makeUser(email: 'nianhao-comment@example.com');
         $this->actingAs($user);

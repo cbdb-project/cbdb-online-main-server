@@ -103,46 +103,55 @@ class NianHaoMutationHandler extends AbstractMutationHandler {
         $resourceId = CompositePrimaryKey::buildStoredResourceId($pk);
         $comment = is_string($meta['comment'] ?? null) ? trim($meta['comment']) : '';
 
+        // NIAN_HAO 為全域代碼表，c_personid 一律設為 0，不受呼叫端控制
+        $operationPersonId = 0;
+
         if ($mode === 'proposal') {
-            return $this->handleProposal($personId, $pk, $resourceId, $updateData, $originalArray, $comment);
+            return $this->handleProposal($operationPersonId, $pk, $resourceId, $updateData, $originalArray, $comment);
         }
 
-        return $this->handleDirect($personId, $nianhaoId, $pk, $resourceId, $updateData, $originalArray, $comment);
+        return $this->handleDirect($operationPersonId, $nianhaoId, $pk, $resourceId, $updateData, $originalArray, $comment);
     }
 
     protected function handleDirect(int $personId, int $nianhaoId, array $pk, string $resourceId, array $updateData, array $originalArray, string $comment): JsonResponse {
         $operationId = (string) Str::ulid();
 
-        DB::table('NIAN_HAO')->where('c_nianhao_id', $nianhaoId)->update($updateData);
+        /** @var \App\Models\Operation|null $operation */
+        $operation = null;
+        $newArray = [];
 
-        $updatedRow = DB::table('NIAN_HAO')->where('c_nianhao_id', $nianhaoId)->first();
-        $newArray = $this->auditLogService->normalizeRow($updatedRow);
+        DB::transaction(function () use ($nianhaoId, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
+            DB::table('NIAN_HAO')->where('c_nianhao_id', $nianhaoId)->update($updateData);
 
-        $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
-        if ($comment !== '') {
-            $resourceData['__note'] = $comment;
-        }
+            $updatedRow = DB::table('NIAN_HAO')->where('c_nianhao_id', $nianhaoId)->first();
+            $newArray = $this->auditLogService->normalizeRow($updatedRow);
 
-        $operation = $this->operationRepository->store(
-            Auth::id(),
-            $personId,
-            Operation::TYPE_UPDATE,
-            'NIAN_HAO',
-            $resourceId,
-            $resourceData,
-            $originalArray
-        );
+            $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
+            if ($comment !== '') {
+                $resourceData['__note'] = $comment;
+            }
 
-        $this->auditLogService->write(
-            'NIAN_HAO',
-            'UPDATE',
-            $pk,
-            $originalArray,
-            $newArray,
-            'user',
-            (string) Auth::id(),
-            $operationId
-        );
+            $operation = $this->operationRepository->store(
+                Auth::id(),
+                $personId,
+                Operation::TYPE_UPDATE,
+                'NIAN_HAO',
+                $resourceId,
+                $resourceData,
+                $originalArray
+            );
+
+            $this->auditLogService->write(
+                'NIAN_HAO',
+                'UPDATE',
+                $pk,
+                $originalArray,
+                $newArray,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        });
 
         return response()->json([
             'ok' => true,

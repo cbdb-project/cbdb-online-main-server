@@ -11,6 +11,9 @@ class MutationHandlerRegistry {
     public function __construct(
         BiogMainMutationHandler $biogMainHandler,
         AltnameMutationHandler $altnameHandler,
+        AddressMutationHandler $addressHandler,
+        EntryMutationHandler $entryHandler,
+        StatusMutationHandler $statusHandler,
         PossessionMutationHandler $possessionHandler,
         SourceMutationHandler $sourceHandler,
         NianHaoMutationHandler $nianHaoHandler
@@ -18,6 +21,9 @@ class MutationHandlerRegistry {
         $this->handlers = [
             $biogMainHandler,
             $altnameHandler,
+            $addressHandler,
+            $entryHandler,
+            $statusHandler,
             $possessionHandler,
             $sourceHandler,
             $nianHaoHandler,

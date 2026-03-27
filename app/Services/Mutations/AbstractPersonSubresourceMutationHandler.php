@@ -1,0 +1,337 @@
+<?php
+
+namespace App\Services\Mutations;
+
+use App\Models\Operation;
+use App\Repositories\OperationRepository;
+use App\Services\AuditLogService;
+use App\Support\CompositePrimaryKey;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+/**
+ * 人物子資源 mutation handler 共用基底類
+ *
+ * 抽象出 repeated-form update 的共通邏輯：
+ * - 驗證 composite PK
+ * - 驗證 person_id 一致性
+ * - 查原始 row
+ * - 驗證 allowed update fields
+ * - 判斷是否有有效變更
+ * - direct 更新（含 transaction + operation + audit_log）
+ * - proposal 寫 operation
+ * - 統一 response shape
+ */
+abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutationHandler {
+    protected OperationRepository $operationRepository;
+    protected AuditLogService $auditLogService;
+
+    public function __construct(
+        OperationRepository $operationRepository,
+        AuditLogService $auditLogService
+    ) {
+        $this->operationRepository = $operationRepository;
+        $this->auditLogService = $auditLogService;
+    }
+
+    // ── 子類必須實作 ─────────────────────────────────────────
+
+    /** 資源名稱（回傳用），例如 'addresses' */
+    abstract protected function resourceName(): string;
+
+    /** 資料表名稱，例如 'BIOG_ADDR_DATA' */
+    abstract protected function tableName(): string;
+
+    /** 顯示名稱（proposal meta 用），例如 '地址' */
+    abstract protected function displayName(): string;
+
+    /** 可接受的 resource alias 列表（含主名），例如 ['addresses', 'address', 'biog_addr_data'] */
+    abstract protected function resourceAliases(): array;
+
+    /** 允許更新的欄位白名單 */
+    abstract protected function allowedFields(): array;
+
+    /** __key_columns（proposal meta 用），通常與 CompositePrimaryKey SCHEMAS 一致 */
+    abstract protected function keyColumns(): array;
+
+    /** person_id 在主鍵中的欄位名，預設 'c_personid' */
+    protected function personIdColumn(): string {
+        return 'c_personid';
+    }
+
+    // ── supports ─────────────────────────────────────────────
+
+    public function supports(string $resource, string $mode, string $operation): bool {
+        return in_array($resource, $this->resourceAliases(), true)
+            && in_array($mode, ['direct', 'proposal'], true)
+            && $operation === 'update';
+    }
+
+    // ── handle ───────────────────────────────────────────────
+
+    public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 1. 授權
+        $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
+        // 2. 驗證 PK 格式
+        try {
+            CompositePrimaryKey::validateOrFail($targetPk, $this->tableName());
+        } catch (\Throwable $e) {
+            return $this->errorResponse('主鍵格式不正確', 422, ['pk' => [$e->getMessage()]]);
+        }
+
+        // 3. changes 不可為空
+        if (empty($changes)) {
+            return $this->errorResponse('changes 不可為空', 422, ['changes' => ['empty']]);
+        }
+
+        // 4. person_id 與 PK 一致性
+        $pkPersonId = $targetPk[$this->personIdColumn()] ?? null;
+        if ((string) $pkPersonId !== (string) $personId) {
+            return $this->errorResponse('person_id 與 target.pk.' . $this->personIdColumn() . ' 不一致', 422, [
+                'person_id' => ['mismatch'],
+            ]);
+        }
+
+        // 5. 查原始記錄
+        $original = $this->findOriginalRow($targetPk);
+        if (!$original) {
+            return $this->errorResponse($this->tableName() . ' 記錄不存在', 404);
+        }
+
+        // 6. 驗證 person_id 與記錄一致性
+        if ((string) ($original->{$this->personIdColumn()} ?? '') !== (string) $personId) {
+            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
+        }
+
+        // 7. 拒絕白名單外的欄位
+        $disallowedFields = array_diff(array_keys($changes), $this->allowedFields());
+        if (!empty($disallowedFields)) {
+            return $this->errorResponse('包含不允許更新的欄位', 422, [
+                'changes' => ['disallowed_fields: ' . implode(', ', $disallowedFields)],
+            ]);
+        }
+
+        // 8. 過濾出可更新欄位
+        $updateData = array_intersect_key($changes, array_flip($this->allowedFields()));
+        if (empty($updateData)) {
+            return $this->errorResponse('changes 至少需包含一個可更新欄位', 422, [
+                'changes' => ['no_supported_fields'],
+            ]);
+        }
+
+        // 9. 欄位值驗證（子類可覆寫）
+        $validationErrors = $this->validateFields($updateData);
+        if (!empty($validationErrors)) {
+            return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
+        }
+
+        // 10. 前處理（子類可覆寫，如 -999 → 0 轉換）
+        $updateData = $this->preprocessUpdateData($updateData);
+
+        // 11. 檢查是否有實際變更
+        $originalArray = $this->auditLogService->normalizeRow($original);
+        if (!$this->hasEffectiveChanges($originalArray, $updateData)) {
+            return $this->errorResponse('未偵測到任何修改內容', 422, [
+                'changes' => ['no_effective_changes'],
+            ]);
+        }
+
+        $comment = is_string($meta['comment'] ?? null) ? trim($meta['comment']) : '';
+
+        // 12. 分派到 direct / proposal
+        if ($mode === 'proposal') {
+            return $this->handleProposal($personId, $targetPk, $updateData, $originalArray, $comment);
+        }
+
+        return $this->handleDirect($personId, $targetPk, $updateData, $originalArray, $comment);
+    }
+
+    // ── Direct Update ────────────────────────────────────────
+
+    protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
+        $operationId = (string) Str::ulid();
+        /** @var Operation|null $operation */
+        $operation = null;
+        $newArray = [];
+
+        DB::transaction(function () use ($personId, $targetPk, $updateData, $originalArray, $comment, $operationId, &$operation, &$newArray) {
+            // 更新資料表
+            $this->performUpdate($targetPk, $updateData);
+
+            // 讀回更新後的資料
+            $updatedRow = $this->findUpdatedRow($targetPk, $updateData);
+            $newArray = $this->auditLogService->normalizeRow($updatedRow);
+
+            // 計算新 PK
+            $newPk = $this->buildNewPk($targetPk, $updateData);
+            $resourceId = CompositePrimaryKey::buildStoredResourceId($newPk);
+
+            // 寫 operation
+            $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
+            if ($comment !== '') {
+                $resourceData['__note'] = $comment;
+            }
+
+            $operation = $this->operationRepository->store(
+                Auth::id(),
+                $personId,
+                Operation::TYPE_UPDATE,
+                $this->tableName(),
+                $resourceId,
+                $resourceData,
+                $originalArray
+            );
+
+            // 寫 audit_log
+            $this->auditLogService->write(
+                $this->tableName(),
+                'UPDATE',
+                $newPk,
+                $originalArray,
+                $newArray,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        });
+
+        return response()->json([
+            'ok' => true,
+            'resource' => $this->resourceName(),
+            'mode' => 'direct',
+            'operation' => 'update',
+            'result' => [
+                'pk' => $this->buildNewPk($targetPk, $updateData),
+                'updated_fields' => array_keys($updateData),
+                'operation_id' => $operation?->id,
+                'row' => $newArray,
+            ],
+        ]);
+    }
+
+    // ── Proposal Update ──────────────────────────────────────
+
+    protected function handleProposal(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
+        $newPk = $this->buildNewPk($targetPk, $updateData);
+        $resourceId = CompositePrimaryKey::buildStoredResourceId($newPk);
+
+        $proposalData = array_merge($originalArray, $updateData, [
+            '__proposal_meta' => [
+                'action' => 'update',
+                'resource_type' => $this->resourceName(),
+                'table' => $this->tableName(),
+                'display_name' => $this->displayName(),
+                'submitted_by' => Auth::user()->name ?? Auth::id(),
+                'submitted_by_id' => Auth::id(),
+                'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                'comment' => $comment,
+            ],
+            '__review_status' => 'pending',
+            '__key_columns' => $this->keyColumns(),
+        ]);
+
+        $operation = $this->operationRepository->store(
+            Auth::id(),
+            $personId,
+            Operation::TYPE_PROPOSAL_UPDATE,
+            $this->tableName(),
+            $resourceId,
+            $proposalData,
+            $originalArray
+        );
+
+        return response()->json([
+            'ok' => true,
+            'resource' => $this->resourceName(),
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'result' => [
+                'pk' => $newPk,
+                'updated_fields' => array_keys($updateData),
+                'status' => 'proposal_updated',
+                'operation_id' => $operation?->id,
+            ],
+        ]);
+    }
+
+    // ── 可覆寫的 helper ──────────────────────────────────────
+
+    /** 查詢原始記錄（子類可覆寫以處理特殊查詢邏輯） */
+    protected function findOriginalRow(array $pk): ?object {
+        $query = DB::table($this->tableName());
+        foreach ($this->keyColumns() as $col) {
+            $query->where($col, $pk[$col] ?? null);
+        }
+
+        return $query->first();
+    }
+
+    /** 執行資料表更新 */
+    protected function performUpdate(array $targetPk, array $updateData): void {
+        $query = DB::table($this->tableName());
+        foreach ($this->keyColumns() as $col) {
+            $query->where($col, $targetPk[$col] ?? null);
+        }
+        $query->update($updateData);
+    }
+
+    /** 讀回更新後的記錄（考慮 PK 可能因更新而改變） */
+    protected function findUpdatedRow(array $targetPk, array $updateData): ?object {
+        $newPk = $this->buildNewPk($targetPk, $updateData);
+        $query = DB::table($this->tableName());
+        foreach ($this->keyColumns() as $col) {
+            $query->where($col, $newPk[$col] ?? null);
+        }
+
+        return $query->first();
+    }
+
+    /** 根據 targetPk 和 updateData 計算新 PK */
+    protected function buildNewPk(array $targetPk, array $updateData): array {
+        $newPk = [];
+        foreach ($this->keyColumns() as $col) {
+            $newPk[$col] = $updateData[$col] ?? $targetPk[$col];
+        }
+
+        return $newPk;
+    }
+
+    /** 欄位值驗證（預設無驗證，子類可覆寫） */
+    protected function validateFields(array $data): array {
+        return [];
+    }
+
+    /** 前處理更新資料（預設無處理，子類可覆寫） */
+    protected function preprocessUpdateData(array $data): array {
+        return $data;
+    }
+
+    /** 判斷是否有實際有效變更 */
+    protected function hasEffectiveChanges(array $originalArray, array $updateData): bool {
+        foreach ($updateData as $field => $value) {
+            $originalValue = $originalArray[$field] ?? null;
+            // 統一以字串比對（處理 int/string 混合問題）
+            if ($this->normalizeForComparison($originalValue) !== $this->normalizeForComparison($value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** 統一值的比對格式 */
+    protected function normalizeForComparison($value): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        return (string) $value;
+    }
+}

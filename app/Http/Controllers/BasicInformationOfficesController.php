@@ -172,7 +172,7 @@ class BasicInformationOfficesController extends Controller {
 
         // 更新 AI 填充日誌（如果本次提交使用了 AI 填充）
         if ($aiFillLogId) {
-            $this->updateAiFillLog($aiFillLogId, $request);
+            $this->updateAiFillLog($aiFillLogId, $request, $id);
         }
 
         // 解析主鍵（officeStoreById 返回查詢參數格式，如 c_office_id=87473&c_posting_id=2104406）
@@ -653,7 +653,7 @@ class BasicInformationOfficesController extends Controller {
     /**
      * 更新 AI 填充日誌，記錄用戶實際提交的數據
      */
-    private function updateAiFillLog(int $logId, Request $request): void {
+    private function updateAiFillLog(int $logId, Request $request, $personId = null): void {
         try {
             $relevantFields = [
                 'c_office_id', 'c_addr', 'c_sequence', 'c_source', 'c_pages',
@@ -666,7 +666,7 @@ class BasicInformationOfficesController extends Controller {
             ];
             $submittedData = $request->only($relevantFields);
 
-            $personId = $request->input('c_personid') ?? $request->route('id') ?? $request->input('_id');
+            $personId = $personId ?? $request->input('c_personid') ?? $request->route('id') ?? $request->input('_id');
 
             DB::table('ai_fill_logs')
                 ->where('id', $logId)

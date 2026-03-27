@@ -115,6 +115,9 @@ class CompositePrimaryKey {
             'c_office_id',
             'c_office_tree_id',
         ],
+        'NIAN_HAO' => [
+            'c_nianhao_id',
+        ],
     ];
 
     /**

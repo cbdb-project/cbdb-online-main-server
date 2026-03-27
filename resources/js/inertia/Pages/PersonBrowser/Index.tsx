@@ -19,6 +19,7 @@ interface PageProps {
     initialPersonId: number | null;
     initialKeyword: string;
     initialTab: string;
+    initialPage: number;
 }
 
 export default function PersonBrowserIndex() {
@@ -32,11 +33,12 @@ export default function PersonBrowserIndex() {
         initialPersonId,
         initialKeyword,
         initialTab,
+        initialPage,
     } = usePage<PageProps>().props;
 
     // ── Core state ──
     const [keyword, setKeyword] = useState(initialKeyword || '');
-    const [page, setPage] = useState(1);
+    const [page, setPage] = useState(initialPage || 1);
     const [people, setPeople] = useState<PersonListItem[]>([]);
     const [pagination, setPagination] = useState<Pagination | null>(null);
     const [listLoading, setListLoading] = useState(false);
@@ -192,9 +194,9 @@ export default function PersonBrowserIndex() {
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
-            doSearch(initialKeyword || '', 1);
+            doSearch(initialKeyword || '', initialPage || 1);
         }
-    }, [doSearch, initialKeyword]);
+    }, [doSearch, initialKeyword, initialPage]);
 
     // ── Browser back/forward ──
     useEffect(() => {

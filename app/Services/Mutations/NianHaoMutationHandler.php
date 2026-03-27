@@ -87,7 +87,7 @@ class NianHaoMutationHandler extends AbstractMutationHandler {
         $originalArray = $this->auditLogService->normalizeRow($original);
         $hasEffectiveChange = false;
         foreach ($updateData as $field => $value) {
-            if ((string) ($originalArray[$field] ?? '') !== (string) $value) {
+            if (($originalArray[$field] ?? null) !== $value) {
                 $hasEffectiveChange = true;
 
                 break;
@@ -110,7 +110,7 @@ class NianHaoMutationHandler extends AbstractMutationHandler {
         return $this->handleDirect($personId, $nianhaoId, $pk, $resourceId, $updateData, $originalArray, $comment);
     }
 
-    protected function handleDirect(int $personId, $nianhaoId, array $pk, string $resourceId, array $updateData, array $originalArray, string $comment): JsonResponse {
+    protected function handleDirect(int $personId, int $nianhaoId, array $pk, string $resourceId, array $updateData, array $originalArray, string $comment): JsonResponse {
         $operationId = (string) Str::ulid();
 
         DB::table('NIAN_HAO')->where('c_nianhao_id', $nianhaoId)->update($updateData);

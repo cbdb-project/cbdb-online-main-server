@@ -471,11 +471,12 @@ class PersonBrowserService {
     private function tabAltNames(int $personId): array {
         $rows = DB::table('ALTNAME_DATA')
             ->select([
+                'ALTNAME_DATA.c_sequence',
                 'ALTNAME_DATA.c_alt_name_chn',
                 'ALTNAME_DATA.c_alt_name',
                 'ALTNAME_DATA.c_alt_name_type_code',
-                'ATC.c_name_type_desc_chn AS c_alt_name_type_desc_chn',
-                'ATC.c_name_type_desc AS c_alt_name_type_desc',
+                'ATC.c_name_type_desc_chn',
+                'ATC.c_name_type_desc',
                 'ALTNAME_DATA.c_source',
                 'ALTNAME_DATA.c_pages',
                 'ALTNAME_DATA.c_notes',
@@ -486,16 +487,18 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_alt_name_chn' => '中文別名',
-                'c_alt_name' => '英文別名',
-                'c_alt_name_type_desc_chn' => '類型（中文）',
-                'c_alt_name_type_desc' => '類型（英文）',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'alt_names',
+            'items' => $rows->map(fn ($r) => [
+                'sequence' => $r->c_sequence,
+                'name_chn' => $r->c_alt_name_chn,
+                'name' => $r->c_alt_name,
+                'type_code' => $r->c_alt_name_type_code,
+                'type_label_chn' => $r->c_name_type_desc_chn,
+                'type_label' => $r->c_name_type_desc,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -520,16 +523,19 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'addr_chn' => '地址（中文）',
-                'addr' => '地址（英文）',
-                'c_addr_desc_chn' => '類型（中文）',
-                'c_addr_desc' => '類型（英文）',
-                'c_firstyear' => '始年',
-                'c_lastyear' => '終年',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'addresses',
+            'items' => $rows->map(fn ($r) => [
+                'sequence' => $r->c_sequence,
+                'addr_id' => $r->c_addr_id,
+                'addr_chn' => $r->addr_chn,
+                'addr' => $r->addr,
+                'type_code' => $r->c_addr_type,
+                'type_label_chn' => $r->c_addr_desc_chn,
+                'type_label' => $r->c_addr_desc,
+                'first_year' => $r->c_firstyear,
+                'last_year' => $r->c_lastyear,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -539,8 +545,8 @@ class PersonBrowserService {
                 'TEXT_CODES.c_title_chn',
                 'TEXT_CODES.c_title',
                 'TEXT_CODES.c_text_year',
-                'TEXT_ROLE_CODES.c_role_desc_chn AS c_role_chn',
-                'TEXT_ROLE_CODES.c_role_desc AS c_role',
+                'TEXT_ROLE_CODES.c_role_desc_chn',
+                'TEXT_ROLE_CODES.c_role_desc',
                 'BIOG_TEXT_DATA.c_textid',
                 'BIOG_TEXT_DATA.c_role_id',
             ])
@@ -550,20 +556,23 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_title_chn' => '著作（中文）',
-                'c_title' => '著作（英文）',
-                'c_text_year' => '年份',
-                'c_role_chn' => '角色（中文）',
-                'c_role' => '角色（英文）',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'texts',
+            'items' => $rows->map(fn ($r) => [
+                'text_id' => $r->c_textid,
+                'title_chn' => $r->c_title_chn,
+                'title' => $r->c_title,
+                'year' => $r->c_text_year,
+                'role_id' => $r->c_role_id,
+                'role_chn' => $r->c_role_desc_chn,
+                'role' => $r->c_role_desc,
+            ])->values()->all(),
         ];
     }
 
     private function tabSources(int $personId): array {
         $rows = DB::table('BIOG_SOURCE_DATA')
             ->select([
+                'BIOG_SOURCE_DATA.c_textid',
                 'TEXT_CODES.c_title_chn',
                 'TEXT_CODES.c_title',
                 'BIOG_SOURCE_DATA.c_pages',
@@ -576,15 +585,16 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_title_chn' => '出處（中文）',
-                'c_title' => '出處（英文）',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-                'c_main_source' => '主要出處',
-                'c_self_bio' => '自傳',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'sources',
+            'items' => $rows->map(fn ($r) => [
+                'text_id' => $r->c_textid,
+                'title_chn' => $r->c_title_chn,
+                'title' => $r->c_title,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+                'is_main_source' => (int) ($r->c_main_source ?? 0) === 1,
+                'is_self_bio' => (int) ($r->c_self_bio ?? 0) === 1,
+            ])->values()->all(),
         ];
     }
 
@@ -593,6 +603,7 @@ class PersonBrowserService {
             ->select([
                 'ENTRY_CODES.c_entry_desc_chn',
                 'ENTRY_CODES.c_entry_desc',
+                'ENTRY_DATA.c_entry_code',
                 'ENTRY_DATA.c_year',
                 'ENTRY_DATA.c_sequence',
                 'ENTRY_DATA.c_kin_code',
@@ -605,22 +616,93 @@ class PersonBrowserService {
             ->orderBy('ENTRY_DATA.c_sequence')
             ->get();
 
+        // 批次查找關聯人物姓名
+        $kinIds = $rows->pluck('c_kin_id')->filter()->unique()->values()->all();
+        $assocIds = $rows->pluck('c_assoc_id')->filter()->unique()->values()->all();
+        $allPersonIds = array_unique(array_merge($kinIds, $assocIds));
+        $personNames = [];
+        if (!empty($allPersonIds)) {
+            $personNames = DB::table('BIOG_MAIN')
+                ->select(['c_personid', 'c_name_chn', 'c_name'])
+                ->whereIn('c_personid', $allPersonIds)
+                ->get()
+                ->keyBy('c_personid');
+        }
+
+        // 查找親屬關係描述
+        $kinCodes = $rows->pluck('c_kin_code')->filter()->unique()->values()->all();
+        $kinLabels = [];
+        if (!empty($kinCodes)) {
+            $kinLabels = DB::table('KINSHIP_CODES')
+                ->select(['c_kincode', 'c_kinrel_chn', 'c_kinrel'])
+                ->whereIn('c_kincode', $kinCodes)
+                ->get()
+                ->keyBy('c_kincode');
+        }
+
+        // 查找社會關係描述
+        $assocCodes = $rows->pluck('c_assoc_code')->filter()->unique()->values()->all();
+        $assocLabels = [];
+        if (!empty($assocCodes)) {
+            $assocLabels = DB::table('ASSOC_CODES')
+                ->select(['c_assoc_code', 'c_assoc_desc_chn', 'c_assoc_desc'])
+                ->whereIn('c_assoc_code', $assocCodes)
+                ->get()
+                ->keyBy('c_assoc_code');
+        }
+
         return [
-            'columns' => [
-                'c_entry_desc_chn' => '入仕方式（中文）',
-                'c_entry_desc' => '入仕方式（英文）',
-                'c_year' => '年份',
-                'c_sequence' => '序號',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'entries',
+            'items' => $rows->map(function ($r) use ($personNames, $kinLabels, $assocLabels) {
+                $kinSummary = null;
+                if (!empty($r->c_kin_id)) {
+                    $kinPerson = $personNames[$r->c_kin_id] ?? null;
+                    $kinLabel = $kinLabels[$r->c_kin_code] ?? null;
+                    $parts = [];
+                    if ($kinLabel) {
+                        $parts[] = $kinLabel->c_kinrel_chn ?? $kinLabel->c_kinrel ?? '';
+                    }
+                    if ($kinPerson) {
+                        $parts[] = $kinPerson->c_name_chn ?? $kinPerson->c_name ?? '';
+                    }
+                    $kinSummary = implode(' ', array_filter($parts)) ?: (string) $r->c_kin_id;
+                }
+
+                $assocSummary = null;
+                if (!empty($r->c_assoc_id)) {
+                    $assocPerson = $personNames[$r->c_assoc_id] ?? null;
+                    $assocLabel = $assocLabels[$r->c_assoc_code] ?? null;
+                    $parts = [];
+                    if ($assocLabel) {
+                        $parts[] = $assocLabel->c_assoc_desc_chn ?? $assocLabel->c_assoc_desc ?? '';
+                    }
+                    if ($assocPerson) {
+                        $parts[] = $assocPerson->c_name_chn ?? $assocPerson->c_name ?? '';
+                    }
+                    $assocSummary = implode(' ', array_filter($parts)) ?: (string) $r->c_assoc_id;
+                }
+
+                return [
+                    'sequence' => $r->c_sequence,
+                    'entry_code' => $r->c_entry_code,
+                    'entry_desc_chn' => $r->c_entry_desc_chn,
+                    'entry_desc' => $r->c_entry_desc,
+                    'year' => $r->c_year,
+                    'kin_id' => $r->c_kin_id,
+                    'kin_summary' => $kinSummary,
+                    'assoc_id' => $r->c_assoc_id,
+                    'assoc_summary' => $assocSummary,
+                ];
+            })->values()->all(),
         ];
     }
 
     private function tabEvents(int $personId): array {
         $rows = DB::table('EVENTS_DATA')
             ->select([
-                'EVENT_CODES.c_event_name_chn AS c_event_desc_chn',
-                'EVENT_CODES.c_event_name AS c_event_desc',
+                'EVENT_CODES.c_event_name_chn',
+                'EVENT_CODES.c_event_name',
+                'EVENTS_DATA.c_event_code',
                 'EVENTS_DATA.c_sequence',
                 'EVENTS_DATA.c_year',
                 'EVENTS_DATA.c_month',
@@ -635,17 +717,34 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_event_desc_chn' => '事件（中文）',
-                'c_event_desc' => '事件（英文）',
-                'c_year' => '年份',
-                'c_month' => '月',
-                'c_day' => '日',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'events',
+            'items' => $rows->map(function ($r) {
+                // 組合日期摘要
+                $dateParts = [];
+                if (!empty($r->c_year)) {
+                    $dateParts[] = $r->c_year . '年';
+                }
+                if (!empty($r->c_month)) {
+                    $dateParts[] = $r->c_month . '月';
+                }
+                if (!empty($r->c_day)) {
+                    $dateParts[] = $r->c_day . '日';
+                }
+
+                return [
+                    'sequence' => $r->c_sequence,
+                    'event_code' => $r->c_event_code,
+                    'event_chn' => $r->c_event_name_chn,
+                    'event' => $r->c_event_name,
+                    'year' => $r->c_year,
+                    'month' => $r->c_month,
+                    'day' => $r->c_day,
+                    'date_summary' => implode('', $dateParts) ?: null,
+                    'source_id' => $r->c_source,
+                    'pages' => $r->c_pages,
+                    'notes' => $r->c_notes,
+                ];
+            })->values()->all(),
         ];
     }
 
@@ -654,6 +753,7 @@ class PersonBrowserService {
             ->select([
                 'STATUS_CODES.c_status_desc_chn',
                 'STATUS_CODES.c_status_desc',
+                'STATUS_DATA.c_status_code',
                 'STATUS_DATA.c_sequence',
                 'STATUS_DATA.c_firstyear',
                 'STATUS_DATA.c_lastyear',
@@ -667,16 +767,18 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_status_desc_chn' => '身分（中文）',
-                'c_status_desc' => '身分（英文）',
-                'c_firstyear' => '始年',
-                'c_lastyear' => '終年',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'statuses',
+            'items' => $rows->map(fn ($r) => [
+                'sequence' => $r->c_sequence,
+                'status_code' => $r->c_status_code,
+                'status_chn' => $r->c_status_desc_chn,
+                'status' => $r->c_status_desc,
+                'first_year' => $r->c_firstyear,
+                'last_year' => $r->c_lastyear,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -685,6 +787,7 @@ class PersonBrowserService {
             ->select([
                 'ASSOC_CODES.c_assoc_desc_chn',
                 'ASSOC_CODES.c_assoc_desc',
+                'ASSOC_DATA.c_assoc_code',
                 'ASSOC_DATA.c_assoc_id',
                 'BM.c_name_chn AS assoc_name_chn',
                 'BM.c_name AS assoc_name',
@@ -701,19 +804,20 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_assoc_desc_chn' => '關係（中文）',
-                'c_assoc_desc' => '關係（英文）',
-                'c_assoc_id' => '關聯人物 ID',
-                'assoc_name_chn' => '關聯人物（中文）',
-                'assoc_name' => '關聯人物（英文）',
-                'c_assoc_first_year' => '始年',
-                'c_assoc_last_year' => '終年',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'associations',
+            'items' => $rows->map(fn ($r) => [
+                'assoc_code' => $r->c_assoc_code,
+                'assoc_desc_chn' => $r->c_assoc_desc_chn,
+                'assoc_desc' => $r->c_assoc_desc,
+                'assoc_person_id' => $r->c_assoc_id,
+                'assoc_person_name_chn' => $r->assoc_name_chn,
+                'assoc_person_name' => $r->assoc_name,
+                'first_year' => $r->c_assoc_first_year,
+                'last_year' => $r->c_assoc_last_year,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -722,6 +826,7 @@ class PersonBrowserService {
             ->select([
                 'KINSHIP_CODES.c_kinrel_chn',
                 'KINSHIP_CODES.c_kinrel',
+                'KIN_DATA.c_kin_code',
                 'KIN_DATA.c_kin_id',
                 'BM.c_name_chn AS kin_name_chn',
                 'BM.c_name AS kin_name',
@@ -735,17 +840,18 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_kinrel_chn' => '關係（中文）',
-                'c_kinrel' => '關係（英文）',
-                'c_kin_id' => '親屬 ID',
-                'kin_name_chn' => '親屬（中文）',
-                'kin_name' => '親屬（英文）',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'kinship',
+            'items' => $rows->map(fn ($r) => [
+                'kin_code' => $r->c_kin_code,
+                'relation_chn' => $r->c_kinrel_chn,
+                'relation' => $r->c_kinrel,
+                'kin_person_id' => $r->c_kin_id,
+                'kin_person_name_chn' => $r->kin_name_chn,
+                'kin_person_name' => $r->kin_name,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -754,6 +860,7 @@ class PersonBrowserService {
             ->select([
                 'POSSESSION_ACT_CODES.c_possession_act_desc_chn',
                 'POSSESSION_ACT_CODES.c_possession_act_desc',
+                'POSSESSION_DATA.c_possession_act_code',
                 'POSSESSION_DATA.c_possession_desc_chn',
                 'POSSESSION_DATA.c_possession_desc',
                 'POSSESSION_DATA.c_quantity',
@@ -767,18 +874,19 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_possession_act_desc_chn' => '行為（中文）',
-                'c_possession_act_desc' => '行為（英文）',
-                'c_possession_desc_chn' => '財產（中文）',
-                'c_possession_desc' => '財產（英文）',
-                'c_quantity' => '數量',
-                'c_possession_yr' => '年份',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'possessions',
+            'items' => $rows->map(fn ($r) => [
+                'act_code' => $r->c_possession_act_code,
+                'act_chn' => $r->c_possession_act_desc_chn,
+                'act' => $r->c_possession_act_desc,
+                'desc_chn' => $r->c_possession_desc_chn,
+                'desc' => $r->c_possession_desc,
+                'quantity' => $r->c_quantity,
+                'year' => $r->c_possession_yr,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -786,9 +894,11 @@ class PersonBrowserService {
         $rows = DB::table('BIOG_INST_DATA')
             ->select([
                 'BIOG_INST_CODES.c_bi_role_chn',
-                'BIOG_INST_CODES.c_bi_role_desc AS c_bi_role',
-                'INST_NAMES.c_inst_name_hz AS c_inst_name_chn',
-                'INST_NAMES.c_inst_name_py AS c_inst_name',
+                'BIOG_INST_CODES.c_bi_role_desc',
+                'BIOG_INST_DATA.c_bi_role_code',
+                'INST_NAMES.c_inst_name_hz',
+                'INST_NAMES.c_inst_name_py',
+                'BIOG_INST_DATA.c_inst_name_code',
                 'BIOG_INST_DATA.c_source',
                 'BIOG_INST_DATA.c_pages',
                 'BIOG_INST_DATA.c_notes',
@@ -799,16 +909,18 @@ class PersonBrowserService {
             ->get();
 
         return [
-            'columns' => [
-                'c_bi_role_chn' => '角色（中文）',
-                'c_bi_role' => '角色（英文）',
-                'c_inst_name_chn' => '機構（中文）',
-                'c_inst_name' => '機構（英文）',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $rows->map(fn ($r) => (array) $r)->values()->all(),
+            'tab' => 'social_institutions',
+            'items' => $rows->map(fn ($r) => [
+                'role_code' => $r->c_bi_role_code,
+                'role_chn' => $r->c_bi_role_chn,
+                'role' => $r->c_bi_role_desc,
+                'inst_name_code' => $r->c_inst_name_code,
+                'inst_name_chn' => $r->c_inst_name_hz,
+                'inst_name' => $r->c_inst_name_py,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
+            ])->values()->all(),
         ];
     }
 
@@ -816,7 +928,8 @@ class PersonBrowserService {
         $rows = DB::table('POSTED_TO_OFFICE_DATA')
             ->select([
                 'OFFICE_CODES.c_office_chn',
-                'OFFICE_CODES.c_office_trans AS c_office',
+                'OFFICE_CODES.c_office_trans',
+                'POSTED_TO_OFFICE_DATA.c_office_id',
                 'POSTED_TO_OFFICE_DATA.c_posting_id',
                 'POSTED_TO_OFFICE_DATA.c_sequence',
                 'POSTED_TO_OFFICE_DATA.c_firstyear',
@@ -843,30 +956,43 @@ class PersonBrowserService {
             ->get()
             ->groupBy('c_posting_id');
 
-        $result = $rows->map(function ($r) use ($addrRows) {
-            $row = (array) $r;
-            $postingId = $row['c_posting_id'] ?? null;
-            $addrs = $addrRows->get($postingId, collect());
-            $row['addresses'] = $addrs->map(function ($a) {
-                return ($a->addr_chn ?? '') . ($a->addr ? ' / ' . $a->addr : '');
-            })->implode('；');
-
-            return $row;
-        });
-
         return [
-            'columns' => [
-                'c_office_chn' => '官名（中文）',
-                'c_office' => '官名（英文）',
-                'addresses' => '任官地址',
-                'c_sequence' => '序號',
-                'c_firstyear' => '始年',
-                'c_lastyear' => '終年',
-                'c_source' => '出處',
-                'c_pages' => '頁碼',
-                'c_notes' => '備註',
-            ],
-            'rows' => $result->values()->all(),
+            'tab' => 'postings',
+            'items' => $rows->map(function ($r) use ($addrRows) {
+                $postingId = $r->c_posting_id;
+                $addrs = $addrRows->get($postingId, collect());
+
+                // 組合任期摘要
+                $tenureParts = [];
+                if (!empty($r->c_firstyear)) {
+                    $tenureParts[] = $r->c_firstyear;
+                }
+                if (!empty($r->c_lastyear)) {
+                    $tenureParts[] = $r->c_lastyear;
+                }
+                $tenureSummary = implode('–', $tenureParts) ?: null;
+
+                return [
+                    'sequence' => $r->c_sequence,
+                    'office_id' => $r->c_office_id,
+                    'posting_id' => $r->c_posting_id,
+                    'office_chn' => $r->c_office_chn,
+                    'office' => $r->c_office_trans,
+                    'first_year' => $r->c_firstyear,
+                    'last_year' => $r->c_lastyear,
+                    'tenure_summary' => $tenureSummary,
+                    'addresses' => $addrs->map(fn ($a) => [
+                        'addr_chn' => $a->addr_chn,
+                        'addr' => $a->addr,
+                    ])->values()->all(),
+                    'address_summary' => $addrs->map(function ($a) {
+                        return ($a->addr_chn ?? '') . ($a->addr ? ' / ' . $a->addr : '');
+                    })->implode('；'),
+                    'source_id' => $r->c_source,
+                    'pages' => $r->c_pages,
+                    'notes' => $r->c_notes,
+                ];
+            })->values()->all(),
         ];
     }
 

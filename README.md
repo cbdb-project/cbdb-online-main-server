@@ -9,6 +9,7 @@
 ### 開發指南
 * [AGENTS 指南](./AGENTS.md) - AI 代理開發必讀
 * [數據庫完整指南](./DATABASE.md) - ⚠️ 必讀：環境、兼容性、Schema 管理
+* [Dev Container 使用說明](./.devcontainer/README.md) - VS Code / Codespaces 一鍵啟動開發環境
 * [CHANGELOG](./CHANGELOG.md)
 
 ### 開發手記

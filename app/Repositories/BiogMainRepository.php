@@ -266,7 +266,7 @@ class BiogMainRepository {
 
         // 提取註解與動作，並從更新數據中移除，避免 SQL unknown column 錯誤
         $comment = $data['__proposal_comment'] ?? null;
-        $data = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode', 'action', '__proposal_comment']));
+        $data = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode', 'action', '__proposal_comment', 'c_created_by', 'c_created_date']));
 
         $biogbasicinformation = BiogMain::find($id);
         $ori = $biogbasicinformation->toArray();
@@ -3223,7 +3223,7 @@ class BiogMainRepository {
         }
 
         $data = $request->all();
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_created_by', 'c_created_date']);
         $data['c_personid'] = $id;
         // Select2 對 id=0 處理有問題，API 中 c_textid=0 會被轉換為 -999，需轉回 0
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];

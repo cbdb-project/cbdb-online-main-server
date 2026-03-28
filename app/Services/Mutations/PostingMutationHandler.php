@@ -5,7 +5,7 @@ namespace App\Services\Mutations;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 
-class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler {
+class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
     public function __construct(
         OperationRepository $operationRepository,
         AuditLogService $auditLogService
@@ -14,26 +14,34 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
     }
 
     protected function resourceName(): string {
-        return 'possessions';
+        return 'postings';
     }
 
     protected function tableName(): string {
-        return 'POSSESSION_DATA';
+        return 'POSTED_TO_OFFICE_DATA';
     }
 
     protected function displayName(): string {
-        return '財產';
+        return '任官';
     }
 
     protected function resourceAliases(): array {
-        return ['possessions', 'possession', 'possession_data'];
+        return ['postings', 'posting', 'offices', 'posted_to_office_data'];
     }
 
     protected function keyColumns(): array {
-        return ['c_possession_record_id'];
+        return ['c_office_id', 'c_posting_id'];
     }
 
-    /** POSSESSION_DATA 的 PK 不含 c_personid，需覆寫 handle 流程 */
+    /** 任官表的 person_id 不在主鍵中，需另外查詢 */
+    protected function personIdColumn(): string {
+        return 'c_personid';
+    }
+
+    /**
+     * 覆寫 PK 驗證邏輯：POSTED_TO_OFFICE_DATA 的 PK 不含 c_personid，
+     * 但 API 仍需 person_id 做一致性檢查，因此跳過 PK 中的 person_id 比對。
+     */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): \Illuminate\Http\JsonResponse {
         // 1. 授權
         $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
@@ -108,23 +116,36 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
 
     protected function allowedFields(): array {
         return [
+            'c_office_id',
             'c_sequence',
             'c_source',
             'c_pages',
             'c_notes',
             'c_supplement',
-            'c_possession_act_code',
-            'c_measure_code',
-            'c_measure_value',
             'c_firstyear',
+            'c_fy_nh_code',
+            'c_fy_nh_year',
+            'c_fy_range',
+            'c_fy_intercalary',
             'c_lastyear',
+            'c_ly_nh_code',
+            'c_ly_nh_year',
+            'c_ly_range',
+            'c_ly_intercalary',
+            'c_appt_type_code',
+            'c_assume_office_code',
         ];
     }
 
     protected function preprocessUpdateData(array $data): array {
-        $data = $this->normalizeSentinelValues($data, [
-            'c_source', 'c_measure_code', 'c_possession_act_code',
-        ]);
+        $data = $this->normalizeSentinelValues($data, ['c_office_id', 'c_source']);
+
+        if (array_key_exists('c_fy_intercalary', $data)) {
+            $data['c_fy_intercalary'] = (int) ($data['c_fy_intercalary'] ?? 0);
+        }
+        if (array_key_exists('c_ly_intercalary', $data)) {
+            $data['c_ly_intercalary'] = (int) ($data['c_ly_intercalary'] ?? 0);
+        }
 
         return $data;
     }

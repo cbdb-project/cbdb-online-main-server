@@ -14,7 +14,13 @@ class MutationHandlerRegistry {
         AddressMutationHandler $addressHandler,
         EntryMutationHandler $entryHandler,
         StatusMutationHandler $statusHandler,
+        EventMutationHandler $eventHandler,
+        AssociationMutationHandler $associationHandler,
+        KinshipMutationHandler $kinshipHandler,
         PossessionMutationHandler $possessionHandler,
+        TextMutationHandler $textHandler,
+        PostingMutationHandler $postingHandler,
+        SocialInstitutionMutationHandler $socialInstitutionHandler,
         SourceMutationHandler $sourceHandler,
         NianHaoMutationHandler $nianHaoHandler
     ) {
@@ -24,7 +30,13 @@ class MutationHandlerRegistry {
             $addressHandler,
             $entryHandler,
             $statusHandler,
+            $eventHandler,
+            $associationHandler,
+            $kinshipHandler,
             $possessionHandler,
+            $textHandler,
+            $postingHandler,
+            $socialInstitutionHandler,
             $sourceHandler,
             $nianHaoHandler,
         ];

@@ -231,6 +231,24 @@ class ApiV2CreateAddressTest extends TestCase {
         $this->assertSame('INSERT', $audit->operation);
     }
 
+    #[Test]
+    public function testDirectAddressCreatePopulatesTimestampFields(): void {
+        $user = $this->makeUser(email: 'create-addr-ts@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload());
+
+        $row = DB::table('BIOG_ADDR_DATA')
+            ->where('c_personid', 1000)
+            ->where('c_addr_id', 200)
+            ->first();
+        $this->assertNotNull($row);
+        $this->assertSame('tester', $row->c_created_by);
+        $this->assertNotNull($row->c_created_date);
+        $this->assertNull($row->c_modified_by);
+        $this->assertNull($row->c_modified_date);
+    }
+
     // ── Proposal Create Tests ───────────────────────────────
 
     #[Test]

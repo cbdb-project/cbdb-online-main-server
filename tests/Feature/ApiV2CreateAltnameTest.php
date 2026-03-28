@@ -235,6 +235,60 @@ class ApiV2CreateAltnameTest extends TestCase {
         $this->assertSame('INSERT', $audit->operation);
     }
 
+    #[Test]
+    public function testDirectAltnameCreatePopulatesTimestampFields(): void {
+        $user = $this->makeUser(email: 'create-ts@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload());
+
+        $row = DB::table('ALTNAME_DATA')->where('c_alt_name_chn', '少陵')->first();
+        $this->assertNotNull($row);
+        $this->assertSame('tester', $row->c_created_by);
+        $this->assertNotNull($row->c_created_date);
+        $this->assertNull($row->c_modified_by);
+        $this->assertNull($row->c_modified_date);
+    }
+
+    #[Test]
+    public function testDirectAltnameCreateWithSentinelKeyNormalizesAndReadsBack(): void {
+        $user = $this->makeUser(email: 'create-sentinel@example.com');
+        $this->actingAs($user);
+
+        // c_alt_name_type_code = -999 會被正規化為 '0'
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_alt_name_chn' => '測試名',
+                    'c_alt_name_type_code' => -999,
+                ],
+            ],
+        ]));
+
+        $response->assertOk();
+
+        // 回傳的 PK 應該是正規化後的值
+        $data = $response->json();
+        $this->assertEquals(0, $data['result']['pk']['c_alt_name_type_code']);
+
+        // row readback 應包含實際資料
+        $this->assertNotEmpty($data['result']['row']);
+
+        // 資料庫中的記錄應使用正規化後的 PK
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '測試名',
+            'c_alt_name_type_code' => 0,
+        ]);
+
+        // audit_log 中的 row_pk 應包含正規化後的值
+        $audit = DB::table('audit_log')->where('table_name', 'ALTNAME_DATA')->first();
+        $this->assertNotNull($audit);
+        $rowPk = json_decode($audit->row_pk, true);
+        $this->assertEquals(0, $rowPk['c_alt_name_type_code']);
+    }
+
     // ── Proposal Create Tests ───────────────────────────────
 
     #[Test]

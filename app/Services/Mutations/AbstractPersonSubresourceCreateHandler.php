@@ -4,6 +4,7 @@ namespace App\Services\Mutations;
 
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
+use App\Repositories\ToolsRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -117,8 +118,11 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
         // 8. 前處理（子類可覆寫，如 -999 → 0 轉換）
         $rowData = $this->preprocessCreateData($rowData);
 
-        // 9. 檢查目標 PK 是否已存在
-        $existing = $this->findExistingRow($targetPk);
+        // 8.1 從正規化後的 rowData 提取實際 PK（前處理可能改變 key 值）
+        $actualPk = $this->extractPkFromRow($rowData);
+
+        // 9. 檢查目標 PK 是否已存在（使用正規化後的 PK）
+        $existing = $this->findExistingRow($actualPk);
         if ($existing) {
             return $this->errorResponse('目標主鍵已存在', 409, ['target.pk' => ['conflict']]);
         }
@@ -127,10 +131,10 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
 
         // 10. 分派到 direct / proposal
         if ($mode === 'proposal') {
-            return $this->handleProposal($personId, $targetPk, $rowData, $comment);
+            return $this->handleProposal($personId, $actualPk, $rowData, $comment);
         }
 
-        return $this->handleDirect($personId, $targetPk, $rowData, $comment);
+        return $this->handleDirect($personId, $actualPk, $rowData, $comment);
     }
 
     /**
@@ -155,12 +159,16 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
         $operation = null;
         $insertedArray = [];
 
+        // 填充 c_created_by / c_created_date
+        $toolsRepo = app(ToolsRepository::class);
+        $rowData = $toolsRepo->timestamp($rowData, true);
+
         try {
             DB::transaction(function () use ($personId, $targetPk, $rowData, $comment, $operationId, &$operation, &$insertedArray) {
                 // 寫入資料表
                 $this->performInsert($rowData);
 
-                // 讀回新增的資料
+                // 讀回新增的資料（使用正規化後的 PK）
                 $insertedRow = $this->findExistingRow($targetPk);
                 $insertedArray = $this->auditLogService->normalizeRow($insertedRow);
 
@@ -182,7 +190,7 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
                     []
                 );
 
-                // 寫 audit_log
+                // 寫 audit_log（使用正規化後的 PK）
                 $this->auditLogService->write(
                     $this->tableName(),
                     'INSERT',
@@ -266,6 +274,16 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     }
 
     // ── 可覆寫的 helper ──────────────────────────────────────
+
+    /** 從 rowData 中提取 PK 欄位（使用正規化後的值） */
+    protected function extractPkFromRow(array $rowData): array {
+        $pk = [];
+        foreach ($this->keyColumns() as $col) {
+            $pk[$col] = $rowData[$col] ?? null;
+        }
+
+        return $pk;
+    }
 
     /** 查詢是否已有同 PK 的記錄 */
     protected function findExistingRow(array $pk): ?object {

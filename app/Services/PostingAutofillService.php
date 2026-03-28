@@ -710,7 +710,26 @@ class PostingAutofillService {
                 }
             }
 
-            // 當使用朝代範圍過濾且仍有多條同名結果時，優先選有效期與朝代重疊最多的
+            // 朝代消歧：利用 ADDRESSES 表的層級鏈（最頂層為朝代）進行精確朝代匹配
+            // 若朝代匹配無結果，則 fallback 到時間段重疊排序
+            if ($isAmbiguous && $dynastyCode !== null) {
+                $dynastyFiltered = $this->filterByDynastyHierarchy(
+                    $results->pluck('id')->toArray(),
+                    $dynastyCode,
+                    $effectiveYear,
+                    $dynastyRangeFilter
+                );
+
+                if ($dynastyFiltered !== null && $dynastyFiltered->count() > 0) {
+                    $results = $results->whereIn('id', $dynastyFiltered->toArray());
+                    $isAmbiguous = $results->count() > 1;
+                    if (!$isAmbiguous) {
+                        $parentMatched = true; // 朝代匹配成功視同消歧成功
+                    }
+                }
+            }
+
+            // Fallback：仍有歧義時，優先選有效期與朝代重疊最多的
             if ($isAmbiguous && $dynastyRangeFilter !== null) {
                 $dyStart = $dynastyRangeFilter['start'];
                 $dyEnd = $dynastyRangeFilter['end'];
@@ -764,6 +783,129 @@ class PostingAutofillService {
             'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
             'matched_length' => mb_strlen($result->text),
         ] : null;
+    }
+
+    /**
+     * 利用 ADDRESSES 表的行政層級鏈進行朝代消歧
+     *
+     * ADDRESSES 表的 belongsX_Name_chn 記錄了完整的行政層級，最頂層為朝代（如「宋朝」「遼朝」）。
+     * 透過匹配層級鏈中的朝代名稱，可精確區分宋/遼/金等並存朝代下的同名地名。
+     *
+     * @param array $candidateIds 候選地址 ID 列表
+     * @param int $dynastyCode 朝代代碼
+     * @param int|null $effectiveYear 任官年份（用於過濾 ADDRESSES 的時間段）
+     * @param array|null $dynastyRangeFilter 朝代年份範圍（無具體年份時使用）
+     * @return \Illuminate\Support\Collection|null 匹配的地址 ID 集合，無法匹配時返回 null
+     */
+    protected function filterByDynastyHierarchy(array $candidateIds, int $dynastyCode, ?int $effectiveYear, ?array $dynastyRangeFilter): ?\Illuminate\Support\Collection {
+        if (empty($candidateIds)) {
+            return null;
+        }
+
+        // 取得朝代中文名（如「宋」「遼」「金」）
+        $dynastyChn = DB::table('DYNASTIES')
+            ->where('c_dy', $dynastyCode)
+            ->value('c_dynasty_chn');
+
+        if (empty($dynastyChn)) {
+            return null;
+        }
+
+        // 從 ADDRESSES 表查詢候選地址的層級記錄
+        $query = DB::table('ADDRESSES')
+            ->whereIn('c_addr_id', $candidateIds)
+            ->select(
+                'c_addr_id',
+                'c_belongs_firstyear',
+                'c_belongs_lastyear',
+                'belongs1_Name_chn',
+                'belongs2_Name_chn',
+                'belongs3_Name_chn',
+                'belongs4_Name_chn',
+                'belongs5_Name_chn'
+            );
+
+        // 加入時間過濾：只匹配任官時間內有效的層級記錄
+        // 處理 NULL 值：視為開放式邊界（與 applyAddrTimeFilter 一致）
+        if ($effectiveYear !== null) {
+            $query->where(function ($q) use ($effectiveYear) {
+                $q->where(function ($sub) use ($effectiveYear) {
+                    $sub->where('c_belongs_firstyear', '<=', $effectiveYear)
+                        ->where('c_belongs_lastyear', '>=', $effectiveYear);
+                })->orWhere(function ($sub) {
+                    $sub->whereNull('c_belongs_firstyear')
+                        ->whereNull('c_belongs_lastyear');
+                })->orWhere(function ($sub) use ($effectiveYear) {
+                    $sub->where('c_belongs_firstyear', '<=', $effectiveYear)
+                        ->whereNull('c_belongs_lastyear');
+                })->orWhere(function ($sub) use ($effectiveYear) {
+                    $sub->whereNull('c_belongs_firstyear')
+                        ->where('c_belongs_lastyear', '>=', $effectiveYear);
+                });
+            });
+        } elseif ($dynastyRangeFilter !== null) {
+            $dyStart = $dynastyRangeFilter['start'];
+            $dyEnd = $dynastyRangeFilter['end'];
+            $query->where(function ($q) use ($dyStart, $dyEnd) {
+                $q->where(function ($sub) use ($dyStart, $dyEnd) {
+                    $sub->where('c_belongs_firstyear', '<=', $dyEnd)
+                        ->where('c_belongs_lastyear', '>=', $dyStart);
+                })->orWhere(function ($sub) {
+                    $sub->whereNull('c_belongs_firstyear')
+                        ->whereNull('c_belongs_lastyear');
+                })->orWhere(function ($sub) use ($dyEnd) {
+                    $sub->where('c_belongs_firstyear', '<=', $dyEnd)
+                        ->whereNull('c_belongs_lastyear');
+                })->orWhere(function ($sub) use ($dyStart) {
+                    $sub->whereNull('c_belongs_firstyear')
+                        ->where('c_belongs_lastyear', '>=', $dyStart);
+                });
+            });
+        }
+
+        $rows = $query->get();
+
+        if ($rows->isEmpty()) {
+            Log::info('[AI Autofill] ADDRESSES 表無匹配記錄，跳過朝代消歧', [
+                'candidate_ids' => $candidateIds,
+                'dynasty_code' => $dynastyCode,
+            ]);
+
+            return null;
+        }
+
+        // 檢查每個候選地址層級鏈的最頂層（最後一個有值的 belongsX）是否為目標朝代
+        // ADDRESSES 中朝代格式為「宋朝」「遼朝」，DYNASTIES 為「宋」「遼」，使用 contains 匹配
+        $matchedIds = $rows->filter(function ($row) use ($dynastyChn) {
+            // 取最後一個有值的 belongsX_Name_chn（即最頂層，通常是朝代）
+            $levels = [
+                $row->belongs5_Name_chn,
+                $row->belongs4_Name_chn,
+                $row->belongs3_Name_chn,
+                $row->belongs2_Name_chn,
+                $row->belongs1_Name_chn,
+            ];
+
+            $topLevel = null;
+            foreach ($levels as $levelName) {
+                if ($levelName !== null) {
+                    $topLevel = $levelName;
+
+                    break;
+                }
+            }
+
+            return $topLevel !== null && str_contains($topLevel, $dynastyChn);
+        })->pluck('c_addr_id')->unique();
+
+        Log::info('[AI Autofill] 朝代層級消歧結果', [
+            'candidate_ids' => $candidateIds,
+            'dynasty_chn' => $dynastyChn,
+            'matched_addr_ids' => $matchedIds->values()->toArray(),
+            'total_addresses_rows' => $rows->count(),
+        ]);
+
+        return $matchedIds->isNotEmpty() ? $matchedIds : null;
     }
 
     /**

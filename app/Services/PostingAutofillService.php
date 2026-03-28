@@ -631,20 +631,21 @@ class PostingAutofillService {
      */
     protected function fuzzyMatchAddress(string $addrName, ?int $year = null, ?int $dynastyCode = null, ?string $parentName = null): ?array {
         // ========== 年份 Fallback 邏輯 ==========
-        // 優先使用任官年份，如果為 null 則 fallback 到朝代年份範圍
+        // 優先使用任官年份；無具體年份時，改用朝代範圍交集過濾
         $effectiveYear = $year;
+        $dynastyRangeFilter = null; // 朝代範圍（僅在無具體年份時使用）
         if ($effectiveYear === null && $dynastyCode !== null) {
             $dynastyRange = $this->getDynastyYearRange($dynastyCode);
             if ($dynastyRange) {
-                // 使用朝代的中點年份作為過濾條件
-                $effectiveYear = (int)(($dynastyRange['start'] + $dynastyRange['end']) / 2);
+                // 無具體任官年份時，只要地名有效期與朝代有交集即可
+                $dynastyRangeFilter = $dynastyRange;
             }
         }
 
         // ========== Step 1: 精確匹配 c_name_chn ==========
         // 注意：使用 ADDR_CODES 表（與 Select2 API 一致）
         $query = DB::table('ADDR_CODES')
-            ->select('c_addr_id as id', 'c_name_chn as text')
+            ->select('c_addr_id as id', 'c_name_chn as text', 'c_firstyear', 'c_lastyear')
             ->where('c_name_chn', '=', $addrName)
             // AI 填充時過濾交通設施相關地名
             ->where('c_name_chn', 'not like', '%驛')  // 驛：全部過濾
@@ -654,28 +655,8 @@ class PostingAutofillService {
             // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
             ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
-        // 加入時間範圍過濾（如果有提供年份）
-        if ($effectiveYear !== null) {
-            $query->where(function ($q) use ($effectiveYear) {
-                $q->where(function ($subQ) use ($effectiveYear) {
-                    // 地名有效期間包含任官年份（兩邊都有值）
-                    $subQ->where('c_firstyear', '<=', $effectiveYear)
-                        ->where('c_lastyear', '>=', $effectiveYear);
-                })->orWhere(function ($subQ) {
-                    // 時間範圍為 NULL（代表不限時間）
-                    $subQ->whereNull('c_firstyear')
-                        ->whereNull('c_lastyear');
-                })->orWhere(function ($subQ) use ($effectiveYear) {
-                    // 開放式結束（只有開始年份，沒有結束年份）
-                    $subQ->where('c_firstyear', '<=', $effectiveYear)
-                        ->whereNull('c_lastyear');
-                })->orWhere(function ($subQ) use ($effectiveYear) {
-                    // 開放式開始（只有結束年份，沒有開始年份）
-                    $subQ->whereNull('c_firstyear')
-                        ->where('c_lastyear', '>=', $effectiveYear);
-                });
-            });
-        }
+        // 加入時間過濾
+        $this->applyAddrTimeFilter($query, $effectiveYear, $dynastyRangeFilter);
 
         $results = $query->get();
         if ($results->count() > 0) {
@@ -729,6 +710,21 @@ class PostingAutofillService {
                 }
             }
 
+            // 當使用朝代範圍過濾且仍有多條同名結果時，優先選有效期與朝代重疊最多的
+            if ($isAmbiguous && $dynastyRangeFilter !== null) {
+                $dyStart = $dynastyRangeFilter['start'];
+                $dyEnd = $dynastyRangeFilter['end'];
+                $results = $results->sortByDesc(function ($addr) use ($dyStart, $dyEnd) {
+                    // 計算地名有效期與朝代的重疊天數（越大越優先）
+                    $addrStart = $addr->c_firstyear ?? $dyStart;
+                    $addrEnd = $addr->c_lastyear ?? $dyEnd;
+                    $overlapStart = max($addrStart, $dyStart);
+                    $overlapEnd = min($addrEnd, $dyEnd);
+
+                    return max(0, $overlapEnd - $overlapStart);
+                });
+            }
+
             $result = $results->first();
 
             // 判斷 match_type：
@@ -757,27 +753,8 @@ class PostingAutofillService {
             // SQLite 使用 LENGTH，MySQL/MariaDB 使用 CHAR_LENGTH
             ->whereRaw('NOT (c_name_chn LIKE ? AND ' . (is_sqlite() ? 'LENGTH' : 'CHAR_LENGTH') . '(c_name_chn) > 2)', ['%津']);
 
-        if ($effectiveYear !== null) {
-            $query->where(function ($q) use ($effectiveYear) {
-                $q->where(function ($subQ) use ($effectiveYear) {
-                    // 兩邊都有值且包含任官年份
-                    $subQ->where('c_firstyear', '<=', $effectiveYear)
-                        ->where('c_lastyear', '>=', $effectiveYear);
-                })->orWhere(function ($subQ) {
-                    // 兩邊都為 NULL
-                    $subQ->whereNull('c_firstyear')
-                        ->whereNull('c_lastyear');
-                })->orWhere(function ($subQ) use ($effectiveYear) {
-                    // 開放式結束（只有開始年份）
-                    $subQ->where('c_firstyear', '<=', $effectiveYear)
-                        ->whereNull('c_lastyear');
-                })->orWhere(function ($subQ) use ($effectiveYear) {
-                    // 開放式開始（只有結束年份）
-                    $subQ->whereNull('c_firstyear')
-                        ->where('c_lastyear', '>=', $effectiveYear);
-                });
-            });
-        }
+        // 加入時間過濾
+        $this->applyAddrTimeFilter($query, $effectiveYear, $dynastyRangeFilter);
 
         $result = $query->first();
 
@@ -787,6 +764,58 @@ class PostingAutofillService {
             'match_type' => 'fuzzy',  // 前綴匹配視為模糊匹配
             'matched_length' => mb_strlen($result->text),
         ] : null;
+    }
+
+    /**
+     * 為地址查詢加入時間過濾條件
+     *
+     * 兩種模式：
+     * 1. 精確年份：地名有效期包含該年份
+     * 2. 朝代範圍交集：地名有效期與朝代有任何重疊即可
+     */
+    protected function applyAddrTimeFilter($query, ?int $effectiveYear, ?array $dynastyRangeFilter): void {
+        if ($effectiveYear !== null) {
+            // 模式 1：有具體年份，地名有效期須包含該年份
+            $query->where(function ($q) use ($effectiveYear) {
+                $q->where(function ($subQ) use ($effectiveYear) {
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                })->orWhere(function ($subQ) {
+                    $subQ->whereNull('c_firstyear')
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    $subQ->where('c_firstyear', '<=', $effectiveYear)
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($effectiveYear) {
+                    $subQ->whereNull('c_firstyear')
+                        ->where('c_lastyear', '>=', $effectiveYear);
+                });
+            });
+        } elseif ($dynastyRangeFilter !== null) {
+            // 模式 2：無具體年份，只要地名有效期與朝代範圍有交集即可
+            // 交集條件：addr.firstyear <= dynasty.end AND addr.lastyear >= dynasty.start
+            $dyStart = $dynastyRangeFilter['start'];
+            $dyEnd = $dynastyRangeFilter['end'];
+            $query->where(function ($q) use ($dyStart, $dyEnd) {
+                $q->where(function ($subQ) use ($dyStart, $dyEnd) {
+                    // 兩邊都有值，且與朝代範圍有交集
+                    $subQ->where('c_firstyear', '<=', $dyEnd)
+                        ->where('c_lastyear', '>=', $dyStart);
+                })->orWhere(function ($subQ) {
+                    // 時間範圍為 NULL（不限時間）
+                    $subQ->whereNull('c_firstyear')
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($dyEnd) {
+                    // 開放式結束：開始年份在朝代結束之前
+                    $subQ->where('c_firstyear', '<=', $dyEnd)
+                        ->whereNull('c_lastyear');
+                })->orWhere(function ($subQ) use ($dyStart) {
+                    // 開放式開始：結束年份在朝代開始之後
+                    $subQ->whereNull('c_firstyear')
+                        ->where('c_lastyear', '>=', $dyStart);
+                });
+            });
+        }
     }
 
     /**

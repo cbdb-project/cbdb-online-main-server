@@ -621,10 +621,10 @@
                                 const listModel = listApiMap[fieldName];
 
                                 if (searchModel) {
-                                    // 調用搜索 API 獲取完整格式化數據
+                                    // 用 ID 搜索以確保精確命中（文本搜索可能因分頁而遺漏）
                                     $.ajax({
                                         url: `/api/select/search/${searchModel}`,
-                                        data: { q: fieldData.text },
+                                        data: { q: fieldData.value },
                                         method: 'GET'
                                     }).done(response => {
                                         $field.empty();
@@ -797,11 +797,11 @@
                             } else {
                                 // 單選欄位
                                 if (isAjaxSelect) {
-                                    // AJAX Select2：調用 AJAX 獲取完整格式化數據
+                                    // AJAX Select2：用 ID 搜索以確保精確命中
                                     const model = ajaxModelMap[fieldName];
                                     $.ajax({
                                         url: `/api/select/search/${model}`,
-                                        data: { q: fieldData.text },
+                                        data: { q: fieldData.value },
                                         method: 'GET'
                                     }).done(response => {
                                         $field.empty();

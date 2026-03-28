@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type PlaygroundMode = 'sql' | 'nl' | 'qbe';
+export type PlaygroundMode = 'sql' | 'nl' | 'qbe' | 'qa';
 
 interface Props {
     activeMode: PlaygroundMode;
@@ -11,6 +11,7 @@ const modes: { key: PlaygroundMode; label: string; icon: string }[] = [
     { key: 'sql', label: 'SQL 查詢', icon: '⌨' },
     { key: 'nl', label: '自然語言', icon: '💬' },
     { key: 'qbe', label: '查詢設計 (QBE)', icon: '🔧' },
+    { key: 'qa', label: '歷史問答', icon: '📖' },
 ];
 
 export default function ModeTabs({ activeMode, onModeChange }: Props) {

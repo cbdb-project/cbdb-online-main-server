@@ -384,6 +384,312 @@ class NaturalLanguageQueryService {
     }
 
     /**
+     * 根據自然語言問題生成段落式答案（歷史人物問答模式）
+     *
+     * 沿用與 generateSQL() 相同的 LLM 與工具鏈，但最終輸出為 Markdown 段落而非 SQL。
+     *
+     * @param string $question 使用者問題
+     * @param array|null $tableNames 限制使用的表名（可選）
+     * @param callable|null $progressCallback SSE 進度回調
+     * @param bool|null $useToolsOverride 是否強制啟用工具
+     * @return array
+     */
+    public function answerQuestion(string $question, ?array $tableNames = null, ?callable $progressCallback = null, ?bool $useToolsOverride = null): array {
+        if (empty($this->apiKey)) {
+            return [
+                'success' => false,
+                'error' => 'LLM API Key 未配置。請在 .env 檔案中設置 GEMINI_API_KEY。',
+            ];
+        }
+
+        $startTime = microtime(true);
+        $logData = [
+            'user_id' => Auth::id(),
+            'question' => '[QA] ' . $question,
+            'llm_prompt' => null,
+            'llm_response' => null,
+            'generated_sql' => null,
+            'explanation' => null,
+            'success' => false,
+            'error_message' => null,
+            'execution_time_ms' => null,
+        ];
+
+        try {
+            $schemaPrompt = $this->schemaService->generateSchemaPrompt($tableNames);
+            $toolsEnabled = config('nl_query_tools.enabled', true);
+            if ($useToolsOverride !== null) {
+                $toolsEnabled = $toolsEnabled && $useToolsOverride;
+            }
+            $systemPrompt = $this->buildQaSystemPrompt($schemaPrompt, $toolsEnabled);
+
+            $logData['llm_prompt'] = $systemPrompt . "\n\n使用者問題：{$question}";
+
+            $tools = $toolsEnabled ? $this->toolsService->getToolDefinitions() : [];
+
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $question],
+            ];
+
+            // 工具調用循環（與 generateSQL 相似邏輯）
+            $maxRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 20));
+            $round = 0;
+            $allToolResults = [];
+            $allSqlUsed = [];
+
+            while ($round < $maxRounds) {
+                $round++;
+                $allowTools = $toolsEnabled && $round < $maxRounds;
+                $response = $this->callLLMForQa($messages, $tools, $allowTools);
+
+                if ($progressCallback) {
+                    $progressCallback('status', [
+                        'message' => "LLM 第 {$round} 輪調用完成",
+                    ]);
+                }
+
+                if (!$response['success']) {
+                    $logData['error_message'] = $response['error'];
+                    $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                    $this->saveLog($logData);
+
+                    return ['success' => false, 'error' => $response['error']];
+                }
+
+                $data = $response['data'];
+                $toolCalls = $data['choices'][0]['message']['tool_calls'] ?? null;
+
+                if ($toolCalls && $allowTools) {
+                    $toolResults = $this->executeToolCalls($toolCalls, $progressCallback);
+                    $allToolResults = array_merge($allToolResults, $toolResults);
+
+                    // 收集 SQL
+                    foreach ($toolResults as $tr) {
+                        if ($tr['tool_name'] === 'query_read_only_sql' && isset($tr['arguments']['sql'])) {
+                            $allSqlUsed[] = $tr['arguments']['sql'];
+                        }
+                    }
+
+                    $messages[] = $data['choices'][0]['message'];
+                    foreach ($toolResults as $toolResult) {
+                        $messages[] = [
+                            'role' => 'tool',
+                            'tool_call_id' => $toolResult['tool_call_id'],
+                            'content' => json_encode($toolResult['result'], JSON_UNESCAPED_UNICODE),
+                        ];
+                    }
+
+                    continue;
+                }
+
+                // 沒有工具調用 → 解析最終回答
+                $content = $data['choices'][0]['message']['content'] ?? '';
+                $parsed = $this->parseQaResponse($content);
+
+                $logData['llm_response'] = json_encode($data, JSON_UNESCAPED_UNICODE);
+                $logData['generated_sql'] = !empty($allSqlUsed) ? implode(";\n", $allSqlUsed) : null;
+                $logData['explanation'] = mb_substr($parsed['summary'] ?? '', 0, 500);
+                $logData['success'] = true;
+                $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                $this->saveLog($logData);
+
+                return [
+                    'success' => true,
+                    'answer_markdown' => $parsed['answer_markdown'],
+                    'summary' => $parsed['summary'],
+                    'sql_used' => array_values(array_unique(array_merge($allSqlUsed, $parsed['sql_used'] ?? []))),
+                    'tool_calls' => !empty($allToolResults) ? $allToolResults : [],
+                    'evidence' => $parsed['evidence'] ?? [],
+                    'caveat' => $parsed['caveat'] ?? '部分歷史背景為模型補充，非資料庫直接欄位。',
+                    'model' => $this->model,
+                ];
+            }
+
+            // 超過輪數限制，強制生成答案
+            $logData['error_message'] = '工具調用次數超過上限';
+            $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+            $this->saveLog($logData);
+
+            return ['success' => false, 'error' => '工具調用次數超過上限，無法生成回答。'];
+        } catch (\Exception $e) {
+            Log::error('歷史問答生成異常', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $logData['error_message'] = '問答生成時發生錯誤: ' . $e->getMessage();
+            $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+            $this->saveLog($logData);
+
+            return ['success' => false, 'error' => '問答生成時發生錯誤: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * 構建歷史問答模式的系統提示詞
+     */
+    protected function buildQaSystemPrompt(string $schemaPrompt, bool $toolsEnabled): string {
+        $toolsHint = '';
+        $maxToolRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 20));
+
+        if ($toolsEnabled) {
+            $toolsHint = <<<TOOLS
+
+**可用工具：**
+- list_allowed_tables(): 列出所有允許查詢的資料表
+- query_table_schema(table_name): 獲取完整表結構
+- query_table(table_name, filters?, columns?, limit?, offset?): 查詢表格資料
+- get_table_row_by_id(table_name, id_column, id_value): 依主鍵抓單筆資料
+- query_read_only_sql(sql, limit?, offset?): 執行只讀 SQL（SELECT/WITH）
+- get_table_schema(table_name): 獲取表格詳細結構
+- get_sample_data_for_table(table_name, limit=10): 獲取表格樣例數據
+- get_code_values(code_type): 獲取代碼表值（dynasties, sex, entry_codes, kinship_codes, status_codes, address_types）
+- get_person_ids(person_name, limit=20): 根據人名搜索人物 ID
+
+**工具使用策略（最多 {$maxToolRounds} 回合）：**
+1. 先用 get_person_ids 搜尋人名，取得人物 ID
+2. 用 query_read_only_sql 或 query_table 查詢人物基本資料、別名、入仕途徑、社會關係等
+3. 用 get_code_values 解讀代碼值（如朝代、入仕方式）
+4. 收集到足夠資料後，綜合整理成自然語言回答
+TOOLS;
+        }
+
+        $allTables = array_keys(config('codes.tables', []));
+        $allTables = array_filter($allTables, function ($tableName) {
+            if ($tableName === 'ADDRESSES') {
+                return false;
+            }
+
+            return !str_starts_with($tableName, 'CBDB__');
+        });
+        $tablesList = implode(', ', $allTables);
+
+        $commonDynasties = <<<DYNASTIES
+**常見朝代代碼速查：**
+- 唐: c_dy = 6
+- 宋: c_dy = 15
+- 元: c_dy = 18
+- 明: c_dy = 19
+- 清: c_dy = 20
+DYNASTIES;
+
+        $coreSchemaInfo = $this->schemaService->getSchemaInfo(['BIOG_MAIN']);
+        $coreSchemaText = "**核心表 BIOG_MAIN（人物主表）結構：**\n";
+        if (isset($coreSchemaInfo['BIOG_MAIN'])) {
+            foreach ($coreSchemaInfo['BIOG_MAIN']['columns'] ?? [] as $column) {
+                $coreSchemaText .= sprintf(
+                    "  - %s (%s): %s\n",
+                    $column['name'],
+                    $column['type'],
+                    $column['comment'] ?? ''
+                );
+            }
+        }
+
+        return <<<PROMPT
+你是 CBDB（中國歷代人物傳記資料庫）的歷史人物問答助手。你的任務是根據使用者的問題，查詢資料庫並提供準確的自然語言回答。
+{$toolsHint}
+
+**核心原則：**
+1. 優先使用工具查詢 CBDB 資料庫獲取事實資料
+2. 回答以繁體中文書寫，使用 Markdown 格式
+3. **必須清楚區分以下兩類資訊：**
+   - **📋 資料庫事實**：直接來自 CBDB 查詢的數據（人物存在性、生卒年、朝代、別名、入仕方式、著述、關係等）
+   - **📚 模型補充**：模型自身的歷史知識補充（朝代背景、制度解釋、歷史上下文等），應使用較保守語氣
+4. 若資料不足，應明確說明，不要編造
+
+**回答格式要求：**
+回答必須是嚴格的 JSON，包含以下欄位：
+- answer_markdown: Markdown 格式的完整回答（段落式，包含粗體、列表、引用等）
+- summary: 一句話摘要（繁體中文）
+- sql_used: 陣列，包含此次回答中使用過的 SQL 語句（若無則為空陣列）
+- evidence: 陣列，每項包含 type（"database" 或 "model_background"）、label、detail
+- caveat: 關於資料來源的注意事項說明
+
+**回答撰寫指引：**
+- 資料庫查到的事實以明確語氣陳述
+- 模型補充的歷史背景使用「根據歷史記載」「一般認為」等保守措辭
+- 在 answer_markdown 中以「**📋 資料庫記錄**」和「**📚 歷史背景補充**」等標題區分不同來源
+- 如果資料庫找不到此人物，應明確告知使用者
+
+{$coreSchemaText}
+
+{$commonDynasties}
+
+**其他可用數據表：**
+{$tablesList}
+
+**回覆 JSON 範例：**
+{
+  "answer_markdown": "## 李白\n\n**📋 資料庫記錄**\n\n根據 CBDB 資料庫...\n\n**📚 歷史背景補充**\n\n李白是唐代最著名的詩人之一...",
+  "summary": "唐代詩人李白的基本資訊與歷史背景。",
+  "sql_used": ["SELECT * FROM BIOG_MAIN WHERE c_personid = 12345"],
+  "evidence": [
+    {"type": "database", "label": "BIOG_MAIN", "detail": "人物基本資料"},
+    {"type": "model_background", "label": "歷史背景補充", "detail": "唐代詩歌文化背景"}
+  ],
+  "caveat": "部分歷史背景為模型補充，非資料庫直接欄位。"
+}
+
+**重要：回覆必須是純 JSON，不要使用 Markdown 代碼區塊或額外文字包裹。**
+PROMPT;
+    }
+
+    /**
+     * 呼叫 LLM API（QA 模式：允許工具時不強制 structured output）
+     */
+    protected function callLLMForQa(array $messages, array $tools = [], bool $allowToolCalls = false): array {
+        if ($allowToolCalls && !empty($tools)) {
+            return $this->callLLM($messages, $tools, true);
+        }
+
+        // 最終回答輪：不使用 structured output，讓模型自由回答 JSON
+        return $this->callLLM($messages, [], false);
+    }
+
+    /**
+     * 解析 QA 回答（從 LLM 返回的 JSON 或純文字中提取結構化答案）
+     */
+    protected function parseQaResponse(string $content): array {
+        $defaults = [
+            'answer_markdown' => '',
+            'summary' => '',
+            'sql_used' => [],
+            'evidence' => [],
+            'caveat' => '部分歷史背景為模型補充，非資料庫直接欄位。',
+        ];
+
+        if (empty(trim($content))) {
+            return array_merge($defaults, [
+                'answer_markdown' => '抱歉，無法生成回答。',
+            ]);
+        }
+
+        // 嘗試從內容中提取 JSON
+        $jsonContent = $this->extractJsonFromContent($content);
+        // 移除控制字元以避免 JSON 解析錯誤（保留換行、製表符等合法字元）
+        $jsonContent = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $jsonContent);
+        $parsed = json_decode($jsonContent, true, 512, JSON_INVALID_UTF8_IGNORE);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+            return [
+                'answer_markdown' => $parsed['answer_markdown'] ?? $content,
+                'summary' => $parsed['summary'] ?? '',
+                'sql_used' => $parsed['sql_used'] ?? [],
+                'evidence' => $parsed['evidence'] ?? [],
+                'caveat' => $parsed['caveat'] ?? $defaults['caveat'],
+            ];
+        }
+
+        // 無法解析 JSON 時，將純文字作為 answer_markdown
+        return array_merge($defaults, [
+            'answer_markdown' => $content,
+            'summary' => mb_substr($content, 0, 100),
+        ]);
+    }
+
+    /**
      * 保存查询日志
      *
      * @param array $logData
@@ -1005,7 +1311,7 @@ PROMPT;
     }
 
     /**
-     * 执行工具调用
+     * 執行工具調用
      *
      * @param array $toolCalls LLM 请求的工具调用
      * @param callable|null $progressCallback 进度回调函数
@@ -1038,12 +1344,16 @@ PROMPT;
             }
 
             $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback);
+            $resultSummary = $this->summarizeToolResult($toolName, $arguments, $result);
+            $status = ($result['success'] ?? false) ? 'completed' : 'error';
 
             $toolResult = [
                 'tool_call_id' => $toolCallId,
                 'tool_name' => $toolName,
+                'status' => $status,
                 'arguments' => $arguments,
                 'result' => $result,
+                'result_summary' => $resultSummary,
             ];
 
             $results[] = $toolResult;
@@ -1055,8 +1365,9 @@ PROMPT;
                     'total_tools' => count($toolCalls),
                     'tool_name' => $toolName,
                     'tool_call_id' => $toolCallId,
+                    'status' => $status,
                     'arguments' => $arguments,
-                    'result' => $result,
+                    'result_summary' => $resultSummary,
                     'success' => !isset($result['error']),
                     'message' => sprintf('工具 %d/%d 執行完成: %s', $index + 1, count($toolCalls), $toolName),
                 ]);
@@ -1064,6 +1375,170 @@ PROMPT;
         }
 
         return $results;
+    }
+
+    /**
+     * 為工具執行結果生成可讀摘要，避免將完整原始 payload 暴露給前端。
+     *
+     * @param string $toolName 工具名稱
+     * @param array  $arguments 呼叫參數
+     * @param array  $result    工具回傳結果
+     * @return array
+     */
+    protected function summarizeToolResult(string $toolName, array $arguments, array $result): array {
+        if (!($result['success'] ?? false)) {
+            return [
+                'status' => 'error',
+                'label' => '工具執行失敗',
+                'error' => $result['error'] ?? '未知錯誤',
+            ];
+        }
+
+        $data = $result['data'] ?? null;
+
+        switch ($toolName) {
+            case 'query_read_only_sql': {
+                $rows = is_array($data['rows'] ?? null) ? $data['rows'] : [];
+                $count = count($rows);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+                $sql = $data['sql'] ?? ($arguments['sql'] ?? '');
+
+                return [
+                    'status' => 'completed',
+                    'label' => "返回 {$count} 筆資料",
+                    'sql' => $sql,
+                    'row_count' => $count,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'query_table': {
+                $rows = is_array($data['rows'] ?? null) ? $data['rows'] : [];
+                $count = count($rows);
+                $total = (int) ($data['total_matching_rows'] ?? $count);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+
+                return [
+                    'status' => 'completed',
+                    'label' => "返回 {$count} 筆資料（共 {$total} 筆匹配）",
+                    'row_count' => $count,
+                    'total_matching' => $total,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'get_sample_data_for_table': {
+                // NlQueryToolsService.getSampleDataForTable 直接返回 $formattedData 陣列
+                $rows = is_array($data) ? $data : [];
+                $count = count($rows);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+
+                return [
+                    'status' => 'completed',
+                    'label' => "取得 {$count} 筆樣例資料",
+                    'row_count' => $count,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'get_table_row_by_id': {
+                $row = (array) ($data['row'] ?? []);
+                $found = !empty($row);
+                $table = $data['table_name'] ?? ($arguments['table_name'] ?? '');
+                $label = $found ? "找到 1 筆記錄（{$table}）" : '未找到記錄';
+
+                return [
+                    'status' => 'completed',
+                    'label' => $label,
+                    'found' => $found,
+                    'table_name' => $table,
+                    'row_preview' => array_slice($row, 0, 8, true),
+                ];
+            }
+
+            case 'query_table_schema': {
+                $cols = (array) ($data['columns'] ?? []);
+                $count = count($cols);
+                $table = $data['table_name'] ?? ($arguments['table_name'] ?? '');
+                $colNames = array_map(
+                    fn ($c) => is_array($c) ? ($c['Field'] ?? $c['name'] ?? '') : (string) $c,
+                    array_slice($cols, 0, 15)
+                );
+
+                return [
+                    'status' => 'completed',
+                    'label' => "查詢 schema: {$table}（{$count} 個欄位）",
+                    'table_name' => $table,
+                    'columns_count' => $count,
+                    'column_names' => array_values(array_filter($colNames)),
+                ];
+            }
+
+            case 'get_table_schema': {
+                // NlQueryToolsService.getTableSchema 回傳 {success, schema, error}
+                $schema = $result['schema'] ?? $data ?? [];
+                $cols = (array) ($schema['columns'] ?? []);
+                $count = count($cols);
+                $table = $arguments['table_name'] ?? '';
+
+                return [
+                    'status' => 'completed',
+                    'label' => "查詢 schema: {$table}（{$count} 個欄位）",
+                    'table_name' => $table,
+                    'columns_count' => $count,
+                ];
+            }
+
+            case 'get_person_ids': {
+                $rows = is_array($data) ? $data : [];
+                $count = $result['count'] ?? count($rows);
+                $names = array_filter(array_column($rows, 'c_name_chn'));
+                $personIds = array_column($rows, 'c_personid');
+
+                return [
+                    'status' => 'completed',
+                    'label' => "找到 {$count} 個相關人物",
+                    'count' => (int) $count,
+                    'person_ids' => array_values(array_slice($personIds, 0, 5)),
+                    'names' => array_values(array_slice($names, 0, 5)),
+                ];
+            }
+
+            case 'get_code_values': {
+                $rows = is_array($data) ? $data : [];
+                $count = count($rows);
+                $codeType = $arguments['code_type'] ?? '';
+
+                return [
+                    'status' => 'completed',
+                    'label' => "取得 {$codeType} 代碼（{$count} 筆）",
+                    'count' => $count,
+                    'code_type' => $codeType,
+                    'preview' => array_slice($rows, 0, 5),
+                ];
+            }
+
+            case 'list_allowed_tables': {
+                $tables = is_array($data) ? $data : [];
+                $count = count($tables);
+
+                return [
+                    'status' => 'completed',
+                    'label' => "列出 {$count} 個允許表格",
+                    'count' => $count,
+                    'tables' => array_slice($tables, 0, 10),
+                ];
+            }
+
+            default:
+                return [
+                    'status' => 'completed',
+                    'label' => '工具執行完成',
+                ];
+        }
     }
 
     protected function executeToolWithRetry(

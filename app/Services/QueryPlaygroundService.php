@@ -55,6 +55,8 @@ class QueryPlaygroundService {
             'schemaEndpoint' => route('query-playground.schema', [], false),
             'generateFromNlEndpoint' => route('query-playground.generate-from-nl', [], false),
             'generateFromNlStreamEndpoint' => route('query-playground.generate-from-nl-stream', [], false),
+            'answerFromNlEndpoint' => route('query-playground.answer-from-nl', [], false),
+            'answerFromNlStreamEndpoint' => route('query-playground.answer-from-nl-stream', [], false),
         ];
     }
 

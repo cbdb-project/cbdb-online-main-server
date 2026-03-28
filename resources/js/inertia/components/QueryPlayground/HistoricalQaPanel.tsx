@@ -85,8 +85,8 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     try {
                         const parsed = JSON.parse(currentData);
                         handleStreamEvent(currentEvent, parsed);
-                    } catch {
-                        // Ignore malformed JSON
+                    } catch (e) {
+                        console.warn('Failed to parse SSE event:', e);
                     }
                     currentEvent = '';
                     currentData = '';

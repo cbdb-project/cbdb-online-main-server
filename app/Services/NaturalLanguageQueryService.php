@@ -561,7 +561,7 @@ TOOLS;
                 return false;
             }
 
-            return strpos($tableName, 'CBDB__') !== 0;
+            return !str_starts_with($tableName, 'CBDB__');
         });
         $tablesList = implode(', ', $allTables);
 
@@ -668,6 +668,7 @@ PROMPT;
 
         // 嘗試從內容中提取 JSON
         $jsonContent = $this->extractJsonFromContent($content);
+        // 移除控制字元以避免 JSON 解析錯誤（保留換行、製表符等合法字元）
         $jsonContent = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $jsonContent);
         $parsed = json_decode($jsonContent, true, 512, JSON_INVALID_UTF8_IGNORE);
 

@@ -6,6 +6,7 @@ import SqlEditorPanel from '../../components/QueryPlayground/SqlEditorPanel';
 import QueryResultTable from '../../components/QueryPlayground/QueryResultTable';
 import QbeBuilder from '../../components/QueryPlayground/QbeBuilder';
 import NlQueryPanel from '../../components/QueryPlayground/NlQueryPanel';
+import HistoricalQaPanel from '../../components/QueryPlayground/HistoricalQaPanel';
 
 interface QbeTable {
     name: string;
@@ -22,6 +23,8 @@ interface PageProps {
     schemaEndpoint: string;
     generateFromNlEndpoint: string;
     generateFromNlStreamEndpoint: string;
+    answerFromNlEndpoint: string;
+    answerFromNlStreamEndpoint: string;
 }
 
 interface QueryResult {
@@ -42,13 +45,15 @@ export default function Index() {
         schemaEndpoint,
         generateFromNlEndpoint,
         generateFromNlStreamEndpoint,
+        answerFromNlEndpoint,
+        answerFromNlStreamEndpoint,
     } = props;
 
     // Determine initial mode from URL
     const getInitialMode = (): PlaygroundMode => {
         const params = new URLSearchParams(window.location.search);
         const mode = params.get('mode');
-        if (mode === 'nl' || mode === 'qbe') return mode;
+        if (mode === 'nl' || mode === 'qbe' || mode === 'qa') return mode;
         return 'sql';
     };
 
@@ -176,7 +181,7 @@ export default function Index() {
         const handlePopState = () => {
             const params = new URLSearchParams(window.location.search);
             const mode = params.get('mode');
-            if (mode === 'nl' || mode === 'qbe') {
+            if (mode === 'nl' || mode === 'qbe' || mode === 'qa') {
                 setActiveMode(mode);
             } else {
                 setActiveMode('sql');
@@ -236,6 +241,14 @@ export default function Index() {
                             tables={qbeTables}
                             schemaEndpoint={schemaEndpoint}
                             onGenerateSql={handleSqlFromOtherMode}
+                        />
+                    )}
+
+                    {activeMode === 'qa' && (
+                        <HistoricalQaPanel
+                            nlModel={nlModel}
+                            answerFromNlEndpoint={answerFromNlEndpoint}
+                            answerFromNlStreamEndpoint={answerFromNlStreamEndpoint}
                         />
                     )}
                 </div>

@@ -300,6 +300,101 @@ class QueryPlaygroundController extends Controller {
     }
 
     /**
+     * 使用自然語言回答歷史人物問題（非流式）
+     */
+    public function answerFromNL(Request $request, NaturalLanguageQueryService $nlqService) {
+        if (!Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        }
+
+        $request->validate([
+            'question' => 'required|string|max:1000',
+            'tables' => 'nullable|array',
+            'tables.*' => 'string',
+            'use_tools' => 'nullable|boolean',
+        ]);
+
+        $question = $request->input('question');
+        $tables = $request->input('tables');
+        $useTools = $request->boolean('use_tools', true);
+
+        $result = $nlqService->answerQuestion($question, $tables, null, $useTools);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+            ], 400);
+        }
+
+        return response()->json($result);
+    }
+
+    /**
+     * 使用自然語言回答歷史人物問題（SSE 流式）
+     */
+    public function answerFromNLStream(Request $request, NaturalLanguageQueryService $nlqService) {
+        if (!Auth::user()->isAdmin()) {
+            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        }
+
+        $request->validate([
+            'question' => 'required|string|max:1000',
+            'tables' => 'nullable|array',
+            'tables.*' => 'string',
+            'use_tools' => 'nullable|boolean',
+        ]);
+
+        $question = $request->input('question');
+        $tables = $request->input('tables');
+        $useTools = $request->boolean('use_tools', true);
+
+        return response()->stream(function () use ($question, $tables, $nlqService, $useTools) {
+            header('Content-Type: text/event-stream');
+            header('Cache-Control: no-cache');
+            header('X-Accel-Buffering: no');
+
+            $sendEvent = function ($event, $data) {
+                echo "event: {$event}\n";
+                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                ob_flush();
+                flush();
+            };
+
+            try {
+                $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools);
+
+                if ($result['success']) {
+                    $sendEvent('complete', [
+                        'success' => true,
+                        'answer_markdown' => $result['answer_markdown'],
+                        'summary' => $result['summary'] ?? '',
+                        'sql_used' => $result['sql_used'] ?? [],
+                        'tool_calls' => $result['tool_calls'] ?? [],
+                        'evidence' => $result['evidence'] ?? [],
+                        'caveat' => $result['caveat'] ?? '',
+                        'model' => $result['model'] ?? null,
+                    ]);
+                } else {
+                    $sendEvent('error', [
+                        'success' => false,
+                        'error' => $result['error'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $sendEvent('error', [
+                    'success' => false,
+                    'error' => '問答生成時發生錯誤: ' . $e->getMessage(),
+                ]);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
      * 顯示自然語言查詢日誌（僅管理員）
      *
      * @param Request $request

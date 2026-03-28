@@ -280,6 +280,8 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/schema', 'QueryPlaygroundController@qbeSchema')->name('query-playground.schema');
     Route::post('query-playground/generate-from-nl', 'QueryPlaygroundController@generateFromNL')->name('query-playground.generate-from-nl');
     Route::post('query-playground/generate-from-nl-stream', 'QueryPlaygroundController@generateFromNLStream')->name('query-playground.generate-from-nl-stream');
+    Route::post('query-playground/answer-from-nl', 'QueryPlaygroundController@answerFromNL')->name('query-playground.answer-from-nl');
+    Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')->name('query-playground.answer-from-nl-stream');
     Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')->name('query-playground.nl-query-logs');
 
     // Query Playground（Inertia + React）

@@ -63,8 +63,8 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
         return $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
     }
 
-    protected function handleDirect(int $personId, array $targetPk, array $rowData, string $comment): \Illuminate\Http\JsonResponse {
-        $response = parent::handleDirect($personId, $targetPk, $rowData, $comment);
+    protected function handleDirect(int $personId, array $actualPk, array $rowData, string $comment): \Illuminate\Http\JsonResponse {
+        $response = parent::handleDirect($personId, $actualPk, $rowData, $comment);
 
         if ($response->getStatusCode() === 200) {
             $this->syncAltnameIndexAfterCreate($rowData);

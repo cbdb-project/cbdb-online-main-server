@@ -153,7 +153,7 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
 
     // ── Direct Create ────────────────────────────────────────
 
-    protected function handleDirect(int $personId, array $targetPk, array $rowData, string $comment): JsonResponse {
+    protected function handleDirect(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
         $operationId = (string) Str::ulid();
         /** @var Operation|null $operation */
         $operation = null;
@@ -164,15 +164,15 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
         $rowData = $toolsRepo->timestamp($rowData, true);
 
         try {
-            DB::transaction(function () use ($personId, $targetPk, $rowData, $comment, $operationId, &$operation, &$insertedArray) {
+            DB::transaction(function () use ($personId, $actualPk, $rowData, $comment, $operationId, &$operation, &$insertedArray) {
                 // 寫入資料表
                 $this->performInsert($rowData);
 
                 // 讀回新增的資料（使用正規化後的 PK）
-                $insertedRow = $this->findExistingRow($targetPk);
+                $insertedRow = $this->findExistingRow($actualPk);
                 $insertedArray = $this->auditLogService->normalizeRow($insertedRow);
 
-                $resourceId = CompositePrimaryKey::buildStoredResourceId($targetPk);
+                $resourceId = CompositePrimaryKey::buildStoredResourceId($actualPk);
 
                 // 寫 operation
                 $resourceData = array_merge($insertedArray, ['__operation_id' => $operationId]);
@@ -194,7 +194,7 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
                 $this->auditLogService->write(
                     $this->tableName(),
                     'INSERT',
-                    $targetPk,
+                    $actualPk,
                     null,
                     $insertedArray,
                     'user',
@@ -216,7 +216,7 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             'mode' => 'direct',
             'operation' => 'create',
             'result' => [
-                'pk' => $targetPk,
+                'pk' => $actualPk,
                 'operation_id' => $operation?->id,
                 'row' => $insertedArray,
             ],
@@ -225,8 +225,8 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
 
     // ── Proposal Create ──────────────────────────────────────
 
-    protected function handleProposal(int $personId, array $targetPk, array $rowData, string $comment): JsonResponse {
-        $resourceId = CompositePrimaryKey::buildStoredResourceId($targetPk);
+    protected function handleProposal(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
+        $resourceId = CompositePrimaryKey::buildStoredResourceId($actualPk);
 
         // 檢查：相同 resource_id 不得已有待審核的新增提案
         if ($this->operationRepository->hasPendingCreateProposal($this->tableName(), $resourceId)) {
@@ -266,7 +266,7 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             'mode' => 'proposal',
             'operation' => 'create',
             'result' => [
-                'pk' => $targetPk,
+                'pk' => $actualPk,
                 'status' => 'proposal_created',
                 'operation_id' => $operation?->id,
             ],

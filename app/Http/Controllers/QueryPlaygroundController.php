@@ -12,6 +12,8 @@ use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 class QueryPlaygroundController extends Controller {
+    protected const SSE_HEARTBEAT_INTERVAL_SECONDS = 10;
+
     protected QueryPlaygroundService $playgroundService;
 
     public function __construct(QueryPlaygroundService $playgroundService) {
@@ -189,6 +191,58 @@ class QueryPlaygroundController extends Controller {
     }
 
     /**
+     * 建立標準 SSE 回應，加入 keep-alive heartbeat 並安全 flush 緩衝區。
+     *
+     * @param callable(callable(string, mixed): void): void $producer
+     */
+    protected function streamSseResponse(callable $producer) {
+        return response()->stream(function () use ($producer) {
+            ignore_user_abort(true);
+
+            $lastSentAt = microtime(true);
+
+            $flush = function () {
+                if (ob_get_level() > 0) {
+                    @ob_flush();
+                }
+
+                flush();
+            };
+
+            $sendComment = function (string $comment) use (&$lastSentAt, $flush) {
+                echo ': ' . $comment . "\n\n";
+                $lastSentAt = microtime(true);
+                $flush();
+            };
+
+            $sendEvent = function (string $event, $data) use (&$lastSentAt, $flush) {
+                echo "event: {$event}\n";
+                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                $lastSentAt = microtime(true);
+                $flush();
+            };
+
+            $sendHeartbeatIfNeeded = function () use (&$lastSentAt, $sendComment) {
+                if ((microtime(true) - $lastSentAt) >= self::SSE_HEARTBEAT_INTERVAL_SECONDS) {
+                    $sendComment('keep-alive');
+                }
+            };
+
+            // 先送出一個 padding comment，降低代理 / 瀏覽器對小回應的緩衝影響。
+            $sendComment(str_repeat(' ', 2048));
+
+            $producer(function (string $event, $data) use ($sendEvent, $sendHeartbeatIfNeeded) {
+                $sendHeartbeatIfNeeded();
+                $sendEvent($event, $data);
+            });
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
      * 使用自然语言生成 SQL 查询（SSE 流式响应）
      *
      * @param Request $request
@@ -212,20 +266,7 @@ class QueryPlaygroundController extends Controller {
 
         $useTools = $request->boolean('use_tools', true);
 
-        return response()->stream(function () use ($question, $tables, $nlqService, $useTools) {
-            // 設定 SSE 头部
-            header('Content-Type: text/event-stream');
-            header('Cache-Control: no-cache');
-            header('X-Accel-Buffering: no'); // 禁用 nginx 缓冲
-
-            // 发送事件的辅助函数
-            $sendEvent = function ($event, $data) {
-                echo "event: {$event}\n";
-                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
-                ob_flush();
-                flush();
-            };
-
+        return $this->streamSseResponse(function (callable $sendEvent) use ($question, $tables, $nlqService, $useTools) {
             try {
                 // 调用服务并传入进度回调
                 $result = $nlqService->generateSQL($question, $tables, $sendEvent, $useTools);
@@ -251,11 +292,7 @@ class QueryPlaygroundController extends Controller {
                     'error' => '生成 SQL 时发生错误: ' . $e->getMessage(),
                 ]);
             }
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'X-Accel-Buffering' => 'no',
-        ]);
+        });
     }
 
     /**
@@ -349,18 +386,7 @@ class QueryPlaygroundController extends Controller {
         $tables = $request->input('tables');
         $useTools = $request->boolean('use_tools', true);
 
-        return response()->stream(function () use ($question, $tables, $nlqService, $useTools) {
-            header('Content-Type: text/event-stream');
-            header('Cache-Control: no-cache');
-            header('X-Accel-Buffering: no');
-
-            $sendEvent = function ($event, $data) {
-                echo "event: {$event}\n";
-                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
-                ob_flush();
-                flush();
-            };
-
+        return $this->streamSseResponse(function (callable $sendEvent) use ($question, $tables, $nlqService, $useTools) {
             try {
                 $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools);
 
@@ -387,11 +413,7 @@ class QueryPlaygroundController extends Controller {
                     'error' => '問答生成時發生錯誤: ' . $e->getMessage(),
                 ]);
             }
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'X-Accel-Buffering' => 'no',
-        ]);
+        });
     }
 
     /**

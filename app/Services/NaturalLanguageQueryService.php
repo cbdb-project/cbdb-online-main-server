@@ -449,6 +449,12 @@ class NaturalLanguageQueryService {
                     'question_preview' => mb_substr($question, 0, 120),
                 ]);
 
+                if ($progressCallback) {
+                    $progressCallback('status', [
+                        'message' => "正在等待 LLM 第 {$round} 輪回應",
+                    ]);
+                }
+
                 $response = $this->callLLMForQa($messages, $tools, $allowTools);
 
                 if ($progressCallback) {

@@ -284,6 +284,8 @@ class HistoricalQaTest extends TestCase {
 
         $response->assertStatus(200);
         $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
+        $this->assertSame('no-cache, no-transform', $response->headers->get('Cache-Control'));
+        $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
     }
 
     // ──── Regression: existing NL endpoints still work ────
@@ -337,5 +339,8 @@ class HistoricalQaTest extends TestCase {
         ], json_encode(['question' => '顯示所有朝代']));
 
         $response->assertStatus(200);
+        $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
+        $this->assertSame('no-cache, no-transform', $response->headers->get('Cache-Control'));
+        $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
     }
 }

@@ -233,7 +233,7 @@ class ApiV2DeleteStatusTest extends TestCase {
     // ── Proposal Delete Tests ───────────────────────────────
 
     #[Test]
-    public function testProposalStatusDeleteSucceeds(): void {
+    public function testProposalStatusDeleteReturns501(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-status-proposal@example.com');
         $this->actingAs($user);
         $this->seedStatus();
@@ -242,14 +242,12 @@ class ApiV2DeleteStatusTest extends TestCase {
             'mode' => 'proposal',
         ]));
 
-        $response->assertOk()
+        $response->assertStatus(501)
             ->assertJson([
-                'ok' => true,
-                'resource' => 'statuses',
-                'mode' => 'proposal',
-                'operation' => 'delete',
-                'result' => [
-                    'status' => 'proposal_deleted',
+                'ok' => false,
+                'errors' => [
+                    'mode' => 'proposal',
+                    'operation' => 'delete',
                 ],
             ]);
 
@@ -259,32 +257,6 @@ class ApiV2DeleteStatusTest extends TestCase {
             'c_sequence' => 1,
             'c_status_code' => 50,
         ]);
-    }
-
-    #[Test]
-    public function testProposalStatusDeleteWritesProposalMeta(): void {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-status-prop-meta@example.com');
-        $this->actingAs($user);
-        $this->seedStatus();
-
-        $this->postJson('/api/v2/delete', $this->deletePayload([
-            'mode' => 'proposal',
-        ]));
-
-        // 已寫入提案操作紀錄
-        $this->assertDatabaseHas('operations', [
-            'resource' => 'STATUS_DATA',
-            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
-        ]);
-
-        $operation = DB::table('operations')->where('resource', 'STATUS_DATA')->first();
-        $resourceData = json_decode($operation->resource_data, true);
-
-        $this->assertSame('pending', $resourceData['__review_status']);
-        $this->assertSame('delete', $resourceData['__proposal_meta']['action']);
-
-        // 無 audit_log
-        $this->assertDatabaseMissing('audit_log', ['table_name' => 'STATUS_DATA']);
     }
 
     // ── Error Cases ─────────────────────────────────────────
@@ -297,27 +269,6 @@ class ApiV2DeleteStatusTest extends TestCase {
         $response = $this->postJson('/api/v2/delete', $this->deletePayload());
 
         $response->assertStatus(404);
-    }
-
-    #[Test]
-    public function testDeleteDuplicatePendingProposalReturns409(): void {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-status-dup-prop@example.com');
-        $this->actingAs($user);
-        $this->seedStatus();
-
-        $payload = $this->deletePayload(['mode' => 'proposal']);
-
-        // 第一次提案成功
-        $first = $this->postJson('/api/v2/delete', $payload);
-        $first->assertOk();
-
-        // 第二次重複提案被拒絕
-        $second = $this->postJson('/api/v2/delete', $payload);
-        $second->assertStatus(409)
-            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['pending_proposal_exists']]]);
-
-        // 只有一筆提案紀錄
-        $this->assertSame(1, DB::table('operations')->where('resource', 'STATUS_DATA')->count());
     }
 
     #[Test]

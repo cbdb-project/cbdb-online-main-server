@@ -61,7 +61,7 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
 
     public function supports(string $resource, string $mode, string $operation): bool {
         return in_array($resource, $this->resourceAliases(), true)
-            && in_array($mode, ['direct', 'proposal'], true)
+            && $mode === 'direct'
             && $operation === 'delete';
     }
 

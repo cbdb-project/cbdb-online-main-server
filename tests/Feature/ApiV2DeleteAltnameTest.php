@@ -232,7 +232,7 @@ class ApiV2DeleteAltnameTest extends TestCase {
     // ── Proposal Delete Tests ───────────────────────────────
 
     #[Test]
-    public function testProposalAltnameDeleteSucceeds(): void {
+    public function testProposalAltnameDeleteReturns501(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-altname-proposal@example.com');
         $this->actingAs($user);
         $this->seedAltname();
@@ -241,14 +241,12 @@ class ApiV2DeleteAltnameTest extends TestCase {
             'mode' => 'proposal',
         ]));
 
-        $response->assertOk()
+        $response->assertStatus(501)
             ->assertJson([
-                'ok' => true,
-                'resource' => 'altnames',
-                'mode' => 'proposal',
-                'operation' => 'delete',
-                'result' => [
-                    'status' => 'proposal_deleted',
+                'ok' => false,
+                'errors' => [
+                    'mode' => 'proposal',
+                    'operation' => 'delete',
                 ],
             ]);
 
@@ -258,32 +256,6 @@ class ApiV2DeleteAltnameTest extends TestCase {
             'c_alt_name_chn' => '子美',
             'c_alt_name_type_code' => 4,
         ]);
-    }
-
-    #[Test]
-    public function testProposalAltnameDeleteWritesProposalMeta(): void {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-altname-prop-meta@example.com');
-        $this->actingAs($user);
-        $this->seedAltname();
-
-        $this->postJson('/api/v2/delete', $this->deletePayload([
-            'mode' => 'proposal',
-        ]));
-
-        // 已寫入提案操作紀錄
-        $this->assertDatabaseHas('operations', [
-            'resource' => 'ALTNAME_DATA',
-            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
-        ]);
-
-        $operation = DB::table('operations')->where('resource', 'ALTNAME_DATA')->first();
-        $resourceData = json_decode($operation->resource_data, true);
-
-        $this->assertSame('pending', $resourceData['__review_status']);
-        $this->assertSame('delete', $resourceData['__proposal_meta']['action']);
-
-        // 無 audit_log
-        $this->assertDatabaseMissing('audit_log', ['table_name' => 'ALTNAME_DATA']);
     }
 
     // ── Error Cases ─────────────────────────────────────────
@@ -296,27 +268,6 @@ class ApiV2DeleteAltnameTest extends TestCase {
         $response = $this->postJson('/api/v2/delete', $this->deletePayload());
 
         $response->assertStatus(404);
-    }
-
-    #[Test]
-    public function testDeleteDuplicatePendingProposalReturns409(): void {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-altname-dup-prop@example.com');
-        $this->actingAs($user);
-        $this->seedAltname();
-
-        $payload = $this->deletePayload(['mode' => 'proposal']);
-
-        // 第一次提案成功
-        $first = $this->postJson('/api/v2/delete', $payload);
-        $first->assertOk();
-
-        // 第二次重複提案被拒絕
-        $second = $this->postJson('/api/v2/delete', $payload);
-        $second->assertStatus(409)
-            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['pending_proposal_exists']]]);
-
-        // 只有一筆提案紀錄
-        $this->assertSame(1, DB::table('operations')->where('resource', 'ALTNAME_DATA')->count());
     }
 
     #[Test]

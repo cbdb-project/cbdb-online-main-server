@@ -466,4 +466,80 @@ class ApiV2MutateAltnameTest extends TestCase {
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'altnames']);
     }
+
+    // ── PK Conflict Tests ────────────────────────────────────
+
+    #[Test]
+    public function testDirectAltnameUpdateWithPkCollisionReturns409(): void {
+        $user = $this->makeUser(email: 'altname-conflict@example.com');
+        $this->actingAs($user);
+        $this->seedAltname();
+        $this->seedAltname([
+            'c_alt_name_chn' => '少陵野老',
+            'c_alt_name_type_code' => 4,
+            'c_source' => 5,
+        ]);
+
+        // Try to update the first row's name to the second row's name (PK collision)
+        $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'changes' => ['c_alt_name_chn' => '少陵野老'],
+        ]));
+
+        $response->assertStatus(409)
+            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['conflict']]]);
+
+        // Original data must be unchanged
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '子美',
+        ]);
+    }
+
+    #[Test]
+    public function testProposalAltnameUpdateWithExistingTargetPkReturns409(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'altname-prop-conflict@example.com');
+        $this->actingAs($user);
+        $this->seedAltname();
+        $this->seedAltname([
+            'c_alt_name_chn' => '少陵野老',
+            'c_alt_name_type_code' => 4,
+            'c_source' => 5,
+        ]);
+
+        // Propose changing the first row's name to the second row's name (PK would collide)
+        $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'mode' => 'proposal',
+            'changes' => ['c_alt_name_chn' => '少陵野老'],
+        ]));
+
+        $response->assertStatus(409)
+            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['conflict']]]);
+
+        // No proposal should have been written
+        $this->assertDatabaseMissing('operations', ['resource' => 'ALTNAME_DATA']);
+    }
+
+    #[Test]
+    public function testProposalAltnameUpdateDuplicatePendingProposalReturns409(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'altname-dup-prop@example.com');
+        $this->actingAs($user);
+        $this->seedAltname();
+
+        $payload = $this->altnamePayload([
+            'mode' => 'proposal',
+            'changes' => ['c_sequence' => 5],
+        ]);
+
+        // First proposal succeeds
+        $first = $this->postJson('/api/v2/mutate', $payload);
+        $first->assertOk();
+
+        // Second identical proposal is rejected as a duplicate
+        $second = $this->postJson('/api/v2/mutate', $payload);
+        $second->assertStatus(409)
+            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['pending_proposal_exists']]]);
+
+        // Only one proposal in the operations table
+        $this->assertSame(1, DB::table('operations')->where('resource', 'ALTNAME_DATA')->count());
+    }
 }

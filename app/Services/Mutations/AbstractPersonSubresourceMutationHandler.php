@@ -190,46 +190,58 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         $operation = null;
         $newArray = [];
 
-        DB::transaction(function () use ($personId, $targetPk, $updateData, $originalArray, $comment, $operationId, &$operation, &$newArray) {
-            // 更新資料表
-            $this->performUpdate($targetPk, $updateData);
+        try {
+            DB::transaction(function () use ($personId, $targetPk, $updateData, $originalArray, $comment, $operationId, &$operation, &$newArray) {
+                // 更新資料表（子類 performUpdate() 可能在 PK 衝突時拋出 InvalidArgumentException）
+                $this->performUpdate($targetPk, $updateData);
 
-            // 讀回更新後的資料
-            $updatedRow = $this->findUpdatedRow($targetPk, $updateData);
-            $newArray = $this->auditLogService->normalizeRow($updatedRow);
+                // 讀回更新後的資料
+                $updatedRow = $this->findUpdatedRow($targetPk, $updateData);
+                $newArray = $this->auditLogService->normalizeRow($updatedRow);
 
-            // 計算新 PK
-            $newPk = $this->buildNewPk($targetPk, $updateData);
-            $resourceId = CompositePrimaryKey::buildStoredResourceId($newPk);
+                // 計算新 PK
+                $newPk = $this->buildNewPk($targetPk, $updateData);
+                $resourceId = CompositePrimaryKey::buildStoredResourceId($newPk);
 
-            // 寫 operation
-            $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
-            if ($comment !== '') {
-                $resourceData['__note'] = $comment;
+                // 寫 operation
+                $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
+                if ($comment !== '') {
+                    $resourceData['__note'] = $comment;
+                }
+
+                $operation = $this->operationRepository->store(
+                    Auth::id(),
+                    $personId,
+                    Operation::TYPE_UPDATE,
+                    $this->tableName(),
+                    $resourceId,
+                    $resourceData,
+                    $originalArray
+                );
+
+                // 寫 audit_log
+                $this->auditLogService->write(
+                    $this->tableName(),
+                    'UPDATE',
+                    $newPk,
+                    $originalArray,
+                    $newArray,
+                    'user',
+                    (string) Auth::id(),
+                    $operation ? (string) $operation->id : null
+                );
+            });
+        } catch (\InvalidArgumentException $e) {
+            // performUpdate() 明確拋出的 PK 衝突（如 AltnameMutationHandler、AddressMutationHandler）
+            return $this->errorResponse($e->getMessage(), 409, ['target.pk' => ['conflict']]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 資料庫唯一性約束衝突（未覆寫 performUpdate() 的 handler，PK 欄位更新時由 DB 層報錯）
+            if ($this->isUniqueConstraintViolation($e)) {
+                return $this->errorResponse('資料更新導致主鍵衝突', 409, ['target.pk' => ['conflict']]);
             }
 
-            $operation = $this->operationRepository->store(
-                Auth::id(),
-                $personId,
-                Operation::TYPE_UPDATE,
-                $this->tableName(),
-                $resourceId,
-                $resourceData,
-                $originalArray
-            );
-
-            // 寫 audit_log
-            $this->auditLogService->write(
-                $this->tableName(),
-                'UPDATE',
-                $newPk,
-                $originalArray,
-                $newArray,
-                'user',
-                (string) Auth::id(),
-                $operation ? (string) $operation->id : null
-            );
-        });
+            throw $e;
+        }
 
         return response()->json([
             'ok' => true,
@@ -250,6 +262,28 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
     protected function handleProposal(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
         $newPk = $this->buildNewPk($targetPk, $updateData);
         $resourceId = CompositePrimaryKey::buildStoredResourceId($newPk);
+
+        // 檢查 1：若 PK 欄位有變動，確認新 PK 對應的記錄不已存在
+        $pkChanged = false;
+        foreach ($this->keyColumns() as $col) {
+            if ((string) ($newPk[$col]) !== (string) ($targetPk[$col] ?? '')) {
+                $pkChanged = true;
+
+                break;
+            }
+        }
+        if ($pkChanged && $this->findOriginalRow($newPk) !== null) {
+            return $this->errorResponse('目標主鍵已存在，無法建立提案', 409, [
+                'target.pk' => ['conflict'],
+            ]);
+        }
+
+        // 檢查 2：相同 resource_id 不得已有待審核的更新提案
+        if ($this->operationRepository->hasPendingUpdateProposal($this->tableName(), $resourceId)) {
+            return $this->errorResponse('相同主鍵已有待審核提案', 409, [
+                'target.pk' => ['pending_proposal_exists'],
+            ]);
+        }
 
         $proposalData = array_merge($originalArray, $updateData, [
             '__proposal_meta' => [
@@ -381,5 +415,20 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         }
 
         return (string) $value;
+    }
+
+    /**
+     * 判斷 QueryException 是否為唯一性約束衝突
+     *
+     * 涵蓋 MySQL（error code 1062）與 SQLite（error code 19 = SQLITE_CONSTRAINT）。
+     */
+    private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {
+        $code = (int) ($e->errorInfo[1] ?? 0);
+        if (in_array($code, [1062, 19], true)) {
+            return true;
+        }
+        $msg = $e->getMessage();
+
+        return str_contains($msg, 'UNIQUE') || str_contains($msg, 'Duplicate entry');
     }
 }

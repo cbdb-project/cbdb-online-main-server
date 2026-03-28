@@ -443,4 +443,30 @@ class ApiV2MutateAddressTest extends TestCase {
         $response = $this->postJson('/api/v2/mutate', $this->addressPayload());
         $response->assertStatus(404);
     }
+
+    // ── PK Conflict Tests ────────────────────────────────────
+
+    #[Test]
+    public function testDirectAddressUpdateWithPkCollisionReturns409(): void {
+        $user = $this->makeUser(email: 'addr-conflict@example.com');
+        $this->actingAs($user);
+        // Seed two addresses with the same c_personid and c_addr_id but different c_addr_type
+        $this->seedAddress(['c_addr_type' => 1, 'c_sequence' => 1]);
+        $this->seedAddress(['c_addr_type' => 2, 'c_sequence' => 1]);
+
+        // Try to change the first address's type to match the second (PK collision)
+        $response = $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_addr_type' => 2],
+        ]));
+
+        $response->assertStatus(409)
+            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['conflict']]]);
+
+        // Original row must be unchanged
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+        ]);
+    }
 }

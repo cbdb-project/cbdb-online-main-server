@@ -1,8 +1,44 @@
 {
-  "name": "CBDB Dev Env",
-  "image": "mcr.microsoft.com/devcontainers/php:8.4-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/node:1": {}
-  }
+    "name": "cbdb-online-main-server",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "22"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "bmewburn.vscode-intelephense-client",
+                "amiralizadeh9480.laravel-extra-intellisense",
+                "onecentlin.laravel-blade",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-azuretools.vscode-docker"
+            ],
+            "settings": {
+                "php.executablePath": "/usr/bin/php",
+                "intelephense.environment.phpVersion": "8.4.0",
+                "[php]": {
+                    "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
+                    "editor.formatOnSave": false
+                }
+            }
+        }
+    },
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "forwardPorts": [8000],
+    "portsAttributes": {
+        "8000": {
+            "label": "Laravel Dev Server",
+            "onAutoForward": "notify"
+        }
+    },
+    "remoteUser": "vscode"
 }
+

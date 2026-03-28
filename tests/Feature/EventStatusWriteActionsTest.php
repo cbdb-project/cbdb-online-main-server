@@ -420,8 +420,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_sequence' => 1,
             'c_status_code' => 2,
             'c_source' => 10,
-            'c_created_by' => '',
-            'c_created_date' => '',
+            'c_created_by' => 'attacker-name',
+            'c_created_date' => '2099-12-31 23:59:59',
             'action' => 'save',
         ]);
 
@@ -471,8 +471,8 @@ class EventStatusWriteActionsTest extends TestCase {
             'c_intercalary' => 0,
             'c_source' => 10,
             'c_addr_id' => [200],
-            'c_created_by' => '',
-            'c_created_date' => '',
+            'c_created_by' => 'attacker-name',
+            'c_created_date' => '2099-12-31 23:59:59',
             'action' => 'save',
         ]);
 

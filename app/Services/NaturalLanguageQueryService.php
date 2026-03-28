@@ -1525,7 +1525,17 @@ PROMPT;
                 $count = count($cols);
                 $table = $data['table_name'] ?? ($arguments['table_name'] ?? '');
                 $colNames = array_map(
-                    fn ($c) => is_array($c) ? ($c['Field'] ?? $c['name'] ?? '') : (string) $c,
+                    static function ($c): string {
+                        if (is_array($c)) {
+                            return (string) ($c['Field'] ?? $c['name'] ?? '');
+                        }
+
+                        if (is_object($c)) {
+                            return (string) ($c->Field ?? $c->name ?? '');
+                        }
+
+                        return is_scalar($c) ? (string) $c : '';
+                    },
                     array_slice($cols, 0, 15)
                 );
 

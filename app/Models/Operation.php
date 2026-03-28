@@ -11,6 +11,7 @@ class Operation extends Model {
     public const TYPE_DELETE = 4;
     public const TYPE_PROPOSAL_CREATE = 8;
     public const TYPE_PROPOSAL_UPDATE = 9;
+    public const TYPE_PROPOSAL_DELETE = 10;
 
     //
     protected $fillable = [

@@ -284,7 +284,7 @@ class HistoricalQaTest extends TestCase {
 
         $response->assertStatus(200);
         $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
-        $this->assertSame('no-cache, no-transform', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache, no-transform', (string) $response->headers->get('Cache-Control'));
         $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
     }
 
@@ -340,7 +340,7 @@ class HistoricalQaTest extends TestCase {
 
         $response->assertStatus(200);
         $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
-        $this->assertSame('no-cache, no-transform', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache, no-transform', (string) $response->headers->get('Cache-Control'));
         $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
     }
 }

@@ -63,11 +63,6 @@ class SqlTableNameExtractorTest extends TestCase {
 
     #[Test]
     public function it_extracts_tables_from_with_recursive_query(): void {
-        DB::statement('DROP TABLE IF EXISTS ADDR_CODES');
-        DB::statement('DROP TABLE IF EXISTS ADDR_BELONGS_DATA');
-        DB::statement('CREATE TABLE ADDR_CODES (c_addr_id INTEGER PRIMARY KEY, c_name_chn TEXT, c_admin_cat_code TEXT, c_firstyear INTEGER, c_lastyear INTEGER)');
-        DB::statement('CREATE TABLE ADDR_BELONGS_DATA (c_addr_id INTEGER, c_belongs_to INTEGER)');
-
         $sql = <<<'SQL'
 WITH RECURSIVE
   chain AS (

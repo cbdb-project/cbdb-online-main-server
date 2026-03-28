@@ -41,7 +41,7 @@ class SqlTableNameExtractor {
                 // WITH RECURSIVE is not fully supported by the parser;
                 // strip RECURSIVE and retry so the CTE body can still be analysed.
                 if (preg_match('/\bWITH\s+RECURSIVE\b/i', $sql)) {
-                    $strippedSql = (string) preg_replace('/\bWITH\s+RECURSIVE\b/i', 'WITH', $sql);
+                    $strippedSql = preg_replace('/\bWITH\s+RECURSIVE\b/i', 'WITH', $sql);
                     $parser = new Parser($strippedSql);
                     if (!empty($parser->errors)) {
                         return [];

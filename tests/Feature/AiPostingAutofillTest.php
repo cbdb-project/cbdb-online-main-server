@@ -396,6 +396,96 @@ class AiPostingAutofillTest extends TestCase {
     }
 
     /**
+     * 測試無具體年份時，地址按朝代範圍交集過濾，且優先選重疊最多的同名地址
+     *
+     * 場景：明代人物，AI 提取「禹州」但無年份信息。
+     * 數據庫有兩條禹州：明代（1575-1643）和清代（1644-1911）。
+     * 兩條都與明代（1368-1644）有交集，但明代禹州重疊更多，應優先選擇。
+     */
+    public function test_address_dynasty_range_overlap_prefers_best_match() {
+        $user = User::factory()->create([
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        // 設定人物朝代為明（c_dy=19）
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 99999,
+            'c_dy' => 19,
+        ]);
+
+        // 插入兩條同名地址：明代禹州和清代禹州
+        DB::table('ADDR_CODES')->insert([
+            [
+                'c_addr_id' => 303350,
+                'c_name' => 'Yuzhou',
+                'c_name_chn' => '禹州',
+                'c_firstyear' => 1575,
+                'c_lastyear' => 1643,
+            ],
+            [
+                'c_addr_id' => 8078,
+                'c_name' => 'Yu Zhou',
+                'c_name_chn' => '禹州',
+                'c_firstyear' => 1644,
+                'c_lastyear' => 1911,
+            ],
+        ]);
+
+        // Mock AI 響應：只有地名，無任何年份信息
+        Http::fake([
+            'https://example.com/api' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'postings' => [
+                                    [
+                                        'title_str' => '吏目',
+                                        'addr_str' => ['full_text' => '河南禹州', 'parent' => '河南', 'name' => '禹州', 'admin_type' => '州'],
+                                        'c_firstyear' => null,
+                                        'c_fy_nh_code' => null,
+                                        'c_fy_nh_year' => null,
+                                        'c_fy_range' => null,
+                                        'c_fy_intercalary' => null,
+                                        'c_fy_month' => null,
+                                        'c_fy_day' => null,
+                                        'c_fy_day_gz' => null,
+                                        'c_lastyear' => null,
+                                        'c_ly_nh_code' => null,
+                                        'c_ly_nh_year' => null,
+                                        'c_ly_range' => null,
+                                        'c_ly_intercalary' => null,
+                                        'c_ly_month' => null,
+                                        'c_ly_day' => null,
+                                        'c_ly_day_gz' => null,
+                                        'c_appt_code' => 1,
+                                        'c_assume_office_code' => null,
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '授河南禹州吏目',
+            'person_id' => 99999,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $data = $response->json('data');
+
+        // 地址應出現在 matched 或 suggested 中，且為明代禹州（303350）而非清代（8078）
+        $addrField = $data['matched_fields']['c_addr'] ?? $data['suggested_fields']['c_addr'] ?? null;
+        $this->assertNotNull($addrField, '地址欄位應有匹配結果');
+        $this->assertContains(303350, (array) $addrField['value'], '應優先選擇與朝代重疊最多的明代禹州（303350），而非邊界交集的清代禹州（8078）');
+    }
+
+    /**
      * 測試朝代邊界重叠處理：1368年同時屬於元和明，無法確定則 fallback
      */
     public function test_dynasty_boundary_overlap_fallback_to_person_dynasty() {

@@ -50,62 +50,75 @@ class ReadOnlyTableQueryService {
         }
 
         $driver = DB::connection()->getDriverName();
-        if ($driver === 'sqlite') {
+        $schemaBuilder = Schema::getConnection()->getSchemaBuilder();
+
+        try {
             return [
                 'table_name' => $tableName,
-                'columns' => DB::select("PRAGMA table_info(`{$tableName}`)"),
-                'indexes' => DB::select("PRAGMA index_list(`{$tableName}`)"),
-                'foreign_keys' => DB::select("PRAGMA foreign_key_list(`{$tableName}`)"),
+                'columns' => $this->normalizeSchemaBuilderRows($schemaBuilder->getColumns($tableName)),
+                'indexes' => $this->normalizeSchemaBuilderRows($schemaBuilder->getIndexes($tableName)),
+                'foreign_keys' => $this->normalizeForeignKeys($schemaBuilder->getForeignKeys($tableName)),
                 'table_info' => [
-                    'driver' => 'sqlite',
+                    'driver' => $driver,
+                    'metadata_source' => 'schema_builder',
+                ],
+            ];
+        } catch (\Throwable $e) {
+            if ($driver === 'sqlite') {
+                return [
+                    'table_name' => $tableName,
+                    'columns' => DB::select("PRAGMA table_info(`{$tableName}`)"),
+                    'indexes' => DB::select("PRAGMA index_list(`{$tableName}`)"),
+                    'foreign_keys' => DB::select("PRAGMA foreign_key_list(`{$tableName}`)"),
+                    'table_info' => [
+                        'driver' => 'sqlite',
+                        'metadata_source' => 'pragma_fallback',
+                        'fallback_error' => $e->getMessage(),
+                    ],
+                ];
+            }
+
+            return [
+                'table_name' => $tableName,
+                'columns' => DB::select("DESCRIBE `{$tableName}`"),
+                'indexes' => DB::select("SHOW INDEX FROM `{$tableName}`"),
+                'foreign_keys' => [],
+                'table_info' => [
+                    'driver' => $driver,
+                    'metadata_source' => 'mysql_fallback',
+                    'fallback_error' => $e->getMessage(),
                 ],
             ];
         }
+    }
 
-        return [
-            'table_name' => $tableName,
-            'columns' => DB::select("DESCRIBE `{$tableName}`"),
-            'indexes' => DB::select("SHOW INDEX FROM `{$tableName}`"),
-            'foreign_keys' => DB::select(
-                <<<'SQL'
-                SELECT
-                  kcu.CONSTRAINT_NAME,
-                  kcu.COLUMN_NAME,
-                  kcu.REFERENCED_TABLE_NAME,
-                  kcu.REFERENCED_COLUMN_NAME,
-                  rc.UPDATE_RULE,
-                  rc.DELETE_RULE,
-                  kcu.ORDINAL_POSITION
-                FROM information_schema.KEY_COLUMN_USAGE AS kcu
-                LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS AS rc
-                  ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
-                 AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                 AND rc.TABLE_NAME = kcu.TABLE_NAME
-                WHERE kcu.TABLE_SCHEMA = DATABASE()
-                  AND kcu.TABLE_NAME = ?
-                  AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-                ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
-                SQL,
-                [$tableName]
-            ),
-            'table_info' => DB::selectOne(
-                <<<'SQL'
-                SELECT
-                  TABLE_NAME,
-                  ENGINE,
-                  TABLE_ROWS,
-                  DATA_LENGTH,
-                  INDEX_LENGTH,
-                  CREATE_TIME,
-                  UPDATE_TIME,
-                  TABLE_COLLATION
-                FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = ?
-                SQL,
-                [$tableName]
-            ),
-        ];
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, object>
+     */
+    private function normalizeSchemaBuilderRows(array $rows): array {
+        return array_map(
+            static fn (array $row): object => (object) $row,
+            $rows
+        );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, object>
+     */
+    private function normalizeForeignKeys(array $rows): array {
+        return array_map(static function (array $row): object {
+            $columns = array_values($row['columns'] ?? []);
+            $foreignColumns = array_values($row['foreign_columns'] ?? []);
+
+            return (object) array_merge($row, [
+                // Keep PRAGMA-style aliases so existing consumers and tests can read the first pair directly.
+                'from' => $columns[0] ?? null,
+                'table' => $row['foreign_table'] ?? null,
+                'to' => $foreignColumns[0] ?? null,
+            ]);
+        }, $rows);
     }
 
     /**

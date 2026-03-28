@@ -552,4 +552,127 @@ class AiPostingAutofillTest extends TestCase {
         $data = $response->json('data');
         $this->assertArrayNotHasKey('c_dy', $data['matched_fields'] ?? []);
     }
+
+    /**
+     * 測試並存朝代（宋/遼）地名消歧：利用 ADDRESSES 表的層級鏈區分同名地名
+     */
+    public function test_concurrent_dynasty_address_disambiguation_via_hierarchy() {
+        $user = User::factory()->create([
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        // 插入遼朝（測試 setUp 中沒有）
+        DB::table('DYNASTIES')->insert([
+            'c_dy' => 16, 'c_dynasty_chn' => '遼', 'c_dynasty' => 'Liao', 'c_start' => 947, 'c_end' => 1125, 'c_sort' => 16,
+        ]);
+
+        // 設定人物朝代為宋
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 88888,
+            'c_dy' => 15,
+        ]);
+
+        // 插入兩個同名地址：宋的鳳州和遼的鳳州，時間範圍重疊
+        DB::table('ADDR_CODES')->insert([
+            [
+                'c_addr_id' => 13691,
+                'c_name' => 'Feng Zhou',
+                'c_name_chn' => '鳳州',
+                'c_firstyear' => 1144,
+                'c_lastyear' => 1279,
+            ],
+            [
+                'c_addr_id' => 3862,
+                'c_name' => 'Feng Zhou',
+                'c_name_chn' => '鳳州',
+                'c_firstyear' => 908,
+                'c_lastyear' => 1121,
+            ],
+        ]);
+
+        // 插入 ADDRESSES 表的層級記錄（模擬真實數據）
+        DB::table('ADDRESSES')->insert([
+            [
+                'c_addr_id' => 13691,
+                'c_name' => 'Feng Zhou',
+                'c_name_chn' => '鳳州',
+                'c_admin_type' => 'Zhou',
+                'c_firstyear' => 1144,
+                'c_lastyear' => 1279,
+                'c_belongs_firstyear' => 1144,
+                'c_belongs_lastyear' => 1279,
+                'belongs1_Name' => '利州路',
+                'belongs1_Name_chn' => '利州路',
+                'belongs2_Name' => '宋朝',
+                'belongs2_Name_chn' => '宋朝',
+            ],
+            [
+                'c_addr_id' => 3862,
+                'c_name' => 'Feng Zhou',
+                'c_name_chn' => '鳳州',
+                'c_admin_type' => 'Zhou',
+                'c_firstyear' => 908,
+                'c_lastyear' => 1121,
+                'c_belongs_firstyear' => 947,
+                'c_belongs_lastyear' => 1115,
+                'belongs1_Name' => '上京道',
+                'belongs1_Name_chn' => '上京道',
+                'belongs2_Name' => '遼朝',
+                'belongs2_Name_chn' => '遼朝',
+            ],
+        ]);
+
+        // Mock AI 響應：鳳州，任官年份 1200（宋朝時期）
+        Http::fake([
+            'https://example.com/api' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'postings' => [
+                                    [
+                                        'title_str' => '',
+                                        'addr_str' => ['full_text' => '鳳州', 'parent' => null, 'name' => '鳳州', 'admin_type' => '州'],
+                                        'c_firstyear' => 1200,
+                                        'c_fy_nh_code' => null,
+                                        'c_fy_nh_year' => null,
+                                        'c_fy_range' => null,
+                                        'c_fy_intercalary' => null,
+                                        'c_fy_month' => null,
+                                        'c_fy_day' => null,
+                                        'c_fy_day_gz' => null,
+                                        'c_lastyear' => null,
+                                        'c_ly_nh_code' => null,
+                                        'c_ly_nh_year' => null,
+                                        'c_ly_range' => null,
+                                        'c_ly_intercalary' => null,
+                                        'c_ly_month' => null,
+                                        'c_ly_day' => null,
+                                        'c_ly_day_gz' => null,
+                                        'c_appt_code' => null,
+                                        'c_assume_office_code' => null,
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '嘉泰元年知鳳州',
+            'person_id' => 88888,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $data = $response->json('data');
+
+        // 地址應匹配到宋的鳳州（13691），而非遼的鳳州（3862）
+        $addrField = $data['matched_fields']['c_addr'] ?? $data['suggested_fields']['c_addr'] ?? null;
+        $this->assertNotNull($addrField, '地址欄位應有匹配結果');
+        $this->assertContains(13691, (array) $addrField['value'], '應選擇宋朝的鳳州（13691），而非遼朝的鳳州（3862）');
+    }
 }

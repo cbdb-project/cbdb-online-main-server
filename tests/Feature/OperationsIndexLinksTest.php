@@ -12,6 +12,11 @@ class OperationsIndexLinksTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
+        config()->set('app.env', 'testing');
+        $this->app['env'] = 'testing';
+        config()->set('prometheus.enabled', false);
+        config()->set('prometheus.storage_adapter', 'memory');
+
         // 使用 SQLite 内存数据库
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -57,6 +62,11 @@ class OperationsIndexLinksTest extends TestCase {
             $table->integer('c_posting_id');
             $table->integer('c_personid')->nullable();
             $table->integer('c_fy_intercalary')->nullable();
+        });
+
+        Schema::create('NIAN_HAO', function ($table) {
+            $table->integer('c_nianhao_id')->primary();
+            $table->string('c_nianhao_chn')->nullable();
         });
 
         Schema::create('KIN_DATA', function ($table) {
@@ -153,6 +163,40 @@ class OperationsIndexLinksTest extends TestCase {
         // 验证可以生成正确的路由
         $expectedLink = route('codes.edit', ['table_name' => $resource, 'id' => $resourceId], false);
         $this->assertEquals('/codes/OFFICE_CODES/803819/edit', $expectedLink);
+    }
+
+    #[Test]
+    public function test_operations_index_normalizes_single_key_query_string_resource_id_for_code_links(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'nianhao-link@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'NIAN_HAO',
+            'resource_id' => 'c_nianhao_id=464',
+            'resource_data' => json_encode(['c_nianhao_id' => 464, 'c_nianhao_chn' => '測試年號']),
+            'resource_original' => json_encode(['c_nianhao_id' => 464, 'c_nianhao_chn' => '舊年號']),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        \DB::table('NIAN_HAO')->insert([
+            'c_nianhao_id' => 464,
+            'c_nianhao_chn' => '測試年號',
+        ]);
+
+        $response = $this->actingAs($user)->get('/operations');
+
+        $response->assertStatus(200);
+        $response->assertSee('/codes/NIAN_HAO/464/edit', false);
+        $response->assertDontSee('/codes/NIAN_HAO/c_nianhao_id=464/edit', false);
     }
 
     #[Test]

@@ -582,4 +582,22 @@ class CompositePrimaryKey {
 
         return self::buildUrl($routeName, ['id' => $personId], $pk);
     }
+
+    /**
+     * 將單一主鍵的 resource_id 正規化為 codes 路由可用的 path id。
+     *
+     * 某些全域代碼表歷史上曾把單主鍵也存成 query-string 格式
+     * （如 c_nianhao_id=464）。codes.edit 需要的是純 path segment，
+     * 因此這裡在可安全判定為單一主鍵時抽出其值，其餘情況保持原值。
+     */
+    public static function normalizeSingleKeyResourceIdForCodeRoute(string $resource, string $resourceId): string {
+        $pk = self::parseStoredResourceId($resourceId, $resource);
+        if (!is_array($pk) || count($pk) !== 1) {
+            return $resourceId;
+        }
+
+        $value = reset($pk);
+
+        return is_scalar($value) || $value === null ? (string) $value : $resourceId;
+    }
 }

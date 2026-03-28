@@ -27,6 +27,8 @@ Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
 Route::get('cbdbapi/person', 'CbdbApiController@person');
 Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationController@store')->name('api.v2.mutate.web');
+Route::middleware(['auth.optional'])->post('api/v2/create', 'Api\\MutationController@create')->name('api.v2.create.web');
+Route::middleware(['auth.optional'])->post('api/v2/delete', 'Api\\MutationController@delete')->name('api.v2.delete.web');
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 

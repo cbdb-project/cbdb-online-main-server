@@ -52,6 +52,71 @@ class MutationController extends Controller {
         return $handler->handle($resource, $mode, $operation, (int) $personId, $targetPk, $changes, is_array($meta) ? $meta : []);
     }
 
+    public function create(Request $request): JsonResponse {
+        $payload = $request->json()->all();
+        if (!is_array($payload) || empty($payload)) {
+            $payload = $request->all();
+        }
+
+        $resource = strtolower((string) ($payload['resource'] ?? ''));
+        $mode = strtolower((string) ($payload['mode'] ?? 'direct'));
+        $personId = $payload['person_id'] ?? null;
+        $targetPk = $payload['target']['pk'] ?? null;
+        $changes = $payload['changes'] ?? [];
+        $meta = $payload['meta'] ?? [];
+
+        if (!is_array($targetPk)) {
+            return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
+        }
+
+        if ($personId === null || $personId === '') {
+            return $this->errorResponse('缺少 person_id', 422, ['person_id' => ['required']]);
+        }
+
+        $handler = $this->handlerRegistry->resolve($resource, $mode, 'create');
+        if (!$handler) {
+            return $this->errorResponse('目前尚未支援此變更模式', 501, [
+                'resource' => $resource,
+                'mode' => $mode,
+                'operation' => 'create',
+            ]);
+        }
+
+        return $handler->handle($resource, $mode, 'create', (int) $personId, $targetPk, is_array($changes) ? $changes : [], is_array($meta) ? $meta : []);
+    }
+
+    public function delete(Request $request): JsonResponse {
+        $payload = $request->json()->all();
+        if (!is_array($payload) || empty($payload)) {
+            $payload = $request->all();
+        }
+
+        $resource = strtolower((string) ($payload['resource'] ?? ''));
+        $mode = strtolower((string) ($payload['mode'] ?? 'direct'));
+        $personId = $payload['person_id'] ?? null;
+        $targetPk = $payload['target']['pk'] ?? null;
+        $meta = $payload['meta'] ?? [];
+
+        if (!is_array($targetPk)) {
+            return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
+        }
+
+        if ($personId === null || $personId === '') {
+            return $this->errorResponse('缺少 person_id', 422, ['person_id' => ['required']]);
+        }
+
+        $handler = $this->handlerRegistry->resolve($resource, $mode, 'delete');
+        if (!$handler) {
+            return $this->errorResponse('目前尚未支援此變更模式', 501, [
+                'resource' => $resource,
+                'mode' => $mode,
+                'operation' => 'delete',
+            ]);
+        }
+
+        return $handler->handle($resource, $mode, 'delete', (int) $personId, $targetPk, [], is_array($meta) ? $meta : []);
+    }
+
     protected function errorResponse(string $message, int $status, array $errors = []): JsonResponse {
         $body = ['ok' => false, 'message' => $message];
         if (!empty($errors)) {

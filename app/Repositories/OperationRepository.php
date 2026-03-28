@@ -118,6 +118,27 @@ class OperationRepository {
         }
     }
 
+    public function hasPendingDeleteProposal(string $resource, string $resourceId, ?int $excludeId = null): bool {
+        try {
+            $query = Operation::where('resource', $resource)
+                ->where('op_type', Operation::TYPE_PROPOSAL_DELETE)
+                ->where('resource_id', $resourceId);
+
+            if ($excludeId !== null) {
+                $query->where('id', '!=', $excludeId);
+            }
+
+            return $query->get()->contains(function (Operation $operation) {
+                $payload = json_decode($operation->resource_data, true);
+                $status = is_array($payload) ? ($payload['__review_status'] ?? null) : null;
+
+                return $status === 'pending';
+            });
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function objectToArray($object) {
         //先編碼成json字串，再解碼成陣列
         return json_decode(json_encode($object), true);

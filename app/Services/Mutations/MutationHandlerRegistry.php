@@ -22,7 +22,15 @@ class MutationHandlerRegistry {
         PostingMutationHandler $postingHandler,
         SocialInstitutionMutationHandler $socialInstitutionHandler,
         SourceMutationHandler $sourceHandler,
-        NianHaoMutationHandler $nianHaoHandler
+        NianHaoMutationHandler $nianHaoHandler,
+        AltnameCreateHandler $altnameCreateHandler,
+        AddressCreateHandler $addressCreateHandler,
+        EntryCreateHandler $entryCreateHandler,
+        StatusCreateHandler $statusCreateHandler,
+        AltnameDeleteHandler $altnameDeleteHandler,
+        AddressDeleteHandler $addressDeleteHandler,
+        EntryDeleteHandler $entryDeleteHandler,
+        StatusDeleteHandler $statusDeleteHandler
     ) {
         $this->handlers = [
             $biogMainHandler,
@@ -39,6 +47,14 @@ class MutationHandlerRegistry {
             $socialInstitutionHandler,
             $sourceHandler,
             $nianHaoHandler,
+            $altnameCreateHandler,
+            $addressCreateHandler,
+            $entryCreateHandler,
+            $statusCreateHandler,
+            $altnameDeleteHandler,
+            $addressDeleteHandler,
+            $entryDeleteHandler,
+            $statusDeleteHandler,
         ];
     }
 

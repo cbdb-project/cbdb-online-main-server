@@ -39,6 +39,8 @@ class ToolsRepository {
             // Result: All users see unified server time (not browser's local time)
             $data['c_created_date'] = Carbon::now();
         } else {
+            // 更新時移除建檔欄位，防止意外覆寫原始建檔資訊
+            unset($data['c_created_by'], $data['c_created_date']);
             $data['c_modified_by'] = Auth::user()->name;
             $data['c_modified_date'] = Carbon::now();
         }

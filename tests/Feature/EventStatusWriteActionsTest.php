@@ -395,6 +395,98 @@ class EventStatusWriteActionsTest extends TestCase {
         ]);
     }
 
+    /**
+     * 回歸測試：更新 STATUS_DATA 時，即使請求帶入 c_created_by / c_created_date，
+     * 也不應覆寫原本的建檔資訊（#844）
+     */
+    #[Test]
+    public function status_update_preserves_created_by_and_created_date(): void {
+        \DB::table('STATUS_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_status_code' => 2,
+            'c_source' => 5,
+            'c_created_by' => 'original-creator',
+            'c_created_date' => '2020-01-01 00:00:00',
+        ]);
+
+        $this->patch(route('basicinformation.statuses.update.query', [
+            'id' => 1,
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_status_code' => 2,
+        ]), [
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_status_code' => 2,
+            'c_source' => 10,
+            'c_created_by' => 'attacker-name',
+            'c_created_date' => '2099-12-31 23:59:59',
+            'action' => 'save',
+        ]);
+
+        $row = \DB::table('STATUS_DATA')->where([
+            ['c_personid', '=', 1],
+            ['c_sequence', '=', 1],
+            ['c_status_code', '=', 2],
+        ])->first();
+
+        $this->assertSame('original-creator', $row->c_created_by, '更新不應覆寫 c_created_by');
+        $this->assertSame('2020-01-01 00:00:00', $row->c_created_date, '更新不應覆寫 c_created_date');
+        $this->assertSame('Writer User', $row->c_modified_by);
+    }
+
+    /**
+     * 回歸測試：更新 EVENTS_DATA 時，即使請求帶入 c_created_by / c_created_date，
+     * 也不應覆寫原本的建檔資訊（#844）
+     */
+    #[Test]
+    public function event_update_preserves_created_by_and_created_date(): void {
+        \DB::table('EVENTS_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+            'c_intercalary' => 1,
+            'c_source' => 8,
+            'c_created_by' => 'original-creator',
+            'c_created_date' => '2020-01-01 00:00:00',
+        ]);
+
+        \DB::table('EVENTS_ADDR')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+            'c_addr_id' => 99,
+        ]);
+
+        $this->patch(route('basicinformation.events.update.query', [
+            'id' => 1,
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+        ]), [
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+            'c_intercalary' => 0,
+            'c_source' => 10,
+            'c_addr_id' => [200],
+            'c_created_by' => 'attacker-name',
+            'c_created_date' => '2099-12-31 23:59:59',
+            'action' => 'save',
+        ]);
+
+        $row = \DB::table('EVENTS_DATA')->where([
+            ['c_personid', '=', 1],
+            ['c_sequence', '=', 1],
+            ['c_event_code', '=', 50],
+        ])->first();
+
+        $this->assertSame('original-creator', $row->c_created_by, '更新不應覆寫 c_created_by');
+        $this->assertSame('2020-01-01 00:00:00', $row->c_created_date, '更新不應覆寫 c_created_date');
+        $this->assertSame('Writer User', $row->c_modified_by);
+    }
+
     private function seedStatusRow(): void {
         \DB::table('STATUS_DATA')->insert([
             'c_personid' => 1,

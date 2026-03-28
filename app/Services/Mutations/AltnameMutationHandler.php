@@ -2,101 +2,118 @@
 
 namespace App\Services\Mutations;
 
-use App\Repositories\BiogMainRepository;
+use App\Repositories\OperationRepository;
+use App\Services\AuditLogService;
+use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
-use App\Support\CompositePrimaryKey;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class AltnameMutationHandler extends AbstractMutationHandler {
-    protected BiogMainRepository $biogMainRepository;
+class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
     protected NameSearchIndexService $nameSearchIndexService;
 
-    public function __construct(BiogMainRepository $biogMainRepository, NameSearchIndexService $nameSearchIndexService) {
-        $this->biogMainRepository = $biogMainRepository;
+    public function __construct(
+        OperationRepository $operationRepository,
+        AuditLogService $auditLogService,
+        NameSearchIndexService $nameSearchIndexService
+    ) {
+        parent::__construct($operationRepository, $auditLogService);
         $this->nameSearchIndexService = $nameSearchIndexService;
     }
 
-    public function supports(string $resource, string $mode, string $operation): bool {
-        return $resource === 'altnames' && $mode === 'direct' && $operation === 'update';
+    protected function resourceName(): string {
+        return 'altnames';
     }
 
-    public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
-        $authorizationError = $this->authorizeDirect();
-        if ($authorizationError) {
-            return $authorizationError;
-        }
-
-        try {
-            CompositePrimaryKey::validateOrFail($targetPk, 'ALTNAME_DATA');
-        } catch (\Throwable $e) {
-            return $this->errorResponse('主鍵格式不正確', 422, ['pk' => [$e->getMessage()]]);
-        }
-
-        if (empty($changes)) {
-            return $this->errorResponse('changes 不可為空', 422, ['changes' => ['empty']]);
-        }
-
-        $original = $this->biogMainRepository->altnameById($targetPk);
-        if (!$original) {
-            return $this->errorResponse('ALTNAME_DATA 記錄不存在', 404);
-        }
-
-        if ((string) ($targetPk['c_personid'] ?? '') !== (string) $personId) {
-            return $this->errorResponse('person_id 與 target.pk.c_personid 不一致', 422, [
-                'person_id' => ['mismatch'],
-            ]);
-        }
-
-        if ((string) ($original->c_personid ?? '') !== (string) $personId) {
-            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
-        }
-
-        $allowedQuickFields = ['c_sequence'];
-        $updateData = array_intersect_key($changes, array_flip($allowedQuickFields));
-        if (empty($updateData)) {
-            return $this->errorResponse('目前此接口至少需包含可更新欄位（例如 c_sequence）', 422, [
-                'changes' => ['no_supported_fields'],
-            ]);
-        }
-
-        $proxy = Request::create('/api/v2/mutate', 'PATCH', $updateData);
-        if (isset($meta['comment']) && is_string($meta['comment']) && trim($meta['comment']) !== '') {
-            $proxy->request->set('__proposal_comment', trim($meta['comment']));
-        }
-
-        try {
-            $newPk = $this->biogMainRepository->altnameUpdateById($proxy, $personId, $targetPk);
-        } catch (\Throwable $e) {
-            return $this->errorResponse('更新失敗：'.$e->getMessage(), 500);
-        }
-
-        if ($newPk === 'bracket_conflict') {
-            return $this->errorResponse('此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。', 409);
-        }
-        if (!$newPk) {
-            return $this->errorResponse('ALTNAME_DATA 記錄不存在', 404);
-        }
-
-        $this->syncAltnameIndexAfterUpdate($original, $updateData, $targetPk, $newPk);
-        $updated = $this->biogMainRepository->altnameById($newPk);
-
-        return response()->json([
-            'ok' => true,
-            'resource' => 'altnames',
-            'mode' => 'direct',
-            'operation' => 'update',
-            'result' => [
-                'pk' => $newPk,
-                'updated_fields' => array_keys($updateData),
-                'row' => $updated ? (array) $updated : null,
-            ],
-        ]);
+    protected function tableName(): string {
+        return 'ALTNAME_DATA';
     }
 
-    protected function syncAltnameIndexAfterUpdate($original, array $changes, array $targetPk, array $newPk): void {
-        if (!$original || !Schema::hasTable('CBDB__NAME_FTS')) {
+    protected function displayName(): string {
+        return '別名';
+    }
+
+    protected function resourceAliases(): array {
+        return ['altnames', 'altname', 'altname_data'];
+    }
+
+    protected function keyColumns(): array {
+        return ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'];
+    }
+
+    protected function allowedFields(): array {
+        return [
+            'c_alt_name_chn',
+            'c_alt_name',
+            'c_alt_name_type_code',
+            'c_source',
+            'c_pages',
+            'c_notes',
+            'c_sequence',
+            'c_alt_name_pinyin',
+            'c_alt_name_pinyin2',
+            'c_alt_name_pinyin3',
+            'c_alt_name_role',
+        ];
+    }
+
+    protected function preprocessUpdateData(array $data): array {
+        // 括號正規化
+        $data = BracketNormalizer::normalizeAltname($data);
+
+        // -999 → 0 轉換
+        $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
+
+        return $data;
+    }
+
+    protected function performUpdate(array $targetPk, array $updateData): void {
+        // 計算更新後的 3-key，若有變動需檢查衝突
+        $newPk3 = [
+            'c_personid' => $targetPk['c_personid'],
+            'c_alt_name_chn' => $updateData['c_alt_name_chn'] ?? $targetPk['c_alt_name_chn'],
+            'c_alt_name_type_code' => $updateData['c_alt_name_type_code'] ?? $targetPk['c_alt_name_type_code'],
+        ];
+
+        if ($newPk3 !== array_intersect_key($targetPk, $newPk3)) {
+            $conflict = DB::table('ALTNAME_DATA')->where([
+                ['c_personid', '=', $newPk3['c_personid']],
+                ['c_alt_name_chn', '=', $newPk3['c_alt_name_chn']],
+                ['c_alt_name_type_code', '=', $newPk3['c_alt_name_type_code']],
+            ])->first();
+            if ($conflict) {
+                throw new \InvalidArgumentException(
+                    '此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。'
+                );
+            }
+        }
+
+        parent::performUpdate($targetPk, $updateData);
+    }
+
+    protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): \Illuminate\Http\JsonResponse {
+        // 記錄原始狀態以便更新搜尋索引
+        $originalObject = $this->findOriginalRow($targetPk);
+
+        $response = parent::handleDirect($personId, $targetPk, $updateData, $originalArray, $comment);
+
+        // 更新搜尋索引
+        if ($response->getStatusCode() === 200 && $originalObject) {
+            $this->syncAltnameIndexAfterUpdate($originalObject, $updateData, $targetPk);
+        }
+
+        return $response;
+    }
+
+    /**
+     * 更新後同步名字搜尋索引
+     *
+     * 當別名的中文名稱（c_alt_name_chn）或類型代碼（c_alt_name_type_code）
+     * 發生變更時，需從全文索引（CBDB__NAME_FTS）移除舊條目並重新索引新條目，
+     * 以確保搜尋結果的正確性。
+     */
+    protected function syncAltnameIndexAfterUpdate(object $original, array $changes, array $targetPk): void {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
             return;
         }
 
@@ -119,6 +136,7 @@ class AltnameMutationHandler extends AbstractMutationHandler {
         }
 
         if (!empty($newName)) {
+            $newPk = $this->buildNewPk($targetPk, $changes);
             $this->nameSearchIndexService->indexAltname(
                 $newPk['c_personid'] ?? $targetPk['c_personid'],
                 $newType,

@@ -11,14 +11,32 @@ class MutationHandlerRegistry {
     public function __construct(
         BiogMainMutationHandler $biogMainHandler,
         AltnameMutationHandler $altnameHandler,
+        AddressMutationHandler $addressHandler,
+        EntryMutationHandler $entryHandler,
+        StatusMutationHandler $statusHandler,
+        EventMutationHandler $eventHandler,
+        AssociationMutationHandler $associationHandler,
+        KinshipMutationHandler $kinshipHandler,
         PossessionMutationHandler $possessionHandler,
+        TextMutationHandler $textHandler,
+        PostingMutationHandler $postingHandler,
+        SocialInstitutionMutationHandler $socialInstitutionHandler,
         SourceMutationHandler $sourceHandler,
         NianHaoMutationHandler $nianHaoHandler
     ) {
         $this->handlers = [
             $biogMainHandler,
             $altnameHandler,
+            $addressHandler,
+            $entryHandler,
+            $statusHandler,
+            $eventHandler,
+            $associationHandler,
+            $kinshipHandler,
             $possessionHandler,
+            $textHandler,
+            $postingHandler,
+            $socialInstitutionHandler,
             $sourceHandler,
             $nianHaoHandler,
         ];

@@ -914,7 +914,7 @@ class PersonBrowserTest extends TestCase {
         $this->assertTrue($response->json('form.fields.c_female.editable'));
         $this->assertSame('enum', $response->json('form.fields.c_by_nh_code.input'));
         $this->assertFalse($response->json('form.fields.c_index_year.editable'));
-        $this->assertTrue($response->json('form.fields.c_index_year.send_on_save'));
+        $this->assertFalse($response->json('form.fields.c_index_year.send_on_save'));
 
         $this->assertSame('漢', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（中文）'));
         $this->assertSame('Han', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（英文）'));

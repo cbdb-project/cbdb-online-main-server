@@ -1010,9 +1010,9 @@ function renderPropertySection(section: Section) {
     const fields = fieldMap(section);
     const mergedFields = [
         { label: '性別 (c_female)', value: fields['性別'] },
-        { label: '朝代 (c_dynasty_chn / c_dynasty)', value: joinDisplayValues(fields['朝代（中文）'], fields['朝代（英文）']) },
-        { label: '族裔 (c_ethnicity_chn / c_ethnicity)', value: joinDisplayValues(fields['族裔（中文）'], fields['族裔（英文）']) },
-        { label: '郡望 (c_choronym_chn / c_choronym)', value: joinDisplayValues(fields['郡望（中文）'], fields['郡望（英文）']) },
+        { label: '朝代 (c_dy)', value: joinDisplayValues(fields['朝代（中文）'], fields['朝代（英文）']) },
+        { label: '族裔 (c_ethnicity_code)', value: joinDisplayValues(fields['族裔（中文）'], fields['族裔（英文）']) },
+        { label: '郡望 (c_choronym_code)', value: joinDisplayValues(fields['郡望（中文）'], fields['郡望（英文）']) },
         { label: '戶籍 (c_household_status_code)', value: joinDisplayValues(fields['戶籍（中文）'], fields['戶籍（英文）']) },
     ];
 

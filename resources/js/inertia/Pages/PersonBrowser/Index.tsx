@@ -53,6 +53,8 @@ export default function PersonBrowserIndex() {
     const [basicInfoEditorState, setBasicInfoEditorState] = useState({ editing: false, dirty: false });
     const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
     const [savingBeforeNavigate, setSavingBeforeNavigate] = useState(false);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT);
+    const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= MOBILE_BREAKPOINT);
 
     const isInitialMount = useRef(true);
     const basicInfoSaveHandlerRef = useRef<(() => Promise<boolean>) | null>(null);
@@ -131,8 +133,11 @@ export default function PersonBrowserIndex() {
         (personId: number) => {
             setSelectedId(personId);
             updateUrl({ person_id: personId, keyword, tab: activeTab });
+            if (isMobile) {
+                setSidebarOpen(false);
+            }
         },
-        [activeTab, keyword, updateUrl],
+        [activeTab, isMobile, keyword, updateUrl],
     );
 
     const handleBasicInfoSaved = useCallback(() => {
@@ -197,6 +202,25 @@ export default function PersonBrowserIndex() {
             doSearch(initialKeyword || '', initialPage || 1);
         }
     }, [doSearch, initialKeyword, initialPage]);
+
+    useEffect(() => {
+        const updateViewport = () => {
+            const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+
+            setIsMobile((prev) => {
+                if (prev !== mobile) {
+                    setSidebarOpen(!mobile);
+                }
+
+                return mobile;
+            });
+        };
+
+        updateViewport();
+        window.addEventListener('resize', updateViewport);
+
+        return () => window.removeEventListener('resize', updateViewport);
+    }, []);
 
     // ── Browser back/forward ──
     useEffect(() => {
@@ -304,9 +328,35 @@ export default function PersonBrowserIndex() {
 
     return (
         <AppShell>
+            {isMobile && sidebarOpen ? (
+                <div
+                    style={mobileBackdropStyle}
+                    onClick={() => setSidebarOpen(false)}
+                />
+            ) : null}
+
             <div style={wrapperStyle}>
                 {/* Left sidebar */}
-                <aside style={sidebarStyle}>
+                <aside
+                    style={{
+                        ...sidebarStyle,
+                        ...(isMobile ? mobileSidebarStyle : {}),
+                        ...(isMobile && sidebarOpen ? mobileSidebarOpenStyle : {}),
+                        ...(isMobile && !sidebarOpen ? mobileSidebarClosedStyle : {}),
+                    }}
+                >
+                    {isMobile ? (
+                        <div style={mobileSidebarHeaderStyle}>
+                            <div style={mobileSidebarTitleStyle}>人物列表</div>
+                            <button
+                                type="button"
+                                style={mobileSidebarCloseButtonStyle}
+                                onClick={() => setSidebarOpen(false)}
+                            >
+                                收起
+                            </button>
+                        </div>
+                    ) : null}
                     <PeopleSearchPanel keyword={keyword} onSearch={guardedHandleSearch} onClear={guardedHandleClear} />
                     <PeopleList
                         people={people}
@@ -320,6 +370,21 @@ export default function PersonBrowserIndex() {
 
                 {/* Right main area */}
                 <div style={mainStyle}>
+                    {isMobile ? (
+                        <div style={mobileToolbarStyle}>
+                            <button
+                                type="button"
+                                style={mobileSidebarToggleButtonStyle}
+                                onClick={() => setSidebarOpen(true)}
+                            >
+                                人物列表
+                            </button>
+                            <div style={mobileToolbarMetaStyle}>
+                                {selectedId ? `人物 #${selectedId}` : '尚未選擇人物'}
+                            </div>
+                        </div>
+                    ) : null}
+
                     <PersonSummaryPanel summary={summary} loading={summaryLoading} error={summaryError} />
 
                     <BrowserTabs
@@ -385,6 +450,8 @@ export default function PersonBrowserIndex() {
 
 // ── Styles ──
 
+const MOBILE_BREAKPOINT = 960;
+
 const wrapperStyle: React.CSSProperties = {
     display: 'flex',
     height: 'calc(100vh - 100px)',
@@ -403,12 +470,95 @@ const sidebarStyle: React.CSSProperties = {
     flexShrink: 0,
 };
 
+const mobileSidebarStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 'min(86vw, 360px)',
+    maxWidth: '86vw',
+    minWidth: 'unset',
+    zIndex: 35,
+    borderRight: '1px solid #d6dde6',
+    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.22)',
+    transition: 'transform 0.22s ease, box-shadow 0.22s ease',
+};
+
+const mobileSidebarOpenStyle: React.CSSProperties = {
+    transform: 'translateX(0)',
+};
+
+const mobileSidebarClosedStyle: React.CSSProperties = {
+    transform: 'translateX(calc(-100% - 16px))',
+    boxShadow: 'none',
+};
+
+const mobileBackdropStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    zIndex: 30,
+};
+
+const mobileSidebarHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '12px 14px',
+    borderBottom: '1px solid #dee2e6',
+    backgroundColor: '#f8fafc',
+};
+
+const mobileSidebarTitleStyle: React.CSSProperties = {
+    fontSize: '0.95rem',
+    fontWeight: 700,
+    color: '#203548',
+};
+
+const mobileSidebarCloseButtonStyle: React.CSSProperties = {
+    border: '1px solid #cdd6df',
+    backgroundColor: '#fff',
+    color: '#445566',
+    borderRadius: 8,
+    padding: '6px 10px',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+};
+
 const mainStyle: React.CSSProperties = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
     backgroundColor: '#f4f6f9',
+};
+
+const mobileToolbarStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '10px 12px 0',
+    flexWrap: 'wrap',
+};
+
+const mobileSidebarToggleButtonStyle: React.CSSProperties = {
+    border: '1px solid #c9d5e2',
+    backgroundColor: '#fff',
+    color: '#204467',
+    borderRadius: 999,
+    padding: '7px 12px',
+    fontSize: '0.83rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+};
+
+const mobileToolbarMetaStyle: React.CSSProperties = {
+    color: '#5f7081',
+    fontSize: '0.82rem',
+    fontWeight: 600,
 };
 
 const tabContentStyle: React.CSSProperties = {

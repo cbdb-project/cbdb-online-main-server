@@ -441,6 +441,14 @@ class NaturalLanguageQueryService {
             while ($round < $maxRounds) {
                 $round++;
                 $allowTools = $toolsEnabled && $round < $maxRounds;
+
+                Log::info('歷史問答 LLM 輪次開始', [
+                    'round' => $round,
+                    'allow_tools' => $allowTools,
+                    'message_count' => count($messages),
+                    'question_preview' => mb_substr($question, 0, 120),
+                ]);
+
                 $response = $this->callLLMForQa($messages, $tools, $allowTools);
 
                 if ($progressCallback) {
@@ -460,7 +468,23 @@ class NaturalLanguageQueryService {
                 $data = $response['data'];
                 $toolCalls = $data['choices'][0]['message']['tool_calls'] ?? null;
 
+                Log::info('歷史問答 LLM 輪次完成', [
+                    'round' => $round,
+                    'allow_tools' => $allowTools,
+                    'tool_call_count' => is_array($toolCalls) ? count($toolCalls) : 0,
+                    'has_content' => !empty($data['choices'][0]['message']['content'] ?? ''),
+                ]);
+
                 if ($toolCalls && $allowTools) {
+                    Log::info('歷史問答進入工具執行', [
+                        'round' => $round,
+                        'tool_call_count' => count($toolCalls),
+                        'tool_names' => array_map(
+                            static fn ($toolCall) => $toolCall['function']['name'] ?? 'unknown',
+                            $toolCalls
+                        ),
+                    ]);
+
                     $toolResults = $this->executeToolCalls($toolCalls, $progressCallback);
                     $allToolResults = array_merge($allToolResults, $toolResults);
 
@@ -470,6 +494,15 @@ class NaturalLanguageQueryService {
                             $allSqlUsed[] = $tr['arguments']['sql'];
                         }
                     }
+
+                    Log::info('歷史問答工具執行完成，準備回填 LLM', [
+                        'round' => $round,
+                        'tool_result_count' => count($toolResults),
+                        'successful_tool_count' => count(array_filter(
+                            $toolResults,
+                            static fn ($toolResult) => ($toolResult['status'] ?? 'error') === 'completed'
+                        )),
+                    ]);
 
                     $messages[] = $data['choices'][0]['message'];
                     foreach ($toolResults as $toolResult) {
@@ -493,6 +526,14 @@ class NaturalLanguageQueryService {
                 $logData['success'] = true;
                 $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
                 $this->saveLog($logData);
+
+                Log::info('歷史問答最終回答完成', [
+                    'round' => $round,
+                    'tool_result_count' => count($allToolResults),
+                    'sql_used_count' => count($allSqlUsed),
+                    'summary_preview' => mb_substr($parsed['summary'] ?? '', 0, 120),
+                    'execution_time_ms' => $logData['execution_time_ms'],
+                ]);
 
                 return [
                     'success' => true,
@@ -1337,6 +1378,9 @@ PROMPT;
             Log::info('执行工具调用', [
                 'tool' => $toolName,
                 'arguments' => $arguments,
+                'tool_call_id' => $toolCallId,
+                'tool_index' => $index + 1,
+                'total_tools' => count($toolCalls),
             ]);
 
             // 发送进度：开始执行工具
@@ -1351,6 +1395,7 @@ PROMPT;
                 ]);
             }
 
+            $toolStartedAt = microtime(true);
             $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback);
             $resultSummary = $this->summarizeToolResult($toolName, $arguments, $result);
             $status = ($result['success'] ?? false) ? 'completed' : 'error';
@@ -1365,6 +1410,14 @@ PROMPT;
             ];
 
             $results[] = $toolResult;
+
+            Log::info('工具調用完成', [
+                'tool' => $toolName,
+                'tool_call_id' => $toolCallId,
+                'status' => $status,
+                'duration_ms' => (int) ((microtime(true) - $toolStartedAt) * 1000),
+                'error' => $result['error'] ?? null,
+            ]);
 
             // 发送进度：工具执行完成
             if ($progressCallback) {
@@ -1565,6 +1618,16 @@ PROMPT;
         ];
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $attemptStartedAt = microtime(true);
+
+            Log::info('工具執行嘗試開始', [
+                'tool' => $toolName,
+                'tool_call_id' => $toolCallId,
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'arguments' => $arguments,
+            ]);
+
             try {
                 $lastResult = $this->toolsService->executeTool($toolName, $arguments);
             } catch (\Throwable $e) {
@@ -1581,6 +1644,15 @@ PROMPT;
                     'error' => "工具執行時發生錯誤: {$e->getMessage()}",
                 ];
             }
+
+            Log::info('工具執行嘗試完成', [
+                'tool' => $toolName,
+                'tool_call_id' => $toolCallId,
+                'attempt' => $attempt,
+                'duration_ms' => (int) ((microtime(true) - $attemptStartedAt) * 1000),
+                'success' => ($lastResult['success'] ?? false) === true,
+                'error' => $lastResult['error'] ?? null,
+            ]);
 
             if (($lastResult['success'] ?? false) === true) {
                 return $lastResult;

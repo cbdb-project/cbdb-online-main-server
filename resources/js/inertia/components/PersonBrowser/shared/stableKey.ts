@@ -1,11 +1,9 @@
 /**
- * 從 pk 物件產生穩定的 React key 字串。
+ * 從 pk 物件產生穩定且無碰撞的 React key 字串。
  *
- * 將 pk 各欄位值以 "|" 連接，null 值轉為空字串，
- * 確保同一筆資料在重新渲染時保持相同的 key。
+ * 使用 JSON.stringify 保留欄位名與型別資訊，
+ * 確保不同 pk 值（含分隔符字元、null 與空字串）不會產生相同 key。
  */
 export function stableKey(pk: Record<string, unknown>): string {
-    return Object.values(pk)
-        .map((v) => (v == null ? '' : String(v)))
-        .join('|');
+    return JSON.stringify(pk);
 }

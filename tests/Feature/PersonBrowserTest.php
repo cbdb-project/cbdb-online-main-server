@@ -1414,4 +1414,48 @@ class PersonBrowserTest extends TestCase {
             }
         }
     }
+
+    #[Test]
+    public function test_tab_items_with_different_pk_produce_unique_json_keys(): void {
+        // alt_names: person 1 has 2 rows with different (c_alt_name_chn, c_alt_name_type_code)
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'alt_names']));
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertGreaterThanOrEqual(2, count($items), 'Need at least 2 alt_name items for uniqueness test');
+
+        $keys = array_map(fn ($item) => json_encode($item['pk']), $items);
+        $this->assertSame(count($keys), count(array_unique($keys)), 'alt_names: JSON-encoded pk must be unique across items');
+    }
+
+    #[Test]
+    public function test_source_pk_with_pipe_and_null_pages_no_collision(): void {
+        // Insert two sources that would collide under naive "|" joining:
+        // row1: pages = "a|b"   → old stableKey: "1|1|a|b"
+        // row2: pages = null    → old stableKey: "1|1|"  (no collision with row1 anyway)
+        // row3: pages = ""      → old stableKey: "1|1|"  (collision with row2 under old impl)
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => 'a|b', 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => null, 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => '', 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+        ]);
+        DB::table('TEXT_CODES')->insertOrIgnore([
+            ['c_textid' => 2, 'c_title' => 'Test Book', 'c_title_chn' => '測試書', 'c_text_year' => null],
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'sources']));
+        $response->assertOk();
+
+        $items = $response->json('items');
+        // Should have at least 4 items (1 from seed + 3 inserted above)
+        $this->assertGreaterThanOrEqual(4, count($items));
+
+        $keys = array_map(fn ($item) => json_encode($item['pk']), $items);
+        $this->assertSame(
+            count($keys),
+            count(array_unique($keys)),
+            'sources: JSON-encoded pk must be unique; pipe chars and null/empty must not collide'
+        );
+    }
 }

@@ -666,7 +666,7 @@ class BasicInformationOfficesController extends Controller {
             ];
             $submittedData = $request->only($relevantFields);
 
-            $personId = $personId ?? $request->input('c_personid') ?? $request->route('id') ?? $request->input('_id');
+            $personId = $personId ?? $request->input('c_personid') ?? $request->route('basicinformation') ?? $request->input('_id');
 
             DB::table('ai_fill_logs')
                 ->where('id', $logId)

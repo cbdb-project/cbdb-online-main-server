@@ -143,7 +143,7 @@ class BasicInformationStatusesController extends Controller {
         flash('Store success @ '.Carbon::now(), 'success');
 
         if ($aiFillLogId) {
-            $this->updateAiFillLog($aiFillLogId, $request);
+            $this->updateAiFillLog($aiFillLogId, $request, $id);
         }
 
         // 使用新的查詢參數模式重定向
@@ -429,7 +429,7 @@ class BasicInformationStatusesController extends Controller {
         flash('Update success @ '.Carbon::now(), 'success');
 
         if ($aiFillLogId) {
-            $this->updateAiFillLog($aiFillLogId, $request);
+            $this->updateAiFillLog($aiFillLogId, $request, $id);
         }
 
         // 重定向到新的查詢參數格式
@@ -485,7 +485,7 @@ class BasicInformationStatusesController extends Controller {
     /**
      * 更新 AI 填充日誌，記錄用戶實際提交的數據
      */
-    private function updateAiFillLog(int $logId, Request $request): void {
+    private function updateAiFillLog(int $logId, Request $request, $personId = null): void {
         try {
             $relevantFields = [
                 'c_status_code', 'c_sequence', 'c_supplement',
@@ -495,7 +495,7 @@ class BasicInformationStatusesController extends Controller {
             ];
             $submittedData = $request->only($relevantFields);
 
-            $personId = $request->input('c_personid') ?? $request->route('id');
+            $personId = $personId ?? $request->input('c_personid') ?? $request->route('basicinformation');
 
             DB::table('ai_fill_logs')
                 ->where('id', $logId)

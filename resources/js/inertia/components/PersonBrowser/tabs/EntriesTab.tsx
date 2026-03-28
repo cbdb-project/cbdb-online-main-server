@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface EntryItem {
     pk: {
@@ -43,8 +44,8 @@ export default function EntriesTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="入仕方式" value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="親屬關聯" value={item.kin_summary} />

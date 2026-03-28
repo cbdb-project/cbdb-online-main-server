@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface AddressItem {
     pk: {
@@ -38,8 +39,8 @@ export default function AddressesTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="地址" value={formatBilingualLabel(item.addr_chn, item.addr)} />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />

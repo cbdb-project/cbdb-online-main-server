@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface PostingItem {
     pk: {
@@ -39,8 +40,8 @@ export default function PostingsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="官名" value={formatBilingualLabel(item.office_chn, item.office)} />
                     <MetaRow label="任期" value={item.tenure_summary} />
                     <MetaRow label="地址" value={item.address_summary} />

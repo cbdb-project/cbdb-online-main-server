@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface KinshipItem {
     pk: {
@@ -40,8 +41,8 @@ export default function KinshipTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.relation_chn, item.relation)} />
                     <MetaRow
                         label="親屬"

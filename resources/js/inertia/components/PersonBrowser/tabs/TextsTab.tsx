@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface TextItem {
     pk: {
@@ -34,8 +35,8 @@ export default function TextsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="著作" value={formatBilingualLabel(item.title_chn, item.title)} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />

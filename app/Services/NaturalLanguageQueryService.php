@@ -1311,7 +1311,7 @@ PROMPT;
     }
 
     /**
-     * 执行工具调用
+     * 執行工具調用
      *
      * @param array $toolCalls LLM 请求的工具调用
      * @param callable|null $progressCallback 进度回调函数
@@ -1344,12 +1344,16 @@ PROMPT;
             }
 
             $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback);
+            $resultSummary = $this->summarizeToolResult($toolName, $arguments, $result);
+            $status = ($result['success'] ?? false) ? 'completed' : 'error';
 
             $toolResult = [
                 'tool_call_id' => $toolCallId,
                 'tool_name' => $toolName,
+                'status' => $status,
                 'arguments' => $arguments,
                 'result' => $result,
+                'result_summary' => $resultSummary,
             ];
 
             $results[] = $toolResult;
@@ -1361,8 +1365,9 @@ PROMPT;
                     'total_tools' => count($toolCalls),
                     'tool_name' => $toolName,
                     'tool_call_id' => $toolCallId,
+                    'status' => $status,
                     'arguments' => $arguments,
-                    'result' => $result,
+                    'result_summary' => $resultSummary,
                     'success' => !isset($result['error']),
                     'message' => sprintf('工具 %d/%d 執行完成: %s', $index + 1, count($toolCalls), $toolName),
                 ]);
@@ -1370,6 +1375,170 @@ PROMPT;
         }
 
         return $results;
+    }
+
+    /**
+     * 為工具執行結果生成可讀摘要，避免將完整原始 payload 暴露給前端。
+     *
+     * @param string $toolName 工具名稱
+     * @param array  $arguments 呼叫參數
+     * @param array  $result    工具回傳結果
+     * @return array
+     */
+    protected function summarizeToolResult(string $toolName, array $arguments, array $result): array {
+        if (!($result['success'] ?? false)) {
+            return [
+                'status' => 'error',
+                'label' => '工具執行失敗',
+                'error' => $result['error'] ?? '未知錯誤',
+            ];
+        }
+
+        $data = $result['data'] ?? null;
+
+        switch ($toolName) {
+            case 'query_read_only_sql': {
+                $rows = is_array($data['rows'] ?? null) ? $data['rows'] : [];
+                $count = count($rows);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+                $sql = $data['sql'] ?? ($arguments['sql'] ?? '');
+
+                return [
+                    'status' => 'completed',
+                    'label' => "返回 {$count} 筆資料",
+                    'sql' => $sql,
+                    'row_count' => $count,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'query_table': {
+                $rows = is_array($data['rows'] ?? null) ? $data['rows'] : [];
+                $count = count($rows);
+                $total = (int) ($data['total_matching_rows'] ?? $count);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+
+                return [
+                    'status' => 'completed',
+                    'label' => "返回 {$count} 筆資料（共 {$total} 筆匹配）",
+                    'row_count' => $count,
+                    'total_matching' => $total,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'get_sample_data_for_table': {
+                // NlQueryToolsService.getSampleDataForTable 直接返回 $formattedData 陣列
+                $rows = is_array($data) ? $data : [];
+                $count = count($rows);
+                $columns = $count > 0 ? array_keys((array) $rows[0]) : [];
+
+                return [
+                    'status' => 'completed',
+                    'label' => "取得 {$count} 筆樣例資料",
+                    'row_count' => $count,
+                    'columns' => $columns,
+                    'preview' => array_slice($rows, 0, 3),
+                ];
+            }
+
+            case 'get_table_row_by_id': {
+                $row = (array) ($data['row'] ?? []);
+                $found = !empty($row);
+                $table = $data['table_name'] ?? ($arguments['table_name'] ?? '');
+                $label = $found ? "找到 1 筆記錄（{$table}）" : '未找到記錄';
+
+                return [
+                    'status' => 'completed',
+                    'label' => $label,
+                    'found' => $found,
+                    'table_name' => $table,
+                    'row_preview' => array_slice($row, 0, 8, true),
+                ];
+            }
+
+            case 'query_table_schema': {
+                $cols = (array) ($data['columns'] ?? []);
+                $count = count($cols);
+                $table = $data['table_name'] ?? ($arguments['table_name'] ?? '');
+                $colNames = array_map(
+                    fn ($c) => is_array($c) ? ($c['Field'] ?? $c['name'] ?? '') : (string) $c,
+                    array_slice($cols, 0, 15)
+                );
+
+                return [
+                    'status' => 'completed',
+                    'label' => "查詢 schema: {$table}（{$count} 個欄位）",
+                    'table_name' => $table,
+                    'columns_count' => $count,
+                    'column_names' => array_values(array_filter($colNames)),
+                ];
+            }
+
+            case 'get_table_schema': {
+                // NlQueryToolsService.getTableSchema 回傳 {success, schema, error}
+                $schema = $result['schema'] ?? $data ?? [];
+                $cols = (array) ($schema['columns'] ?? []);
+                $count = count($cols);
+                $table = $arguments['table_name'] ?? '';
+
+                return [
+                    'status' => 'completed',
+                    'label' => "查詢 schema: {$table}（{$count} 個欄位）",
+                    'table_name' => $table,
+                    'columns_count' => $count,
+                ];
+            }
+
+            case 'get_person_ids': {
+                $rows = is_array($data) ? $data : [];
+                $count = $result['count'] ?? count($rows);
+                $names = array_filter(array_column($rows, 'c_name_chn'));
+                $personIds = array_column($rows, 'c_personid');
+
+                return [
+                    'status' => 'completed',
+                    'label' => "找到 {$count} 個相關人物",
+                    'count' => (int) $count,
+                    'person_ids' => array_values(array_slice($personIds, 0, 5)),
+                    'names' => array_values(array_slice($names, 0, 5)),
+                ];
+            }
+
+            case 'get_code_values': {
+                $rows = is_array($data) ? $data : [];
+                $count = count($rows);
+                $codeType = $arguments['code_type'] ?? '';
+
+                return [
+                    'status' => 'completed',
+                    'label' => "取得 {$codeType} 代碼（{$count} 筆）",
+                    'count' => $count,
+                    'code_type' => $codeType,
+                    'preview' => array_slice($rows, 0, 5),
+                ];
+            }
+
+            case 'list_allowed_tables': {
+                $tables = is_array($data) ? $data : [];
+                $count = count($tables);
+
+                return [
+                    'status' => 'completed',
+                    'label' => "列出 {$count} 個允許表格",
+                    'count' => $count,
+                    'tables' => array_slice($tables, 0, 10),
+                ];
+            }
+
+            default:
+                return [
+                    'status' => 'completed',
+                    'label' => '工具執行完成',
+                ];
+        }
     }
 
     protected function executeToolWithRetry(

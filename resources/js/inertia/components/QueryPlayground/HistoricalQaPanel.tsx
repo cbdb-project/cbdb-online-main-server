@@ -1,11 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-
-interface ToolCall {
-    name: string;
-    status: 'running' | 'complete' | 'error';
-    args?: Record<string, unknown>;
-    result?: string;
-}
+import ToolTracePanel, { type ToolCallTrace, type ToolResultSummary } from './ToolTracePanel';
 
 interface Evidence {
     type: 'database' | 'model_background';
@@ -29,7 +23,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
     const [answerMarkdown, setAnswerMarkdown] = useState('');
     const [summary, setSummary] = useState('');
     const [sqlUsed, setSqlUsed] = useState<string[]>([]);
-    const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+    const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
     const [evidence, setEvidence] = useState<Evidence[]>([]);
     const [caveat, setCaveat] = useState('');
     const [showDetails, setShowDetails] = useState(false);
@@ -157,6 +151,18 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 setSqlUsed(data.sql_used || []);
                 setEvidence(data.evidence || []);
                 setCaveat(data.caveat || '');
+                // Populate tool calls from non-streaming response
+                if (Array.isArray(data.tool_calls)) {
+                    const traces: ToolCallTrace[] = data.tool_calls.map((tc: Record<string, unknown>) => ({
+                        tool_call_id: String(tc.tool_call_id ?? ''),
+                        name: String(tc.tool_name ?? ''),
+                        status: tc.status === 'error' ? 'error' : 'completed',
+                        arguments: (tc.arguments as Record<string, unknown>) ?? undefined,
+                        result_summary: (tc.result_summary as ToolResultSummary) ?? undefined,
+                        error: tc.status === 'error' ? String((tc.result_summary as Record<string, unknown>)?.error ?? '') : undefined,
+                    }));
+                    setToolCalls(traces);
+                }
             } catch (err) {
                 setError(err instanceof Error ? err.message : '問答生成失敗');
             } finally {
@@ -172,21 +178,32 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 break;
             case 'tool_execution_start':
                 setToolCalls((prev) => [...prev, {
+                    tool_call_id: String(data.tool_call_id ?? ''),
                     name: String(data.tool_name || data.name || 'tool'),
                     status: 'running',
-                    args: data.arguments as Record<string, unknown>,
+                    arguments: (data.arguments as Record<string, unknown>) ?? undefined,
                 }]);
                 break;
-            case 'tool_execution_complete':
+            case 'tool_execution_complete': {
+                const toolCallId = String(data.tool_call_id ?? '');
+                const status: ToolCallTrace['status'] = data.success === false ? 'error' : 'completed';
+                const resultSummary = (data.result_summary as ToolResultSummary) ?? undefined;
                 setToolCalls((prev) => {
                     const updated = [...prev];
-                    const last = updated.findLastIndex((t) => t.status === 'running');
-                    if (last >= 0) {
-                        updated[last] = { ...updated[last], status: 'complete', result: String(data.result || '') };
+                    let idx = toolCallId ? updated.findLastIndex(t => t.tool_call_id === toolCallId) : -1;
+                    if (idx < 0) idx = updated.findLastIndex(t => t.status === 'running');
+                    if (idx >= 0) {
+                        updated[idx] = {
+                            ...updated[idx],
+                            status,
+                            result_summary: resultSummary,
+                            error: status === 'error' ? (resultSummary?.error ?? String(data.error ?? '')) : undefined,
+                        };
                     }
                     return updated;
                 });
                 break;
+            }
             case 'complete':
                 setAnswerMarkdown(String(data.answer_markdown || ''));
                 setSummary(String(data.summary || ''));
@@ -315,31 +332,8 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 </div>
             )}
 
-            {/* Tool calls timeline */}
-            {toolCalls.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', display: 'block', marginBottom: 6 }}>
-                        工具調用過程
-                    </label>
-                    <div style={{ borderLeft: '3px solid #dee2e6', paddingLeft: 12 }}>
-                        {toolCalls.map((tc, i) => (
-                            <div key={i} style={{ marginBottom: 8, fontSize: '0.8rem' }}>
-                                <span style={{
-                                    display: 'inline-block',
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: '50%',
-                                    backgroundColor: tc.status === 'running' ? '#ffc107' : tc.status === 'complete' ? '#28a745' : '#dc3545',
-                                    marginRight: 8,
-                                }} />
-                                <strong>{tc.name}</strong>
-                                {tc.status === 'running' && <span style={{ color: '#6c757d' }}> — 執行中…</span>}
-                                {tc.status === 'complete' && <span style={{ color: '#28a745' }}> — 完成</span>}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {/* Tool trace */}
+            <ToolTracePanel toolCalls={toolCalls} />
 
             {/* Loading indicator */}
             {loading && !answerMarkdown && toolCalls.length === 0 && (

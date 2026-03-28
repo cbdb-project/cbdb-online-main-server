@@ -60,4 +60,62 @@ class SqlTableNameExtractorTest extends TestCase {
 
         $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $tables);
     }
+
+    #[Test]
+    public function it_extracts_tables_from_with_recursive_query(): void {
+        DB::statement('DROP TABLE IF EXISTS ADDR_CODES');
+        DB::statement('DROP TABLE IF EXISTS ADDR_BELONGS_DATA');
+        DB::statement('CREATE TABLE ADDR_CODES (c_addr_id INTEGER PRIMARY KEY, c_name_chn TEXT, c_admin_cat_code TEXT, c_firstyear INTEGER, c_lastyear INTEGER)');
+        DB::statement('CREATE TABLE ADDR_BELONGS_DATA (c_addr_id INTEGER, c_belongs_to INTEGER)');
+
+        $sql = <<<'SQL'
+WITH RECURSIVE
+  chain AS (
+    SELECT ac.c_addr_id, ac.c_name_chn, ac.c_admin_cat_code, ac.c_firstyear, ac.c_lastyear,
+           abd.c_belongs_to, 1 AS lvl
+    FROM ADDR_CODES ac
+      LEFT JOIN ADDR_BELONGS_DATA abd ON abd.c_addr_id = ac.c_addr_id
+    WHERE ac.c_name_chn LIKE '%辦事大臣%'
+    UNION ALL
+    SELECT ac2.c_addr_id, ac2.c_name_chn, ac2.c_admin_cat_code, ac2.c_firstyear, ac2.c_lastyear,
+           abd2.c_belongs_to, chain.lvl + 1
+    FROM chain
+      JOIN ADDR_CODES ac2 ON ac2.c_addr_id = chain.c_belongs_to
+      LEFT JOIN ADDR_BELONGS_DATA abd2 ON abd2.c_addr_id = ac2.c_addr_id
+    WHERE chain.c_belongs_to IS NOT NULL AND chain.lvl < 8
+  )
+SELECT * FROM chain ORDER BY c_addr_id, lvl
+SQL;
+
+        $tables = $this->extractor->extractTableNames($sql);
+
+        $this->assertEqualsCanonicalizing(['ADDR_CODES', 'ADDR_BELONGS_DATA'], $tables);
+    }
+
+    #[Test]
+    public function it_extracts_tables_ignoring_table_aliases(): void {
+        $tables = $this->extractor->extractTableNames(
+            'SELECT d.c_dy, b.c_personid FROM DYNASTIES d JOIN BIOG_MAIN b ON 1 = 1'
+        );
+
+        $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $tables);
+    }
+
+    #[Test]
+    public function it_extracts_tables_from_subquery_with_aliases(): void {
+        $tables = $this->extractor->extractTableNames(
+            'SELECT d.* FROM DYNASTIES d JOIN (SELECT c_personid FROM BIOG_MAIN GROUP BY c_personid) t ON 1 = 1'
+        );
+
+        $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $tables);
+    }
+
+    #[Test]
+    public function it_extracts_tables_from_with_recursive_using_non_keyword_cte_name(): void {
+        $tables = $this->extractor->extractTableNames(
+            'WITH RECURSIVE cte AS (SELECT c_dy FROM DYNASTIES UNION ALL SELECT c_dy FROM cte) SELECT * FROM cte'
+        );
+
+        $this->assertSame(['DYNASTIES'], $tables);
+    }
 }

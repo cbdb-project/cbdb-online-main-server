@@ -23,6 +23,11 @@ class SqlTableNameExtractor {
 
         $cteAliases = $this->extractCteAliasesFromSql($sql);
 
+        $tablesFromRegex = $this->extractTableNamesFromRegex($sql, $cteAliases);
+        if ($tablesFromRegex !== []) {
+            return $tablesFromRegex;
+        }
+
         return $this->extractTableNamesFromExplain($sql, $cteAliases);
     }
 
@@ -33,7 +38,17 @@ class SqlTableNameExtractor {
         try {
             $parser = new Parser($sql);
             if (!empty($parser->errors)) {
-                return [];
+                // WITH RECURSIVE is not fully supported by the parser;
+                // strip RECURSIVE and retry so the CTE body can still be analysed.
+                if (preg_match('/\bWITH\s+RECURSIVE\b/i', $sql)) {
+                    $strippedSql = (string) preg_replace('/\bWITH\s+RECURSIVE\b/i', 'WITH', $sql);
+                    $parser = new Parser($strippedSql);
+                    if (!empty($parser->errors)) {
+                        return [];
+                    }
+                } else {
+                    return [];
+                }
             }
 
             $tables = [];
@@ -168,6 +183,31 @@ class SqlTableNameExtractor {
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /**
+     * Regex-based fallback: extract table names from FROM / JOIN clauses.
+     *
+     * Captures the first identifier after FROM or JOIN, which is always the
+     * real table name (aliases follow the table name and are NOT captured).
+     * CTE aliases are filtered out so only physical tables remain.
+     *
+     * @param array<string, bool> $cteAliases
+     * @return string[]
+     */
+    private function extractTableNamesFromRegex(string $sql, array $cteAliases): array {
+        $tables = [];
+
+        // Match: FROM tablename or JOIN tablename
+        // Handles optional backtick / double-quote quoting.
+        // The first captured group is always the real table name.
+        if (preg_match_all('/\b(?:FROM|JOIN)\s+[`"]?([A-Za-z_]\w*)[`"]?/i', $sql, $matches)) {
+            foreach ($matches[1] as $table) {
+                $tables[] = $table;
+            }
+        }
+
+        return $this->normalizeAndFilterTables($tables, $cteAliases);
     }
 
     /**

@@ -91,12 +91,10 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             return $this->errorResponse('changes 不可為空', 422, ['changes' => ['empty']]);
         }
 
-        // 4. person_id 與 PK 一致性
-        $pkPersonId = $targetPk[$this->personIdColumn()] ?? null;
-        if ((string) $pkPersonId !== (string) $personId) {
-            return $this->errorResponse('person_id 與 target.pk.' . $this->personIdColumn() . ' 不一致', 422, [
-                'person_id' => ['mismatch'],
-            ]);
+        // 4. person_id 與 PK 一致性（子類可覆寫跳過此步驟）
+        $pkValidationError = $this->validatePersonIdInPk($personId, $targetPk);
+        if ($pkValidationError) {
+            return $pkValidationError;
         }
 
         // 5. 查原始記錄
@@ -106,8 +104,9 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         }
 
         // 6. 驗證 person_id 與記錄一致性
-        if ((string) ($original->{$this->personIdColumn()} ?? '') !== (string) $personId) {
-            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
+        $rowValidationError = $this->validatePersonIdInRow($personId, $original);
+        if ($rowValidationError) {
+            return $rowValidationError;
         }
 
         // 7. 拒絕白名單外的欄位
@@ -151,6 +150,36 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         }
 
         return $this->handleDirect($personId, $targetPk, $updateData, $originalArray, $comment);
+    }
+
+    /**
+     * 驗證 person_id 與 PK 中的 c_personid 一致性
+     *
+     * 當 PK 不含 c_personid（如 POSSESSION_DATA、POSTED_TO_OFFICE_DATA）時，
+     * 子類可覆寫此方法回傳 null 以跳過此檢查。
+     */
+    protected function validatePersonIdInPk(int $personId, array $targetPk): ?JsonResponse {
+        $pkPersonId = $targetPk[$this->personIdColumn()] ?? null;
+        if ((string) $pkPersonId !== (string) $personId) {
+            return $this->errorResponse('person_id 與 target.pk.' . $this->personIdColumn() . ' 不一致', 422, [
+                'person_id' => ['mismatch'],
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * 驗證 person_id 與原始記錄的 c_personid 一致性
+     *
+     * 預設檢查 $original->{personIdColumn()} 是否與 $personId 相同。
+     */
+    protected function validatePersonIdInRow(int $personId, object $original): ?JsonResponse {
+        if ((string) ($original->{$this->personIdColumn()} ?? '') !== (string) $personId) {
+            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
+        }
+
+        return null;
     }
 
     // ── Direct Update ────────────────────────────────────────
@@ -324,7 +353,7 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
      */
     protected function normalizeSentinelValues(array $data, array $fields): array {
         foreach ($fields as $field) {
-            if (array_key_exists($field, $data) && $data[$field] == -999) {
+            if (array_key_exists($field, $data) && ($data[$field] === -999 || $data[$field] === '-999')) {
                 $data[$field] = '0';
             }
         }

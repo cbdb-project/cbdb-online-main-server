@@ -7,6 +7,18 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface EntryItem {
+    pk: {
+        c_personid: number;
+        c_entry_code: number | null;
+        c_sequence: number | null;
+        c_kin_code: number | null;
+        c_assoc_code: number | null;
+        c_kin_id: number | null;
+        c_year: number | null;
+        c_assoc_id: number | null;
+        c_inst_code: number | null;
+        c_inst_name_code: number | null;
+    };
     sequence: number | null;
     entry_code: number | null;
     entry_desc_chn: string | null;

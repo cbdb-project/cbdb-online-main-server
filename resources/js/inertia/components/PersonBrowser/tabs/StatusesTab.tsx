@@ -7,6 +7,11 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 
 interface StatusItem {
+    pk: {
+        c_personid: number;
+        c_sequence: number | null;
+        c_status_code: number | null;
+    };
     sequence: number | null;
     status_code: number | null;
     status_chn: string | null;

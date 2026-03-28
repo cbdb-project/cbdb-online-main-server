@@ -7,9 +7,16 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface InstitutionItem {
+    pk: {
+        c_personid: number;
+        c_inst_code: number | null;
+        c_inst_name_code: number | null;
+        c_bi_role_code: number | null;
+    };
     role_code: number | null;
     role_chn: string | null;
     role: string | null;
+    inst_code: number | null;
     inst_name_code: number | null;
     inst_name_chn: string | null;
     inst_name: string | null;

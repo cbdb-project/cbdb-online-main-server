@@ -7,6 +7,11 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface TextItem {
+    pk: {
+        c_personid: number;
+        c_textid: number | null;
+        c_role_id: number | null;
+    };
     text_id: number | null;
     title_chn: string | null;
     title: string | null;

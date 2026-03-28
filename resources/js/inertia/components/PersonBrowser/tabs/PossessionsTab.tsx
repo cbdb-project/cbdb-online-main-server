@@ -7,6 +7,9 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface PossessionItem {
+    pk: {
+        c_possession_record_id: number | null;
+    };
     act_code: number | null;
     act_chn: string | null;
     act: string | null;

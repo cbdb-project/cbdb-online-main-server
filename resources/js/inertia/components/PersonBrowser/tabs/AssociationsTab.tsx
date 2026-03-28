@@ -7,6 +7,17 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
 
 interface AssociationItem {
+    pk: {
+        c_personid: number;
+        c_assoc_code: number | null;
+        c_assoc_id: number | null;
+        c_kin_code: number | null;
+        c_kin_id: number | null;
+        c_assoc_kin_code: number | null;
+        c_assoc_kin_id: number | null;
+        c_text_title: string | null;
+        c_assoc_first_year: number | null;
+    };
     assoc_code: number | null;
     assoc_desc_chn: string | null;
     assoc_desc: string | null;

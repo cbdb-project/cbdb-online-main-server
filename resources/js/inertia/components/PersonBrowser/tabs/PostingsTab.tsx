@@ -7,6 +7,10 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface PostingItem {
+    pk: {
+        c_office_id: number | null;
+        c_posting_id: number | null;
+    };
     sequence: number | null;
     office_id: number | null;
     posting_id: number | null;

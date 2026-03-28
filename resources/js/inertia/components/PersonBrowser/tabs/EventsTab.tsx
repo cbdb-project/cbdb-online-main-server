@@ -7,6 +7,11 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface EventItem {
+    pk: {
+        c_personid: number;
+        c_sequence: number | null;
+        c_event_code: number | null;
+    };
     sequence: number | null;
     event_code: number | null;
     event_chn: string | null;

@@ -7,6 +7,12 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 
 interface AddressItem {
+    pk: {
+        c_personid: number;
+        c_addr_id: number | null;
+        c_addr_type: number | null;
+        c_sequence: number | null;
+    };
     sequence: number | null;
     addr_id: number | null;
     addr_chn: string | null;

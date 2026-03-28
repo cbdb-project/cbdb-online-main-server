@@ -7,6 +7,11 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel } from '../shared/formatters';
 
 interface KinshipItem {
+    pk: {
+        c_personid: number;
+        c_kin_id: number | null;
+        c_kin_code: number | null;
+    };
     kin_code: number | null;
     relation_chn: string | null;
     relation: string | null;

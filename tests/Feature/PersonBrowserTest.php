@@ -200,7 +200,9 @@ class PersonBrowserTest extends TestCase {
                 c_kin_code INT,
                 c_kin_id INT,
                 c_assoc_code INT,
-                c_assoc_id INT
+                c_assoc_id INT,
+                c_inst_code INT,
+                c_inst_name_code INT
             )
         ');
 
@@ -260,6 +262,11 @@ class PersonBrowserTest extends TestCase {
                 c_personid INT,
                 c_assoc_code INT,
                 c_assoc_id INT,
+                c_kin_code INT,
+                c_kin_id INT,
+                c_assoc_kin_code INT,
+                c_assoc_kin_id INT,
+                c_text_title VARCHAR(255),
                 c_sequence INT,
                 c_assoc_first_year INT,
                 c_assoc_last_year INT,
@@ -628,7 +635,18 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('ENTRY_DATA')->insert([
-            ['c_personid' => 1, 'c_entry_code' => 1, 'c_sequence' => 1, 'c_year' => 742, 'c_kin_code' => null, 'c_kin_id' => null, 'c_assoc_code' => null, 'c_assoc_id' => null],
+            [
+                'c_personid' => 1,
+                'c_entry_code' => 1,
+                'c_sequence' => 1,
+                'c_year' => 742,
+                'c_kin_code' => null,
+                'c_kin_id' => null,
+                'c_assoc_code' => null,
+                'c_assoc_id' => null,
+                'c_inst_code' => null,
+                'c_inst_name_code' => null,
+            ],
         ]);
 
         DB::table('ENTRY_CODES')->insert([
@@ -1077,8 +1095,12 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('tab', 'addresses');
         $response->assertJsonStructure([
             'tab',
-            'items' => [['sequence', 'addr_id', 'addr_chn', 'addr', 'type_label_chn', 'type_label', 'first_year', 'last_year', 'notes']],
+            'items' => [['pk', 'sequence', 'addr_id', 'addr_chn', 'addr', 'type_label_chn', 'type_label', 'first_year', 'last_year', 'notes']],
         ]);
+        $response->assertJsonPath('items.0.pk.c_personid', 1);
+        $response->assertJsonPath('items.0.pk.c_addr_id', 100);
+        $response->assertJsonPath('items.0.pk.c_addr_type', 1);
+        $response->assertJsonPath('items.0.pk.c_sequence', 1);
         $response->assertJsonPath('items.0.addr_chn', '長安');
         $response->assertJsonPath('items.0.type_label_chn', '居住地');
         $response->assertJsonPath('items.0.first_year', 730);
@@ -1109,8 +1131,11 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('tab', 'statuses');
         $response->assertJsonStructure([
             'tab',
-            'items' => [['sequence', 'status_chn', 'status', 'first_year', 'last_year', 'pages', 'notes']],
+            'items' => [['pk', 'sequence', 'status_chn', 'status', 'first_year', 'last_year', 'pages', 'notes']],
         ]);
+        $response->assertJsonPath('items.0.pk.c_personid', 1);
+        $response->assertJsonPath('items.0.pk.c_sequence', 1);
+        $response->assertJsonPath('items.0.pk.c_status_code', 10);
         $response->assertJsonPath('items.0.status_chn', '詩人');
         $response->assertJsonPath('items.0.status', 'Poet');
     }
@@ -1121,6 +1146,11 @@ class PersonBrowserTest extends TestCase {
             'c_personid' => 1,
             'c_assoc_code' => 1,
             'c_assoc_id' => 2,
+            'c_kin_code' => null,
+            'c_kin_id' => null,
+            'c_assoc_kin_code' => null,
+            'c_assoc_kin_id' => null,
+            'c_text_title' => null,
             'c_sequence' => 1,
             'c_assoc_first_year' => 744,
             'c_assoc_last_year' => 762,
@@ -1141,10 +1171,133 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('tab', 'associations');
         $response->assertJsonStructure([
             'tab',
-            'items' => [['assoc_desc_chn', 'assoc_desc', 'assoc_person_id', 'assoc_person_name_chn', 'first_year', 'last_year']],
+            'items' => [['pk', 'assoc_desc_chn', 'assoc_desc', 'assoc_person_id', 'assoc_person_name_chn', 'first_year', 'last_year']],
         ]);
+        $response->assertJsonPath('items.0.pk.c_personid', 1);
+        $response->assertJsonPath('items.0.pk.c_assoc_code', 1);
+        $response->assertJsonPath('items.0.pk.c_assoc_id', 2);
+        $response->assertJsonPath('items.0.pk.c_assoc_first_year', 744);
         $response->assertJsonPath('items.0.assoc_desc_chn', '友');
         $response->assertJsonPath('items.0.assoc_person_name_chn', '杜甫');
+    }
+
+    #[Test]
+    public function test_tab_entries_pk_matches_composite_primary_key_schema(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'entries']));
+
+        $response->assertOk();
+        $pk = $response->json('items.0.pk');
+        $this->assertIsArray($pk);
+
+        // ENTRY_DATA schema: c_personid, c_entry_code, c_sequence, c_kin_code,
+        //   c_assoc_code, c_kin_id, c_year, c_assoc_id, c_inst_code, c_inst_name_code
+        $expectedKeys = [
+            'c_personid', 'c_entry_code', 'c_sequence', 'c_kin_code',
+            'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id',
+            'c_inst_code', 'c_inst_name_code',
+        ];
+        foreach ($expectedKeys as $key) {
+            $this->assertArrayHasKey($key, $pk, "entries pk missing '{$key}'");
+        }
+        $this->assertSame(1, $pk['c_personid']);
+        $this->assertSame(1, $pk['c_entry_code']);
+    }
+
+    #[Test]
+    public function test_tab_associations_pk_matches_composite_primary_key_schema(): void {
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 1,
+            'c_assoc_code' => 2,
+            'c_assoc_id' => 3,
+            'c_kin_code' => 5,
+            'c_kin_id' => 2,
+            'c_assoc_kin_code' => null,
+            'c_assoc_kin_id' => null,
+            'c_text_title' => '唐詩',
+            'c_sequence' => 2,
+            'c_assoc_first_year' => 750,
+            'c_assoc_last_year' => 760,
+            'c_source' => null,
+            'c_pages' => null,
+            'c_notes' => null,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'associations']));
+
+        $response->assertOk();
+
+        // Find the item with assoc_code=2 that has more populated pk fields
+        $items = $response->json('items');
+        $item = collect($items)->firstWhere('pk.c_assoc_code', 2);
+        $this->assertNotNull($item, 'Association with c_assoc_code=2 not found');
+        $pk = $item['pk'];
+
+        // ASSOC_DATA schema: c_personid, c_assoc_code, c_assoc_id, c_kin_code,
+        //   c_kin_id, c_assoc_kin_code, c_assoc_kin_id, c_text_title, c_assoc_first_year
+        $expectedKeys = [
+            'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code',
+            'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id',
+            'c_text_title', 'c_assoc_first_year',
+        ];
+        foreach ($expectedKeys as $key) {
+            $this->assertArrayHasKey($key, $pk, "associations pk missing '{$key}'");
+        }
+        $this->assertSame(1, $pk['c_personid']);
+        $this->assertSame(5, $pk['c_kin_code']);
+        $this->assertSame('唐詩', $pk['c_text_title']);
+    }
+
+    #[Test]
+    public function test_tab_possessions_pk_has_record_id(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'possessions']));
+
+        $response->assertOk();
+        $pk = $response->json('items.0.pk');
+        $this->assertIsArray($pk);
+        $this->assertArrayHasKey('c_possession_record_id', $pk);
+        $this->assertSame(1, $pk['c_possession_record_id']);
+    }
+
+    #[Test]
+    public function test_tab_social_institutions_pk_has_inst_code(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'social_institutions']));
+
+        $response->assertOk();
+        $pk = $response->json('items.0.pk');
+        $this->assertIsArray($pk);
+
+        // BIOG_INST_DATA schema: c_personid, c_inst_code, c_inst_name_code, c_bi_role_code
+        $expectedKeys = ['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code'];
+        foreach ($expectedKeys as $key) {
+            $this->assertArrayHasKey($key, $pk, "social_institutions pk missing '{$key}'");
+        }
+        $this->assertSame(1, $pk['c_personid']);
+        $this->assertSame(1, $pk['c_inst_code']);
+    }
+
+    #[Test]
+    public function test_all_non_basic_tabs_items_have_pk(): void {
+        $tabsWithData = [
+            'alt_names', 'texts', 'sources', 'entries',
+            'events', 'possessions', 'social_institutions',
+            'postings', 'kinship',
+        ];
+
+        foreach ($tabsWithData as $tabKey) {
+            $response = $this->actingAs($this->user)
+                ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => $tabKey]));
+
+            $response->assertOk();
+            $items = $response->json('items');
+            if (!empty($items)) {
+                $this->assertArrayHasKey('pk', $items[0], "Tab '{$tabKey}' items[0] missing 'pk'");
+                $this->assertIsArray($items[0]['pk'], "Tab '{$tabKey}' items[0].pk should be an array");
+            }
+        }
     }
 
     #[Test]

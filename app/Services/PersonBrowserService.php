@@ -489,6 +489,11 @@ class PersonBrowserService {
         return [
             'tab' => 'alt_names',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_alt_name_chn' => $r->c_alt_name_chn,
+                    'c_alt_name_type_code' => $r->c_alt_name_type_code,
+                ],
                 'sequence' => $r->c_sequence,
                 'name_chn' => $r->c_alt_name_chn,
                 'name' => $r->c_alt_name,
@@ -525,6 +530,12 @@ class PersonBrowserService {
         return [
             'tab' => 'addresses',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_addr_id' => $r->c_addr_id,
+                    'c_addr_type' => $r->c_addr_type,
+                    'c_sequence' => $r->c_sequence,
+                ],
                 'sequence' => $r->c_sequence,
                 'addr_id' => $r->c_addr_id,
                 'addr_chn' => $r->addr_chn,
@@ -558,6 +569,11 @@ class PersonBrowserService {
         return [
             'tab' => 'texts',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_textid' => $r->c_textid,
+                    'c_role_id' => $r->c_role_id,
+                ],
                 'text_id' => $r->c_textid,
                 'title_chn' => $r->c_title_chn,
                 'title' => $r->c_title,
@@ -587,6 +603,11 @@ class PersonBrowserService {
         return [
             'tab' => 'sources',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_textid' => $r->c_textid,
+                    'c_pages' => $r->c_pages,
+                ],
                 'text_id' => $r->c_textid,
                 'title_chn' => $r->c_title_chn,
                 'title' => $r->c_title,
@@ -610,6 +631,8 @@ class PersonBrowserService {
                 'ENTRY_DATA.c_kin_id',
                 'ENTRY_DATA.c_assoc_code',
                 'ENTRY_DATA.c_assoc_id',
+                'ENTRY_DATA.c_inst_code',
+                'ENTRY_DATA.c_inst_name_code',
             ])
             ->leftJoin('ENTRY_CODES', 'ENTRY_CODES.c_entry_code', '=', 'ENTRY_DATA.c_entry_code')
             ->where('ENTRY_DATA.c_personid', $personId)
@@ -653,7 +676,7 @@ class PersonBrowserService {
 
         return [
             'tab' => 'entries',
-            'items' => $rows->map(function ($r) use ($personNames, $kinLabels, $assocLabels) {
+            'items' => $rows->map(function ($r) use ($personId, $personNames, $kinLabels, $assocLabels) {
                 $kinSummary = null;
                 if (!empty($r->c_kin_id)) {
                     $kinPerson = $personNames->get($r->c_kin_id);
@@ -683,6 +706,18 @@ class PersonBrowserService {
                 }
 
                 return [
+                    'pk' => [
+                        'c_personid' => $personId,
+                        'c_entry_code' => $r->c_entry_code,
+                        'c_sequence' => $r->c_sequence,
+                        'c_kin_code' => $r->c_kin_code,
+                        'c_assoc_code' => $r->c_assoc_code,
+                        'c_kin_id' => $r->c_kin_id,
+                        'c_year' => $r->c_year,
+                        'c_assoc_id' => $r->c_assoc_id,
+                        'c_inst_code' => $r->c_inst_code,
+                        'c_inst_name_code' => $r->c_inst_name_code,
+                    ],
                     'sequence' => $r->c_sequence,
                     'entry_code' => $r->c_entry_code,
                     'entry_desc_chn' => $r->c_entry_desc_chn,
@@ -718,7 +753,7 @@ class PersonBrowserService {
 
         return [
             'tab' => 'events',
-            'items' => $rows->map(function ($r) {
+            'items' => $rows->map(function ($r) use ($personId) {
                 // 組合日期摘要
                 $dateParts = [];
                 if (!empty($r->c_year)) {
@@ -732,6 +767,11 @@ class PersonBrowserService {
                 }
 
                 return [
+                    'pk' => [
+                        'c_personid' => $personId,
+                        'c_sequence' => $r->c_sequence,
+                        'c_event_code' => $r->c_event_code,
+                    ],
                     'sequence' => $r->c_sequence,
                     'event_code' => $r->c_event_code,
                     'event_chn' => $r->c_event_name_chn,
@@ -769,6 +809,11 @@ class PersonBrowserService {
         return [
             'tab' => 'statuses',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_sequence' => $r->c_sequence,
+                    'c_status_code' => $r->c_status_code,
+                ],
                 'sequence' => $r->c_sequence,
                 'status_code' => $r->c_status_code,
                 'status_chn' => $r->c_status_desc_chn,
@@ -789,6 +834,11 @@ class PersonBrowserService {
                 'ASSOC_CODES.c_assoc_desc',
                 'ASSOC_DATA.c_assoc_code',
                 'ASSOC_DATA.c_assoc_id',
+                'ASSOC_DATA.c_kin_code',
+                'ASSOC_DATA.c_kin_id',
+                'ASSOC_DATA.c_assoc_kin_code',
+                'ASSOC_DATA.c_assoc_kin_id',
+                'ASSOC_DATA.c_text_title',
                 'BM.c_name_chn AS assoc_name_chn',
                 'BM.c_name AS assoc_name',
                 'ASSOC_DATA.c_assoc_first_year',
@@ -806,6 +856,17 @@ class PersonBrowserService {
         return [
             'tab' => 'associations',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_assoc_code' => $r->c_assoc_code,
+                    'c_assoc_id' => $r->c_assoc_id,
+                    'c_kin_code' => $r->c_kin_code,
+                    'c_kin_id' => $r->c_kin_id,
+                    'c_assoc_kin_code' => $r->c_assoc_kin_code,
+                    'c_assoc_kin_id' => $r->c_assoc_kin_id,
+                    'c_text_title' => $r->c_text_title,
+                    'c_assoc_first_year' => $r->c_assoc_first_year,
+                ],
                 'assoc_code' => $r->c_assoc_code,
                 'assoc_desc_chn' => $r->c_assoc_desc_chn,
                 'assoc_desc' => $r->c_assoc_desc,
@@ -842,6 +903,11 @@ class PersonBrowserService {
         return [
             'tab' => 'kinship',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_kin_id' => $r->c_kin_id,
+                    'c_kin_code' => $r->c_kin_code,
+                ],
                 'kin_code' => $r->c_kin_code,
                 'relation_chn' => $r->c_kinrel_chn,
                 'relation' => $r->c_kinrel,
@@ -860,6 +926,7 @@ class PersonBrowserService {
             ->select([
                 'POSSESSION_ACT_CODES.c_possession_act_desc_chn',
                 'POSSESSION_ACT_CODES.c_possession_act_desc',
+                'POSSESSION_DATA.c_possession_record_id',
                 'POSSESSION_DATA.c_possession_act_code',
                 'POSSESSION_DATA.c_possession_desc_chn',
                 'POSSESSION_DATA.c_possession_desc',
@@ -876,6 +943,9 @@ class PersonBrowserService {
         return [
             'tab' => 'possessions',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_possession_record_id' => $r->c_possession_record_id,
+                ],
                 'act_code' => $r->c_possession_act_code,
                 'act_chn' => $r->c_possession_act_desc_chn,
                 'act' => $r->c_possession_act_desc,
@@ -896,6 +966,7 @@ class PersonBrowserService {
                 'BIOG_INST_CODES.c_bi_role_chn',
                 'BIOG_INST_CODES.c_bi_role_desc',
                 'BIOG_INST_DATA.c_bi_role_code',
+                'BIOG_INST_DATA.c_inst_code',
                 'INST_NAMES.c_inst_name_hz',
                 'INST_NAMES.c_inst_name_py',
                 'BIOG_INST_DATA.c_inst_name_code',
@@ -911,9 +982,16 @@ class PersonBrowserService {
         return [
             'tab' => 'social_institutions',
             'items' => $rows->map(fn ($r) => [
+                'pk' => [
+                    'c_personid' => $personId,
+                    'c_inst_code' => $r->c_inst_code,
+                    'c_inst_name_code' => $r->c_inst_name_code,
+                    'c_bi_role_code' => $r->c_bi_role_code,
+                ],
                 'role_code' => $r->c_bi_role_code,
                 'role_chn' => $r->c_bi_role_chn,
                 'role' => $r->c_bi_role_desc,
+                'inst_code' => $r->c_inst_code,
                 'inst_name_code' => $r->c_inst_name_code,
                 'inst_name_chn' => $r->c_inst_name_hz,
                 'inst_name' => $r->c_inst_name_py,
@@ -973,6 +1051,10 @@ class PersonBrowserService {
                 $tenureSummary = implode('–', $tenureParts) ?: null;
 
                 return [
+                    'pk' => [
+                        'c_office_id' => $r->c_office_id,
+                        'c_posting_id' => $r->c_posting_id,
+                    ],
                     'sequence' => $r->c_sequence,
                     'office_id' => $r->c_office_id,
                     'posting_id' => $r->c_posting_id,

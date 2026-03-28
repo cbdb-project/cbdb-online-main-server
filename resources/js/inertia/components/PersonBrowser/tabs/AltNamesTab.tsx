@@ -7,6 +7,11 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 
 interface AltNameItem {
+    pk: {
+        c_personid: number;
+        c_alt_name_chn: string | null;
+        c_alt_name_type_code: number | null;
+    };
     sequence: number | null;
     name_chn: string | null;
     name: string | null;

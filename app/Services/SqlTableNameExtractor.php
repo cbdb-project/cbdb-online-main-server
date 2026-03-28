@@ -192,22 +192,48 @@ class SqlTableNameExtractor {
      * real table name (aliases follow the table name and are NOT captured).
      * CTE aliases are filtered out so only physical tables remain.
      *
+     * Before matching, SQL comments and single-quoted string literals are
+     * stripped so that identifiers inside non-code content (e.g.
+     * WHERE name = 'FROM users') do not cause false positives.
+     *
      * @param array<string, bool> $cteAliases
      * @return string[]
      */
     private function extractTableNamesFromRegex(string $sql, array $cteAliases): array {
         $tables = [];
 
+        $cleanedSql = $this->stripCommentsAndStringLiterals($sql);
+
         // Match: FROM tablename or JOIN tablename
         // Handles optional backtick / double-quote quoting.
         // The first captured group is always the real table name.
-        if (preg_match_all('/\b(?:FROM|JOIN)\s+[`"]?([A-Za-z_]\w*)[`"]?/i', $sql, $matches)) {
+        if (preg_match_all('/\b(?:FROM|JOIN)\s+[`"]?([A-Za-z_]\w*)[`"]?/i', $cleanedSql, $matches)) {
             foreach ($matches[1] as $table) {
                 $tables[] = $table;
             }
         }
 
         return $this->normalizeAndFilterTables($tables, $cteAliases);
+    }
+
+    /**
+     * Strip SQL block comments, line comments, and single-quoted string
+     * literals so that regex-based extraction does not pick up identifiers
+     * from non-code content (e.g. WHERE name = 'FROM users').
+     *
+     * Double-quoted identifiers are intentionally preserved because they
+     * may legitimately wrap table names.
+     */
+    private function stripCommentsAndStringLiterals(string $sql): string {
+        return (string) preg_replace(
+            [
+                '/\/\*.*?\*\//s',   // Block comments: /* ... */
+                '/--[^\r\n]*/',     // Line comments:  -- ...
+                "/'(?:[^']|'')*'/", // Single-quoted strings (handles '' escaping)
+            ],
+            ' ',
+            $sql
+        );
     }
 
     /**

@@ -262,6 +262,41 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
+    public function it_allows_with_recursive_queries_using_whitelisted_tables() {
+        $this->be($this->adminUser);
+
+        Config::set('codes.tables.ADDR_CODES', 'Address Codes');
+        Config::set('codes.tables.ADDR_BELONGS_DATA', 'Address Belongs Data');
+
+        // Exact query from issue #948
+        $sql = <<<'SQL'
+WITH RECURSIVE
+  chain AS (
+    SELECT ac.c_addr_id, ac.c_name_chn, ac.c_admin_cat_code, ac.c_firstyear, ac.c_lastyear,
+           abd.c_belongs_to, 1 AS lvl
+    FROM ADDR_CODES ac
+      LEFT JOIN ADDR_BELONGS_DATA abd ON abd.c_addr_id = ac.c_addr_id
+    WHERE ac.c_name_chn LIKE '%辦事大臣%'
+    UNION ALL
+    SELECT ac2.c_addr_id, ac2.c_name_chn, ac2.c_admin_cat_code, ac2.c_firstyear, ac2.c_lastyear,
+           abd2.c_belongs_to, chain.lvl + 1
+    FROM chain
+      JOIN ADDR_CODES ac2 ON ac2.c_addr_id = chain.c_belongs_to
+      LEFT JOIN ADDR_BELONGS_DATA abd2 ON abd2.c_addr_id = ac2.c_addr_id
+    WHERE chain.c_belongs_to IS NOT NULL AND chain.lvl < 8
+  )
+SELECT * FROM chain ORDER BY c_addr_id, lvl
+SQL;
+
+        $response = $this->postJson(route('query-playground.run'), ['sql' => $sql]);
+
+        // Must not get 403 — table validation should recognise ADDR_CODES and
+        // ADDR_BELONGS_DATA, filtering out the CTE alias "chain".
+        // A 500 (table doesn't exist in test DB) is acceptable.
+        $this->assertNotEquals(403, $response->status(), 'WITH RECURSIVE query with whitelisted tables must pass table validation (issue #948)');
+    }
+
+    #[Test]
     public function it_handles_real_world_example_from_issue() {
         $this->be($this->adminUser);
 

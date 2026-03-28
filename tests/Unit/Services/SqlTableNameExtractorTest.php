@@ -113,4 +113,40 @@ SQL;
 
         $this->assertSame(['DYNASTIES'], $tables);
     }
+
+    #[Test]
+    public function it_does_not_extract_table_names_from_string_literals(): void {
+        $tables = $this->extractor->extractTableNames(
+            "SELECT c_dy FROM DYNASTIES WHERE status = 'FROM BIOG_MAIN WHERE 1=1'"
+        );
+
+        $this->assertSame(['DYNASTIES'], $tables);
+    }
+
+    #[Test]
+    public function it_does_not_extract_table_names_from_block_comments(): void {
+        $tables = $this->extractor->extractTableNames(
+            'SELECT c_dy /* FROM BIOG_MAIN */ FROM DYNASTIES'
+        );
+
+        $this->assertSame(['DYNASTIES'], $tables);
+    }
+
+    #[Test]
+    public function it_does_not_extract_table_names_from_line_comments(): void {
+        $tables = $this->extractor->extractTableNames(
+            "SELECT c_dy FROM DYNASTIES -- FROM BIOG_MAIN\nWHERE 1 = 1"
+        );
+
+        $this->assertSame(['DYNASTIES'], $tables);
+    }
+
+    #[Test]
+    public function it_handles_escaped_quotes_in_string_literals(): void {
+        $tables = $this->extractor->extractTableNames(
+            "SELECT c_dy FROM DYNASTIES WHERE status = 'it''s FROM BIOG_MAIN'"
+        );
+
+        $this->assertSame(['DYNASTIES'], $tables);
+    }
 }

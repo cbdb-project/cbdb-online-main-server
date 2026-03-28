@@ -244,4 +244,32 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
 
         $this->service->queryReadOnlySql('DELETE FROM DYNASTIES');
     }
+
+    #[Test]
+    public function it_supports_with_recursive_in_read_only_sql(): void {
+        DB::statement('DROP TABLE IF EXISTS ADDR_TREE');
+        DB::statement('CREATE TABLE ADDR_TREE (id INTEGER PRIMARY KEY, parent_id INTEGER, name TEXT)');
+        DB::table('ADDR_TREE')->insert([
+            ['id' => 1, 'parent_id' => null, 'name' => 'Root'],
+            ['id' => 2, 'parent_id' => 1, 'name' => 'Child1'],
+            ['id' => 3, 'parent_id' => 1, 'name' => 'Child2'],
+            ['id' => 4, 'parent_id' => 2, 'name' => 'Grandchild'],
+        ]);
+        Config::set('mcp.cbdb.allowed_tables', ['DYNASTIES', 'BIOG_MAIN', 'ADDR_TREE']);
+
+        $this->service = new ReadOnlyTableQueryService();
+
+        $result = $this->service->queryReadOnlySql(
+            'WITH RECURSIVE tree AS ('
+            . '  SELECT id, parent_id, name, 1 AS lvl FROM ADDR_TREE WHERE parent_id IS NULL'
+            . '  UNION ALL'
+            . '  SELECT t.id, t.parent_id, t.name, tree.lvl + 1 FROM ADDR_TREE t JOIN tree ON t.parent_id = tree.id WHERE tree.lvl < 5'
+            . ') SELECT * FROM tree ORDER BY id',
+            20,
+            0
+        );
+
+        $this->assertEqualsCanonicalizing(['ADDR_TREE'], $result['tables']);
+        $this->assertSame(4, $result['returned_rows']);
+    }
 }

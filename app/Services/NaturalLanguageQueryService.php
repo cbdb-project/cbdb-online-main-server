@@ -548,10 +548,12 @@ class NaturalLanguageQueryService {
 - get_person_ids(person_name, limit=20): 根據人名搜索人物 ID
 
 **工具使用策略（最多 {$maxToolRounds} 回合）：**
-1. 先用 get_person_ids 搜尋人名，取得人物 ID
-2. 用 query_read_only_sql 或 query_table 查詢人物基本資料、別名、入仕途徑、社會關係等
-3. 用 get_code_values 解讀代碼值（如朝代、入仕方式）
-4. 收集到足夠資料後，綜合整理成自然語言回答
+1. 查詢任何資料表之前，先用 query_table_schema 或 get_table_schema 確認欄位名稱；不要臆測欄位名
+2. 涉及名稱、官名、地名、書名等查詢時，若 schema 顯示有 alternative name 欄位，必須同時檢查主名稱欄位與 alternative name 欄位
+3. 先用 get_person_ids 搜尋人名，取得人物 ID
+4. 用 query_read_only_sql 或 query_table 查詢人物基本資料、別名、入仕途徑、社會關係等
+5. 用 get_code_values 解讀代碼值（如朝代、入仕方式）
+6. 收集到足夠資料後，綜合整理成自然語言回答
 TOOLS;
         }
 
@@ -594,10 +596,12 @@ DYNASTIES;
 **核心原則：**
 1. 優先使用工具查詢 CBDB 資料庫獲取事實資料
 2. 回答以繁體中文書寫，使用 Markdown 格式
-3. **必須清楚區分以下兩類資訊：**
+3. 在使用任何資料表前，先查 schema 確認欄位名稱；不要臆測欄位名
+4. 若 schema 顯示除了主名稱欄位外還有 alternative name 欄位，查詢時要一併檢查（例如 `OFFICE_CODES.c_office_chn` 與 `OFFICE_CODES.c_office_chn_alt`）
+5. **必須清楚區分以下兩類資訊：**
    - **📋 資料庫事實**：直接來自 CBDB 查詢的數據（人物存在性、生卒年、朝代、別名、入仕方式、著述、關係等）
    - **📚 模型補充**：模型自身的歷史知識補充（朝代背景、制度解釋、歷史上下文等），應使用較保守語氣
-4. 若資料不足，應明確說明，不要編造
+6. 若資料不足，應明確說明，不要編造
 
 **回答格式要求：**
 回答必須是嚴格的 JSON，包含以下欄位：
@@ -737,7 +741,9 @@ PROMPT;
 2. 不要使用 EXPLAIN、DESCRIBE、SHOW 等元查询
 3. 查询只能使用以下提供的表和字段
 4. 使用标准 SQL 语法（MySQL/MariaDB 兼容）
-5. 返回格式为 JSON，包含以下字段：
+5. 先核对提供的 schema 再使用字段；不要臆測欄位名
+6. 若 schema 顯示主名稱欄位之外還有 alternative name 欄位，查詢名稱時必須一併考慮
+7. 返回格式为 JSON，包含以下字段：
    - sql: SQL 查询语句（纯文本，不需要代码块标记）；如果无法生成则为 null
    - explanation: 简短的查询解释（一到两句话，使用繁体中文）；如果无法生成则为 null
    - error: 错误信息（繁体中文），说明为何无法生成 SQL；成功时为 null
@@ -796,13 +802,14 @@ PROMPT;
 - get_person_ids(person_name, limit=20): 根據人名搜索人物 ID
 
 **使用建議：**
-1. 先用 list_allowed_tables 確認候選表，再用 query_table_schema 檢查欄位與關聯
-2. 需要確認實際值時，用 query_table / get_sample_data_for_table / get_table_row_by_id
-3. 構造 WHERE 條件但不確定代碼值時，使用 get_code_values
-4. 用戶提到具體人名時，使用 get_person_ids 查找 ID
-5. 生成最終 SQL 前，可先用 query_read_only_sql(limit 小值) 驗證可執行性
-6. 每次可以同時請求多個工具，並一次取得結果後再繼續推理（最多 {$maxToolRounds} 回合）
-7. 回覆必須是純 JSON，請勿使用任何 Markdown 代碼區塊或額外文字
+1. 先用 list_allowed_tables 確認候選表，再用 query_table_schema 或 get_table_schema 檢查欄位與關聯；不要臆測欄位名
+2. 涉及名稱搜尋時，若 schema 顯示主名稱欄位之外另有 alternative name 欄位，必須一併查詢（例如 `OFFICE_CODES.c_office_chn` 與 `OFFICE_CODES.c_office_chn_alt`）
+3. 需要確認實際值時，用 query_table / get_sample_data_for_table / get_table_row_by_id
+4. 構造 WHERE 條件但不確定代碼值時，使用 get_code_values
+5. 用戶提到具體人名時，使用 get_person_ids 查找 ID
+6. 生成最終 SQL 前，可先用 query_read_only_sql(limit 小值) 驗證可執行性
+7. 每次可以同時請求多個工具，並一次取得結果後再繼續推理（最多 {$maxToolRounds} 回合）
+8. 回覆必須是純 JSON，請勿使用任何 Markdown 代碼區塊或額外文字
 TOOLS;
         }
 
@@ -855,6 +862,7 @@ DYNASTIES;
    - explanation: 简短的查询解释（一到两句话，使用繁体中文）；如果无法生成则为 null
    - error: 错误信息（繁体中文），说明为何无法生成 SQL；成功时为 null
 6. 不得臆測欄位或代碼值；不確定時先使用 get_table_schema 或 get_code_values
+7. 若 schema 顯示主名稱欄位之外還有 alternative name 欄位，查詢名稱時必須一併納入條件（例如 `OFFICE_CODES.c_office_chn_alt`）
 
 **何时返回 error（设置 sql 和 explanation 为 null）：**
 - 用户问题不清楚或过于模糊

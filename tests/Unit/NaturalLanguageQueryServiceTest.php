@@ -265,4 +265,316 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertGreaterThanOrEqual(2, $heartbeatCount);
         $this->assertContains('正在等待 LLM 第 1 輪回應', $statusMessages);
     }
+
+    #[Test]
+    public function it_triggers_heartbeat_callback_during_tool_execution() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 2);
+
+        $this->schemaService->method('generateSchemaPrompt')
+            ->willReturn('Mock schema info');
+
+        $this->toolsService->method('executeTool')
+            ->willReturn([
+                'success' => true,
+                'data' => ['rows' => [['c_dy' => 1, 'c_dynasty_chn' => '唐']]],
+                'error' => null,
+            ]);
+
+        $this->toolsService->method('getToolDefinitions')
+            ->willReturn([]);
+
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
+            private int $localCallCount = 0;
+
+            protected function performHeartbeatAwareLlmRequest(
+                array $requestData,
+                ?callable $heartbeatCallback = null,
+                ?callable $abortCheck = null
+            ): array {
+                $this->localCallCount++;
+
+                // 第一次：回傳 tool_calls
+                if ($this->localCallCount === 1) {
+                    $data = [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => null,
+                                    'tool_calls' => [
+                                        [
+                                            'id' => 'call_001',
+                                            'type' => 'function',
+                                            'function' => [
+                                                'name' => 'query_table_schema',
+                                                'arguments' => json_encode(['table_name' => 'DYNASTIES']),
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                                'finish_reason' => 'tool_calls',
+                            ],
+                        ],
+                    ];
+
+                    return [
+                        'successful' => true,
+                        'status' => 200,
+                        'body' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                        'json' => $data,
+                    ];
+                }
+
+                // 第二次：回傳最終 SQL
+                $data = [
+                    'choices' => [
+                        [
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => json_encode([
+                                    'sql' => 'SELECT * FROM DYNASTIES',
+                                    'explanation' => '此查詢選擇所有朝代。',
+                                    'error' => null,
+                                ]),
+                            ],
+                            'finish_reason' => 'stop',
+                        ],
+                    ],
+                ];
+
+                return [
+                    'successful' => true,
+                    'status' => 200,
+                    'body' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                    'json' => $data,
+                ];
+            }
+        };
+
+        $heartbeatCount = 0;
+
+        $result = $service->generateSQL(
+            '顯示所有朝代',
+            null,
+            function (string $event, array $data) {},
+            true,
+            function () use (&$heartbeatCount) {
+                $heartbeatCount++;
+            },
+            fn () => false
+        );
+
+        $this->assertTrue($result['success']);
+        // heartbeat 應至少在 tool execution 前後各觸發一次
+        $this->assertGreaterThanOrEqual(2, $heartbeatCount);
+    }
+
+    #[Test]
+    public function it_triggers_heartbeat_during_tool_retry_sleep() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 2);
+
+        $this->schemaService->method('generateSchemaPrompt')
+            ->willReturn('Mock schema info');
+
+        $toolCallCount = 0;
+        $this->toolsService->method('executeTool')
+            ->willReturnCallback(function () use (&$toolCallCount) {
+                $toolCallCount++;
+                if ($toolCallCount === 1) {
+                    // 第一次失敗（可重試的錯誤）
+                    return [
+                        'success' => false,
+                        'data' => null,
+                        'error' => '連線超時',
+                    ];
+                }
+
+                // 第二次成功
+                return [
+                    'success' => true,
+                    'data' => ['rows' => []],
+                    'error' => null,
+                ];
+            });
+
+        $this->toolsService->method('getToolDefinitions')
+            ->willReturn([]);
+
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
+            private int $localCallCount = 0;
+
+            protected function performHeartbeatAwareLlmRequest(
+                array $requestData,
+                ?callable $heartbeatCallback = null,
+                ?callable $abortCheck = null
+            ): array {
+                $this->localCallCount++;
+
+                if ($this->localCallCount === 1) {
+                    $data = [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => null,
+                                    'tool_calls' => [
+                                        [
+                                            'id' => 'call_001',
+                                            'type' => 'function',
+                                            'function' => [
+                                                'name' => 'query_table_schema',
+                                                'arguments' => json_encode(['table_name' => 'DYNASTIES']),
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                                'finish_reason' => 'tool_calls',
+                            ],
+                        ],
+                    ];
+
+                    return [
+                        'successful' => true,
+                        'status' => 200,
+                        'body' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                        'json' => $data,
+                    ];
+                }
+
+                $data = [
+                    'choices' => [
+                        [
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => json_encode([
+                                    'sql' => 'SELECT * FROM DYNASTIES',
+                                    'explanation' => '此查詢選擇所有朝代。',
+                                    'error' => null,
+                                ]),
+                            ],
+                            'finish_reason' => 'stop',
+                        ],
+                    ],
+                ];
+
+                return [
+                    'successful' => true,
+                    'status' => 200,
+                    'body' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                    'json' => $data,
+                ];
+            }
+        };
+
+        $heartbeatCount = 0;
+
+        $result = $service->generateSQL(
+            '顯示所有朝代',
+            null,
+            function (string $event, array $data) {},
+            true,
+            function () use (&$heartbeatCount) {
+                $heartbeatCount++;
+            },
+            fn () => false
+        );
+
+        $this->assertTrue($result['success']);
+        // retry sleep (400ms) 使用 sleepWithHeartbeat，每 200ms 觸發一次
+        // 加上 tool 執行前後的 heartbeat，總計應至少 4 次
+        $this->assertGreaterThanOrEqual(4, $heartbeatCount);
+    }
+
+    #[Test]
+    public function it_stops_tool_execution_when_abort_check_returns_true() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 2);
+
+        $this->schemaService->method('generateSchemaPrompt')
+            ->willReturn('Mock schema info');
+
+        $toolExecutionCount = 0;
+        $this->toolsService->method('executeTool')
+            ->willReturnCallback(function () use (&$toolExecutionCount) {
+                $toolExecutionCount++;
+
+                return [
+                    'success' => true,
+                    'data' => ['rows' => []],
+                    'error' => null,
+                ];
+            });
+
+        $this->toolsService->method('getToolDefinitions')
+            ->willReturn([]);
+
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
+            protected function performHeartbeatAwareLlmRequest(
+                array $requestData,
+                ?callable $heartbeatCallback = null,
+                ?callable $abortCheck = null
+            ): array {
+                // 回傳兩個 tool calls
+                $data = [
+                    'choices' => [
+                        [
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => null,
+                                'tool_calls' => [
+                                    [
+                                        'id' => 'call_001',
+                                        'type' => 'function',
+                                        'function' => [
+                                            'name' => 'query_table_schema',
+                                            'arguments' => json_encode(['table_name' => 'DYNASTIES']),
+                                        ],
+                                    ],
+                                    [
+                                        'id' => 'call_002',
+                                        'type' => 'function',
+                                        'function' => [
+                                            'name' => 'query_table_schema',
+                                            'arguments' => json_encode(['table_name' => 'BIOG_MAIN']),
+                                        ],
+                                    ],
+                                ],
+                            ],
+                            'finish_reason' => 'tool_calls',
+                        ],
+                    ],
+                ];
+
+                return [
+                    'successful' => true,
+                    'status' => 200,
+                    'body' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                    'json' => $data,
+                ];
+            }
+        };
+
+        $result = $service->generateSQL(
+            '顯示所有朝代',
+            null,
+            function (string $event, array $data) {},
+            true,
+            null,
+            function () use (&$toolExecutionCount) {
+                // 第一個 tool 執行完後設定中止
+                if ($toolExecutionCount >= 1) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
+
+        // 應在第二個 tool 執行前中止
+        $this->assertEquals(1, $toolExecutionCount);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Client disconnected', $result['error']);
+    }
 }

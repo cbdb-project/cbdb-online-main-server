@@ -284,19 +284,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->toolsService->method('getToolDefinitions')
             ->willReturn([]);
 
-        $callCount = 0;
-
-        $service = new class ($this->schemaService, $this->toolsService, $callCount) extends NaturalLanguageQueryService {
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
             private int $localCallCount = 0;
-
-            public function __construct(
-                \App\Services\DatabaseSchemaService $schemaService,
-                \App\Services\NlQueryToolsService $toolsService,
-                int &$callCount
-            ) {
-                parent::__construct($schemaService, $toolsService);
-                $this->localCallCount = &$callCount;
-            }
 
             protected function performHeartbeatAwareLlmRequest(
                 array $requestData,
@@ -413,19 +402,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->toolsService->method('getToolDefinitions')
             ->willReturn([]);
 
-        $callCount = 0;
-
-        $service = new class ($this->schemaService, $this->toolsService, $callCount) extends NaturalLanguageQueryService {
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
             private int $localCallCount = 0;
-
-            public function __construct(
-                \App\Services\DatabaseSchemaService $schemaService,
-                \App\Services\NlQueryToolsService $toolsService,
-                int &$callCount
-            ) {
-                parent::__construct($schemaService, $toolsService);
-                $this->localCallCount = &$callCount;
-            }
 
             protected function performHeartbeatAwareLlmRequest(
                 array $requestData,
@@ -532,20 +510,7 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->toolsService->method('getToolDefinitions')
             ->willReturn([]);
 
-        $abortAfterFirstTool = false;
-
-        $service = new class ($this->schemaService, $this->toolsService, $abortAfterFirstTool) extends NaturalLanguageQueryService {
-            private bool $shouldAbort;
-
-            public function __construct(
-                \App\Services\DatabaseSchemaService $schemaService,
-                \App\Services\NlQueryToolsService $toolsService,
-                bool &$abortAfterFirstTool
-            ) {
-                parent::__construct($schemaService, $toolsService);
-                $this->shouldAbort = &$abortAfterFirstTool;
-            }
-
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
             protected function performHeartbeatAwareLlmRequest(
                 array $requestData,
                 ?callable $heartbeatCallback = null,

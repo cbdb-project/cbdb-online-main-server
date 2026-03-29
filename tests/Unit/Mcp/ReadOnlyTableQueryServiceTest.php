@@ -159,6 +159,14 @@ class ReadOnlyTableQueryServiceTest extends TestCase {
     }
 
     #[Test]
+    public function it_rejects_non_allowlisted_table_in_comma_separated_from_clause(): void {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('not in allowlist');
+
+        $this->service->queryReadOnlySql('WITH x AS (SELECT 1) SELECT * FROM DYNASTIES, users');
+    }
+
+    #[Test]
     public function it_supports_with_query_in_read_only_sql(): void {
         $result = $this->service->queryReadOnlySql(
             'WITH active_dynasties AS (SELECT c_dy FROM DYNASTIES WHERE status = "active") SELECT c_dy FROM active_dynasties ORDER BY c_dy',

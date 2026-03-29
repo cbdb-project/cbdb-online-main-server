@@ -204,16 +204,157 @@ class SqlTableNameExtractor {
 
         $cleanedSql = $this->stripCommentsAndStringLiterals($sql);
 
-        // Match: FROM tablename or JOIN tablename
-        // Handles optional backtick / double-quote quoting.
-        // The first captured group is always the real table name.
-        if (preg_match_all('/\b(?:FROM|JOIN)\s+[`"]?([A-Za-z_]\w*)[`"]?/i', $cleanedSql, $matches)) {
-            foreach ($matches[1] as $table) {
-                $tables[] = $table;
+        $offset = 0;
+        $length = strlen($cleanedSql);
+        while ($offset < $length && preg_match('/\b(FROM|JOIN)\b/i', $cleanedSql, $matches, PREG_OFFSET_CAPTURE, $offset) === 1) {
+            $keyword = strtoupper((string) $matches[1][0]);
+            $cursor = (int) $matches[1][1] + strlen((string) $matches[1][0]);
+
+            if ($keyword === 'FROM') {
+                [$fromTables, $cursor] = $this->extractTableNamesFromFromClause($cleanedSql, $cursor);
+                $tables = array_merge($tables, $fromTables);
+            } else {
+                [$joinTable, $cursor] = $this->readTableReference($cleanedSql, $cursor);
+                if ($joinTable !== null) {
+                    $tables[] = $joinTable;
+                }
             }
+
+            $offset = max($cursor, ((int) $matches[1][1]) + 1);
         }
 
         return $this->normalizeAndFilterTables($tables, $cteAliases);
+    }
+
+    /**
+     * @return array{0:string[],1:int}
+     */
+    private function extractTableNamesFromFromClause(string $sql, int $offset): array {
+        $tables = [];
+        $length = strlen($sql);
+        $cursor = $offset;
+
+        while ($cursor < $length) {
+            $cursor = $this->skipWhitespace($sql, $cursor);
+            if ($cursor >= $length || $sql[$cursor] === ')' || $this->isClauseBoundary($sql, $cursor) || $this->isJoinBoundary($sql, $cursor)) {
+                break;
+            }
+
+            if ($sql[$cursor] === '(') {
+                $cursor = $this->skipBalancedParentheses($sql, $cursor);
+                $cursor = $this->skipOptionalAlias($sql, $cursor);
+            } else {
+                [$table, $cursor] = $this->readTableReference($sql, $cursor);
+                if ($table === null) {
+                    break;
+                }
+
+                $tables[] = $table;
+                $cursor = $this->skipOptionalAlias($sql, $cursor);
+            }
+
+            $cursor = $this->skipWhitespace($sql, $cursor);
+            if ($cursor < $length && $sql[$cursor] === ',') {
+                $cursor++;
+
+                continue;
+            }
+
+            break;
+        }
+
+        return [$tables, $cursor];
+    }
+
+    /**
+     * @return array{0:string|null,1:int}
+     */
+    private function readTableReference(string $sql, int $offset): array {
+        $cursor = $this->skipWhitespace($sql, $offset);
+        if ($cursor >= strlen($sql) || $sql[$cursor] === '(') {
+            return [null, $cursor < strlen($sql) ? $cursor + 1 : $cursor];
+        }
+
+        if (!preg_match('/^([`"]?[A-Za-z_]\w*[`"]?(?:\s*\.\s*[`"]?[A-Za-z_]\w*[`"]?)?)/', substr($sql, $cursor), $matches)) {
+            return [null, $cursor];
+        }
+
+        $table = str_replace(' ', '', (string) $matches[1]);
+        $cursor += strlen((string) $matches[1]);
+
+        return [$table, $cursor];
+    }
+
+    private function skipOptionalAlias(string $sql, int $offset): int {
+        $cursor = $this->skipWhitespace($sql, $offset);
+        $remainingSql = substr($sql, $cursor);
+        if ($remainingSql === false || $remainingSql === '') {
+            return $cursor;
+        }
+
+        if (preg_match('/^AS\b/i', $remainingSql, $matches) === 1) {
+            $cursor += strlen((string) $matches[0]);
+            $cursor = $this->skipWhitespace($sql, $cursor);
+            $remainingSql = substr($sql, $cursor);
+        }
+
+        if (
+            $remainingSql === false
+            || $remainingSql === ''
+            || $remainingSql[0] === ','
+            || $remainingSql[0] === ')'
+            || $this->isClauseBoundary($sql, $cursor)
+            || $this->isJoinBoundary($sql, $cursor)
+        ) {
+            return $cursor;
+        }
+
+        if (preg_match('/^[A-Za-z_]\w*/', $remainingSql, $matches) === 1) {
+            $cursor += strlen((string) $matches[0]);
+        }
+
+        return $cursor;
+    }
+
+    private function skipWhitespace(string $sql, int $offset): int {
+        $length = strlen($sql);
+        while ($offset < $length && ctype_space($sql[$offset])) {
+            $offset++;
+        }
+
+        return $offset;
+    }
+
+    private function skipBalancedParentheses(string $sql, int $offset): int {
+        $depth = 0;
+        $length = strlen($sql);
+
+        for ($cursor = $offset; $cursor < $length; $cursor++) {
+            if ($sql[$cursor] === '(') {
+                $depth++;
+
+                continue;
+            }
+
+            if ($sql[$cursor] !== ')') {
+                continue;
+            }
+
+            $depth--;
+            if ($depth === 0) {
+                return $cursor + 1;
+            }
+        }
+
+        return $length;
+    }
+
+    private function isClauseBoundary(string $sql, int $offset): bool {
+        return preg_match('/^(WHERE|GROUP|ORDER|HAVING|LIMIT|UNION|EXCEPT|INTERSECT|WINDOW|QUALIFY)\b/i', substr($sql, $offset)) === 1;
+    }
+
+    private function isJoinBoundary(string $sql, int $offset): bool {
+        return preg_match('/^(JOIN|LEFT|RIGHT|INNER|FULL|CROSS|NATURAL|STRAIGHT_JOIN)\b/i', substr($sql, $offset)) === 1;
     }
 
     /**

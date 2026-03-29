@@ -115,6 +115,15 @@ SQL;
     }
 
     #[Test]
+    public function it_extracts_all_tables_from_comma_separated_from_clause_in_fallback_path(): void {
+        $tables = $this->extractor->extractTableNames(
+            'WITH x AS (SELECT 1) SELECT * FROM DYNASTIES, BIOG_MAIN'
+        );
+
+        $this->assertEqualsCanonicalizing(['DYNASTIES', 'BIOG_MAIN'], $tables);
+    }
+
+    #[Test]
     public function it_does_not_extract_table_names_from_string_literals(): void {
         $tables = $this->extractor->extractTableNames(
             "SELECT c_dy FROM DYNASTIES WHERE status = 'FROM BIOG_MAIN WHERE 1=1'"

@@ -187,4 +187,82 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertStringContainsString('無法執行此操作', $result['error']);
         $this->assertStringContainsString('僅支援查詢', $result['error']);
     }
+
+    #[Test]
+    public function it_triggers_heartbeat_callback_during_blocking_llm_requests() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $this->schemaService->method('generateSchemaPrompt')
+            ->willReturn('Mock schema info');
+
+        $service = new class ($this->schemaService, $this->toolsService) extends NaturalLanguageQueryService {
+            protected function performHeartbeatAwareLlmRequest(
+                array $requestData,
+                ?callable $heartbeatCallback = null,
+                ?callable $abortCheck = null
+            ): array {
+                if ($heartbeatCallback) {
+                    $heartbeatCallback();
+                    $heartbeatCallback();
+                }
+
+                return [
+                    'successful' => true,
+                    'status' => 200,
+                    'body' => json_encode([
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => json_encode([
+                                        'sql' => 'SELECT * FROM DYNASTIES',
+                                        'explanation' => '此查詢選擇所有朝代。',
+                                        'error' => null,
+                                    ]),
+                                ],
+                                'finish_reason' => 'stop',
+                            ],
+                        ],
+                    ], JSON_UNESCAPED_UNICODE),
+                    'json' => [
+                        'choices' => [
+                            [
+                                'message' => [
+                                    'role' => 'assistant',
+                                    'content' => json_encode([
+                                        'sql' => 'SELECT * FROM DYNASTIES',
+                                        'explanation' => '此查詢選擇所有朝代。',
+                                        'error' => null,
+                                    ]),
+                                ],
+                                'finish_reason' => 'stop',
+                            ],
+                        ],
+                    ],
+                ];
+            }
+        };
+
+        $heartbeatCount = 0;
+        $statusMessages = [];
+
+        $result = $service->generateSQL(
+            '顯示所有朝代',
+            null,
+            function (string $event, array $data) use (&$statusMessages) {
+                if ($event === 'status') {
+                    $statusMessages[] = $data['message'] ?? '';
+                }
+            },
+            false,
+            function () use (&$heartbeatCount) {
+                $heartbeatCount++;
+            },
+            fn () => false
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertGreaterThanOrEqual(2, $heartbeatCount);
+        $this->assertContains('正在等待 LLM 第 1 輪回應', $statusMessages);
+    }
 }

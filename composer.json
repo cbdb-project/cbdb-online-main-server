@@ -6,6 +6,7 @@
     "type": "project",
     "require": {
         "php": "^8.2",
+        "ext-curl": "*",
         "guzzlehttp/guzzle": "^7.2",
         "inertiajs/inertia-laravel": "^2.0",
         "laracasts/flash": "^3.0",

@@ -288,6 +288,56 @@ class HistoricalQaTest extends TestCase {
         $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
     }
 
+    #[Test]
+    public function answer_from_nl_stream_includes_keep_alive_comments_when_service_requests_heartbeat() {
+        Config::set('query_playground.sse_heartbeat_seconds', 0);
+
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')
+            ->willReturnCallback(function (
+                string $question,
+                ?array $tables,
+                ?callable $progressCallback,
+                ?bool $useTools,
+                ?callable $heartbeatCallback,
+                ?callable $abortCheck
+            ) {
+                $this->assertNotNull($heartbeatCallback);
+                $this->assertNotNull($abortCheck);
+                $this->assertFalse($abortCheck());
+
+                $heartbeatCallback();
+
+                return [
+                    'success' => true,
+                    'answer_markdown' => '李白是唐代詩人。',
+                    'summary' => '唐代詩人',
+                    'sql_used' => [],
+                    'tool_calls' => [],
+                    'evidence' => [],
+                    'caveat' => '',
+                    'model' => 'gemini-test-model',
+                ];
+            });
+
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->call('POST', route('query-playground.answer-from-nl-stream'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'text/event-stream',
+        ], json_encode(['question' => '李白是什麼時代的人？']));
+
+        $response->assertStatus(200);
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString(': keep-alive', $content);
+        $this->assertStringContainsString('event: complete', $content);
+    }
+
     // ──── Regression: existing NL endpoints still work ────
 
     #[Test]

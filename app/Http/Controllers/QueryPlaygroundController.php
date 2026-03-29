@@ -191,50 +191,90 @@ class QueryPlaygroundController extends Controller {
     }
 
     /**
-     * 建立標準 SSE 回應，加入 keep-alive heartbeat 並安全 flush 緩衝區。
+     * 建立標準 SSE 回應，提供事件發送、heartbeat 與斷線檢查。
      *
-     * @param callable(callable(string, mixed): void): void $producer
+     * @param callable(callable(string, mixed): void, callable(): bool, callable(): bool): void $producer
      */
     protected function streamSseResponse(callable $producer) {
         return response()->stream(function () use ($producer) {
             ignore_user_abort(true);
 
             $lastSentAt = microtime(true);
+            $heartbeatInterval = max(0, (int) config('query_playground.sse_heartbeat_seconds', self::SSE_HEARTBEAT_INTERVAL_SECONDS));
+            $clientDisconnected = false;
 
-            $flush = function () {
+            $isClientDisconnected = function () use (&$clientDisconnected) {
+                if ($clientDisconnected) {
+                    return true;
+                }
+
+                $clientDisconnected = connection_aborted() !== 0;
+
+                return $clientDisconnected;
+            };
+
+            $flush = function () use (&$clientDisconnected) {
                 if (ob_get_level() > 0) {
                     @ob_flush();
                 }
 
                 flush();
+                $clientDisconnected = connection_aborted() !== 0;
             };
 
-            $sendComment = function (string $comment) use (&$lastSentAt, $flush) {
+            $sendComment = function (string $comment) use (&$lastSentAt, $flush, $isClientDisconnected) {
+                if ($isClientDisconnected()) {
+                    return false;
+                }
+
                 echo ': ' . $comment . "\n\n";
                 $lastSentAt = microtime(true);
                 $flush();
+
+                return !$isClientDisconnected();
             };
 
-            $sendEvent = function (string $event, $data) use (&$lastSentAt, $flush) {
+            $sendEvent = function (string $event, $data) use (&$lastSentAt, $flush, $isClientDisconnected) {
+                if ($isClientDisconnected()) {
+                    return false;
+                }
+
                 echo "event: {$event}\n";
                 echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
                 $lastSentAt = microtime(true);
                 $flush();
+
+                return !$isClientDisconnected();
             };
 
-            $sendHeartbeatIfNeeded = function () use (&$lastSentAt, $sendComment) {
-                if ((microtime(true) - $lastSentAt) >= self::SSE_HEARTBEAT_INTERVAL_SECONDS) {
-                    $sendComment('keep-alive');
+            $sendHeartbeatIfNeeded = function () use (&$lastSentAt, $heartbeatInterval, $sendComment, $isClientDisconnected) {
+                if ($isClientDisconnected()) {
+                    return false;
                 }
+
+                if ((microtime(true) - $lastSentAt) >= $heartbeatInterval) {
+                    return $sendComment('keep-alive');
+                }
+
+                return true;
             };
 
             // 先送出一個 padding comment，降低代理 / 瀏覽器對小回應的緩衝影響。
-            $sendComment(str_repeat(' ', 2048));
+            if (!$sendComment(str_repeat(' ', (int) config('query_playground.sse_padding_bytes', 2048)))) {
+                return;
+            }
 
-            $producer(function (string $event, $data) use ($sendEvent, $sendHeartbeatIfNeeded) {
-                $sendHeartbeatIfNeeded();
-                $sendEvent($event, $data);
-            });
+            $producer(
+                function (string $event, $data) use ($sendEvent, $sendHeartbeatIfNeeded, $isClientDisconnected) {
+                    if (!$sendHeartbeatIfNeeded() || $isClientDisconnected()) {
+                        return;
+                    }
+
+                    $sendEvent($event, $data);
+                },
+                $sendHeartbeatIfNeeded,
+                $isClientDisconnected
+            );
         }, 200, [
             'Content-Type' => 'text/event-stream; charset=UTF-8',
             'Cache-Control' => 'no-cache, no-transform',
@@ -266,10 +306,10 @@ class QueryPlaygroundController extends Controller {
 
         $useTools = $request->boolean('use_tools', true);
 
-        return $this->streamSseResponse(function (callable $sendEvent) use ($question, $tables, $nlqService, $useTools) {
+        return $this->streamSseResponse(function (callable $sendEvent, callable $sendHeartbeatIfNeeded, callable $isClientDisconnected) use ($question, $tables, $nlqService, $useTools) {
             try {
                 // 调用服务并传入进度回调
-                $result = $nlqService->generateSQL($question, $tables, $sendEvent, $useTools);
+                $result = $nlqService->generateSQL($question, $tables, $sendEvent, $useTools, $sendHeartbeatIfNeeded, $isClientDisconnected);
 
                 // 发送最终结果
                 if ($result['success']) {
@@ -386,9 +426,9 @@ class QueryPlaygroundController extends Controller {
         $tables = $request->input('tables');
         $useTools = $request->boolean('use_tools', true);
 
-        return $this->streamSseResponse(function (callable $sendEvent) use ($question, $tables, $nlqService, $useTools) {
+        return $this->streamSseResponse(function (callable $sendEvent, callable $sendHeartbeatIfNeeded, callable $isClientDisconnected) use ($question, $tables, $nlqService, $useTools) {
             try {
-                $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools);
+                $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools, $sendHeartbeatIfNeeded, $isClientDisconnected);
 
                 if ($result['success']) {
                     $sendEvent('complete', [

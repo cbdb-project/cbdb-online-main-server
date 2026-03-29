@@ -31,7 +31,14 @@ class NaturalLanguageQueryService {
      * @param bool|null $useToolsOverride 是否強制啟用工具（為 null 時依配置）
      * @return array ['success' => bool, 'sql' => string|null, 'error' => string|null, 'explanation' => string|null, 'model' => string|null, 'tool_calls' => array|null]
      */
-    public function generateSQL(string $question, ?array $tableNames = null, ?callable $progressCallback = null, ?bool $useToolsOverride = null): array {
+    public function generateSQL(
+        string $question,
+        ?array $tableNames = null,
+        ?callable $progressCallback = null,
+        ?bool $useToolsOverride = null,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
         if (empty($this->apiKey)) {
             return [
                 'success' => false,
@@ -81,8 +88,15 @@ class NaturalLanguageQueryService {
                 ],
             ];
 
+            if ($progressCallback) {
+                $progressCallback('status', [
+                    'round' => 1,
+                    'message' => '正在等待 LLM 第 1 輪回應',
+                ]);
+            }
+
             // 第一次调用 LLM（可能返回工具调用请求）
-            $response = $this->callLLM($messages, $tools, $toolsEnabled);
+            $response = $this->callLLM($messages, $tools, $toolsEnabled, $heartbeatCallback, $abortCheck);
 
             // 发送进度：第一次 LLM 调用完成
             if ($progressCallback) {
@@ -94,7 +108,14 @@ class NaturalLanguageQueryService {
 
             if (!$response['success']) {
                 if ($toolsEnabled) {
-                    $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, null, $response['error']);
+                    $fallback = $this->fallbackToNonToolMode(
+                        $messages,
+                        $progressCallback,
+                        null,
+                        $response['error'],
+                        $heartbeatCallback,
+                        $abortCheck
+                    );
                     if ($fallback['success']) {
                         $result = $fallback['result'];
                         $result['model'] = $this->model;
@@ -236,7 +257,14 @@ class NaturalLanguageQueryService {
                         }
 
                         if ($round >= $maxRounds) {
-                            $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, $allToolResults, '工具調用次數超過上限');
+                            $fallback = $this->fallbackToNonToolMode(
+                                $messages,
+                                $progressCallback,
+                                $allToolResults,
+                                '工具調用次數超過上限',
+                                $heartbeatCallback,
+                                $abortCheck
+                            );
                             if ($fallback['success']) {
                                 $result = $fallback['result'];
                                 $result['tool_calls'] = $allToolResults;
@@ -277,7 +305,14 @@ class NaturalLanguageQueryService {
                             ];
                         }
 
-                        $response = $this->callLLM($messages, $tools, true);
+                        if ($progressCallback) {
+                            $progressCallback('status', [
+                                'round' => $round + 1,
+                                'message' => "正在等待 LLM 第 " . ($round + 1) . ' 輪回應',
+                            ]);
+                        }
+
+                        $response = $this->callLLM($messages, $tools, true, $heartbeatCallback, $abortCheck);
                         if ($progressCallback) {
                             $progressCallback('llm_call_complete', [
                                 'round' => $round + 1,
@@ -286,7 +321,14 @@ class NaturalLanguageQueryService {
                         }
 
                         if (!$response['success']) {
-                            $fallback = $this->fallbackToNonToolMode($messages, $progressCallback, $allToolResults, $response['error']);
+                            $fallback = $this->fallbackToNonToolMode(
+                                $messages,
+                                $progressCallback,
+                                $allToolResults,
+                                $response['error'],
+                                $heartbeatCallback,
+                                $abortCheck
+                            );
                             if ($fallback['success']) {
                                 $result = $fallback['result'];
                                 $result['tool_calls'] = $allToolResults;
@@ -394,7 +436,14 @@ class NaturalLanguageQueryService {
      * @param bool|null $useToolsOverride 是否強制啟用工具
      * @return array
      */
-    public function answerQuestion(string $question, ?array $tableNames = null, ?callable $progressCallback = null, ?bool $useToolsOverride = null): array {
+    public function answerQuestion(
+        string $question,
+        ?array $tableNames = null,
+        ?callable $progressCallback = null,
+        ?bool $useToolsOverride = null,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
         if (empty($this->apiKey)) {
             return [
                 'success' => false,
@@ -455,7 +504,7 @@ class NaturalLanguageQueryService {
                     ]);
                 }
 
-                $response = $this->callLLMForQa($messages, $tools, $allowTools);
+                $response = $this->callLLMForQa($messages, $tools, $allowTools, $heartbeatCallback, $abortCheck);
 
                 if ($progressCallback) {
                     $progressCallback('status', [
@@ -690,13 +739,19 @@ PROMPT;
     /**
      * 呼叫 LLM API（QA 模式：允許工具時不強制 structured output）
      */
-    protected function callLLMForQa(array $messages, array $tools = [], bool $allowToolCalls = false): array {
+    protected function callLLMForQa(
+        array $messages,
+        array $tools = [],
+        bool $allowToolCalls = false,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
         if ($allowToolCalls && !empty($tools)) {
-            return $this->callLLM($messages, $tools, true);
+            return $this->callLLM($messages, $tools, true, $heartbeatCallback, $abortCheck);
         }
 
         // 最終回答輪：不使用 structured output，讓模型自由回答 JSON
-        return $this->callLLM($messages, [], false);
+        return $this->callLLM($messages, [], false, $heartbeatCallback, $abortCheck);
     }
 
     /**
@@ -1188,7 +1243,13 @@ PROMPT;
      * @param bool $allowToolCalls 是否允许工具调用
      * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
      */
-    protected function callLLM(array $messages, array $tools = [], bool $allowToolCalls = false): array {
+    protected function callLLM(
+        array $messages,
+        array $tools = [],
+        bool $allowToolCalls = false,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
         try {
             $maxCompletionTokens = (int) config('services.gemini.max_completion_tokens', 8192);
             if ($maxCompletionTokens < 256) {
@@ -1244,22 +1305,18 @@ PROMPT;
 
             for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
                 try {
-                    $response = Http::connectTimeout(10)
-                        ->timeout(45)
-                        ->withHeaders([
-                            'Content-Type' => 'application/json',
-                            'Authorization' => 'Bearer ' . $this->apiKey,
-                        ])
-                        ->post($this->apiEndpoint, $requestData);
+                    $this->assertClientConnected($abortCheck);
+
+                    $response = $this->performLlmHttpRequest($requestData, $heartbeatCallback, $abortCheck);
                     // 收到任何 HTTP 回應後，清除先前重試留下的 exception 狀態
                     $lastException = null;
 
-                    if ($response->successful()) {
+                    if ($response['successful']) {
                         break;
                     }
 
                     if ($this->shouldRetryHttpResponse($response) && $attempt < $maxAttempts) {
-                        usleep($retryDelayMs * 1000);
+                        $this->sleepWithHeartbeat($retryDelayMs, $heartbeatCallback, $abortCheck);
 
                         continue;
                     }
@@ -1269,7 +1326,7 @@ PROMPT;
                     $lastException = $exception;
 
                     if ($this->shouldRetryException($exception) && $attempt < $maxAttempts) {
-                        usleep($retryDelayMs * 1000);
+                        $this->sleepWithHeartbeat($retryDelayMs, $heartbeatCallback, $abortCheck);
 
                         continue;
                     }
@@ -1282,10 +1339,10 @@ PROMPT;
                 throw $lastException;
             }
 
-            if (!$response->successful()) {
-                $errorMessage = $this->extractApiErrorMessage($response->json(), $response->body());
+            if (!$response['successful']) {
+                $errorMessage = $this->extractApiErrorMessage($response['json'], $response['body']);
                 Log::error('LLM API 调用失败', [
-                    'status' => $response->status(),
+                    'status' => $response['status'],
                     'error' => $errorMessage,
                     'model' => $this->model,
                     'endpoint' => $this->apiEndpoint,
@@ -1300,10 +1357,29 @@ PROMPT;
 
             return [
                 'success' => true,
-                'data' => $response->json(),
+                'data' => $response['json'],
                 'error' => null,
             ];
 
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'Client disconnected') {
+                return [
+                    'success' => false,
+                    'data' => null,
+                    'error' => '客戶端已中斷連線，已停止生成。',
+                ];
+            }
+
+            Log::error('调用 LLM 时发生异常', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => '调用 LLM 时发生错误: ' . $e->getMessage(),
+            ];
         } catch (\Exception $e) {
             Log::error('调用 LLM 时发生异常', [
                 'exception' => $e->getMessage(),
@@ -1315,6 +1391,141 @@ PROMPT;
                 'data' => null,
                 'error' => '调用 LLM 时发生错误: ' . $e->getMessage(),
             ];
+        }
+    }
+
+    protected function performLlmHttpRequest(
+        array $requestData,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
+        if ($heartbeatCallback === null && $abortCheck === null) {
+            $response = Http::connectTimeout(10)
+                ->timeout(45)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                ])
+                ->post($this->apiEndpoint, $requestData);
+
+            return [
+                'successful' => $response->successful(),
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'json' => $response->json(),
+            ];
+        }
+
+        return $this->performHeartbeatAwareLlmRequest($requestData, $heartbeatCallback, $abortCheck);
+    }
+
+    protected function performHeartbeatAwareLlmRequest(
+        array $requestData,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
+        $body = json_encode($requestData, JSON_UNESCAPED_UNICODE);
+        if ($body === false) {
+            throw new \RuntimeException('LLM 請求序列化失敗。');
+        }
+
+        $responseBody = '';
+        $ch = curl_init($this->apiEndpoint);
+        if ($ch === false) {
+            throw new \RuntimeException('無法初始化 cURL。');
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_HEADER => false,
+            CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$responseBody) {
+                $responseBody .= $chunk;
+
+                return strlen($chunk);
+            },
+        ]);
+
+        $multiHandle = curl_multi_init();
+        curl_multi_add_handle($multiHandle, $ch);
+
+        try {
+            $running = null;
+
+            do {
+                $this->assertClientConnected($abortCheck);
+
+                do {
+                    $multiExecResult = curl_multi_exec($multiHandle, $running);
+                } while ($multiExecResult === CURLM_CALL_MULTI_PERFORM);
+
+                if ($multiExecResult !== CURLM_OK) {
+                    throw new \RuntimeException('cURL multi exec 失敗: ' . curl_multi_strerror($multiExecResult));
+                }
+
+                if ($running > 0) {
+                    if ($heartbeatCallback) {
+                        $heartbeatCallback();
+                    }
+
+                    $selectResult = curl_multi_select($multiHandle, 1.0);
+                    if ($selectResult === -1) {
+                        usleep(100000);
+                    }
+                }
+            } while ($running > 0);
+
+            if (curl_errno($ch) !== 0) {
+                throw new \RuntimeException(curl_error($ch));
+            }
+
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        } finally {
+            curl_multi_remove_handle($multiHandle, $ch);
+            curl_multi_close($multiHandle);
+            curl_close($ch);
+        }
+
+        $decoded = json_decode($responseBody, true);
+
+        return [
+            'successful' => $status >= 200 && $status < 300,
+            'status' => $status,
+            'body' => $responseBody,
+            'json' => is_array($decoded) ? $decoded : null,
+        ];
+    }
+
+    protected function sleepWithHeartbeat(
+        int $milliseconds,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): void {
+        $remainingMs = max(0, $milliseconds);
+
+        while ($remainingMs > 0) {
+            $this->assertClientConnected($abortCheck);
+
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
+            }
+
+            $sleepChunkMs = min(200, $remainingMs);
+            usleep($sleepChunkMs * 1000);
+            $remainingMs -= $sleepChunkMs;
+        }
+    }
+
+    protected function assertClientConnected(?callable $abortCheck = null): void {
+        if ($abortCheck && $abortCheck()) {
+            throw new \RuntimeException('Client disconnected');
         }
     }
 
@@ -1347,11 +1558,12 @@ PROMPT;
     }
 
     protected function shouldRetryHttpResponse($response): bool {
-        if ($response->status() >= 500) {
+        $status = is_array($response) ? ($response['status'] ?? 0) : $response->status();
+        if ($status >= 500) {
             return true;
         }
 
-        $body = $response->body();
+        $body = is_array($response) ? ($response['body'] ?? '') : $response->body();
 
         return stripos($body, 'UnexpectedEOFAtTarget') !== false
             || stripos($body, 'Unexpected EOF at target') !== false;
@@ -1809,7 +2021,9 @@ PROMPT;
         array $messages,
         ?callable $progressCallback = null,
         ?array $toolResults = null,
-        ?string $reason = null
+        ?string $reason = null,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
     ): array {
         if ($progressCallback) {
             $progressCallback('llm_fallback_start', [
@@ -1824,7 +2038,7 @@ PROMPT;
             'content' => '若工具不可用，請根據既有 schema 資訊直接生成最合理的 SQL，並嚴格返回 JSON。',
         ];
 
-        $fallbackResponse = $this->callLLM($fallbackMessages, [], false);
+        $fallbackResponse = $this->callLLM($fallbackMessages, [], false, $heartbeatCallback, $abortCheck);
         if (!$fallbackResponse['success']) {
             if ($progressCallback) {
                 $progressCallback('llm_fallback_failed', [

@@ -242,7 +242,7 @@ class NaturalLanguageQueryService {
                             ]);
                         }
 
-                        $toolResults = $this->executeToolCalls($toolCalls, $progressCallback);
+                        $toolResults = $this->executeToolCalls($toolCalls, $progressCallback, $heartbeatCallback, $abortCheck);
                         $roundEntry['tool_results'] = $toolResults;
                         $roundsLog[] = $roundEntry;
                         $allToolResults = array_merge($allToolResults, $toolResults);
@@ -540,7 +540,7 @@ class NaturalLanguageQueryService {
                         ),
                     ]);
 
-                    $toolResults = $this->executeToolCalls($toolCalls, $progressCallback);
+                    $toolResults = $this->executeToolCalls($toolCalls, $progressCallback, $heartbeatCallback, $abortCheck);
                     $allToolResults = array_merge($allToolResults, $toolResults);
 
                     // 收集 SQL
@@ -1584,10 +1584,17 @@ PROMPT;
      * @param callable|null $progressCallback 进度回调函数
      * @return array
      */
-    protected function executeToolCalls(array $toolCalls, ?callable $progressCallback = null): array {
+    protected function executeToolCalls(
+        array $toolCalls,
+        ?callable $progressCallback = null,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
+    ): array {
         $results = [];
 
         foreach ($toolCalls as $index => $toolCall) {
+            $this->assertClientConnected($abortCheck);
+
             $toolName = $toolCall['function']['name'] ?? '';
             $decodedArguments = json_decode($toolCall['function']['arguments'] ?? '{}', true);
             $arguments = is_array($decodedArguments) ? $decodedArguments : [];
@@ -1613,10 +1620,18 @@ PROMPT;
                 ]);
             }
 
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
+            }
+
             $toolStartedAt = microtime(true);
-            $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback);
+            $result = $this->executeToolWithRetry($toolName, $arguments, $toolCallId, $index, count($toolCalls), $progressCallback, $heartbeatCallback, $abortCheck);
             $resultSummary = $this->summarizeToolResult($toolName, $arguments, $result);
             $status = ($result['success'] ?? false) ? 'completed' : 'error';
+
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
+            }
 
             $toolResult = [
                 'tool_call_id' => $toolCallId,
@@ -1836,7 +1851,9 @@ PROMPT;
         string $toolCallId,
         int $index,
         int $totalTools,
-        ?callable $progressCallback = null
+        ?callable $progressCallback = null,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null
     ): array {
         $maxAttempts = 2;
         $lastResult = [
@@ -1846,6 +1863,8 @@ PROMPT;
         ];
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $this->assertClientConnected($abortCheck);
+
             $attemptStartedAt = microtime(true);
 
             Log::info('工具執行嘗試開始', [
@@ -1855,6 +1874,10 @@ PROMPT;
                 'max_attempts' => $maxAttempts,
                 'arguments' => $arguments,
             ]);
+
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
+            }
 
             try {
                 $lastResult = $this->toolsService->executeTool($toolName, $arguments);
@@ -1871,6 +1894,10 @@ PROMPT;
                     'data' => null,
                     'error' => "工具執行時發生錯誤: {$e->getMessage()}",
                 ];
+            }
+
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
             }
 
             Log::info('工具執行嘗試完成', [
@@ -1902,11 +1929,13 @@ PROMPT;
                 ]);
             }
 
-            usleep(400 * 1000);
+            $this->sleepWithHeartbeat(400, $heartbeatCallback, $abortCheck);
         }
 
         $fallbackCall = $this->buildFallbackToolCall($toolName, $arguments);
         if ($fallbackCall !== null) {
+            $this->assertClientConnected($abortCheck);
+
             if ($progressCallback) {
                 $progressCallback('tool_execution_fallback', [
                     'tool_index' => $index + 1,
@@ -1919,6 +1948,10 @@ PROMPT;
                 ]);
             }
 
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
+            }
+
             try {
                 $fallbackResult = $this->toolsService->executeTool($fallbackCall['tool_name'], $fallbackCall['arguments']);
             } catch (\Throwable $e) {
@@ -1927,6 +1960,10 @@ PROMPT;
                     'data' => null,
                     'error' => "替代工具執行時發生錯誤: {$e->getMessage()}",
                 ];
+            }
+
+            if ($heartbeatCallback) {
+                $heartbeatCallback();
             }
 
             if (($fallbackResult['success'] ?? false) === true) {

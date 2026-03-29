@@ -7,6 +7,7 @@ use App\Services\Mcp\ReadOnlyTableQueryService;
 use App\Services\NlQueryToolsService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NlQueryToolsServiceTest extends TestCase {
@@ -30,7 +31,7 @@ class NlQueryToolsServiceTest extends TestCase {
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_sample_data_for_allowed_table(): void {
         // 创建测试表
         DB::statement('DROP TABLE IF EXISTS DYNASTIES');
@@ -53,7 +54,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertEquals('Song', $result['data'][1]['c_dy']);
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_table_not_in_whitelist(): void {
         $result = $this->service->getSampleDataForTable('users', 10);
 
@@ -62,7 +63,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertStringContainsString('不在允許的表格清單中', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_non_existent_table(): void {
         // 确保表不存在
         DB::statement('DROP TABLE IF EXISTS BIOG_MAIN');
@@ -75,7 +76,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertNotNull($result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_respects_limit_parameter(): void {
         // 创建测试表
         DB::statement('DROP TABLE IF EXISTS DYNASTIES');
@@ -93,7 +94,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertCount(5, $result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_execute_get_sample_data_tool(): void {
         // 创建测试表
         DB::statement('DROP TABLE IF EXISTS DYNASTIES');
@@ -109,7 +110,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertIsArray($result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_unknown_tool(): void {
         $result = $this->service->executeTool('unknown_tool', []);
 
@@ -117,7 +118,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertStringContainsString('未知的工具', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_tool_definitions(): void {
         Config::set('nl_query_tools.tools', [
             [
@@ -133,7 +134,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertEquals('get_sample_data_for_table', $definitions[0]['name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_table(): void {
         // 创建空表
         DB::statement('DROP TABLE IF EXISTS DYNASTIES');
@@ -146,7 +147,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertCount(0, $result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_is_case_insensitive_for_table_names(): void {
         // 创建测试表
         DB::statement('DROP TABLE IF EXISTS DYNASTIES');
@@ -160,7 +161,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertIsArray($result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_execute_list_allowed_tables_tool(): void {
         $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
         $readOnlyService->method('listAllowedTables')
@@ -173,7 +174,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertEquals(['DYNASTIES', 'BIOG_MAIN'], $result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_execute_query_table_schema_tool(): void {
         $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
         $readOnlyService->method('queryTableSchema')
@@ -195,7 +196,7 @@ class NlQueryToolsServiceTest extends TestCase {
         $this->assertEquals('DYNASTIES', $result['data']['table_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_execute_query_read_only_sql_tool(): void {
         $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
         $readOnlyService->method('queryReadOnlySql')

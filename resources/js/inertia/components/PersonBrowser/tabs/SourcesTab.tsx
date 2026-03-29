@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface SourceItem {
     pk: {
@@ -34,8 +35,8 @@ export default function SourcesTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <div style={headerStyle}>
                         <MetaRow label="書名" value={formatBilingualLabel(item.title_chn, item.title)} />
                         <div style={badgesStyle}>

@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface AssociationItem {
     pk: {
@@ -44,8 +45,8 @@ export default function AssociationsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.assoc_desc_chn, item.assoc_desc)} />
                     <MetaRow
                         label="關聯人物"

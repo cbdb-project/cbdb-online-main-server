@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface InstitutionItem {
     pk: {
@@ -38,8 +39,8 @@ export default function InstitutionsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="機構" value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
                     <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
                     <MetaRow label="出處" value={item.source_id} />

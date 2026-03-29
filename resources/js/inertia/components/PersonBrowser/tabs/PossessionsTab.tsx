@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface PossessionItem {
     pk: {
@@ -35,8 +36,8 @@ export default function PossessionsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="財產" value={formatBilingualLabel(item.desc_chn, item.desc)} />
                     <MetaRow label="行為" value={formatBilingualLabel(item.act_chn, item.act)} />
                     <MetaRow label="數量" value={item.quantity} />

@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface StatusItem {
     pk: {
@@ -36,8 +37,8 @@ export default function StatusesTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="身份" value={formatBilingualLabel(item.status_chn, item.status)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="出處" value={item.source_id} />

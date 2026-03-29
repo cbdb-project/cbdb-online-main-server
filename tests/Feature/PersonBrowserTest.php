@@ -1348,4 +1348,114 @@ class PersonBrowserTest extends TestCase {
 
         $this->fail('Missing basic info field: ' . $label);
     }
+
+    #[Test]
+    public function test_alt_names_pk_does_not_contain_c_sequence(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'alt_names']));
+
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertNotEmpty($items);
+
+        $pk = $items[0]['pk'];
+        $this->assertIsArray($pk);
+        $this->assertArrayHasKey('c_personid', $pk);
+        $this->assertArrayHasKey('c_alt_name_chn', $pk);
+        $this->assertArrayHasKey('c_alt_name_type_code', $pk);
+        $this->assertArrayNotHasKey('c_sequence', $pk, 'ALTNAME_DATA pk must not contain c_sequence');
+        $this->assertCount(3, $pk, 'ALTNAME_DATA pk should have exactly 3 fields');
+    }
+
+    #[Test]
+    public function test_all_tab_pk_fields_match_composite_primary_key_schemas(): void {
+        // Mapping: tab key => [table name in SCHEMAS, expected pk fields]
+        $tabPkMap = [
+            'alt_names' => ['ALTNAME_DATA', ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code']],
+            'addresses' => ['BIOG_ADDR_DATA', ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence']],
+            'texts' => ['BIOG_TEXT_DATA', ['c_personid', 'c_textid', 'c_role_id']],
+            'sources' => ['BIOG_SOURCE_DATA', ['c_personid', 'c_textid', 'c_pages']],
+            'entries' => ['ENTRY_DATA', ['c_personid', 'c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code']],
+            'events' => ['EVENTS_DATA', ['c_personid', 'c_sequence', 'c_event_code']],
+            'statuses' => ['STATUS_DATA', ['c_personid', 'c_sequence', 'c_status_code']],
+            'associations' => ['ASSOC_DATA', ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year']],
+            'kinship' => ['KIN_DATA', ['c_personid', 'c_kin_id', 'c_kin_code']],
+            'possessions' => ['POSSESSION_DATA', ['c_possession_record_id']],
+            'social_institutions' => ['BIOG_INST_DATA', ['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code']],
+            'postings' => ['POSTED_TO_OFFICE_DATA', ['c_office_id', 'c_posting_id']],
+        ];
+
+        $schemas = \App\Support\CompositePrimaryKey::SCHEMAS;
+
+        foreach ($tabPkMap as $tabKey => [$table, $expectedFields]) {
+            // Verify expected fields match SCHEMAS
+            $this->assertArrayHasKey($table, $schemas, "Table '{$table}' not found in CompositePrimaryKey::SCHEMAS");
+            $this->assertSame(
+                $schemas[$table],
+                $expectedFields,
+                "Expected pk fields for tab '{$tabKey}' (table {$table}) do not match CompositePrimaryKey::SCHEMAS"
+            );
+
+            // Verify the API returns matching pk fields
+            $response = $this->actingAs($this->user)
+                ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => $tabKey]));
+            $response->assertOk();
+
+            $items = $response->json('items');
+            if (!empty($items)) {
+                $pk = $items[0]['pk'];
+                $this->assertIsArray($pk, "Tab '{$tabKey}' pk should be an array");
+                $actualKeys = array_keys($pk);
+                $this->assertSame(
+                    $expectedFields,
+                    $actualKeys,
+                    "Tab '{$tabKey}' pk fields from API do not match expected: " . json_encode($actualKeys)
+                );
+            }
+        }
+    }
+
+    #[Test]
+    public function test_tab_items_with_different_pk_produce_unique_json_keys(): void {
+        // alt_names: person 1 has 2 rows with different (c_alt_name_chn, c_alt_name_type_code)
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'alt_names']));
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertGreaterThanOrEqual(2, count($items), 'Need at least 2 alt_name items for uniqueness test');
+
+        $keys = array_map(fn ($item) => json_encode($item['pk']), $items);
+        $this->assertSame(count($keys), count(array_unique($keys)), 'alt_names: JSON-encoded pk must be unique across items');
+    }
+
+    #[Test]
+    public function test_source_pk_with_pipe_and_null_pages_no_collision(): void {
+        // Insert two sources that would collide under naive "|" joining:
+        // row1: pages = "a|b"   → old stableKey: "1|1|a|b"
+        // row2: pages = null    → old stableKey: "1|1|"  (no collision with row1 anyway)
+        // row3: pages = ""      → old stableKey: "1|1|"  (collision with row2 under old impl)
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => 'a|b', 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => null, 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+            ['c_personid' => 1, 'c_textid' => 2, 'c_pages' => '', 'c_notes' => null, 'c_main_source' => 0, 'c_self_bio' => 0],
+        ]);
+        DB::table('TEXT_CODES')->insertOrIgnore([
+            ['c_textid' => 2, 'c_title' => 'Test Book', 'c_title_chn' => '測試書', 'c_text_year' => null],
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'sources']));
+        $response->assertOk();
+
+        $items = $response->json('items');
+        // Should have at least 4 items (1 from seed + 3 inserted above)
+        $this->assertGreaterThanOrEqual(4, count($items));
+
+        $keys = array_map(fn ($item) => json_encode($item['pk']), $items);
+        $this->assertSame(
+            count($keys),
+            count(array_unique($keys)),
+            'sources: JSON-encoded pk must be unique; pipe chars and null/empty must not collide'
+        );
+    }
 }

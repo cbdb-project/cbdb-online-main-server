@@ -5,6 +5,7 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
+import { stableKey } from '../shared/stableKey';
 
 interface EventItem {
     pk: {
@@ -38,8 +39,8 @@ export default function EventsTab({ data }: Props) {
 
     return (
         <div style={containerStyle}>
-            {pageItems.map((item, i) => (
-                <TabCard key={i}>
+            {pageItems.map((item) => (
+                <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="事件" value={formatBilingualLabel(item.event_chn, item.event)} />
                     <MetaRow label="日期" value={item.date_summary} />
                     <MetaRow label="出處" value={item.source_id} />

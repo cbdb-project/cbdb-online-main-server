@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ImportTradSimpMapTest extends TestCase {
@@ -33,7 +34,7 @@ class ImportTradSimpMapTest extends TestCase {
         return $tempFile;
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_comment_lines_starting_with_hash(): void {
         // 模擬 OpenCC 文件內容，包含註釋行
         $mockContent = <<<'TXT'
@@ -71,7 +72,7 @@ TXT;
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_inline_comments(): void {
         // 測試行內註釋（# 後面的內容應被忽略）
         $mockContent = <<<'TXT'
@@ -99,7 +100,7 @@ TXT;
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_empty_lines(): void {
         $mockContent = <<<'TXT'
 
@@ -125,7 +126,7 @@ TXT;
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_lines_with_only_comments(): void {
         $mockContent = <<<'TXT'
 # 完整的註釋行

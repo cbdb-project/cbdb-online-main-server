@@ -6,6 +6,7 @@ use App\Services\AuditLogService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AuditLogServiceTest extends TestCase {
@@ -37,7 +38,7 @@ class AuditLogServiceTest extends TestCase {
         });
     }
 
-    /** @test */
+    #[Test]
     public function it_builds_row_pk_text_using_schema_order_and_rfc3986(): void {
         $rowPk = [
             'c_alt_name_type_code' => 10,
@@ -55,7 +56,7 @@ class AuditLogServiceTest extends TestCase {
         );
     }
 
-    /** @test */
+    #[Test]
     public function it_writes_audit_log_with_generated_operation_id(): void {
         $this->service->write(
             'BIOG_MAIN',

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GenerateSchemaDocsTest extends TestCase {
@@ -30,7 +31,7 @@ class GenerateSchemaDocsTest extends TestCase {
         parent::tearDown();
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_sqlite_schema_documentation() {
         // 運行命令生成文檔
         Artisan::call('cbdb:generate-schema-docs', [
@@ -54,7 +55,7 @@ class GenerateSchemaDocsTest extends TestCase {
         $this->assertStringContainsString('### BIOG_MAIN', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_includes_table_columns_and_types() {
         Artisan::call('cbdb:generate-schema-docs', [
             '--output' => $this->relativeOutputPath,
@@ -69,7 +70,7 @@ class GenerateSchemaDocsTest extends TestCase {
         $this->assertStringContainsString('password', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_marks_views_differently_from_tables() {
         Artisan::call('cbdb:generate-schema-docs', [
             '--output' => $this->relativeOutputPath,
@@ -84,7 +85,7 @@ class GenerateSchemaDocsTest extends TestCase {
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_shows_primary_keys() {
         Artisan::call('cbdb:generate-schema-docs', [
             '--output' => $this->relativeOutputPath,
@@ -97,7 +98,7 @@ class GenerateSchemaDocsTest extends TestCase {
         $this->assertStringContainsString('**主鍵**', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_handle_custom_output_path() {
         $customPath = 'tests/custom_schema_output_' . uniqid() . '.md';
 

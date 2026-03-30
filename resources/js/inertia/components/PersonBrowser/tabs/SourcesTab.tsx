@@ -43,6 +43,7 @@ export default function SourcesTab({ data, canEdit }: Props) {
                 const record = textRecords[item.text_id ?? 0];
                 const title =
                     formatTextTitle(record) ?? formatBilingualLabel(item.title_chn, item.title) ?? (item.text_id ? String(item.text_id) : null);
+                const titleUrl = record?.c_url_homepage ?? null;
                 const url = buildTextUrl(record, item.pages);
 
                 return (
@@ -51,8 +52,8 @@ export default function SourcesTab({ data, canEdit }: Props) {
                             <MetaRow
                                 label="書名"
                                 value={
-                                    url && title ? (
-                                        <a href={url} target="_blank" rel="noreferrer" style={linkStyle}>
+                                    titleUrl && title ? (
+                                        <a href={titleUrl} target="_blank" rel="noreferrer" style={linkStyle}>
                                             {title}
                                         </a>
                                     ) : (

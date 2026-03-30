@@ -20,6 +20,7 @@ interface Props {
     mutateEndpoint: string;
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
+    onSelectPerson?: (personId: number) => void;
     onBasicInfoSaved?: () => void;
     onBasicInfoEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
@@ -32,7 +33,7 @@ interface TabState {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type TypedTabComponent = React.ComponentType<{ data: any; canEdit: boolean }>;
+type TypedTabComponent = React.ComponentType<{ data: any; canEdit: boolean; onSelectPerson?: (personId: number) => void }>;
 
 const TAB_COMPONENTS: Record<string, TypedTabComponent> = {
     alt_names: AltNamesTab,
@@ -60,6 +61,7 @@ export default function TabContentLoader({
     mutateEndpoint,
     pinyinEndpoint,
     canEditBasicInfo,
+    onSelectPerson,
     onBasicInfoSaved,
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
@@ -175,7 +177,7 @@ export default function TabContentLoader({
     // 其他 tabs：使用各自的 typed component
     const TabComponent = TAB_COMPONENTS[activeTab];
     if (TabComponent) {
-        return <TabComponent data={state.data} canEdit={canEditBasicInfo} />;
+        return <TabComponent data={state.data} canEdit={canEditBasicInfo} onSelectPerson={onSelectPerson} />;
     }
 
     // Fallback（不應出現，但作為安全後備）

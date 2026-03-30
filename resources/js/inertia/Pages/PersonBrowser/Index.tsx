@@ -402,6 +402,7 @@ export default function PersonBrowserIndex() {
                             mutateEndpoint={mutateEndpoint}
                             pinyinEndpoint={pinyinEndpoint}
                             canEditBasicInfo={canEditBasicInfo}
+                            onSelectPerson={guardedHandleSelect}
                             onBasicInfoSaved={handleBasicInfoSaved}
                             onBasicInfoEditorStateChange={setBasicInfoEditorState}
                             onRegisterBasicInfoSaveHandler={registerBasicInfoSaveHandler}

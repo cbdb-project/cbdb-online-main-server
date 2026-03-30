@@ -109,10 +109,10 @@
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" name="delete_user" id="delete_user" value="1">
-                                    删除此用戶
+                                    刪除此用戶
                                 </label>
                                 <small class="form-text text-danger">
-                                    <strong>警告：</strong>勾选此项并保存将会删除该用戶账号。此操作不可恢复！
+                                    <strong>警告：</strong>勾選此項並儲存將會刪除該用戶帳號。此操作不可恢復！
                                 </small>
                             </div>
                         </div>
@@ -121,7 +121,7 @@
 
                 <div class="card-footer">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa fa-save"></i> 保存修改
+                        <i class="fa fa-save"></i> 儲存修改
                     </button>
                     <a href="{{ route('manage.index') }}" class="btn btn-secondary">
                         <i class="fa fa-times"></i> 取消
@@ -135,7 +135,7 @@
 <script>
 document.getElementById('delete_user').addEventListener('change', function() {
     if (this.checked) {
-        if (!confirm('您真的确定要删除此用戶吗？\n\n此操作不可恢复！\n\n請確認！')) {
+        if (!confirm('您真的確定要刪除此用戶嗎？\n\n此操作不可恢復！\n\n請確認！')) {
             this.checked = false;
         }
     }
@@ -144,7 +144,7 @@ document.getElementById('delete_user').addEventListener('change', function() {
 document.querySelector('form').addEventListener('submit', function(e) {
     const deleteCheckbox = document.getElementById('delete_user');
     if (deleteCheckbox.checked) {
-        if (!confirm('最后确认：您真的要删除此用戶吗？')) {
+        if (!confirm('最後確認：您真的要刪除此用戶嗎？')) {
             e.preventDefault();
             return false;
         }

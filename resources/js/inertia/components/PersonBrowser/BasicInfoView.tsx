@@ -564,7 +564,7 @@ function renderEditor(
             </div>
 
             <div style={editorBottomBarStyle}>
-                <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，保存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
+                <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，儲存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
                 <button
                     type="button"
                     style={primaryButtonStyle}
@@ -1061,7 +1061,7 @@ function renderActiveYearsSection(section: Section) {
                 <TimelineCard
                     title="在世始年 (c_fl_earliest_year)"
                     items={[
-                        ['公元年份 (c_fl_earliest_year)', fields['在世始年']],
+                        ['西元年份 (c_fl_earliest_year)', fields['在世始年']],
                         ['年號 (c_fl_ey_nh_code)', fields['在世始年號']],
                         ['年號年 (c_fl_ey_nh_year)', fields['在世始年號年']],
                     ]}
@@ -1070,7 +1070,7 @@ function renderActiveYearsSection(section: Section) {
                 <TimelineCard
                     title="在世終年 (c_fl_latest_year)"
                     items={[
-                        ['公元年份 (c_fl_latest_year)', fields['在世終年']],
+                        ['西元年份 (c_fl_latest_year)', fields['在世終年']],
                         ['年號 (c_fl_ly_nh_code)', fields['在世終年號']],
                         ['年號年 (c_fl_ly_nh_year)', fields['在世終年號年']],
                     ]}

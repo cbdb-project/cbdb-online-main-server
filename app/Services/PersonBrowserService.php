@@ -1294,7 +1294,7 @@ class PersonBrowserService {
                 'send_on_save' => false,
             ]),
 
-            'c_fl_earliest_year' => $this->basicInfoFormField('c_fl_earliest_year', '公元年份 (c_fl_earliest_year)', $row['c_fl_earliest_year'] ?? '', 'number'),
+            'c_fl_earliest_year' => $this->basicInfoFormField('c_fl_earliest_year', '西元年份 (c_fl_earliest_year)', $row['c_fl_earliest_year'] ?? '', 'number'),
             'c_fl_ey_nh_code' => $this->basicInfoFormField('c_fl_ey_nh_code', '年號 (c_fl_ey_nh_code)', $row['c_fl_ey_nh_code'] ?? '', 'enum', true, [
                 'display_value' => $flEarliestNH,
                 'enum_model' => 'nianhao',
@@ -1303,7 +1303,7 @@ class PersonBrowserService {
             'c_fl_ey_nh_year' => $this->basicInfoFormField('c_fl_ey_nh_year', '年號年 (c_fl_ey_nh_year)', $row['c_fl_ey_nh_year'] ?? '', 'number'),
             'c_fl_ey_notes' => $this->basicInfoFormField('c_fl_ey_notes', '備註 (c_fl_ey_notes)', $row['c_fl_ey_notes'] ?? '', 'textarea'),
 
-            'c_fl_latest_year' => $this->basicInfoFormField('c_fl_latest_year', '公元年份 (c_fl_latest_year)', $row['c_fl_latest_year'] ?? '', 'number'),
+            'c_fl_latest_year' => $this->basicInfoFormField('c_fl_latest_year', '西元年份 (c_fl_latest_year)', $row['c_fl_latest_year'] ?? '', 'number'),
             'c_fl_ly_nh_code' => $this->basicInfoFormField('c_fl_ly_nh_code', '年號 (c_fl_ly_nh_code)', $row['c_fl_ly_nh_code'] ?? '', 'enum', true, [
                 'display_value' => $flLatestNH,
                 'enum_model' => 'nianhao',

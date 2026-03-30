@@ -28,10 +28,12 @@ class ApiV2GetTest extends TestCase {
         $this->createUsersTable();
         $this->createBiogMainTable();
         $this->createAltnameTable();
+        $this->createBiogTextTable();
     }
 
     protected function tearDown(): void {
         Schema::dropIfExists('ALTNAME_DATA');
+        Schema::dropIfExists('BIOG_TEXT_DATA');
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('users');
         parent::tearDown();
@@ -70,6 +72,19 @@ class ApiV2GetTest extends TestCase {
         });
     }
 
+    protected function createBiogTextTable(): void {
+        Schema::create('BIOG_TEXT_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_textid');
+            $table->integer('c_role_id');
+            $table->integer('c_year')->nullable();
+            $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->text('c_notes')->nullable();
+            $table->primary(['c_personid', 'c_role_id', 'c_textid']);
+        });
+    }
+
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'get-tester@example.com'): User {
         return User::create([
             'name' => 'tester',
@@ -93,6 +108,25 @@ class ApiV2GetTest extends TestCase {
             'c_alt_name_type_code' => 4,
             'c_alt_name' => 'Zimei',
             'c_sequence' => 1,
+        ]);
+    }
+
+    protected function seedText(): void {
+        DB::table('BIOG_MAIN')->updateOrInsert([
+            'c_personid' => 1000,
+        ], [
+            'c_name_chn' => '杜甫',
+            'c_name' => 'Du Fu',
+        ]);
+
+        DB::table('BIOG_TEXT_DATA')->insert([
+            'c_personid' => 1000,
+            'c_textid' => 7596,
+            'c_role_id' => 1,
+            'c_year' => 1080,
+            'c_source' => 9000,
+            'c_pages' => '12-14',
+            'c_notes' => '測試著作記錄',
         ]);
     }
 
@@ -165,5 +199,43 @@ class ApiV2GetTest extends TestCase {
 
         $response->assertStatus(422)
             ->assertJsonPath('errors.person_id.0', 'mismatch');
+    }
+
+    #[Test]
+    public function testGetEndpointReadsTextsFromBiogTextData(): void {
+        $user = $this->makeUser(email: 'get-texts@example.com');
+        $this->actingAs($user);
+        $this->seedText();
+
+        $response = $this->postJson('/api/v2/get', [
+            'resource' => 'texts',
+            'person_id' => 1000,
+            'target' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_textid' => 7596,
+                    'c_role_id' => 1,
+                ],
+            ],
+        ]);
+
+        $response->assertOk()->assertJson([
+            'ok' => true,
+            'resource' => 'texts',
+            'operation' => 'get',
+            'result' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_textid' => 7596,
+                    'c_role_id' => 1,
+                ],
+                'row' => [
+                    'c_personid' => 1000,
+                    'c_textid' => 7596,
+                    'c_role_id' => 1,
+                    'c_year' => 1080,
+                ],
+            ],
+        ]);
     }
 }

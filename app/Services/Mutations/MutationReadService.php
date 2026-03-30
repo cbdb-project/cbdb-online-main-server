@@ -74,7 +74,7 @@ class MutationReadService {
         ],
         [
             'resource' => 'texts',
-            'table' => 'TEXT_DATA',
+            'table' => 'BIOG_TEXT_DATA',
             'key_columns' => ['c_personid', 'c_textid', 'c_role_id'],
             'person_id_column' => 'c_personid',
             'aliases' => ['texts', 'text', 'text_data', 'biog_text_data'],

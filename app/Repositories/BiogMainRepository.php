@@ -3190,11 +3190,7 @@ class BiogMainRepository {
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        $row = DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_pages', '=', $temp_l[2]],
-        ])->first();
+        $row = $this->sourceQueryFromLegacyId($temp_l)->first();
         $text_str = null;
         if ($row && ($row->c_textid || $row->c_textid === 0)) {
             $text_ = TextCode::find($row->c_textid);
@@ -3213,11 +3209,7 @@ class BiogMainRepository {
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        $row = DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_pages', '=', $temp_l[2]],
-        ])->first();
+        $row = $this->sourceQueryFromLegacyId($temp_l)->first();
         if (!$row) {
             return [];
         }
@@ -3235,11 +3227,7 @@ class BiogMainRepository {
         $data['c_modified_date'] = $c_modified_date;
 
         DB::transaction(function () use ($id, $temp_l, $row, $data) {
-            DB::table('BIOG_SOURCE_DATA')->where([
-                ['c_personid', '=', $temp_l[0]],
-                ['c_textid', '=', $temp_l[1]],
-                ['c_pages', '=', $temp_l[2]],
-            ])->update($data);
+            $this->sourceQueryFromLegacyId($temp_l)->update($data);
 
             $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
@@ -3314,26 +3302,18 @@ class BiogMainRepository {
         foreach ($temp_l as $key => $value) {
             $temp_l[$key] = $this->unionPKDef_decode($value);
         }
-        $row = DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $temp_l[0]],
-            ['c_textid', '=', $temp_l[1]],
-            ['c_pages', '=', $temp_l[2]],
-        ])->first();
+        $row = $this->sourceQueryFromLegacyId($temp_l)->first();
 
         if (!$row) {
             return;
         }
 
         DB::transaction(function () use ($id, $temp_l, $row) {
-            DB::table('BIOG_SOURCE_DATA')->where([
-                ['c_personid', '=', $temp_l[0]],
-                ['c_textid', '=', $temp_l[1]],
-                ['c_pages', '=', $temp_l[2]],
-            ])->delete();
+            $this->sourceQueryFromLegacyId($temp_l)->delete();
             $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $temp_l[0],
                 'c_textid' => $temp_l[1],
-                'c_pages' => $temp_l[2],
+                'c_pages' => $this->normalizeLegacySourcePages($temp_l[2] ?? ''),
             ]), $row);
             (new AuditLogService())->write(
                 'BIOG_SOURCE_DATA',
@@ -3341,7 +3321,7 @@ class BiogMainRepository {
                 [
                     'c_personid' => $temp_l[0],
                     'c_textid' => $temp_l[1],
-                    'c_pages' => $temp_l[2],
+                    'c_pages' => $this->normalizeLegacySourcePages($temp_l[2] ?? ''),
                 ],
                 (new AuditLogService())->normalizeRow($row),
                 null,
@@ -3432,6 +3412,25 @@ class BiogMainRepository {
         $result = $key;
 
         return $result;
+    }
+
+    protected function sourceQueryFromLegacyId(array $temp_l) {
+        $query = DB::table('BIOG_SOURCE_DATA')->where([
+            ['c_personid', '=', $temp_l[0]],
+            ['c_textid', '=', $temp_l[1]],
+        ]);
+
+        $cPages = $this->normalizeLegacySourcePages($temp_l[2] ?? '');
+
+        if ($cPages === null) {
+            return $query->whereNull('c_pages');
+        }
+
+        return $query->where('c_pages', '=', $cPages);
+    }
+
+    protected function normalizeLegacySourcePages($value): ?string {
+        return $value === 'NULL' ? null : (string) $value;
     }
 
     //20230628觸發「自動生成」功能

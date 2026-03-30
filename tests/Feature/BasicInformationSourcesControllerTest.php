@@ -27,6 +27,8 @@ class BasicInformationSourcesControllerTest extends TestCase {
             'database' => ':memory:',
             'prefix' => '',
         ]);
+        Config::set('prometheus.enabled', false);
+        Config::set('prometheus.storage_adapter', 'memory');
 
         DB::purge('sqlite');
         DB::reconnect('sqlite');

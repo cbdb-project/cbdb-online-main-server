@@ -269,8 +269,7 @@ class BasicInformationSourcesController extends Controller {
      */
     public function editQuery(Request $request, $id) {
         // 從查詢參數提取複合主鍵
-        $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $pk = $this->extractSourcePkFromQuery($request);
 
         // 驗證必填欄位（c_pages 可能為空字串）
         if (!isset($pk['c_personid']) || !isset($pk['c_textid'])) {
@@ -278,9 +277,7 @@ class BasicInformationSourcesController extends Controller {
         }
 
         // 使用 Repository 查詢（格式：c_personid-c_textid-c_pages）
-        $c_pages = $pk['c_pages'] ?? '';
-        $encodedPages = $this->biogMainRepository->unionPKDef($c_pages);
-        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$encodedPages;
+        $id_ = $this->buildLegacySourceId($pk);
         $res = $this->biogMainRepository->sourceById($id, $id_);
 
         // 處理 personLabel
@@ -374,14 +371,7 @@ class BasicInformationSourcesController extends Controller {
         // 從 URL 查詢字串提取原始 PK（用於定位記錄）
         // 注意：不能用 fromRequest()，因為它會合併查詢參數和表單 body，
         // 當使用者修改了 c_textid 或 c_pages 時，表單的新值會覆蓋原始 PK
-        $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
-        $pk = [];
-        foreach ($schema as $field) {
-            $value = CompositePrimaryKey::normalizeQueryValue($request->query($field));
-            if ($value !== null) {
-                $pk[$field] = $value;
-            }
-        }
+        $pk = $this->extractSourcePkFromQuery($request);
 
         // 驗證必填欄位（c_pages 為可選）
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
@@ -392,9 +382,7 @@ class BasicInformationSourcesController extends Controller {
         }
 
         // 構建舊格式 ID（格式：c_personid-c_textid-c_pages）
-        $c_pages = $pk['c_pages'] ?? '';
-        $encodedPages = $this->biogMainRepository->unionPKDef($c_pages);
-        $id_ = $pk['c_personid'].'-'.$pk['c_textid'].'-'.$encodedPages;
+        $id_ = $this->buildLegacySourceId($pk);
 
         // 使用 Repository 更新
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
@@ -439,28 +427,29 @@ class BasicInformationSourcesController extends Controller {
         }
 
         // 從查詢參數提取複合主鍵
-        $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
-        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+        $pk = $this->extractSourcePkFromQuery($request);
 
         // 驗證必填欄位（c_pages 為可選）
         CompositePrimaryKey::validateOrFail($pk, 'BIOG_SOURCE_DATA', ['c_pages']);
 
-        $cPages = $pk['c_pages'] ?? '';
-        $row = DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_textid']],
-            ['c_pages', '=', $cPages],
-        ])->first();
+        $cPages = array_key_exists('c_pages', $pk) ? $pk['c_pages'] : '';
+        $rowQuery = DB::table('BIOG_SOURCE_DATA')
+            ->where('c_personid', '=', $pk['c_personid'])
+            ->where('c_textid', '=', $pk['c_textid']);
+
+        if ($cPages === null) {
+            $rowQuery->whereNull('c_pages');
+        } else {
+            $rowQuery->where('c_pages', '=', $cPages);
+        }
+
+        $row = (clone $rowQuery)->first();
 
         if (!$row) {
             abort(404, 'BIOG_SOURCE_DATA 記錄不存在');
         }
 
-        DB::table('BIOG_SOURCE_DATA')->where([
-            ['c_personid', '=', $pk['c_personid']],
-            ['c_textid', '=', $pk['c_textid']],
-            ['c_pages', '=', $cPages],
-        ])->delete();
+        $rowQuery->delete();
 
         $operation = (new OperationRepository())->store(
             Auth::id(),
@@ -493,5 +482,26 @@ class BasicInformationSourcesController extends Controller {
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route('basicinformation.sources.index', ['basicinformation' => $id]);
+    }
+
+    private function buildLegacySourceId(array $pk): string {
+        $cPages = array_key_exists('c_pages', $pk) ? $pk['c_pages'] : '';
+        $encodedPages = $cPages === null
+            ? 'NULL'
+            : $this->biogMainRepository->unionPKDef((string) $cPages);
+
+        return $pk['c_personid'].'-'.$pk['c_textid'].'-'.$encodedPages;
+    }
+
+    private function extractSourcePkFromQuery(Request $request): array {
+        $pk = [];
+
+        foreach (CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'] as $field) {
+            if ($request->query->has($field)) {
+                $pk[$field] = CompositePrimaryKey::normalizeQueryValue($request->query($field));
+            }
+        }
+
+        return $pk;
     }
 }

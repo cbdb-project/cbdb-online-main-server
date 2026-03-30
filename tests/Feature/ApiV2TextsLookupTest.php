@@ -14,6 +14,9 @@ class ApiV2TextsLookupTest extends TestCase {
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('cache.default', 'array');
+        config()->set('prometheus.enabled', false);
+        config()->set('prometheus.storage_adapter', 'memory');
         DB::purge('sqlite');
         DB::setDefaultConnection('sqlite');
         DB::reconnect('sqlite');
@@ -77,9 +80,12 @@ class ApiV2TextsLookupTest extends TestCase {
                 'c_title' => 'ctext',
                 'c_text_year' => 2010,
                 'c_source' => null,
+                'c_pages' => null,
                 'c_url_api' => 'https://ctext.org/',
                 'c_url_api_coda' => null,
                 'c_url_homepage' => 'https://ctext.org/zhs',
+                'c_notes' => null,
+                'c_title_alt_chn' => null,
             ],
             [
                 'c_textid' => 9999,
@@ -87,7 +93,12 @@ class ApiV2TextsLookupTest extends TestCase {
                 'c_title' => 'Source Text',
                 'c_text_year' => 1999,
                 'c_source' => null,
+                'c_pages' => null,
                 'c_url_api' => 'https://example.com/source/',
+                'c_url_api_coda' => null,
+                'c_url_homepage' => null,
+                'c_notes' => null,
+                'c_title_alt_chn' => null,
             ],
         ]);
     }

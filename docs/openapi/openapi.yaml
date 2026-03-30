@@ -1,0 +1,405 @@
+openapi: 3.1.0
+info:
+  title: CBDB Mutation API
+  version: 0.1.0
+  description: |
+    CBDB `/api/v2` mutation protocol description for AI agents and frontend clients.
+
+    This specification currently covers the canonical endpoints:
+    - `POST /api/v2/create`
+    - `POST /api/v2/mutate`
+    - `POST /api/v2/delete`
+    - `GET|POST /api/v2/get`
+
+    `POST /api/v2/get` is the recommended way to read a single record because it supports
+    nested `target.pk` payloads naturally. `GET /api/v2/get` is kept for compatibility.
+servers:
+  - url: /
+tags:
+  - name: Mutation API
+paths:
+  /api/v2/create:
+    post:
+      tags: [Mutation API]
+      summary: Create a resource record
+      operationId: createMutationResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequest'
+            examples:
+              basicinformation:
+                summary: Create basic information
+                value:
+                  resource: basicinformation
+                  mode: direct
+                  person_id: 1000
+                  target:
+                    pk:
+                      c_personid: 1000
+                  changes:
+                    c_name_chn: 杜甫
+                    c_name: Du Fu
+      responses:
+        '200':
+          description: Create succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '501':
+          $ref: '#/components/responses/UnsupportedMode'
+  /api/v2/mutate:
+    post:
+      tags: [Mutation API]
+      summary: Update a resource record
+      operationId: mutateResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MutateRequest'
+            examples:
+              updateSequence:
+                summary: Update one field on a target record
+                value:
+                  resource: altnames
+                  mode: direct
+                  operation: update
+                  person_id: 1000
+                  target:
+                    pk:
+                      c_personid: 1000
+                      c_alt_name_chn: 子美
+                      c_alt_name_type_code: 4
+                  changes:
+                    c_sequence: 2
+      responses:
+        '200':
+          description: Update succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '501':
+          $ref: '#/components/responses/UnsupportedMode'
+  /api/v2/delete:
+    post:
+      tags: [Mutation API]
+      summary: Delete a resource record
+      operationId: deleteResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRequest'
+            examples:
+              deleteAltName:
+                summary: Delete one alt name record
+                value:
+                  resource: altnames
+                  mode: direct
+                  person_id: 1000
+                  target:
+                    pk:
+                      c_personid: 1000
+                      c_alt_name_chn: 子美
+                      c_alt_name_type_code: 4
+      responses:
+        '200':
+          description: Delete succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '501':
+          $ref: '#/components/responses/UnsupportedMode'
+  /api/v2/get:
+    get:
+      tags: [Mutation API]
+      summary: Read a single resource record by primary key
+      operationId: getResourceByPkViaQuery
+      description: |
+        Compatibility form of the single-record read endpoint.
+        Nested query parameters should follow Laravel array syntax, for example:
+        `?resource=altnames&person_id=1000&target[pk][c_personid]=1000&target[pk][c_alt_name_chn]=子美&target[pk][c_alt_name_type_code]=4`
+      parameters:
+        - $ref: '#/components/parameters/Resource'
+        - $ref: '#/components/parameters/PersonId'
+      responses:
+        '200':
+          description: Record found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '501':
+          $ref: '#/components/responses/UnsupportedGetMode'
+    post:
+      tags: [Mutation API]
+      summary: Read a single resource record by primary key
+      operationId: getResourceByPk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetRequest'
+            examples:
+              getAltName:
+                summary: Read one alt name record
+                value:
+                  resource: altnames
+                  person_id: 1000
+                  target:
+                    pk:
+                      c_personid: 1000
+                      c_alt_name_chn: 子美
+                      c_alt_name_type_code: 4
+      responses:
+        '200':
+          description: Record found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '501':
+          $ref: '#/components/responses/UnsupportedGetMode'
+components:
+  parameters:
+    Resource:
+      name: resource
+      in: query
+      required: true
+      schema:
+        type: string
+      description: Logical resource name such as `basicinformation`, `altnames`, `addresses`, `entries`.
+    PersonId:
+      name: person_id
+      in: query
+      required: true
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+      description: Person identifier used for ownership and consistency checks.
+  responses:
+    Unauthorized:
+      description: Login required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            ok: false
+            message: Unauthenticated.
+    Forbidden:
+      description: Authenticated but not active or not authorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            ok: false
+            message: 該使用者沒有權限，請聯繫管理員
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnsupportedMode:
+      description: Resource or mode is not implemented for mutation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnsupportedGetMode:
+      description: Resource is not implemented for get
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Target record was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    PkObject:
+      type: object
+      description: Composite or single primary key object. Property names depend on resource definition.
+      additionalProperties:
+        oneOf:
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+    TargetObject:
+      type: object
+      required: [pk]
+      properties:
+        pk:
+          $ref: '#/components/schemas/PkObject'
+      additionalProperties: true
+    BaseMutationRequest:
+      type: object
+      required: [resource, person_id, target]
+      properties:
+        resource:
+          type: string
+        mode:
+          type: string
+          default: direct
+          enum: [direct, proposal]
+        person_id:
+          oneOf:
+            - type: integer
+            - type: string
+        target:
+          $ref: '#/components/schemas/TargetObject'
+        meta:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    MutateRequest:
+      allOf:
+        - $ref: '#/components/schemas/BaseMutationRequest'
+        - type: object
+          required: [changes]
+          properties:
+            operation:
+              type: string
+              default: update
+              enum: [update]
+            changes:
+              type: object
+              additionalProperties: true
+    CreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/BaseMutationRequest'
+        - type: object
+          properties:
+            changes:
+              type: object
+              additionalProperties: true
+    DeleteRequest:
+      allOf:
+        - $ref: '#/components/schemas/BaseMutationRequest'
+    GetRequest:
+      type: object
+      required: [resource, person_id, target]
+      properties:
+        resource:
+          type: string
+        person_id:
+          oneOf:
+            - type: integer
+            - type: string
+        target:
+          $ref: '#/components/schemas/TargetObject'
+      additionalProperties: true
+    MutationSuccessResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        resource:
+          type: string
+        mode:
+          type: string
+        operation:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    GetSuccessResponse:
+      type: object
+      required: [ok, resource, mode, operation, result]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        resource:
+          type: string
+        mode:
+          type: string
+          const: direct
+        operation:
+          type: string
+          const: get
+        result:
+          type: object
+          required: [pk, row]
+          properties:
+            pk:
+              $ref: '#/components/schemas/PkObject'
+            row:
+              type: object
+              additionalProperties: true
+          additionalProperties: true
+      additionalProperties: true
+    ErrorResponse:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              oneOf:
+                - type: string
+                - type: integer
+                - type: number
+                - type: boolean
+                - type: 'null'
+      additionalProperties: true

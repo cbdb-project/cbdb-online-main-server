@@ -26,9 +26,15 @@ Route::get('home', 'HomeController@index')->name('home');
 Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('dashboard');
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
 Route::get('cbdbapi/person', 'CbdbApiController@person');
+Route::get('openapi.yaml', function () {
+    return response()->file(base_path('docs/openapi/openapi.yaml'), [
+        'Content-Type' => 'application/yaml; charset=UTF-8',
+    ]);
+})->name('openapi.yaml');
 Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationController@store')->name('api.v2.mutate.web');
 Route::middleware(['auth.optional'])->post('api/v2/create', 'Api\\MutationController@create')->name('api.v2.create.web');
 Route::middleware(['auth.optional'])->post('api/v2/delete', 'Api\\MutationController@delete')->name('api.v2.delete.web');
+Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 

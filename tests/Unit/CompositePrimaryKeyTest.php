@@ -83,6 +83,25 @@ class CompositePrimaryKeyTest extends TestCase {
     }
 
     #[Test]
+    public function it_decodes_null_sentinel_from_request(): void {
+        $request = new Request([
+            'c_personid' => 12345,
+            'c_textid' => 678,
+            'c_pages' => 'NULL',
+        ]);
+
+        $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
+        $pk = CompositePrimaryKey::fromRequest($request, $schema);
+
+        $this->assertSame([
+            'c_personid' => 12345,
+            'c_textid' => 678,
+        ], $pk);
+        $this->assertArrayNotHasKey('c_pages', $pk);
+        $this->assertNull(CompositePrimaryKey::normalizeQueryValue('NULL'));
+    }
+
+    #[Test]
     public function it_can_build_query_string_correctly(): void {
         // 直接測試 http_build_query 的行為
         $params = [

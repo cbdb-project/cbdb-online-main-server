@@ -377,7 +377,7 @@ class BasicInformationSourcesController extends Controller {
         $schema = CompositePrimaryKey::SCHEMAS['BIOG_SOURCE_DATA'];
         $pk = [];
         foreach ($schema as $field) {
-            $value = $request->query($field);
+            $value = CompositePrimaryKey::normalizeQueryValue($request->query($field));
             if ($value !== null) {
                 $pk[$field] = $value;
             }

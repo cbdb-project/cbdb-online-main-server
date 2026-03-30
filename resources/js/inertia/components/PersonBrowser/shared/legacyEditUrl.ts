@@ -28,11 +28,11 @@ export function buildLegacyEditUrl(tabKey: string, pk: LegacyPk, fallbackPersonI
 
     const params = new URLSearchParams();
     Object.entries(pk).forEach(([key, value]) => {
-        if (value === null || value === undefined) {
+        if (value === undefined) {
             return;
         }
 
-        params.set(key, String(value));
+        params.set(key, value === null ? 'NULL' : String(value));
     });
 
     const query = params.toString();

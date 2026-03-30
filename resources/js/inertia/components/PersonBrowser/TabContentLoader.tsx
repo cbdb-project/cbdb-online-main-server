@@ -32,7 +32,7 @@ interface TabState {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type TypedTabComponent = React.ComponentType<{ data: any }>;
+type TypedTabComponent = React.ComponentType<{ data: any; canEdit: boolean }>;
 
 const TAB_COMPONENTS: Record<string, TypedTabComponent> = {
     alt_names: AltNamesTab,
@@ -175,7 +175,7 @@ export default function TabContentLoader({
     // 其他 tabs：使用各自的 typed component
     const TabComponent = TAB_COMPONENTS[activeTab];
     if (TabComponent) {
-        return <TabComponent data={state.data} />;
+        return <TabComponent data={state.data} canEdit={canEditBasicInfo} />;
     }
 
     // Fallback（不應出現，但作為安全後備）

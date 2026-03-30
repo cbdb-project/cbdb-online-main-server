@@ -41,6 +41,20 @@ export function buildLegacyEditUrl(tabKey: string, pk: LegacyPk, fallbackPersonI
     return query ? `${path}?${query}` : path;
 }
 
+export function buildLegacyCreateUrl(tabKey: string, fallbackPersonId?: number | null): string | null {
+    const segment = TAB_SEGMENTS[tabKey];
+    if (!segment) {
+        return null;
+    }
+
+    const personId = normalizePersonId(fallbackPersonId ?? getCurrentPersonIdFromLocation());
+    if (personId === null) {
+        return null;
+    }
+
+    return `/basicinformation/${personId}/${segment}/create`;
+}
+
 function normalizePersonId(...values: Array<string | number | boolean | null | undefined>): number | null {
     for (const value of values) {
         if (typeof value === 'number' && Number.isFinite(value)) {

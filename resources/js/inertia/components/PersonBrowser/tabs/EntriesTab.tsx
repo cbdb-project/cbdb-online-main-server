@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
@@ -34,24 +35,23 @@ interface EntryItem {
 
 interface Props {
     data: { tab: string; items: EntryItem[] };
+    canEdit: boolean;
 }
 
-export default function EntriesTab({ data }: Props) {
+export default function EntriesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="entries" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="入仕方式" value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="親屬關聯" value={item.kin_summary} />
                     <MetaRow label="社會關聯" value={item.assoc_summary} />
-                    <LegacyEditButton tabKey="entries" pk={item.pk} />
+                    <LegacyEditButton tabKey="entries" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

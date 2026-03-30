@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
@@ -27,17 +28,16 @@ interface AltNameItem {
 
 interface Props {
     data: { tab: string; items: AltNameItem[] };
+    canEdit: boolean;
 }
 
-export default function AltNamesTab({ data }: Props) {
+export default function AltNamesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="alt_names" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="別名" value={formatBilingualLabel(item.name_chn, item.name)} />
@@ -45,7 +45,7 @@ export default function AltNamesTab({ data }: Props) {
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
-                    <LegacyEditButton tabKey="alt_names" pk={item.pk} />
+                    <LegacyEditButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

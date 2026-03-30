@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
@@ -25,17 +26,16 @@ interface SourceItem {
 
 interface Props {
     data: { tab: string; items: SourceItem[] };
+    canEdit: boolean;
 }
 
-export default function SourcesTab({ data }: Props) {
+export default function SourcesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="sources" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <div style={headerStyle}>
@@ -47,7 +47,7 @@ export default function SourcesTab({ data }: Props) {
                     </div>
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
-                    <LegacyEditButton tabKey="sources" pk={item.pk} />
+                    <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

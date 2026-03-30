@@ -1,19 +1,18 @@
 import React from 'react';
-import { buildLegacyEditUrl, LegacyPk } from './legacyEditUrl';
+import { buildLegacyCreateUrl } from './legacyEditUrl';
 
 interface Props {
     tabKey: string;
-    pk: LegacyPk;
     canEdit: boolean;
     fallbackPersonId?: number | null;
 }
 
-export default function LegacyEditButton({ tabKey, pk, canEdit, fallbackPersonId }: Props) {
+export default function LegacyCreateButton({ tabKey, canEdit, fallbackPersonId }: Props) {
     if (!canEdit) {
         return null;
     }
 
-    const href = buildLegacyEditUrl(tabKey, pk, fallbackPersonId);
+    const href = buildLegacyCreateUrl(tabKey, fallbackPersonId);
     if (!href) {
         return null;
     }
@@ -21,16 +20,16 @@ export default function LegacyEditButton({ tabKey, pk, canEdit, fallbackPersonId
     return (
         <div style={containerStyle}>
             <a href={href} style={linkStyle}>
-                修改
+                新增
             </a>
         </div>
     );
 }
 
 const containerStyle: React.CSSProperties = {
-    marginTop: 10,
     display: 'flex',
     justifyContent: 'flex-end',
+    marginBottom: 8,
 };
 
 const linkStyle: React.CSSProperties = {
@@ -40,8 +39,8 @@ const linkStyle: React.CSSProperties = {
     minHeight: 30,
     padding: '0 12px',
     borderRadius: 4,
-    border: '1px solid #17a2b8',
-    color: '#17a2b8',
+    border: '1px solid #28a745',
+    color: '#28a745',
     backgroundColor: '#fff',
     textDecoration: 'none',
     fontSize: '0.875rem',

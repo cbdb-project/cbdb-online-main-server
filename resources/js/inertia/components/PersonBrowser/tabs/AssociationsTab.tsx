@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
@@ -35,17 +36,16 @@ interface AssociationItem {
 
 interface Props {
     data: { tab: string; items: AssociationItem[] };
+    canEdit: boolean;
 }
 
-export default function AssociationsTab({ data }: Props) {
+export default function AssociationsTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="associations" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.assoc_desc_chn, item.assoc_desc)} />
@@ -57,7 +57,7 @@ export default function AssociationsTab({ data }: Props) {
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
-                    <LegacyEditButton tabKey="associations" pk={item.pk} />
+                    <LegacyEditButton tabKey="associations" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

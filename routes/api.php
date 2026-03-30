@@ -17,6 +17,14 @@ Route::group([], function () {
     Route::match(['get', 'post'], 'name', 'Api\NameController@index');
 });
 
+Route::group([
+    'prefix' => 'v2',
+    'middleware' => ['auth.optional'],
+], function () {
+    Route::get('texts', 'Api\TextLookupController@index');
+    Route::get('texts/{textId}', 'Api\TextLookupController@show')->where('textId', '[0-9]+');
+});
+
 // Select APIs with optional authentication
 // Allows both authenticated users and guests to access
 Route::group([

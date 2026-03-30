@@ -8,6 +8,8 @@ import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface PossessionItem {
     pk: {
@@ -32,6 +34,7 @@ interface Props {
 
 export default function PossessionsTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
@@ -43,7 +46,7 @@ export default function PossessionsTab({ data, canEdit }: Props) {
                     <MetaRow label="行為" value={formatBilingualLabel(item.act_chn, item.act)} />
                     <MetaRow label="數量" value={item.quantity} />
                     <MetaRow label="年份" value={item.year} />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
                     <LegacyEditButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />

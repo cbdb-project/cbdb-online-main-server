@@ -8,6 +8,8 @@ import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface KinshipItem {
     pk: {
@@ -37,6 +39,7 @@ interface Props {
  */
 export default function KinshipTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
@@ -49,7 +52,7 @@ export default function KinshipTab({ data, canEdit }: Props) {
                         label="親屬"
                         value={formatPersonLabel(item.kin_person_id, item.kin_person_name_chn, item.kin_person_name)}
                     />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
                     <LegacyEditButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />

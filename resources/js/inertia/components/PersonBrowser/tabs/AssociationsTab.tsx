@@ -8,6 +8,8 @@ import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface AssociationItem {
     pk: {
@@ -41,6 +43,7 @@ interface Props {
 
 export default function AssociationsTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
@@ -54,7 +57,7 @@ export default function AssociationsTab({ data, canEdit }: Props) {
                         value={formatPersonLabel(item.assoc_person_id, item.assoc_person_name_chn, item.assoc_person_name)}
                     />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
                     <LegacyEditButton tabKey="associations" pk={item.pk} canEdit={canEdit} />

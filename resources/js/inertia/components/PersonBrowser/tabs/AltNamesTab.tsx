@@ -8,6 +8,8 @@ import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface AltNameItem {
     pk: {
@@ -33,6 +35,7 @@ interface Props {
 
 export default function AltNamesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
@@ -42,7 +45,7 @@ export default function AltNamesTab({ data, canEdit }: Props) {
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="別名" value={formatBilingualLabel(item.name_chn, item.name)} />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
                     <LegacyEditButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />

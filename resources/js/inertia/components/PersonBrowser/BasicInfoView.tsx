@@ -564,7 +564,7 @@ function renderEditor(
             </div>
 
             <div style={editorBottomBarStyle}>
-                <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，保存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
+                <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，儲存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
                 <button
                     type="button"
                     style={primaryButtonStyle}

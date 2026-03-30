@@ -412,9 +412,9 @@ export default function PersonBrowserIndex() {
 
             <SelectionDialog
                 isOpen={showUnsavedDialog}
-                title="尚有未保存修改"
+                title="尚有未儲存的修改"
                 description={basicInfoEditorState.dirty
-                    ? '目前的人物基本信息仍在編輯中，且有未保存修改。你可以先儲存，再切換到其他人物或頁籤。'
+                    ? '目前的人物基本信息仍在編輯中，且有未儲存的修改。你可以先儲存，再切換到其他人物或頁籤。'
                     : '目前仍停留在編輯模式。若不需要保留本次編輯，可直接離開。'}
                 width={560}
                 onClose={handleStayOnPage}

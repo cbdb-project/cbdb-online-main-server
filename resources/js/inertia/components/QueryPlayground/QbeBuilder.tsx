@@ -227,10 +227,10 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         persistHistoryEntries(nextHistory);
         setPersistenceNotice(
             reason === 'manual'
-                ? `已保存目前版本（${formatSavedAt(savedAt)}）`
+                ? `已儲存目前版本（${formatSavedAt(savedAt)}）`
                 : reason === 'generate'
-                    ? `已保存產生 SQL 前的版本（${formatSavedAt(savedAt)}）`
-                    : `已保存重設前的版本（${formatSavedAt(savedAt)}）`,
+                    ? `已儲存產生 SQL 前的版本（${formatSavedAt(savedAt)}）`
+                    : `已儲存重設前的版本（${formatSavedAt(savedAt)}）`,
         );
     }, [buildDraftState, historyEntries]);
 
@@ -407,8 +407,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 backgroundColor: '#f8f9fa',
             }}>
                 <div style={{ fontSize: '0.85rem', color: '#495057', marginBottom: 8 }}>
-                    QBE 草稿會自動保存在目前瀏覽器，離開頁面後可回來繼續編輯。
-                    {lastSavedAt ? ` 最近保存：${formatSavedAt(lastSavedAt)}` : ''}
+                    QBE 草稿會自動儲存在目前瀏覽器，離開頁面後可回來繼續編輯。
+                    {lastSavedAt ? ` 最近儲存：${formatSavedAt(lastSavedAt)}` : ''}
                 </div>
                 {persistenceNotice && (
                     <div style={{ fontSize: '0.8rem', color: '#0c5460', marginBottom: 8 }}>
@@ -417,7 +417,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button onClick={() => saveHistorySnapshot('manual')} style={smallBtnStyle}>
-                        保存目前版本
+                        儲存目前版本
                     </button>
                     <select
                         value={selectedHistoryId}

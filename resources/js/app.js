@@ -181,7 +181,7 @@ window.initAjaxSelect = function($el, model, options = {}) {
             },
             cache: true
         },
-        placeholder: '请搜索',
+        placeholder: '請搜尋',
         minimumInputLength: 1,
         width: '100%',
         theme: 'bootstrap4',

@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -46,6 +47,7 @@ export default function SourcesTab({ data }: Props) {
                     </div>
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="sources" pk={item.pk} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

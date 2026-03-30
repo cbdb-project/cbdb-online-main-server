@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -45,6 +46,7 @@ export default function AddressesTab({ data }: Props) {
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="addresses" pk={item.pk} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

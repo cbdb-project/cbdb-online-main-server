@@ -3,6 +3,7 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -44,6 +45,7 @@ export default function AltNamesTab({ data }: Props) {
                     <MetaRow label="出處" value={item.source_id} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="alt_names" pk={item.pk} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

@@ -418,18 +418,18 @@ function initEraConversion() {
         e.preventDefault();
         const $btn = $(this);
 
-        // 找到對應的公元年份輸入框
+        // 找到對應的西元年份輸入框
         const $container = $btn.closest('.d-flex').parent();
         const $yearInput = $container.find('.era-year-input').first();
 
         if (!$yearInput.length) {
-            console.error('找不到公元年份輸入框');
+            console.error('找不到西元年份輸入框');
             return;
         }
 
         const year = parseInt($yearInput.val(), 10);
         if (isNaN(year) || year === 0) {
-            alert('請先輸入有效的公元年份');
+            alert('請先輸入有效的西元年份');
             return;
         }
 
@@ -482,7 +482,7 @@ function initEraConversion() {
             let allResults = convertYear(year, { mode: 'all' });
 
             if (!allResults || allResults.length === 0) {
-                alert(`無法找到公元 ${year} 年對應的年號`);
+                alert(`無法找到西元 ${year} 年對應的年號`);
                 return;
             }
 
@@ -506,7 +506,7 @@ function initEraConversion() {
                             const $dynastyNameHidden = findRelatedHiddenInput($form, 'dynasty_name');
                             dynastyName = $dynastyNameHidden.length > 0 ? $dynastyNameHidden.val() : '所選朝代';
                         }
-                        alert(`所選朝代「${dynastyName}」在公元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
+                        alert(`所選朝代「${dynastyName}」在西元 ${year} 年沒有對應的年號。\n\n請檢查朝代選擇是否正確，或查看所有可能的年號選項。`);
                         // 仍顯示所有結果供用戶參考，但標記為不匹配
                         shouldWarnDynastyMismatch = true;
                     } else if (dynastyFilteredResults.length === 1) {
@@ -565,7 +565,7 @@ function initEraConversion() {
         }
     });
 
-    // 監聽反向轉換按鈕點擊事件（年號 → 公元年份）
+    // 監聽反向轉換按鈕點擊事件（年號 → 西元年份）
     $(document).on('click', '.era-reverse-convert-btn', function(e) {
         e.preventDefault();
         const $btn = $(this);
@@ -603,11 +603,11 @@ function initEraConversion() {
             // 直接使用年號 ID 進行轉換（使用 code 而非字串）
             convertNianhaoIdToYear(nianhaoId, nhYear).then(result => {
                 if (result.success) {
-                    // 填充公元年份並觸發 change 事件，以通知表單髒值檢測
+                    // 填充西元年份並觸發 change 事件，以通知表單髒值檢測
                     $yearInput.val(result.year).trigger('change');
 
                     // 顯示成功提示
-                    showConversionSuccess($btn, `公元 ${result.year} 年`, '將年號轉換為公元年份');
+                    showConversionSuccess($btn, `西元 ${result.year} 年`, '將年號轉換為西元年份');
                 } else {
                     alert(result.message || '轉換失敗');
                 }
@@ -625,16 +625,16 @@ function initEraConversion() {
 
 /**
  * 填充年號欄位的輔助函數
- * 使用公元年份和年份範圍精確匹配年號 ID，避免字串匹配的歧義
+ * 使用西元年份和年份範圍精確匹配年號 ID，避免字串匹配的歧義
  * @param {Object} eraResult - cn-era 返回的年號對象
- * @param {number} gregorianYear - 公元年份（用於精確匹配年份範圍）
+ * @param {number} gregorianYear - 西元年份（用於精確匹配年份範圍）
  */
 async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, nhYearName, $btn) {
     const reignTitle = eraResult.reign_title;
     const yearNum = eraResult.year;
 
     try {
-        // 使用年號名稱和公元年份精確查找 ID
+        // 使用年號名稱和西元年份精確查找 ID
         let nianhaoId = await findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum);
 
         // 如果精確匹配失敗，嘗試模糊匹配作為降級方案
@@ -646,7 +646,7 @@ async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, n
                 // 找到候選，詢問用戶是否使用
                 const confirmed = confirm(
                     `年號「${reignTitle}」的資料庫記錄與 cn-era 數據存在差異。\n\n` +
-                    `cn-era: ${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num} (公元 ${gregorianYear})\n` +
+                    `cn-era: ${eraResult.dynasty_name} ${reignTitle} ${eraResult.year_num} (西元 ${gregorianYear})\n` +
                     `資料庫: ${fallbackResult.dbInfo}\n\n` +
                     `是否使用資料庫中的記錄？\n` +
                     `（選擇「取消」將放棄轉換）`
@@ -692,7 +692,7 @@ async function fillEraFields(eraResult, gregorianYear, $container, nhCodeName, n
 /**
  * 顯示年號選擇對話框
  * @param {Array} results - cn-era 返回的年號選項陣列
- * @param {number} gregorianYear - 公元年份
+ * @param {number} gregorianYear - 西元年份
  * @param {boolean} isDynastyMismatch - 是否為朝代不匹配的情況
  * @param {Function} onSelect - 選擇回調函數
  */
@@ -768,10 +768,10 @@ function showEraSelectionDialog(results, gregorianYear, isDynastyMismatch, onSel
 }
 
 /**
- * 根據年號名稱和公元年份精確查找年號 ID
+ * 根據年號名稱和西元年份精確查找年號 ID
  * 使用年份範圍匹配，避免同名年號的歧義
  * @param {string} reignTitle - 年號名稱
- * @param {number} gregorianYear - 公元年份
+ * @param {number} gregorianYear - 西元年份
  * @param {number} yearNum - 年號年數（用於驗證）
  */
 async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
@@ -824,7 +824,7 @@ async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
             const firstYear = parseInt(rangeMatch[1], 10);
             const lastYear = parseInt(rangeMatch[2], 10);
 
-            // 檢查公元年份是否在範圍內
+            // 檢查西元年份是否在範圍內
             if (gregorianYear >= firstYear && gregorianYear <= lastYear) {
                 // 額外驗證：計算的年數是否匹配
                 const calculatedYearNum = gregorianYear - firstYear + 1;
@@ -849,7 +849,7 @@ async function findNianhaoIdByNameAndYear(reignTitle, gregorianYear, yearNum) {
  * 模糊匹配年號 ID（降級方案）
  * 當精確匹配失敗時，使用名稱匹配並返回最接近的候選
  * @param {string} reignTitle - 年號名稱
- * @param {number} gregorianYear - 公元年份（用於顯示資訊）
+ * @param {number} gregorianYear - 西元年份（用於顯示資訊）
  * @param {number} yearNum - 年號年數（用於顯示資訊）
  * @returns {Promise<{found: boolean, id: number|null, dbInfo: string}>}
  */
@@ -1050,7 +1050,7 @@ async function getDynastyRanges() {
 }
 
 /**
- * 根據年號 ID 和年數轉換為公元年份
+ * 根據年號 ID 和年數轉換為西元年份
  * 直接使用資料庫的年號記錄進行計算，避免字串匹配的歧義
  * @param {string|number} nianhaoId - 年號 ID (c_nianhao_id)
  * @param {number} yearNum - 年號年數
@@ -1097,11 +1097,11 @@ async function convertNianhaoIdToYear(nianhaoId, yearNum) {
         if (yearNum < 1 || yearNum > duration) {
             return {
                 success: false,
-                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間\n（年號範圍：公元 ${firstYear}-${lastYear}）`,
+                message: `年號 ${nianhaoRecord.c_nianhao_chn} 的年數應在 1-${duration} 之間\n（年號範圍：西元 ${firstYear}-${lastYear}）`,
             };
         }
 
-        // 計算公元年份
+        // 計算西元年份
         const year = firstYear + yearNum - 1;
 
         return {
@@ -1120,7 +1120,7 @@ async function convertNianhaoIdToYear(nianhaoId, yearNum) {
 }
 
 /**
- * 根據年號名稱、年數和朝代反向轉換為公元年份
+ * 根據年號名稱、年數和朝代反向轉換為西元年份
  * 使用二分搜索優化性能
  * @param {string} reignTitle - 年號名稱
  * @param {number} yearNum - 年號年數
@@ -1237,8 +1237,8 @@ async function convertReignToYear(reignTitle, yearNum, dynastyCode = null) {
         }
 
         const message = dynastyCode
-            ? `在指定朝代中找不到「${reignTitle} ${yearNum}年」的對應公元年份`
-            : `找不到「${reignTitle} ${yearNum}年」的對應公元年份`;
+            ? `在指定朝代中找不到「${reignTitle} ${yearNum}年」的對應西元年份`
+            : `找不到「${reignTitle} ${yearNum}年」的對應西元年份`;
 
         return {
             success: false,

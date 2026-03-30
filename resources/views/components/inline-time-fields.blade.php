@@ -53,13 +53,13 @@
             <div class="d-flex mr-3">
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary era-convert-btn"
-                        title="將公元年份轉換為年號"
+                        title="將西元年份轉換為年號"
                         data-toggle="tooltip">
                     <i class="fas fa-arrow-right"></i>
                 </button>
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary era-reverse-convert-btn ml-1"
-                        title="將年號轉換為公元年份"
+                        title="將年號轉換為西元年份"
                         data-toggle="tooltip">
                     <i class="fas fa-arrow-left"></i>
                 </button>

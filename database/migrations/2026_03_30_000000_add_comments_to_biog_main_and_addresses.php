@@ -7,7 +7,8 @@ return new class () extends Migration {
     /**
      * Run the migrations.
      *
-     * Add column/table comments to BIOG_MAIN name fields and ADDRESSES table.
+     * Add column/table comments to BIOG_MAIN, ADDRESSES, operations, and users.
+     * (ai_fill_logs, audit_log, nl_query_logs already have comments in their CREATE migrations.)
      * Comments are MySQL/MariaDB only; SQLite does not support COMMENT syntax.
      */
     public function up(): void {
@@ -79,6 +80,22 @@ return new class () extends Migration {
         ];
 
         $this->batchModifyComments('ADDRESSES', $addressesComments);
+
+        // =====================================================================
+        // operations — op_type column comment (手動加的，無對應 CREATE migration)
+        // =====================================================================
+
+        $this->batchModifyComments('operations', [
+            'op_type' => '1.Popst(Create) 2.Put(Update 全部信息) 3. Patch(Update 部分属性) 4.Delete(Delete)',
+        ]);
+
+        // =====================================================================
+        // users — is_active column comment (手動加的，無對應 CREATE migration)
+        // =====================================================================
+
+        $this->batchModifyComments('users', [
+            'is_active' => '0 未验证， 2 激活邮件， 1 有编辑权限',
+        ]);
     }
 
     /**
@@ -114,6 +131,12 @@ return new class () extends Migration {
         ];
 
         $this->batchRemoveComments('ADDRESSES', $addressesColumns);
+
+        // Remove operations column comments
+        $this->batchRemoveComments('operations', ['op_type']);
+
+        // Remove users column comments
+        $this->batchRemoveComments('users', ['is_active']);
     }
 
     /**

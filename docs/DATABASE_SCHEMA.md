@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-02-24 01:37:20
+> 生成時間：2026-03-31 15:54:20
 
 ## 目錄
 
@@ -15,32 +15,32 @@
 
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
-| `c_addr_id` | int(11) | YES | NULL |  |
-| `c_addr_cbd` | varchar(255) | YES | NULL |  |
-| `c_name` | varchar(255) | YES | NULL |  |
-| `c_name_chn` | varchar(255) | YES | NULL |  |
-| `c_admin_type` | varchar(255) | YES | NULL |  |
-| `c_firstyear` | smallint(6) | YES | NULL |  |
-| `c_lastyear` | smallint(6) | YES | NULL |  |
-| `c_belongs_firstyear` | smallint(6) | YES | NULL |  |
-| `c_belongs_lastyear` | smallint(6) | YES | NULL |  |
-| `x_coord` | double | YES | NULL |  |
-| `y_coord` | double | YES | NULL |  |
-| `belongs1_ID` | int(11) | YES | NULL |  |
-| `belongs1_Name` | varchar(255) | YES | NULL |  |
-| `belongs1_Name_chn` | varchar(255) | YES | NULL |  |
-| `belongs2_ID` | int(11) | YES | NULL |  |
-| `belongs2_Name` | varchar(255) | YES | NULL |  |
-| `belongs2_Name_chn` | varchar(255) | YES | NULL |  |
-| `belongs3_ID` | int(11) | YES | NULL |  |
-| `belongs3_Name` | varchar(255) | YES | NULL |  |
-| `belongs3_Name_chn` | varchar(255) | YES | NULL |  |
-| `belongs4_ID` | int(11) | YES | NULL |  |
-| `belongs4_Name` | varchar(255) | YES | NULL |  |
-| `belongs4_Name_chn` | varchar(255) | YES | NULL |  |
-| `belongs5_ID` | int(11) | YES | NULL |  |
-| `belongs5_Name` | varchar(255) | YES | NULL |  |
-| `belongs5_Name_chn` | varchar(255) | YES | NULL |  |
+| `c_addr_id` | int(11) | YES | NULL | Address ID; FK to ADDR_CODES.c_addr_id (not enforced). Multiple rows may exist per address for different time segments |
+| `c_addr_cbd` | varchar(255) | YES | NULL | Legacy CBDB address code from ADDR_CODES |
+| `c_name` | varchar(255) | YES | NULL | Romanized address name from ADDR_CODES.c_name |
+| `c_name_chn` | varchar(255) | YES | NULL | Chinese address name from ADDR_CODES.c_name_chn |
+| `c_admin_type` | varchar(255) | YES | NULL | Administrative unit type (e.g. zhou, fu, xian) from ADDR_CODES.c_admin_type |
+| `c_firstyear` | smallint(6) | YES | NULL | First year this address was active (from ADDR_CODES) |
+| `c_lastyear` | smallint(6) | YES | NULL | Last year this address was active (from ADDR_CODES) |
+| `c_belongs_firstyear` | smallint(6) | YES | NULL | First year this hierarchy chain is valid; derived as max(addr_first, belongs_first) across all levels |
+| `c_belongs_lastyear` | smallint(6) | YES | NULL | Last year this hierarchy chain is valid; derived as min(addr_last, belongs_last) across all levels |
+| `x_coord` | double | YES | NULL | Longitude (x-coordinate) from ADDR_CODES |
+| `y_coord` | double | YES | NULL | Latitude (y-coordinate) from ADDR_CODES |
+| `belongs1_ID` | int(11) | YES | NULL | Level-1 parent address ID (immediate parent) |
+| `belongs1_Name` | varchar(255) | YES | NULL | Level-1 parent romanized name |
+| `belongs1_Name_chn` | varchar(255) | YES | NULL | Level-1 parent Chinese name |
+| `belongs2_ID` | int(11) | YES | NULL | Level-2 parent address ID |
+| `belongs2_Name` | varchar(255) | YES | NULL | Level-2 parent romanized name |
+| `belongs2_Name_chn` | varchar(255) | YES | NULL | Level-2 parent Chinese name |
+| `belongs3_ID` | int(11) | YES | NULL | Level-3 parent address ID |
+| `belongs3_Name` | varchar(255) | YES | NULL | Level-3 parent romanized name |
+| `belongs3_Name_chn` | varchar(255) | YES | NULL | Level-3 parent Chinese name |
+| `belongs4_ID` | int(11) | YES | NULL | Level-4 parent address ID |
+| `belongs4_Name` | varchar(255) | YES | NULL | Level-4 parent romanized name |
+| `belongs4_Name_chn` | varchar(255) | YES | NULL | Level-4 parent Chinese name |
+| `belongs5_ID` | int(11) | YES | NULL | Level-5 parent address ID |
+| `belongs5_Name` | varchar(255) | YES | NULL | Level-5 parent romanized name |
+| `belongs5_Name_chn` | varchar(255) | YES | NULL | Level-5 parent Chinese name |
 
 **索引**:
 
@@ -162,6 +162,7 @@
 | `id` | bigint(20) unsigned | NO | (NULL) |  [AUTO_INCREMENT] |
 | `user_id` | bigint(20) unsigned | NO | (NULL) | 執行填充的用戶 ID |
 | `c_personid` | int(11) | NO | (NULL) | 目標人物 ID |
+| `category` | varchar(20) | NO | 'posting' |  |
 | `route_name` | varchar(255) | NO | (NULL) | 路由名稱 |
 | `route_url` | varchar(500) | NO | (NULL) | 頁面 URL 路徑 |
 | `source_text` | text | NO | (NULL) | 用戶輸入的原始史料文本 |
@@ -182,6 +183,7 @@
 - `ai_fill_logs_c_personid_index`: (c_personid)
 - `ai_fill_logs_success_index`: (success)
 - `ai_fill_logs_created_at_index`: (created_at)
+- `ai_fill_logs_category_index`: (category)
 
 ---
 
@@ -603,8 +605,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
-| `c_name` | varchar(255) | YES | NULL |  |
-| `c_name_chn` | varchar(255) | YES | NULL |  |
+| `c_name` | varchar(255) | YES | NULL | Hanyu Pinyin full name; auto-generated: c_surname + " " + c_mingzi |
+| `c_name_chn` | varchar(255) | YES | NULL | Chinese full name; auto-generated: c_surname_chn + c_mingzi_chn (no space) |
 | `c_index_year` | smallint(6) | YES | NULL |  |
 | `c_index_year_type_code` | varchar(255) | YES | NULL |  |
 | `c_index_year_source_id` | int(11) | YES | NULL |  |
@@ -632,10 +634,10 @@
 | `c_fl_ly_nh_code` | smallint(6) | YES | NULL |  |
 | `c_fl_ly_nh_year` | smallint(6) | YES | NULL |  |
 | `c_fl_ly_notes` | longtext | YES | NULL |  |
-| `c_surname` | varchar(255) | YES | NULL |  |
-| `c_surname_chn` | varchar(255) | YES | NULL |  |
-| `c_mingzi` | varchar(255) | YES | NULL |  |
-| `c_mingzi_chn` | varchar(255) | YES | NULL |  |
+| `c_surname` | varchar(255) | YES | NULL | Hanyu Pinyin romanization of the person's surname; auto-generated from c_surname_chn via pinyin lookup table |
+| `c_surname_chn` | varchar(255) | YES | NULL | Chinese surname; split from c_name_chn by matching longest known surname in pinyin table |
+| `c_mingzi` | varchar(255) | YES | NULL | Hanyu Pinyin romanization of the person's given name (excluding surname); auto-generated from c_mingzi_chn |
+| `c_mingzi_chn` | varchar(255) | YES | NULL | Chinese given name (excluding surname); remainder of c_name_chn after surname extraction |
 | `c_dy` | smallint(6) | YES | NULL |  |
 | `c_choronym_code` | smallint(6) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
@@ -647,15 +649,14 @@
 | `c_dy_day` | smallint(6) | YES | NULL |  |
 | `c_by_day_gz` | smallint(6) | YES | NULL |  |
 | `c_dy_day_gz` | smallint(6) | YES | NULL |  |
-| `c_surname_proper` | varchar(255) | YES | NULL |  |
-| `c_mingzi_proper` | varchar(255) | YES | NULL |  |
-| `c_name_proper` | varchar(255) | YES | NULL |  |
-| `c_surname_rm` | varchar(255) | YES | NULL |  |
-| `c_mingzi_rm` | varchar(255) | YES | NULL |  |
-| `c_name_rm` | varchar(255) | YES | NULL |  |
+| `c_surname_proper` | varchar(255) | YES | NULL | Surname in the person's native language (non-Chinese), if applicable; user-editable |
+| `c_mingzi_proper` | varchar(255) | YES | NULL | Given name in the person's native language (non-Chinese, excluding surname), if applicable; user-editable |
+| `c_name_proper` | varchar(255) | YES | NULL | Full name in the person's native language; auto-generated: c_mingzi_proper + " " + c_surname_proper (given-name-first order) |
+| `c_surname_rm` | varchar(255) | YES | NULL | Non-Pinyin romanization of the person's surname (e.g. Wade-Giles, McCune-Reischauer), if applicable; user-editable |
+| `c_mingzi_rm` | varchar(255) | YES | NULL | Non-Pinyin romanization of the person's given name (excluding surname), if applicable; user-editable |
+| `c_name_rm` | varchar(255) | YES | NULL | Non-Pinyin romanized full name; auto-generated: c_mingzi_rm + " " + c_surname_rm (given-name-first order) |
 | `c_created_by` | varchar(255) | YES | NULL |  |
 | `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_self_bio` | smallint(6) | YES | NULL |  |
 | `c_created_date` | datetime | YES | NULL |  |
 | `c_modified_date` | datetime | YES | NULL |  |
 
@@ -2366,8 +2367,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_personid` | int(11) | NO | (NULL) |  |
-| `c_name` | varchar(255) | YES | NULL |  |
-| `c_name_chn` | varchar(255) | YES | NULL |  |
+| `c_name` | varchar(255) | YES | NULL | Hanyu Pinyin full name; auto-generated: c_surname + " " + c_mingzi |
+| `c_name_chn` | varchar(255) | YES | NULL | Chinese full name; auto-generated: c_surname_chn + c_mingzi_chn (no space) |
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_name_hz` | varchar(255) | YES | NULL |  |
@@ -2949,7 +2950,6 @@
 | `c_name_rm` | varchar(255) | YES | NULL |  |
 | `c_created_by` | varchar(255) | YES | NULL |  |
 | `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_self_bio` | INTEGER | YES | NULL |  |
 | `c_created_date` | datetime | YES | (NULL) |  |
 | `c_modified_date` | datetime | YES | (NULL) |  |
 
@@ -4315,9 +4315,11 @@
 | `submitted_at` | datetime | YES | (NULL) |  |
 | `created_at` | datetime | YES | (NULL) |  |
 | `updated_at` | datetime | YES | (NULL) |  |
+| `category` | varchar | NO | 'posting' |  |
 
 **索引**:
 
+- `ai_fill_logs_category_index`: (category)
 - `ai_fill_logs_created_at_index`: (created_at)
 - `ai_fill_logs_success_index`: (success)
 - `ai_fill_logs_c_personid_index`: (c_personid)

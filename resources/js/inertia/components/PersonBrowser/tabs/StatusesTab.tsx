@@ -3,9 +3,13 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface StatusItem {
     pk: {
@@ -26,24 +30,25 @@ interface StatusItem {
 
 interface Props {
     data: { tab: string; items: StatusItem[] };
+    canEdit: boolean;
 }
 
-export default function StatusesTab({ data }: Props) {
+export default function StatusesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="statuses" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="身份" value={formatBilingualLabel(item.status_chn, item.status)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="statuses" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

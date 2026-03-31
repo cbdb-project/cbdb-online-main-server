@@ -3,9 +3,13 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatPersonLabel, formatYearRange } from '../shared/formatters';
+import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { formatTextTitle } from '../shared/textLookup';
+import { useTextCodes } from '../shared/useTextCodes';
 
 interface AssociationItem {
     pk: {
@@ -34,28 +38,30 @@ interface AssociationItem {
 
 interface Props {
     data: { tab: string; items: AssociationItem[] };
+    canEdit: boolean;
+    onSelectPerson?: (personId: number) => void;
 }
 
-export default function AssociationsTab({ data }: Props) {
+export default function AssociationsTab({ data, canEdit, onSelectPerson }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
+    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="associations" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.assoc_desc_chn, item.assoc_desc)} />
                     <MetaRow
                         label="關聯人物"
-                        value={formatPersonLabel(item.assoc_person_id, item.assoc_person_name_chn, item.assoc_person_name)}
+                        value={renderAssociationPerson(item, onSelectPerson)}
                     />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
-                    <MetaRow label="出處" value={item.source_id} />
+                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="associations" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -67,4 +73,35 @@ const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
+};
+
+function renderAssociationPerson(item: AssociationItem, onSelectPerson?: (personId: number) => void): React.ReactNode {
+    if (!item.assoc_person_id) {
+        return null;
+    }
+
+    const label = formatBilingualLabel(item.assoc_person_name_chn, item.assoc_person_name);
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => onSelectPerson?.(item.assoc_person_id as number)}
+                style={linkButtonStyle}
+            >
+                [{item.assoc_person_id}]
+            </button>
+            {label ? ` ${label}` : null}
+        </>
+    );
+}
+
+const linkButtonStyle: React.CSSProperties = {
+    border: 'none',
+    background: 'none',
+    padding: 0,
+    color: '#007bff',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    font: 'inherit',
 };

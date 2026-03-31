@@ -109,7 +109,9 @@ class PersonBrowserTest extends TestCase {
             CREATE TABLE IF NOT EXISTS ADDR_CODES (
                 c_addr_id INTEGER PRIMARY KEY,
                 c_name VARCHAR(255),
-                c_name_chn VARCHAR(255)
+                c_name_chn VARCHAR(255),
+                x_coord DOUBLE,
+                y_coord DOUBLE
             )
         ');
 
@@ -168,7 +170,8 @@ class PersonBrowserTest extends TestCase {
                 c_textid INTEGER PRIMARY KEY,
                 c_title VARCHAR(255),
                 c_title_chn VARCHAR(255),
-                c_text_year INT
+                c_text_year INT,
+                c_url_homepage VARCHAR(255)
             )
         ');
 
@@ -457,8 +460,8 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('ADDR_CODES')->insert([
-            ['c_addr_id' => 100, 'c_name' => 'Chang An', 'c_name_chn' => '長安'],
-            ['c_addr_id' => 101, 'c_name' => 'Luoyang', 'c_name_chn' => '洛陽'],
+            ['c_addr_id' => 100, 'c_name' => 'Chang An', 'c_name_chn' => '長安', 'x_coord' => 108.9398, 'y_coord' => 34.3416],
+            ['c_addr_id' => 101, 'c_name' => 'Luoyang', 'c_name_chn' => '洛陽', 'x_coord' => 112.4540, 'y_coord' => 34.6197],
         ]);
 
         DB::table('ETHNICITY_TRIBE_CODES')->insert([
@@ -623,7 +626,7 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('TEXT_CODES')->insert([
-            ['c_textid' => 1, 'c_title' => 'New Tang Book', 'c_title_chn' => '新唐書', 'c_text_year' => 1060],
+            ['c_textid' => 1, 'c_title' => 'New Tang Book', 'c_title_chn' => '新唐書', 'c_text_year' => 1060, 'c_url_homepage' => 'https://example.com/texts/1'],
         ]);
 
         DB::table('TEXT_ROLE_CODES')->insert([
@@ -1095,7 +1098,7 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('tab', 'addresses');
         $response->assertJsonStructure([
             'tab',
-            'items' => [['pk', 'sequence', 'addr_id', 'addr_chn', 'addr', 'type_label_chn', 'type_label', 'first_year', 'last_year', 'notes']],
+            'items' => [['pk', 'sequence', 'addr_id', 'addr_chn', 'addr', 'type_label_chn', 'type_label', 'first_year', 'last_year', 'longitude', 'latitude', 'notes']],
         ]);
         $response->assertJsonPath('items.0.pk.c_personid', 1);
         $response->assertJsonPath('items.0.pk.c_addr_id', 100);
@@ -1104,6 +1107,8 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('items.0.addr_chn', '長安');
         $response->assertJsonPath('items.0.type_label_chn', '居住地');
         $response->assertJsonPath('items.0.first_year', 730);
+        $response->assertJsonPath('items.0.longitude', 108.9398);
+        $response->assertJsonPath('items.0.latitude', 34.3416);
     }
 
     #[Test]

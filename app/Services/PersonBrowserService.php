@@ -513,6 +513,8 @@ class PersonBrowserService {
                 'BIOG_ADDR_DATA.c_addr_id',
                 'AC.c_name_chn AS addr_chn',
                 'AC.c_name AS addr',
+                'AC.x_coord',
+                'AC.y_coord',
                 'BIOG_ADDR_DATA.c_addr_type',
                 'BAC.c_addr_desc_chn',
                 'BAC.c_addr_desc',
@@ -545,6 +547,8 @@ class PersonBrowserService {
                 'type_label' => $r->c_addr_desc,
                 'first_year' => $r->c_firstyear,
                 'last_year' => $r->c_lastyear,
+                'longitude' => $r->x_coord,
+                'latitude' => $r->y_coord,
                 'notes' => $r->c_notes,
             ])->values()->all(),
         ];

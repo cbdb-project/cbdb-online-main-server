@@ -3,6 +3,8 @@ import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
+import LegacyCreateButton from '../shared/LegacyCreateButton';
+import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -23,28 +25,45 @@ interface AddressItem {
     type_label: string | null;
     first_year: number | null;
     last_year: number | null;
+    longitude: number | null;
+    latitude: number | null;
     notes: string | null;
 }
 
 interface Props {
     data: { tab: string; items: AddressItem[] };
+    canEdit: boolean;
 }
 
-export default function AddressesTab({ data }: Props) {
+export default function AddressesTab({ data, canEdit }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
-
-    if (data.items.length === 0) {
-        return <EmptyState />;
-    }
 
     return (
         <div style={containerStyle}>
+            <LegacyCreateButton tabKey="addresses" canEdit={canEdit} />
+            {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="地址" value={formatBilingualLabel(item.addr_chn, item.addr)} />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
                     <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow
+                        label="經緯度"
+                        value={
+                            item.latitude !== null && item.longitude !== null ? (
+                                <a
+                                    href={buildOpenStreetMapUrl(item.latitude, item.longitude)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={linkStyle}
+                                >
+                                    {`${item.longitude}, ${item.latitude}`}
+                                </a>
+                            ) : null
+                        }
+                    />
                     <MetaRow label="備註" value={item.notes} />
+                    <LegacyEditButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -57,3 +76,12 @@ const containerStyle: React.CSSProperties = {
     flexDirection: 'column',
     gap: 8,
 };
+
+const linkStyle: React.CSSProperties = {
+    color: '#007bff',
+    textDecoration: 'none',
+};
+
+function buildOpenStreetMapUrl(latitude: number, longitude: number): string {
+    return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=12/${latitude}/${longitude}`;
+}

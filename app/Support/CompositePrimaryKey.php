@@ -165,10 +165,28 @@ class CompositePrimaryKey {
      * @return array 包含欄位值的關聯陣列（過濾掉 null 和空字串）
      */
     public static function fromRequest(Request $request, array $fields): array {
-        return array_filter(
-            $request->only($fields),
-            fn ($value) => $value !== null
-        );
+        $values = [];
+        foreach ($fields as $field) {
+            $value = self::normalizeQueryValue($request->input($field));
+            if ($value !== null) {
+                $values[$field] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * 將查詢字串中的特殊保留值還原為實際值。
+     *
+     * 目前主要處理 buildUrl()/buildStoredResourceId() 使用的 'NULL' 哨兵值，
+     * 避免 query-string 在往返過程中把 null 與缺少欄位混為一談。
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    public static function normalizeQueryValue(mixed $value): mixed {
+        return $value === 'NULL' ? null : $value;
     }
 
     /**

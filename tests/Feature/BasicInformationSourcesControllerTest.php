@@ -27,6 +27,8 @@ class BasicInformationSourcesControllerTest extends TestCase {
             'database' => ':memory:',
             'prefix' => '',
         ]);
+        Config::set('prometheus.enabled', false);
+        Config::set('prometheus.storage_adapter', 'memory');
 
         DB::purge('sqlite');
         DB::reconnect('sqlite');
@@ -34,7 +36,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         Schema::create('BIOG_SOURCE_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
             $table->integer('c_textid');
-            $table->string('c_pages');
+            $table->string('c_pages')->nullable();
             $table->text('c_notes')->nullable();
             $table->tinyInteger('c_main_source')->default(0);
             $table->tinyInteger('c_self_bio')->default(0);
@@ -308,7 +310,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
         ]);
     }
 
-    private function seedSourceRow(int $personid, int $textid, string $pages, string $notes = ''): void {
+    private function seedSourceRow(int $personid, int $textid, ?string $pages, string $notes = ''): void {
         DB::table('BIOG_SOURCE_DATA')->insert([
             'c_personid' => $personid,
             'c_textid' => $textid,
@@ -410,5 +412,46 @@ class BasicInformationSourcesControllerTest extends TestCase {
         );
 
         $response->assertStatus(400);
+    }
+
+    #[Test]
+    public function updateQuery_with_null_pages_query_hits_null_row(): void {
+        $this->actingAs($this->createWriterUser());
+
+        $this->seedSourceRow(100, 200, null, 'null-page-row');
+        $this->seedSourceRow(100, 200, '', 'empty-page-row');
+
+        $response = $this->patch(
+            route('basicinformation.sources.update.query', ['id' => 100])
+            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 200, 'c_pages' => 'NULL']),
+            [
+                'c_textid' => 200,
+                'c_pages' => 'new-page',
+                'c_notes' => 'updated-from-null',
+                'c_main_source' => 0,
+                'c_self_bio' => 0,
+                'action' => 'save',
+            ]
+        );
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 200,
+            'c_pages' => null,
+        ]);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 200,
+            'c_pages' => '',
+            'c_notes' => 'empty-page-row',
+        ]);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
+            'c_personid' => 100,
+            'c_textid' => 200,
+            'c_pages' => 'new-page',
+            'c_notes' => 'updated-from-null',
+        ]);
     }
 }

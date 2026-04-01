@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\NaturalLanguageQueryService;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -392,5 +393,179 @@ class HistoricalQaTest extends TestCase {
         $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
         $this->assertStringContainsString('no-cache, no-transform', (string) $response->headers->get('Cache-Control'));
         $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
+    }
+
+    // ──── LLM 空 content 處理 ────
+
+    /**
+     * 輔助：建立使用 partial mock 的 NaturalLanguageQueryService，
+     * 攔截 performLlmHttpRequest 以避免依賴 Http::fake() 或真實 curl。
+     * 這確保不論內部走 Laravel Http 或 curl_multi 路徑，測試都能正確攔截。
+     *
+     * @param  array|callable  $responses  固定回應陣列或依序返回的 callable
+     * @param  bool  $stubToolExecution  是否同時 stub executeToolCalls（避免碰到測試 DB 缺少資料表）
+     * @return NaturalLanguageQueryService
+     */
+    protected function mockLlmService(array|callable $responses, bool $stubToolExecution = false): NaturalLanguageQueryService {
+        Config::set('services.gemini.api_key', 'test-api-key');
+        Config::set('services.gemini.api_endpoint', 'https://fake-gemini.test/v1/chat/completions');
+
+        $methods = ['performLlmHttpRequest'];
+        if ($stubToolExecution) {
+            $methods[] = 'executeToolCalls';
+        }
+
+        $service = $this->getMockBuilder(NaturalLanguageQueryService::class)
+            ->setConstructorArgs([
+                $this->app->make(\App\Services\DatabaseSchemaService::class),
+                $this->app->make(\App\Services\NlQueryToolsService::class),
+            ])
+            ->onlyMethods($methods)
+            ->getMock();
+
+        if (is_callable($responses)) {
+            $service->method('performLlmHttpRequest')
+                ->willReturnCallback($responses);
+        } else {
+            $service->method('performLlmHttpRequest')
+                ->willReturn($responses);
+        }
+
+        if ($stubToolExecution) {
+            $service->method('executeToolCalls')
+                ->willReturnCallback(function (array $toolCalls) {
+                    return array_map(fn ($tc) => [
+                        'tool_call_id' => $tc['id'] ?? 'stub_id',
+                        'tool_name' => $tc['function']['name'] ?? 'unknown',
+                        'arguments' => json_decode($tc['function']['arguments'] ?? '{}', true),
+                        'status' => 'completed',
+                        'result' => ['stub' => true],
+                        'result_summary' => ['row_count' => 0],
+                    ], $toolCalls);
+                });
+        }
+
+        return $service;
+    }
+
+    #[Test]
+    public function qa_returns_error_when_llm_content_is_null() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 5);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => null],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('清代所有人物的任官記錄');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('未能生成回答', $result['error']);
+    }
+
+    #[Test]
+    public function qa_returns_error_when_llm_content_is_empty_string() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 5);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => ''],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('清代所有人物的任官記錄');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('未能生成回答', $result['error']);
+    }
+
+    // ──── QA 最終輪不套用 SQL structured output ────
+
+    #[Test]
+    public function qa_last_round_does_not_apply_sql_structured_output() {
+        Config::set('nl_query_tools.enabled', true);
+        Config::set('nl_query_tools.max_tool_calls', 2);
+
+        $callCount = 0;
+        $capturedRequests = [];
+
+        $service = $this->mockLlmService(function (array $requestData) use (&$callCount, &$capturedRequests) {
+            $callCount++;
+            $capturedRequests[] = $requestData;
+
+            if ($callCount === 1) {
+                return [
+                    'successful' => true,
+                    'status' => 200,
+                    'body' => '',
+                    'json' => [
+                        'choices' => [[
+                            'message' => [
+                                'role' => 'assistant',
+                                'content' => null,
+                                'tool_calls' => [[
+                                    'id' => 'call_1',
+                                    'type' => 'function',
+                                    'function' => [
+                                        'name' => 'get_code_values',
+                                        'arguments' => json_encode(['code_type' => 'dynasties']),
+                                    ],
+                                ]],
+                            ],
+                            'finish_reason' => 'tool_calls',
+                        ]],
+                    ],
+                ];
+            }
+
+            // 第 2 輪（最後一輪）
+            return [
+                'successful' => true,
+                'status' => 200,
+                'body' => '',
+                'json' => [
+                    'choices' => [[
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => json_encode([
+                                'answer_markdown' => '## 清代人物任官記錄查詢結果',
+                                'summary' => '清代人物任官記錄。',
+                                'sql_used' => [],
+                                'evidence' => [],
+                                'caveat' => '部分歷史背景為模型補充。',
+                            ]),
+                        ],
+                        'finish_reason' => 'stop',
+                    ]],
+                ],
+            ];
+        }, true);  // stubToolExecution: 避免碰到測試 DB 缺少資料表
+
+        $result = $service->answerQuestion('清代所有人物的任官記錄');
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('清代人物任官記錄', $result['answer_markdown']);
+
+        // 驗證確實發了 2 次 LLM 請求
+        $this->assertCount(2, $capturedRequests, '應發出 2 次 LLM 請求（1 次工具輪 + 1 次最終輪）');
+
+        // 驗證最後一輪沒有被套用 response_format
+        $lastRequest = $capturedRequests[count($capturedRequests) - 1];
+        $this->assertArrayNotHasKey('response_format', $lastRequest, '最後一輪 QA 請求不應套用 SQL 的 response_format');
     }
 }

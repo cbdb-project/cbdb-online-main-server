@@ -487,14 +487,26 @@ class NaturalLanguageQueryService {
             $allToolResults = [];
             $allSqlUsed = [];
 
+            // 預建不含工具描述的 system prompt，供最終輪使用
+            // Gemini 模型即使 request 不帶 tools，只要 system prompt 提及工具就會嘗試呼叫
+            $noToolSystemPrompt = $toolsEnabled
+                ? $this->buildQaSystemPrompt($schemaPrompt, false)
+                : null;
+
             while ($round < $maxRounds) {
                 $round++;
                 $allowTools = $toolsEnabled && $round < $maxRounds;
 
+                // 最終輪：替換 system prompt 為不含工具描述的版本，避免 Gemini MALFORMED_FUNCTION_CALL
+                $currentMessages = $messages;
+                if (!$allowTools && $noToolSystemPrompt !== null && !empty($currentMessages)) {
+                    $currentMessages[0] = ['role' => 'system', 'content' => $noToolSystemPrompt];
+                }
+
                 Log::info('歷史問答 LLM 輪次開始', [
                     'round' => $round,
                     'allow_tools' => $allowTools,
-                    'message_count' => count($messages),
+                    'message_count' => count($currentMessages),
                     'question_preview' => mb_substr($question, 0, 120),
                 ]);
 
@@ -504,7 +516,7 @@ class NaturalLanguageQueryService {
                     ]);
                 }
 
-                $response = $this->callLLMForQa($messages, $tools, $allowTools, $heartbeatCallback, $abortCheck);
+                $response = $this->callLLMForQa($currentMessages, $tools, $allowTools, $heartbeatCallback, $abortCheck);
 
                 if ($progressCallback) {
                     $progressCallback('status', [
@@ -573,6 +585,23 @@ class NaturalLanguageQueryService {
 
                 // 沒有工具調用 → 解析最終回答
                 $content = $data['choices'][0]['message']['content'] ?? '';
+
+                // 若 LLM 返回空 content（安全過濾、輸出截斷等），視為失敗
+                if (empty(trim($content))) {
+                    $finishReason = $data['choices'][0]['finish_reason'] ?? 'unknown';
+                    Log::warning('歷史問答 LLM 返回空 content', [
+                        'round' => $round,
+                        'finish_reason' => $finishReason,
+                    ]);
+
+                    $logData['error_message'] = "LLM 返回空回應（finish_reason: {$finishReason}）";
+                    $logData['llm_response'] = json_encode($data, JSON_UNESCAPED_UNICODE);
+                    $logData['execution_time_ms'] = (int) ((microtime(true) - $startTime) * 1000);
+                    $this->saveLog($logData);
+
+                    return ['success' => false, 'error' => 'LLM 未能生成回答，請稍後再試。'];
+                }
+
                 $parsed = $this->parseQaResponse($content);
 
                 $logData['llm_response'] = json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -750,8 +779,8 @@ PROMPT;
             return $this->callLLM($messages, $tools, true, $heartbeatCallback, $abortCheck);
         }
 
-        // 最終回答輪：不使用 structured output，讓模型自由回答 JSON
-        return $this->callLLM($messages, [], false, $heartbeatCallback, $abortCheck);
+        // 最終回答輪：不使用 structured output，讓模型依 system prompt 自由回覆 QA JSON
+        return $this->callLLM($messages, [], false, $heartbeatCallback, $abortCheck, false);
     }
 
     /**
@@ -779,6 +808,28 @@ PROMPT;
         $parsed = json_decode($jsonContent, true, 512, JSON_INVALID_UTF8_IGNORE);
 
         if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+            // 若 LLM 被強制回覆 SQL structured output 格式（{sql, explanation, error}），
+            // 將其轉換為 QA 格式
+            if (isset($parsed['sql']) && !isset($parsed['answer_markdown'])) {
+                $sqlText = $parsed['sql'] ?? '';
+                $explanation = $parsed['explanation'] ?? '';
+                $answerMd = '';
+                if ($explanation) {
+                    $answerMd .= $explanation . "\n\n";
+                }
+                if ($sqlText) {
+                    $answerMd .= "```sql\n{$sqlText}\n```";
+                }
+
+                return [
+                    'answer_markdown' => $answerMd ?: $content,
+                    'summary' => $explanation ?: '',
+                    'sql_used' => $sqlText ? [$sqlText] : [],
+                    'evidence' => [],
+                    'caveat' => $defaults['caveat'],
+                ];
+            }
+
             return [
                 'answer_markdown' => $parsed['answer_markdown'] ?? $content,
                 'summary' => $parsed['summary'] ?? '',
@@ -1248,7 +1299,8 @@ PROMPT;
         array $tools = [],
         bool $allowToolCalls = false,
         ?callable $heartbeatCallback = null,
-        ?callable $abortCheck = null
+        ?callable $abortCheck = null,
+        bool $useStructuredOutput = true
     ): array {
         try {
             $maxCompletionTokens = (int) config('services.gemini.max_completion_tokens', 8192);
@@ -1268,8 +1320,8 @@ PROMPT;
             if (!empty($tools) && $allowToolCalls) {
                 $requestData['tools'] = $tools;
                 $requestData['tool_choice'] = 'auto';
-            } else {
-                // 如果不允许工具调用，使用 structured output
+            } elseif ($useStructuredOutput) {
+                // SQL 生成模式：使用 structured output 強制回覆格式
                 $requestData['response_format'] = [
                     'type' => 'json_schema',
                     'json_schema' => [
@@ -1446,6 +1498,7 @@ PROMPT;
             CURLOPT_TIMEOUT => 45,
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_HEADER => false,
+            CURLOPT_ENCODING => '',  // 自動處理 gzip/deflate 壓縮回應
             CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$responseBody) {
                 $responseBody .= $chunk;
 

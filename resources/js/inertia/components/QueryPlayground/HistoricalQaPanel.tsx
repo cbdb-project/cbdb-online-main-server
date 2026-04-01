@@ -472,7 +472,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
 
 /**
  * Simple Markdown to HTML renderer.
- * Handles headings, bold, italic, lists, blockquotes, code blocks, and paragraphs.
+ * Handles headings, bold, italic, lists, blockquotes, code blocks, tables, and paragraphs.
  */
 function renderMarkdown(md: string): string {
     // Escape HTML first
@@ -508,6 +508,48 @@ function renderMarkdown(md: string): string {
 
     // Wrap consecutive <li> in <ul>
     html = html.replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="padding-left:8px;margin:8px 0;">$1</ul>');
+
+    // Markdown tables
+    html = html.replace(
+        /(^\|.+\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n(?:\|.+\|[ \t]*\n?)*)/gm,
+        (_tableBlock: string) => {
+            const lines = _tableBlock.trim().split('\n');
+            if (lines.length < 2) return _tableBlock;
+
+            const parseRow = (line: string) =>
+                line.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+
+            const headers = parseRow(lines[0]);
+
+            // Parse alignment from separator row
+            const separators = parseRow(lines[1]);
+            const aligns = separators.map(s => {
+                if (s.startsWith(':') && s.endsWith(':')) return 'center';
+                if (s.endsWith(':')) return 'right';
+                return 'left';
+            });
+
+            let table = '<div style="overflow-x:auto;margin:10px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.85rem;">';
+            table += '<thead><tr>';
+            headers.forEach((h, i) => {
+                table += `<th style="border:1px solid #dee2e6;padding:6px 10px;background:#f8f9fa;text-align:${aligns[i] || 'left'};">${h}</th>`;
+            });
+            table += '</tr></thead><tbody>';
+
+            for (let i = 2; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const cells = parseRow(lines[i]);
+                table += '<tr>';
+                cells.forEach((c, j) => {
+                    table += `<td style="border:1px solid #dee2e6;padding:6px 10px;text-align:${aligns[j] || 'left'};">${c}</td>`;
+                });
+                table += '</tr>';
+            }
+
+            table += '</tbody></table></div>';
+            return table;
+        },
+    );
 
     // Horizontal rule
     html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #dee2e6;margin:12px 0;" />');

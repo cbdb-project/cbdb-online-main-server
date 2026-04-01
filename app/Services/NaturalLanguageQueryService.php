@@ -1453,7 +1453,7 @@ PROMPT;
     ): array {
         if ($heartbeatCallback === null && $abortCheck === null) {
             $response = Http::connectTimeout(10)
-                ->timeout(45)
+                ->timeout(120)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'Authorization' => 'Bearer ' . $this->apiKey,
@@ -1495,7 +1495,7 @@ PROMPT;
                 'Authorization: Bearer ' . $this->apiKey,
             ],
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 45,
+            CURLOPT_TIMEOUT => 120,
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_HEADER => false,
             CURLOPT_ENCODING => '',  // 自動處理 gzip/deflate 壓縮回應

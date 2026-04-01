@@ -169,7 +169,7 @@ export default function BasicInfoView({
         try {
             const [surname, mingzi] = await Promise.all([
                 fetchPinyinValue(pinyinEndpoint, formState.c_surname_chn ?? ''),
-                fetchPinyinValue(pinyinEndpoint, formState.c_mingzi_chn ?? ''),
+                fetchPinyinValue(pinyinEndpoint, formState.c_mingzi_chn ?? '', false),
             ]);
 
             setFormState((prev) => applyGeneratedPinyin(prev, initialState, surname, mingzi));
@@ -1286,12 +1286,13 @@ function joinWithSpace(left?: string, right?: string): string {
         .join(' ');
 }
 
-async function fetchPinyinValue(endpoint: string, query: string): Promise<string> {
+async function fetchPinyinValue(endpoint: string, query: string, split: boolean = true): Promise<string> {
     if (!query.trim()) {
         return '';
     }
 
-    const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`, {
+    const splitParam = split ? '' : '&split=0';
+    const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}${splitParam}`, {
         headers: {
             'Accept': 'text/plain',
             'X-Requested-With': 'XMLHttpRequest',

@@ -506,7 +506,7 @@ onViteReady(function(){
         var c_textid = $("input[name='c_surname_chn']").val();
         var c_textid2 = $("input[name='c_mingzi_chn']").val();
         var url = "/api/select/search/pinyin?q=" + c_textid + "";
-        var url2 = "/api/select/search/pinyin?q=" + c_textid2 + "";
+        var url2 = "/api/select/search/pinyin?q=" + c_textid2 + "&split=0";
         /* disable trigger button, preventing multiple requests */
         $(this).attr("disabled", true);
 

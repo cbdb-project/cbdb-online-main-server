@@ -10,6 +10,7 @@ use App\Models\EntryCode;
 use App\Models\EventCode;
 use App\Models\KinshipCode;
 use App\Models\OfficeCode;
+use App\Models\Pinyin;
 use App\Models\SocialInst;
 use App\Models\SocialInstAddr;
 use App\Models\SocialInstCode;
@@ -24,6 +25,7 @@ use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
+use App\Services\VariantCharNormalizer;
 use App\v1;
 use Illuminate\Http\Request;
 //20181017建安新增
@@ -553,8 +555,9 @@ class ApiController extends Controller {
 
     public function searchPinyin(Request $request) {
         $word = trim((string) $request->q);
+        $split = (int) $request->input('split', 1);
         if (!empty($word)) {
-            $res = $this->buildRelationshipPinyin($word) ?? $this->buildPinyinWord($word);
+            $res = $this->buildRelationshipPinyin($word, $split) ?? $this->buildPinyinWord($word, $split);
 
             // 全角括號轉半角，並確保括號前與文字之間有一個空格
             $res = str_replace(['（', '）'], ['(', ')'], $res);
@@ -568,24 +571,31 @@ class ApiController extends Controller {
         }
     }
 
-    private function buildPinyinWord(string $word): string {
+    private function buildPinyinWord(string $word, int $split = 1): string {
         $word = trim($word);
         if ($word === '') {
             return '';
         }
 
-        $repository = new BiogMainRepository();
-        $result = $repository->auto_pinyin(['c_name_chn' => $word]);
+        if ($split) {
+            $repository = new BiogMainRepository();
+            $result = $repository->auto_pinyin(['c_name_chn' => $word]);
 
-        return trim((string) ($result['c_name'] ?? ''));
+            return trim((string) ($result['c_name'] ?? ''));
+        }
+
+        // 不拆分姓氏，僅做純拼音轉換
+        $normalized = VariantCharNormalizer::normalize($word);
+
+        return ucfirst(Pinyin::getPinyin($normalized));
     }
 
-    private function buildRelationshipPinyin(string $word): ?string {
+    private function buildRelationshipPinyin(string $word, int $split = 1): ?string {
         $titlesPattern = implode('|', array_map('preg_quote', array_keys($this->relationshipPhrases())));
 
         // 特例 1：例如「（李白妻）」→「(Wife of Li Bai)」
         if (preg_match('/^\s*[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
-            $target = $this->buildPinyinWord($matches[1] ?? '');
+            $target = $this->buildPinyinWord($matches[1] ?? '', $split);
             $phrase = $this->relationshipPhrases()[$matches[2]] ?? null;
 
             return $phrase ? '('.$phrase.' '.trim($target).')' : null;
@@ -593,8 +603,8 @@ class ApiController extends Controller {
 
         // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
         if (preg_match('/^(.*?)[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
-            $prefix = $this->buildPinyinWord($matches[1] ?? '');
-            $target = $this->buildPinyinWord($matches[2] ?? '');
+            $prefix = $this->buildPinyinWord($matches[1] ?? '', $split);
+            $target = $this->buildPinyinWord($matches[2] ?? '', $split);
             $phrase = $this->relationshipPhrases()[$matches[3]] ?? null;
 
             return $phrase ? trim($prefix).' ('.$phrase.' '.trim($target).')' : null;

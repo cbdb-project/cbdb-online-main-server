@@ -102,6 +102,24 @@ class ApiSearchPinyinTest extends TestCase {
     }
 
     #[Test]
+    public function search_pinyin_with_split_zero_does_not_split_by_surname(): void {
+        DB::table('pinyin')->insert([
+            'lastname_chn' => '安',
+            'lastname_pinyin' => 'An',
+        ]);
+
+        // 預設 split=1 會在已知姓氏後插入空格
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('安石'));
+        $response->assertOk();
+        $this->assertSame('An Shi', trim($response->getContent()));
+
+        // split=0 不拆分姓氏，整體視為一個詞轉換
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('安石').'&split=0');
+        $response->assertOk();
+        $this->assertSame('Anshi', trim($response->getContent()));
+    }
+
+    #[Test]
     public function search_pinyin_converts_prefixed_relationship_patterns_to_english_phrases(): void {
         DB::table('pinyin')->insert([
             ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],

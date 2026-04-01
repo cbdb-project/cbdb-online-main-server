@@ -22,6 +22,13 @@ interface PageProps {
     initialPage: number;
 }
 
+interface BrowserLocationState {
+    personId: number | null;
+    keyword: string;
+    tab: string;
+    page: number;
+}
+
 export default function PersonBrowserIndex() {
     const {
         searchEndpoint,
@@ -59,6 +66,56 @@ export default function PersonBrowserIndex() {
     const isInitialMount = useRef(true);
     const basicInfoSaveHandlerRef = useRef<(() => Promise<boolean>) | null>(null);
     const pendingNavigationRef = useRef<(() => void) | null>(null);
+    const committedLocationRef = useRef<BrowserLocationState>({
+        personId: initialPersonId,
+        keyword: initialKeyword || '',
+        tab: initialTab || 'basic_info',
+        page: initialPage || 1,
+    });
+    const bypassNextPopGuardRef = useRef(false);
+
+    const readLocationState = useCallback((search: string): BrowserLocationState => {
+        const params = new URLSearchParams(search);
+        const personId = params.get('person_id');
+        const parsedPage = parseInt(params.get('page') || '1', 10);
+
+        return {
+            personId: personId ? parseInt(personId, 10) : null,
+            keyword: params.get('keyword') || '',
+            tab: params.get('tab') || 'basic_info',
+            page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+        };
+    }, []);
+
+    const buildUrlForState = useCallback((state: BrowserLocationState) => {
+        const url = new URL(window.location.href);
+
+        if (state.personId != null) {
+            url.searchParams.set('person_id', String(state.personId));
+        } else {
+            url.searchParams.delete('person_id');
+        }
+
+        if (state.keyword) {
+            url.searchParams.set('keyword', state.keyword);
+        } else {
+            url.searchParams.delete('keyword');
+        }
+
+        if (state.tab) {
+            url.searchParams.set('tab', state.tab);
+        } else {
+            url.searchParams.delete('tab');
+        }
+
+        if (state.page > 1) {
+            url.searchParams.set('page', String(state.page));
+        } else {
+            url.searchParams.delete('page');
+        }
+
+        return url.toString();
+    }, []);
 
     // ── URL sync ──
     const updateUrl = useCallback(
@@ -73,13 +130,19 @@ export default function PersonBrowserIndex() {
                 if (params.keyword) url.searchParams.set('keyword', params.keyword);
                 else url.searchParams.delete('keyword');
             }
-            if (params.tab) url.searchParams.set('tab', params.tab);
-            if (params.page && params.page > 1) url.searchParams.set('page', String(params.page));
-            else url.searchParams.delete('page');
+            if (params.tab !== undefined) {
+                if (params.tab) url.searchParams.set('tab', params.tab);
+                else url.searchParams.delete('tab');
+            }
+            if (params.page !== undefined) {
+                if (params.page > 1) url.searchParams.set('page', String(params.page));
+                else url.searchParams.delete('page');
+            }
 
+            committedLocationRef.current = readLocationState(url.search);
             window.history.pushState({}, '', url.toString());
         },
-        [],
+        [readLocationState],
     );
 
     // ── Search ──
@@ -101,6 +164,14 @@ export default function PersonBrowserIndex() {
         },
         [searchEndpoint],
     );
+
+    const applyLocationState = useCallback((state: BrowserLocationState) => {
+        setKeyword(state.keyword);
+        setPage(state.page);
+        setActiveTab(state.tab);
+        setSelectedId(state.personId);
+        doSearch(state.keyword, state.page);
+    }, [doSearch]);
 
     const handleSearch = useCallback(
         (q: string) => {
@@ -132,12 +203,12 @@ export default function PersonBrowserIndex() {
     const handleSelect = useCallback(
         (personId: number) => {
             setSelectedId(personId);
-            updateUrl({ person_id: personId, keyword, tab: activeTab });
+            updateUrl({ person_id: personId, keyword, tab: activeTab, page });
             if (isMobile) {
                 setSidebarOpen(false);
             }
         },
-        [activeTab, isMobile, keyword, updateUrl],
+        [activeTab, isMobile, keyword, page, updateUrl],
     );
 
     const handleBasicInfoSaved = useCallback(() => {
@@ -189,10 +260,10 @@ export default function PersonBrowserIndex() {
         (tab: string) => {
             runOrWarnUnsaved(() => {
                 setActiveTab(tab);
-                updateUrl({ person_id: selectedId, keyword, tab });
+                updateUrl({ person_id: selectedId, keyword, tab, page });
             });
         },
-        [selectedId, keyword, runOrWarnUnsaved, updateUrl],
+        [page, selectedId, keyword, runOrWarnUnsaved, updateUrl],
     );
 
     // ── Initial load ──
@@ -225,41 +296,33 @@ export default function PersonBrowserIndex() {
     // ── Browser back/forward ──
     useEffect(() => {
         const onPop = () => {
+            const nextState = readLocationState(window.location.search);
+
+            if (bypassNextPopGuardRef.current) {
+                bypassNextPopGuardRef.current = false;
+                committedLocationRef.current = nextState;
+                applyLocationState(nextState);
+
+                return;
+            }
+
             if (basicInfoEditorState.dirty) {
-                window.history.pushState({}, '', window.location.href);
+                window.history.pushState({}, '', buildUrlForState(committedLocationRef.current));
                 pendingNavigationRef.current = () => {
-                    const params = new URLSearchParams(window.location.search);
-                    const pid = params.get('person_id');
-                    const kw = params.get('keyword') || '';
-                    const tab = params.get('tab') || 'basic_info';
-                    const pg = parseInt(params.get('page') || '1', 10);
-                    setKeyword(kw);
-                    setPage(pg);
-                    setActiveTab(tab);
-                    if (pid) setSelectedId(parseInt(pid, 10));
-                    else setSelectedId(null);
-                    doSearch(kw, pg);
+                    bypassNextPopGuardRef.current = true;
+                    window.history.back();
                 };
                 setShowUnsavedDialog(true);
 
                 return;
             }
 
-            const params = new URLSearchParams(window.location.search);
-            const pid = params.get('person_id');
-            const kw = params.get('keyword') || '';
-            const tab = params.get('tab') || 'basic_info';
-            const pg = parseInt(params.get('page') || '1', 10);
-            setKeyword(kw);
-            setPage(pg);
-            setActiveTab(tab);
-            if (pid) setSelectedId(parseInt(pid, 10));
-            else setSelectedId(null);
-            doSearch(kw, pg);
+            committedLocationRef.current = nextState;
+            applyLocationState(nextState);
         };
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
-    }, [basicInfoEditorState.dirty, doSearch]);
+    }, [applyLocationState, basicInfoEditorState.dirty, buildUrlForState, readLocationState]);
 
     useEffect(() => {
         const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -310,18 +373,6 @@ export default function PersonBrowserIndex() {
         pendingNavigationRef.current = null;
     }, []);
 
-    const guardedHandleSearch = useCallback((q: string) => {
-        runOrWarnUnsaved(() => handleSearch(q));
-    }, [handleSearch, runOrWarnUnsaved]);
-
-    const guardedHandleClear = useCallback(() => {
-        runOrWarnUnsaved(handleClear);
-    }, [handleClear, runOrWarnUnsaved]);
-
-    const guardedHandlePageChange = useCallback((p: number) => {
-        runOrWarnUnsaved(() => handlePageChange(p));
-    }, [handlePageChange, runOrWarnUnsaved]);
-
     const guardedHandleSelect = useCallback((personId: number) => {
         runOrWarnUnsaved(() => handleSelect(personId));
     }, [handleSelect, runOrWarnUnsaved]);
@@ -357,14 +408,14 @@ export default function PersonBrowserIndex() {
                             </button>
                         </div>
                     ) : null}
-                    <PeopleSearchPanel keyword={keyword} onSearch={guardedHandleSearch} onClear={guardedHandleClear} />
+                    <PeopleSearchPanel keyword={keyword} onSearch={handleSearch} onClear={handleClear} />
                     <PeopleList
                         people={people}
                         pagination={pagination}
                         selectedId={selectedId}
                         loading={listLoading}
                         onSelect={guardedHandleSelect}
-                        onPageChange={guardedHandlePageChange}
+                        onPageChange={handlePageChange}
                     />
                 </aside>
 
@@ -414,9 +465,6 @@ export default function PersonBrowserIndex() {
             <SelectionDialog
                 isOpen={showUnsavedDialog}
                 title="尚有未儲存的修改"
-                description={basicInfoEditorState.dirty
-                    ? '目前的人物基本信息仍在編輯中，且有未儲存的修改。你可以先儲存，再切換到其他人物或頁籤。'
-                    : '目前仍停留在編輯模式。若不需要保留本次編輯，可直接離開。'}
                 width={560}
                 onClose={handleStayOnPage}
                 footer={(
@@ -441,8 +489,7 @@ export default function PersonBrowserIndex() {
                 )}
             >
                 <div style={dialogBodyTextStyle}>
-                    左側切換人物、右側切換頁籤、搜尋與翻頁都會離開目前編輯中的資料。
-                    {basicInfoEditorState.dirty ? '如果你希望保留這次修改，請先儲存。' : '如果只是誤入編輯模式，也可以直接離開。'}
+                    目前的人物基本信息仍在編輯中，且有未儲存的修改。如果你希望保留這次修改，請先儲存，再切換到其他人物或頁籤。
                 </div>
             </SelectionDialog>
         </AppShell>

@@ -3,7 +3,17 @@
 # CBDB Online Main Server 部署脚本
 # 用于在服务器上部署应用时执行必要的更新操作
 
-set -e
+set -euo pipefail
+
+bg_pids=()
+
+cleanup_background_jobs() {
+  for pid in "${bg_pids[@]:-}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+}
+
+trap cleanup_background_jobs EXIT
 
 echo "开始部署..."
 
@@ -17,37 +27,28 @@ else
   echo "警告: 未找到 .git 目录，version.txt 标记为 unknown"
 fi
 
-# 2. 安装/更新 Composer 依赖
-# 注：同时安装 dev 依赖以便运行 PHPUnit 测试
-echo "更新 Composer 依赖..."
-composer install --optimize-autoloader
+# 2. 并行安装后端与前端依赖，并重建前端资源
+# 注：目前保留 dev 依赖，以兼容现行服务器流程
+echo "并行更新 Composer 依赖与前端资源..."
+composer install --optimize-autoloader --no-interaction &
+bg_pids+=($!)
 
-# 3. 强制触发 package discovery
-php artisan package:discover --ansi
+(
+  npm ci
+  npm run build
+) &
+bg_pids+=($!)
 
-# 4. 重建前端静态资源
-echo "重建前端静态资源..."
-npm install
-npm run prod
-if [ -d node_modules ]; then
-  echo "清理 node_modules..."
-  rm -rf node_modules
-fi
-if [ -d "$HOME/.npm" ]; then
-  echo "清理 npm cache..."
-  rm -rf "$HOME/.npm"
-fi
+for pid in "${bg_pids[@]}"; do
+  wait "$pid"
+done
+bg_pids=()
 
-set +e
-
-# 5. 清除缓存
+# 3. 清除缓存
 echo "清除应用缓存..."
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
+php artisan optimize:clear
 
-# 6. 重建缓存
+# 4. 重建缓存
 echo "重建缓存..."
 php artisan config:cache
 php artisan route:cache

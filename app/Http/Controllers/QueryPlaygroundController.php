@@ -36,18 +36,7 @@ class QueryPlaygroundController extends Controller {
             abort(403, 'Unauthorized. Expert access required.');
         }
 
-        $initialSql = $request->input('sql', 'SELECT * FROM DYNASTIES');
-        $qbeTables = $this->playgroundService->getQbeTables();
-
-        return view('query_playground.index', [
-            'page_title' => 'SQL 查詢練習場',
-            'page_title_key' => 'Query Playground',
-            'page_description' => '本功能目前處於測試階段，請適度使用以維護系統穩定',
-            'page_url' => route('query-playground.index'),
-            'initial_sql' => $initialSql,
-            'nl_model' => config('services.gemini.model', 'gemini-3-flash-preview'),
-            'qbe_tables' => $qbeTables,
-        ]);
+        return redirect()->route('app.query-playground.index', $request->query());
     }
 
     /**

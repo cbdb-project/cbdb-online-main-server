@@ -45,6 +45,7 @@ export default function InstitutionsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="機構 ID" value={item.inst_code} />
                     <MetaRow label="機構" value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
                     <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />

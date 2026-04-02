@@ -283,7 +283,13 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')->name('admin.unidirectional-relationship-repair');
     Route::post('admin/unidirectional-relationship-repair/kinship', 'UnidirectionalRelationshipRepairController@repairKinship')->name('admin.unidirectional-relationship-repair.kinship');
     // Query Playground
-    Route::get('query-playground', 'QueryPlaygroundController@index')->name('query-playground.index');
+    Route::get('query-playground', function () {
+        if (!auth()->user()?->isAdmin()) {
+            abort(403, 'Unauthorized. Expert access required.');
+        }
+
+        return redirect()->route('app.query-playground.index', request()->query());
+    })->name('query-playground.index');
     Route::post('query-playground/run', 'QueryPlaygroundController@run')->name('query-playground.run');
     Route::post('query-playground/schema', 'QueryPlaygroundController@qbeSchema')->name('query-playground.schema');
     Route::post('query-playground/generate-from-nl', 'QueryPlaygroundController@generateFromNL')->name('query-playground.generate-from-nl');

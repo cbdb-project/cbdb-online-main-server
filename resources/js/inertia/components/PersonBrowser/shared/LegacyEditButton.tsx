@@ -28,22 +28,23 @@ export default function LegacyEditButton({ tabKey, pk, canEdit, fallbackPersonId
 }
 
 const containerStyle: React.CSSProperties = {
-    marginTop: 10,
-    display: 'flex',
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 10,
+    right: 14,
+    zIndex: 1,
 };
 
 const linkStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 30,
-    padding: '0 12px',
+    minHeight: 26,
+    padding: '0 10px',
     borderRadius: 4,
     border: '1px solid #17a2b8',
     color: '#17a2b8',
     backgroundColor: '#fff',
     textDecoration: 'none',
-    fontSize: '0.875rem',
+    fontSize: '0.8125rem',
     fontWeight: 600,
 };

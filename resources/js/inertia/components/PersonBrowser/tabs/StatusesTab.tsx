@@ -43,8 +43,10 @@ export default function StatusesTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="序號" value={item.sequence ?? '—'} />
                     <MetaRow label="身份" value={formatBilingualLabel(item.status_chn, item.status)} />
-                    <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow label="身份代碼" value={item.status_code} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />

@@ -166,11 +166,10 @@ class QueryPlaygroundAppTest extends TestCase {
     }
 
     #[Test]
-    public function old_blade_playground_still_works() {
+    public function old_playground_entry_redirects_to_app_version() {
         $this->be($this->adminUser);
         $response = $this->get(route('query-playground.index'));
-        $response->assertStatus(200);
-        $response->assertSee('SQL 查詢練習場');
+        $response->assertRedirect(route('app.query-playground.index'));
     }
 
     #[Test]

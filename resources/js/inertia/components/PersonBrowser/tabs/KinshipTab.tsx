@@ -6,7 +6,7 @@ import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatPersonLabel } from '../shared/formatters';
+import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
@@ -49,6 +49,7 @@ export default function KinshipTab({ data, canEdit, onSelectPerson }: Props) {
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.relation_chn, item.relation)} />
+                    <MetaRow label="關係代碼" value={item.kin_code} />
                     <MetaRow label="親屬" value={renderKinshipPerson(item, onSelectPerson)} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
@@ -65,11 +66,6 @@ const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
-};
-
-const linkStyle: React.CSSProperties = {
-    color: '#007bff',
-    textDecoration: 'none',
 };
 
 function renderKinshipPerson(item: KinshipItem, onSelectPerson?: (personId: number) => void): React.ReactNode {

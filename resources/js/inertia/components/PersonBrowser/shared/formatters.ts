@@ -21,9 +21,9 @@ export function formatPersonLabel(id: number | null, nameChn: string | null, nam
 }
 
 /**
- * 組合中英文標籤，如「中文名（English Name）」。
+ * 組合中英文標籤，如「中文名 / English Name」。
  */
 export function formatBilingualLabel(chn: string | null, eng: string | null): string | null {
-    if (chn && eng) return `${chn}（${eng}）`;
+    if (chn && eng) return `${chn} / ${eng}`;
     return chn || eng || null;
 }

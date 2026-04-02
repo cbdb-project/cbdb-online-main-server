@@ -22,8 +22,9 @@ export default function MetaRow({ label, value }: Props) {
 const rowStyle: React.CSSProperties = {
     display: 'flex',
     gap: 8,
-    padding: '3px 0',
-    fontSize: '0.8125rem',
+    padding: '4px 0',
+    fontSize: '0.9rem',
+    lineHeight: 1.4,
     borderBottom: '1px solid #f5f5f5',
 };
 

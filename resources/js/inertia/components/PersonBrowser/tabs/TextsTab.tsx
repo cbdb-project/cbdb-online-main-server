@@ -38,6 +38,7 @@ export default function TextsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="著作 ID" value={item.text_id} />
                     <MetaRow label="著作" value={formatBilingualLabel(item.title_chn, item.title)} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />

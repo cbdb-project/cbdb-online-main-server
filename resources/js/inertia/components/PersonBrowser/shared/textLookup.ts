@@ -16,7 +16,7 @@ export interface TextCodeRecord {
 export function formatTextTitle(record: TextCodeRecord | null | undefined, fallbackId?: number | null): string | null {
     if (record) {
         if (record.c_title_chn && record.c_title) {
-            return `${record.c_title_chn}（${record.c_title}）`;
+            return `${record.c_title_chn} / ${record.c_title}`;
         }
 
         return record.c_title_chn || record.c_title || (fallbackId ? String(fallbackId) : null);

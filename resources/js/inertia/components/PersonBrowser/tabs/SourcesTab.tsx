@@ -45,27 +45,36 @@ export default function SourcesTab({ data, canEdit }: Props) {
                     formatTextTitle(record) ?? formatBilingualLabel(item.title_chn, item.title) ?? (item.text_id ? String(item.text_id) : null);
                 const titleUrl = record?.c_url_homepage ?? null;
                 const url = buildTextUrl(record, item.pages);
+                const tags = [
+                    item.is_main_source ? '主出處' : null,
+                    item.is_self_bio ? '本人傳記' : null,
+                ].filter((value): value is string => Boolean(value));
 
                 return (
                     <TabCard key={stableKey(item.pk)}>
-                        <div style={headerStyle}>
-                            <MetaRow
-                                label="書名"
-                                value={
-                                    titleUrl && title ? (
-                                        <a href={titleUrl} target="_blank" rel="noreferrer" style={linkStyle}>
-                                            {title}
-                                        </a>
-                                    ) : (
-                                        title
-                                    )
-                                }
-                            />
-                            <div style={badgesStyle}>
-                                {item.is_main_source && <span style={badgeMainStyle}>主出處</span>}
-                                {item.is_self_bio && <span style={badgeBioStyle}>自傳</span>}
-                            </div>
-                        </div>
+                        <MetaRow
+                            label="書名"
+                            value={
+                                titleUrl && title ? (
+                                    <a href={titleUrl} target="_blank" rel="noreferrer" style={linkStyle}>
+                                        {title}
+                                    </a>
+                                ) : (
+                                    title
+                                )
+                            }
+                        />
+                        <MetaRow label="著作 ID" value={item.text_id} />
+                        <MetaRow label="標記" value={tags.length > 0 ? (
+                            <span style={badgesStyle}>
+                                {tags.map((tag) => (
+                                    <span key={tag} style={tag === '本人傳記' ? badgeBioStyle : badgeMainStyle}>
+                                        {tag}
+                                    </span>
+                                ))}
+                            </span>
+                        ) : null}
+                        />
                         <MetaRow label="頁碼" value={item.pages} />
                         <MetaRow
                             label="連結"
@@ -93,16 +102,11 @@ const containerStyle: React.CSSProperties = {
     gap: 8,
 };
 
-const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-};
-
 const badgesStyle: React.CSSProperties = {
-    display: 'flex',
+    display: 'inline-flex',
+    flexWrap: 'wrap',
     gap: 4,
-    flexShrink: 0,
+    alignItems: 'center',
 };
 
 const linkStyle: React.CSSProperties = {

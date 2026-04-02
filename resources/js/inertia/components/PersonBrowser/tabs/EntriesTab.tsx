@@ -47,7 +47,9 @@ export default function EntriesTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="序號" value={item.sequence ?? '—'} />
                     <MetaRow label="入仕方式" value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
+                    <MetaRow label="入仕代碼" value={item.entry_code} />
                     <MetaRow label="年份" value={item.year} />
                     <MetaRow label="親屬關聯" value={item.kin_summary} />
                     <MetaRow label="社會關聯" value={item.assoc_summary} />

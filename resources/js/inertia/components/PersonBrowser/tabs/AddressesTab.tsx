@@ -44,9 +44,11 @@ export default function AddressesTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="序號" value={item.sequence ?? '—'} />
+                    <MetaRow label="地址 ID" value={item.addr_id} />
                     <MetaRow label="地址" value={formatBilingualLabel(item.addr_chn, item.addr)} />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow
                         label="經緯度"
                         value={

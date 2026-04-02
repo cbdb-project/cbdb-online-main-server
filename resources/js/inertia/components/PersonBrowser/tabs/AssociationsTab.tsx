@@ -53,11 +53,12 @@ export default function AssociationsTab({ data, canEdit, onSelectPerson }: Props
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="關係" value={formatBilingualLabel(item.assoc_desc_chn, item.assoc_desc)} />
+                    <MetaRow label="關係代碼" value={item.assoc_code} />
                     <MetaRow
                         label="關聯人物"
                         value={renderAssociationPerson(item, onSelectPerson)}
                     />
-                    <MetaRow label="年份" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />

@@ -63,8 +63,7 @@ class QueryPlaygroundTest extends TestCase {
     public function expert_users_can_access_playground() {
         $this->be($this->adminUser);
         $response = $this->get(route('query-playground.index'));
-        $response->assertStatus(200);
-        $response->assertSee('SQL 查詢練習場');
+        $response->assertRedirect(route('app.query-playground.index'));
     }
 
     #[Test]

@@ -6,7 +6,7 @@ import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel } from '../shared/formatters';
+import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
@@ -46,8 +46,11 @@ export default function PostingsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="序號" value={item.sequence ?? '—'} />
+                    <MetaRow label="官職 ID" value={item.office_id} />
                     <MetaRow label="官名" value={formatBilingualLabel(item.office_chn, item.office)} />
                     <MetaRow label="任期" value={item.tenure_summary} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
                     <MetaRow label="地址" value={item.address_summary} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />

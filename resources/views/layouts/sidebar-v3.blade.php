@@ -47,6 +47,13 @@
                 </li>
 
                 <li class="nav-item">
+                    <a href="{{ route('app.person-browser.index') }}" class="nav-link {{ request()->routeIs('app.person-browser.*') ? 'active' : '' }}">
+                        <i class="nav-icon fas fa-user-friends"></i>
+                        <p>人物瀏覽（新版）</p>
+                    </a>
+                </li>
+
+                <li class="nav-item">
                     <a href="{{ route('operations.index') }}" class="nav-link {{ $activePage == 'NewUpdate' ? 'active' : '' }}">
                         <i class="nav-icon fas fa-clipboard-list"></i>
                         <p>最近操作記錄</p>
@@ -315,10 +322,10 @@
                         $expertPages = [
                             'Query Playground',
                         ];
-                        $expertMenuOpen = in_array($activePage, $expertPages, true);
+                        $expertMenuOpen = in_array($activePage, $expertPages, true) || request()->routeIs('app.query-playground.*');
                     @endphp
                     <li class="nav-item {{ $expertMenuOpen ? 'menu-open' : '' }}">
-                        <a href="{{ route('query-playground.index') }}" class="nav-link {{ $expertMenuOpen ? 'active' : '' }}">
+                        <a href="{{ route('app.query-playground.index') }}" class="nav-link {{ $expertMenuOpen ? 'active' : '' }}">
                             <i class="nav-icon fas fa-flask"></i>
                             <p>
                                 專家工具
@@ -327,7 +334,7 @@
                         </a>
                         <ul class="nav nav-treeview">
                             <li class="nav-item">
-                                <a href="{{ route('query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' ? 'active' : '' }}">
+                                <a href="{{ route('app.query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' || request()->routeIs('app.query-playground.*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-terminal"></i>
                                     <p>SQL 查詢練習場</p>
                                 </a>

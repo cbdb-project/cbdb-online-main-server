@@ -42,6 +42,7 @@ export default function PossessionsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
+                    <MetaRow label="記錄 ID" value={item.pk.c_possession_record_id} />
                     <MetaRow label="財產" value={formatBilingualLabel(item.desc_chn, item.desc)} />
                     <MetaRow label="行為" value={formatBilingualLabel(item.act_chn, item.act)} />
                     <MetaRow label="數量" value={item.quantity} />

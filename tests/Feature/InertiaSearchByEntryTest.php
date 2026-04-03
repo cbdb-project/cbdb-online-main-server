@@ -127,13 +127,13 @@ class InertiaSearchByEntryTest extends TestCase {
 
     #[Test]
     public function test_index_requires_authentication(): void {
-        $response = $this->get(route('search-by.entry.index'));
+        $response = $this->get(route('app.search-by.entry.index'));
         $response->assertRedirect(route('login'));
     }
 
     #[Test]
     public function test_index_returns_inertia_page(): void {
-        $response = $this->actingAs($this->user)->get(route('search-by.entry.index'));
+        $response = $this->actingAs($this->user)->get(route('app.search-by.entry.index'));
 
         $response->assertOk();
         $response->assertInertia(
@@ -145,14 +145,14 @@ class InertiaSearchByEntryTest extends TestCase {
                 ->where('initialFilters.entry_codes', [])
                 ->where('initialFilters.dynasty_codes', [])
                 ->where('initialFilters.place_ids', [])
-                ->where('pageUrl', route('search-by.entry.index', [], false))
-                ->where('queryEndpoint', route('search-by.entry.query', [], false))
+                ->where('pageUrl', route('app.search-by.entry.index', [], false))
+                ->where('queryEndpoint', route('app.search-by.entry.query', [], false))
         );
     }
 
     #[Test]
     public function test_index_can_preload_codes_and_places_from_query_string(): void {
-        $response = $this->actingAs($this->user)->get(route('search-by.entry.index', [
+        $response = $this->actingAs($this->user)->get(route('app.search-by.entry.index', [
             'type_id' => 'TYPE1',
             'entry_codes' => [1],
             'place_ids' => [100],
@@ -173,13 +173,14 @@ class InertiaSearchByEntryTest extends TestCase {
     }
 
     #[Test]
-    public function test_legacy_app_route_still_points_to_same_page(): void {
+    public function test_index_uses_app_route_as_canonical_page_url(): void {
         $response = $this->actingAs($this->user)->get(route('app.search-by.entry.index'));
 
         $response->assertOk();
         $response->assertInertia(
             fn (Assert $page) => $page
                 ->component('SearchByEntry/Index')
+                ->where('pageUrl', route('app.search-by.entry.index', [], false))
         );
     }
 }

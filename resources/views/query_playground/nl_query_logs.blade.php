@@ -7,7 +7,7 @@
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-history mr-1"></i> {{ $page_title }}</h3>
                 <div class="card-tools">
-                    <a href="{{ route('query-playground.index') }}" class="btn btn-sm btn-primary">
+                    <a href="{{ route('app.query-playground.index') }}" class="btn btn-sm btn-primary">
                         <i class="fas fa-arrow-left"></i> 返回查詢練習場
                     </a>
                 </div>

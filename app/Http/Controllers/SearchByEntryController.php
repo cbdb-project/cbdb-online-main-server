@@ -28,16 +28,12 @@ class SearchByEntryController extends Controller {
             'preloadedCodes' => $preloadedCodes,
             'preloadedPlaces' => $this->entryQueryService->getPlacesByIds($normalizedFilters['place_ids']),
             'initialFilters' => $normalizedFilters,
-            'pageUrl' => route('search-by.entry.index', [], false),
-            'typesEndpoint' => route('search-by.entry.types', [], false),
-            'codesEndpoint' => route('search-by.entry.codes', [], false),
-            'placesEndpoint' => route('search-by.entry.places', [], false),
-            'queryEndpoint' => route('search-by.entry.query', [], false),
+            'pageUrl' => route('app.search-by.entry.index', [], false),
+            'typesEndpoint' => route('app.search-by.entry.types', [], false),
+            'codesEndpoint' => route('app.search-by.entry.codes', [], false),
+            'placesEndpoint' => route('app.search-by.entry.places', [], false),
+            'queryEndpoint' => route('app.search-by.entry.query', [], false),
         ]);
-    }
-
-    public function appIndex(Request $request): InertiaResponse {
-        return $this->index($request);
     }
 
     public function getEntryTypes(): JsonResponse {

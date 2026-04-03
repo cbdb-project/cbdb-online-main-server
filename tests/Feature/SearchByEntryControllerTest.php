@@ -317,7 +317,7 @@ class SearchByEntryControllerTest extends TestCase {
 
     #[Test]
     public function test_can_get_entry_types(): void {
-        $response = $this->actingAs($this->user)->getJson(route('search-by.entry.types'));
+        $response = $this->actingAs($this->user)->getJson(route('app.search-by.entry.types'));
 
         $response->assertOk()
             ->assertJson([
@@ -329,7 +329,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_can_get_entry_codes_by_type(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.codes', ['type_id' => 'TYPE1']));
+            ->getJson(route('app.search-by.entry.codes', ['type_id' => 'TYPE1']));
 
         $response->assertOk()
             ->assertJson([
@@ -341,7 +341,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_can_search_places(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.places', ['q' => '入仕地']));
+            ->getJson(route('app.search-by.entry.places', ['q' => '入仕地']));
 
         $response->assertOk()
             ->assertJson([
@@ -354,7 +354,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_query_requires_at_least_one_condition(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.query'));
+            ->getJson(route('app.search-by.entry.query'));
 
         $response->assertStatus(422)
             ->assertJsonPath('errors.filters.0', '請至少設定一項搜尋條件。');
@@ -363,7 +363,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_query_can_match_person_keyword_from_alt_name(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.query', [
+            ->getJson(route('app.search-by.entry.query', [
                 'person_keyword' => '別名甲',
             ]));
 
@@ -376,7 +376,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_query_can_include_subordinate_places(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.query', [
+            ->getJson(route('app.search-by.entry.query', [
                 'place_ids' => [100],
                 'include_sub_units' => true,
             ]));
@@ -389,7 +389,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_query_can_filter_by_single_dynasty_checkbox(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.query', [
+            ->getJson(route('app.search-by.entry.query', [
                 'dynasty_codes' => ['DY2'],
             ]));
 
@@ -401,7 +401,7 @@ class SearchByEntryControllerTest extends TestCase {
     #[Test]
     public function test_query_can_filter_by_multiple_dynasties(): void {
         $response = $this->actingAs($this->user)
-            ->getJson(route('search-by.entry.query', [
+            ->getJson(route('app.search-by.entry.query', [
                 'dynasty_codes' => ['DY1', 'DY2'],
             ]));
 

@@ -228,16 +228,13 @@ Route::middleware('auth')->group(function () {
     Route::delete('api-tokens', 'ApiTokenController@destroyAll')->name('api-tokens.destroy-all');
 
     // 按入仕查詢（Inertia + React）
-    Route::get('search-by/entry', 'SearchByEntryController@index')
-        ->middleware('inertia')
-        ->name('search-by.entry.index');
-    Route::get('app/search-by/entry', 'SearchByEntryController@appIndex')
+    Route::get('app/search-by/entry', 'SearchByEntryController@index')
         ->middleware('inertia')
         ->name('app.search-by.entry.index');
-    Route::get('search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('search-by.entry.types');
-    Route::get('search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('search-by.entry.codes');
-    Route::get('search-by/entry/places', 'SearchByEntryController@getPlaces')->name('search-by.entry.places');
-    Route::get('search-by/entry/query', 'SearchByEntryController@query')->name('search-by.entry.query');
+    Route::get('app/search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('app.search-by.entry.types');
+    Route::get('app/search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('app.search-by.entry.codes');
+    Route::get('app/search-by/entry/places', 'SearchByEntryController@getPlaces')->name('app.search-by.entry.places');
+    Route::get('app/search-by/entry/query', 'SearchByEntryController@query')->name('app.search-by.entry.query');
 
     // 檢視表（Inertia + React）
     Route::get('app/view', 'ViewTableController@appIndex')

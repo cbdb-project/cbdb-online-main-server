@@ -179,6 +179,83 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
     }
 
     #[Test]
+    public function test_fullwidth_parentheses_are_converted(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 100,
+            'c_dy' => '1',
+        ]);
+
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "100\t測試稿（附錄）\t99999",
+        ]);
+
+        $record = DB::table('TEXT_CODES')->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('測試稿(附錄)', $record->c_title_chn);
+    }
+
+    #[Test]
+    public function test_fullwidth_colon_is_converted_with_single_space(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 101,
+            'c_dy' => '2',
+        ]);
+
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "101\t測試稿：卷一\t99998",
+        ]);
+
+        $record = DB::table('TEXT_CODES')->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('測試稿: 卷一', $record->c_title_chn);
+    }
+
+    #[Test]
+    public function test_fullwidth_colon_with_spaces_does_not_add_extra(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 102,
+            'c_dy' => '3',
+        ]);
+
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "102\t測試稿：  卷一\t99997",
+        ]);
+
+        $record = DB::table('TEXT_CODES')->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        // Spaces are removed first, then colon adds exactly one space
+        $this->assertSame('測試稿: 卷一', $record->c_title_chn);
+    }
+
+    #[Test]
+    public function test_combined_fullwidth_punctuation_normalization(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 103,
+            'c_dy' => '4',
+        ]);
+
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "103\t測試稿（附錄）： 卷一\t99996",
+        ]);
+
+        $record = DB::table('TEXT_CODES')->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('測試稿(附錄): 卷一', $record->c_title_chn);
+    }
+
+    #[Test]
     public function test_blank_source_is_rejected(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

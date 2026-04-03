@@ -217,6 +217,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
      */
     protected function normalizeTitle(string $title): string {
         $title = preg_replace('/\s+/u', '', $title);
+        $title = str_replace(['（', '）'], ['(', ')'], $title);
         $title = preg_replace('/[:：]\s*/u', ': ', $title);
 
         return trim($title);

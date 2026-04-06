@@ -125,11 +125,13 @@ For each posting in `postings`, fill the following fields:
         → Example: "永興軍" → `"name": "永興", "admin_type": "軍"`
         → Example: "安豐軍" → `"name": "安豐", "admin_type": "軍"`
         → Example: "西京監" → `"name": "西京", "admin_type": "監"`
-      * For **2-character names** ending with 州/府:
-        → The last character is likely part of the place name itself
+      * For **2-character names** (e.g. 黃縣、涿州、泉州):
+        → The last character is the admin_type, but name must **keep the full 2-character form**
         → Example: "涿州" → `"name": "涿州", "admin_type": "州"`
         → Example: "泉州" → `"name": "泉州", "admin_type": "州"`
         → Example: "杭州" → `"name": "杭州", "admin_type": "州"`
+        → Example: "黃縣" → `"name": "黃縣", "admin_type": "縣"`
+        → Example: "吳郡" → `"name": "吳郡", "admin_type": "郡"`
       * If admin unit cannot be determined, set to `null`
 
  **If no location is explicitly stated, return `null` for the entire addr_str.**

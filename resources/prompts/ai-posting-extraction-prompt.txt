@@ -255,28 +255,11 @@ For each posting in `postings`, fill the following fields:
 19. **c_appt_code**
 
     * Type: integer or `null`
-    * The appointment type code, based on explicit markers in the text (權、行、守、試、攝、封、贈、追封、追贈、卒封、累封、襲封、署、判、兼、蔭襲, etc.).
+    * The appointment type code, based on explicit markers in the text (權、行、守、試、攝、封、贈、追封、追贈、卒封、累封、襲封、署、判、兼、蔭襲、援例, etc.).
     * Use one of the following integer codes; if the type is not clear, set to `null` (not 0):
 
     ```json
-    0  -> 未詳 / Unknown
-    1  -> 正授 / Regular Appointment
-    2  -> 權 / Provisional Appointment
-    3  -> 行 / Lower Acting Appointment
-    4  -> 守 / Higher Acting Appointment
-    5  -> 試 / Exceptional Acting Appointment
-    13 -> 攝 / Irregular Appointment
-    21 -> 封 / Enfoeffed As
-    22 -> 贈 / Granted The Nominal Title Of
-    27 -> 追封 / Posthumously Enfoeffed
-    28 -> 追贈 / Posthumously Granted The Nominal Title Of
-    29 -> 卒封 / Enfoeffed At Death As
-    30 -> 累封 / Further Enfoeffed As
-    31 -> 襲封 / Inherited Enfoeffement As
-    32 -> 署 / Acting (or deputy)
-    33 -> 判 / Rank Higher Than Position Expects
-    37 -> 兼 / Concurrent Appointment
-    41 -> 蔭襲
+    {{APPT_CODE_MAPPINGS}}
     ```
 
     * If the text **explicitly** marks a type but you cannot map it, set `c_appt_code` to `0`.
@@ -289,12 +272,7 @@ For each posting in `postings`, fill the following fields:
     * Use one of:
 
     ```json
-    0 -> 未詳 / Unknown
-    1 -> 赴任 / Assumed the office
-    2 -> 辭不就 / Declined the office
-    3 -> 未赴任而卒 / Died before assuming the office
-    4 -> 未赴任而改命 / Appointment changed before assuming the office
-    5 -> 未赴任 / Did not assume the office
+    {{ASSUME_OFFICE_CODE_MAPPINGS}}
     ```
 
     * If there is no information, set `c_assume_office_code` to `null`.

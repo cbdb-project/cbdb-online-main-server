@@ -115,6 +115,10 @@ class PostingAutofillService {
         }
 
         $promptContent = file_get_contents($this->promptTemplate);
+
+        // 從資料庫動態載入代碼表，替換 prompt 中的佔位符
+        $promptContent = $this->injectCodeMappings($promptContent);
+
         $fullPrompt = $promptContent . "\n\n" . $sourceText;
 
         // 調用 LLM API
@@ -187,6 +191,39 @@ class PostingAutofillService {
             'data' => $postings[0], // 返回第一筆
             'error' => null,
         ];
+    }
+
+    /**
+     * 從資料庫載入代碼表，替換 prompt 模板中的佔位符
+     */
+    protected function injectCodeMappings(string $promptContent): string {
+        // APPOINTMENT_CODES
+        $apptCodes = DB::table('APPOINTMENT_CODES')
+            ->select(['c_appt_code', 'c_appt_desc_chn', 'c_appt_desc'])
+            ->orderBy('c_appt_code')
+            ->get();
+
+        $apptLines = $apptCodes->map(function ($row) {
+            $desc = trim(($row->c_appt_desc_chn ?? '') . ' / ' . ($row->c_appt_desc ?? ''), ' /');
+            return sprintf('    %d -> %s', $row->c_appt_code, $desc);
+        })->implode("\n");
+
+        $promptContent = str_replace('{{APPT_CODE_MAPPINGS}}', $apptLines, $promptContent);
+
+        // ASSUME_OFFICE_CODES
+        $assumeCodes = DB::table('ASSUME_OFFICE_CODES')
+            ->select(['c_assume_office_code', 'c_assume_office_desc_chn', 'c_assume_office_desc'])
+            ->orderBy('c_assume_office_code')
+            ->get();
+
+        $assumeLines = $assumeCodes->map(function ($row) {
+            $desc = trim(($row->c_assume_office_desc_chn ?? '') . ' / ' . ($row->c_assume_office_desc ?? ''), ' /');
+            return sprintf('    %d -> %s', $row->c_assume_office_code, $desc);
+        })->implode("\n");
+
+        $promptContent = str_replace('{{ASSUME_OFFICE_CODE_MAPPINGS}}', $assumeLines, $promptContent);
+
+        return $promptContent;
     }
 
     /**

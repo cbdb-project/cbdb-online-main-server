@@ -21,7 +21,7 @@
     "sass": "^1.79.4",
     "sass-loader": "^12.1.0",
     "typescript": "^6.0.2",
-    "vite": "^7.2.4",
+    "vite": "^7.3.2",
     "vue": "^3.0.0"
   },
   "dependencies": {

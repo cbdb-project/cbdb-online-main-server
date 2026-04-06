@@ -665,8 +665,7 @@ class PostingAutofillService {
      *
      * 例如 AI 可能回傳 name=黃, admin_type=縣，應修正為 name=黃縣, admin_type=縣。
      */
-    protected function normalizeAddrName(array $addrData): array
-    {
+    protected function normalizeAddrName(array $addrData): array {
         $name = $addrData['name'] ?? null;
         $adminType = $addrData['admin_type'] ?? null;
 

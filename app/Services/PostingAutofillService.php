@@ -352,6 +352,7 @@ class PostingAutofillService {
         // 2. 地名匹配（addr_str）
         if (!empty($aiData['addr_str']) && is_array($aiData['addr_str'])) {
             $addrData = $aiData['addr_str'];
+            $addrData = $this->normalizeAddrName($addrData);
             $searchName = $addrData['name'] ?? null;
             $parentName = $addrData['parent'] ?? null;
 
@@ -657,6 +658,22 @@ class PostingAutofillService {
         }
 
         return null;
+    }
+
+    /**
+     * 正規化 addr_str：當 name 剝離 admin_type 後只剩一個字時，將 admin_type 補回 name。
+     *
+     * 例如 AI 可能回傳 name=黃, admin_type=縣，應修正為 name=黃縣, admin_type=縣。
+     */
+    protected function normalizeAddrName(array $addrData): array {
+        $name = $addrData['name'] ?? null;
+        $adminType = $addrData['admin_type'] ?? null;
+
+        if ($name !== null && $adminType !== null && mb_strlen($name) === 1) {
+            $addrData['name'] = $name.$adminType;
+        }
+
+        return $addrData;
     }
 
     /**

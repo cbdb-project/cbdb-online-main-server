@@ -205,6 +205,7 @@ class PostingAutofillService {
 
         $apptLines = $apptCodes->map(function ($row) {
             $desc = trim(($row->c_appt_desc_chn ?? '') . ' / ' . ($row->c_appt_desc ?? ''), ' /');
+
             return sprintf('    %d -> %s', $row->c_appt_code, $desc);
         })->implode("\n");
 
@@ -218,6 +219,7 @@ class PostingAutofillService {
 
         $assumeLines = $assumeCodes->map(function ($row) {
             $desc = trim(($row->c_assume_office_desc_chn ?? '') . ' / ' . ($row->c_assume_office_desc ?? ''), ' /');
+
             return sprintf('    %d -> %s', $row->c_assume_office_code, $desc);
         })->implode("\n");
 

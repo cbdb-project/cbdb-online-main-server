@@ -1,0 +1,219 @@
+:root {
+    --bg: #f4efe5;
+    --panel: rgba(251, 247, 238, 0.96);
+    --border: #d1c2a4;
+    --text: #2d2418;
+    --muted: #685a43;
+    --accent: #8c3b1d;
+    --accent-strong: #6d2e17;
+    --shadow: 0 16px 40px rgba(76, 53, 27, 0.16);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    font-family: "Noto Serif TC", "PingFang TC", "Microsoft JhengHei", serif;
+    color: var(--text);
+    background:
+        radial-gradient(circle at top left, rgba(202, 164, 110, 0.2), transparent 32%),
+        linear-gradient(180deg, #efe5d0 0%, var(--bg) 100%);
+}
+
+body {
+    min-height: 100vh;
+}
+
+.panel-toggle {
+    display: inline-flex;
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    z-index: 1200;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    background: rgba(140, 59, 29, 0.94);
+    color: #fff8f0;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.panel-toggle-bars {
+    display: grid;
+    gap: 5px;
+}
+
+.panel-toggle-bars span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+}
+
+.layout {
+    display: block;
+    min-height: 100vh;
+}
+
+.panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 360px;
+    max-width: calc(100vw - 28px);
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 20px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    z-index: 1100;
+    transform: translateX(-102%);
+    transition: transform 180ms ease;
+}
+
+.panel.is-open {
+    transform: translateX(0);
+}
+
+.panel h1 {
+    margin: 0 0 10px;
+    font-size: 28px;
+    line-height: 1.2;
+}
+
+.lead {
+    margin: 0 0 20px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.form {
+    display: grid;
+    gap: 14px;
+}
+
+.form label {
+    display: grid;
+    gap: 6px;
+}
+
+.form span,
+.tips h2 {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.form input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.86);
+    color: var(--text);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.actions button {
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: var(--accent);
+    color: #fff8f0;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.actions button:hover {
+    background: var(--accent-strong);
+}
+
+.tips {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.layer-controls {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.layer-controls label {
+    display: grid;
+    gap: 8px;
+}
+
+.layer-controls input[type="range"] {
+    width: 100%;
+}
+
+.slider-value {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.tips ul {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.status {
+    min-height: 24px;
+    margin: 18px 0 0;
+    color: var(--accent-strong);
+    font-size: 14px;
+}
+
+.map-shell {
+    min-width: 0;
+}
+
+#map {
+    width: 100%;
+    min-height: 100vh;
+}
+
+.leaflet-popup-content {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.panel.is-open + .map-shell .leaflet-left {
+    left: min(360px, calc(100vw - 28px));
+}
+
+@media (max-width: 960px) {
+    .panel {
+        width: min(88vw, 360px);
+    }
+
+    .panel.is-open + .map-shell .leaflet-left {
+        left: min(88vw, 360px);
+    }
+
+    #map {
+        min-height: 100vh;
+    }
+}

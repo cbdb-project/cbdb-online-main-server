@@ -111,8 +111,17 @@ class PersonBrowserTest extends TestCase {
                 c_addr_id INTEGER PRIMARY KEY,
                 c_name VARCHAR(255),
                 c_name_chn VARCHAR(255),
+                c_admin_cat_code INT,
                 x_coord DOUBLE,
                 y_coord DOUBLE
+            )
+        ');
+
+        DB::statement('
+            CREATE TABLE IF NOT EXISTS ADMIN_CAT_CODES (
+                c_admin_cat_code INTEGER PRIMARY KEY,
+                c_admin_cat_hz VARCHAR(255),
+                c_admin_cat_trans VARCHAR(255)
             )
         ');
 
@@ -461,8 +470,12 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('ADDR_CODES')->insert([
-            ['c_addr_id' => 100, 'c_name' => 'Chang An', 'c_name_chn' => '長安', 'x_coord' => 108.9398, 'y_coord' => 34.3416],
-            ['c_addr_id' => 101, 'c_name' => 'Luoyang', 'c_name_chn' => '洛陽', 'x_coord' => 112.4540, 'y_coord' => 34.6197],
+            ['c_addr_id' => 100, 'c_name' => 'Chang An', 'c_name_chn' => '長安', 'c_admin_cat_code' => 1, 'x_coord' => 108.9398, 'y_coord' => 34.3416],
+            ['c_addr_id' => 101, 'c_name' => 'Luoyang', 'c_name_chn' => '洛陽', 'c_admin_cat_code' => 1, 'x_coord' => 112.4540, 'y_coord' => 34.6197],
+        ]);
+
+        DB::table('ADMIN_CAT_CODES')->insert([
+            ['c_admin_cat_code' => 1, 'c_admin_cat_hz' => '府', 'c_admin_cat_trans' => 'Prefecture'],
         ]);
 
         DB::table('ETHNICITY_TRIBE_CODES')->insert([

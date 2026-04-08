@@ -10,6 +10,7 @@ import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
 
 interface AddressItem {
     pk: {
@@ -22,6 +23,8 @@ interface AddressItem {
     addr_id: number | null;
     addr_chn: string | null;
     addr: string | null;
+    admin_cat_code: number | null;
+    admin_cat_label: string | null;
     type_code: number | null;
     type_label_chn: string | null;
     type_label: string | null;
@@ -33,7 +36,7 @@ interface AddressItem {
 }
 
 interface Props {
-    data: { tab: string; items: AddressItem[] };
+    data: { tab: string; person_index_year?: number | null; items: AddressItem[] };
     canEdit: boolean;
     postCE?: boolean;
 }
@@ -49,23 +52,25 @@ export default function AddressesTab({ data, canEdit, postCE }: Props) {
                 <TabCard key={stableKey(item.pk)}>
                     <MetaRow label="序號" value={item.sequence ?? '—'} />
                     <MetaRow label="地址 ID" value={item.addr_id} />
-                    <MetaRow label="地址" value={formatBilingualLabel(item.addr_chn, item.addr)} />
+                    <MetaRow
+                        label="地址"
+                        value={(
+                            <AddressDisplayWithMap
+                                labelChn={item.addr_chn}
+                                labelEng={item.addr}
+                                adminCatCode={item.admin_cat_code}
+                                adminCatLabel={item.admin_cat_label}
+                                latitude={item.latitude}
+                                longitude={item.longitude}
+                                year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}
+                            />
+                        )}
+                    />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
                     <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
                     <MetaRow
                         label="經緯度"
-                        value={
-                            item.latitude !== null && item.longitude !== null ? (
-                                <a
-                                    href={buildOpenStreetMapUrl(item.latitude, item.longitude)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={linkStyle}
-                                >
-                                    {`${item.longitude}, ${item.latitude}`}
-                                </a>
-                            ) : null
-                        }
+                        value={item.latitude !== null && item.longitude !== null ? `${item.longitude}, ${item.latitude}` : null}
                     />
                     <MetaRow label="備註" value={item.notes} />
                     <CardActions>
@@ -85,11 +90,10 @@ const containerStyle: React.CSSProperties = {
     gap: 8,
 };
 
-const linkStyle: React.CSSProperties = {
-    color: '#A51C30',
-    textDecoration: 'none',
-};
+function inferDisplayYear(firstYear: number | null, lastYear: number | null, fallbackYear: number | null): number | null {
+    if (firstYear !== null && lastYear !== null) {
+        return Math.round((firstYear + lastYear) / 2);
+    }
 
-function buildOpenStreetMapUrl(latitude: number, longitude: number): string {
-    return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=12/${latitude}/${longitude}`;
+    return firstYear ?? lastYear ?? fallbackYear;
 }

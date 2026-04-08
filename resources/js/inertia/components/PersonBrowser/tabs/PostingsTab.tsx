@@ -31,6 +31,8 @@ interface PostingItem {
         addr_id: number | null;
         addr_chn: string | null;
         addr: string | null;
+        admin_cat_code: number | null;
+        admin_cat_label: string | null;
         longitude: number | null;
         latitude: number | null;
     }>;
@@ -71,6 +73,8 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
                                         <AddressDisplayWithMap
                                             labelChn={address.addr_chn}
                                             labelEng={address.addr}
+                                            adminCatCode={address.admin_cat_code}
+                                            adminCatLabel={address.admin_cat_label}
                                             latitude={address.latitude}
                                             longitude={address.longitude}
                                             year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}

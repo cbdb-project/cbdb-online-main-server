@@ -5,6 +5,8 @@ import MapPreviewTrigger from './MapPreviewTrigger';
 interface Props {
     labelChn: string | null;
     labelEng: string | null;
+    adminCatCode?: number | null;
+    adminCatLabel?: string | null;
     latitude?: number | null;
     longitude?: number | null;
     year?: number | null;
@@ -14,6 +16,8 @@ interface Props {
 export default function AddressDisplayWithMap({
     labelChn,
     labelEng,
+    adminCatCode = null,
+    adminCatLabel = null,
     latitude = null,
     longitude = null,
     year = null,
@@ -33,6 +37,8 @@ export default function AddressDisplayWithMap({
                     latitude={latitude}
                     longitude={longitude}
                     label={labelChn || labelEng || '地點'}
+                    adminCatCode={adminCatCode}
+                    adminCatLabel={adminCatLabel}
                     year={year}
                     mapId={mapId}
                 />

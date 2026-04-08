@@ -5,6 +5,8 @@ interface Props {
     latitude: number;
     longitude: number;
     label: string;
+    adminCatCode?: number | null;
+    adminCatLabel?: string | null;
     year?: number | null;
     mapId?: string | null;
     buttonLabel?: string;
@@ -14,6 +16,8 @@ export default function MapPreviewTrigger({
     latitude,
     longitude,
     label,
+    adminCatCode = null,
+    adminCatLabel = null,
     year = null,
     mapId = null,
     buttonLabel = '看地圖',
@@ -23,6 +27,7 @@ export default function MapPreviewTrigger({
         () => buildMapUrl({ latitude, longitude, label, year, mapId }),
         [label, latitude, longitude, mapId, year],
     );
+    const dialogTitle = buildDialogTitle(label, adminCatCode, adminCatLabel, year);
 
     return (
         <>
@@ -39,7 +44,7 @@ export default function MapPreviewTrigger({
 
             <SelectionDialog
                 isOpen={open}
-                title={label}
+                title={dialogTitle}
                 width={1180}
                 onClose={() => setOpen(false)}
                 footer={(
@@ -56,13 +61,45 @@ export default function MapPreviewTrigger({
                 <div style={frameWrapStyle}>
                     <iframe
                         src={mapUrl}
-                        title={`${label} 地圖`}
+                        title={`${dialogTitle} 地圖`}
                         style={iframeStyle}
                     />
                 </div>
             </SelectionDialog>
         </>
     );
+}
+
+function buildDialogTitle(label: string, adminCatCode: number | null, adminCatLabel: string | null, year: number | null) {
+    const parts = [label];
+
+    parts.push(`行政類別: ${formatAdminCat(adminCatCode, adminCatLabel)}`);
+    parts.push(`年份: ${year ?? '—'}`);
+
+    return parts.join(' / ');
+}
+
+function formatAdminCat(adminCatCode: number | null, adminCatLabel: string | null) {
+    if (adminCatLabel && adminCatCode !== null) {
+        return extractPrimaryAdminCatLabel(adminCatLabel);
+    }
+
+    if (adminCatLabel) {
+        return extractPrimaryAdminCatLabel(adminCatLabel);
+    }
+
+    if (adminCatCode !== null) {
+        return String(adminCatCode);
+    }
+
+    return '—';
+}
+
+function extractPrimaryAdminCatLabel(adminCatLabel: string) {
+    return adminCatLabel
+        .split(' / ')
+        .map((part) => part.trim())
+        .find((part) => part !== '') || adminCatLabel;
 }
 
 function buildMapUrl({

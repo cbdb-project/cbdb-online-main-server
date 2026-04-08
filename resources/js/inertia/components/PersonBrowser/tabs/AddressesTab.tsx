@@ -23,6 +23,8 @@ interface AddressItem {
     addr_id: number | null;
     addr_chn: string | null;
     addr: string | null;
+    admin_cat_code: number | null;
+    admin_cat_label: string | null;
     type_code: number | null;
     type_label_chn: string | null;
     type_label: string | null;
@@ -56,6 +58,8 @@ export default function AddressesTab({ data, canEdit, postCE }: Props) {
                             <AddressDisplayWithMap
                                 labelChn={item.addr_chn}
                                 labelEng={item.addr}
+                                adminCatCode={item.admin_cat_code}
+                                adminCatLabel={item.admin_cat_label}
                                 latitude={item.latitude}
                                 longitude={item.longitude}
                                 year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}

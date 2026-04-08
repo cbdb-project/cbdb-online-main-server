@@ -6,6 +6,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PersonBrowserService {
+    private function formatAdminCatLabel(?string $hz, ?string $trans): ?string {
+        $parts = array_values(array_filter([
+            $hz ? trim($hz) : null,
+            $trans ? trim($trans) : null,
+        ]));
+
+        if (empty($parts)) {
+            return null;
+        }
+
+        return implode(' / ', array_unique($parts));
+    }
+
     /**
      * 搜尋人物列表。
      * 支援：c_personid、中文名、英文名/拼音名、別名（alt names）。
@@ -248,11 +261,15 @@ class PersonBrowserService {
                 'DYNASTIES.c_start AS dynasty_start',
                 'ADDR_CODES.c_name_chn AS index_addr_chn',
                 'ADDR_CODES.c_name AS index_addr',
+                'ADDR_CODES.c_admin_cat_code AS index_addr_admin_cat_code',
+                'ADMIN_CAT_CODES.c_admin_cat_hz AS index_addr_admin_cat_hz',
+                'ADMIN_CAT_CODES.c_admin_cat_trans AS index_addr_admin_cat_trans',
                 'ADDR_CODES.x_coord AS index_addr_longitude',
                 'ADDR_CODES.y_coord AS index_addr_latitude',
             ])
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
+            ->leftJoin('ADMIN_CAT_CODES', 'ADMIN_CAT_CODES.c_admin_cat_code', '=', 'ADDR_CODES.c_admin_cat_code')
             ->where('BIOG_MAIN.c_personid', $personId)
             ->first();
 
@@ -333,6 +350,11 @@ class PersonBrowserService {
             'dynasty_start' => $row['dynasty_start'] ?? null,
             'index_addr_chn' => $row['index_addr_chn'],
             'index_addr' => $row['index_addr'],
+            'index_addr_admin_cat_code' => $row['index_addr_admin_cat_code'],
+            'index_addr_admin_cat_label' => $this->formatAdminCatLabel(
+                $row['index_addr_admin_cat_hz'] ?? null,
+                $row['index_addr_admin_cat_trans'] ?? null,
+            ),
             'index_addr_longitude' => $row['index_addr_longitude'],
             'index_addr_latitude' => $row['index_addr_latitude'],
             'c_notes' => $row['c_notes'],
@@ -660,6 +682,9 @@ class PersonBrowserService {
                 'BIOG_ADDR_DATA.c_addr_id',
                 'AC.c_name_chn AS addr_chn',
                 'AC.c_name AS addr',
+                'AC.c_admin_cat_code',
+                'ACC.c_admin_cat_hz',
+                'ACC.c_admin_cat_trans',
                 'AC.x_coord',
                 'AC.y_coord',
                 'BIOG_ADDR_DATA.c_addr_type',
@@ -671,6 +696,7 @@ class PersonBrowserService {
                 'BIOG_ADDR_DATA.c_notes',
             ])
             ->leftJoin('ADDR_CODES AS AC', 'AC.c_addr_id', '=', 'BIOG_ADDR_DATA.c_addr_id')
+            ->leftJoin('ADMIN_CAT_CODES AS ACC', 'ACC.c_admin_cat_code', '=', 'AC.c_admin_cat_code')
             ->leftJoin('BIOG_ADDR_CODES AS BAC', 'BAC.c_addr_type', '=', 'BIOG_ADDR_DATA.c_addr_type')
             ->where('BIOG_ADDR_DATA.c_personid', $personId)
             ->orderBy('BIOG_ADDR_DATA.c_sequence')
@@ -690,6 +716,8 @@ class PersonBrowserService {
                 'addr_id' => $r->c_addr_id,
                 'addr_chn' => $r->addr_chn,
                 'addr' => $r->addr,
+                'admin_cat_code' => $r->c_admin_cat_code,
+                'admin_cat_label' => $this->formatAdminCatLabel($r->c_admin_cat_hz ?? null, $r->c_admin_cat_trans ?? null),
                 'type_code' => $r->c_addr_type,
                 'type_label_chn' => $r->c_addr_desc_chn,
                 'type_label' => $r->c_addr_desc,
@@ -1181,10 +1209,14 @@ class PersonBrowserService {
                 'POSTED_TO_ADDR_DATA.c_addr_id',
                 'AC.c_name_chn AS addr_chn',
                 'AC.c_name AS addr',
+                'AC.c_admin_cat_code',
+                'ACC.c_admin_cat_hz',
+                'ACC.c_admin_cat_trans',
                 'AC.x_coord',
                 'AC.y_coord',
             ])
             ->leftJoin('ADDR_CODES AS AC', 'AC.c_addr_id', '=', 'POSTED_TO_ADDR_DATA.c_addr_id')
+            ->leftJoin('ADMIN_CAT_CODES AS ACC', 'ACC.c_admin_cat_code', '=', 'AC.c_admin_cat_code')
             ->where('POSTED_TO_ADDR_DATA.c_personid', $personId)
             ->where('POSTED_TO_ADDR_DATA.c_office_id', '!=', -1)
             ->get()
@@ -1224,6 +1256,8 @@ class PersonBrowserService {
                         'addr_id' => $a->c_addr_id,
                         'addr_chn' => $a->addr_chn,
                         'addr' => $a->addr,
+                        'admin_cat_code' => $a->c_admin_cat_code,
+                        'admin_cat_label' => $this->formatAdminCatLabel($a->c_admin_cat_hz ?? null, $a->c_admin_cat_trans ?? null),
                         'longitude' => $a->x_coord,
                         'latitude' => $a->y_coord,
                     ])->values()->all(),

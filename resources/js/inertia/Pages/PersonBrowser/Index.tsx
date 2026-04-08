@@ -56,9 +56,9 @@ export default function PersonBrowserIndex() {
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
-            return params.get('sort') === 'asc' ? 'asc' : 'desc';
+            return params.get('sort') === 'desc' ? 'desc' : 'asc';
         }
-        return 'desc';
+        return 'asc';
     });
     const [people, setPeople] = useState<PersonListItem[]>([]);
     const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -187,7 +187,7 @@ export default function PersonBrowserIndex() {
 
     // ── Search ──
     const doSearch = useCallback(
-        (q: string, p: number, dy: string = '', sort: SortOrder = 'desc') => {
+        (q: string, p: number, dy: string = '', sort: SortOrder = 'asc') => {
             setListLoading(true);
             let url = `${searchEndpoint}?q=${encodeURIComponent(q)}&page=${p}&per_page=20&sort=${sort}`;
             if (dy) {

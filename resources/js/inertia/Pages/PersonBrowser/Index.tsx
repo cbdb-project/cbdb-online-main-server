@@ -2,13 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import AppShell from '../../Layouts/AppShell';
 import PeopleSearchPanel from '../../components/PersonBrowser/PeopleSearchPanel';
-import PeopleList, { PersonListItem, Pagination } from '../../components/PersonBrowser/PeopleList';
+import PeopleList, { PersonListItem, Pagination, SortOrder } from '../../components/PersonBrowser/PeopleList';
 import PersonSummaryPanel, { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
 import BrowserTabs, { TAB_DEFINITIONS } from '../../components/PersonBrowser/BrowserTabs';
 import TabContentLoader from '../../components/PersonBrowser/TabContentLoader';
 import SelectionDialog from '../../components/SelectionDialog';
 
 interface PageProps {
+    [key: string]: unknown;
     tabKeys: string[];
     searchEndpoint: string;
     summaryEndpoint: string;
@@ -29,6 +30,7 @@ interface BrowserLocationState {
     dynasty: string;
     tab: string;
     page: number;
+    sort: SortOrder;
 }
 
 export default function PersonBrowserIndex() {
@@ -51,6 +53,13 @@ export default function PersonBrowserIndex() {
     const [dynasty, setDynasty] = useState(initialDynasty || '');
     const [dynastyOptions, setDynastyOptions] = useState<Array<{ c_dy: number; label: string; count: number }>>([]);
     const [page, setPage] = useState(initialPage || 1);
+    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('sort') === 'asc' ? 'asc' : 'desc';
+        }
+        return 'desc';
+    });
     const [people, setPeople] = useState<PersonListItem[]>([]);
     const [pagination, setPagination] = useState<Pagination | null>(null);
     const [listLoading, setListLoading] = useState(false);
@@ -77,6 +86,7 @@ export default function PersonBrowserIndex() {
         dynasty: initialDynasty || '',
         tab: initialTab || 'basic_info',
         page: initialPage || 1,
+        sort: sortOrder,
     });
     const bypassNextPopGuardRef = useRef(false);
 
@@ -85,12 +95,15 @@ export default function PersonBrowserIndex() {
         const personId = params.get('person_id');
         const parsedPage = parseInt(params.get('page') || '1', 10);
 
+        const rawSort = params.get('sort');
+
         return {
             personId: personId ? parseInt(personId, 10) : null,
             keyword: params.get('keyword') || '',
             dynasty: params.get('c_dy') || '',
             tab: params.get('tab') || 'basic_info',
             page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+            sort: rawSort === 'asc' ? 'asc' : 'desc',
         };
     }, []);
 
@@ -127,12 +140,18 @@ export default function PersonBrowserIndex() {
             url.searchParams.delete('page');
         }
 
+        if (state.sort === 'asc') {
+            url.searchParams.set('sort', 'asc');
+        } else {
+            url.searchParams.delete('sort');
+        }
+
         return url.toString();
     }, []);
 
     // ── URL sync ──
     const updateUrl = useCallback(
-        (params: { person_id?: number | null; keyword?: string; dynasty?: string; tab?: string; page?: number }) => {
+        (params: { person_id?: number | null; keyword?: string; dynasty?: string; tab?: string; page?: number; sort?: SortOrder }) => {
             const url = new URL(window.location.href);
             if (params.person_id != null) {
                 url.searchParams.set('person_id', String(params.person_id));
@@ -155,6 +174,10 @@ export default function PersonBrowserIndex() {
                 if (params.page > 1) url.searchParams.set('page', String(params.page));
                 else url.searchParams.delete('page');
             }
+            if (params.sort !== undefined) {
+                if (params.sort === 'asc') url.searchParams.set('sort', 'asc');
+                else url.searchParams.delete('sort');
+            }
 
             committedLocationRef.current = readLocationState(url.search);
             window.history.pushState({}, '', url.toString());
@@ -164,9 +187,9 @@ export default function PersonBrowserIndex() {
 
     // ── Search ──
     const doSearch = useCallback(
-        (q: string, p: number, dy: string = '') => {
+        (q: string, p: number, dy: string = '', sort: SortOrder = 'desc') => {
             setListLoading(true);
-            let url = `${searchEndpoint}?q=${encodeURIComponent(q)}&page=${p}&per_page=20`;
+            let url = `${searchEndpoint}?q=${encodeURIComponent(q)}&page=${p}&per_page=20&sort=${sort}`;
             if (dy) {
                 url += `&c_dy=${encodeURIComponent(dy)}`;
             }
@@ -192,9 +215,10 @@ export default function PersonBrowserIndex() {
         setKeyword(state.keyword);
         setDynasty(state.dynasty);
         setPage(state.page);
+        setSortOrder(state.sort);
         setActiveTab(state.tab);
         setSelectedId(state.personId);
-        doSearch(state.keyword, state.page, state.dynasty);
+        doSearch(state.keyword, state.page, state.dynasty, state.sort);
     }, [doSearch]);
 
     const handleSearch = useCallback(
@@ -202,27 +226,27 @@ export default function PersonBrowserIndex() {
             setKeyword(q);
             setDynasty(dy);
             setPage(1);
-            doSearch(q, 1, dy);
+            doSearch(q, 1, dy, sortOrder);
             updateUrl({ keyword: q, dynasty: dy, page: 1 });
         },
-        [doSearch, updateUrl],
+        [doSearch, sortOrder, updateUrl],
     );
 
     const handleClear = useCallback(() => {
         setKeyword('');
         setDynasty('');
         setPage(1);
-        doSearch('', 1, '');
+        doSearch('', 1, '', sortOrder);
         updateUrl({ keyword: '', dynasty: '', page: 1 });
-    }, [doSearch, updateUrl]);
+    }, [doSearch, sortOrder, updateUrl]);
 
     const handlePageChange = useCallback(
         (p: number) => {
             setPage(p);
-            doSearch(keyword, p, dynasty);
+            doSearch(keyword, p, dynasty, sortOrder);
             updateUrl({ keyword, dynasty, page: p });
         },
-        [keyword, dynasty, doSearch, updateUrl],
+        [keyword, dynasty, sortOrder, doSearch, updateUrl],
     );
 
     // ── Select person ──
@@ -237,10 +261,20 @@ export default function PersonBrowserIndex() {
         [activeTab, dynasty, isMobile, keyword, page, updateUrl],
     );
 
+    const handleSortChange = useCallback(
+        (sort: SortOrder) => {
+            setSortOrder(sort);
+            setPage(1);
+            doSearch(keyword, 1, dynasty, sort);
+            updateUrl({ keyword, dynasty, page: 1, sort });
+        },
+        [keyword, dynasty, doSearch, updateUrl],
+    );
+
     const handleBasicInfoSaved = useCallback(() => {
         setSummaryRefreshKey((prev) => prev + 1);
-        doSearch(keyword, page, dynasty);
-    }, [doSearch, keyword, page, dynasty]);
+        doSearch(keyword, page, dynasty, sortOrder);
+    }, [doSearch, keyword, page, dynasty, sortOrder]);
 
     const registerBasicInfoSaveHandler = useCallback((handler: (() => Promise<boolean>) | null) => {
         basicInfoSaveHandlerRef.current = handler;
@@ -296,7 +330,7 @@ export default function PersonBrowserIndex() {
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
-            doSearch(initialKeyword || '', initialPage || 1, initialDynasty || '');
+            doSearch(initialKeyword || '', initialPage || 1, initialDynasty || '', sortOrder);
         }
     }, [doSearch, initialKeyword, initialDynasty, initialPage]);
 
@@ -440,8 +474,10 @@ export default function PersonBrowserIndex() {
                         pagination={pagination}
                         selectedId={selectedId}
                         loading={listLoading}
+                        sortOrder={sortOrder}
                         onSelect={guardedHandleSelect}
                         onPageChange={handlePageChange}
+                        onSortChange={handleSortChange}
                     />
                 </aside>
 

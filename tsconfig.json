@@ -11,9 +11,8 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
-        "baseUrl": ".",
         "paths": {
-            "@inertia/*": ["resources/js/inertia/*"]
+            "@inertia/*": ["./resources/js/inertia/*"]
         }
     },
     "include": ["resources/js/inertia/**/*"]

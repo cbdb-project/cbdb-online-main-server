@@ -1,5 +1,7 @@
 import React from 'react';
 
+export type SortOrder = 'asc' | 'desc';
+
 export interface PersonListItem {
     c_personid: number;
     c_name_chn: string | null;
@@ -23,8 +25,10 @@ interface Props {
     pagination: Pagination | null;
     selectedId: number | null;
     loading: boolean;
+    sortOrder: SortOrder;
     onSelect: (personId: number) => void;
     onPageChange: (page: number) => void;
+    onSortChange: (sort: SortOrder) => void;
 }
 
 function buildPersonUrl(personId: number): string {
@@ -35,7 +39,7 @@ function buildPersonUrl(personId: number): string {
 
 const VISITED_RESET_CLASS = 'pb-person-link';
 
-export default function PeopleList({ people, pagination, selectedId, loading, onSelect, onPageChange }: Props) {
+export default function PeopleList({ people, pagination, selectedId, loading, sortOrder, onSelect, onPageChange, onSortChange }: Props) {
     const handleCardClick = (event: React.MouseEvent<HTMLAnchorElement>, personId: number) => {
         event.preventDefault();
         event.currentTarget.blur();
@@ -90,31 +94,46 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                 ))}
             </div>
 
-            {pagination && pagination.last_page > 1 && (
-                <div style={pagerStyle}>
+            <div style={footerStyle}>
+                <div style={sortAreaStyle}>
                     <button
-                        disabled={pagination.current_page <= 1}
-                        onPointerDown={(event) => event.preventDefault()}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={(event) => handlePagerClick(event, pagination.current_page - 1)}
-                        style={pagerBtnStyle}
+                        type="button"
+                        style={sortToggleBtnStyle}
+                        onClick={() => onSortChange(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        title="Toggle ID sort order"
                     >
-                        ‹ 上頁
+                        ⇅ ID
                     </button>
-                    <span style={pagerInfoStyle}>
-                        {pagination.current_page} / {pagination.last_page}
+                    <span style={sortHintStyle}>
+                        {sortOrder === 'asc' ? 'ASC' : 'DESC'}
                     </span>
-                    <button
-                        disabled={pagination.current_page >= pagination.last_page}
-                        onPointerDown={(event) => event.preventDefault()}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={(event) => handlePagerClick(event, pagination.current_page + 1)}
-                        style={pagerBtnStyle}
-                    >
-                        下頁 ›
-                    </button>
                 </div>
-            )}
+                {pagination && pagination.last_page > 1 && (
+                    <div style={pagerStyle}>
+                        <button
+                            disabled={pagination.current_page <= 1}
+                            onPointerDown={(event) => event.preventDefault()}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => handlePagerClick(event, pagination.current_page - 1)}
+                            style={pagerBtnStyle}
+                        >
+                            ‹ 上頁
+                        </button>
+                        <span style={pagerInfoStyle}>
+                            {pagination.current_page} / {pagination.last_page}
+                        </span>
+                        <button
+                            disabled={pagination.current_page >= pagination.last_page}
+                            onPointerDown={(event) => event.preventDefault()}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => handlePagerClick(event, pagination.current_page + 1)}
+                            style={pagerBtnStyle}
+                        >
+                            下頁 ›
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -249,13 +268,47 @@ const miniTagValueStyle: React.CSSProperties = {
     textOverflow: 'ellipsis',
 };
 
+const footerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: '6px 8px',
+    borderTop: '1px solid #dee2e6',
+    flexShrink: 0,
+};
+
+const sortAreaStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+};
+
+const sortToggleBtnStyle: React.CSSProperties = {
+    padding: '6px 10px',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    border: '1px solid #ced4da',
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    color: '#495057',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    minHeight: 34,
+};
+
+const sortHintStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    color: '#8a9bae',
+    whiteSpace: 'nowrap',
+};
+
 const pagerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    padding: '6px 8px',
-    borderTop: '1px solid #dee2e6',
     fontSize: '0.8125rem',
 };
 

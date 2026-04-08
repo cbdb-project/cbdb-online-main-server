@@ -92,6 +92,7 @@ class PersonBrowserService {
                     'per_page' => $paginator->perPage(),
                     'total' => $paginator->total(),
                 ],
+                'dynasty_counts' => $dynastyCounts,
             ];
         }
 
@@ -244,6 +245,7 @@ class PersonBrowserService {
                 'BIOG_MAIN.c_notes',
                 'DYNASTIES.c_dynasty_chn',
                 'DYNASTIES.c_dynasty',
+                'DYNASTIES.c_start AS dynasty_start',
                 'ADDR_CODES.c_name_chn AS index_addr_chn',
                 'ADDR_CODES.c_name AS index_addr',
             ])
@@ -297,6 +299,7 @@ class PersonBrowserService {
             'index_year_type' => $indexYearTypeDesc,
             'dynasty_chn' => $row['c_dynasty_chn'],
             'dynasty' => $row['c_dynasty'],
+            'dynasty_start' => $row['dynasty_start'] ?? null,
             'index_addr_chn' => $row['index_addr_chn'],
             'index_addr' => $row['index_addr'],
             'c_notes' => $row['c_notes'],
@@ -474,22 +477,29 @@ class PersonBrowserService {
                     'title' => '生卒年',
                     'fields' => [
                         ['label' => '出生年', 'value' => $row['c_birthyear'] ?? ''],
+                        ['label' => '出生年號 ID', 'value' => $row['c_by_nh_code'] ?? ''],
                         ['label' => '出生年號', 'value' => $birthNH],
                         ['label' => '出生年號年', 'value' => $row['c_by_nh_year'] ?? ''],
+                        ['label' => '出生年範圍 ID', 'value' => $row['c_by_range'] ?? ''],
                         ['label' => '出生年範圍', 'value' => $birthRange],
                         ['label' => '出生閏月', 'value' => $this->intercalaryLabel($row['c_by_intercalary'] ?? null)],
                         ['label' => '出生月', 'value' => $row['c_by_month'] ?? ''],
                         ['label' => '出生日', 'value' => $row['c_by_day'] ?? ''],
+                        ['label' => '出生日時干支 ID', 'value' => $row['c_by_day_gz'] ?? ''],
                         ['label' => '出生日時干支', 'value' => $birthGanzhi],
                         ['label' => '死亡年', 'value' => $row['c_deathyear'] ?? ''],
+                        ['label' => '死亡年號 ID', 'value' => $row['c_dy_nh_code'] ?? ''],
                         ['label' => '死亡年號', 'value' => $deathNH],
                         ['label' => '死亡年號年', 'value' => $row['c_dy_nh_year'] ?? ''],
+                        ['label' => '死亡年範圍 ID', 'value' => $row['c_dy_range'] ?? ''],
                         ['label' => '死亡年範圍', 'value' => $deathRange],
                         ['label' => '死亡閏月', 'value' => $this->intercalaryLabel($row['c_dy_intercalary'] ?? null)],
                         ['label' => '死亡月', 'value' => $row['c_dy_month'] ?? ''],
                         ['label' => '死亡日', 'value' => $row['c_dy_day'] ?? ''],
+                        ['label' => '死亡日時干支 ID', 'value' => $row['c_dy_day_gz'] ?? ''],
                         ['label' => '死亡日時干支', 'value' => $deathGanzhi],
                         ['label' => '享年', 'value' => $row['c_death_age'] ?? ''],
+                        ['label' => '享年範圍 ID', 'value' => $row['c_death_age_range'] ?? ''],
                         ['label' => '享年範圍', 'value' => $deathAgeRange],
                     ],
                 ],
@@ -497,10 +507,12 @@ class PersonBrowserService {
                     'title' => '活動年份',
                     'fields' => [
                         ['label' => '在世始年', 'value' => $row['c_fl_earliest_year'] ?? ''],
+                        ['label' => '在世始年號 ID', 'value' => $row['c_fl_ey_nh_code'] ?? ''],
                         ['label' => '在世始年號', 'value' => $flEarliestNH],
                         ['label' => '在世始年號年', 'value' => $row['c_fl_ey_nh_year'] ?? ''],
                         ['label' => '在世始年註', 'value' => $row['c_fl_ey_notes'] ?? ''],
                         ['label' => '在世終年', 'value' => $row['c_fl_latest_year'] ?? ''],
+                        ['label' => '在世終年號 ID', 'value' => $row['c_fl_ly_nh_code'] ?? ''],
                         ['label' => '在世終年號', 'value' => $flLatestNH],
                         ['label' => '在世終年號年', 'value' => $row['c_fl_ly_nh_year'] ?? ''],
                         ['label' => '在世終年註', 'value' => $row['c_fl_ly_notes'] ?? ''],
@@ -1194,7 +1206,7 @@ class PersonBrowserService {
             return (string) $code;
         }
 
-        return ($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao ?? '');
+        return trim(($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao ?? ''), ' /');
     }
 
     private function lookupYearRange($code): string {

@@ -975,32 +975,32 @@ function renderLifeSection(section: Section) {
                     title="生年"
                     items={[
                         ['年份 (c_birthyear)', fields['出生年']],
-                        ['年號 (c_by_nh_code)', fields['出生年號']],
+                        ['年號 (c_by_nh_code)', prefixId(fields['出生年號 ID'], String(fields['出生年號'] ?? ''))],
                         ['年號年 (c_by_nh_year)', fields['出生年號年']],
-                        ['範圍 (c_by_range)', fields['出生年範圍']],
+                        ['範圍 (c_by_range)', prefixId(fields['出生年範圍 ID'], String(fields['出生年範圍'] ?? ''))],
                         ['閏月 (c_by_intercalary)', fields['出生閏月']],
                         ['月份 (c_by_month)', fields['出生月']],
                         ['日期 (c_by_day)', fields['出生日']],
-                        ['日干支 (c_by_day_gz)', fields['出生日時干支']],
+                        ['日干支 (c_by_day_gz)', prefixId(fields['出生日時干支 ID'], String(fields['出生日時干支'] ?? ''))],
                     ]}
                 />
                 <TimelineCard
                     title="卒年"
                     items={[
                         ['年份 (c_deathyear)', fields['死亡年']],
-                        ['年號 (c_dy_nh_code)', fields['死亡年號']],
+                        ['年號 (c_dy_nh_code)', prefixId(fields['死亡年號 ID'], String(fields['死亡年號'] ?? ''))],
                         ['年號年 (c_dy_nh_year)', fields['死亡年號年']],
-                        ['範圍 (c_dy_range)', fields['死亡年範圍']],
+                        ['範圍 (c_dy_range)', prefixId(fields['死亡年範圍 ID'], String(fields['死亡年範圍'] ?? ''))],
                         ['閏月 (c_dy_intercalary)', fields['死亡閏月']],
                         ['月份 (c_dy_month)', fields['死亡月']],
                         ['日期 (c_dy_day)', fields['死亡日']],
-                        ['日干支 (c_dy_day_gz)', fields['死亡日時干支']],
+                        ['日干支 (c_dy_day_gz)', prefixId(fields['死亡日時干支 ID'], String(fields['死亡日時干支'] ?? ''))],
                     ]}
                 />
             </div>
             <div style={compactGridStyle}>
                 <ReadOnlyField label="享年 (c_death_age)" value={fields['享年']} />
-                <ReadOnlyField label="享年範圍 (c_death_age_range)" value={fields['享年範圍']} />
+                <ReadOnlyField label="享年範圍 (c_death_age_range)" value={prefixId(fields['享年範圍 ID'], String(fields['享年範圍'] ?? ''))} />
             </div>
         </>
     );
@@ -1063,7 +1063,7 @@ function renderActiveYearsSection(section: Section) {
                     title="在世始年 (c_fl_earliest_year)"
                     items={[
                         ['西元年份 (c_fl_earliest_year)', fields['在世始年']],
-                        ['年號 (c_fl_ey_nh_code)', fields['在世始年號']],
+                        ['年號 (c_fl_ey_nh_code)', prefixId(fields['在世始年號 ID'], String(fields['在世始年號'] ?? ''))],
                         ['年號年 (c_fl_ey_nh_year)', fields['在世始年號年']],
                     ]}
                     note={fields['在世始年註']}
@@ -1072,7 +1072,7 @@ function renderActiveYearsSection(section: Section) {
                     title="在世終年 (c_fl_latest_year)"
                     items={[
                         ['西元年份 (c_fl_latest_year)', fields['在世終年']],
-                        ['年號 (c_fl_ly_nh_code)', fields['在世終年號']],
+                        ['年號 (c_fl_ly_nh_code)', prefixId(fields['在世終年號 ID'], String(fields['在世終年號'] ?? ''))],
                         ['年號年 (c_fl_ly_nh_year)', fields['在世終年號年']],
                     ]}
                     note={fields['在世終年註']}

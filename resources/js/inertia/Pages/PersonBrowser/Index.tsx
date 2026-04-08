@@ -18,6 +18,7 @@ interface PageProps {
     canEditBasicInfo: boolean;
     initialPersonId: number | null;
     initialKeyword: string;
+    initialDynasty: string;
     initialTab: string;
     initialPage: number;
 }
@@ -25,6 +26,7 @@ interface PageProps {
 interface BrowserLocationState {
     personId: number | null;
     keyword: string;
+    dynasty: string;
     tab: string;
     page: number;
 }
@@ -39,13 +41,14 @@ export default function PersonBrowserIndex() {
         canEditBasicInfo,
         initialPersonId,
         initialKeyword,
+        initialDynasty,
         initialTab,
         initialPage,
     } = usePage<PageProps>().props;
 
     // ── Core state ──
     const [keyword, setKeyword] = useState(initialKeyword || '');
-    const [dynasty, setDynasty] = useState('');
+    const [dynasty, setDynasty] = useState(initialDynasty || '');
     const [dynastyOptions, setDynastyOptions] = useState<Array<{ c_dy: number; label: string; count: number }>>([]);
     const [page, setPage] = useState(initialPage || 1);
     const [people, setPeople] = useState<PersonListItem[]>([]);
@@ -71,6 +74,7 @@ export default function PersonBrowserIndex() {
     const committedLocationRef = useRef<BrowserLocationState>({
         personId: initialPersonId,
         keyword: initialKeyword || '',
+        dynasty: initialDynasty || '',
         tab: initialTab || 'basic_info',
         page: initialPage || 1,
     });
@@ -84,6 +88,7 @@ export default function PersonBrowserIndex() {
         return {
             personId: personId ? parseInt(personId, 10) : null,
             keyword: params.get('keyword') || '',
+            dynasty: params.get('c_dy') || '',
             tab: params.get('tab') || 'basic_info',
             page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
         };
@@ -110,6 +115,12 @@ export default function PersonBrowserIndex() {
             url.searchParams.delete('tab');
         }
 
+        if (state.dynasty) {
+            url.searchParams.set('c_dy', state.dynasty);
+        } else {
+            url.searchParams.delete('c_dy');
+        }
+
         if (state.page > 1) {
             url.searchParams.set('page', String(state.page));
         } else {
@@ -121,7 +132,7 @@ export default function PersonBrowserIndex() {
 
     // ── URL sync ──
     const updateUrl = useCallback(
-        (params: { person_id?: number | null; keyword?: string; tab?: string; page?: number }) => {
+        (params: { person_id?: number | null; keyword?: string; dynasty?: string; tab?: string; page?: number }) => {
             const url = new URL(window.location.href);
             if (params.person_id != null) {
                 url.searchParams.set('person_id', String(params.person_id));
@@ -131,6 +142,10 @@ export default function PersonBrowserIndex() {
             if (params.keyword != null) {
                 if (params.keyword) url.searchParams.set('keyword', params.keyword);
                 else url.searchParams.delete('keyword');
+            }
+            if (params.dynasty !== undefined) {
+                if (params.dynasty) url.searchParams.set('c_dy', params.dynasty);
+                else url.searchParams.delete('c_dy');
             }
             if (params.tab !== undefined) {
                 if (params.tab) url.searchParams.set('tab', params.tab);
@@ -175,11 +190,12 @@ export default function PersonBrowserIndex() {
 
     const applyLocationState = useCallback((state: BrowserLocationState) => {
         setKeyword(state.keyword);
+        setDynasty(state.dynasty);
         setPage(state.page);
         setActiveTab(state.tab);
         setSelectedId(state.personId);
-        doSearch(state.keyword, state.page, dynasty);
-    }, [doSearch, dynasty]);
+        doSearch(state.keyword, state.page, state.dynasty);
+    }, [doSearch]);
 
     const handleSearch = useCallback(
         (q: string, dy: string) => {
@@ -187,7 +203,7 @@ export default function PersonBrowserIndex() {
             setDynasty(dy);
             setPage(1);
             doSearch(q, 1, dy);
-            updateUrl({ keyword: q, page: 1 });
+            updateUrl({ keyword: q, dynasty: dy, page: 1 });
         },
         [doSearch, updateUrl],
     );
@@ -197,14 +213,14 @@ export default function PersonBrowserIndex() {
         setDynasty('');
         setPage(1);
         doSearch('', 1, '');
-        updateUrl({ keyword: '', page: 1 });
+        updateUrl({ keyword: '', dynasty: '', page: 1 });
     }, [doSearch, updateUrl]);
 
     const handlePageChange = useCallback(
         (p: number) => {
             setPage(p);
             doSearch(keyword, p, dynasty);
-            updateUrl({ keyword, page: p });
+            updateUrl({ keyword, dynasty, page: p });
         },
         [keyword, dynasty, doSearch, updateUrl],
     );
@@ -213,12 +229,12 @@ export default function PersonBrowserIndex() {
     const handleSelect = useCallback(
         (personId: number) => {
             setSelectedId(personId);
-            updateUrl({ person_id: personId, keyword, tab: activeTab, page });
+            updateUrl({ person_id: personId, keyword, dynasty, tab: activeTab, page });
             if (isMobile) {
                 setSidebarOpen(false);
             }
         },
-        [activeTab, isMobile, keyword, page, updateUrl],
+        [activeTab, dynasty, isMobile, keyword, page, updateUrl],
     );
 
     const handleBasicInfoSaved = useCallback(() => {
@@ -270,19 +286,19 @@ export default function PersonBrowserIndex() {
         (tab: string) => {
             runOrWarnUnsaved(() => {
                 setActiveTab(tab);
-                updateUrl({ person_id: selectedId, keyword, tab, page });
+                updateUrl({ person_id: selectedId, keyword, dynasty, tab, page });
             });
         },
-        [page, selectedId, keyword, runOrWarnUnsaved, updateUrl],
+        [page, selectedId, keyword, dynasty, runOrWarnUnsaved, updateUrl],
     );
 
     // ── Initial load ──
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
-            doSearch(initialKeyword || '', initialPage || 1, '');
+            doSearch(initialKeyword || '', initialPage || 1, initialDynasty || '');
         }
-    }, [doSearch, initialKeyword, initialPage]);
+    }, [doSearch, initialKeyword, initialDynasty, initialPage]);
 
     useEffect(() => {
         const updateViewport = () => {
@@ -463,6 +479,7 @@ export default function PersonBrowserIndex() {
                             mutateEndpoint={mutateEndpoint}
                             pinyinEndpoint={pinyinEndpoint}
                             canEditBasicInfo={canEditBasicInfo}
+                            postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                             onSelectPerson={guardedHandleSelect}
                             onBasicInfoSaved={handleBasicInfoSaved}
                             onBasicInfoEditorStateChange={setBasicInfoEditorState}

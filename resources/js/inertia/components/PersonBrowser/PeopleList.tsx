@@ -27,10 +27,16 @@ interface Props {
     onPageChange: (page: number) => void;
 }
 
+function buildPersonUrl(personId: number): string {
+    const url = new URL(window.location.href);
+    url.searchParams.set('person_id', String(personId));
+    return url.pathname + url.search;
+}
+
 export default function PeopleList({ people, pagination, selectedId, loading, onSelect, onPageChange }: Props) {
-    const handleCardClick = (event: React.MouseEvent<HTMLDivElement>, personId: number) => {
-        const target = event.currentTarget as HTMLDivElement & { blur?: () => void };
-        target.blur?.();
+    const handleCardClick = (event: React.MouseEvent<HTMLAnchorElement>, personId: number) => {
+        event.preventDefault();
+        event.currentTarget.blur();
         onSelect(personId);
     };
 
@@ -51,8 +57,9 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
         <div style={containerStyle}>
             <div style={listStyle}>
                 {people.map((p) => (
-                    <div
+                    <a
                         key={p.c_personid}
+                        href={buildPersonUrl(p.c_personid)}
                         style={{
                             ...itemStyle,
                             ...(p.c_personid === selectedId ? selectedItemStyle : {}),
@@ -75,7 +82,7 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                             <MiniTag label="字" value={p.alt_name_zi} />
                             <MiniTag label="號" value={p.alt_name_hao} />
                         </div>
-                    </div>
+                    </a>
                 ))}
             </div>
 
@@ -132,6 +139,9 @@ const listStyle: React.CSSProperties = {
 };
 
 const itemStyle: React.CSSProperties = {
+    display: 'block',
+    textDecoration: 'none',
+    color: 'inherit',
     margin: '8px 10px 0',
     padding: '12px 14px',
     borderStyle: 'solid',

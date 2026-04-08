@@ -15,6 +15,7 @@ export interface PersonSummary {
     index_year_type: string | null;
     dynasty_chn: string | null;
     dynasty: string | null;
+    dynasty_start: number | null;
     index_addr_chn: string | null;
     index_addr: string | null;
     c_notes: string | null;

@@ -39,10 +39,11 @@ interface AssociationItem {
 interface Props {
     data: { tab: string; items: AssociationItem[] };
     canEdit: boolean;
+    postCE?: boolean;
     onSelectPerson?: (personId: number) => void;
 }
 
-export default function AssociationsTab({ data, canEdit, onSelectPerson }: Props) {
+export default function AssociationsTab({ data, canEdit, postCE, onSelectPerson }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -58,7 +59,7 @@ export default function AssociationsTab({ data, canEdit, onSelectPerson }: Props
                         label="關聯人物"
                         value={renderAssociationPerson(item, onSelectPerson)}
                     />
-                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />

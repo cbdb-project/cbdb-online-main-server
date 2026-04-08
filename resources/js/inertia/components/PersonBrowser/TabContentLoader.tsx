@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import BasicInfoView from './BasicInfoView';
 import AltNamesTab from './tabs/AltNamesTab';
 import AddressesTab from './tabs/AddressesTab';
@@ -68,20 +68,28 @@ export default function TabContentLoader({
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
 }: Props) {
-    const [cache, setCache] = useState<Record<string, TabState>>({});
-    const prevPersonRef = useRef<number | null>(null);
+    const [cacheState, setCacheState] = useState<{ personId: number | null; tabs: Record<string, TabState> }>({
+        personId,
+        tabs: {},
+    });
 
-    // 人物切換時清空快取
-    useEffect(() => {
-        if (prevPersonRef.current !== personId) {
-            setCache({});
-            prevPersonRef.current = personId;
-        }
-    }, [personId]);
+    // 人物切換時重設快取；本次渲染直接使用空快取，不等下一輪
+    const personChanged = cacheState.personId !== personId;
+    if (personChanged) {
+        setCacheState({ personId, tabs: {} });
+    }
+
+    const cache = personChanged ? {} : cacheState.tabs;
+    const setCache = (updater: Record<string, TabState> | ((prev: Record<string, TabState>) => Record<string, TabState>)) => {
+        setCacheState((prev) => ({
+            ...prev,
+            tabs: typeof updater === 'function' ? updater(prev.tabs) : updater,
+        }));
+    };
 
     // lazy load
     useEffect(() => {
-        if (!personId || !activeTab) return;
+        if (personId == null || !activeTab) return;
         if (cache[activeTab]) return;
 
         const url = tabEndpoint
@@ -92,7 +100,7 @@ export default function TabContentLoader({
 
         const controller = new AbortController();
 
-        fetch(url)
+        fetch(url, { signal: controller.signal })
             .then((res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
@@ -127,7 +135,7 @@ export default function TabContentLoader({
         });
     };
 
-    if (!personId) {
+    if (personId == null) {
         return null;
     }
 

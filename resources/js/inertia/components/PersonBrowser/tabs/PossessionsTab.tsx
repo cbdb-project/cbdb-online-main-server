@@ -5,6 +5,8 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
+import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -50,7 +52,10 @@ export default function PossessionsTab({ data, canEdit }: Props) {
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
-                    <LegacyEditButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />
+                    <CardActions>
+                        <LegacyEditButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />
+                    </CardActions>
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />

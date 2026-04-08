@@ -5,6 +5,8 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
+import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -87,7 +89,10 @@ export default function SourcesTab({ data, canEdit }: Props) {
                             }
                         />
                         <MetaRow label="備註" value={item.notes} />
-                        <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
+                        <CardActions>
+                            <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
+                            <LegacyDeleteButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
+                        </CardActions>
                     </TabCard>
                 );
             })}

@@ -255,6 +255,35 @@ class PersonBrowserService {
             ->first();
 
         if (!$row) {
+            // person_id=0 是「未詳」哨兵值，沒有 BIOG_MAIN 記錄但在系統中合法使用
+            if ($personId === 0) {
+                $counts = $this->tabCounts($personId);
+
+                return [
+                    'c_personid' => 0,
+                    'c_name_chn' => '未詳',
+                    'c_name' => 'Unknown',
+                    'c_name_proper' => null,
+                    'c_name_rm' => null,
+                    'c_surname_chn' => null,
+                    'c_mingzi_chn' => null,
+                    'gender' => null,
+                    'c_birthyear' => null,
+                    'c_deathyear' => null,
+                    'c_index_year' => null,
+                    'index_year_type' => null,
+                    'dynasty_chn' => null,
+                    'dynasty' => null,
+                    'dynasty_start' => null,
+                    'index_addr_chn' => null,
+                    'index_addr' => null,
+                    'c_notes' => null,
+                    'alt_name_zi' => '',
+                    'alt_name_hao' => '',
+                    'tab_counts' => $counts,
+                ];
+            }
+
             return null;
         }
 

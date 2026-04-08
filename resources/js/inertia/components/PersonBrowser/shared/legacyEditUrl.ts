@@ -41,6 +41,32 @@ export function buildLegacyEditUrl(tabKey: string, pk: LegacyPk, fallbackPersonI
     return query ? `${path}?${query}` : path;
 }
 
+export function buildLegacyDeleteUrl(tabKey: string, pk: LegacyPk, fallbackPersonId?: number | null): string | null {
+    const segment = TAB_SEGMENTS[tabKey];
+    if (!segment) {
+        return null;
+    }
+
+    const personId = normalizePersonId(pk.c_personid, fallbackPersonId ?? getCurrentPersonIdFromLocation());
+    if (personId === null) {
+        return null;
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(pk).forEach(([key, value]) => {
+        if (value === undefined) {
+            return;
+        }
+
+        params.set(key, value === null ? 'NULL' : String(value));
+    });
+
+    const query = params.toString();
+    const path = `/basicinformation/${personId}/${segment}/delete`;
+
+    return query ? `${path}?${query}` : path;
+}
+
 export function buildLegacyCreateUrl(tabKey: string, fallbackPersonId?: number | null): string | null {
     const segment = TAB_SEGMENTS[tabKey];
     if (!segment) {

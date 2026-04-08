@@ -259,7 +259,7 @@ export default function PersonBrowserIndex() {
 
     // ── Load summary when selectedId changes ──
     useEffect(() => {
-        if (!selectedId) {
+        if (selectedId == null) {
             setSummary(null);
             return;
         }
@@ -457,7 +457,7 @@ export default function PersonBrowserIndex() {
                                 人物列表
                             </button>
                             <div style={mobileToolbarMetaStyle}>
-                                {selectedId ? `人物 #${selectedId}` : '尚未選擇人物'}
+                                {selectedId != null ? `人物 #${selectedId}` : '尚未選擇人物'}
                             </div>
                         </div>
                     ) : null}

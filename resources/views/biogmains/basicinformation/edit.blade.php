@@ -291,7 +291,7 @@
                     <label for="c_death_age_range" class="col-sm-2 col-form-label">範圍 (c_death_age_range)</label>
                     <div class="col-sm-4">
                         <select class="form-control select2" name="c_death_age_range" id="c_death_age_range" {{ $disabled }}>
-                            {{--<option value="null"></option>--}}
+                            <option value="" {{ $basicinformation->c_death_age_range === null ? 'selected' : '' }}>請選擇</option>
                             @foreach($yearRange as $item )
                                 @if($item->c_range_code === $basicinformation->c_death_age_range)
                                     <option value="{{ $item->c_range_code }}"

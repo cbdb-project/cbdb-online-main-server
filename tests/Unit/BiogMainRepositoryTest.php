@@ -46,6 +46,43 @@ class BiogMainRepositoryTest extends TestCase {
     }
 
     #[Test]
+    public function testNullifyEmptyForeignKeysConvertsEmptyStringsToNull() {
+        $data = [
+            'c_death_age_range' => '',
+            'c_by_range' => '',
+            'c_dy_range' => 'null',
+            'c_dy' => '',
+            'c_birthyear' => '',
+            'c_name_chn' => '',
+        ];
+
+        $result = BiogMainRepository::nullifyEmptyForeignKeys($data);
+
+        $this->assertNull($result['c_death_age_range']);
+        $this->assertNull($result['c_by_range']);
+        $this->assertNull($result['c_dy_range']);
+        $this->assertNull($result['c_dy']);
+        // 非 FK 欄位不受影響
+        $this->assertSame('', $result['c_birthyear']);
+        $this->assertSame('', $result['c_name_chn']);
+    }
+
+    #[Test]
+    public function testNullifyEmptyForeignKeysPreservesValidValues() {
+        $data = [
+            'c_death_age_range' => '-1',
+            'c_by_range' => '3',
+            'c_dy' => '15',
+        ];
+
+        $result = BiogMainRepository::nullifyEmptyForeignKeys($data);
+
+        $this->assertSame('-1', $result['c_death_age_range']);
+        $this->assertSame('3', $result['c_by_range']);
+        $this->assertSame('15', $result['c_dy']);
+    }
+
+    #[Test]
     public function testNormalizeSelectionListHandlesMinus999AndSorts() {
         $input = ['-999', 123, '456', 123];
         $expected = ['0', '123', '456'];

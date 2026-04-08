@@ -264,6 +264,9 @@ class BiogMainRepository {
         $data['c_by_intercalary'] = (int)($data['c_by_intercalary']);
         $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary']);
 
+        // FK 欄位空字串轉 null，避免表單提交時將空值寫為無效外鍵
+        $data = self::nullifyEmptyForeignKeys($data);
+
         // 提取註解與動作，並從更新數據中移除，避免 SQL unknown column 錯誤
         $comment = $data['__proposal_comment'] ?? null;
         $data = array_diff_key($data, array_flip(['_method', '_token', '_wysihtml5_mode', 'action', '__proposal_comment', 'c_created_by', 'c_created_date']));
@@ -318,6 +321,29 @@ class BiogMainRepository {
             'no_changes' => false,
             'operation_id' => isset($operation) && $operation ? $operation->id : null,
         ];
+    }
+
+    /**
+     * BIOG_MAIN 中可為 NULL 的外鍵欄位：空字串轉 null。
+     * 避免表單提交空值時被寫為無效外鍵（如 ''）或因 select 無空選項而帶入第一筆預設值。
+     */
+    public static function nullifyEmptyForeignKeys(array $data): array {
+        $nullableFkFields = [
+            'c_by_nh_code', 'c_by_range', 'c_by_day_gz',
+            'c_dy_nh_code', 'c_dy_range', 'c_dy_day_gz',
+            'c_death_age_range',
+            'c_fl_ey_nh_code', 'c_fl_ly_nh_code',
+            'c_ethnicity_code', 'c_choronym_code', 'c_household_status_code',
+            'c_dy',
+        ];
+
+        foreach ($nullableFkFields as $field) {
+            if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === 'null')) {
+                $data[$field] = null;
+            }
+        }
+
+        return $data;
     }
 
     public function store(Request $request) {

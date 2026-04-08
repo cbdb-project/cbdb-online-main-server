@@ -1264,7 +1264,9 @@ function buildSaveChanges(form: BasicInfoForm, values: FormState): Record<string
         }
 
         let value = values[key] ?? '';
-        if (key === 'c_female' && value === '') {
+
+        // enum（含 c_female）及 FK 欄位：空字串視為「未選擇」，送 null
+        if (field.input === 'enum' && value === '') {
             changes[key] = null;
 
             return;

@@ -187,6 +187,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         $payload = array_replace($base, $allowedChanges);
         $payload['c_by_intercalary'] = $payload['c_by_intercalary'] ?? 0;
         $payload['c_dy_intercalary'] = $payload['c_dy_intercalary'] ?? 0;
+        $payload = BiogMainRepository::nullifyEmptyForeignKeys($payload);
 
         return [$payload, array_keys($allowedChanges)];
     }
@@ -205,6 +206,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
             : (int) $female;
         $payload['c_by_intercalary'] = (int) ($payload['c_by_intercalary'] ?? 0);
         $payload['c_dy_intercalary'] = (int) ($payload['c_dy_intercalary'] ?? 0);
+        $payload = BiogMainRepository::nullifyEmptyForeignKeys($payload);
 
         return (new ToolsRepository())->timestamp($payload);
     }

@@ -5,9 +5,11 @@ const DEFAULT_PAGE_SIZE = 20;
 /**
  * Tab-local 分頁 hook。
  * 管理頁碼、計算當前頁面的 slice、總頁數。
+ * 支援「顯示全部」模式，展開所有記錄。
  */
 export function useTabPager<T>(items: T[], pageSize: number = DEFAULT_PAGE_SIZE) {
     const [currentPage, setCurrentPage] = useState(1);
+    const [showAll, setShowAll] = useState(false);
 
     const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 
@@ -21,9 +23,10 @@ export function useTabPager<T>(items: T[], pageSize: number = DEFAULT_PAGE_SIZE)
     const safePage = Math.min(Math.max(1, currentPage), totalPages);
 
     const pageItems = useMemo(() => {
+        if (showAll) return items;
         const start = (safePage - 1) * pageSize;
         return items.slice(start, start + pageSize);
-    }, [items, safePage, pageSize]);
+    }, [items, safePage, pageSize, showAll]);
 
     return {
         currentPage: safePage,
@@ -31,5 +34,7 @@ export function useTabPager<T>(items: T[], pageSize: number = DEFAULT_PAGE_SIZE)
         pageItems,
         setCurrentPage,
         totalItems: items.length,
+        showAll,
+        setShowAll,
     };
 }

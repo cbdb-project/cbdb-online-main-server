@@ -38,7 +38,7 @@ interface Props {
 }
 
 export default function PostingsTab({ data, canEdit, postCE }: Props) {
-    const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
@@ -59,7 +59,7 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
                     <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
-            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
         </div>
     );
 }

@@ -39,7 +39,7 @@ interface Props {
  * 僅顯示直接關係，不做親屬的親屬展開（kinship network expansion）。
  */
 export default function KinshipTab({ data, canEdit, onSelectPerson }: Props) {
-    const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     return (
@@ -57,7 +57,7 @@ export default function KinshipTab({ data, canEdit, onSelectPerson }: Props) {
                     <LegacyEditButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
-            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
         </div>
     );
 }

@@ -32,7 +32,7 @@ interface Props {
 }
 
 export default function SourcesTab({ data, canEdit }: Props) {
-    const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.text_id));
 
     return (
@@ -91,7 +91,7 @@ export default function SourcesTab({ data, canEdit }: Props) {
                     </TabCard>
                 );
             })}
-            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
         </div>
     );
 }

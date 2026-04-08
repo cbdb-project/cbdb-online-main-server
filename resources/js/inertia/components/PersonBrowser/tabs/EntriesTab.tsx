@@ -39,7 +39,7 @@ interface Props {
 }
 
 export default function EntriesTab({ data, canEdit }: Props) {
-    const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
+    const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
 
     return (
         <div style={containerStyle}>
@@ -56,7 +56,7 @@ export default function EntriesTab({ data, canEdit }: Props) {
                     <LegacyEditButton tabKey="entries" pk={item.pk} canEdit={canEdit} />
                 </TabCard>
             ))}
-            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
         </div>
     );
 }

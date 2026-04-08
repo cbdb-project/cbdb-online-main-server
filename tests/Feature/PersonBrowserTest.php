@@ -761,7 +761,7 @@ class PersonBrowserTest extends TestCase {
             fn (Assert $page) => $page
                 ->component('PersonBrowser/Index')
                 ->where('canEditBasicInfo', true)
-                ->where('initialPersonId', null)
+                ->where('initialPersonId', 1)
                 ->where('initialKeyword', '')
                 ->where('initialTab', 'basic_info')
                 ->where('initialPage', 1)
@@ -791,6 +791,22 @@ class PersonBrowserTest extends TestCase {
     // ───────────────────────────────────
 
     #[Test]
+    public function test_person_browser_keeps_initial_person_id_null_when_query_omits_person_id(): void {
+        $response = $this->actingAs($this->user)->get(
+            route('app.person-browser.index') . '?keyword=%E7%8E%8B&page=3'
+        );
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('PersonBrowser/Index')
+                ->where('initialPersonId', null)
+                ->where('initialKeyword', '王')
+                ->where('initialPage', 3)
+        );
+    }
+
+    #[Test]
     public function test_search_requires_authentication(): void {
         $response = $this->getJson(route('app.person-browser.search'));
         $response->assertStatus(401);
@@ -807,9 +823,9 @@ class PersonBrowserTest extends TestCase {
             'pagination' => ['current_page', 'last_page', 'per_page', 'total'],
         ]);
         $response->assertJsonPath('pagination.total', 3);
-        $response->assertJsonPath('data.0.c_personid', 3);
+        $response->assertJsonPath('data.0.c_personid', 1);
         $response->assertJsonPath('data.1.c_personid', 2);
-        $response->assertJsonPath('data.2.c_personid', 1);
+        $response->assertJsonPath('data.2.c_personid', 3);
     }
 
     #[Test]

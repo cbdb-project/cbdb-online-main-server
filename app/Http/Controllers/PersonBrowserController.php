@@ -21,6 +21,7 @@ class PersonBrowserController extends Controller {
      */
     public function index(Request $request): InertiaResponse {
         $user = $request->user();
+        $hasQueryParameters = !empty($request->query());
 
         return Inertia::render('PersonBrowser/Index', [
             'tabKeys' => PersonBrowserService::validTabKeys(),
@@ -30,7 +31,9 @@ class PersonBrowserController extends Controller {
             'mutateEndpoint' => route('api.v2.mutate.web', [], false),
             'pinyinEndpoint' => '/api/select/search/pinyin',
             'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
-            'initialPersonId' => $request->input('person_id') ? (int) $request->input('person_id') : null,
+            'initialPersonId' => $request->has('person_id')
+                ? (int) $request->input('person_id')
+                : ($hasQueryParameters ? null : 1),
             'initialKeyword' => $request->input('keyword', ''),
             'initialDynasty' => $request->input('c_dy', ''),
             'initialTab' => $request->input('tab', 'basic_info'),

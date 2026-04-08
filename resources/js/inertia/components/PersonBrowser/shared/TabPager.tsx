@@ -4,10 +4,17 @@ interface Props {
     currentPage: number;
     totalPages: number;
     onPageChange: (page: number) => void;
+    showAll?: boolean;
+    onToggleShowAll?: () => void;
+    totalItems?: number;
 }
 
-export default function TabPager({ currentPage, totalPages, onPageChange }: Props) {
-    if (totalPages <= 1) return null;
+export default function TabPager({ currentPage, totalPages, onPageChange, showAll, onToggleShowAll, totalItems }: Props) {
+    const hasShowAllToggle = onToggleShowAll != null && (totalPages > 1 || showAll);
+
+    if (totalPages <= 1 && !showAll) {
+        return null;
+    }
 
     const pages: number[] = [];
     const range = 2;
@@ -29,44 +36,61 @@ export default function TabPager({ currentPage, totalPages, onPageChange }: Prop
 
     return (
         <div style={containerStyle}>
-            <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => onPageChange(currentPage - 1)}
-                style={{ ...btnStyle, ...(currentPage <= 1 ? disabledStyle : {}) }}
-            >
-                ‹
-            </button>
-            {display.map((item, idx) =>
-                item === 'ellipsis' ? (
-                    <span key={`e-${idx}`} style={ellipsisStyle}>
-                        …
-                    </span>
-                ) : (
+            {!showAll ? (
+                <>
                     <button
                         type="button"
-                        key={item}
-                        onClick={() => onPageChange(item)}
-                        style={{
-                            ...btnStyle,
-                            ...(item === currentPage ? activeStyle : {}),
-                        }}
+                        disabled={currentPage <= 1}
+                        onClick={() => onPageChange(currentPage - 1)}
+                        style={{ ...btnStyle, ...(currentPage <= 1 ? disabledStyle : {}) }}
                     >
-                        {item}
+                        ‹
                     </button>
-                ),
+                    {display.map((item, idx) =>
+                        item === 'ellipsis' ? (
+                            <span key={`e-${idx}`} style={ellipsisStyle}>
+                                …
+                            </span>
+                        ) : (
+                            <button
+                                type="button"
+                                key={item}
+                                onClick={() => onPageChange(item)}
+                                style={{
+                                    ...btnStyle,
+                                    ...(item === currentPage ? activeStyle : {}),
+                                }}
+                            >
+                                {item}
+                            </button>
+                        ),
+                    )}
+                    <button
+                        type="button"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => onPageChange(currentPage + 1)}
+                        style={{ ...btnStyle, ...(currentPage >= totalPages ? disabledStyle : {}) }}
+                    >
+                        ›
+                    </button>
+                    <span style={infoStyle}>
+                        第 {currentPage} / {totalPages} 頁
+                    </span>
+                </>
+            ) : (
+                <span style={infoStyle}>
+                    共 {totalItems ?? '—'} 筆記錄
+                </span>
             )}
-            <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => onPageChange(currentPage + 1)}
-                style={{ ...btnStyle, ...(currentPage >= totalPages ? disabledStyle : {}) }}
-            >
-                ›
-            </button>
-            <span style={infoStyle}>
-                第 {currentPage} / {totalPages} 頁
-            </span>
+            {hasShowAllToggle ? (
+                <button
+                    type="button"
+                    onClick={onToggleShowAll}
+                    style={showAllBtnStyle}
+                >
+                    {showAll ? '分頁顯示' : '顯示全部'}
+                </button>
+            ) : null}
         </div>
     );
 }
@@ -111,4 +135,17 @@ const infoStyle: React.CSSProperties = {
     marginLeft: 8,
     fontSize: '0.75rem',
     color: '#6c757d',
+};
+
+const showAllBtnStyle: React.CSSProperties = {
+    all: 'unset',
+    marginLeft: 12,
+    padding: '3px 10px',
+    fontSize: '0.78rem',
+    cursor: 'pointer',
+    borderRadius: 4,
+    border: '1px solid #c9d5e2',
+    backgroundColor: '#f8fafc',
+    color: '#204467',
+    fontWeight: 600,
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import BasicInfoView from './BasicInfoView';
 import AltNamesTab from './tabs/AltNamesTab';
 import AddressesTab from './tabs/AddressesTab';
@@ -68,35 +68,39 @@ export default function TabContentLoader({
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
 }: Props) {
-    const [cacheState, setCacheState] = useState<{ personId: number | null; tabs: Record<string, TabState> }>({
-        personId,
-        tabs: {},
-    });
+    const [cache, setCache] = useState<Record<string, TabState>>({});
+    const [fetchSeq, setFetchSeq] = useState(0);
+    const cachePersonRef = useRef<number | null>(personId);
 
-    // 人物切換時重設快取；本次渲染直接使用空快取，不等下一輪
-    const personChanged = cacheState.personId !== personId;
+    // 人物切換時同步清快取，本次渲染直接使用空值
+    const personChanged = cachePersonRef.current !== personId;
     if (personChanged) {
-        setCacheState({ personId, tabs: {} });
+        cachePersonRef.current = personId;
+        if (Object.keys(cache).length > 0) {
+            setCache({});
+        }
     }
 
-    const cache = personChanged ? {} : cacheState.tabs;
-    const setCache = (updater: Record<string, TabState> | ((prev: Record<string, TabState>) => Record<string, TabState>)) => {
-        setCacheState((prev) => ({
-            ...prev,
-            tabs: typeof updater === 'function' ? updater(prev.tabs) : updater,
-        }));
-    };
+    const effectiveCache = personChanged ? {} : cache;
 
-    // lazy load
+    // lazy load — 由 personId / activeTab / fetchSeq 驅動
     useEffect(() => {
         if (personId == null || !activeTab) return;
-        if (cache[activeTab]) return;
+
+        // 透過 updater 讀取最新 cache，避免把 cache 引用放進依賴
+        let alreadyCached = false;
+        setCache((prev) => {
+            if (prev[activeTab]) {
+                alreadyCached = true;
+                return prev;
+            }
+            return { ...prev, [activeTab]: { loading: true, error: null, data: null } };
+        });
+        if (alreadyCached) return;
 
         const url = tabEndpoint
             .replace('__PERSON_ID__', String(personId))
             .replace('__TAB_KEY__', activeTab);
-
-        setCache((prev) => ({ ...prev, [activeTab]: { loading: true, error: null, data: null } }));
 
         const controller = new AbortController();
 
@@ -124,22 +128,22 @@ export default function TabContentLoader({
         return () => {
             controller.abort();
         };
-    }, [personId, activeTab, tabEndpoint, cache]);
+    }, [personId, activeTab, tabEndpoint, fetchSeq]);
 
     const retryActiveTab = () => {
         setCache((prev) => {
             const next = { ...prev };
             delete next[activeTab];
-
             return next;
         });
+        setFetchSeq((s) => s + 1);
     };
 
     if (personId == null) {
         return null;
     }
 
-    const state = cache[activeTab];
+    const state = effectiveCache[activeTab];
 
     if (!state || state.loading) {
         return <div style={msgStyle}>載入中…</div>;

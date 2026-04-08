@@ -33,6 +33,8 @@ function buildPersonUrl(personId: number): string {
     return url.pathname + url.search;
 }
 
+const VISITED_RESET_CLASS = 'pb-person-link';
+
 export default function PeopleList({ people, pagination, selectedId, loading, onSelect, onPageChange }: Props) {
     const handleCardClick = (event: React.MouseEvent<HTMLAnchorElement>, personId: number) => {
         event.preventDefault();
@@ -55,11 +57,13 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
 
     return (
         <div style={containerStyle}>
+            <style>{`.${VISITED_RESET_CLASS}:visited { color: inherit; }`}</style>
             <div style={listStyle}>
                 {people.map((p) => (
                     <a
                         key={p.c_personid}
                         href={buildPersonUrl(p.c_personid)}
+                        className={VISITED_RESET_CLASS}
                         style={{
                             ...itemStyle,
                             ...(p.c_personid === selectedId ? selectedItemStyle : {}),

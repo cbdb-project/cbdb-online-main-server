@@ -107,7 +107,7 @@ const linkButtonStyle: React.CSSProperties = {
     border: 'none',
     background: 'none',
     padding: 0,
-    color: '#007bff',
+    color: '#A51C30',
     textDecoration: 'none',
     cursor: 'pointer',
     font: 'inherit',

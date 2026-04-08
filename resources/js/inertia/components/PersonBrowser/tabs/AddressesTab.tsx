@@ -86,7 +86,7 @@ const containerStyle: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-    color: '#007bff',
+    color: '#A51C30',
     textDecoration: 'none',
 };
 

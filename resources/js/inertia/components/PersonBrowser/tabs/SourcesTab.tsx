@@ -115,7 +115,7 @@ const badgesStyle: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-    color: '#007bff',
+    color: '#A51C30',
     textDecoration: 'none',
 };
 
@@ -123,7 +123,7 @@ const badgeMainStyle: React.CSSProperties = {
     fontSize: '0.6875rem',
     padding: '1px 6px',
     borderRadius: 3,
-    backgroundColor: '#007bff',
+    backgroundColor: '#A51C30',
     color: '#fff',
 };
 
@@ -131,6 +131,7 @@ const badgeBioStyle: React.CSSProperties = {
     fontSize: '0.6875rem',
     padding: '1px 6px',
     borderRadius: 3,
-    backgroundColor: '#28a745',
-    color: '#fff',
+    backgroundColor: '#fff',
+    color: '#A51C30',
+    border: '1px solid #A51C30',
 };

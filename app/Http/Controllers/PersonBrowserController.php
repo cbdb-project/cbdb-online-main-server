@@ -32,6 +32,7 @@ class PersonBrowserController extends Controller {
             'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'initialPersonId' => $request->input('person_id') ? (int) $request->input('person_id') : null,
             'initialKeyword' => $request->input('keyword', ''),
+            'initialDynasty' => $request->input('c_dy', ''),
             'initialTab' => $request->input('tab', 'basic_info'),
             'initialPage' => max(1, (int) $request->input('page', 1)),
         ]);

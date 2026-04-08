@@ -15,6 +15,7 @@ export interface PersonSummary {
     index_year_type: string | null;
     dynasty_chn: string | null;
     dynasty: string | null;
+    dynasty_start: number | null;
     index_addr_chn: string | null;
     index_addr: string | null;
     c_notes: string | null;
@@ -55,49 +56,39 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
     return (
         <div style={boxStyle}>
             <div style={headerStyle}>
-                <div style={mainNameStyle}>{summary.c_name_chn || '—'}</div>
-                {secondaryNames.length > 0 && (
-                    <div style={secondaryNameBlockStyle}>
-                        {secondaryNames.map((name) => (
-                            <div key={name} style={secondaryNameStyle}>{name}</div>
-                        ))}
-                    </div>
-                )}
-                <div style={metaRowStyle}>
-                    <MutedMeta label="CBDB ID (c_personid)" value={`#${summary.c_personid}`} />
-                    <MutedMeta label="性別 (c_female)" value={summary.gender} />
-                    <MutedMeta label="朝代 (c_dy)" value={summary.dynasty_chn} />
-                    <MutedMeta label="Index Address (c_index_addr_id)" value={summary.index_addr_chn} />
+                <div style={nameRowStyle}>
+                    <div style={mainNameStyle}>{summary.c_name_chn || '—'}</div>
+                    {secondaryNames.length > 0 && (
+                        <div style={secondaryNameBlockStyle}>
+                            {secondaryNames.map((name) => (
+                                <div key={name} style={secondaryNameStyle}>{name}</div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
-            <div style={gridStyle}>
-                <Field label="生卒年 (c_birthyear / c_deathyear)" value={lifespan} />
-                <Field label="Index Year (c_index_year)" value={summary.c_index_year != null ? String(summary.c_index_year) : ''} />
-                {summary.alt_name_zi && <Field label="字 (ALTNAME_DATA.c_alt_name_chn)" value={summary.alt_name_zi} />}
-                {summary.alt_name_hao && <Field label="號 (ALTNAME_DATA.c_alt_name_chn)" value={summary.alt_name_hao} />}
+            <div style={tagRowStyle}>
+                <Tag label="ID" value={`#${summary.c_personid}`} />
+                <Tag label="性別" value={summary.gender} />
+                <Tag label="朝代" value={summary.dynasty_chn} />
+                <Tag label="籍貫" value={summary.index_addr_chn} />
+                <Tag label="生卒" value={lifespan} />
+                <Tag label="Index Year" value={summary.c_index_year != null ? String(summary.c_index_year) : null} />
+                {summary.alt_name_zi ? <Tag label="字" value={summary.alt_name_zi} /> : null}
+                {summary.alt_name_hao ? <Tag label="號" value={summary.alt_name_hao} /> : null}
             </div>
         </div>
     );
 }
 
-function MutedMeta({ label, value }: { label: string; value: string | null | undefined }) {
+function Tag({ label, value }: { label: string; value: string | null | undefined }) {
     if (!value) return null;
 
     return (
-        <div style={mutedMetaStyle}>
-            <span style={mutedMetaLabelStyle}>{label}</span>
-            <span style={mutedMetaValueStyle}>{value}</span>
-        </div>
-    );
-}
-
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-    if (!value) return null;
-    return (
-        <div style={fieldStyle}>
-            <span style={fieldLabelStyle}>{label}</span>
-            <span style={fieldValueStyle}>{value}</span>
-        </div>
+        <span style={tagStyle}>
+            <span style={tagLabelStyle}>{label}</span>
+            <span style={tagValueStyle}>{value}</span>
+        </span>
     );
 }
 
@@ -112,6 +103,13 @@ const headerStyle: React.CSSProperties = {
     marginBottom: 12,
 };
 
+const nameRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: '4px 14px',
+};
+
 const mainNameStyle: React.CSSProperties = {
     fontSize: '1.65rem',
     fontWeight: 700,
@@ -122,60 +120,46 @@ const mainNameStyle: React.CSSProperties = {
 const secondaryNameBlockStyle: React.CSSProperties = {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '4px 12px',
-    marginTop: 4,
+    gap: '4px 10px',
+    alignItems: 'baseline',
 };
 
 const secondaryNameStyle: React.CSSProperties = {
-    fontSize: '0.98rem',
+    fontSize: '1.65rem',
     color: '#667788',
-    lineHeight: 1.35,
+    lineHeight: 1.2,
 };
 
-const metaRowStyle: React.CSSProperties = {
+const tagRowStyle: React.CSSProperties = {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '6px 16px',
-    marginTop: 10,
+    gap: 8,
 };
 
-const gridStyle: React.CSSProperties = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px 18px',
-};
-
-const fieldStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 5,
-    fontSize: '0.92rem',
-    alignItems: 'baseline',
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-    color: '#677786',
-    whiteSpace: 'nowrap',
-};
-
-const fieldValueStyle: React.CSSProperties = {
-    color: '#203142',
-    fontWeight: 600,
-};
-
-const mutedMetaStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: 5,
+const tagStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 6,
+    overflow: 'hidden',
     fontSize: '0.9rem',
+    lineHeight: 1,
+    border: '1px solid #e0d5d7',
 };
 
-const mutedMetaLabelStyle: React.CSSProperties = {
-    color: '#8090a0',
+const tagLabelStyle: React.CSSProperties = {
+    padding: '6px 10px',
+    backgroundColor: '#f9eced',
+    color: '#7a2030',
+    fontWeight: 600,
     whiteSpace: 'nowrap',
 };
 
-const mutedMetaValueStyle: React.CSSProperties = {
-    color: '#566678',
+const tagValueStyle: React.CSSProperties = {
+    padding: '6px 11px',
+    backgroundColor: '#fff',
+    color: '#2a1015',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
 };
 
 const msgStyle: React.CSSProperties = {

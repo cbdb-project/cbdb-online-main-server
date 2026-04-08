@@ -1,24 +1,43 @@
 import React, { useState, useCallback } from 'react';
 
+interface DynastyOption {
+    c_dy: number;
+    label: string;
+    count: number;
+}
+
 interface Props {
     keyword: string;
-    onSearch: (keyword: string) => void;
+    dynasty: string;
+    dynastyOptions: DynastyOption[];
+    onSearch: (keyword: string, dynasty: string) => void;
     onClear: () => void;
 }
 
-export default function PeopleSearchPanel({ keyword, onSearch, onClear }: Props) {
+export default function PeopleSearchPanel({ keyword, dynasty, dynastyOptions, onSearch, onClear }: Props) {
     const [input, setInput] = useState(keyword);
+    const [selectedDynasty, setSelectedDynasty] = useState(dynasty);
 
     const handleSubmit = useCallback(
         (e: React.FormEvent) => {
             e.preventDefault();
-            onSearch(input.trim());
+            onSearch(input.trim(), selectedDynasty);
+        },
+        [input, selectedDynasty, onSearch],
+    );
+
+    const handleDynastyChange = useCallback(
+        (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const value = e.target.value;
+            setSelectedDynasty(value);
+            onSearch(input.trim(), value);
         },
         [input, onSearch],
     );
 
     const handleClear = useCallback(() => {
         setInput('');
+        setSelectedDynasty('');
         onClear();
     }, [onClear]);
 
@@ -26,6 +45,12 @@ export default function PeopleSearchPanel({ keyword, onSearch, onClear }: Props)
     React.useEffect(() => {
         setInput(keyword);
     }, [keyword]);
+
+    React.useEffect(() => {
+        setSelectedDynasty(dynasty);
+    }, [dynasty]);
+
+    const total = dynastyOptions.reduce((sum, d) => sum + d.count, 0);
 
     return (
         <form onSubmit={handleSubmit} style={formStyle}>
@@ -36,11 +61,23 @@ export default function PeopleSearchPanel({ keyword, onSearch, onClear }: Props)
                 placeholder="搜尋人物（ID / 姓名 / 拼音）"
                 style={inputStyle}
             />
+            <select
+                value={selectedDynasty}
+                onChange={handleDynastyChange}
+                style={selectStyle}
+            >
+                <option value="">全部朝代{total > 0 ? ` (${total})` : ''}</option>
+                {dynastyOptions.map((d) => (
+                    <option key={d.c_dy} value={String(d.c_dy)}>
+                        {d.label} ({d.count})
+                    </option>
+                ))}
+            </select>
             <div style={btnGroupStyle}>
                 <button type="submit" style={searchBtnStyle}>
                     搜尋
                 </button>
-                {keyword && (
+                {(keyword || dynasty) && (
                     <button type="button" onClick={handleClear} style={clearBtnStyle}>
                         清除
                     </button>
@@ -68,6 +105,19 @@ const inputStyle: React.CSSProperties = {
     boxSizing: 'border-box',
 };
 
+const selectStyle: React.CSSProperties = {
+    padding: '6px 10px',
+    border: '1px solid #ced4da',
+    borderRadius: 4,
+    fontSize: '0.8125rem',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: '#fff',
+    color: '#495057',
+    cursor: 'pointer',
+};
+
 const btnGroupStyle: React.CSSProperties = {
     display: 'flex',
     gap: 6,
@@ -79,7 +129,7 @@ const searchBtnStyle: React.CSSProperties = {
     fontSize: '0.8125rem',
     border: 'none',
     borderRadius: 4,
-    backgroundColor: '#007bff',
+    backgroundColor: '#A51C30',
     color: '#fff',
     cursor: 'pointer',
 };

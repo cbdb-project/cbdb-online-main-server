@@ -33,9 +33,10 @@ interface AddressItem {
 interface Props {
     data: { tab: string; items: AddressItem[] };
     canEdit: boolean;
+    postCE?: boolean;
 }
 
-export default function AddressesTab({ data, canEdit }: Props) {
+export default function AddressesTab({ data, canEdit, postCE }: Props) {
     const { pageItems, currentPage, totalPages, setCurrentPage } = useTabPager(data.items);
 
     return (
@@ -48,7 +49,7 @@ export default function AddressesTab({ data, canEdit }: Props) {
                     <MetaRow label="地址 ID" value={item.addr_id} />
                     <MetaRow label="地址" value={formatBilingualLabel(item.addr_chn, item.addr)} />
                     <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year)} />
+                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
                     <MetaRow
                         label="經緯度"
                         value={

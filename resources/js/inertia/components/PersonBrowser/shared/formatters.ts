@@ -1,11 +1,21 @@
 /**
  * 格式化年份區間為顯示字串。
+ * 過濾哨兵值 0 和 -9999（CBDB 預設「未知」）。
+ * 當 postCE 為 true（人物朝代在公元後），額外過濾所有負數年份。
  */
-export function formatYearRange(first: number | null, last: number | null): string | null {
-    if (first && last) return `${first}–${last}`;
-    if (first) return `${first}–`;
-    if (last) return `–${last}`;
+export function formatYearRange(first: number | null, last: number | null, postCE: boolean = false): string | null {
+    const validFirst = isValidYear(first, postCE) ? first : null;
+    const validLast = isValidYear(last, postCE) ? last : null;
+    if (validFirst && validLast) return `${validFirst}–${validLast}`;
+    if (validFirst) return `${validFirst}–`;
+    if (validLast) return `–${validLast}`;
     return null;
+}
+
+function isValidYear(year: number | null, postCE: boolean): year is number {
+    if (year == null || year === 0 || year === -9999) return false;
+    if (postCE && year < 0) return false;
+    return true;
 }
 
 /**

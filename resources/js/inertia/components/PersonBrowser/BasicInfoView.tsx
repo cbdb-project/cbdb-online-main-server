@@ -296,13 +296,13 @@ export default function BasicInfoView({
                 save,
                 saving,
             ) : (
-                <>
+                <div style={{ paddingBottom: 16 }}>
                     {sections.map((section, index) => (
                         <div key={section.title} style={index === 0 ? sectionStyle : sectionWithDividerStyle}>
                             {renderReadOnlySection(section)}
                         </div>
                     ))}
-                </>
+                </div>
             )}
         </div>
     );
@@ -1030,8 +1030,9 @@ function renderPropertySection(section: Section) {
 
 function renderIndexSection(section: Section) {
     const fields = fieldMap(section);
-    const indexYearType = joinDisplayValues(fields['Index Year Type（中文）'], fields['Index Year Type（英文）']);
-    const indexAddress = joinDisplayValues(fields['Index Address（中文）'], fields['Index Address（英文）']);
+    const indexYearType = prefixId(fields['Index Year Type'], joinDisplayValues(fields['Index Year Type（中文）'], fields['Index Year Type（英文）']));
+    const indexAddress = prefixId(fields['Index Address ID'], joinDisplayValues(fields['Index Address（中文）'], fields['Index Address（英文）']));
+    const indexAddrType = prefixId(fields['Index Address Type'], joinDisplayValues(fields['Index Address Type（中文）'], fields['Index Address Type（英文）']));
 
     return (
         <>
@@ -1044,7 +1045,7 @@ function renderIndexSection(section: Section) {
                 </div>
                 <div style={indexAddressRowStyle}>
                     <ReadOnlyField label="Index Address (c_index_addr_id)" value={indexAddress} derived />
-                    <ReadOnlyField label="Index Address Type (c_index_addr_type_code)" value={fields['Index Address Type']} derived />
+                    <ReadOnlyField label="Index Address Type (c_index_addr_type_code)" value={indexAddrType} derived />
                 </div>
             </div>
         </>
@@ -1451,6 +1452,14 @@ function joinDisplayValues(left: FieldValue, right: FieldValue) {
     return parts.join(' / ');
 }
 
+function prefixId(id: FieldValue, display: string): string {
+    if (id == null || id === '' || display === '—') {
+        return display;
+    }
+
+    return `[${id}] ${display}`;
+}
+
 function scrollPanelToTop(panelRef: React.RefObject<HTMLDivElement | null>) {
     window.requestAnimationFrame(() => {
         panelRef.current?.scrollIntoView({
@@ -1523,7 +1532,7 @@ const buttonBaseStyle: React.CSSProperties = {
 
 const primaryButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
-    backgroundColor: '#255f93',
+    backgroundColor: '#A51C30',
     color: '#fff',
 };
 
@@ -1562,12 +1571,15 @@ const errorMessageStyle: React.CSSProperties = {
 };
 
 const sectionStyle: React.CSSProperties = {
-    padding: 20,
+    margin: '16px 16px 0',
+    padding: '20px 20px 24px',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #dfe6ee',
+    borderRadius: 10,
 };
 
 const sectionWithDividerStyle: React.CSSProperties = {
     ...sectionStyle,
-    borderTop: '1px solid #e8edf3',
 };
 
 const sectionHeadingStyle: React.CSSProperties = {
@@ -1576,14 +1588,18 @@ const sectionHeadingStyle: React.CSSProperties = {
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
+    padding: '10px 14px',
+    backgroundColor: '#f9eced',
+    borderRadius: 6,
+    borderLeft: '3px solid #A51C30',
     flexWrap: 'wrap',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
     margin: 0,
-    fontSize: '1rem',
+    fontSize: '1.08rem',
     fontWeight: 700,
-    color: '#233444',
+    color: '#3d1019',
     letterSpacing: '0.01em',
 };
 
@@ -1592,8 +1608,8 @@ const sectionBadgeStyle: React.CSSProperties = {
     alignItems: 'center',
     padding: '5px 10px',
     borderRadius: 999,
-    backgroundColor: '#eef4fb',
-    color: '#30567a',
+    backgroundColor: '#fbeef0',
+    color: '#7a2030',
     fontSize: '0.78rem',
     fontWeight: 700,
 };
@@ -1611,7 +1627,10 @@ const editorNameGroupGridStyle: React.CSSProperties = {
 };
 
 const nameGroupCardStyle: React.CSSProperties = {
-    padding: 0,
+    padding: '14px 14px 16px',
+    border: '1px solid #dfe6ee',
+    borderRadius: 8,
+    backgroundColor: '#fdfdfe',
 };
 
 const editorNameGroupStyle: React.CSSProperties = {
@@ -1622,9 +1641,9 @@ const editorNameGroupStyle: React.CSSProperties = {
 };
 
 const nameGroupTitleStyle: React.CSSProperties = {
-    fontSize: '0.8rem',
+    fontSize: '0.88rem',
     fontWeight: 700,
-    color: '#48627d',
+    color: '#6b2533',
     marginBottom: 12,
     textAlign: 'center',
 };
@@ -1673,13 +1692,16 @@ const timelineGridStyle: React.CSSProperties = {
 };
 
 const timelineCardStyle: React.CSSProperties = {
-    padding: 0,
+    padding: 16,
+    border: '1px solid #dfe6ee',
+    borderRadius: 8,
+    backgroundColor: '#fdfdfe',
 };
 
 const timelineTitleStyle: React.CSSProperties = {
-    fontSize: '0.9rem',
+    fontSize: '0.94rem',
     fontWeight: 700,
-    color: '#35516b',
+    color: '#6b2533',
     marginBottom: 12,
     textAlign: 'center',
 };
@@ -1705,9 +1727,9 @@ const fullWidthStyle: React.CSSProperties = {
 };
 
 const fieldLabelStyle: React.CSSProperties = {
-    fontSize: '0.77rem',
-    fontWeight: 700,
-    color: '#667788',
+    fontSize: '0.84rem',
+    fontWeight: 600,
+    color: '#556677',
     marginBottom: 6,
     textAlign: 'left',
     whiteSpace: 'nowrap',
@@ -1727,6 +1749,7 @@ const fieldValueBoxStyle: React.CSSProperties = {
     border: '1px solid #cfd7e2',
     backgroundColor: '#fff',
     color: '#1f2d3d',
+    fontSize: '0.92rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1896,9 +1919,9 @@ const notesBoxStyle: React.CSSProperties = {
 };
 
 const notesLabelStyle: React.CSSProperties = {
-    fontSize: '0.77rem',
-    fontWeight: 700,
-    color: '#667788',
+    fontSize: '0.84rem',
+    fontWeight: 600,
+    color: '#556677',
     marginBottom: 6,
     textAlign: 'left',
 };

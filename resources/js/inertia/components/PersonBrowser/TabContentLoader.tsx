@@ -126,7 +126,7 @@ export default function TabContentLoader({
     };
 
     if (!personId) {
-        return <div style={msgStyle}>請先選擇人物</div>;
+        return null;
     }
 
     const state = cache[activeTab];

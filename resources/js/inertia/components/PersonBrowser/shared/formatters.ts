@@ -2,9 +2,11 @@
  * 格式化年份區間為顯示字串。
  */
 export function formatYearRange(first: number | null, last: number | null): string | null {
-    if (first && last) return `${first}–${last}`;
-    if (first) return `${first}–`;
-    if (last) return `–${last}`;
+    const validFirst = first != null && first > 0 ? first : null;
+    const validLast = last != null && last > 0 ? last : null;
+    if (validFirst && validLast) return `${validFirst}–${validLast}`;
+    if (validFirst) return `${validFirst}–`;
+    if (validLast) return `–${validLast}`;
     return null;
 }
 

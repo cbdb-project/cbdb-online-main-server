@@ -91,7 +91,7 @@ const btnStyle: React.CSSProperties = {
 };
 
 const activeStyle: React.CSSProperties = {
-    backgroundColor: '#007bff',
+    backgroundColor: '#A51C30',
     color: '#fff',
     fontWeight: 600,
 };

@@ -14,6 +14,7 @@ class PersonBrowserService {
      */
     public function search(Request $request): array {
         $q = trim($request->input('q', ''));
+        $dynasty = $request->input('c_dy', '');
         $perPage = (int) $request->input('per_page', 20);
         $page = (int) $request->input('page', 1);
         $perPage = max(1, min($perPage, 100));
@@ -21,6 +22,10 @@ class PersonBrowserService {
 
         $idQuery = DB::table('BIOG_MAIN')
             ->select('BIOG_MAIN.c_personid');
+
+        if ($dynasty !== '') {
+            $idQuery->where('BIOG_MAIN.c_dy', '=', (int) $dynasty);
+        }
 
         if ($q !== '') {
             if (ctype_digit($q)) {
@@ -37,6 +42,17 @@ class PersonBrowserService {
                     ->unique()
                     ->values()
                     ->toArray();
+
+                if ($dynasty !== '' && !empty($ftsIds)) {
+                    // 倒排索引結果需要過濾朝代
+                    $ftsIds = DB::table('BIOG_MAIN')
+                        ->whereIn('c_personid', $ftsIds)
+                        ->where('c_dy', '=', (int) $dynasty)
+                        ->pluck('c_personid')
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->toArray();
+                }
 
                 if (!empty($ftsIds)) {
                     $idQuery->whereIn('BIOG_MAIN.c_personid', $ftsIds)
@@ -57,6 +73,9 @@ class PersonBrowserService {
         } else {
             $idQuery->orderBy('BIOG_MAIN.c_personid', 'DESC');
         }
+
+        // 取得朝代分布（基於當前搜尋條件，不含朝代篩選）
+        $dynastyCounts = $this->buildDynastyCounts($q);
 
         $paginator = $idQuery->paginate($perPage, ['BIOG_MAIN.c_personid'], 'page', $page);
         $pageIds = collect($paginator->items())
@@ -95,6 +114,21 @@ class PersonBrowserService {
             ->values()
             ->all();
 
+        // 批量查詢字、號
+        $altNames = DB::table('ALTNAME_DATA')
+            ->select(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'])
+            ->whereIn('c_personid', $pageIds)
+            ->whereIn('c_alt_name_type_code', [4, 5])
+            ->get()
+            ->groupBy('c_personid');
+
+        foreach ($rows as &$row) {
+            $personAltNames = $altNames->get((int) $row['c_personid'], collect());
+            $row['alt_name_zi'] = $personAltNames->where('c_alt_name_type_code', 4)->pluck('c_alt_name_chn')->first() ?? '';
+            $row['alt_name_hao'] = $personAltNames->where('c_alt_name_type_code', 5)->pluck('c_alt_name_chn')->first() ?? '';
+        }
+        unset($row);
+
         $orderMap = array_flip($pageIds);
         usort($rows, function (array $left, array $right) use ($orderMap) {
             return ($orderMap[(int) $left['c_personid']] ?? PHP_INT_MAX)
@@ -109,6 +143,7 @@ class PersonBrowserService {
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+            'dynasty_counts' => $dynastyCounts,
         ];
     }
 
@@ -130,6 +165,58 @@ class PersonBrowserService {
             implode(' ', $cases),
             count($normalized)
         );
+    }
+
+    /**
+     * 取得符合搜尋條件的人物的朝代分布統計。
+     *
+     * @return array<int, array{c_dy: int, label: string, count: int}>
+     */
+    private function buildDynastyCounts(string $q): array {
+        $query = DB::table('BIOG_MAIN')
+            ->join('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+            ->selectRaw('COUNT(*) as cnt');
+
+        if ($q !== '') {
+            if (ctype_digit($q)) {
+                $query->where('BIOG_MAIN.c_personid', '=', (int) $q);
+            } else {
+                $ftsIds = DB::table('CBDB__NAME_FTS')
+                    ->where('search_term', 'LIKE', $q . '%')
+                    ->orderByRaw('LENGTH(search_term) ASC')
+                    ->limit(500)
+                    ->pluck('c_personid')
+                    ->unique()
+                    ->values()
+                    ->toArray();
+
+                if (!empty($ftsIds)) {
+                    $query->whereIn('BIOG_MAIN.c_personid', $ftsIds);
+                } else {
+                    $query->where(function ($sub) use ($q) {
+                        $sub->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
+                            ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $q . '%')
+                            ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
+                            ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
+                            ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $q . '%')
+                            ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $q . '%');
+                    });
+                }
+            }
+        }
+
+        return $query
+            ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+            ->orderByRaw('cnt DESC')
+            ->get()
+            ->map(fn ($row) => [
+                'c_dy' => (int) $row->c_dy,
+                'label' => $row->c_dynasty_chn,
+                'count' => (int) $row->cnt,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -301,12 +388,15 @@ class PersonBrowserService {
                 'ETH.c_name AS c_ethnicity',
                 'CHR.c_choronym_chn',
                 'CHR.c_choronym_desc AS c_choronym',
+                'INDEX_ADDR_TYPE.c_addr_desc_chn AS index_addr_type_chn',
+                'INDEX_ADDR_TYPE.c_addr_desc AS index_addr_type_eng',
             ])
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
             ->leftJoin('BIOG_MAIN AS INDEX_SOURCE_PERSON', 'INDEX_SOURCE_PERSON.c_personid', '=', 'BIOG_MAIN.c_index_year_source_id')
             ->leftJoin('ETHNICITY_TRIBE_CODES AS ETH', 'ETH.c_ethnicity_code', '=', 'BIOG_MAIN.c_ethnicity_code')
             ->leftJoin('CHORONYM_CODES AS CHR', 'CHR.c_choronym_code', '=', 'BIOG_MAIN.c_choronym_code')
+            ->leftJoin('BIOG_ADDR_CODES AS INDEX_ADDR_TYPE', 'INDEX_ADDR_TYPE.c_addr_type', '=', 'BIOG_MAIN.c_index_addr_type_code')
             ->where('BIOG_MAIN.c_personid', $personId)
             ->first();
 
@@ -430,9 +520,12 @@ class PersonBrowserService {
                         ['label' => 'Index Year Type（中文）', 'value' => $indexYearTypeChn],
                         ['label' => 'Index Year Type（英文）', 'value' => $indexYearTypeEng],
                         ['label' => 'Index Year Source', 'value' => $indexYearSource],
+                        ['label' => 'Index Address ID', 'value' => $row['c_index_addr_id'] ?? ''],
                         ['label' => 'Index Address（中文）', 'value' => $row['index_addr_chn'] ?? ''],
                         ['label' => 'Index Address（英文）', 'value' => $row['index_addr'] ?? ''],
                         ['label' => 'Index Address Type', 'value' => $row['c_index_addr_type_code'] ?? ''],
+                        ['label' => 'Index Address Type（中文）', 'value' => $row['index_addr_type_chn'] ?? ''],
+                        ['label' => 'Index Address Type（英文）', 'value' => $row['index_addr_type_eng'] ?? ''],
                     ],
                 ],
                 [

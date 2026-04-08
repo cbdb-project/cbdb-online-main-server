@@ -45,6 +45,8 @@ export default function PersonBrowserIndex() {
 
     // ── Core state ──
     const [keyword, setKeyword] = useState(initialKeyword || '');
+    const [dynasty, setDynasty] = useState('');
+    const [dynastyOptions, setDynastyOptions] = useState<Array<{ c_dy: number; label: string; count: number }>>([]);
     const [page, setPage] = useState(initialPage || 1);
     const [people, setPeople] = useState<PersonListItem[]>([]);
     const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -147,14 +149,20 @@ export default function PersonBrowserIndex() {
 
     // ── Search ──
     const doSearch = useCallback(
-        (q: string, p: number) => {
+        (q: string, p: number, dy: string = '') => {
             setListLoading(true);
-            const url = `${searchEndpoint}?q=${encodeURIComponent(q)}&page=${p}&per_page=20`;
+            let url = `${searchEndpoint}?q=${encodeURIComponent(q)}&page=${p}&per_page=20`;
+            if (dy) {
+                url += `&c_dy=${encodeURIComponent(dy)}`;
+            }
             fetch(url)
                 .then((r) => r.json())
                 .then((json) => {
                     setPeople(json.data || []);
                     setPagination(json.pagination || null);
+                    if (json.dynasty_counts) {
+                        setDynastyOptions(json.dynasty_counts);
+                    }
                 })
                 .catch(() => {
                     setPeople([]);
@@ -170,14 +178,15 @@ export default function PersonBrowserIndex() {
         setPage(state.page);
         setActiveTab(state.tab);
         setSelectedId(state.personId);
-        doSearch(state.keyword, state.page);
-    }, [doSearch]);
+        doSearch(state.keyword, state.page, dynasty);
+    }, [doSearch, dynasty]);
 
     const handleSearch = useCallback(
-        (q: string) => {
+        (q: string, dy: string) => {
             setKeyword(q);
+            setDynasty(dy);
             setPage(1);
-            doSearch(q, 1);
+            doSearch(q, 1, dy);
             updateUrl({ keyword: q, page: 1 });
         },
         [doSearch, updateUrl],
@@ -185,18 +194,19 @@ export default function PersonBrowserIndex() {
 
     const handleClear = useCallback(() => {
         setKeyword('');
+        setDynasty('');
         setPage(1);
-        doSearch('', 1);
+        doSearch('', 1, '');
         updateUrl({ keyword: '', page: 1 });
     }, [doSearch, updateUrl]);
 
     const handlePageChange = useCallback(
         (p: number) => {
             setPage(p);
-            doSearch(keyword, p);
+            doSearch(keyword, p, dynasty);
             updateUrl({ keyword, page: p });
         },
-        [keyword, doSearch, updateUrl],
+        [keyword, dynasty, doSearch, updateUrl],
     );
 
     // ── Select person ──
@@ -213,8 +223,8 @@ export default function PersonBrowserIndex() {
 
     const handleBasicInfoSaved = useCallback(() => {
         setSummaryRefreshKey((prev) => prev + 1);
-        doSearch(keyword, page);
-    }, [doSearch, keyword, page]);
+        doSearch(keyword, page, dynasty);
+    }, [doSearch, keyword, page, dynasty]);
 
     const registerBasicInfoSaveHandler = useCallback((handler: (() => Promise<boolean>) | null) => {
         basicInfoSaveHandlerRef.current = handler;
@@ -270,7 +280,7 @@ export default function PersonBrowserIndex() {
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
-            doSearch(initialKeyword || '', initialPage || 1);
+            doSearch(initialKeyword || '', initialPage || 1, '');
         }
     }, [doSearch, initialKeyword, initialPage]);
 
@@ -408,7 +418,7 @@ export default function PersonBrowserIndex() {
                             </button>
                         </div>
                     ) : null}
-                    <PeopleSearchPanel keyword={keyword} onSearch={handleSearch} onClear={handleClear} />
+                    <PeopleSearchPanel keyword={keyword} dynasty={dynasty} dynastyOptions={dynastyOptions} onSearch={handleSearch} onClear={handleClear} />
                     <PeopleList
                         people={people}
                         pagination={pagination}

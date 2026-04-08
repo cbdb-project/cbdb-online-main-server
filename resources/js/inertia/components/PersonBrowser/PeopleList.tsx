@@ -7,6 +7,8 @@ export interface PersonListItem {
     c_dynasty_chn: string | null;
     c_index_year: number | null;
     index_addr_chn: string | null;
+    alt_name_zi?: string | null;
+    alt_name_hao?: string | null;
 }
 
 export interface Pagination {
@@ -66,17 +68,12 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
                                 {p.c_name && <span style={romanNameStyle}>{p.c_name}</span>}
                             </div>
                         </div>
-                        <div style={secondaryRowStyle}>
-                            <div style={secondaryLeftStyle}>
-                                <span>{p.c_dynasty_chn || '—'}</span>
-                                {p.c_index_year != null && (
-                                    <>
-                                        <span style={separatorStyle}>/</span>
-                                        <span>{p.c_index_year}</span>
-                                    </>
-                                )}
-                            </div>
-                            <div style={secondaryRightStyle}>{p.index_addr_chn || ''}</div>
+                        <div style={tagRowStyle}>
+                            <MiniTag label="朝" value={p.c_dynasty_chn} />
+                            <MiniTag label="年" value={p.c_index_year != null ? String(p.c_index_year) : null} />
+                            <MiniTag label="地" value={p.index_addr_chn} />
+                            <MiniTag label="字" value={p.alt_name_zi} />
+                            <MiniTag label="號" value={p.alt_name_hao} />
                         </div>
                     </div>
                 ))}
@@ -111,6 +108,17 @@ export default function PeopleList({ people, pagination, selectedId, loading, on
     );
 }
 
+function MiniTag({ label, value }: { label: string; value: string | null | undefined }) {
+    if (!value) return null;
+
+    return (
+        <span style={miniTagStyle}>
+            <span style={miniTagLabelStyle}>{label}</span>
+            <span style={miniTagValueStyle}>{value}</span>
+        </span>
+    );
+}
+
 const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -142,12 +150,12 @@ const itemStyle: React.CSSProperties = {
 };
 
 const selectedItemStyle: React.CSSProperties = {
-    backgroundColor: '#eef5ff',
-    borderTopColor: '#bfd7f5',
-    borderRightColor: '#bfd7f5',
-    borderBottomColor: '#bfd7f5',
-    borderLeftColor: '#bfd7f5',
-    boxShadow: '0 2px 6px rgba(0, 123, 255, 0.08)',
+    backgroundColor: '#fdf5f6',
+    borderTopColor: '#e0b0b7',
+    borderRightColor: '#e0b0b7',
+    borderBottomColor: '#e0b0b7',
+    borderLeftColor: '#e0b0b7',
+    boxShadow: '0 2px 6px rgba(165, 28, 48, 0.08)',
 };
 
 const topRowStyle: React.CSSProperties = {
@@ -191,34 +199,40 @@ const romanNameStyle: React.CSSProperties = {
     wordBreak: 'break-word',
 };
 
-const secondaryRowStyle: React.CSSProperties = {
+const tagRowStyle: React.CSSProperties = {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 4,
     marginTop: 8,
-    color: '#516170',
-    fontSize: '0.75rem',
 };
 
-const secondaryLeftStyle: React.CSSProperties = {
-    display: 'flex',
+const miniTagStyle: React.CSSProperties = {
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
-    minWidth: 0,
+    borderRadius: 4,
+    overflow: 'hidden',
+    fontSize: '0.82rem',
+    lineHeight: 1,
+    border: '1px solid #e8dfe0',
 };
 
-const secondaryRightStyle: React.CSSProperties = {
-    color: '#6b7785',
-    textAlign: 'right',
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+const miniTagLabelStyle: React.CSSProperties = {
+    padding: '3px 6px',
+    backgroundColor: '#f9eced',
+    color: '#7a2030',
+    fontWeight: 600,
     whiteSpace: 'nowrap',
 };
 
-const separatorStyle: React.CSSProperties = {
-    color: '#a0acb8',
+const miniTagValueStyle: React.CSSProperties = {
+    padding: '3px 6px',
+    backgroundColor: '#fff',
+    color: '#3a1520',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    maxWidth: 80,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
 };
 
 const pagerStyle: React.CSSProperties = {

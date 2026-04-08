@@ -836,9 +836,10 @@ class PersonBrowserTest extends TestCase {
             'pagination' => ['current_page', 'last_page', 'per_page', 'total'],
         ]);
         $response->assertJsonPath('pagination.total', 3);
-        $response->assertJsonPath('data.0.c_personid', 1);
+        // 預設排序為降序（DESC）
+        $response->assertJsonPath('data.0.c_personid', 3);
         $response->assertJsonPath('data.1.c_personid', 2);
-        $response->assertJsonPath('data.2.c_personid', 3);
+        $response->assertJsonPath('data.2.c_personid', 1);
     }
 
     #[Test]
@@ -868,6 +869,30 @@ class PersonBrowserTest extends TestCase {
 
         $response->assertOk();
         $response->assertJsonPath('data.0.c_personid', 1);
+    }
+
+    #[Test]
+    public function test_search_by_fts_honors_sort_direction(): void {
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['search_term' => '太守', 'c_personid' => 2],
+            ['search_term' => '太史', 'c_personid' => 3],
+        ]);
+
+        $ascendingResponse = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.search') . '?q=太&sort=asc');
+
+        $ascendingResponse->assertOk();
+        $ascendingResponse->assertJsonPath('data.0.c_personid', 1);
+        $ascendingResponse->assertJsonPath('data.1.c_personid', 2);
+        $ascendingResponse->assertJsonPath('data.2.c_personid', 3);
+
+        $descendingResponse = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.search') . '?q=太&sort=desc');
+
+        $descendingResponse->assertOk();
+        $descendingResponse->assertJsonPath('data.0.c_personid', 3);
+        $descendingResponse->assertJsonPath('data.1.c_personid', 2);
+        $descendingResponse->assertJsonPath('data.2.c_personid', 1);
     }
 
     // ───────────────────────────────────

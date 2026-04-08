@@ -32,6 +32,7 @@ class PersonBrowserService {
         $page = (int) $request->input('page', 1);
         $perPage = max(1, min($perPage, 100));
         $page = max(1, $page);
+        $sortDirection = strtolower($request->input('sort', 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
         $idQuery = DB::table('BIOG_MAIN')
             ->select('BIOG_MAIN.c_personid');
@@ -44,7 +45,7 @@ class PersonBrowserService {
             if (ctype_digit($q)) {
                 // 純數字：精確 personid 查詢
                 $idQuery->where('BIOG_MAIN.c_personid', '=', (int) $q)
-                    ->orderBy('BIOG_MAIN.c_personid', 'ASC');
+                    ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
             } else {
                 // 先嘗試倒排索引
                 $ftsIds = DB::table('CBDB__NAME_FTS')
@@ -69,7 +70,7 @@ class PersonBrowserService {
 
                 if (!empty($ftsIds)) {
                     $idQuery->whereIn('BIOG_MAIN.c_personid', $ftsIds)
-                        ->orderByRaw($this->buildIdOrderCase('BIOG_MAIN.c_personid', $ftsIds));
+                        ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
                 } else {
                     // 回退：多欄位 LIKE 搜尋
                     $idQuery->where(function ($sub) use ($q) {
@@ -80,11 +81,11 @@ class PersonBrowserService {
                             ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $q . '%')
                             ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $q . '%');
                     })
-                        ->orderBy('BIOG_MAIN.c_personid', 'ASC');
+                        ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
                 }
             }
         } else {
-            $idQuery->orderBy('BIOG_MAIN.c_personid', 'ASC');
+            $idQuery->orderBy('BIOG_MAIN.c_personid', $sortDirection);
         }
 
         // 取得朝代分布（基於當前搜尋條件，不含朝代篩選）
@@ -159,26 +160,6 @@ class PersonBrowserService {
             ],
             'dynasty_counts' => $dynastyCounts,
         ];
-    }
-
-    private function buildIdOrderCase(string $column, array $ids): string {
-        $normalized = array_values(array_map('intval', $ids));
-
-        if (empty($normalized)) {
-            return sprintf('%s ASC', $column);
-        }
-
-        $cases = [];
-        foreach ($normalized as $index => $id) {
-            $cases[] = sprintf('WHEN %d THEN %d', $id, $index);
-        }
-
-        return sprintf(
-            'CASE %s %s ELSE %d END',
-            $column,
-            implode(' ', $cases),
-            count($normalized)
-        );
     }
 
     /**

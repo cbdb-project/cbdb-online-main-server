@@ -12,6 +12,7 @@ import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
 
 interface PostingItem {
     pk: {
@@ -26,7 +27,13 @@ interface PostingItem {
     first_year: number | null;
     last_year: number | null;
     tenure_summary: string | null;
-    addresses: Array<{ addr_chn: string | null; addr: string | null }>;
+    addresses: Array<{
+        addr_id: number | null;
+        addr_chn: string | null;
+        addr: string | null;
+        longitude: number | null;
+        latitude: number | null;
+    }>;
     address_summary: string | null;
     source_id: number | null;
     pages: string | null;
@@ -34,7 +41,7 @@ interface PostingItem {
 }
 
 interface Props {
-    data: { tab: string; items: PostingItem[] };
+    data: { tab: string; person_index_year?: number | null; items: PostingItem[] };
     canEdit: boolean;
     postCE?: boolean;
 }
@@ -54,7 +61,25 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
                     <MetaRow label="官名" value={formatBilingualLabel(item.office_chn, item.office)} />
                     <MetaRow label="任期" value={item.tenure_summary} />
                     <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow label="地址" value={item.address_summary} />
+                    <MetaRow
+                        label="地址"
+                        value={item.addresses.length > 0 ? (
+                            <span style={addressListStyle}>
+                                {item.addresses.map((address, index) => (
+                                    <React.Fragment key={`${address.addr_id ?? 'addr'}-${index}`}>
+                                        {index > 0 ? <span>；</span> : null}
+                                        <AddressDisplayWithMap
+                                            labelChn={address.addr_chn}
+                                            labelEng={address.addr}
+                                            latitude={address.latitude}
+                                            longitude={address.longitude}
+                                            year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}
+                                        />
+                                    </React.Fragment>
+                                ))}
+                            </span>
+                        ) : item.address_summary}
+                    />
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
@@ -74,3 +99,18 @@ const containerStyle: React.CSSProperties = {
     flexDirection: 'column',
     gap: 8,
 };
+
+const addressListStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+};
+
+function inferDisplayYear(firstYear: number | null, lastYear: number | null, fallbackYear: number | null): number | null {
+    if (firstYear !== null && lastYear !== null) {
+        return Math.round((firstYear + lastYear) / 2);
+    }
+
+    return firstYear ?? lastYear ?? fallbackYear;
+}

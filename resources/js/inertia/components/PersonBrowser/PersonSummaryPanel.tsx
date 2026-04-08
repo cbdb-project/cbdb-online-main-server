@@ -1,4 +1,5 @@
 import React from 'react';
+import AddressDisplayWithMap from './shared/AddressDisplayWithMap';
 
 export interface PersonSummary {
     c_personid: number;
@@ -18,6 +19,8 @@ export interface PersonSummary {
     dynasty_start: number | null;
     index_addr_chn: string | null;
     index_addr: string | null;
+    index_addr_longitude: number | null;
+    index_addr_latitude: number | null;
     c_notes: string | null;
     alt_name_zi: string;
     alt_name_hao: string;
@@ -71,7 +74,18 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
                 <Tag label="ID" value={`#${summary.c_personid}`} />
                 <Tag label="性別" value={summary.gender} />
                 <Tag label="朝代" value={summary.dynasty_chn} />
-                <Tag label="籍貫" value={summary.index_addr_chn} />
+                <Tag
+                    label="籍貫"
+                    value={(
+                        <AddressDisplayWithMap
+                            labelChn={summary.index_addr_chn}
+                            labelEng={summary.index_addr}
+                            latitude={summary.index_addr_latitude}
+                            longitude={summary.index_addr_longitude}
+                            year={summary.c_index_year}
+                        />
+                    )}
+                />
                 <Tag label="生卒" value={lifespan} />
                 <Tag label="Index Year" value={summary.c_index_year != null ? String(summary.c_index_year) : null} />
                 {summary.alt_name_zi ? <Tag label="字" value={summary.alt_name_zi} /> : null}
@@ -81,7 +95,7 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
     );
 }
 
-function Tag({ label, value }: { label: string; value: string | null | undefined }) {
+function Tag({ label, value }: { label: string; value: React.ReactNode }) {
     if (!value) return null;
 
     return (

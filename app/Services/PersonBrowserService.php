@@ -71,7 +71,7 @@ class PersonBrowserService {
                 }
             }
         } else {
-            $idQuery->orderBy('BIOG_MAIN.c_personid', 'DESC');
+            $idQuery->orderBy('BIOG_MAIN.c_personid', 'ASC');
         }
 
         // 取得朝代分布（基於當前搜尋條件，不含朝代篩選）

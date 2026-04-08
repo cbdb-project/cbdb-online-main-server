@@ -101,7 +101,8 @@ class PersonBrowserTest extends TestCase {
             CREATE TABLE IF NOT EXISTS DYNASTIES (
                 c_dy INTEGER PRIMARY KEY,
                 c_dynasty VARCHAR(255),
-                c_dynasty_chn VARCHAR(255)
+                c_dynasty_chn VARCHAR(255),
+                c_start INTEGER
             )
         ');
 
@@ -455,8 +456,8 @@ class PersonBrowserTest extends TestCase {
 
     protected function seedTestData(): void {
         DB::table('DYNASTIES')->insert([
-            ['c_dy' => 1, 'c_dynasty' => 'Tang', 'c_dynasty_chn' => '唐'],
-            ['c_dy' => 2, 'c_dynasty' => 'Song', 'c_dynasty_chn' => '宋'],
+            ['c_dy' => 1, 'c_dynasty' => 'Tang', 'c_dynasty_chn' => '唐', 'c_start' => 618],
+            ['c_dy' => 2, 'c_dynasty' => 'Song', 'c_dynasty_chn' => '宋', 'c_start' => 960],
         ]);
 
         DB::table('ADDR_CODES')->insert([

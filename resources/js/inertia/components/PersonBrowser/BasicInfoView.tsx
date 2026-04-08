@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 interface Props {
     sections: Section[];
@@ -84,6 +84,10 @@ export default function BasicInfoView({
         () => buildDirtyFieldSet(form, initialState, formState),
         [form, initialState, formState],
     );
+    const editableKeys = useMemo(() => {
+        if (!form?.fields) return new Set<string>();
+        return new Set(Object.entries(form.fields).filter(([, f]) => f.editable).map(([k]) => k));
+    }, [form]);
 
     useEffect(() => {
         setEditing(false);
@@ -138,13 +142,30 @@ export default function BasicInfoView({
         setError(null);
     };
 
-    const cancelEdit = () => {
+    const deleteFormRef = useRef<HTMLFormElement | null>(null);
+
+    const handleDelete = useCallback(() => {
+        if (!canEdit || !personId) return;
+        if (!window.confirm('您真的確定要刪除此人物嗎？\n\n此操作無法撤銷，請確認！')) return;
+        deleteFormRef.current?.submit();
+    }, [canEdit, personId]);
+
+    const cancelEdit = useCallback(() => {
         setEditing(false);
         setFormState(initialState);
         setFieldErrors({});
         setMessage(null);
         setError(null);
-    };
+    }, [initialState]);
+
+    useEffect(() => {
+        if (!editing) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') cancelEdit();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [editing, cancelEdit]);
 
     const updateField = (key: string, value: string) => {
         setFormState((prev) => applyDerivedFields({
@@ -255,9 +276,18 @@ export default function BasicInfoView({
                     </div>
                     <div style={toolbarButtonGroupStyle}>
                         {!editing && canEdit ? (
-                            <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
-                                編輯基本信息
-                            </button>
+                            <>
+                                <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
+                                    編輯基本信息
+                                </button>
+                                <form ref={deleteFormRef} method="POST" action={`/basicinformation/${personId}`} style={{ display: 'none' }}>
+                                    <input type="hidden" name="_method" value="DELETE" />
+                                    <input type="hidden" name="_token" value={getCsrfToken()} />
+                                </form>
+                                <button type="button" style={dangerButtonStyle} onClick={handleDelete}>
+                                    刪除人物
+                                </button>
+                            </>
                         ) : editing ? (
                             <>
                                 <button
@@ -295,11 +325,12 @@ export default function BasicInfoView({
                 generatingPinyin,
                 save,
                 saving,
+                cancelEdit,
             ) : (
                 <div style={{ paddingBottom: 16 }}>
                     {sections.map((section, index) => (
                         <div key={section.title} style={index === 0 ? sectionStyle : sectionWithDividerStyle}>
-                            {renderReadOnlySection(section)}
+                            {renderReadOnlySection(section, canEdit ? beginEdit : undefined, editableKeys)}
                         </div>
                     ))}
                 </div>
@@ -318,6 +349,7 @@ function renderEditor(
     generatingPinyin?: boolean,
     onSave?: () => void,
     saving?: boolean,
+    onCancel?: () => void,
 ) {
     return (
         <>
@@ -565,14 +597,24 @@ function renderEditor(
 
             <div style={editorBottomBarStyle}>
                 <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，儲存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
-                <button
-                    type="button"
-                    style={primaryButtonStyle}
-                    onClick={onSave}
-                    disabled={saving}
-                >
-                    {saving ? '儲存中…' : '整頁儲存'}
-                </button>
+                <div style={editorBottomBarButtonsStyle}>
+                    <button
+                        type="button"
+                        style={neutralButtonStyle}
+                        onClick={onCancel}
+                        disabled={saving}
+                    >
+                        取消
+                    </button>
+                    <button
+                        type="button"
+                        style={primaryButtonStyle}
+                        onClick={onSave}
+                        disabled={saving}
+                    >
+                        {saving ? '儲存中…' : '整頁儲存'}
+                    </button>
+                </div>
             </div>
         </>
     );
@@ -882,20 +924,35 @@ function EnumAutocompleteField({
     );
 }
 
-function renderReadOnlySection(section: Section) {
+function extractFieldKey(label: string): string | null {
+    const match = label.match(/\(([^)]+)\)\s*$/);
+    return match ? match[1] : null;
+}
+
+function editableClickHandler(label: string, editableKeys: Set<string>, onClickEdit?: () => void): (() => void) | undefined {
+    if (!onClickEdit) return undefined;
+    const key = extractFieldKey(label);
+    if (key && editableKeys.has(key)) return onClickEdit;
+    // 允許直接傳入 field key（無括號）
+    if (editableKeys.has(label)) return onClickEdit;
+    return undefined;
+}
+
+function renderReadOnlySection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
+    const ek = editableKeys ?? new Set<string>();
     switch (section.title) {
         case '姓名資料':
-            return renderNameSection(section);
+            return renderNameSection(section, onClickEdit, ek);
         case '生卒年':
-            return renderLifeSection(section);
+            return renderLifeSection(section, onClickEdit, ek);
         case '基本屬性':
-            return renderPropertySection(section);
+            return renderPropertySection(section, onClickEdit, ek);
         case '指數資料':
-            return renderIndexSection(section);
+            return renderIndexSection(section, onClickEdit, ek);
         case '活動年份':
-            return renderActiveYearsSection(section);
+            return renderActiveYearsSection(section, onClickEdit, ek);
         case '備註':
-            return renderNotesSection(section);
+            return renderNotesSection(section, onClickEdit, ek);
         case '建立 / 修改資訊':
             return renderAuditSection(section);
         default:
@@ -903,7 +960,7 @@ function renderReadOnlySection(section: Section) {
     }
 }
 
-function renderNameSection(section: Section) {
+function renderNameSection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
     const fields = fieldMap(section);
     const groups = [
         {
@@ -954,6 +1011,7 @@ function renderNameSection(section: Section) {
                                     label={label}
                                     value={sectionValue}
                                     derived={index === group.items.length - 1}
+                                    onClickEdit={editableClickHandler(label, editableKeys ?? new Set(), onClickEdit)}
                                 />
                             ))}
                         </div>
@@ -964,7 +1022,7 @@ function renderNameSection(section: Section) {
     );
 }
 
-function renderLifeSection(section: Section) {
+function renderLifeSection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
     const fields = fieldMap(section);
 
     return (
@@ -983,6 +1041,8 @@ function renderLifeSection(section: Section) {
                         ['日期 (c_by_day)', fields['出生日']],
                         ['日干支 (c_by_day_gz)', prefixId(fields['出生日時干支 ID'], String(fields['出生日時干支'] ?? ''))],
                     ]}
+                    onClickEdit={onClickEdit}
+                    editableKeys={editableKeys}
                 />
                 <TimelineCard
                     title="卒年"
@@ -996,17 +1056,19 @@ function renderLifeSection(section: Section) {
                         ['日期 (c_dy_day)', fields['死亡日']],
                         ['日干支 (c_dy_day_gz)', prefixId(fields['死亡日時干支 ID'], String(fields['死亡日時干支'] ?? ''))],
                     ]}
+                    onClickEdit={onClickEdit}
+                    editableKeys={editableKeys}
                 />
             </div>
             <div style={compactGridStyle}>
-                <ReadOnlyField label="享年 (c_death_age)" value={fields['享年']} />
-                <ReadOnlyField label="享年範圍 (c_death_age_range)" value={prefixId(fields['享年範圍 ID'], String(fields['享年範圍'] ?? ''))} />
+                <ReadOnlyField label="享年 (c_death_age)" value={fields['享年']} onClickEdit={editableClickHandler('c_death_age', editableKeys ?? new Set(), onClickEdit)} />
+                <ReadOnlyField label="享年範圍 (c_death_age_range)" value={prefixId(fields['享年範圍 ID'], String(fields['享年範圍'] ?? ''))} onClickEdit={editableClickHandler('c_death_age_range', editableKeys ?? new Set(), onClickEdit)} />
             </div>
         </>
     );
 }
 
-function renderPropertySection(section: Section) {
+function renderPropertySection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
     const fields = fieldMap(section);
     const mergedFields = [
         { label: '性別 (c_female)', value: fields['性別'] },
@@ -1021,14 +1083,14 @@ function renderPropertySection(section: Section) {
             <SectionHeading title={section.title} />
             <div style={compactGridStyle}>
                 {mergedFields.map((field) => (
-                    <ReadOnlyField key={field.label} label={field.label} value={field.value} />
+                    <ReadOnlyField key={field.label} label={field.label} value={field.value} onClickEdit={editableClickHandler(field.label, editableKeys ?? new Set(), onClickEdit)} />
                 ))}
             </div>
         </>
     );
 }
 
-function renderIndexSection(section: Section) {
+function renderIndexSection(section: Section, _onClickEdit?: () => void, _editableKeys?: Set<string>) {
     const fields = fieldMap(section);
     const indexYearType = prefixId(fields['Index Year Type'], joinDisplayValues(fields['Index Year Type（中文）'], fields['Index Year Type（英文）']));
     const indexAddress = prefixId(fields['Index Address ID'], joinDisplayValues(fields['Index Address（中文）'], fields['Index Address（英文）']));
@@ -1052,7 +1114,7 @@ function renderIndexSection(section: Section) {
     );
 }
 
-function renderActiveYearsSection(section: Section) {
+function renderActiveYearsSection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
     const fields = fieldMap(section);
 
     return (
@@ -1067,6 +1129,8 @@ function renderActiveYearsSection(section: Section) {
                         ['年號年 (c_fl_ey_nh_year)', fields['在世始年號年']],
                     ]}
                     note={fields['在世始年註']}
+                    onClickEdit={onClickEdit}
+                    editableKeys={editableKeys}
                 />
                 <TimelineCard
                     title="在世終年 (c_fl_latest_year)"
@@ -1076,20 +1140,38 @@ function renderActiveYearsSection(section: Section) {
                         ['年號年 (c_fl_ly_nh_year)', fields['在世終年號年']],
                     ]}
                     note={fields['在世終年註']}
+                    onClickEdit={onClickEdit}
+                    editableKeys={editableKeys}
                 />
             </div>
         </>
     );
 }
 
-function renderNotesSection(section: Section) {
+function renderNotesSection(section: Section, onClickEdit?: () => void, editableKeys?: Set<string>) {
     const fields = fieldMap(section);
 
     return (
         <>
             <SectionHeading title={section.title} />
             <div style={notesLabelStyle}>備註 (c_notes)</div>
-            <div style={notesBoxStyle}>{displayValue(fields['備註'])}</div>
+            {(() => {
+                const handler = editableClickHandler('c_notes', editableKeys ?? new Set(), onClickEdit);
+                return (
+                    <div
+                        style={{
+                            ...notesBoxStyle,
+                            ...(handler ? clickableFieldStyle : {}),
+                        }}
+                        onClick={handler}
+                        role={handler ? 'button' : undefined}
+                        tabIndex={handler ? 0 : undefined}
+                        onKeyDown={handler ? (e) => { if (e.key === 'Enter' || e.key === ' ') handler(); } : undefined}
+                    >
+                        {displayValue(fields['備註'])}
+                    </div>
+                );
+            })()}
         </>
     );
 }
@@ -1136,19 +1218,24 @@ function TimelineCard({
     title,
     items,
     note,
+    onClickEdit,
+    editableKeys,
 }: {
     title: string;
     items: Array<[string, FieldValue]>;
     note?: FieldValue;
+    onClickEdit?: () => void;
+    editableKeys?: Set<string>;
 }) {
+    const ek = editableKeys ?? new Set<string>();
     return (
         <div style={timelineCardStyle}>
             <div style={timelineTitleStyle}>{title}</div>
             <div style={timelineItemsGridStyle}>
                 {items.map(([label, sectionValue]) => (
-                    <ReadOnlyField key={label} label={label} value={sectionValue} />
+                    <ReadOnlyField key={label} label={label} value={sectionValue} onClickEdit={editableClickHandler(label, ek, onClickEdit)} />
                 ))}
-                {note !== undefined ? <ReadOnlyField label={`${title.includes('始') ? '備註 (c_fl_ey_notes)' : '備註 (c_fl_ly_notes)'}`} value={note} fullWidth subtle /> : null}
+                {note !== undefined ? (() => { const noteLabel = title.includes('始') ? '備註 (c_fl_ey_notes)' : '備註 (c_fl_ly_notes)'; return <ReadOnlyField label={noteLabel} value={note} fullWidth subtle onClickEdit={editableClickHandler(noteLabel, ek, onClickEdit)} />; })() : null}
             </div>
         </div>
     );
@@ -1163,6 +1250,7 @@ function ReadOnlyField({
     emphasis = false,
     derived = false,
     dirty = false,
+    onClickEdit,
 }: {
     label: string;
     value: FieldValue;
@@ -1172,6 +1260,7 @@ function ReadOnlyField({
     emphasis?: boolean;
     derived?: boolean;
     dirty?: boolean;
+    onClickEdit?: () => void;
 }) {
     return (
         <div
@@ -1189,7 +1278,12 @@ function ReadOnlyField({
                     ...(emphasis ? emphasisValueBoxStyle : {}),
                     ...(derived ? derivedValueBoxStyle : {}),
                     ...(dirty ? dirtyValueBoxStyle : {}),
+                    ...(onClickEdit ? clickableFieldStyle : {}),
                 }}
+                onClick={onClickEdit}
+                role={onClickEdit ? 'button' : undefined}
+                tabIndex={onClickEdit ? 0 : undefined}
+                onKeyDown={onClickEdit ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClickEdit(); } : undefined}
             >
                 {displayValue(value)}
             </div>
@@ -1552,6 +1646,13 @@ const neutralButtonStyle: React.CSSProperties = {
     borderColor: '#cdd7e1',
 };
 
+const dangerButtonStyle: React.CSSProperties = {
+    ...buttonBaseStyle,
+    backgroundColor: '#fff',
+    color: '#dc3545',
+    borderColor: '#dc3545',
+};
+
 const successMessageStyle: React.CSSProperties = {
     margin: '16px 20px 0',
     padding: '10px 12px',
@@ -1587,7 +1688,6 @@ const sectionWithDividerStyle: React.CSSProperties = {
 const sectionHeadingStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
     padding: '10px 14px',
@@ -1861,6 +1961,11 @@ const editorBottomBarStyle: React.CSSProperties = {
     backgroundColor: '#f9fbfe',
 };
 
+const editorBottomBarButtonsStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 8,
+};
+
 const editorBottomBarHintStyle: React.CSSProperties = {
     fontSize: '0.82rem',
     color: '#62798f',
@@ -1926,6 +2031,11 @@ const notesLabelStyle: React.CSSProperties = {
     color: '#556677',
     marginBottom: 6,
     textAlign: 'left',
+};
+
+const clickableFieldStyle: React.CSSProperties = {
+    cursor: 'pointer',
+    transition: 'background-color 0.15s',
 };
 
 const emptyStyle: React.CSSProperties = {

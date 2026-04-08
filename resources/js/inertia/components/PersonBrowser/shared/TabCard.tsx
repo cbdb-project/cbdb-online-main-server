@@ -15,6 +15,6 @@ const cardStyle: React.CSSProperties = {
     position: 'relative',
     border: '1px solid #dee2e6',
     borderRadius: 6,
-    padding: '10px 88px 10px 14px',
+    padding: '10px 90px 10px 14px',
     backgroundColor: '#fff',
 };

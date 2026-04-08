@@ -5,6 +5,8 @@ import TabPager from '../shared/TabPager';
 import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
+import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -63,7 +65,10 @@ export default function AssociationsTab({ data, canEdit, postCE, onSelectPerson 
                     <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label="頁碼" value={item.pages} />
                     <MetaRow label="備註" value={item.notes} />
-                    <LegacyEditButton tabKey="associations" pk={item.pk} canEdit={canEdit} />
+                    <CardActions>
+                        <LegacyEditButton tabKey="associations" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="associations" pk={item.pk} canEdit={canEdit} />
+                    </CardActions>
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />

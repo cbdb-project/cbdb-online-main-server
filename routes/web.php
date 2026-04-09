@@ -257,6 +257,16 @@ Route::middleware('auth')->group(function () {
         ->where('personId', '[0-9]+')
         ->name('app.person-browser.tab');
 
+    // 歷史地圖
+    Route::get('app/maps', 'HistoricalMapsController@index')
+        ->name('app.maps.index');
+    Route::get('maps', 'HistoricalMapsController@legacyRedirect')
+        ->name('maps.index');
+    Route::get('maps/index.html', 'HistoricalMapsController@legacyRedirect');
+    Route::get('maps/tang', 'HistoricalMapsController@legacyRedirect');
+    Route::get('maps/tang/{path?}', 'HistoricalMapsController@legacyRedirect')
+        ->where('path', '.*');
+
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');

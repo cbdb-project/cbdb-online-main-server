@@ -132,10 +132,28 @@ window.addEventListener('load', function () {
         panelToggle.setAttribute('aria-label', isOpen ? '收起控制面板' : '展開控制面板');
     }
 
+    function getActiveHistoricalMinZoom() {
+        if (!activeHistoricalConfig || typeof activeHistoricalConfig.minZoom !== 'number') {
+            return 0;
+        }
+
+        return activeHistoricalConfig.minZoom;
+    }
+
+    function ensureActiveHistoricalLayerVisible() {
+        const minZoom = getActiveHistoricalMinZoom();
+
+        if (map.getZoom() < minZoom) {
+            map.setZoom(minZoom);
+        }
+    }
+
     function resetView() {
-        map.fitBounds(tangBounds, {
-            padding: [20, 20],
-        });
+        const padding = [20, 20];
+        const boundsZoom = map.getBoundsZoom(tangBounds, false, padding);
+        const targetZoom = Math.max(boundsZoom, getActiveHistoricalMinZoom());
+
+        map.setView(tangBounds.getCenter(), targetZoom);
     }
 
     function setOsmOpacity(value) {
@@ -176,6 +194,7 @@ window.addEventListener('load', function () {
         activeHistoricalConfig = nextConfig;
         activeHistoricalLayer = buildHistoricalLayer(nextConfig).addTo(map);
         historicalLayerSelect.value = nextConfig.id;
+        ensureActiveHistoricalLayerVisible();
 
         activeHistoricalLayer.on('tileerror', function () {
             setStatus('歷史地圖圖磚載入失敗：' + nextConfig.title);

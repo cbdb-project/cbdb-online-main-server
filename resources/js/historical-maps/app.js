@@ -1,6 +1,17 @@
-(function () {
+import '../../css/historical-maps/app.css';
+
+window.addEventListener('load', function () {
+    if (typeof window.L === 'undefined') {
+        return;
+    }
+
     const historicalMaps = [
-        { id: 'Tang_Admin', title: '唐代各道、州界', maxNativeZoom: 12 },
+        { id: 'Tang_Admin', title: '唐代各道、州界', maxNativeZoom: 8 },
+        { id: 'Tang_TrafficRoute', title: '唐代交通路線圖', maxNativeZoom: 8, tileExtension: 'jpg', minZoom: 5 },
+        { id: 'shang', title: '商時期地圖', maxNativeZoom: 12 },
+        { id: 'Xijhou', title: '西周時期地圖', maxNativeZoom: 12 },
+        { id: 'spring_autumn', title: '春秋時期地圖', maxNativeZoom: 12 },
+        { id: 'warring_states', title: '戰國時期地圖', maxNativeZoom: 12 },
         { id: 'bc0210', title: '秦代歷史地圖 (Qin)', yearRange: [-221, -206], maxNativeZoom: 12 },
         { id: 'bc0007', title: '西漢歷史地圖 (W. Han)', yearRange: [-206, 8], maxNativeZoom: 12 },
         { id: 'ad0140', title: '東漢歷史地圖 (E. Han)', yearRange: [25, 220], maxNativeZoom: 12 },
@@ -14,8 +25,8 @@
         { id: 'ad1208', title: '南宋歷史地圖 (S. Song)', yearRange: [1127, 1279], maxNativeZoom: 12 },
         { id: 'ad1330', title: '元代歷史地圖 (Yuan)', yearRange: [1271, 1368], maxNativeZoom: 12 },
         { id: 'ad1582', title: '明代歷史地圖 (Ming)', yearRange: [1368, 1644], maxNativeZoom: 12 },
-        { id: 'ad1582_10_2s', title: '讀史方輿紀要地名', yearRange: [1500, 1700], maxNativeZoom: 12 },
-        { id: 'ad1820', title: '清代歷史地圖 (Qing)', yearRange: [1644, 1912], maxNativeZoom: 12 }
+        { id: 'ad1820', title: '清代歷史地圖 (Qing)', yearRange: [1644, 1912], maxNativeZoom: 12 },
+        { id: 'spaper', title: '中華民國新地圖 (Republic of China)', yearRange: [1912, 1949], maxNativeZoom: 12 },
     ];
 
     const historicalMapsById = new Map(
@@ -24,39 +35,39 @@
         })
     );
 
-    const tangBounds = L.latLngBounds(
+    const tangBounds = window.L.latLngBounds(
         [17.13, 66.85],
         [61.4, 146.7]
     );
 
-    const map = L.map('map', {
+    const map = window.L.map('map', {
         zoomControl: true,
-        attributionControl: true
+        attributionControl: true,
     });
 
     map.attributionControl.setPrefix(false);
 
-    const openStreetMapLayer = L.tileLayer(
+    const openStreetMapLayer = window.L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors',
         }
     );
 
-    const cartoPositronLayer = L.tileLayer(
+    const cartoPositronLayer = window.L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
         {
             maxZoom: 20,
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         }
     );
 
-    const esriGrayLayer = L.tileLayer(
+    const esriGrayLayer = window.L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
         {
             maxZoom: 16,
-            attribution: 'Tiles &copy; Esri'
+            attribution: 'Tiles &copy; Esri',
         }
     );
 
@@ -67,18 +78,18 @@
     const baseLayers = {
         'CartoDB Positron': cartoPositronLayer,
         'Esri Gray Canvas': esriGrayLayer,
-        'OSM Standard': openStreetMapLayer
+        'OSM Standard': openStreetMapLayer,
     };
 
-    L.control.layers(
+    window.L.control.layers(
         baseLayers,
         {},
         {
-            collapsed: false
+            collapsed: false,
         }
     ).addTo(map);
 
-    const markers = L.layerGroup().addTo(map);
+    const markers = window.L.layerGroup().addTo(map);
 
     const form = document.getElementById('marker-form');
     const latInput = document.getElementById('lat-input');
@@ -94,6 +105,23 @@
     const clearMarkersButton = document.getElementById('clear-markers');
     const query = new URLSearchParams(window.location.search);
 
+    if (
+        !(form instanceof HTMLFormElement) ||
+        !(latInput instanceof HTMLInputElement) ||
+        !(lngInput instanceof HTMLInputElement) ||
+        !(labelInput instanceof HTMLInputElement) ||
+        !(historicalLayerSelect instanceof HTMLSelectElement) ||
+        !(status instanceof HTMLElement) ||
+        !(osmOpacityInput instanceof HTMLInputElement) ||
+        !(osmOpacityValue instanceof HTMLElement) ||
+        !(panel instanceof HTMLElement) ||
+        !(panelToggle instanceof HTMLButtonElement) ||
+        !(resetViewButton instanceof HTMLButtonElement) ||
+        !(clearMarkersButton instanceof HTMLButtonElement)
+    ) {
+        return;
+    }
+
     function setStatus(message) {
         status.textContent = message;
     }
@@ -104,10 +132,28 @@
         panelToggle.setAttribute('aria-label', isOpen ? '收起控制面板' : '展開控制面板');
     }
 
+    function getActiveHistoricalMinZoom() {
+        if (!activeHistoricalConfig || typeof activeHistoricalConfig.minZoom !== 'number') {
+            return 0;
+        }
+
+        return activeHistoricalConfig.minZoom;
+    }
+
+    function ensureActiveHistoricalLayerVisible() {
+        const minZoom = getActiveHistoricalMinZoom();
+
+        if (map.getZoom() < minZoom) {
+            map.setZoom(minZoom);
+        }
+    }
+
     function resetView() {
-        map.fitBounds(tangBounds, {
-            padding: [20, 20]
-        });
+        const padding = [20, 20];
+        const boundsZoom = map.getBoundsZoom(tangBounds, false, padding);
+        const targetZoom = Math.max(boundsZoom, getActiveHistoricalMinZoom());
+
+        map.setView(tangBounds.getCenter(), targetZoom);
     }
 
     function setOsmOpacity(value) {
@@ -118,17 +164,17 @@
 
     function buildHistoricalLayer(mapConfig) {
         const options = {
-            minZoom: 0,
+            minZoom: typeof mapConfig.minZoom === 'number' ? mapConfig.minZoom : 0,
             maxZoom: 20,
-            attribution: '底圖來源：中央研究院人社中心 GIS 專題中心'
+            attribution: '底圖來源：中華文明之時空基礎架構(CCTS)',
         };
 
         if (typeof mapConfig.maxNativeZoom === 'number') {
             options.maxNativeZoom = mapConfig.maxNativeZoom;
         }
 
-        return L.tileLayer(
-            'https://gis.sinica.edu.tw/ccts/file-exists.php?img=' + mapConfig.id + '-png-{z}-{x}-{y}',
+        return window.L.tileLayer(
+            'https://tiles.digitalhumanities.dev/tiles/' + mapConfig.id + '/{z}/{x}/{y}.' + (mapConfig.tileExtension || 'png'),
             options
         );
     }
@@ -148,6 +194,7 @@
         activeHistoricalConfig = nextConfig;
         activeHistoricalLayer = buildHistoricalLayer(nextConfig).addTo(map);
         historicalLayerSelect.value = nextConfig.id;
+        ensureActiveHistoricalLayerVisible();
 
         activeHistoricalLayer.on('tileerror', function () {
             setStatus('歷史地圖圖磚載入失敗：' + nextConfig.title);
@@ -203,7 +250,7 @@
     }
 
     function addMarker(lat, lng, label) {
-        const marker = L.marker([lat, lng]).addTo(markers);
+        const marker = window.L.marker([lat, lng]).addTo(markers);
         const popupLabel = label && label.trim() ? label.trim() : '未命名地點';
 
         marker.bindPopup(
@@ -214,7 +261,7 @@
 
         marker.openPopup();
         map.setView([lat, lng], Math.max(map.getZoom(), 6), {
-            animate: true
+            animate: true,
         });
 
         setStatus('已加入 marker：' + popupLabel + ' (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')');
@@ -232,7 +279,7 @@
         return {
             lat: lat,
             lng: lng,
-            label: label
+            label: label,
         };
     }
 
@@ -242,7 +289,7 @@
         if (mapId && historicalMapsById.has(mapId)) {
             return {
                 mapId: mapId,
-                reason: '已依 map 參數切換歷史地圖'
+                reason: '已依 map 參數切換歷史地圖',
             };
         }
 
@@ -254,13 +301,13 @@
 
             return {
                 mapId: inferred.id,
-                reason: '已依 year=' + year + ' 推定歷史地圖'
+                reason: '已依 year=' + year + ' 推定歷史地圖',
             };
         }
 
         return {
             mapId: historicalMaps[0].id,
-            reason: ''
+            reason: '',
         };
     }
 
@@ -333,4 +380,4 @@
     } else {
         addMarker(34.3416, 108.9398, '長安');
     }
-})();
+});

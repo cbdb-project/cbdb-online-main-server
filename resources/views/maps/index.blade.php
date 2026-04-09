@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>中國歷代行政區地圖</title>
-    <script>
-        if (window.location.pathname === '/maps/tang') {
-            window.location.replace('/maps/tang/' + window.location.search + window.location.hash);
-        }
-    </script>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link
         rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin="anonymous"
     >
-    <link rel="stylesheet" href="./styles.css">
+    @vite(['resources/js/historical-maps/app.js'])
 </head>
 <body>
     <button
@@ -83,7 +82,7 @@
                     <li>輸入 WGS84 經緯度即可加點。</li>
                     <li>可用 <code>map</code> 指定圖層，例如 <code>?map=ad0741</code>。</li>
                     <li>也可用 <code>year</code> 推定圖層，例如 <code>?year=741</code>。</li>
-                    <li>marker 仍可由 query param 指定：<code>?lat=34.3416&amp;lng=108.9398&amp;label=長安</code>。</li>
+                    <li>marker 可由 query param 指定：<code>?lat=34.3416&amp;lng=108.9398&amp;label=長安</code>。</li>
                 </ul>
             </div>
 
@@ -91,7 +90,7 @@
         </aside>
 
         <main class="map-shell">
-            <div id="map" aria-label="唐代行政區地圖"></div>
+            <div id="map" aria-label="歷史行政區地圖"></div>
         </main>
     </div>
 
@@ -100,6 +99,5 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin="anonymous"
     ></script>
-    <script src="./app.js"></script>
 </body>
 </html>

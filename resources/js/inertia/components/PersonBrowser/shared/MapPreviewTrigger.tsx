@@ -129,7 +129,7 @@ function buildMapUrl({
         query.set('map', mapId);
     }
 
-    return `/maps/index.html?${query.toString()}`;
+    return `/app/maps?${query.toString()}`;
 }
 
 function MapIcon() {

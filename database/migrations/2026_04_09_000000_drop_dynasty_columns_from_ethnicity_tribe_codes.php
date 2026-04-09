@@ -21,8 +21,7 @@ return new class () extends Migration {
         'QingShiGao',
     ];
 
-    public function up(): void
-    {
+    public function up(): void {
         Schema::table('ETHNICITY_TRIBE_CODES', function (Blueprint $table) {
             foreach (self::COLUMNS as $column) {
                 if (Schema::hasColumn('ETHNICITY_TRIBE_CODES', $column)) {
@@ -32,8 +31,7 @@ return new class () extends Migration {
         });
     }
 
-    public function down(): void
-    {
+    public function down(): void {
         Schema::table('ETHNICITY_TRIBE_CODES', function (Blueprint $table) {
             foreach (self::COLUMNS as $column) {
                 $table->string($column, 255)->nullable()->default(null);

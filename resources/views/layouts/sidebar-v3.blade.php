@@ -42,14 +42,14 @@
                 <li class="nav-item">
                     <a href="{{ route('basicinformation.index') }}" class="nav-link {{ $activePage == 'Basicinformation' ? 'active' : '' }}">
                         <i class="nav-icon fas fa-landmark"></i>
-                        <p>人物基本資料</p>
+                        <p>人物編輯</p>
                     </a>
                 </li>
 
                 <li class="nav-item">
                     <a href="{{ route('app.person-browser.index') }}" class="nav-link {{ request()->routeIs('app.person-browser.*') ? 'active' : '' }}">
                         <i class="nav-icon fas fa-user-friends"></i>
-                        <p>人物瀏覽（新版）</p>
+                        <p>人物瀏覽</p>
                     </a>
                 </li>
 

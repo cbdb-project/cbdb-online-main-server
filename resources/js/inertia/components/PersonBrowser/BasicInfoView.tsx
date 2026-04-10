@@ -158,14 +158,6 @@ export default function BasicInfoView({
         setError(null);
     }, [initialState]);
 
-    useEffect(() => {
-        if (!editing) return;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') cancelEdit();
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [editing, cancelEdit]);
 
     const updateField = (key: string, value: string) => {
         setFormState((prev) => applyDerivedFields({
@@ -330,7 +322,7 @@ export default function BasicInfoView({
                 <div style={{ paddingBottom: 16 }}>
                     {sections.map((section, index) => (
                         <div key={section.title} style={index === 0 ? sectionStyle : sectionWithDividerStyle}>
-                            {renderReadOnlySection(section, canEdit ? beginEdit : undefined, editableKeys)}
+                            {renderReadOnlySection(section, undefined, editableKeys)}
                         </div>
                     ))}
                 </div>

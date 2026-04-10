@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SelectionDialog from '../../../components/SelectionDialog';
+import { APP_THEME } from '../../../theme';
 
 interface Props {
     latitude: number;
@@ -20,7 +21,7 @@ export default function MapPreviewTrigger({
     adminCatLabel = null,
     year = null,
     mapId = null,
-    buttonLabel = '看地圖',
+    buttonLabel = '地圖',
 }: Props) {
     const [open, setOpen] = useState(false);
     const mapUrl = useMemo(
@@ -147,20 +148,24 @@ const buttonStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    marginLeft: 8,
-    padding: '2px 7px',
-    borderRadius: 999,
-    border: '1px solid #A51C30',
-    backgroundColor: '#fff',
-    color: '#A51C30',
+    padding: 0,
+    border: 'none',
+    backgroundColor: 'transparent',
+    color: APP_THEME.brandText,
     cursor: 'pointer',
-    fontSize: '0.8rem',
-    lineHeight: 1.2,
-    verticalAlign: 'middle',
+    fontSize: 'inherit',
+    fontFamily: 'inherit',
+    fontWeight: 600,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    appearance: 'none',
+    WebkitAppearance: 'none',
 };
 
 const iconStyle: React.CSSProperties = {
     display: 'block',
+    width: 13,
+    height: 13,
 };
 
 const frameWrapStyle: React.CSSProperties = {
@@ -195,8 +200,8 @@ const closeButtonStyle: React.CSSProperties = {
     height: 36,
     padding: '0 14px',
     borderRadius: 4,
-    border: '1px solid #A51C30',
-    backgroundColor: '#A51C30',
+    border: `1px solid ${APP_THEME.brand}`,
+    backgroundColor: APP_THEME.brand,
     color: '#fff',
     cursor: 'pointer',
     fontSize: '0.9rem',

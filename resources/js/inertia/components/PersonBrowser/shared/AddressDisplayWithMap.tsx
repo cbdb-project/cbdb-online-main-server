@@ -50,6 +50,7 @@ export default function AddressDisplayWithMap({
 const wrapStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 4,
+    lineHeight: 1,
 };

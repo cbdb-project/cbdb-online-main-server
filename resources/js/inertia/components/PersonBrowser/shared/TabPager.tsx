@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_THEME } from '../../../theme';
 
 interface Props {
     currentPage: number;
@@ -115,7 +116,7 @@ const btnStyle: React.CSSProperties = {
 };
 
 const activeStyle: React.CSSProperties = {
-    backgroundColor: '#A51C30',
+    backgroundColor: APP_THEME.brand,
     color: '#fff',
     fontWeight: 600,
 };

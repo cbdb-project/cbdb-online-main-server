@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePage } from '@inertiajs/react';
+import { APP_THEME } from '../theme';
 
 interface AppShellProps {
     children: React.ReactNode;
@@ -10,10 +11,10 @@ export default function AppShell({ children }: AppShellProps) {
     const version = app?.version || 'unknown';
 
     return (
-        <div style={{ minHeight: '100vh', backgroundColor: '#f4f6f9', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', display: 'flex', flexDirection: 'column' }}>
-            <header style={{ backgroundColor: '#A51C30', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ minHeight: '100vh', backgroundColor: APP_THEME.canvas, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', display: 'flex', flexDirection: 'column' }}>
+            <header style={{ backgroundColor: APP_THEME.brand, color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>CBDB 中國歷代人物傳記資料庫</h1>
-                <a href="/" style={{ color: '#f2c4ca', textDecoration: 'none', fontSize: '0.875rem' }}>← 返回首頁</a>
+                <a href="/" style={{ color: APP_THEME.brandOnDark, textDecoration: 'none', fontSize: '0.875rem' }}>← 返回首頁</a>
             </header>
             <main style={{ padding: 0, margin: 0, flex: 1 }}>
                 {children}
@@ -41,6 +42,6 @@ export default function AppShell({ children }: AppShellProps) {
 }
 
 const footerLinkStyle: React.CSSProperties = {
-    color: '#A51C30',
+    color: APP_THEME.brandText,
     textDecoration: 'none',
 };

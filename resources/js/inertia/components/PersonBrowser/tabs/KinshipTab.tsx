@@ -12,6 +12,7 @@ import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { APP_THEME } from '../../../theme';
 
 interface KinshipItem {
     pk: {
@@ -98,7 +99,7 @@ const linkButtonStyle: React.CSSProperties = {
     border: 'none',
     background: 'none',
     padding: 0,
-    color: '#A51C30',
+    color: APP_THEME.brandText,
     textDecoration: 'none',
     cursor: 'pointer',
     font: 'inherit',

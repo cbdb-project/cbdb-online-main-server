@@ -1,5 +1,6 @@
 import React from 'react';
 import AddressDisplayWithMap from './shared/AddressDisplayWithMap';
+import { APP_THEME } from '../../theme';
 
 export interface PersonSummary {
     c_personid: number;
@@ -78,7 +79,7 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
                 <Tag label="朝代" value={summary.dynasty_chn} />
                 <Tag
                     label="籍貫"
-                    value={(
+                    value={summary.index_addr_chn || summary.index_addr ? (
                         <AddressDisplayWithMap
                             labelChn={summary.index_addr_chn}
                             labelEng={summary.index_addr}
@@ -88,7 +89,7 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
                             longitude={summary.index_addr_longitude}
                             year={summary.c_index_year}
                         />
-                    )}
+                    ) : '(未詳)'}
                 />
                 <Tag label="生卒" value={lifespan} />
                 <Tag label="Index Year" value={summary.c_index_year != null ? String(summary.c_index_year) : null} />
@@ -161,21 +162,25 @@ const tagStyle: React.CSSProperties = {
     overflow: 'hidden',
     fontSize: '0.9rem',
     lineHeight: 1,
-    border: '1px solid #e0d5d7',
+    border: `1px solid ${APP_THEME.brandBorder}`,
 };
 
 const tagLabelStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
     padding: '6px 10px',
-    backgroundColor: '#f9eced',
-    color: '#7a2030',
+    backgroundColor: APP_THEME.brandSurfaceStrong,
+    color: APP_THEME.brandTextStrong,
     fontWeight: 600,
     whiteSpace: 'nowrap',
 };
 
 const tagValueStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
     padding: '6px 11px',
     backgroundColor: '#fff',
-    color: '#2a1015',
+    color: APP_THEME.brandTextStrong,
     fontWeight: 700,
     whiteSpace: 'nowrap',
 };

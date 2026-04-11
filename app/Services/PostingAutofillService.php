@@ -121,8 +121,8 @@ class PostingAutofillService {
 
         $fullPrompt = $promptContent . "\n\n" . $sourceText;
 
-        // 調用 LLM API
-        $response = Http::timeout(30)
+        // 調用 LLM API（完整 prompt 約 12KB，模型處理需要較長時間）
+        $response = Http::connectTimeout(15)->timeout(90)
             ->withHeaders([
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $this->apiKey,

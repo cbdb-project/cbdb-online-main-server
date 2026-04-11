@@ -40,6 +40,9 @@ class AiPostingAutofillController extends Controller {
         $sourceText = $request->input('source_text');
         $personId = $request->input('person_id');
 
+        // AI API 回應可能需要較長時間，延長 PHP 執行時間限制
+        set_time_limit(120);
+
         $startTime = microtime(true);
         $result = $this->autofillService->extractAndMatch($sourceText, $personId);
         $executionTimeMs = (int) round((microtime(true) - $startTime) * 1000);

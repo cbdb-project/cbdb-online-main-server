@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_THEME } from '../../theme';
 
 interface TabDef {
     key: string;
@@ -80,19 +81,19 @@ const tabStyle: React.CSSProperties = {
 
 const activeTabStyle: React.CSSProperties = {
     backgroundColor: '#fff',
-    color: '#A51C30',
+    color: APP_THEME.brandText,
     fontWeight: 700,
     border: '1px solid #e0e0e0',
     borderBottom: '2px solid #fff',
 };
 
 const badgeStyle: React.CSSProperties = {
-    backgroundColor: '#f9eced',
+    backgroundColor: APP_THEME.brandSurface,
     borderRadius: 8,
     padding: '1px 6px',
     fontSize: '0.72rem',
     fontWeight: 600,
-    color: '#A51C30',
+    color: APP_THEME.brandText,
     minWidth: 16,
     textAlign: 'center',
 };

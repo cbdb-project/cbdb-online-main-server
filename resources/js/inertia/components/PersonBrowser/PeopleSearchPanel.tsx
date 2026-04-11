@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { APP_THEME } from '../../theme';
 
 interface DynastyOption {
     c_dy: number;
@@ -129,7 +130,7 @@ const searchBtnStyle: React.CSSProperties = {
     fontSize: '0.8125rem',
     border: 'none',
     borderRadius: 4,
-    backgroundColor: '#A51C30',
+    backgroundColor: APP_THEME.brand,
     color: '#fff',
     cursor: 'pointer',
 };

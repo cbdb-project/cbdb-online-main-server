@@ -12,6 +12,7 @@ import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { buildTextUrl, formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { APP_THEME } from '../../../theme';
 
 interface SourceItem {
     pk: {
@@ -115,7 +116,7 @@ const badgesStyle: React.CSSProperties = {
 };
 
 const linkStyle: React.CSSProperties = {
-    color: '#A51C30',
+    color: APP_THEME.brandText,
     textDecoration: 'none',
 };
 
@@ -123,7 +124,7 @@ const badgeMainStyle: React.CSSProperties = {
     fontSize: '0.6875rem',
     padding: '1px 6px',
     borderRadius: 3,
-    backgroundColor: '#A51C30',
+    backgroundColor: APP_THEME.brand,
     color: '#fff',
 };
 
@@ -132,6 +133,6 @@ const badgeBioStyle: React.CSSProperties = {
     padding: '1px 6px',
     borderRadius: 3,
     backgroundColor: '#fff',
-    color: '#A51C30',
-    border: '1px solid #A51C30',
+    color: APP_THEME.brandText,
+    border: `1px solid ${APP_THEME.brandBorder}`,
 };

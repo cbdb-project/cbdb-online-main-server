@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { APP_THEME } from '../../theme';
 
 interface Props {
     sections: Section[];
@@ -276,9 +277,6 @@ export default function BasicInfoView({
                                     <input type="hidden" name="_method" value="DELETE" />
                                     <input type="hidden" name="_token" value={getCsrfToken()} />
                                 </form>
-                                <button type="button" style={dangerButtonStyle} onClick={handleDelete}>
-                                    刪除人物
-                                </button>
                             </>
                         ) : editing ? (
                             <>
@@ -325,6 +323,13 @@ export default function BasicInfoView({
                             {renderReadOnlySection(section, undefined, editableKeys)}
                         </div>
                     ))}
+                    {!editing && canEdit ? (
+                        <div style={dangerActionWrapStyle}>
+                            <button type="button" style={dangerButtonStyle} onClick={handleDelete}>
+                                刪除人物
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             )}
         </div>
@@ -346,7 +351,7 @@ function renderEditor(
     return (
         <>
             <div style={sectionStyle}>
-                <SectionHeading title="姓名資料" badge={badgeLabel('Person ID', values.c_personid)} />
+                <SectionHeading title="姓名資料" />
                 <div style={editorNameGroupGridStyle}>
                     <EditorGroup
                         title="中文"
@@ -991,7 +996,7 @@ function renderNameSection(section: Section, onClickEdit?: () => void, editableK
 
     return (
         <>
-            <SectionHeading title={section.title} badge={badgeLabel('Person ID', fields['Person ID'])} />
+            <SectionHeading title={section.title} />
             <div style={nameGroupGridStyle}>
                 {groups.map((group) => (
                     <div key={group.title} style={nameGroupCardStyle}>
@@ -1520,14 +1525,6 @@ function displayValue(value: FieldValue) {
     return String(value);
 }
 
-function badgeLabel(prefix: string, value: FieldValue) {
-    if (value == null || value === '') {
-        return null;
-    }
-
-    return `${prefix} ${value}`;
-}
-
 function joinDisplayValues(left: FieldValue, right: FieldValue) {
     const parts = [left, right]
         .map((value) => (value == null ? '' : String(value).trim()))
@@ -1620,7 +1617,7 @@ const buttonBaseStyle: React.CSSProperties = {
 
 const primaryButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
-    backgroundColor: '#A51C30',
+    backgroundColor: APP_THEME.brand,
     color: '#fff',
 };
 
@@ -1636,6 +1633,12 @@ const neutralButtonStyle: React.CSSProperties = {
     backgroundColor: '#fff',
     color: '#4f6274',
     borderColor: '#cdd7e1',
+};
+
+const dangerActionWrapStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    padding: '8px 16px 0',
 };
 
 const dangerButtonStyle: React.CSSProperties = {
@@ -1683,9 +1686,9 @@ const sectionHeadingStyle: React.CSSProperties = {
     gap: 12,
     marginBottom: 16,
     padding: '10px 14px',
-    backgroundColor: '#f9eced',
+    backgroundColor: APP_THEME.brandSurface,
     borderRadius: 6,
-    borderLeft: '3px solid #A51C30',
+    borderLeft: `3px solid ${APP_THEME.brand}`,
     flexWrap: 'wrap',
 };
 
@@ -1693,7 +1696,7 @@ const sectionTitleStyle: React.CSSProperties = {
     margin: 0,
     fontSize: '1.08rem',
     fontWeight: 700,
-    color: '#3d1019',
+    color: APP_THEME.brandTextStrong,
     letterSpacing: '0.01em',
 };
 
@@ -1702,8 +1705,8 @@ const sectionBadgeStyle: React.CSSProperties = {
     alignItems: 'center',
     padding: '5px 10px',
     borderRadius: 999,
-    backgroundColor: '#fbeef0',
-    color: '#7a2030',
+    backgroundColor: APP_THEME.brandSurfaceStrong,
+    color: APP_THEME.brandText,
     fontSize: '0.78rem',
     fontWeight: 700,
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_THEME } from '../../../theme';
 
 interface Props {
     label: string;
@@ -29,7 +30,7 @@ const rowStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-    color: '#6c757d',
+    color: APP_THEME.brandText,
     minWidth: 80,
     flexShrink: 0,
     fontWeight: 500,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { buildLegacyCreateUrl } from './legacyEditUrl';
+import { APP_THEME } from '../../../theme';
 
 interface Props {
     tabKey: string;
@@ -39,8 +40,8 @@ const linkStyle: React.CSSProperties = {
     minHeight: 30,
     padding: '0 12px',
     borderRadius: 4,
-    border: '1px solid #A51C30',
-    color: '#A51C30',
+    border: `1px solid ${APP_THEME.brandBorder}`,
+    color: APP_THEME.brandText,
     backgroundColor: '#fff',
     textDecoration: 'none',
     fontSize: '0.875rem',

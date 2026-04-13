@@ -743,7 +743,6 @@ class CodesController extends Controller {
         //20210323插入聯合主鍵的邏輯
         $id_name = $this->getIdName($table);
         $id_name_1 = $this->getIdName_1($table);
-        $id_name_2 = $this->getIdName_2($table);
         $id = $data[$id_name].'_._'.$data[$id_name_1];
 
         //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];

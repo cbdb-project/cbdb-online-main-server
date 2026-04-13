@@ -730,6 +730,7 @@ class CodesController extends Controller {
                 ->withErrors(['missing_keys' => '新增失敗：請確認主鍵欄位已填寫完整。']);
         }
         $data = $this->enforceAuditFieldsForCreate($table, $data);
+
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
         //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
@@ -842,7 +843,7 @@ class CodesController extends Controller {
         return redirect()->route('codes.show', ['table_name' => $table]);
     }
 
-protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
+    protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
         $thead = $this->getTableColumns($table);
 
         if (!empty($joinConfig)) {

@@ -29,7 +29,7 @@
     <div class="form-group row">
         <label for="c_sequence" class="col-sm-2 col-form-label">次序(sequence)</label>
         <div class="col-sm-10">
-            <input type="text" class="form-control" name="c_sequence" value="{{ $isEdit ? $row->c_sequence : '' }}" maxlength="4">
+            <input type="text" class="form-control" name="c_sequence" value="{{ $isEdit ? $row->c_sequence : '0' }}" maxlength="4">
         </div>
     </div>
 

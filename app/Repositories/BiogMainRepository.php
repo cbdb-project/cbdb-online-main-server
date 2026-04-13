@@ -2836,6 +2836,9 @@ class BiogMainRepository {
         $data['c_personid'] = $id;
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
+        if (!isset($data['c_sequence']) || $data['c_sequence'] === '' || $data['c_sequence'] === null) {
+            $data['c_sequence'] = 0;
+        }
         $duplicate = DB::table('BIOG_ADDR_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
             ['c_addr_id', '=', $data['c_addr_id']],

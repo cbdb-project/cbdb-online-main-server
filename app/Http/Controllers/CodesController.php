@@ -740,13 +740,6 @@ class CodesController extends Controller {
         //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
         //$id = $data[$id_];
         //}
-        //20210323插入聯合主鍵的邏輯
-        $id_name = $this->getIdName($table);
-        $id_name_1 = $this->getIdName_1($table);
-        $id = $data[$id_name].'_._'.$data[$id_name_1];
-
-        //$id = $data[$id_name].'_._'.$data[$id_name_1].'_._'.$data[$id_name_2];
-        //修改結束
         try {
             DB::table($table)->insert($data);
         } catch (\Illuminate\Database\QueryException $e) {
@@ -849,19 +842,7 @@ class CodesController extends Controller {
         return redirect()->route('codes.show', ['table_name' => $table]);
     }
 
-    protected function getIdName($table_name) {
-        return $columns = Schema::getColumnListing($table_name)[0];
-    }
-
-    protected function getIdName_1($table_name) {
-        return $columns = Schema::getColumnListing($table_name)[1];
-    }
-
-    protected function getIdName_2($table_name) {
-        return $columns = Schema::getColumnListing($table_name)[2];
-    }
-
-    protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
+protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
         $thead = $this->getTableColumns($table);
 
         if (!empty($joinConfig)) {

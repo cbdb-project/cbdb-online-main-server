@@ -110,6 +110,18 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a href="/codes/ADDR_BELONGS_DATA" class="nav-link {{ in_array($activePage, ['ADDR_BELONGS_DATA'], true) ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-sitemap"></i>
+                                <p>地址從屬表 <small>(ADDR_BELONGS_DATA)</small></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/codes/ADDR_CODES" class="nav-link {{ in_array($activePage, ['ADDR_CODES'], true) ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-map-marker-alt"></i>
+                                <p>地址編碼表 <small>(ADDR_CODES)</small></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a href="/codes/ALTNAME_CODES" class="nav-link {{ in_array($activePage, ['ALTNAME_CODES'], true) ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-user-tag"></i>
                                 <p>別名編碼表 <small>(ALTNAME_CODES)</small></p>
@@ -119,18 +131,6 @@
                             <a href="/codes/APPOINTMENT_CODES" class="nav-link {{ in_array($activePage, ['APPOINTMENT_CODES'], true) ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-briefcase"></i>
                                 <p>任命類型編碼表 <small>(APPOINTMENT_CODES)</small></p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/codes/TEXT_CODES" class="nav-link {{ in_array($activePage, ['TEXT_CODES'], true) ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-book"></i>
-                                <p>著作編碼表 <small>(TEXT_CODES)</small></p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/codes/ADDR_CODES" class="nav-link {{ in_array($activePage, ['ADDR_CODES'], true) ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-map-marker-alt"></i>
-                                <p>地址編碼表 <small>(ADDR_CODES)</small></p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -146,9 +146,9 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="/codes/ADDR_BELONGS_DATA" class="nav-link {{ in_array($activePage, ['ADDR_BELONGS_DATA'], true) ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-sitemap"></i>
-                                <p>地址從屬表 <small>(ADDR_BELONGS_DATA)</small></p>
+                            <a href="/codes/TEXT_CODES" class="nav-link {{ in_array($activePage, ['TEXT_CODES'], true) ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-book"></i>
+                                <p>著作編碼表 <small>(TEXT_CODES)</small></p>
                             </a>
                         </li>
                         <li class="nav-item">

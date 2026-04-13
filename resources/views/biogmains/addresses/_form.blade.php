@@ -17,7 +17,7 @@
     <div class="form-group row">
         <label for="c_sequence" class="col-sm-2 col-form-label">遷徙次序</label>
         <div class="col-sm-10">
-            <input type="number" class="form-control" name="c_sequence" value="{{ $isEdit ? $row->c_sequence : '' }}" maxlength="4" {{ $isEdit ? '' : 'required' }}>
+            <input type="number" class="form-control" name="c_sequence" value="{{ $isEdit ? $row->c_sequence : '0' }}" maxlength="4" required>
         </div>
     </div>
 

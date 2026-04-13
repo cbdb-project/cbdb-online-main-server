@@ -255,6 +255,9 @@ class EventStatusRepository {
         $data = $request->all();
         $data = $this->formatSelect($data);
         $data['c_personid'] = $id;
+        if (!isset($data['c_sequence']) || $data['c_sequence'] === '' || $data['c_sequence'] === null) {
+            $data['c_sequence'] = 0;
+        }
         $this->insertAddrEvent($data['c_addr_id'], $id, $data['c_sequence'], $data['c_event_code']);
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);

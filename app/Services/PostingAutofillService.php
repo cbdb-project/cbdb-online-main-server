@@ -317,9 +317,16 @@ class PostingAutofillService {
             ]);
         }
 
+        // 先取出 addr_str 的 admin_type，供官名消歧使用
+        // （例如「同知」在府、州、縣語境下應對應不同的官名）
+        $addrAdminType = null;
+        if (!empty($aiData['addr_str']) && is_array($aiData['addr_str'])) {
+            $addrAdminType = $aiData['addr_str']['admin_type'] ?? null;
+        }
+
         // 1. 官名匹配（title_str）
         if (!empty($aiData['title_str'])) {
-            $officeMatch = $this->fuzzyMatchOffice($aiData['title_str'], $effectiveDynasty);
+            $officeMatch = $this->fuzzyMatchOffice($aiData['title_str'], $effectiveDynasty, $addrAdminType);
             if ($officeMatch) {
                 // 根據匹配類型決定是確認匹配還是建議
                 if ($officeMatch['match_type'] === 'exact') {
@@ -521,9 +528,10 @@ class PostingAutofillService {
      *
      * @param string $officeName 官名
      * @param int|null $dynastyCode 朝代代碼（用於過濾）
+     * @param string|null $adminType 地址的行政層級（府/州/縣），用於消歧泛稱官名
      * @return array|null ['id' => int, 'text' => string, 'match_type' => 'exact'|'fuzzy']
      */
-    protected function fuzzyMatchOffice(string $officeName, ?int $dynastyCode = null): ?array {
+    protected function fuzzyMatchOffice(string $officeName, ?int $dynastyCode = null, ?string $adminType = null): ?array {
         // ========== Step 1: 精確匹配 c_office_chn ==========
         $query = DB::table('OFFICE_CODES')
             ->select('c_office_id as id', 'c_office_chn as text')
@@ -540,6 +548,17 @@ class PostingAutofillService {
                 'text' => $result->text,
                 'match_type' => 'exact',
             ];
+        }
+
+        // ========== Step 1.5: 根據 admin_type 消歧泛稱官名 ==========
+        // 僅在朝代專屬精確匹配（Step 1）落空時才觸發。
+        // 例如宋代 effectiveDynasty=15 時，OFFICE_CODES 沒有 c_dy=15 且 c_office_chn='同知' 的記錄，
+        // 若直接落入 Step 2 的 alt 匹配，會誤命中「同知樞密院事」等泛稱 alt 清單。
+        // 此處針對已知的泛稱（如同知）依 admin_type 對應抽象官名（如同知某府軍府事）。
+        // 放在 Step 1 之後可保留明清等朝代已有的「同知」專屬記錄，避免覆蓋朝代專屬精確匹配。
+        $disambiguated = $this->disambiguateOfficeByAdminType($officeName, $adminType);
+        if ($disambiguated !== null) {
+            return $disambiguated;
         }
 
         // ========== Step 2: 精確匹配 c_office_chn_alt（分號分割） ==========
@@ -658,6 +677,59 @@ class PostingAutofillService {
         }
 
         return null;
+    }
+
+    /**
+     * 根據地址 admin_type 對泛稱官名進行消歧。
+     *
+     * AI 有時只抽出泛稱（例如「同知」），需要結合地名的行政層級才能對應到正確的抽象官名：
+     *   - 府同知 → 同知某府軍府事（c_office_id = 6974）
+     *   - 州同知、縣同知 → 同知某州軍州事（c_office_id = 3301）
+     *
+     * 這類抽象官名在 OFFICE_CODES 中有固定的 c_office_chn，使用 where 精確查詢，
+     * 不受朝代過濾影響（抽象官名供各朝代檢索使用）。
+     *
+     * @return array|null ['id' => int, 'text' => string, 'match_type' => 'exact']
+     */
+    protected function disambiguateOfficeByAdminType(string $officeName, ?string $adminType): ?array {
+        if ($adminType === null || $adminType === '') {
+            return null;
+        }
+
+        $map = [
+            '同知' => [
+                '府' => '同知某府軍府事',
+                '州' => '同知某州軍州事',
+                '縣' => '同知某州軍州事',
+            ],
+        ];
+
+        if (!isset($map[$officeName][$adminType])) {
+            return null;
+        }
+
+        $targetName = $map[$officeName][$adminType];
+        $row = DB::table('OFFICE_CODES')
+            ->select('c_office_id as id', 'c_office_chn as text')
+            ->where('c_office_chn', '=', $targetName)
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        Log::info('[AI Autofill] 官名消歧命中', [
+            'office_name' => $officeName,
+            'admin_type' => $adminType,
+            'resolved_to' => $targetName,
+            'office_id' => $row->id,
+        ]);
+
+        return [
+            'id' => $row->id,
+            'text' => $row->text,
+            'match_type' => 'exact',
+        ];
     }
 
     /**

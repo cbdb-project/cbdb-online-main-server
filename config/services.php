@@ -42,4 +42,10 @@ return [
         'max_completion_tokens' => (int) env('GEMINI_MAX_COMPLETION_TOKENS', 8192),
     ],
 
+    'gemini_fallback' => [
+        'api_key' => env('GEMINI_API_KEY_1'),
+        'api_endpoint' => env('GEMINI_API_ENDPOINT_1'),
+        'model' => env('GEMINI_MODEL_1'),
+    ],
+
 ];

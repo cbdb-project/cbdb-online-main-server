@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Support\LlmFallbackTrait;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class PostingAutofillService {
+    use LlmFallbackTrait;
+
     protected string $apiKey;
     protected string $apiEndpoint;
     protected string $model;
@@ -18,6 +21,7 @@ class PostingAutofillService {
         $this->apiKey = config('services.gemini.api_key', '');
         $this->apiEndpoint = config('services.gemini.api_endpoint');
         $this->model = config('services.gemini.model');
+        $this->initLlmFallback();
 
         // 讀取 prompt 模板（AI 任官信息提取 prompt）
         $this->promptTemplate = resource_path('prompts/ai-posting-extraction-prompt.txt');
@@ -102,9 +106,38 @@ class PostingAutofillService {
     }
 
     /**
-     * 調用 AI API 提取結構化數據
+     * 調用 AI API 提取結構化數據（含 fallback）
      */
     protected function callAI(string $sourceText): array {
+        try {
+            $result = $this->doCallAI($sourceText);
+        } catch (\Exception $e) {
+            Log::error('PostingAutofill 主要 LLM 連線異常', ['exception' => $e->getMessage()]);
+            $result = [
+                'success' => false,
+                'data' => null,
+                'error' => 'AI API 連線失敗：' . $e->getMessage(),
+            ];
+        }
+
+        if (!$result['success'] && $this->hasFallback()) {
+            Log::warning('PostingAutofill 主要 LLM 失敗，嘗試 fallback', ['primary_error' => $result['error']]);
+            $original = $this->switchToFallback();
+
+            try {
+                $result = $this->doCallAI($sourceText);
+            } finally {
+                $this->restoreFromFallback($original);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * 實際調用 AI API 的邏輯
+     */
+    protected function doCallAI(string $sourceText): array {
         // 讀取 prompt 模板
         if (!file_exists($this->promptTemplate)) {
             return [

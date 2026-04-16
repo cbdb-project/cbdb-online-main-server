@@ -554,6 +554,139 @@ class AiPostingAutofillTest extends TestCase {
     }
 
     /**
+     * 測試主要 LLM 回傳 429 時自動 fallback 到備援 LLM
+     */
+    public function test_fallback_triggered_on_primary_api_error() {
+        config(['services.gemini_fallback.api_key' => 'fallback-key']);
+        config(['services.gemini_fallback.api_endpoint' => 'https://fallback.example.com/api']);
+        config(['services.gemini_fallback.model' => 'fallback-model']);
+
+        $user = User::factory()->create([
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Http::fake([
+            // 主要 API 回 429
+            'https://example.com/api' => Http::response([
+                'error' => ['message' => 'Rate limit exceeded'],
+            ], 429),
+            // 備援 API 成功
+            'https://fallback.example.com/api' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'postings' => [
+                                    [
+                                        'title_str' => '知縣',
+                                        'addr_str' => null,
+                                        'c_firstyear' => null, 'c_fy_nh_code' => null, 'c_fy_nh_year' => null,
+                                        'c_fy_range' => null, 'c_fy_intercalary' => null, 'c_fy_month' => null,
+                                        'c_fy_day' => null, 'c_fy_day_gz' => null, 'c_lastyear' => null,
+                                        'c_ly_nh_code' => null, 'c_ly_nh_year' => null, 'c_ly_range' => null,
+                                        'c_ly_intercalary' => null, 'c_ly_month' => null, 'c_ly_day' => null,
+                                        'c_ly_day_gz' => null, 'c_appt_code' => null, 'c_assume_office_code' => null,
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '知某縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'fallback.example.com'));
+    }
+
+    /**
+     * 測試主要 LLM 連線異常（ConnectionException）時自動 fallback
+     */
+    public function test_fallback_triggered_on_primary_connection_exception() {
+        config(['services.gemini_fallback.api_key' => 'fallback-key']);
+        config(['services.gemini_fallback.api_endpoint' => 'https://fallback.example.com/api']);
+        config(['services.gemini_fallback.model' => 'fallback-model']);
+
+        $user = User::factory()->create([
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        $callCount = 0;
+        Http::fake(function ($request) use (&$callCount) {
+            $callCount++;
+            if (str_contains($request->url(), 'example.com/api') && !str_contains($request->url(), 'fallback')) {
+                // 模擬連線異常
+                throw new \Illuminate\Http\Client\ConnectionException('Connection timed out');
+            }
+
+            // 備援 API 成功
+            return Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'postings' => [
+                                    [
+                                        'title_str' => '知縣',
+                                        'addr_str' => null,
+                                        'c_firstyear' => null, 'c_fy_nh_code' => null, 'c_fy_nh_year' => null,
+                                        'c_fy_range' => null, 'c_fy_intercalary' => null, 'c_fy_month' => null,
+                                        'c_fy_day' => null, 'c_fy_day_gz' => null, 'c_lastyear' => null,
+                                        'c_ly_nh_code' => null, 'c_ly_nh_year' => null, 'c_ly_range' => null,
+                                        'c_ly_intercalary' => null, 'c_ly_month' => null, 'c_ly_day' => null,
+                                        'c_ly_day_gz' => null, 'c_appt_code' => null, 'c_assume_office_code' => null,
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200);
+        });
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '知某縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+    }
+
+    /**
+     * 測試備援未設定時，主要 API 失敗直接報錯（不嘗試 fallback）
+     */
+    public function test_no_fallback_when_not_configured() {
+        // 確保備援未設定
+        config(['services.gemini_fallback.api_key' => '']);
+        config(['services.gemini_fallback.api_endpoint' => '']);
+
+        $user = User::factory()->create([
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Http::fake([
+            'https://example.com/api' => Http::response([
+                'error' => ['message' => 'Unauthorized'],
+            ], 401),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '知某縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(400)->assertJson(['success' => false]);
+    }
+
+    /**
      * 測試並存朝代（宋/遼）地名消歧：利用 ADDRESSES 表的層級鏈區分同名地名
      */
     public function test_concurrent_dynasty_address_disambiguation_via_hierarchy() {

@@ -66,7 +66,7 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_ly_nh_year',
             'c_ly_range',
             'c_ly_intercalary',
-            'c_appt_type_code',
+            'c_appt_code',
             'c_assume_office_code',
         ];
     }

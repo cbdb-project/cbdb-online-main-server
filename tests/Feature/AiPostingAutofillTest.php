@@ -192,6 +192,9 @@ class AiPostingAutofillTest extends TestCase {
      * 測試 AI API 調用失敗時的錯誤處理
      */
     public function test_ai_api_failure_returns_error() {
+        // 停用 fallback，確保主要 API 失敗後不會轉而打到真實外部服務
+        config(['services.gemini_fallback.api_key' => '']);
+
         $user = User::factory()->create([
             'is_active' => 1,
             'is_admin' => 1,

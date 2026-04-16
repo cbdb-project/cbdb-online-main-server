@@ -128,6 +128,15 @@ class User extends Authenticatable {
     }
 
     /**
+     * 检查用户是否可以审核提案（活跃的一般用户、专家或系统管理员）
+     *
+     * @return bool
+     */
+    public function canReviewProposals(): bool {
+        return $this->isActive() && !$this->isCrowdsourcingUser();
+    }
+
+    /**
      * 检查用户是否可以查看審計日誌（活跃的专家或系统管理员）
      *
      * @return bool

@@ -11,6 +11,8 @@ use Tests\TestCase;
 class QueryPlaygroundAppTest extends TestCase {
     protected User $adminUser;
     protected User $regularUser;
+    protected User $inactiveUser;
+    protected User $crowdsourcingUser;
 
     protected function setUp(): void {
         parent::setUp();
@@ -40,6 +42,24 @@ class QueryPlaygroundAppTest extends TestCase {
             'is_admin' => User::ROLE_REGULAR,
             'is_active' => User::STATUS_ACTIVE,
         ]);
+
+        $this->inactiveUser = new User();
+        $this->inactiveUser->forceFill([
+            'id' => 3,
+            'name' => 'Inactive User',
+            'email' => 'inactive@example.com',
+            'is_admin' => User::ROLE_REGULAR,
+            'is_active' => User::STATUS_INACTIVE,
+        ]);
+
+        $this->crowdsourcingUser = new User();
+        $this->crowdsourcingUser->forceFill([
+            'id' => 4,
+            'name' => 'Crowdsourcing User',
+            'email' => 'crowdsourcing@example.com',
+            'is_admin' => User::ROLE_CROWDSOURCING,
+            'is_active' => User::STATUS_ACTIVE,
+        ]);
     }
 
     #[Test]
@@ -50,10 +70,24 @@ class QueryPlaygroundAppTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_access_app_playground() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_access_app_playground() {
+        $this->be($this->inactiveUser);
         $response = $this->get(route('app.query-playground.index'));
         $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function regular_users_can_access_app_playground() {
+        $this->be($this->regularUser);
+        $response = $this->get(route('app.query-playground.index'));
+        $response->assertStatus(200);
+    }
+
+    #[Test]
+    public function crowdsourcing_users_can_access_app_playground() {
+        $this->be($this->crowdsourcingUser);
+        $response = $this->get(route('app.query-playground.index'));
+        $response->assertStatus(200);
     }
 
     #[Test]

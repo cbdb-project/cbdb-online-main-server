@@ -91,10 +91,7 @@
                                     <option value="3" {{ $user->is_admin == 3 ? 'selected' : '' }}>系统管理员</option>
                                 </select>
                                 <small class="form-text text-muted">
-                                    <strong>一般用戶：</strong>基本权限<br>
-                                    <strong>专家：</strong>拥有管理权限<br>
-                                    <strong>眾包：</strong>眾包用戶权限<br>
-                                    <strong>系统管理员：</strong>最高权限
+                                    @include('manage._role-descriptions')
                                 </small>
                             </div>
                         </div>

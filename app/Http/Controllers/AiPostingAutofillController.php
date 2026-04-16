@@ -22,8 +22,8 @@ class AiPostingAutofillController extends Controller {
      * @return \Illuminate\Http\JsonResponse
      */
     public function extract(Request $request) {
-        // 權限檢查：只有能直接寫入的用戶才能使用 AI 功能
-        if (!Auth::user()->canWriteDirectly()) {
+        // 權限檢查：所有活躍用戶皆可使用 AI 填充功能
+        if (!Auth::user()->isActive()) {
             return response()->json([
                 'success' => false,
                 'error' => '您沒有使用 AI 功能的權限',

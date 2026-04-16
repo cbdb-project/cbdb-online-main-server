@@ -10,6 +10,8 @@ use Tests\TestCase;
 class QueryPlaygroundTest extends TestCase {
     protected $adminUser;
     protected $regularUser;
+    protected $inactiveUser;
+    protected $crowdsourcingUser;
 
     protected function setUp(): void {
         parent::setUp();
@@ -43,6 +45,24 @@ class QueryPlaygroundTest extends TestCase {
             'is_admin' => User::ROLE_REGULAR,
             'is_active' => User::STATUS_ACTIVE,
         ]);
+
+        $this->inactiveUser = new User();
+        $this->inactiveUser->forceFill([
+            'id' => 3,
+            'name' => 'Inactive User',
+            'email' => 'inactive@example.com',
+            'is_admin' => User::ROLE_REGULAR,
+            'is_active' => User::STATUS_INACTIVE,
+        ]);
+
+        $this->crowdsourcingUser = new User();
+        $this->crowdsourcingUser->forceFill([
+            'id' => 4,
+            'name' => 'Crowdsourcing User',
+            'email' => 'crowdsourcing@example.com',
+            'is_admin' => User::ROLE_CROWDSOURCING,
+            'is_active' => User::STATUS_ACTIVE,
+        ]);
     }
 
     #[Test]
@@ -53,10 +73,24 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_access_playground() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_access_playground() {
+        $this->be($this->inactiveUser);
         $response = $this->get(route('query-playground.index'));
         $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function regular_users_can_access_playground() {
+        $this->be($this->regularUser);
+        $response = $this->get(route('query-playground.index'));
+        $response->assertRedirect(route('app.query-playground.index'));
+    }
+
+    #[Test]
+    public function crowdsourcing_users_can_access_playground() {
+        $this->be($this->crowdsourcingUser);
+        $response = $this->get(route('query-playground.index'));
+        $response->assertRedirect(route('app.query-playground.index'));
     }
 
     #[Test]
@@ -67,8 +101,8 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_run_queries() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_run_queries() {
+        $this->be($this->inactiveUser);
         $response = $this->postJson(route('query-playground.run'), [
             'sql' => 'SELECT * FROM DYNASTIES',
         ]);
@@ -178,8 +212,8 @@ class QueryPlaygroundTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_generate_from_nl() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_generate_from_nl() {
+        $this->be($this->inactiveUser);
         $response = $this->postJson(route('query-playground.generate-from-nl'), [
             'question' => 'test question',
         ]);
@@ -366,8 +400,8 @@ SQL;
     }
 
     #[Test]
-    public function regular_users_cannot_access_qbe_schema_endpoint() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_access_qbe_schema_endpoint() {
+        $this->be($this->inactiveUser);
 
         $response = $this->postJson(route('query-playground.schema'), [
             'tables' => ['DYNASTIES'],

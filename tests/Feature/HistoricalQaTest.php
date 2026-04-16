@@ -13,6 +13,7 @@ use Tests\TestCase;
 class HistoricalQaTest extends TestCase {
     protected User $adminUser;
     protected User $regularUser;
+    protected User $inactiveUser;
 
     protected function setUp(): void {
         parent::setUp();
@@ -41,6 +42,15 @@ class HistoricalQaTest extends TestCase {
             'email' => 'reg@example.com',
             'is_admin' => User::ROLE_REGULAR,
             'is_active' => User::STATUS_ACTIVE,
+        ]);
+
+        $this->inactiveUser = new User();
+        $this->inactiveUser->forceFill([
+            'id' => 3,
+            'name' => 'Inactive User',
+            'email' => 'inactive@example.com',
+            'is_admin' => User::ROLE_REGULAR,
+            'is_active' => User::STATUS_INACTIVE,
         ]);
     }
 
@@ -103,8 +113,8 @@ class HistoricalQaTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_access_answer_from_nl() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_access_answer_from_nl() {
+        $this->be($this->inactiveUser);
         $response = $this->postJson(route('query-playground.answer-from-nl'), [
             'question' => '李白是什麼時代的人？',
         ]);
@@ -121,8 +131,8 @@ class HistoricalQaTest extends TestCase {
     }
 
     #[Test]
-    public function regular_users_cannot_access_answer_from_nl_stream() {
-        $this->be($this->regularUser);
+    public function inactive_users_cannot_access_answer_from_nl_stream() {
+        $this->be($this->inactiveUser);
         $response = $this->postJson(route('query-playground.answer-from-nl-stream'), [
             'question' => '李白是什麼時代的人？',
         ]);

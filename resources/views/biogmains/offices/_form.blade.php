@@ -27,8 +27,8 @@
 
     <x-forms.person-id-display :personId="$id" />
 
-    {{-- AI 智能填充區塊（僅在新增模式且用戶有直接寫入權限時顯示） --}}
-    @if(!$isEdit && config('services.gemini.api_key') && auth()->user()->canWriteDirectly())
+    {{-- AI 智能填充區塊（僅在新增模式且用戶已啟用時顯示） --}}
+    @if(!$isEdit && config('services.gemini.api_key') && auth()->user()->isActive())
         <input type="hidden" name="ai_fill_log_id" id="ai-fill-log-id" value="">
         <div class="card card-info mb-3" id="ai-autofill-section">
             <div class="card-header d-flex align-items-center">
@@ -356,9 +356,9 @@
         }
 
         // ===================================================================
-        // AI 智能填充功能（僅在新增模式且用戶有直接寫入權限時啟用）
+        // AI 智能填充功能（僅在新增模式且用戶已啟用時啟用）
         // ===================================================================
-        @if(!$isEdit && config('services.gemini.api_key') && optional(auth()->user())->canWriteDirectly())
+        @if(!$isEdit && config('services.gemini.api_key') && optional(auth()->user())->isActive())
         (function() {
             // 環境變量控制：僅在開發模式下輸出調試日誌
             const DEBUG = {{ config('app.debug') ? 'true' : 'false' }};

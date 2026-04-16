@@ -32,8 +32,8 @@ class QueryPlaygroundController extends Controller {
     ];
 
     public function index(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            abort(403, 'Unauthorized. Expert access required.');
+        if (!Auth::user()->isActive()) {
+            abort(403, '您的帳號尚未啟用，無法使用此功能。');
         }
 
         return redirect()->route('app.query-playground.index', $request->query());
@@ -43,8 +43,8 @@ class QueryPlaygroundController extends Controller {
      * Inertia + React 版本的 Query Playground 主頁。
      */
     public function appIndex(Request $request): InertiaResponse {
-        if (!Auth::user()->isAdmin()) {
-            abort(403, 'Unauthorized. Expert access required.');
+        if (!Auth::user()->isActive()) {
+            abort(403, '您的帳號尚未啟用，無法使用此功能。');
         }
 
         $props = $this->playgroundService->buildPageProps(
@@ -55,8 +55,8 @@ class QueryPlaygroundController extends Controller {
     }
 
     public function qbeSchema(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([
@@ -77,8 +77,8 @@ class QueryPlaygroundController extends Controller {
     }
 
     public function run(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([
@@ -280,8 +280,8 @@ class QueryPlaygroundController extends Controller {
      * @return \Symfony\Component\HttpFoundation\StreamedResponse
      */
     public function generateFromNLStream(Request $request, NaturalLanguageQueryService $nlqService) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([
@@ -333,8 +333,8 @@ class QueryPlaygroundController extends Controller {
      * @return \Illuminate\Http\JsonResponse
      */
     public function generateFromNL(Request $request, NaturalLanguageQueryService $nlqService) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([
@@ -370,8 +370,8 @@ class QueryPlaygroundController extends Controller {
      * 使用自然語言回答歷史人物問題（非流式）
      */
     public function answerFromNL(Request $request, NaturalLanguageQueryService $nlqService) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([
@@ -401,8 +401,8 @@ class QueryPlaygroundController extends Controller {
      * 使用自然語言回答歷史人物問題（SSE 流式）
      */
     public function answerFromNLStream(Request $request, NaturalLanguageQueryService $nlqService) {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized. Expert access required.'], 403);
+        if (!Auth::user()->isActive()) {
+            return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
         $request->validate([

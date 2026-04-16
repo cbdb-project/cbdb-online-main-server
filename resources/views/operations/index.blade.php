@@ -570,7 +570,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         </form>
                                     </div>
                                 @endif
-                                @if($isProposal && Auth::check() && Auth::user()->canManageUsers() && $reviewStatus === 'pending')
+                                @if($isProposal && Auth::check() && Auth::user()->canReviewProposals() && $reviewStatus === 'pending')
                                     <div class="operations-action-list">
                                         <form method="post" action="{{ route('operations.proposals.approve', $item->id) }}" class="operations-action-form">
                                             {{ csrf_field() }}

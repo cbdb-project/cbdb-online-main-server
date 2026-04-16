@@ -43,10 +43,10 @@ class AiPostingAutofillTest extends TestCase {
     }
 
     /**
-     * 測試無寫入權限用戶無法使用 AI 功能
+     * 測試未啟用用戶無法使用 AI 功能
      */
-    public function test_user_without_write_permission_cannot_use_ai() {
-        // 創建無寫入權限的用戶（is_active = 0）
+    public function test_inactive_user_cannot_use_ai() {
+        // 創建未啟用的用戶（is_active = 0）
         $user = User::factory()->create([
             'is_active' => 0,
             'is_admin' => 0,
@@ -62,6 +62,45 @@ class AiPostingAutofillTest extends TestCase {
                 'success' => false,
                 'error' => '您沒有使用 AI 功能的權限',
             ]);
+    }
+
+    /**
+     * 測試已啟用眾包用戶可使用 AI 功能
+     */
+    public function test_active_crowdsourcing_user_can_use_ai() {
+        $user = User::factory()->create([
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_CROWDSOURCING,
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode(['postings' => [[
+                            'title_str' => '知縣',
+                            'addr_str' => '新城',
+                            'c_firstyear' => 1723,
+                            'c_fy_nh_code' => null, 'c_fy_nh_year' => null,
+                            'c_fy_range' => null, 'c_fy_intercalary' => false,
+                            'c_fy_month' => null, 'c_fy_day' => null, 'c_fy_day_gz' => null,
+                            'c_lastyear' => null, 'c_ly_nh_code' => null, 'c_ly_nh_year' => null,
+                            'c_ly_range' => null, 'c_ly_intercalary' => null,
+                            'c_ly_month' => null, 'c_ly_day' => null, 'c_ly_day_gz' => null,
+                            'c_appt_code' => null, 'c_assume_office_code' => null,
+                        ]]]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '雍正元年正月初三知陝西新城縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
     }
 
     /**
@@ -197,7 +236,9 @@ class AiPostingAutofillTest extends TestCase {
             'is_admin' => 1,
         ]);
 
-        // Mock API 失敗響應
+        // 確保沒有 fallback，只測主要 API 失敗場景
+        config(['services.gemini_fallback.api_key' => '']);
+
         Http::fake([
             'https://example.com/api' => Http::response([
                 'error' => ['message' => 'API quota exceeded'],

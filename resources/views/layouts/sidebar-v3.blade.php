@@ -317,7 +317,7 @@
                     </ul>
                 </li>
 
-                @if(Auth::check() and Auth::user()->isAdmin())
+                @if(Auth::check() and Auth::user()->isActive())
                     @php
                         $expertPages = [
                             'Query Playground',

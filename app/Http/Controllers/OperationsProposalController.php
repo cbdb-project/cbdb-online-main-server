@@ -130,7 +130,7 @@ class OperationsProposalController extends Controller {
     }
 
     protected function ensureCanReview(Operation $operation): void {
-        if (!Auth::check() || !Auth::user()->canRestoreOperations()) {
+        if (!Auth::check() || !Auth::user()->canReviewProposals()) {
             abort(403, '無權審核提案。');
         }
 

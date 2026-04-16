@@ -24,6 +24,13 @@
             </div>
         </div>
         <div class="card-body">
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <strong>角色說明：</strong><br>
+                @include('manage._role-descriptions')
+                <button type="button" class="close" data-dismiss="alert" aria-label="關閉">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-striped table-sm table-hover">
                     <thead>

@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-03-31 15:54:20
+> 生成時間：2026-04-16 16:23:42
 
 ## 目錄
 
@@ -989,16 +989,6 @@
 | `c_romanized` | varchar(255) | YES | NULL |  |
 | `c_surname` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
-| `JiuTangShu` | varchar(255) | YES | NULL |  |
-| `XinTangShu` | varchar(255) | YES | NULL |  |
-| `JiuWudaiShi` | varchar(255) | YES | NULL |  |
-| `XinWudaiShi` | varchar(255) | YES | NULL |  |
-| `SongShi` | varchar(255) | YES | NULL |  |
-| `LiaoShi` | varchar(255) | YES | NULL |  |
-| `JinShi` | varchar(255) | YES | NULL |  |
-| `YuanShi` | varchar(255) | YES | NULL |  |
-| `MingShi` | varchar(255) | YES | NULL |  |
-| `QingShiGao` | varchar(255) | YES | NULL |  |
 | `c_sortorder` | smallint(6) | YES | NULL |  |
 
 **索引**:
@@ -1492,7 +1482,7 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_office_id` | int(11) | NO | (NULL) |  |
-| `c_dy` | smallint(6) | YES | NULL |  |
+| `c_dy` | smallint(6) | NO | 0 |  |
 | `c_office_pinyin` | varchar(255) | YES | NULL |  |
 | `c_office_chn` | varchar(255) | YES | NULL |  |
 | `c_office_pinyin_alt` | varchar(255) | YES | NULL |  |
@@ -1773,7 +1763,6 @@
 | `c_ly_nh_code` | smallint(6) | YES | NULL |  |
 | `c_ly_nh_year` | smallint(6) | YES | NULL |  |
 | `c_ly_range` | smallint(6) | YES | NULL |  |
-| `c_appt_type_code` | smallint(6) | YES | NULL |  |
 | `c_assume_office_code` | smallint(6) | YES | NULL |  |
 | `c_inst_code` | smallint(6) | YES | 0 |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
@@ -1793,7 +1782,7 @@
 | `c_dy` | smallint(6) | YES | NULL |  |
 | `c_created_by` | varchar(255) | YES | NULL |  |
 | `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_appt_code` | varchar(255) | YES | NULL |  |
+| `c_appt_code` | smallint(6) | YES | NULL |  |
 | `c_created_date` | datetime | YES | NULL |  |
 | `c_modified_date` | datetime | YES | NULL |  |
 
@@ -1805,7 +1794,6 @@
 - `c_posting_id_POSTED_TO_OFFICE_DATA_index`: (c_posting_id)
 - `c_fy_nh_code_POSTED_TO_OFFICE_DATA_index`: (c_fy_nh_code)
 - `c_ly_nh_code_POSTED_TO_OFFICE_DATA_index`: (c_ly_nh_code)
-- `c_appt_type_code_POSTED_TO_OFFICE_DATA_index`: (c_appt_type_code)
 - `c_assume_office_code_POSTED_TO_OFFICE_DATA_index`: (c_assume_office_code)
 - `c_inst_code_POSTED_TO_OFFICE_DATA_index`: (c_inst_code)
 - `c_inst_name_code_POSTED_TO_OFFICE_DATA_index`: (c_inst_name_code)
@@ -1817,6 +1805,7 @@
 - `c_ly_day_gz`: (c_ly_day_gz)
 - `c_ly_range`: (c_ly_range)
 - `c_source`: (c_source)
+- `c_appt_code_POSTED_TO_OFFICE_DATA_index`: (c_appt_code)
 
 ---
 
@@ -3219,16 +3208,6 @@
 | `c_romanized` | varchar(255) | YES | NULL |  |
 | `c_surname` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | (NULL) |  |
-| `JiuTangShu` | varchar(255) | YES | NULL |  |
-| `XinTangShu` | varchar(255) | YES | NULL |  |
-| `JiuWudaiShi` | varchar(255) | YES | NULL |  |
-| `XinWudaiShi` | varchar(255) | YES | NULL |  |
-| `SongShi` | varchar(255) | YES | NULL |  |
-| `LiaoShi` | varchar(255) | YES | NULL |  |
-| `JinShi` | varchar(255) | YES | NULL |  |
-| `YuanShi` | varchar(255) | YES | NULL |  |
-| `MingShi` | varchar(255) | YES | NULL |  |
-| `QingShiGao` | varchar(255) | YES | NULL |  |
 | `c_sortorder` | INTEGER | YES | NULL |  |
 
 ---
@@ -3600,7 +3579,7 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_office_id` | INTEGER | NO | (NULL) |  |
-| `c_dy` | INTEGER | YES | NULL |  |
+| `c_dy` | INTEGER | NO | '0' |  |
 | `c_office_pinyin` | varchar(255) | YES | NULL |  |
 | `c_office_chn` | varchar(255) | YES | NULL |  |
 | `c_office_pinyin_alt` | varchar(255) | YES | NULL |  |
@@ -3761,7 +3740,6 @@
 | `c_ly_nh_code` | INTEGER | YES | NULL |  |
 | `c_ly_nh_year` | INTEGER | YES | NULL |  |
 | `c_ly_range` | INTEGER | YES | NULL |  |
-| `c_appt_type_code` | INTEGER | YES | NULL |  |
 | `c_assume_office_code` | INTEGER | YES | NULL |  |
 | `c_inst_code` | INTEGER | YES | '0' |  |
 | `c_inst_name_code` | INTEGER | YES | '0' |  |

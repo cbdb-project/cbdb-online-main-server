@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Support\LlmFallbackTrait;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CodeLookupService {
+    use LlmFallbackTrait;
+
     protected string $apiKey;
     protected string $apiEndpoint;
     protected string $model;
@@ -15,6 +18,7 @@ class CodeLookupService {
         $this->apiKey = config('services.gemini.api_key', '');
         $this->apiEndpoint = config('services.gemini.api_endpoint');
         $this->model = config('services.gemini.model', 'gemini-2.0-flash');
+        $this->initLlmFallback();
     }
 
     /**
@@ -235,6 +239,23 @@ PROMPT;
     }
 
     protected function callLLM(array $messages): array {
+        $result = $this->doCallLLM($messages);
+
+        if (!$result['success'] && $this->hasFallback()) {
+            Log::warning('CodeLookup 主要 LLM 失敗，嘗試 fallback', ['primary_error' => $result['error']]);
+            $original = $this->switchToFallback();
+
+            try {
+                $result = $this->doCallLLM($messages);
+            } finally {
+                $this->restoreFromFallback($original);
+            }
+        }
+
+        return $result;
+    }
+
+    protected function doCallLLM(array $messages): array {
         try {
             $maxCompletionTokens = (int) config('services.gemini.max_completion_tokens', 8192);
             if ($maxCompletionTokens < 256) {

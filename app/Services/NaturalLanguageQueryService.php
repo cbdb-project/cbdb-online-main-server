@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Support\LlmFallbackTrait;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class NaturalLanguageQueryService {
+    use LlmFallbackTrait;
+
     protected DatabaseSchemaService $schemaService;
     protected NlQueryToolsService $toolsService;
     protected string $apiKey;
@@ -20,6 +23,7 @@ class NaturalLanguageQueryService {
         $this->apiKey = config('services.gemini.api_key', '');
         $this->apiEndpoint = config('services.gemini.api_endpoint', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
         $this->model = config('services.gemini.model', 'gemini-3-flash-preview');
+        $this->initLlmFallback();
     }
 
     /**
@@ -1295,6 +1299,34 @@ PROMPT;
      * @return array ['success' => bool, 'data' => array|null, 'error' => string|null]
      */
     protected function callLLM(
+        array $messages,
+        array $tools = [],
+        bool $allowToolCalls = false,
+        ?callable $heartbeatCallback = null,
+        ?callable $abortCheck = null,
+        bool $useStructuredOutput = true
+    ): array {
+        $result = $this->doCallLLM($messages, $tools, $allowToolCalls, $heartbeatCallback, $abortCheck, $useStructuredOutput);
+
+        if (!$result['success'] && $this->hasFallback() && !$this->isClientDisconnectError($result)) {
+            Log::warning('主要 LLM 失敗，嘗試 fallback', ['primary_error' => $result['error']]);
+            $original = $this->switchToFallback();
+
+            try {
+                $result = $this->doCallLLM($messages, $tools, $allowToolCalls, $heartbeatCallback, $abortCheck, $useStructuredOutput);
+            } finally {
+                $this->restoreFromFallback($original);
+            }
+        }
+
+        return $result;
+    }
+
+    private function isClientDisconnectError(array $result): bool {
+        return isset($result['error']) && str_contains($result['error'], '客戶端已中斷連線');
+    }
+
+    protected function doCallLLM(
         array $messages,
         array $tools = [],
         bool $allowToolCalls = false,

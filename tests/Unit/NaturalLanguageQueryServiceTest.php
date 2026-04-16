@@ -100,6 +100,47 @@ class NaturalLanguageQueryServiceTest extends TestCase {
     }
 
     #[Test]
+    public function it_falls_back_to_secondary_llm_on_primary_api_error() {
+        Config::set('services.gemini_fallback.api_key', 'fallback-key');
+        Config::set('services.gemini_fallback.api_endpoint', 'https://fallback.example.com/api');
+        Config::set('services.gemini_fallback.model', 'fallback-model');
+
+        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
+        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $service = new NaturalLanguageQueryService($schemaService, $toolsService);
+
+        Http::fake([
+            // 主要 API 回 429（所有重試都會打到 * 或明確的 endpoint）
+            Config::get('services.gemini.api_endpoint', '*') => Http::response([
+                'error' => ['message' => 'Rate limit exceeded'],
+            ], 429),
+            // 備援 API 成功
+            'https://fallback.example.com/api' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => json_encode([
+                                'sql' => 'SELECT 1',
+                                'explanation' => '備援回應',
+                                'error' => null,
+                            ]),
+                        ],
+                        'finish_reason' => 'stop',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $result = $service->generateSQL('test question');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('SELECT 1', $result['sql']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'fallback.example.com'));
+    }
+
+    #[Test]
     public function it_handles_invalid_json_response() {
         $this->schemaService->method('generateSchemaPrompt')
             ->willReturn('Mock schema info');

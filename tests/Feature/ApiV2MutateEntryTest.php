@@ -121,7 +121,6 @@ class ApiV2MutateEntryTest extends TestCase {
             $table->integer('c_entry_nh_code')->nullable();
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
-            $table->string('c_secondary_source_author', 255)->nullable();
             $table->string('c_secondary_source_title', 255)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();

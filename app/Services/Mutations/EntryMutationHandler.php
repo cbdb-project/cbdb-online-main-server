@@ -63,7 +63,6 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_entry_nh_code',
             'c_entry_nh_year',
             'c_entry_range',
-            'c_secondary_source_author',
             'c_secondary_source_title',
         ];
     }

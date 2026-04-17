@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-04-16 16:23:42
+> 生成時間：2026-04-17 16:02:03
 
 ## 目錄
 
@@ -1922,7 +1922,6 @@
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
-| `c_secondary_source_author` | varchar(255) | YES | NULL |  |
 
 **索引**:
 
@@ -1980,8 +1979,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_name_hz` | varchar(255) | YES | NULL |  |
-| `c_inst_name_py` | varchar(255) | YES | NULL |  |
+| `c_inst_name_hz` | varchar(255) | NO | '' |  |
+| `c_inst_name_py` | varchar(255) | NO | '' |  |
 
 **索引**:
 
@@ -2360,8 +2359,8 @@
 | `c_name_chn` | varchar(255) | YES | NULL | Chinese full name; auto-generated: c_surname_chn + c_mingzi_chn (no space) |
 | `c_inst_name_code` | smallint(6) | NO | (NULL) |  |
 | `c_inst_code` | smallint(6) | NO | (NULL) |  |
-| `c_inst_name_hz` | varchar(255) | YES | NULL |  |
-| `c_inst_name_py` | varchar(255) | YES | NULL |  |
+| `c_inst_name_hz` | varchar(255) | NO | '' |  |
+| `c_inst_name_py` | varchar(255) | NO | '' |  |
 | `c_bi_role_code` | smallint(6) | NO | (NULL) |  |
 | `c_bi_role_desc` | varchar(255) | YES | NULL |  |
 | `c_bi_role_chn` | varchar(255) | YES | NULL |  |
@@ -3860,7 +3859,6 @@
 | `c_source` | INTEGER | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | (NULL) |  |
-| `c_secondary_source_author` | varchar(255) | YES | NULL |  |
 
 ---
 
@@ -3903,8 +3901,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_inst_name_code` | INTEGER | NO | (NULL) |  |
-| `c_inst_name_hz` | varchar(255) | YES | NULL |  |
-| `c_inst_name_py` | varchar(255) | YES | NULL |  |
+| `c_inst_name_hz` | varchar | NO | '' |  |
+| `c_inst_name_py` | varchar | NO | '' |  |
 
 ---
 
@@ -4192,8 +4190,8 @@
 | `c_name_chn` | varchar(255) | YES | (NULL) |  |
 | `c_inst_name_code` | INTEGER | YES | (NULL) |  |
 | `c_inst_code` | INTEGER | YES | (NULL) |  |
-| `c_inst_name_hz` | varchar(255) | YES | (NULL) |  |
-| `c_inst_name_py` | varchar(255) | YES | (NULL) |  |
+| `c_inst_name_hz` | varchar | YES | (NULL) |  |
+| `c_inst_name_py` | varchar | YES | (NULL) |  |
 | `c_bi_role_code` | INTEGER | YES | (NULL) |  |
 | `c_bi_role_desc` | varchar(255) | YES | (NULL) |  |
 | `c_bi_role_chn` | varchar(255) | YES | (NULL) |  |

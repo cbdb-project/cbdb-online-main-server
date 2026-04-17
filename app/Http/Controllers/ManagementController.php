@@ -55,8 +55,19 @@ class ManagementController extends Controller {
         $perPage = (int) $request->get('per_page', 50);
         $data = $query->paginate($perPage)->appends($request->except('page'));
 
+        // 最近 7 天內註冊的未激活用戶（ID 倒序，最多 15 個）
+        $inactiveUsers = User::query()
+            ->where('is_active', User::STATUS_INACTIVE)
+            ->where('created_at', '>=', Carbon::now()->subDays(7))
+            ->where('confirmation_token', '!=', '-')
+            ->where('password', '!=', '-')
+            ->orderByDesc('id')
+            ->limit(15)
+            ->get();
+
         return view('manage.index', [
             'data' => $data,
+            'inactiveUsers' => $inactiveUsers,
             'page_title' => '用戶管理',
             'page_description' => '管理用戶',
         ]);

@@ -2,6 +2,53 @@
 
 @section('content')
 
+    @if($inactiveUsers->isNotEmpty())
+    <div class="card card-warning card-outline mb-4">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-user-clock mr-1"></i>近 7 天未激活用戶（{{ $inactiveUsers->count() }}）</h3>
+            <div class="card-tools">
+                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-sm table-hover mb-0">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Institution</th>
+                        <th>是否通過審核</th>
+                        <th>用戶角色</th>
+                        <th style="width: 120px">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($inactiveUsers as $inactiveUser)
+                        <tr>
+                            <td>{{ $inactiveUser->id }}</td>
+                            <td>{{ $inactiveUser->name }}</td>
+                            <td>{{ $inactiveUser->email }}</td>
+                            <td>{{ $inactiveUser->institution }}</td>
+                            <td><span class="badge badge-warning">未激活</span></td>
+                            <td><span class="badge badge-primary">{{ $inactiveUser->getRoleName() }}</span></td>
+                            <td>
+                                <a class="btn btn-sm btn-primary" href="{{ route('manage.edit', $inactiveUser->id) }}">
+                                    <i class="fa fa-edit"></i> 編輯
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="card card-default">
         <div class="card-header">
             <h3 class="card-title">用戶管理</h3>

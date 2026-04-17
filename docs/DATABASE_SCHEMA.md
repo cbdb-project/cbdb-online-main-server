@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-04-17 16:02:03
+> 生成時間：2026-04-17 16:41:16
 
 ## 目錄
 

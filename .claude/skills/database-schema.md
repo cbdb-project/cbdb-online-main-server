@@ -11,6 +11,16 @@ description: 查詢和維護數據庫表格結構、字段類型、索引策略�
 
 ## 查詢步驟
 
+### 0. 快速瀏覽：`docs/DATABASE_SCHEMA.md`（可選，但推薦先看）
+
+`docs/DATABASE_SCHEMA.md` 由 `php artisan cbdb:generate-schema-docs` 自動生成，包含 MySQL/MariaDB 與 SQLite 兩份彙整後的表結構與索引清單，適合作為第一手總覽參考：
+
+- 想快速確認某欄位是否存在、型別、是否可空
+- 想比對 MySQL 與 SQLite 的 Schema 差異
+- 想了解目前所有表的索引策略
+
+⚠️ **注意**：此文件是生成產物，可能略為落後於最新 migration。若涉及精確判斷（例如寫 migration、修改欄位型別），請以 migration 檔案為準。
+
 ### 1. 查找 Baseline Migration (主要來源)
 
 數據庫表格的基礎結構定義在 **2025-01-01 的 baseline migration** 中：
@@ -389,3 +399,5 @@ php artisan tinker
 
 - `AGENTS.md` - 項目的數據庫使用規範
 - `database/migrations/` - 所有數據庫結構定義
+- `docs/DATABASE_SCHEMA.md` - 由 `php artisan cbdb:generate-schema-docs` 自動生成的 schema 總覽（MySQL + SQLite）
+- `docs/SCHEMA_DOCS_GENERATION.md` - schema 文件生成指令的完整使用說明

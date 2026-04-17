@@ -30,7 +30,7 @@
 ### 基本用法
 
 ```bash
-# 生成 Schema 文檔（默認輸出到 DATABASE_SCHEMA.md）
+# 生成 Schema 文檔（默認輸出到 docs/DATABASE_SCHEMA.md）
 php artisan cbdb:generate-schema-docs
 
 # 指定輸出文件
@@ -44,7 +44,7 @@ php artisan cbdb:generate-schema-docs --mysql-connection=staging
 
 | 選項 | 默認值 | 說明 |
 |------|--------|------|
-| `--output` | `DATABASE_SCHEMA.md` | 輸出 Markdown 文件路徑 |
+| `--output` | `docs/DATABASE_SCHEMA.md` | 輸出 Markdown 文件路徑 |
 | `--mysql-connection` | `mysql` | MySQL 數據庫連接名稱（來自 `config/database.php`）|
 
 ## 環境要求
@@ -151,7 +151,7 @@ php artisan migrate
 php artisan cbdb:generate-schema-docs
 
 # 3. 提交到版本控制
-git add DATABASE_SCHEMA.md
+git add docs/DATABASE_SCHEMA.md
 git commit -m "更新：同步 Schema 文檔"
 ```
 
@@ -166,7 +166,7 @@ git commit -m "更新：同步 Schema 文檔"
 
 - name: Check Schema Consistency
   run: |
-    if grep -q "僅存在於 MySQL 的表\|僅存在於 SQLite 的表" DATABASE_SCHEMA.md; then
+    if grep -q "僅存在於 MySQL 的表\|僅存在於 SQLite 的表" docs/DATABASE_SCHEMA.md; then
       echo "警告：MySQL 和 SQLite Schema 不一致"
       exit 1
     fi

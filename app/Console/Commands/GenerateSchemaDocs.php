@@ -15,7 +15,7 @@ class GenerateSchemaDocs extends Command {
      * @var string
      */
     protected $signature = 'cbdb:generate-schema-docs
-                            {--output=DATABASE_SCHEMA.md : 輸出文件路徑}
+                            {--output=docs/DATABASE_SCHEMA.md : 輸出文件路徑}
                             {--mysql-connection=mysql : MySQL 數據庫連接名稱}';
 
     /**

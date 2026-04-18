@@ -129,9 +129,11 @@ class BasicInformationSourcesController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_SOURCE_DATA 的 NOT NULL 複合主鍵欄位
+        // c_pages 為 varchar NOT NULL，現行 DB 以空字串 '' 作為「未知頁數」哨兵
         $request->merge([
-            'c_textid' => ($request->input('c_textid') == -999) ? '0' : ($request->input('c_textid') ?? '0'),
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_pages' => CompositePrimaryKey::emptyToSentinel($request->input('c_pages'), ''),
         ]);
 
         // 檢查動作類型
@@ -228,6 +230,13 @@ class BasicInformationSourcesController extends Controller {
 
             return redirect()->back();
         }
+
+        // 數據預處理：補齊 BIOG_SOURCE_DATA 的 NOT NULL 複合主鍵欄位
+        $request->merge([
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_pages' => CompositePrimaryKey::emptyToSentinel($request->input('c_pages'), ''),
+        ]);
+
         $data = $this->biogMainRepository->sourceUpdateById($request, $id, $id_);
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -338,9 +347,10 @@ class BasicInformationSourcesController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_SOURCE_DATA 的 NOT NULL 複合主鍵欄位
         $request->merge([
-            'c_textid' => ($request->input('c_textid') == -999) ? '0' : ($request->input('c_textid') ?? '0'),
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_pages' => CompositePrimaryKey::emptyToSentinel($request->input('c_pages'), ''),
         ]);
 
         // 檢查動作類型

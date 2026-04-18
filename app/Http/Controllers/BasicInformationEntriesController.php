@@ -148,12 +148,17 @@ class BasicInformationEntriesController extends Controller {
         // 數據預處理：處理 -999 轉為 0 並分割 c_inst_code
         // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
         $data = $request->all();
-        $data['c_entry_code'] = ($data['c_entry_code'] ?? 0) == -999 ? '0' : ($data['c_entry_code'] ?? '0');
-        $data['c_entry_addr_id'] = ($data['c_entry_addr_id'] ?? 0) == -999 ? '0' : ($data['c_entry_addr_id'] ?? '0');
-        $data['c_kin_code'] = ($data['c_kin_code'] ?? 0) == -999 ? '0' : ($data['c_kin_code'] ?? '0');
-        $data['c_assoc_code'] = ($data['c_assoc_code'] ?? 0) == -999 ? '0' : ($data['c_assoc_code'] ?? '0');
-        $data['c_inst_code'] = ($data['c_inst_code'] ?? 0) == -999 ? '0' : ($data['c_inst_code'] ?? '0');
-        $data['c_source'] = ($data['c_source'] ?? 0) == -999 ? '0' : ($data['c_source'] ?? '0');
+        $data['c_entry_code'] = CompositePrimaryKey::emptyToSentinel($data['c_entry_code'] ?? null);
+        $data['c_entry_addr_id'] = CompositePrimaryKey::emptyToSentinel($data['c_entry_addr_id'] ?? null);
+        $data['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($data['c_kin_code'] ?? null);
+        $data['c_assoc_code'] = CompositePrimaryKey::emptyToSentinel($data['c_assoc_code'] ?? null);
+        $data['c_inst_code'] = CompositePrimaryKey::emptyToSentinel($data['c_inst_code'] ?? null);
+        $data['c_source'] = CompositePrimaryKey::emptyToSentinel($data['c_source'] ?? null);
+        // 補齊其他 NOT NULL 複合主鍵欄位，避免清空後觸發 "缺少必要的複合主鍵參數" 錯誤
+        $data['c_year'] = CompositePrimaryKey::emptyToSentinel($data['c_year'] ?? null);
+        $data['c_kin_id'] = CompositePrimaryKey::emptyToSentinel($data['c_kin_id'] ?? null);
+        $data['c_assoc_id'] = CompositePrimaryKey::emptyToSentinel($data['c_assoc_id'] ?? null);
+        $data['c_sequence'] = CompositePrimaryKey::emptyToSentinel($data['c_sequence'] ?? null);
 
         $temp = explode("-", $data['c_inst_code']);
         $c_inst_code = $temp[0];
@@ -174,6 +179,10 @@ class BasicInformationEntriesController extends Controller {
             'c_inst_code' => $c_inst_code,
             'c_inst_name_code' => $c_inst_name_code,
             'c_source' => $data['c_source'],
+            'c_year' => $data['c_year'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_sequence' => $data['c_sequence'],
         ]);
 
         // 檢查動作類型
@@ -295,12 +304,17 @@ class BasicInformationEntriesController extends Controller {
         */
         // 數據預處理：處理 -999 轉為 0 並分割 c_inst_code
         $data = $request->all();
-        $data['c_entry_code'] = ($data['c_entry_code'] ?? 0) == -999 ? '0' : ($data['c_entry_code'] ?? '0');
-        $data['c_entry_addr_id'] = ($data['c_entry_addr_id'] ?? 0) == -999 ? '0' : ($data['c_entry_addr_id'] ?? '0');
-        $data['c_kin_code'] = ($data['c_kin_code'] ?? 0) == -999 ? '0' : ($data['c_kin_code'] ?? '0');
-        $data['c_assoc_code'] = ($data['c_assoc_code'] ?? 0) == -999 ? '0' : ($data['c_assoc_code'] ?? '0');
-        $data['c_inst_code'] = ($data['c_inst_code'] ?? 0) == -999 ? '0' : ($data['c_inst_code'] ?? '0');
-        $data['c_source'] = ($data['c_source'] ?? 0) == -999 ? '0' : ($data['c_source'] ?? '0');
+        $data['c_entry_code'] = CompositePrimaryKey::emptyToSentinel($data['c_entry_code'] ?? null);
+        $data['c_entry_addr_id'] = CompositePrimaryKey::emptyToSentinel($data['c_entry_addr_id'] ?? null);
+        $data['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($data['c_kin_code'] ?? null);
+        $data['c_assoc_code'] = CompositePrimaryKey::emptyToSentinel($data['c_assoc_code'] ?? null);
+        $data['c_inst_code'] = CompositePrimaryKey::emptyToSentinel($data['c_inst_code'] ?? null);
+        $data['c_source'] = CompositePrimaryKey::emptyToSentinel($data['c_source'] ?? null);
+        // 補齊其他 NOT NULL 複合主鍵欄位，避免清空後觸發 "缺少必要的複合主鍵參數" 錯誤
+        $data['c_year'] = CompositePrimaryKey::emptyToSentinel($data['c_year'] ?? null);
+        $data['c_kin_id'] = CompositePrimaryKey::emptyToSentinel($data['c_kin_id'] ?? null);
+        $data['c_assoc_id'] = CompositePrimaryKey::emptyToSentinel($data['c_assoc_id'] ?? null);
+        $data['c_sequence'] = CompositePrimaryKey::emptyToSentinel($data['c_sequence'] ?? null);
 
         $temp = explode("-", $data['c_inst_code']);
         $c_inst_code = $temp[0];
@@ -319,6 +333,10 @@ class BasicInformationEntriesController extends Controller {
             'c_inst_code' => $c_inst_code,
             'c_inst_name_code' => $c_inst_name_code,
             'c_source' => $data['c_source'],
+            'c_year' => $data['c_year'],
+            'c_kin_id' => $data['c_kin_id'],
+            'c_assoc_id' => $data['c_assoc_id'],
+            'c_sequence' => $data['c_sequence'],
         ]);
 
         $data = $request->all();
@@ -526,11 +544,16 @@ class BasicInformationEntriesController extends Controller {
         // 數據預處理：處理 -999 轉為 0 並分割 c_inst_code
         // 這些預處理必須在提案 (proposal) 和直接儲存 (save) 之前完成
         $request->merge([
-            'c_entry_code' => ($request->input('c_entry_code') == -999) ? '0' : ($request->input('c_entry_code') ?? '0'),
-            'c_entry_addr_id' => ($request->input('c_entry_addr_id') == -999) ? '0' : ($request->input('c_entry_addr_id') ?? '0'),
-            'c_kin_code' => ($request->input('c_kin_code') == -999) ? '0' : ($request->input('c_kin_code') ?? '0'),
-            'c_assoc_code' => ($request->input('c_assoc_code') == -999) ? '0' : ($request->input('c_assoc_code') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_entry_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_entry_code')),
+            'c_entry_addr_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_entry_addr_id')),
+            'c_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_code')),
+            'c_assoc_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_code')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
+            // 補齊其他 NOT NULL 複合主鍵欄位，避免清空後觸發 "缺少必要的複合主鍵參數" 錯誤
+            'c_year' => CompositePrimaryKey::emptyToSentinel($request->input('c_year')),
+            'c_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_id')),
+            'c_assoc_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_id')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
         ]);
 
         $temp = explode("-", $request->input('c_inst_code', ''));

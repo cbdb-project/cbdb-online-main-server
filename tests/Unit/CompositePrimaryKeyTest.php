@@ -83,6 +83,36 @@ class CompositePrimaryKeyTest extends TestCase {
     }
 
     #[Test]
+    public function empty_to_sentinel_normalizes_null_blank_and_minus_999_to_default_zero(): void {
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel(null));
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel(''));
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel(-999));
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel('-999'));
+    }
+
+    #[Test]
+    public function empty_to_sentinel_preserves_legitimate_values_as_string(): void {
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel('0'));
+        $this->assertSame('0', CompositePrimaryKey::emptyToSentinel(0));
+        $this->assertSame('1351', CompositePrimaryKey::emptyToSentinel(1351));
+        $this->assertSame('12345', CompositePrimaryKey::emptyToSentinel('12345'));
+        $this->assertSame('某書', CompositePrimaryKey::emptyToSentinel('某書'));
+    }
+
+    #[Test]
+    public function empty_to_sentinel_accepts_custom_sentinel_for_text_fields(): void {
+        // BIOG_SOURCE_DATA.c_pages 使用空字串作哨兵
+        $this->assertSame('', CompositePrimaryKey::emptyToSentinel(null, ''));
+        $this->assertSame('', CompositePrimaryKey::emptyToSentinel('', ''));
+        $this->assertSame('卷三', CompositePrimaryKey::emptyToSentinel('卷三', ''));
+
+        // ASSOC_DATA.c_text_title 使用 [n/a] 作哨兵
+        $this->assertSame('[n/a]', CompositePrimaryKey::emptyToSentinel(null, '[n/a]'));
+        $this->assertSame('[n/a]', CompositePrimaryKey::emptyToSentinel('', '[n/a]'));
+        $this->assertSame('論語', CompositePrimaryKey::emptyToSentinel('論語', '[n/a]'));
+    }
+
+    #[Test]
     public function it_decodes_null_sentinel_from_request(): void {
         $request = new Request([
             'c_personid' => 12345,

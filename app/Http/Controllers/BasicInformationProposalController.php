@@ -488,14 +488,20 @@ class BasicInformationProposalController extends Controller {
     }
 
     protected function normalizePayloadForTable(string $table, array $payload): array {
-        if ($table !== 'BIOG_SOURCE_DATA') {
-            return $payload;
+        if ($table === 'BIOG_SOURCE_DATA') {
+            $payload['c_pages'] = (string) ($payload['c_pages'] ?? '');
+
+            if (array_key_exists('c_textid', $payload) && $payload['c_textid'] !== null && $payload['c_textid'] !== '') {
+                $payload['c_textid'] = (int) $payload['c_textid'] === -999 ? 0 : (int) $payload['c_textid'];
+            }
         }
 
-        $payload['c_pages'] = (string) ($payload['c_pages'] ?? '');
-
-        if (array_key_exists('c_textid', $payload) && $payload['c_textid'] !== null && $payload['c_textid'] !== '') {
-            $payload['c_textid'] = (int) $payload['c_textid'] === -999 ? 0 : (int) $payload['c_textid'];
+        // ASSOC_DATA 的 c_text_title 統一用 '[n/a]' 作為「未知出處」哨兵，
+        // c_assoc_first_year 統一用 '-9999' 作為「未知年份」哨兵。
+        // 兩者皆為 9-key 複合主鍵的一部分，提案與直接寫入需維持同一慣例。
+        if ($table === 'ASSOC_DATA') {
+            $payload['c_text_title'] = CompositePrimaryKey::emptyToSentinel($payload['c_text_title'] ?? null, '[n/a]');
+            $payload['c_assoc_first_year'] = CompositePrimaryKey::emptyToSentinel($payload['c_assoc_first_year'] ?? null, '-9999');
         }
 
         return $payload;

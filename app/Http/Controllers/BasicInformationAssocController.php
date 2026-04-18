@@ -166,21 +166,26 @@ class BasicInformationAssocController extends Controller {
             $c_inst_name_code = '0';
         }
 
+        // 數據預處理：補齊 ASSOC_DATA 的 NOT NULL 複合主鍵欄位
+        // c_text_title 以 '[n/a]' 為「未知出處」哨兵（DB 現行慣例）
+        // c_assoc_first_year 以 '-9999' 為「未知年份」哨兵
         $request->merge([
             'c_inst_code' => $c_inst_code,
             'c_inst_name_code' => $c_inst_name_code,
+            'c_assoc_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_code')),
+            'c_assoc_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_id')),
+            'c_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_code')),
+            'c_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_id')),
+            'c_assoc_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_code')),
+            'c_assoc_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_id')),
+            'c_text_title' => CompositePrimaryKey::emptyToSentinel($request->input('c_text_title'), '[n/a]'),
+            'c_assoc_first_year' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_first_year'), '-9999'),
         ]);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 處理年份缺省值，確保符合複合主鍵要求
-            // 注意：c_text_title 允許為空字串，不需要強制填充 [n/a]，以免破壞現有空值資料的匹配
-            if ($request->input('c_assoc_first_year') === null || $request->input('c_assoc_first_year') === '') {
-                $request->merge(['c_assoc_first_year' => '-9999']);
-            }
-
             // 轉發到提案控制器
             return app(\App\Http\Controllers\BasicInformationProposalController::class)
                 ->proposalStore($request, $id, 'assoc');
@@ -291,7 +296,7 @@ class BasicInformationAssocController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理：分割 c_inst_code
+        // 數據預處理：分割 c_inst_code 並補齊 ASSOC_DATA 的 NOT NULL 複合主鍵欄位
         $temp = explode("-", $request->input('c_inst_code', ''));
         $c_inst_code = $temp[0] ?: '0';
         $c_inst_name_code = $temp[1] ?? '0';
@@ -304,6 +309,14 @@ class BasicInformationAssocController extends Controller {
         $request->merge([
             'c_inst_code' => $c_inst_code,
             'c_inst_name_code' => $c_inst_name_code,
+            'c_assoc_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_code')),
+            'c_assoc_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_id')),
+            'c_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_code')),
+            'c_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_id')),
+            'c_assoc_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_code')),
+            'c_assoc_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_id')),
+            'c_text_title' => CompositePrimaryKey::emptyToSentinel($request->input('c_text_title'), '[n/a]'),
+            'c_assoc_first_year' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_first_year'), '-9999'),
         ]);
 
         if (!Auth::user()->canWriteDirectly()) {
@@ -447,7 +460,7 @@ class BasicInformationAssocController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理：分割 c_inst_code
+        // 數據預處理：分割 c_inst_code 並補齊 ASSOC_DATA 的 NOT NULL 複合主鍵欄位
         $temp = explode("-", $request->input('c_inst_code', ''));
         $c_inst_code = $temp[0] ?: '0';
         $c_inst_name_code = $temp[1] ?? '0';
@@ -460,17 +473,20 @@ class BasicInformationAssocController extends Controller {
         $request->merge([
             'c_inst_code' => $c_inst_code,
             'c_inst_name_code' => $c_inst_name_code,
+            'c_assoc_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_code')),
+            'c_assoc_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_id')),
+            'c_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_code')),
+            'c_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_kin_id')),
+            'c_assoc_kin_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_code')),
+            'c_assoc_kin_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_kin_id')),
+            'c_text_title' => CompositePrimaryKey::emptyToSentinel($request->input('c_text_title'), '[n/a]'),
+            'c_assoc_first_year' => CompositePrimaryKey::emptyToSentinel($request->input('c_assoc_first_year'), '-9999'),
         ]);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');
 
         if ($action === 'proposal') {
-            // 處理年份缺省值
-            if ($request->input('c_assoc_first_year') === null || $request->input('c_assoc_first_year') === '') {
-                $request->merge(['c_assoc_first_year' => '-9999']);
-            }
-
             // 提案模式需要從 URL 查詢字串取得原始 PK（而非表單提交的新值）
             $schema = CompositePrimaryKey::SCHEMAS['ASSOC_DATA'];
             $originalPk = [];

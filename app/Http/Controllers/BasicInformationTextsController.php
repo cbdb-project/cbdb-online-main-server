@@ -117,10 +117,11 @@ class BasicInformationTextsController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_TEXT_DATA 的 NOT NULL 複合主鍵欄位
         $request->merge([
-            'c_textid' => ($request->input('c_textid') == -999) ? '0' : ($request->input('c_textid') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_role_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_role_id')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型
@@ -224,10 +225,11 @@ class BasicInformationTextsController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_TEXT_DATA 的 NOT NULL 複合主鍵欄位
         $request->merge([
-            'c_textid' => ($request->input('c_textid') == -999) ? '0' : ($request->input('c_textid') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_role_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_role_id')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型
@@ -368,6 +370,12 @@ class BasicInformationTextsController extends Controller {
 
             return redirect()->back();
         }
+
+        // 數據預處理：補齊 BIOG_TEXT_DATA 的 NOT NULL 複合主鍵欄位
+        $request->merge([
+            'c_textid' => CompositePrimaryKey::emptyToSentinel($request->input('c_textid')),
+            'c_role_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_role_id')),
+        ]);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');

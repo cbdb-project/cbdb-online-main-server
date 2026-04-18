@@ -118,8 +118,9 @@ class BasicInformationStatusesController extends Controller {
 
         // 數據預處理
         $request->merge([
-            'c_status_code' => ($request->input('c_status_code') == -999) ? '0' : ($request->input('c_status_code') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_status_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_status_code')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型
@@ -219,6 +220,13 @@ class BasicInformationStatusesController extends Controller {
 
             return redirect()->back();
         }
+
+        // 數據預處理：補齊 STATUS_DATA 的 NOT NULL 複合主鍵欄位
+        $request->merge([
+            'c_status_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_status_code')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+        ]);
+
         $data = $this->biogMainRepository->statuseUpdateById($request, $id_, $id);
         flash('Update success @ '.Carbon::now(), 'success');
 
@@ -370,8 +378,9 @@ class BasicInformationStatusesController extends Controller {
 
         // 數據預處理
         $request->merge([
-            'c_status_code' => ($request->input('c_status_code') == -999) ? '0' : ($request->input('c_status_code') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_status_code' => CompositePrimaryKey::emptyToSentinel($request->input('c_status_code')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型

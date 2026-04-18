@@ -190,6 +190,25 @@ class CompositePrimaryKey {
     }
 
     /**
+     * 將空值（null / 空字串 / '-999' / -999）正規化為指定哨兵值，
+     * 讓使用者清空表單欄位時仍能寫入 NOT NULL 複合主鍵欄位。
+     *
+     * 不同資料表的「未知」哨兵慣例不同：
+     * - 數字欄位（c_year, c_kin_id 等整數主鍵）：'0'
+     * - BIOG_SOURCE_DATA.c_pages（varchar）：''（現行 DB 已有 4823 筆以此為慣例）
+     * - ASSOC_DATA.c_text_title（varchar）：'[n/a]'（現行 DB 已有 68203 筆以此為慣例）
+     *
+     * 傳入非空值時原樣回傳（轉為字串），避免干擾合法內容。
+     */
+    public static function emptyToSentinel(mixed $value, string $sentinel = '0'): string {
+        if ($value === null || $value === '' || $value === -999 || $value === '-999') {
+            return $sentinel;
+        }
+
+        return (string) $value;
+    }
+
+    /**
      * 生成帶查詢參數的 URL
      *
      * @param string $route 路由名稱

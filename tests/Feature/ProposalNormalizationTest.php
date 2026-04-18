@@ -100,24 +100,27 @@ class ProposalNormalizationTest extends TestCase {
     }
 
     /**
-     * 驗證 P2: ASSOC_DATA 提案正確處理空字串 c_text_title
+     * 驗證 ASSOC_DATA 修改提案把空字串 c_text_title 正規化為 '[n/a]' 哨兵。
+     *
+     * 歷史上曾以空字串作為「未知出處」的佔位值，2026 年後統一改用 '[n/a]'
+     * （見 migration 2026_04_18_000000_normalize_assoc_data_empty_text_title.php）。
+     * 控制器在送出提案時應將空輸入 fallback 為 '[n/a]'，確保 PK 匹配到遷移後的資料。
      */
     #[Test]
-    public function testAssocProposalWithEmptyTextTitle() {
+    public function testAssocProposalNormalizesEmptyTextTitleToNaSentinel() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
-        // 插入一條 c_text_title 為空字串的原始資料
+        // 原始資料以 '[n/a]' 為 c_text_title（反映遷移後的現況）
         DB::table('ASSOC_DATA')->insert([
             'c_personid' => 100,
             'c_assoc_code' => 1,
             'c_assoc_id' => 2,
-            'c_text_title' => '', // 空字串
+            'c_text_title' => '[n/a]',
             'c_assoc_first_year' => 1000,
         ]);
 
-        // 模擬修改提案
-        // URL 包含 c_text_title= (空字串)
+        // URL 故意送空字串 c_text_title，期望控制器把它正規化為 '[n/a]' 後比對到原始資料
         $response = $this->patch(route('basicinformation.assoc.update.query', [
             'id' => 100,
             'action' => 'proposal',
@@ -128,32 +131,31 @@ class ProposalNormalizationTest extends TestCase {
             'c_kin_id' => 0,
             'c_assoc_kin_code' => 0,
             'c_assoc_kin_id' => 0,
-            'c_text_title' => '', // 關鍵：空字串 PK 欄位
+            'c_text_title' => '',
             'c_assoc_first_year' => 1000,
         ]), [
             'c_notes' => '更新後的備註',
-            '__proposal_comment' => '測試空字串 PK',
+            '__proposal_comment' => '測試空字串 c_text_title 被正規化',
         ]);
 
         $response->assertRedirect();
 
-        // 驗證提案是否成功建立，且 c_text_title 被正確識別
         $operation = Operation::where('resource', 'ASSOC_DATA')->first();
         $this->assertNotNull($operation, '提案未建立，可能是 PK 匹配失敗');
 
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('更新後的備註', $payload['c_notes']);
 
-        // 驗證 resource_id 包含 c_text_title 的空字串 (應被編碼為 NULL 或空，取決於 buildCompositeId)
-        // 在 BasicInformationProposalController 中，'' 或 null 會被轉為 'NULL'
-        $this->assertStringContainsString('NULL', $operation->resource_id);
+        // resource_id 裡 c_text_title 應該是 URL 編碼後的 '[n/a]'（而非舊契約的 'NULL'）
+        $this->assertStringContainsString('c_text_title='.rawurlencode('[n/a]'), $operation->resource_id);
     }
 
     /**
-     * 驗證 ASSOC_DATA 新增提案允許空字串 c_text_title
+     * 驗證 ASSOC_DATA 新增提案即使送出空字串 c_text_title 仍可成功，
+     * 空值會被正規化為 '[n/a]' 寫入。
      */
     #[Test]
-    public function testAssocCreateProposalAllowsEmptyTextTitle() {
+    public function testAssocCreateProposalNormalizesEmptyTextTitleToNaSentinel() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);
 
@@ -179,6 +181,9 @@ class ProposalNormalizationTest extends TestCase {
             ->latest('id')
             ->first();
         $this->assertNotNull($operation, 'ASSOC_DATA 空標題新增提案未建立');
+
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('[n/a]', $payload['c_text_title'], '空字串 c_text_title 應被正規化為 [n/a]');
     }
 
     /**

@@ -127,10 +127,12 @@ class BasicInformationAddressesController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_ADDR_DATA 的 NOT NULL 複合主鍵欄位
         $request->merge([
-            'c_addr_id' => ($request->input('c_addr_id') == -999) ? '0' : ($request->input('c_addr_id') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_addr_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_id')),
+            'c_addr_type' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_type')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型
@@ -309,10 +311,12 @@ class BasicInformationAddressesController extends Controller {
             return redirect()->back();
         }
 
-        // 數據預處理
+        // 數據預處理：補齊 BIOG_ADDR_DATA 的 NOT NULL 複合主鍵欄位
         $request->merge([
-            'c_addr_id' => ($request->input('c_addr_id') == -999) ? '0' : ($request->input('c_addr_id') ?? '0'),
-            'c_source' => ($request->input('c_source') == -999) ? '0' : ($request->input('c_source') ?? '0'),
+            'c_addr_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_id')),
+            'c_addr_type' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_type')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+            'c_source' => CompositePrimaryKey::emptyToSentinel($request->input('c_source')),
         ]);
 
         // 檢查動作類型
@@ -508,6 +512,13 @@ class BasicInformationAddressesController extends Controller {
 
             return redirect()->back();
         }
+
+        // 數據預處理：補齊 BIOG_ADDR_DATA 的 NOT NULL 複合主鍵欄位
+        $request->merge([
+            'c_addr_id' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_id')),
+            'c_addr_type' => CompositePrimaryKey::emptyToSentinel($request->input('c_addr_type')),
+            'c_sequence' => CompositePrimaryKey::emptyToSentinel($request->input('c_sequence')),
+        ]);
 
         // 檢查動作類型
         $action = $request->input('action', 'save');

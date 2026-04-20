@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-04-17 16:41:16
+> 生成時間：2026-04-20 13:15:57
 
 ## 目錄
 
@@ -2013,8 +2013,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_status_code` | smallint(6) | NO | (NULL) |  |
-| `c_status_desc` | varchar(255) | YES | NULL |  |
-| `c_status_desc_chn` | varchar(255) | YES | NULL |  |
+| `c_status_desc` | varchar(255) | NO | '' |  |
+| `c_status_desc_chn` | varchar(255) | NO | '' |  |
 
 **索引**:
 
@@ -3925,8 +3925,8 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_status_code` | INTEGER | NO | (NULL) |  |
-| `c_status_desc` | varchar(255) | YES | NULL |  |
-| `c_status_desc_chn` | varchar(255) | YES | NULL |  |
+| `c_status_desc` | varchar | NO | '' |  |
+| `c_status_desc_chn` | varchar | NO | '' |  |
 
 ---
 

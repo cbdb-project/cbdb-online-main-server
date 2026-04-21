@@ -2134,9 +2134,9 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_text_cat_code` | smallint(6) | NO | (NULL) |  |
-| `c_text_cat_desc` | varchar(255) | YES | NULL |  |
-| `c_text_cat_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_text_cat_pinyin` | varchar(255) | YES | NULL |  |
+| `c_text_cat_desc` | varchar(255) | NO | '' |  |
+| `c_text_cat_desc_chn` | varchar(255) | NO | '' |  |
+| `c_text_cat_pinyin` | varchar(255) | NO | '' |  |
 | `c_text_cat_parent_id` | varchar(255) | YES | NULL |  |
 | `c_text_cat_level` | varchar(255) | YES | NULL |  |
 | `c_text_cat_sortorder` | smallint(6) | YES | NULL |  |
@@ -4030,9 +4030,9 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_text_cat_code` | INTEGER | NO | (NULL) |  |
-| `c_text_cat_desc` | varchar(255) | YES | NULL |  |
-| `c_text_cat_desc_chn` | varchar(255) | YES | NULL |  |
-| `c_text_cat_pinyin` | varchar(255) | YES | NULL |  |
+| `c_text_cat_desc` | varchar(255) | NO | '' |  |
+| `c_text_cat_desc_chn` | varchar(255) | NO | '' |  |
+| `c_text_cat_pinyin` | varchar(255) | NO | '' |  |
 | `c_text_cat_parent_id` | varchar(255) | YES | NULL |  |
 | `c_text_cat_level` | varchar(255) | YES | NULL |  |
 | `c_text_cat_sortorder` | INTEGER | YES | NULL |  |

@@ -48,6 +48,7 @@
                         <li>您的文本將發送至第三方 AI 服務（Google Gemini API、OpenAI API 等，恕不另行通知）進行處理</li>
                         <li>AI 填充結果僅供參考，請務必核實後再提交</li>
                     </ul>
+                    <p class="mb-0 mt-2">當前使用模型：<code>{{ config('services.gemini.model') }}</code></p>
                 </div>
             </div>
             <div class="card-body">

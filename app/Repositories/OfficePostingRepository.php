@@ -51,6 +51,11 @@ class OfficePostingRepository {
         $data['c_office_id'] = $data['c_office_id'] == -999 ? '0' : $data['c_office_id'];
         //$data['c_inst_code'] = $data['c_inst_code'] == -999 ? '0' : $data['c_inst_code'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        // c_appt_code 欄位為 NOT NULL；null／空字串／-999 統一回填 0（APPOINTMENT_CODES 的「未詳」哨兵）
+        if (array_key_exists('c_appt_code', $data)) {
+            $apptValue = $data['c_appt_code'];
+            $data['c_appt_code'] = ($apptValue === null || $apptValue === '' || $apptValue == -999) ? 0 : (int) $apptValue;
+        }
 
         $hasPostingChange = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date']);
 
@@ -368,6 +373,11 @@ class OfficePostingRepository {
 
             $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
             $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
+            // c_appt_code 欄位為 NOT NULL；null／空字串／-999 統一回填 0（APPOINTMENT_CODES 的「未詳」哨兵）
+            if (array_key_exists('c_appt_code', $data)) {
+                $apptValue = $data['c_appt_code'];
+                $data['c_appt_code'] = ($apptValue === null || $apptValue === '' || $apptValue == -999) ? 0 : (int) $apptValue;
+            }
 
             $lastPostingId = DB::table('POSTING_DATA')
                 ->lockForUpdate()

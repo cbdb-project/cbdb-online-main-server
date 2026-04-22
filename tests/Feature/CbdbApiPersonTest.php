@@ -190,7 +190,7 @@ class CbdbApiPersonTest extends TestCase {
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
-            $table->integer('c_appt_code')->nullable();
+            $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
             $table->integer('c_source')->nullable();
             $table->string('c_pages')->nullable();
@@ -208,6 +208,12 @@ class CbdbApiPersonTest extends TestCase {
             $table->integer('c_appt_code')->primary();
             $table->string('c_appt_desc_chn')->nullable();
         });
+        // 對齊 migration 2026_04_22 建立的 0 號「未詳」哨兵，
+        // 避免日後擴測到 ApiController2 之類做 PHP 解參考的路徑時踩 NPE。
+        \DB::table('APPOINTMENT_CODES')->insert([
+            'c_appt_code' => 0,
+            'c_appt_desc_chn' => '未詳',
+        ]);
 
         Schema::create('ASSUME_OFFICE_CODES', function (Blueprint $table) {
             $table->integer('c_assume_office_code')->primary();

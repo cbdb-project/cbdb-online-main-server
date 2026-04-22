@@ -81,6 +81,14 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
             $data['c_ly_intercalary'] = (int) ($data['c_ly_intercalary'] ?? 0);
         }
 
+        // c_appt_code 欄位為 NOT NULL；null／空字串／-999 統一回填 0（APPOINTMENT_CODES 的「未詳」哨兵）
+        if (array_key_exists('c_appt_code', $data)) {
+            $value = $data['c_appt_code'];
+            if ($value === null || $value === '' || $value == -999) {
+                $data['c_appt_code'] = 0;
+            }
+        }
+
         return $data;
     }
 }

@@ -121,7 +121,7 @@ class ApiV2MutatePostingTest extends TestCase {
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
-            $table->integer('c_appt_code')->nullable();
+            $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
             $table->primary(['c_office_id', 'c_posting_id']);
         });

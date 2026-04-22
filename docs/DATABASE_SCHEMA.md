@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-04-20 13:15:57
+> 生成時間：2026-04-22 13:56:39
 
 ## 目錄
 
@@ -1763,6 +1763,7 @@
 | `c_ly_nh_code` | smallint(6) | YES | NULL |  |
 | `c_ly_nh_year` | smallint(6) | YES | NULL |  |
 | `c_ly_range` | smallint(6) | YES | NULL |  |
+| `c_appt_code` | smallint(6) | NO | 0 |  |
 | `c_assume_office_code` | smallint(6) | YES | NULL |  |
 | `c_inst_code` | smallint(6) | YES | 0 |  |
 | `c_inst_name_code` | smallint(6) | YES | 0 |  |
@@ -1782,7 +1783,6 @@
 | `c_dy` | smallint(6) | YES | NULL |  |
 | `c_created_by` | varchar(255) | YES | NULL |  |
 | `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_appt_code` | smallint(6) | YES | NULL |  |
 | `c_created_date` | datetime | YES | NULL |  |
 | `c_modified_date` | datetime | YES | NULL |  |
 
@@ -3758,7 +3758,7 @@
 | `c_dy` | INTEGER | YES | NULL |  |
 | `c_created_by` | varchar(255) | YES | NULL |  |
 | `c_modified_by` | varchar(255) | YES | NULL |  |
-| `c_appt_code` | varchar(255) | YES | NULL |  |
+| `c_appt_code` | INTEGER | NO | '0' |  |
 | `c_created_date` | datetime | YES | (NULL) |  |
 | `c_modified_date` | datetime | YES | (NULL) |  |
 
@@ -4030,9 +4030,9 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `c_text_cat_code` | INTEGER | NO | (NULL) |  |
-| `c_text_cat_desc` | varchar(255) | NO | '' |  |
-| `c_text_cat_desc_chn` | varchar(255) | NO | '' |  |
-| `c_text_cat_pinyin` | varchar(255) | NO | '' |  |
+| `c_text_cat_desc` | varchar | NO | '' |  |
+| `c_text_cat_desc_chn` | varchar | NO | '' |  |
+| `c_text_cat_pinyin` | varchar | NO | '' |  |
 | `c_text_cat_parent_id` | varchar(255) | YES | NULL |  |
 | `c_text_cat_level` | varchar(255) | YES | NULL |  |
 | `c_text_cat_sortorder` | INTEGER | YES | NULL |  |

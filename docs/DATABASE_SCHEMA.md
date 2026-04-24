@@ -1,7 +1,7 @@
 # 數據庫 Schema 文檔
 
 > 本文檔由 `php artisan cbdb:generate-schema-docs` 自動生成
-> 生成時間：2026-04-22 13:56:39
+> 生成時間：2026-04-24 16:52:43
 
 ## 目錄
 
@@ -1492,10 +1492,6 @@
 | `c_source` | int(11) | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | NULL |  |
-| `c_category_1` | varchar(255) | YES | NULL |  |
-| `c_category_2` | varchar(255) | YES | NULL |  |
-| `c_category_3` | varchar(255) | YES | NULL |  |
-| `c_category_4` | varchar(255) | YES | NULL |  |
 
 **索引**:
 
@@ -3588,10 +3584,6 @@
 | `c_source` | INTEGER | YES | NULL |  |
 | `c_pages` | varchar(255) | YES | NULL |  |
 | `c_notes` | longtext | YES | (NULL) |  |
-| `c_category_1` | varchar(255) | YES | NULL |  |
-| `c_category_2` | varchar(255) | YES | NULL |  |
-| `c_category_3` | varchar(255) | YES | NULL |  |
-| `c_category_4` | varchar(255) | YES | NULL |  |
 
 ---
 

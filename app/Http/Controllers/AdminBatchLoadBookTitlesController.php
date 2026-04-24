@@ -41,6 +41,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
             'results' => session('batch_results', []),
             'batchErrors' => session('batch_errors', []),
             'batchId' => session('batch_id'),
+            'toast' => session('toast'),
         ]);
     }
 
@@ -52,9 +53,16 @@ class AdminBatchLoadBookTitlesController extends Controller {
 
         $data = $request->validate([
             'entries' => 'required|string',
+            'force' => 'nullable|in:1',
         ]);
 
+        $skipPinyinCheck = ($data['force'] ?? null) === '1';
+
         [$rows, $errors] = $this->parseEntries($data['entries']);
+
+        if (empty($errors)) {
+            $errors = $this->validateRows($rows, $skipPinyinCheck);
+        }
 
         if (!empty($errors)) {
             return redirect()
@@ -123,7 +131,49 @@ class AdminBatchLoadBookTitlesController extends Controller {
             ->route('admin.batch-load-book-titles')
             ->with('batch_results', $results)
             ->with('batch_errors', [])
-            ->with('batch_id', $batchId);
+            ->with('batch_id', $batchId)
+            ->with('toast', ['msg' => '已新增 '.count($results).' 筆資料。', 'type' => 'success']);
+    }
+
+    /**
+     * Undo a previous batch by deleting every TEXT_CODES row whose c_notes
+     * matches the supplied batch id, plus the matching operations log entries.
+     * Identifying the batch by the c_notes sentinel keeps this idempotent and
+     * cheap (no need to track which row IDs were created in this session).
+     */
+    public function undo(Request $request) {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'batch_id' => 'required|string|regex:/^[0-9]{14}-[0-9A-F]{6}$/',
+        ]);
+
+        $marker = '['.$data['batch_id'].']';
+
+        $deleted = DB::transaction(function () use ($marker) {
+            $textIds = DB::table('TEXT_CODES')
+                ->where('c_notes', $marker)
+                ->pluck('c_textid')
+                ->map(fn ($v) => (string) $v)
+                ->all();
+
+            if (empty($textIds)) {
+                return 0;
+            }
+
+            DB::table('operations')
+                ->where('resource', 'TEXT_CODES')
+                ->whereIn('resource_id', $textIds)
+                ->delete();
+
+            return DB::table('TEXT_CODES')->where('c_notes', $marker)->delete();
+        });
+
+        return redirect()
+            ->route('admin.batch-load-book-titles')
+            ->with('toast', $deleted > 0
+                ? ['msg' => "已撤回批次 {$data['batch_id']}，共刪除 {$deleted} 筆。", 'type' => 'success']
+                : ['msg' => "找不到對應批次 {$data['batch_id']} 的資料，可能已被撤回或不存在。", 'type' => 'warning']);
     }
 
     /**
@@ -209,7 +259,95 @@ class AdminBatchLoadBookTitlesController extends Controller {
      * Generate a batch identifier for audit trail.
      */
     protected function generateBatchId(): string {
-        return now()->format('YmdHis');
+        // Second-level timestamp + 6 hex chars of randomness so two imports inside the
+        // same second cannot share a marker (which would make undo() ambiguous).
+        return now()->format('YmdHis').'-'.strtoupper(bin2hex(random_bytes(3)));
+    }
+
+    /**
+     * Validate every parsed row. Author and source ID checks are mandatory.
+     * The pinyin-coverage check is skipped when $skipPinyinCheck is true,
+     * letting an admin force-import titles with rare characters that are
+     * known-correct but not yet in the Pinyin dict.
+     *
+     * @param array<int,array<string,mixed>> $rows
+     * @return array<int,string>
+     */
+    protected function validateRows(array $rows, bool $skipPinyinCheck = false): array {
+        $errors = [];
+
+        $authorIds = array_values(array_unique(array_map(static fn ($r) => (int) $r['author_id'], $rows)));
+        $sourceIds = [];
+        foreach ($rows as $r) {
+            if (ctype_digit((string) $r['source'])) {
+                $sourceIds[] = (int) $r['source'];
+            }
+        }
+        $sourceIds = array_values(array_unique($sourceIds));
+
+        $existingAuthors = $authorIds
+            ? DB::table('BIOG_MAIN')->whereIn('c_personid', $authorIds)->pluck('c_personid')->map(fn ($v) => (int) $v)->all()
+            : [];
+        $existingAuthors = array_flip($existingAuthors);
+
+        $existingSources = $sourceIds
+            ? DB::table('TEXT_CODES')->whereIn('c_textid', $sourceIds)->pluck('c_textid')->map(fn ($v) => (int) $v)->all()
+            : [];
+        $existingSources = array_flip($existingSources);
+
+        foreach ($rows as $row) {
+            $line = $row['line'];
+
+            if (!isset($existingAuthors[(int) $row['author_id']])) {
+                $errors[] = "第 {$line} 行作者 ID {$row['author_id']} 不存在於 BIOG_MAIN";
+            }
+
+            $sourceRaw = (string) $row['source'];
+            if (!ctype_digit($sourceRaw)) {
+                $errors[] = "第 {$line} 行來源 TEXT_ID 必須為整數（目前為「{$sourceRaw}」）";
+            } elseif (!isset($existingSources[(int) $sourceRaw])) {
+                $errors[] = "第 {$line} 行來源 TEXT_ID {$sourceRaw} 不存在於 TEXT_CODES";
+            }
+
+            if (!$skipPinyinCheck) {
+                $unpinyinable = $this->collectUnpinyinableHan((string) $row['title']);
+                if (!empty($unpinyinable)) {
+                    $display = implode(' ', array_map(static function ($ch) {
+                        return sprintf('「%s」(U+%04X)', $ch, mb_ord($ch, 'UTF-8'));
+                    }, $unpinyinable));
+                    $errors[] = "第 {$line} 行書名含有無拼音對應的漢字（將造成 c_title 內仍含中文）：{$display}";
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Return Han characters in the title that the Pinyin dictionary cannot translate.
+     * Mirrors the steps buildPinyin() takes (drop volume info, normalize variants),
+     * so the result reflects exactly which characters would survive untranslated in
+     * c_title. Pinyin::getPinyin() returns the original character on lookup miss.
+     *
+     * @return array<int,string>
+     */
+    protected function collectUnpinyinableHan(string $title): array {
+        $titleWithoutVolume = $this->stripVolumeInfo($title);
+        $normalized = VariantCharNormalizer::normalize($titleWithoutVolume);
+        $chars = preg_split('//u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $unmapped = [];
+        foreach ($chars as $ch) {
+            if (!preg_match('/^\p{Han}$/u', $ch)) {
+                continue;
+            }
+            $pinyin = trim((string) Pinyin::getPinyin($ch));
+            if ($pinyin === '' || $pinyin === $ch) {
+                $unmapped[$ch] = true;
+            }
+        }
+
+        return array_keys($unmapped);
     }
 
     /**

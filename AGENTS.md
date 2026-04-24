@@ -108,3 +108,4 @@ php artisan cbdb:import-trad-simp-map --truncate
 - `.claude/skills/pre-commit-checks.md`
 - `.claude/skills/testing-guide.md`
 - `.claude/skills/commit-messages/SKILL.md`
+- `.claude/skills/frontend-event-handler-debugging.md`

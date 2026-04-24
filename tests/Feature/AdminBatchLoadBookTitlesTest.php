@@ -128,6 +128,10 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_personid' => 12345,
             'c_dy' => '88',
         ]);
+        DB::table('TEXT_CODES')->insert([
+            'c_textid' => 54321,
+            'c_title_chn' => '來源書',
+        ]);
 
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "12345\t測試稿: 卷一\t54321",
@@ -135,7 +139,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
 
-        $record = DB::table('TEXT_CODES')->where('c_textid', 1)->first();
+        $record = DB::table('TEXT_CODES')->where('c_textid', 54322)->first();
         $this->assertNotNull($record);
         $this->assertSame('測試稿: 卷一', $record->c_title_chn);
         $this->assertSame('ce shi gao', $record->c_title);
@@ -143,7 +147,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame('Batch Admin', $record->c_created_by);
         $this->assertSame('88', $record->c_text_dy);
         $this->assertSame('54321', $record->c_source);
-        $this->assertMatchesRegularExpression('/^\[[0-9]{14}\]$/', $record->c_notes);
+        $this->assertMatchesRegularExpression('/^\[[0-9]{14}-[0-9A-F]{6}\]$/', $record->c_notes);
         $this->assertNull($record->c_modified_by);
         $this->assertNull($record->c_modified_date);
 
@@ -187,6 +191,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_personid' => 100,
             'c_dy' => '1',
         ]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 99999, 'c_title_chn' => '來源']);
 
         $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "100\t測試稿（附錄）\t99999",
@@ -206,6 +211,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_personid' => 101,
             'c_dy' => '2',
         ]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 99998, 'c_title_chn' => '來源']);
 
         $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "101\t測試稿：卷一\t99998",
@@ -225,6 +231,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_personid' => 102,
             'c_dy' => '3',
         ]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 99997, 'c_title_chn' => '來源']);
 
         $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "102\t測試稿：  卷一\t99997",
@@ -245,6 +252,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_personid' => 103,
             'c_dy' => '4',
         ]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 99996, 'c_title_chn' => '來源']);
 
         $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "103\t測試稿（附錄）： 卷一\t99996",
@@ -272,5 +280,319 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $followUp = $this->get(route('admin.batch-load-book-titles'));
         $followUp->assertSee('匯入失敗');
         $this->assertSame(0, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_unknown_author_id_is_rejected(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('TEXT_CODES')->insert(['c_textid' => 700, 'c_title_chn' => '來源']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "9999999\t測試書\t700",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('不存在於 BIOG_MAIN', implode("\n", $errors));
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
+    public function test_unknown_source_text_id_is_rejected(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_dy' => '5']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "200\t測試書\t8888888",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('不存在於 TEXT_CODES', implode("\n", $errors));
+        $this->assertSame(0, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
+    public function test_non_numeric_source_text_id_is_rejected(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 201, 'c_dy' => '5']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "201\t測試書\tabc",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('必須為整數', implode("\n", $errors));
+        $this->assertSame(0, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_title_with_allowed_punctuation_passes(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 204, 'c_dy' => '7']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 703, 'c_title_chn' => '來源']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "204\t四書講義(屠錫光)\t703",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+        $this->assertSame(2, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_failed_validation_does_not_log_or_import_any_row(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 205, 'c_dy' => '8']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 704, 'c_title_chn' => '來源']);
+
+        // 靑 (U+9751) is unmapped in the Pinyin dict, which fails the pinyin check.
+        $entries = "205\t合法書名\t704\n205\t靑瑣稿\t704";
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => $entries,
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        // Only the seeded TEXT_CODES row remains: nothing from this batch was inserted
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
+    public function test_unpinyinable_han_character_is_rejected(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 260, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 760, 'c_title_chn' => '來源']);
+
+        // 靑 (U+9751) is a valid Han character but not in the Pinyin dict, so without
+        // this check it would survive untranslated in c_title (e.g. "靑 suo xian na gao").
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "260\t靑瑣獻納稿\t760",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
+        $this->assertStringContainsString('靑', implode("\n", $errors));
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
+    public function test_force_submit_bypasses_pinyin_check_only(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 270, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 770, 'c_title_chn' => '來源']);
+
+        // Same title that fails the pinyin check; with force=1 the row should import.
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "270\t靑瑣獻納稿\t770",
+            'force' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+        $this->assertSame(2, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_force_submit_still_enforces_id_checks(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('TEXT_CODES')->insert(['c_textid' => 771, 'c_title_chn' => '來源']);
+
+        // Author 9999999 does not exist — force flag must NOT bypass this.
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "9999999\t靑瑣獻納稿\t771",
+            'force' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertStringContainsString('不存在於 BIOG_MAIN', implode("\n", $errors));
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_pinyin_dict_now_covers_zhi_and_xi_additions(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 280, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 780, 'c_title_chn' => '來源']);
+
+        // 巵→zhi, 繫→xi were added to Pinyin::$dic. They should now pass the check.
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "280\t莊巵言\t780\n280\t易繫詞講\t780",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $rows = DB::table('TEXT_CODES')->where('c_textid', '>', 780)->orderBy('c_textid')->get();
+        $this->assertSame('zhuang zhi yan', $rows[0]->c_title);
+        $this->assertSame('yi xi ci jiang', $rows[1]->c_title);
+    }
+
+    #[Test]
+    public function test_unpinyinable_han_after_volume_separator_is_ignored(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 261, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 761, 'c_title_chn' => '來源']);
+
+        // Anything after a colon is dropped before pinyin conversion (see stripVolumeInfo),
+        // so unpinyinable chars in the volume annotation should not block the import.
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "261\t測試稿: 卷靑\t761",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+    }
+
+    #[Test]
+    public function test_undo_deletes_text_codes_and_operations_for_batch(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 400, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 900, 'c_title_chn' => '來源']);
+
+        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "400\t第一本書\t900\n400\t第二本書\t900",
+        ]);
+        $batchId = $store->getSession()->get('batch_id');
+        $this->assertNotNull($batchId);
+        $this->assertSame(3, DB::table('TEXT_CODES')->count());
+        $this->assertSame(2, DB::table('operations')->where('resource', 'TEXT_CODES')->count());
+
+        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+            'batch_id' => $batchId,
+        ]);
+        $undo->assertRedirect(route('admin.batch-load-book-titles'));
+        $toast = $undo->getSession()->get('toast', []);
+        $this->assertStringContainsString('共刪除 2 筆', $toast['msg'] ?? '');
+        $this->assertSame('success', $toast['type'] ?? '');
+
+        // Only the originally seeded source row remains.
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->where('resource', 'TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_undo_only_affects_matching_batch(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 401, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 901, 'c_title_chn' => '來源']);
+
+        $first = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "401\t批次甲\t901",
+        ]);
+        $firstBatch = $first->getSession()->get('batch_id');
+
+        // Each batch gets a random suffix, so two imports inside the same second
+        // still receive distinct ids. No sleep needed.
+        $second = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "401\t批次乙\t901",
+        ]);
+        $secondBatch = $second->getSession()->get('batch_id');
+        $this->assertNotSame($firstBatch, $secondBatch);
+
+        $this->post(route('admin.batch-load-book-titles.undo'), [
+            'batch_id' => $firstBatch,
+        ]);
+
+        // Second batch should survive.
+        $this->assertNotNull(DB::table('TEXT_CODES')->where('c_notes', '['.$secondBatch.']')->first());
+        $this->assertNull(DB::table('TEXT_CODES')->where('c_notes', '['.$firstBatch.']')->first());
+    }
+
+    #[Test]
+    public function test_undo_with_unknown_batch_id_is_safe(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('TEXT_CODES')->insert(['c_textid' => 902, 'c_title_chn' => '來源']);
+
+        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+            'batch_id' => '20990101000000-DEADBE',
+        ]);
+        $undo->assertRedirect(route('admin.batch-load-book-titles'));
+        $toast = $undo->getSession()->get('toast', []);
+        $this->assertStringContainsString('找不到對應批次', $toast['msg'] ?? '');
+        $this->assertSame('warning', $toast['type'] ?? '');
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+    }
+
+    #[Test]
+    public function test_undo_rejects_malformed_batch_id(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+            'batch_id' => 'not-a-batch',
+        ]);
+        // Laravel validation failure → redirect back with errors.
+        $undo->assertStatus(302);
+        $this->assertNotEmpty($undo->getSession()->get('errors'));
+    }
+
+    #[Test]
+    public function test_non_admin_cannot_undo(): void {
+        $user = $this->makeUser(['is_admin' => 0]);
+        $this->actingAs($user);
+
+        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+            'batch_id' => '20260101000000-ABCDEF',
+        ]);
+        $undo->assertStatus(403);
+    }
+
+    #[Test]
+    public function test_results_page_renders_copy_button_with_payload(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 300, 'c_dy' => '9']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 800, 'c_title_chn' => '來源']);
+
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "300\t某某書\t800",
+        ]);
+
+        $followUp = $this->get(route('admin.batch-load-book-titles'));
+        $followUp->assertSee('Copy textid and title');
+        $followUp->assertSee("801\t某某書", false);
+        $followUp->assertSee('id="copy-textid-title-source"', false);
     }
 }

@@ -29,26 +29,161 @@
                 </div>
             @endif
 
-            @if(!empty($results))
-                <div class="alert alert-success">
-                    已新增 {{ count($results) }} 筆資料。
-                </div>
-            @endif
-
             <form method="post" action="{{ route('admin.batch-load-book-titles.store') }}">
                 {{ csrf_field() }}
                 <div class="form-group">
                     <label for="entries">批次資料（以 Tab 分隔）</label>
-                    <textarea name="entries" id="entries" class="form-control @error('entries') is-invalid @enderror" rows="10" placeholder="作者ID[TAB]書名[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
+                    <div class="entries-editor">
+                        <pre id="entries-line-numbers" class="entries-line-numbers" aria-hidden="true">1</pre>
+                        <textarea name="entries" id="entries" class="form-control entries-textarea @error('entries') is-invalid @enderror" rows="10" spellcheck="false" placeholder="作者ID[TAB]書名[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
+                    </div>
                     @error('entries')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
                 </div>
-                <button type="submit" class="btn btn-primary">送出匯入</button>
+                <button type="submit" class="btn btn-primary mr-2">送出匯入</button>
+                <button type="submit" name="force" value="1" class="btn btn-warning mr-2"
+                        onclick="return confirm('強制送出將略過拼音檢查（人和書的 ID 仍會檢查）。確定繼續？');">
+                    強制送出匯入（略過拼音檢查）
+                </button>
                 <a href="{{ route('admin.batch-load-book-titles') }}" class="btn btn-default">清除重填</a>
             </form>
 
+            @push('styles')
+                <style>
+                    .entries-editor {
+                        display: flex;
+                        align-items: stretch;
+                        border: 1px solid #ced4da;
+                        border-radius: .25rem;
+                        background: #fff;
+                        overflow: hidden;
+                    }
+                    .entries-editor.is-invalid { border-color: #dc3545; }
+                    .entries-line-numbers {
+                        margin: 0;
+                        padding: .375rem .5rem;
+                        background: #f1f3f5;
+                        color: #6c757d;
+                        text-align: right;
+                        user-select: none;
+                        border-right: 1px solid #e9ecef;
+                        overflow: hidden;
+                        min-width: 3em;
+                        white-space: pre;
+                        font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                        font-size: 14px;
+                        line-height: 1.5;
+                    }
+                    .entries-textarea.form-control {
+                        border: 0;
+                        border-radius: 0;
+                        box-shadow: none;
+                        resize: vertical;
+                        font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        flex: 1 1 auto;
+                        min-width: 0;
+                    }
+                    .entries-textarea.form-control:focus {
+                        box-shadow: none;
+                    }
+                </style>
+            @endpush
+            @push('scripts')
+                <script>
+                    (function () {
+                        var ta = document.getElementById('entries');
+                        var gutter = document.getElementById('entries-line-numbers');
+                        if (!ta || !gutter) return;
+
+                        function render() {
+                            var lines = ta.value.split('\n').length;
+                            if (lines < 1) lines = 1;
+                            var out = '';
+                            for (var i = 1; i <= lines; i++) {
+                                out += (i === lines ? i : i + '\n');
+                            }
+                            gutter.textContent = out;
+                            gutter.scrollTop = ta.scrollTop;
+                        }
+
+                        ta.addEventListener('input', render);
+                        ta.addEventListener('scroll', function () { gutter.scrollTop = ta.scrollTop; });
+                        render();
+                    })();
+                </script>
+            @endpush
+
+            @push('scripts')
+                <script>
+                    // Shared toast helper for short transient messages on this page.
+                    // type: 'success' | 'error' | 'warning'
+                    window.showBatchToast = function (msg, type) {
+                        // Anchor to .content-wrapper (the main content area below the navbar)
+                        // so the toast clears any card chrome and never overlaps the navbar
+                        // user icon. We set position:relative on the anchor on first use so
+                        // absolute positioning resolves against it without touching layout CSS.
+                        var anchor = document.querySelector('.content-wrapper') || document.querySelector('.card-body') || document.body;
+                        if (anchor && getComputedStyle(anchor).position === 'static') {
+                            anchor.style.position = 'relative';
+                        }
+                        var toast = document.getElementById('batch-page-toast');
+                        if (!toast) {
+                            toast = document.createElement('div');
+                            toast.id = 'batch-page-toast';
+                            toast.style.cssText = [
+                                'position:absolute', 'top:16px', 'right:24px',
+                                'z-index:1050', 'padding:10px 18px',
+                                'border-radius:4px', 'color:#fff',
+                                'font-size:14px',
+                                'box-shadow:0 2px 8px rgba(0,0,0,0.2)',
+                                'opacity:0', 'transition:opacity 200ms ease',
+                                'pointer-events:none', 'max-width:60%'
+                            ].join(';');
+                            anchor.appendChild(toast);
+                        }
+                        toast.textContent = msg;
+                        var bg = '#28a745';
+                        if (type === 'error') bg = '#dc3545';
+                        else if (type === 'warning') bg = '#ffc107';
+                        toast.style.background = bg;
+                        toast.style.color = (type === 'warning') ? '#212529' : '#fff';
+                        requestAnimationFrame(function () { toast.style.opacity = '1'; });
+                        clearTimeout(toast._t);
+                        toast._t = setTimeout(function () { toast.style.opacity = '0'; }, 3000);
+                    };
+                </script>
+                @if(!empty($toast))
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            window.showBatchToast(@json($toast['msg']), @json($toast['type'] ?? 'success'));
+                        });
+                    </script>
+                @endif
+            @endpush
+
             @if(!empty($results))
+                @php
+                    $copyPayload = collect($results)
+                        ->map(fn ($row) => $row['c_textid']."\t".$row['title'])
+                        ->implode("\n");
+                @endphp
+                <div class="d-flex align-items-center" style="margin-top: 20px; gap: 8px;">
+                    <button type="button" id="copy-textid-title" class="btn btn-outline-primary">
+                        Copy textid and title
+                    </button>
+                    <textarea id="copy-textid-title-source" hidden>{{ $copyPayload }}</textarea>
+                    @if(!empty($batchId))
+                        <form method="post" action="{{ route('admin.batch-load-book-titles.undo') }}" class="m-0"
+                              onsubmit="return confirm('將刪除此次批次新增的全部 TEXT_CODES 資料與對應 operations 紀錄。確定撤回？');">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="batch_id" value="{{ $batchId }}">
+                            <button type="submit" class="btn btn-outline-danger">撤回此次匯入</button>
+                        </form>
+                    @endif
+                </div>
                 <div class="table-responsive" style="margin-top: 20px;">
                     <table class="table table-bordered table-striped table-condensed">
                         <thead>
@@ -85,6 +220,61 @@
                         </tbody>
                     </table>
                 </div>
+                @push('scripts')
+                    <script>
+                        // Event delegation on document survives DOM-replacement by browser
+                        // extensions (e.g. inline page translators that clone form controls).
+                        // Binding directly to #copy-textid-title would break in those cases
+                        // because the listener stays attached to the orphaned original node.
+                        document.addEventListener('click', function (ev) {
+                            if (!ev.target.closest('#copy-textid-title')) return;
+                            var source = document.getElementById('copy-textid-title-source');
+                            if (!source) return;
+                            var text = source.value || '';
+                            if (!text) return;
+
+                            function fallbackCopy(t) {
+                                var ta = document.createElement('textarea');
+                                ta.value = t;
+                                ta.setAttribute('readonly', '');
+                                ta.style.position = 'fixed';
+                                ta.style.top = '0';
+                                ta.style.left = '0';
+                                ta.style.opacity = '0';
+                                document.body.appendChild(ta);
+                                ta.focus();
+                                ta.select();
+                                var ok = false;
+                                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                                document.body.removeChild(ta);
+                                return ok;
+                            }
+
+                            function done(ok) {
+                                if (ok) {
+                                    window.showBatchToast('已複製 ' + text.split('\n').length + ' 筆', 'success');
+                                } else {
+                                    source.removeAttribute('hidden');
+                                    source.style.display = 'block';
+                                    source.style.width = '100%';
+                                    source.style.minHeight = '8em';
+                                    source.style.marginTop = '8px';
+                                    source.focus();
+                                    source.select();
+                                    window.showBatchToast('自動複製失敗，已展開下方文字框，請 Ctrl+C 手動複製', 'error');
+                                }
+                            }
+
+                            if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(text)
+                                    .then(function () { done(true); })
+                                    .catch(function () { done(fallbackCopy(text)); });
+                            } else {
+                                done(fallbackCopy(text));
+                            }
+                        });
+                    </script>
+                @endpush
             @endif
         </div>
     </div>

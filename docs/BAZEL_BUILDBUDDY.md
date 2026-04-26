@@ -1,7 +1,7 @@
 # Bazel 與 BuildBuddy
 
 本專案提供最小 Bazel 入口，用來在本機或 BuildBuddy Remote Execution 執行 PHPUnit。
-`//:phpunit` 是由 `tests/**/*Test.php` 生成的 `test_suite`，每個 PHPUnit test 檔案會對應一個 Bazel test target，方便遠端平行執行。Composer vendor 會先由 `//:composer_vendor` 產生 tarball，再提供給各測試 target 共用，避免每個測試檔重複安裝 Composer 依賴。
+`//:phpunit` 是由 `tests/**/*Test.php` 生成的 `test_suite`，每個 PHPUnit test 檔案會對應一個 Bazel test target，方便遠端平行執行。Composer vendor 會先由 `//:composer_vendor` 依 `composer.json` / `composer.lock` 產生 tarball，再提供給各測試 target 共用，避免每個測試檔重複安裝 Composer 依賴。
 
 ## 本機執行
 

@@ -44,6 +44,5 @@ export COMPOSER_CACHE_DIR="${home_root}/composer-cache"
 export COMPOSER_HOME="${home_root}/composer-home"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-composer install --prefer-dist --no-progress --no-interaction --no-ansi
+composer install --prefer-dist --no-progress --no-interaction --no-ansi --no-scripts
 tar -czf "${output}" vendor
-

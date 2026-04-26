@@ -3,6 +3,16 @@ load("//tools/bazel:phpunit_test.bzl", "phpunit_tests")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
+    name = "composer_sources",
+    srcs = [
+        "app/helpers.php",
+        "composer.json",
+        "composer.lock",
+        "database/migrations/helpers.php",
+    ] + glob(["database/factories/**"]),
+)
+
+filegroup(
     name = "phpunit_sources",
     srcs = glob(
         [
@@ -35,7 +45,7 @@ filegroup(
 
 genrule(
     name = "composer_vendor",
-    srcs = [":phpunit_sources"],
+    srcs = [":composer_sources"],
     outs = ["composer_vendor.tar.gz"],
     cmd = "$(location //tools/bazel:composer_vendor.sh) $@",
     tools = ["//tools/bazel:composer_vendor.sh"],

@@ -1,0 +1,4 @@
+exports_files([
+    "composer_vendor.sh",
+    "phpunit_runner.sh",
+])

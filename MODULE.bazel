@@ -1,0 +1,4 @@
+module(
+    name = "cbdb_online_main_server",
+    version = "0.0.0",
+)

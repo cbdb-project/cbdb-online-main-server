@@ -17,6 +17,9 @@ version.txt
 .php-cs-fixer.cache
 .claude/settings.local.json
 
+# Bazel
+/bazel-*
+
 # SQLite DB for development with Docker
 db-data/database.sqlite3
 database/database.sqlite3

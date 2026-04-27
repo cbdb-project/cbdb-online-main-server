@@ -1,0 +1,62 @@
+load("//tools/bazel:phpunit_test.bzl", "phpunit_tests")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "composer_sources",
+    srcs = [
+        "app/helpers.php",
+        "composer.json",
+        "composer.lock",
+        "database/migrations/helpers.php",
+    ] + glob(["database/factories/**"]),
+)
+
+filegroup(
+    name = "phpunit_sources",
+    srcs = glob(
+        [
+            ".env.example",
+            "app/**",
+            "artisan",
+            "bootstrap/**",
+            "composer.json",
+            "composer.lock",
+            "config/**",
+            "database/**",
+            "package-lock.json",
+            "package.json",
+            "phpunit.xml",
+            "public/**",
+            "resources/**",
+            "routes/**",
+            "tests/**",
+            "tsconfig.json",
+            "vite.config.js",
+        ],
+        exclude = [
+            "bootstrap/cache/**",
+            "public/build/**",
+            "public/hot",
+            "public/storage/**",
+        ],
+    ),
+)
+
+genrule(
+    name = "composer_vendor",
+    srcs = [":composer_sources"],
+    outs = ["composer_vendor.tar.gz"],
+    cmd = "$(location //tools/bazel:composer_vendor.sh) $@",
+    tools = ["//tools/bazel:composer_vendor.sh"],
+)
+
+phpunit_tests(
+    name = "phpunit",
+    data = [
+        ":composer_vendor",
+        ":phpunit_sources",
+    ],
+    runner = "//tools/bazel:phpunit_runner.sh",
+    test_files = glob(["tests/**/*Test.php"]),
+)

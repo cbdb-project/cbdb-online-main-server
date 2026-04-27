@@ -1,0 +1,18 @@
+common --enable_bzlmod
+
+test --test_output=errors
+test --test_timeout=900
+
+# BuildBuddy 通用設定。API key 請放在使用者自己的 ~/.bazelrc：
+# build:buildbuddy --remote_header=x-buildbuddy-api-key=<YOUR_API_KEY>
+build:buildbuddy --bes_backend=grpcs://remote.buildbuddy.io
+build:buildbuddy --bes_results_url=https://app.buildbuddy.io/invocation/
+build:buildbuddy --remote_cache=grpcs://remote.buildbuddy.io
+build:buildbuddy --remote_cache_compression
+build:buildbuddy --remote_executor=grpcs://remote.buildbuddy.io
+build:buildbuddy --remote_timeout=3600
+
+# Laravel/PHPUnit 遠端執行環境。若改用自有 image，可在 ~/.bazelrc 覆蓋同一個 flag。
+build:buildbuddy-phpunit --config=buildbuddy
+build:buildbuddy-phpunit --remote_default_exec_properties=OSFamily=Linux
+build:buildbuddy-phpunit --remote_default_exec_properties=container-image=docker://kirschbaumdevelopment/laravel-test-runner:8.4

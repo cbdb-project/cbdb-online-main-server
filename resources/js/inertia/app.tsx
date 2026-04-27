@@ -1,5 +1,8 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+import { installNumberInputWheelGuard } from '../utils/disableNumberInputWheel';
+
+installNumberInputWheelGuard();
 
 createInertiaApp({
     resolve: (name) => {

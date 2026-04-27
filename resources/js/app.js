@@ -29,6 +29,9 @@ import '../css/mobile-responsive.css';
 import '../css/ai-autofill.css';
 
 import { formatTimestamp, getUserOffsetMinutes, getUserTimeZone } from './utils/datetime';
+import { installNumberInputWheelGuard } from './utils/disableNumberInputWheel';
+
+installNumberInputWheelGuard();
 
 // Set global defaults for all Select2 instances to use Bootstrap 4 theme
 $.fn.select2.defaults.set('theme', 'bootstrap4');

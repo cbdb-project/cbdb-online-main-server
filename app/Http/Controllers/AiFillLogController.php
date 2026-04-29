@@ -94,7 +94,8 @@ class AiFillLogController extends Controller {
         $fieldLabels = [
             'c_office_id' => '官名',
             'c_addr' => '地名',
-            'c_dy' => '朝代',
+            // 朝代（c_dy）刻意排除：實務上不是 AI 從原文提取，而是依人物或年份自動推得，
+            // 與用戶提交值比較容易讓比對結果失真。
             'c_firstyear' => '始年',
             'c_fy_nh_code' => '始年年號',
             'c_fy_nh_year' => '年號年數',
@@ -184,7 +185,6 @@ class AiFillLogController extends Controller {
         // 代碼欄位 → [table, pk_column, text_column]
         $codeLookups = [
             'c_office_id' => ['OFFICE_CODES', 'c_office_id', 'c_office_chn'],
-            'c_dy' => ['DYNASTIES', 'c_dy', 'c_dynasty_chn'],
             'c_fy_nh_code' => ['NIAN_HAO', 'c_nianhao_id', 'c_nianhao_chn'],
             'c_ly_nh_code' => ['NIAN_HAO', 'c_nianhao_id', 'c_nianhao_chn'],
             'c_appt_code' => ['APPOINTMENT_CODES', 'c_appt_code', 'c_appt_desc_chn'],

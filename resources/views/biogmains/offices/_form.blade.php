@@ -69,13 +69,13 @@
         </div>
 
         {{-- 填充結果摘要（成功後顯示） --}}
-        <div class="alert alert-success" id="ai-result-summary" style="display:none;">
+        <div class="alert alert-light border" id="ai-result-summary" style="display:none;">
             <h5><i class="fas fa-check-circle"></i> AI 填充完成</h5>
             <ul class="mb-2">
                 <li>✅ <strong id="matched-count">0</strong> 個欄位成功匹配</li>
                 <li id="suggested-line" style="display:none;">⚠️ <strong id="suggested-count">0</strong> 個欄位需要確認（黃色標記，請檢查後直接提交）</li>
                 <li id="not-found-line" style="display:none;">🔍 <strong id="not-found-count">0</strong> 個欄位需要手動搜尋（AI 已提取關鍵字但未找到匹配）</li>
-                <li>❌ <strong id="empty-count">0</strong> 個欄位無法提取</li>
+                <li id="empty-line" style="display:none;">❌ <strong id="empty-count">0</strong> 個欄位無法提取</li>
             </ul>
         </div>
     @endif
@@ -417,6 +417,69 @@
                 }
             }
 
+            /**
+             * AI 提取了關鍵字但找不到匹配時，在欄位下方顯示提示
+             * 點擊「填入搜尋」會打開 Select2 並把 AI 關鍵字填到搜尋框
+             */
+            function showAiNotFoundHint($field, hintText) {
+                const $container = $field.closest('.col-sm-10, .col-sm-4, .col-sm-12').first();
+                if ($container.length === 0) return;
+                $container.find('.ai-not-found-hint').remove();
+
+                const safe = $('<div>').text(hintText).html();
+                const $hint = $(
+                    '<p class="ai-not-found-hint small mb-0 mt-1" ' +
+                        'style="color:#6c757d; background:#f6f8fa; padding:4px 10px; ' +
+                        'border-left:3px solid #adb5bd; border-radius:2px;">' +
+                        '<i class="fas fa-search" style="opacity:.6; margin-right:4px;"></i>' +
+                        'AI 提取「<strong style="color:#495057;">' + safe + '</strong>」未找到匹配 ' +
+                        '<button type="button" class="btn btn-link btn-sm p-0 ai-not-found-search" ' +
+                            'style="vertical-align:baseline;">填入搜尋</button>' +
+                    '</p>'
+                );
+                $container.append($hint);
+
+                $hint.find('.ai-not-found-search').on('click', function() {
+                    fillSelect2Search($field, hintText);
+                });
+            }
+
+            /**
+             * 把文字塞進 Select2 的搜尋輸入框並觸發搜尋。
+             * 處理 single / multi-select 的搜尋框位置差異，並在 multi-select 時
+             * 先清掉值為 0 的「未詳」placeholder，避免它與 search 並排擠壓視覺。
+             */
+            function fillSelect2Search($field, text) {
+                if (!$field.is('select') || !$field.hasClass('select2-hidden-accessible')) {
+                    $field.val(text).trigger('change').focus();
+                    return;
+                }
+
+                const isMulti = $field.prop('multiple');
+                if (isMulti) {
+                    const cleaned = ($field.val() || []).filter(function (v) {
+                        return String(v) !== '0';
+                    });
+                    $field.val(cleaned).trigger('change');
+                }
+
+                // 在 select2:open 之後再操作搜尋框，確保 DOM 已經就位
+                $field.one('select2:open', function () {
+                    // single-select：搜尋框在彈出 dropdown 內
+                    // multi-select：搜尋框在原本選擇容器內
+                    const $search = $('.select2-search__field:visible').last();
+                    if ($search.length > 0) {
+                        $search.val(text).trigger('input').trigger('keyup');
+                        $search.focus();
+                    }
+                });
+                $field.select2('open');
+            }
+
+            function clearAiNotFoundHints() {
+                $('.ai-not-found-hint').remove();
+            }
+
             // 點擊「AI 智能填充」按鈕
             $btnAiAutofill.on('click', function() {
                 const sourceText = $aiSourceText.val().trim();
@@ -482,6 +545,14 @@
                             } else {
                                 $('#not-found-line').hide();
                             }
+                            // 「無法提取」只在「完全沒匹配到任何欄位」時才提示，
+                            // 避免常規情況下出現「18 個欄位無法提取」這種誤導性訊息。
+                            var anyHit = stats.matched_count + stats.suggested_count + stats.not_found_count;
+                            if (anyHit === 0 && stats.empty_count > 0) {
+                                $('#empty-line').show();
+                            } else {
+                                $('#empty-line').hide();
+                            }
                             $aiResultSummary.show();
 
                             $btnClearAi.show();
@@ -519,6 +590,7 @@
                     removeAiClasses($(this));
                 });
                 $('.ai-field-label').removeClass('ai-field-label');
+                clearAiNotFoundHints();
 
                 // 1. 填充成功匹配的欄位（綠色）
                 for (const [fieldName, fieldData] of Object.entries(matched)) {
@@ -834,8 +906,12 @@
                                 }
                             }
                         } else {
-                            // 情況 2: 完全找不到匹配（只有 ai_extracted）→ 不修改欄位，跳過
-                            debugLog(`[AI Autofill] 欄位 ${fieldName} 未找到匹配，跳過填充`);
+                            // 情況 2: 完全找不到匹配（只有 ai_extracted）→ 顯示 AI 提取的關鍵字作為手動搜尋線索
+                            const hintText = fieldData.ai_extracted || fieldData.search_query || '';
+                            if (hintText) {
+                                showAiNotFoundHint($field, hintText);
+                            }
+                            debugLog(`[AI Autofill] 欄位 ${fieldName} 未找到匹配，顯示提示：${hintText}`);
                             continue;
                         }
                     } else {
@@ -869,6 +945,7 @@
                 });
 
                 $('.ai-field-label').removeClass('ai-field-label');
+                clearAiNotFoundHints();
                 $aiResultSummary.hide();
                 $btnClearAi.hide();
                 $aiStatus.empty();

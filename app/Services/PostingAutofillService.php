@@ -54,7 +54,7 @@ class PostingAutofillService {
             $aiData = $extractResult['data'];
 
             // 2. 對每個欄位進行模糊匹配
-            $matchResult = $this->matchFields($aiData, $personId);
+            $matchResult = $this->matchFields($aiData, $personId, $sourceText);
 
             return [
                 'success' => true,
@@ -264,7 +264,7 @@ class PostingAutofillService {
     /**
      * 對 AI 提取的數據進行模糊匹配
      */
-    protected function matchFields(array $aiData, int $personId): array {
+    protected function matchFields(array $aiData, int $personId, ?string $sourceText = null): array {
         $matched = [];
         $suggested = [];
         $empty = [];
@@ -393,49 +393,90 @@ class PostingAutofillService {
         if (!empty($aiData['addr_str']) && is_array($aiData['addr_str'])) {
             $addrData = $aiData['addr_str'];
             $addrData = $this->normalizeAddrName($addrData);
+            $fullText = $addrData['full_text'] ?? null;
             $searchName = $addrData['name'] ?? null;
             $parentName = $addrData['parent'] ?? null;
 
-            if (!empty($searchName)) {
-                $addrMatch = $this->fuzzyMatchAddress($searchName, $postingYear, $effectiveDynasty, $parentName);
+            // 候選查詢：優先用 full_text（避免 AI 對 parent/name 的錯誤再切分，例如將「江南東路」切成
+            // parent=「江南」、name=「東路」），失敗才退到 name + parent 的舊路徑。
+            //
+            // parent 的傳遞策略：
+            // - full_text == name：AI 沒有把字串再切到 name 之中，parent 是同層級補充的可信資訊，
+            //   保留它讓 fuzzyMatchAddress 在同名地名（如多個「永康」）時做歧義消解。
+            // - full_text != name：AI 把 full_text 拆成 parent + name，parent 可能本身就是 full_text
+            //   的前段（例如「江南東路」→ parent=「江南」），此時若用 full_text 還傳這個 parent，
+            //   可能反而讓 fuzzyMatchAddress 套錯歧義消解規則，故傳 null。
+            $candidates = [];
+            if (!empty($fullText)) {
+                $fullTextParent = ($fullText === $searchName) ? $parentName : null;
+                $candidates[] = ['query' => $fullText, 'parent' => $fullTextParent];
+            }
+            if (!empty($searchName) && $searchName !== $fullText) {
+                $candidates[] = ['query' => $searchName, 'parent' => $parentName];
+            }
 
+            $addrMatch = null;
+            $searchQuery = null;
+            foreach ($candidates as $candidate) {
+                $result = $this->fuzzyMatchAddress(
+                    $candidate['query'],
+                    $postingYear,
+                    $effectiveDynasty,
+                    $candidate['parent']
+                );
+
+                if ($result === null) {
+                    continue;
+                }
+                if ($addrMatch === null) {
+                    $addrMatch = $result;
+                    $searchQuery = $candidate['query'];
+                }
+                if ($result['match_type'] === 'exact') {
+                    $addrMatch = $result;
+                    $searchQuery = $candidate['query'];
+
+                    break;
+                }
+            }
+
+            // 顯示給前端的「建議搜尋字串」優先用 full_text（最完整，沒被 AI 二次切壞）
+            $displayQuery = $fullText ?: $searchName;
+
+            if (!empty($candidates)) {
                 if ($addrMatch) {
-                    $inputLength = mb_strlen($searchName);
+                    $inputLength = mb_strlen($searchQuery);
                     $matchedLength = $addrMatch['matched_length'];
 
                     // 判斷是否需要建議（黃色）：
                     // 1. 模糊匹配（前綴匹配，或有歧義但上層匹配失敗）
                     // 2. 輸入包含上層信息但只匹配到下層（輸入長度 > 匹配長度）
-                    // 注意：match_type 已經考慮了上層匹配的情況，不需要再檢查 parent 欄位
                     $needsConfirmation = (
                         $addrMatch['match_type'] === 'fuzzy' ||
                         $inputLength > $matchedLength
                     );
 
                     if ($needsConfirmation) {
-                        // 需要確認 → 黃色（建議）
                         $suggested['c_addr'] = [
                             'value' => [$addrMatch['id']],
                             'text' => [$addrMatch['text']],
-                            'ai_extracted' => $addrData['full_text'] ?? $searchName,
-                            'ai_structured' => $addrData, // 保留完整的結構化信息
-                            'search_query' => $searchName,
+                            'ai_extracted' => $displayQuery,
+                            'ai_structured' => $addrData,
+                            'search_query' => $displayQuery,
                         ];
                     } else {
-                        // 精確匹配且長度一致 → 綠色（確認）
                         $matched['c_addr'] = [
                             'value' => [$addrMatch['id']],
                             'text' => [$addrMatch['text']],
-                            'ai_extracted' => $addrData['full_text'] ?? $searchName,
-                            'ai_structured' => $addrData, // 保留完整的結構化信息
+                            'ai_extracted' => $displayQuery,
+                            'ai_structured' => $addrData,
                         ];
                     }
                 } else {
-                    // 完全找不到 → 黃色（建議）
                     $suggested['c_addr'] = [
-                        'ai_extracted' => $addrData['full_text'] ?? $searchName,
-                        'ai_structured' => $addrData, // 保留完整的結構化信息
-                        'search_query' => $searchName,
+                        'ai_extracted' => $displayQuery,
+                        'ai_structured' => $addrData,
+                        'search_query' => $displayQuery,
                     ];
                 }
             } else {
@@ -549,11 +590,253 @@ class PostingAutofillService {
             }
         }
 
+        // 單邊命中時嘗試邊界滑窗：例如「荊湖北路轉運司判官」AI 將其切成
+        // title=「判官」、addr=「荊湖北路轉運司」，導致 c_office_id 命中但 c_addr 找不到。
+        // 在保留兩邊「都精確命中」的前提下，沿原文切點滑窗找到更佳切法。
+        $this->refineTitleAddrBoundary(
+            $sourceText,
+            $aiData,
+            $matched,
+            $suggested,
+            $postingYear,
+            $effectiveDynasty,
+            $addrAdminType
+        );
+
         return [
             'matched' => $matched,
             'suggested' => $suggested,
             'empty' => $empty,
         ];
+    }
+
+    /**
+     * 邊界滑窗：在 title_str 與 addr_str.full_text 連起來的字串上滑切點，
+     * 嘗試找到「title 與 addr 同時 exact 命中字典」的更佳切法。
+     *
+     * 僅在單邊命中（office matched + addr 未匹配，或反之）時觸發，避免無謂計算。
+     * 命中時就地修改 $matched 與 $suggested。
+     */
+    protected function refineTitleAddrBoundary(
+        ?string $sourceText,
+        array $aiData,
+        array &$matched,
+        array &$suggested,
+        ?int $postingYear,
+        ?int $effectiveDynasty,
+        ?string $adminType
+    ): void {
+        $titleStr = $aiData['title_str'] ?? null;
+        $addrFull = $aiData['addr_str']['full_text'] ?? null;
+        if (empty($titleStr) || empty($addrFull)) {
+            return;
+        }
+
+        $officeMatched = isset($matched['c_office_id']);
+        $addrMatched = isset($matched['c_addr']);
+        $addrLost = isset($suggested['c_addr']) && empty($suggested['c_addr']['value']);
+        $officeLost = isset($suggested['c_office_id']) && empty($suggested['c_office_id']['value']);
+
+        $caseA = $officeMatched && !$addrMatched && $addrLost;
+        $caseB = $addrMatched && !$officeMatched && $officeLost;
+        if (!$caseA && !$caseB) {
+            return;
+        }
+
+        // 優先以 sourceText 為基準找 addr / title 的最近配對（取所有 occurrence 中
+        // union span 最短的那一對），這樣可：
+        //   - 正確處理 AI 把 title 吃進 addr.full_text 的情境（簡單拼接會產生重複）
+        //   - 即使 sourceText 中 addr/title 各出現多次也能收斂到實際相鄰那一組
+        //   - 順帶從 sourceText 推斷兩者順序
+        // 為避免在長 sourceText 中跨段落取一大塊（會讓 loop 內的 DB 查詢爆量），
+        // 後續以 MAX_COMBINED_LEN 硬性截斷，超過直接放棄滑窗。
+        $combined = null;
+        $addrFirst = true;
+        if (!empty($sourceText)) {
+            $best = $this->findClosestSpan($sourceText, $addrFull, $titleStr);
+            if ($best !== null) {
+                $combined = mb_substr($sourceText, $best['start'], $best['len']);
+                $addrFirst = $best['addr_first'];
+            }
+        }
+        if ($combined === null) {
+            // sourceText 缺失或 AI 與 sourceText 不一致時，退回直接拼接（addr-first 預設）。
+            $combined = $addrFull . $titleStr;
+        }
+
+        $totalLen = mb_strlen($combined);
+        if ($totalLen < 2) {
+            return;
+        }
+
+        // 硬性 cap：合併字串過長表示 AI 抽取的 addr/title 在 sourceText 中相距很遠，
+        // 多半不是同一個任官敘述，且字符數過大會讓滑窗 × DB 查詢量變得過重。
+        // 25 字對應最壞情況 24 個切點 × 2 次 DB 查詢 = 48 次，仍是可接受區間。
+        $MAX_COMBINED_LEN = 25;
+        if ($totalLen > $MAX_COMBINED_LEN) {
+            Log::info('[AI Autofill] 邊界滑窗略過：合併字串過長', [
+                'combined_len' => $totalLen,
+                'cap' => $MAX_COMBINED_LEN,
+                'ai_addr' => $addrFull,
+                'ai_title' => $titleStr,
+            ]);
+
+            return;
+        }
+
+        $aiSplit = [
+            'addr' => $addrFull,
+            'title' => $titleStr,
+        ];
+
+        // AI 原始邊界，作為「離 AI 切點越近越可信」的次要排序基準
+        $aiBoundary = $addrFirst ? mb_strlen($aiSplit['addr']) : mb_strlen($aiSplit['title']);
+
+        $bestSplit = null;
+        $validCount = 0;
+        // 排名以 tuple 比較：[地址命中字串長度, -|邊界距離|]
+        // 主排序：偏好較具體（較長）的地址，例如「荊湖北路」優於「荊湖」、「邶州」優於「邶」。
+        //         CBDB 領域中地址通常是穩定的行政單位名（路/府/州/縣），長越具體；
+        //         也對應「AI 把官名詞吃進地址」這個最常見的失誤方向 —— 只要存在
+        //         「更長地址 + 仍 exact 命中官名」的切法，就比「短地址 + 長複合官名」可靠。
+        // 次排序：與 AI 原邊界距離越小越可信（AI 通常接近正解，只是被個別字差打偏），
+        //         做為相同地址長度時的保守 tie-breaker。
+        $bestRank = [-1, PHP_INT_MIN];
+        for ($i = 1; $i < $totalLen; $i++) {
+            $part1 = mb_substr($combined, 0, $i);
+            $part2 = mb_substr($combined, $i);
+            $candidate = $addrFirst
+                ? ['addr' => $part1, 'title' => $part2]
+                : ['addr' => $part2, 'title' => $part1];
+
+            // 跳過 AI 原始切法（與目前狀態一致，沒必要再算）
+            if ($candidate['addr'] === $aiSplit['addr'] && $candidate['title'] === $aiSplit['title']) {
+                continue;
+            }
+
+            $addrM = $this->fuzzyMatchAddress($candidate['addr'], $postingYear, $effectiveDynasty, null);
+            if ($addrM === null || $addrM['match_type'] !== 'exact') {
+                continue;
+            }
+
+            $officeM = $this->fuzzyMatchOffice($candidate['title'], $effectiveDynasty, $adminType);
+            if ($officeM === null || $officeM['match_type'] !== 'exact') {
+                continue;
+            }
+
+            $validCount++;
+            $addrLen = mb_strlen($addrM['text']);
+            $boundaryDistance = abs($i - $aiBoundary);
+            $rank = [$addrLen, -$boundaryDistance];
+
+            if ($rank > $bestRank) {
+                $bestRank = $rank;
+                $bestSplit = [
+                    'addr' => $candidate['addr'],
+                    'title' => $candidate['title'],
+                    'addr_match' => $addrM,
+                    'office_match' => $officeM,
+                ];
+            }
+        }
+
+        if ($validCount > 1) {
+            Log::info('[AI Autofill] 邊界滑窗發現多個合法切法，依 (地址長, 距 AI 切點) 取最優', [
+                'combined' => $combined,
+                'valid_count' => $validCount,
+                'picked_addr' => $bestSplit['addr'] ?? null,
+                'picked_title' => $bestSplit['title'] ?? null,
+            ]);
+        }
+
+        if ($bestSplit === null) {
+            return;
+        }
+
+        Log::info('[AI Autofill] 邊界滑窗修正', [
+            'ai_addr' => $aiSplit['addr'],
+            'ai_title' => $aiSplit['title'],
+            'refined_addr' => $bestSplit['addr'],
+            'refined_title' => $bestSplit['title'],
+        ]);
+
+        $matched['c_office_id'] = [
+            'value' => $bestSplit['office_match']['id'],
+            'text' => $bestSplit['office_match']['text'],
+            'ai_extracted' => $titleStr,
+            'refined_from_boundary' => true,
+        ];
+        unset($suggested['c_office_id']);
+
+        $matched['c_addr'] = [
+            'value' => [$bestSplit['addr_match']['id']],
+            'text' => [$bestSplit['addr_match']['text']],
+            'ai_extracted' => $addrFull,
+            'ai_structured' => $aiData['addr_str'] ?? null,
+            'refined_from_boundary' => true,
+        ];
+        unset($suggested['c_addr']);
+    }
+
+    /**
+     * 在 $haystack 中找出 $needle1 與 $needle2 兩個子字串的所有出現位置，
+     * 回傳「union span 最短」的那一對。用於從可能很長的 sourceText 中
+     * 收斂出 addr / title 實際相鄰的那段。
+     *
+     * @return array|null ['start' => int, 'len' => int, 'addr_first' => bool] 或 null（任一找不到）
+     */
+    protected function findClosestSpan(string $haystack, string $needle1, string $needle2): ?array {
+        $positions1 = $this->findAllPositions($haystack, $needle1);
+        $positions2 = $this->findAllPositions($haystack, $needle2);
+        if (empty($positions1) || empty($positions2)) {
+            return null;
+        }
+
+        $len1 = mb_strlen($needle1);
+        $len2 = mb_strlen($needle2);
+
+        $best = null;
+        // 最壞情況下兩邊各 N 個 occurrence 會跑 N×N 次比較，但因為下游已經對總長度 cap，
+        // 且 needle 本身相對較長，N 通常極小（多半為 1），不會構成效能問題。
+        foreach ($positions1 as $p1) {
+            foreach ($positions2 as $p2) {
+                $start = min($p1, $p2);
+                $end = max($p1 + $len1, $p2 + $len2);
+                $spanLen = $end - $start;
+                if ($best === null || $spanLen < $best['len']) {
+                    $best = [
+                        'start' => $start,
+                        'len' => $spanLen,
+                        'addr_first' => ($p1 <= $p2),
+                    ];
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * 找出 $needle 在 $haystack 中所有起始位置（mb 安全）。
+     * 為避免極端輸入導致無限迴圈，限制最多回傳 16 個 occurrence。
+     */
+    protected function findAllPositions(string $haystack, string $needle): array {
+        if ($needle === '') {
+            return [];
+        }
+        $positions = [];
+        $offset = 0;
+        $maxOccurrences = 16;
+        while (count($positions) < $maxOccurrences) {
+            $pos = mb_strpos($haystack, $needle, $offset);
+            if ($pos === false) {
+                break;
+            }
+            $positions[] = $pos;
+            $offset = $pos + 1;
+        }
+
+        return $positions;
     }
 
     /**

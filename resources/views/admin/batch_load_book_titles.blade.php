@@ -207,7 +207,16 @@
                                 <td>{{ $row['line'] }}</td>
                                 <td>{{ $row['author_id'] }}</td>
                                 <td>{{ $row['title'] }}</td>
-                                <td>{{ $row['title_pinyin'] }}</td>
+                                <td class="pinyin-cell" data-textid="{{ $row['c_textid'] }}" data-batch-id="{{ $batchId }}">
+                                    <span class="pinyin-display">{{ $row['title_pinyin'] }}</span>
+                                    <input type="text" class="form-control form-control-sm pinyin-input" value="{{ $row['title_pinyin'] }}" hidden>
+                                    <div class="pinyin-actions mt-1">
+                                        <button type="button" class="btn btn-xs btn-outline-secondary pinyin-edit-btn" title="編輯拼音" aria-label="編輯拼音"><i class="fa fa-edit" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-xs btn-primary pinyin-save-btn" hidden>保存</button>
+                                        <button type="button" class="btn btn-xs btn-default pinyin-cancel-btn" hidden>取消</button>
+                                        <span class="pinyin-status text-muted small ml-2"></span>
+                                    </div>
+                                </td>
                                 <td>{{ $row['source'] }}</td>
                                 <td>{{ $row['dynasty'] ?? '—' }}</td>
                                 <td>{{ $row['text_type'] }}</td>
@@ -220,6 +229,127 @@
                         </tbody>
                     </table>
                 </div>
+                @push('scripts')
+                    <script>
+                        // Inline pinyin editing for the result table. We POST one row at a
+                        // time to update-pinyin, then SELECT-back the stored value from the
+                        // server response so the cell reflects exactly what landed in DB.
+                        (function () {
+                            var endpoint = @json(route('admin.batch-load-book-titles.update-pinyin', [], false));
+                            var tokenInput = document.querySelector('input[name="_token"]');
+                            var csrfToken = tokenInput ? tokenInput.value : '';
+
+                            function setBusy(cell, busy) {
+                                var status = cell.querySelector('.pinyin-status');
+                                if (status) status.textContent = busy ? '保存中…' : '';
+                                cell.querySelectorAll('button').forEach(function (b) { b.disabled = busy; });
+                            }
+
+                            function enterEdit(cell) {
+                                cell.querySelector('.pinyin-display').hidden = true;
+                                var input = cell.querySelector('.pinyin-input');
+                                input.hidden = false;
+                                input.focus();
+                                input.select();
+                                cell.querySelector('.pinyin-edit-btn').hidden = true;
+                                cell.querySelector('.pinyin-save-btn').hidden = false;
+                                cell.querySelector('.pinyin-cancel-btn').hidden = false;
+                            }
+
+                            function leaveEdit(cell) {
+                                cell.querySelector('.pinyin-display').hidden = false;
+                                cell.querySelector('.pinyin-input').hidden = true;
+                                cell.querySelector('.pinyin-edit-btn').hidden = false;
+                                cell.querySelector('.pinyin-save-btn').hidden = true;
+                                cell.querySelector('.pinyin-cancel-btn').hidden = true;
+                            }
+
+                            function applyStored(cell, storedValue) {
+                                var display = cell.querySelector('.pinyin-display');
+                                display.textContent = storedValue;
+                                cell.querySelector('.pinyin-input').value = storedValue;
+                                var status = cell.querySelector('.pinyin-status');
+                                if (status) {
+                                    status.textContent = '已寫入：' + storedValue;
+                                    status.classList.remove('text-danger');
+                                    status.classList.add('text-success');
+                                    setTimeout(function () {
+                                        status.textContent = '';
+                                        status.classList.remove('text-success');
+                                    }, 4000);
+                                }
+                            }
+
+                            function showError(cell, msg) {
+                                var status = cell.querySelector('.pinyin-status');
+                                if (status) {
+                                    status.textContent = msg;
+                                    status.classList.remove('text-success');
+                                    status.classList.add('text-danger');
+                                }
+                            }
+
+                            document.addEventListener('click', function (ev) {
+                                var cell = ev.target.closest('.pinyin-cell');
+                                if (!cell) return;
+
+                                if (ev.target.closest('.pinyin-edit-btn')) {
+                                    enterEdit(cell);
+                                    return;
+                                }
+                                if (ev.target.closest('.pinyin-cancel-btn')) {
+                                    var display = cell.querySelector('.pinyin-display').textContent;
+                                    cell.querySelector('.pinyin-input').value = display;
+                                    leaveEdit(cell);
+                                    var status = cell.querySelector('.pinyin-status');
+                                    if (status) status.textContent = '';
+                                    return;
+                                }
+                                if (ev.target.closest('.pinyin-save-btn')) {
+                                    var input = cell.querySelector('.pinyin-input');
+                                    var newValue = (input.value || '').trim();
+                                    if (newValue === '') {
+                                        showError(cell, '拼音不可為空');
+                                        return;
+                                    }
+                                    setBusy(cell, true);
+                                    var body = new FormData();
+                                    body.append('_token', csrfToken);
+                                    body.append('c_textid', cell.dataset.textid);
+                                    body.append('batch_id', cell.dataset.batchId);
+                                    body.append('pinyin', newValue);
+
+                                    fetch(endpoint, {
+                                        method: 'POST',
+                                        body: body,
+                                        credentials: 'same-origin',
+                                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
+                                    })
+                                    .then(function (resp) {
+                                        return resp.json().then(function (json) { return { ok: resp.ok, json: json }; });
+                                    })
+                                    .then(function (result) {
+                                        setBusy(cell, false);
+                                        if (!result.ok || !result.json || result.json.ok === false) {
+                                            var msg = (result.json && result.json.message) || '保存失敗';
+                                            showError(cell, msg);
+                                            window.showBatchToast && window.showBatchToast(msg, 'error');
+                                            return;
+                                        }
+                                        applyStored(cell, result.json.c_title || '');
+                                        leaveEdit(cell);
+                                        window.showBatchToast && window.showBatchToast('已更新 c_textid ' + result.json.c_textid, 'success');
+                                    })
+                                    .catch(function () {
+                                        setBusy(cell, false);
+                                        showError(cell, '網路錯誤，請重試');
+                                    });
+                                }
+                            });
+                        })();
+                    </script>
+                @endpush
+
                 @push('scripts')
                     <script>
                         // Event delegation on document survives DOM-replacement by browser

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Operation;
 use App\Models\Pinyin;
 use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\VariantCharNormalizer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -174,6 +176,104 @@ class AdminBatchLoadBookTitlesController extends Controller {
             ->with('toast', $deleted > 0
                 ? ['msg' => "已撤回批次 {$data['batch_id']}，共刪除 {$deleted} 筆。", 'type' => 'success']
                 : ['msg' => "找不到對應批次 {$data['batch_id']} 的資料，可能已被撤回或不存在。", 'type' => 'warning']);
+    }
+
+    /**
+     * Update the c_title (pinyin) of a single TEXT_CODES row created by a
+     * specific batch. Scoped to rows whose c_notes still equals "[$batchId]"
+     * so this endpoint cannot be used to mutate unrelated TEXT_CODES rows.
+     * After the UPDATE we re-SELECT the row and return the actual stored
+     * value so the UI can display exactly what landed in the database.
+     */
+    public function updatePinyin(Request $request): JsonResponse {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'c_textid' => 'required|integer',
+            'batch_id' => 'required|string|regex:/^[0-9]{14}-[0-9A-F]{6}$/',
+            'pinyin' => 'required|string|max:255',
+        ]);
+
+        $marker = '['.$data['batch_id'].']';
+        $textId = (int) $data['c_textid'];
+
+        $original = DB::table('TEXT_CODES')->where('c_textid', $textId)->first();
+        if (!$original) {
+            return response()->json(['ok' => false, 'message' => '找不到該筆 TEXT_CODES。'], 404);
+        }
+        if ((string) $original->c_notes !== $marker) {
+            // Refuse edits on rows that were not created by the supplied batch.
+            // Keeps this endpoint scoped to the just-imported result table only.
+            return response()->json(['ok' => false, 'message' => '此筆資料不屬於指定批次，無法編輯。'], 422);
+        }
+
+        $newPinyin = $this->normalizePinyinInput($data['pinyin']);
+        if ($newPinyin === '') {
+            return response()->json(['ok' => false, 'message' => '拼音內容不可為空。'], 422);
+        }
+
+        $stored = DB::transaction(function () use ($original, $textId, $newPinyin) {
+            $payload = $this->toolsRepository->timestamp([
+                'c_title' => $newPinyin,
+            ], false);
+
+            DB::table('TEXT_CODES')->where('c_textid', $textId)->update($payload);
+
+            // SELECT the row back so we return whatever the database actually stored
+            // (after any column-level coercion such as truncation or charset folding).
+            $fresh = DB::table('TEXT_CODES')->where('c_textid', $textId)->first();
+
+            // resource_data and resource_original must describe the SAME column
+            // set, otherwise OperationRepository::getArrDiff() walks resource_data
+            // keys and reports any unmatched key (c_textid, c_title_chn …) as a
+            // false "field changed" entry on the comparison modal. Likewise,
+            // restoreUpdate filters resource_original through filterColumns and
+            // UPDATEs whatever survives, so we must capture every column this
+            // endpoint actually mutates: c_title plus c_modified_by/c_modified_date
+            // (set by timestamp()). c_textid is recoverable from resource_id via
+            // CompositePrimaryKey::parseStoredResourceId('TEXT_CODES'), so omit it
+            // here. c_title_chn is never written by this endpoint — keep it out.
+            $resourceData = $payload;
+            $resourceOriginal = [
+                'c_title' => $original->c_title,
+                'c_modified_by' => $original->c_modified_by,
+                'c_modified_date' => $original->c_modified_date,
+            ];
+
+            $this->operationRepository->store(
+                Auth::id(),
+                '',
+                Operation::TYPE_UPDATE,
+                'TEXT_CODES',
+                $textId,
+                $resourceData,
+                $resourceOriginal
+            );
+
+            return $fresh;
+        });
+
+        return response()->json([
+            'ok' => true,
+            'c_textid' => (int) $stored->c_textid,
+            'c_title' => (string) $stored->c_title,
+            'c_title_chn' => (string) $stored->c_title_chn,
+            'modified_by' => $stored->c_modified_by,
+            'modified_date' => (string) $stored->c_modified_date,
+        ]);
+    }
+
+    /**
+     * Trim, collapse whitespace and lowercase the user-edited pinyin string.
+     * The admin is the authority on what the pinyin should be, so we do NOT
+     * re-run the Pinyin dictionary here — that would silently overwrite their
+     * fix. We only normalise whitespace/case so the stored value is consistent
+     * with the rest of c_title in TEXT_CODES.
+     */
+    protected function normalizePinyinInput(string $value): string {
+        $value = preg_replace('/\s+/u', ' ', $value);
+
+        return strtolower(trim((string) $value));
     }
 
     /**

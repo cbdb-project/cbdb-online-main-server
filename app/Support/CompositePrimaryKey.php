@@ -118,6 +118,13 @@ class CompositePrimaryKey {
         'NIAN_HAO' => [
             'c_nianhao_id',
         ],
+        // 與 OperationsController::resourceKeyColumns() 同步：兩處表名映射必須對齊，
+        // 否則 normalizeResourceId() 會把 follow-up 操作 resource_id 重寫成
+        // query-string 格式 (c_textid=N) 而 parseStoredResourceId() 卻無法解析，
+        // 造成 /operations 編輯連結變成 /codes/TEXT_CODES/c_textid=N/edit。
+        'TEXT_CODES' => [
+            'c_textid',
+        ],
     ];
 
     /**

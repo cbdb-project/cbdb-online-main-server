@@ -1011,6 +1011,7 @@ class OperationsController extends Controller {
             'STATUS_DATA' => ['c_personid','c_sequence','c_status_code'],
             'KIN_DATA' => ['c_personid','c_kin_id','c_kin_code'],
             'POSSESSION_DATA' => ['c_possession_record_id'],
+            'TEXT_CODES' => ['c_textid'],
             'BIOG_INST_DATA' => ['c_personid','c_inst_code','c_inst_name_code','c_bi_role_code'],
             'EVENTS_DATA' => ['c_personid','c_sequence','c_event_code'],
             'ASSOC_DATA' => ['c_personid','c_assoc_code','c_assoc_id','c_kin_code','c_kin_id','c_assoc_kin_code','c_assoc_kin_id','c_text_title','c_assoc_first_year'],
@@ -1039,9 +1040,16 @@ class OperationsController extends Controller {
             $restored
         );
 
+        // operations.c_personid is NOT NULL with a FK to BIOG_MAIN in the
+        // production schema (database/migrations/2025_01_01_000000_import_cbdb_schema.php).
+        // Non-person resources (TEXT_CODES, OFFICE_*, …) have no person id to
+        // resolve, so coerce null to 0 — matching the CREATE-time convention
+        // used by every batch importer in this codebase.
+        $auditPersonId = $personId ?? 0;
+
         $this->operationRepository->store(
             Auth::id(),
-            $personId,
+            $auditPersonId,
             3,
             $originalOperation->resource,
             $resourceId,

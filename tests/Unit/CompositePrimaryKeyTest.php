@@ -1045,4 +1045,21 @@ class CompositePrimaryKeyTest extends TestCase {
 
         $this->assertSame('464', $result);
     }
+
+    #[Test]
+    public function it_normalizes_text_codes_resource_id_for_code_route(): void {
+        // TEXT_CODES is registered in OperationsController::resourceKeyColumns()
+        // so restore audit rows can normalize to query-string format. SCHEMAS
+        // must mirror that registration, otherwise the operations index page
+        // emits /codes/TEXT_CODES/c_textid=1234/edit instead of /codes/TEXT_CODES/1234/edit.
+        $this->assertSame(
+            '1234',
+            CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute('TEXT_CODES', 'c_textid=1234')
+        );
+
+        // Plain int form (used by the original create + initial pinyin update)
+        // must still parse back through the same SCHEMAS entry.
+        $parsed = CompositePrimaryKey::parseStoredResourceId('1234', 'TEXT_CODES');
+        $this->assertSame(['c_textid' => '1234'], $parsed);
+    }
 }

@@ -54,6 +54,16 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         Schema::create('operations', function (Blueprint $table) {
             $table->increments('id');
             $table->integer('user_id');
+            // Production schema (database/migrations/2025_01_01_000000_import_cbdb_schema.php:2306-2318)
+            // declares operations.c_personid as int NOT NULL with a FK to
+            // BIOG_MAIN(c_personid). We mirror only the NOT NULL part here, not
+            // the FK: enforcing the FK in tests would require seeding a
+            // c_personid=0 stub row in BIOG_MAIN (the codebase-wide sentinel that
+            // every batch importer writes for non-person resources via empty
+            // string -> 0 cast), which would ripple through the rest of the
+            // batch-importer test suite. The unit under test here is the
+            // null-vs-0 coercion in OperationsController::recordRestoreOperation,
+            // which the NOT NULL constraint alone is sufficient to verify.
             $table->integer('c_personid');
             $table->smallInteger('op_type');
             $table->string('resource');
@@ -576,6 +586,248 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'batch_id' => '20260101000000-ABCDEF',
         ]);
         $undo->assertStatus(403);
+    }
+
+    #[Test]
+    public function test_admin_can_update_pinyin_and_response_returns_stored_value(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 500, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 1000, 'c_title_chn' => '來源']);
+
+        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "500\t測試稿\t1000",
+        ]);
+        $batchId = $store->getSession()->get('batch_id');
+        $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
+        $this->assertSame('ce shi gao', $created->c_title);
+
+        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => $created->c_textid,
+            'batch_id' => $batchId,
+            'pinyin' => '  Ce  Shi  GAO  ',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'ok' => true,
+            'c_textid' => (int) $created->c_textid,
+            'c_title' => 'ce shi gao',
+        ]);
+
+        $fresh = DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->first();
+        $this->assertSame('ce shi gao', $fresh->c_title);
+        $this->assertSame('Batch Admin', $fresh->c_modified_by);
+        $this->assertNotNull($fresh->c_modified_date);
+
+        $update = DB::table('operations')
+            ->where('resource', 'TEXT_CODES')
+            ->where('resource_id', (string) $created->c_textid)
+            ->where('op_type', 3)
+            ->first();
+        $this->assertNotNull($update);
+        $payload = json_decode($update->resource_data, true);
+        $this->assertSame('ce shi gao', $payload['c_title']);
+
+        // resource_data must NOT carry columns this endpoint never mutates.
+        // OperationRepository::getArrDiff() walks resource_data keys and would
+        // otherwise show a false "c_title_chn changed null → 來源" / "c_textid
+        // changed null → N" line in the comparison modal on every pinyin edit.
+        $this->assertArrayNotHasKey('c_title_chn', $payload);
+        $this->assertArrayNotHasKey('c_textid', $payload);
+
+        // resource_original must include every column this endpoint writes,
+        // otherwise restoreUpdate would leave the post-edit modifier/timestamp
+        // on a row whose pinyin was reverted.
+        $original = json_decode($update->resource_original, true);
+        $this->assertSame('ce shi gao', $original['c_title']);
+        $this->assertArrayHasKey('c_modified_by', $original);
+        $this->assertArrayHasKey('c_modified_date', $original);
+        $this->assertNull($original['c_modified_by']);
+        $this->assertNull($original['c_modified_date']);
+    }
+
+    #[Test]
+    public function test_update_pinyin_rejects_row_outside_supplied_batch(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 501, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 1100, 'c_title_chn' => '來源']);
+
+        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "501\t測試稿\t1100",
+        ]);
+        $batchId = $store->getSession()->get('batch_id');
+        $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
+
+        // A different (well-formed) batch id whose marker does not match the row.
+        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => $created->c_textid,
+            'batch_id' => '20990101000000-AAAAAA',
+            'pinyin' => 'something else',
+        ]);
+
+        $response->assertStatus(422);
+        $fresh = DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->first();
+        $this->assertSame('ce shi gao', $fresh->c_title);
+        $this->assertSame(0, DB::table('operations')->where('op_type', 3)->count());
+    }
+
+    #[Test]
+    public function test_update_pinyin_rejects_unknown_text_id(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => 99999999,
+            'batch_id' => '20260101000000-ABCDEF',
+            'pinyin' => 'foo bar',
+        ]);
+
+        $response->assertStatus(404);
+    }
+
+    #[Test]
+    public function test_update_pinyin_rejects_empty_input(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 502, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 1200, 'c_title_chn' => '來源']);
+        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "502\t測試稿\t1200",
+        ]);
+        $batchId = $store->getSession()->get('batch_id');
+        $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
+
+        // Both empty and whitespace-only fail the `required` rule (Laravel trims
+        // strings before the required check), so the request is rejected at
+        // validation time with a redirect+session errors.
+        foreach (['', '   '] as $value) {
+            $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+                'c_textid' => $created->c_textid,
+                'batch_id' => $batchId,
+                'pinyin' => $value,
+            ]);
+            $response->assertStatus(302);
+            $this->assertNotEmpty($response->getSession()->get('errors'));
+        }
+
+        $fresh = DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->first();
+        $this->assertSame('ce shi gao', $fresh->c_title);
+    }
+
+    #[Test]
+    public function test_update_pinyin_rejects_malformed_batch_id(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => 1,
+            'batch_id' => 'not-a-batch',
+            'pinyin' => 'foo',
+        ]);
+        $response->assertStatus(302);
+        $this->assertNotEmpty($response->getSession()->get('errors'));
+    }
+
+    #[Test]
+    public function test_non_admin_cannot_update_pinyin(): void {
+        $user = $this->makeUser(['is_admin' => 0]);
+        $this->actingAs($user);
+
+        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => 1,
+            'batch_id' => '20260101000000-ABCDEF',
+            'pinyin' => 'foo',
+        ]);
+        $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function test_update_pinyin_log_can_be_restored_via_operations_endpoint(): void {
+        // The pinyin update writes an op_type=3 operation against TEXT_CODES.
+        // The /operations restore action requires TEXT_CODES to be in
+        // OperationsController::resourceKeyColumns(); without that mapping, the
+        // restore button on the operations index throws "缺少主鍵條件". This test
+        // exercises the full round-trip so the integration cannot regress silently.
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 600, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 1400, 'c_title_chn' => '來源']);
+
+        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "600\t測試稿\t1400",
+        ]);
+        $batchId = $store->getSession()->get('batch_id');
+        $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
+        $this->assertSame('ce shi gao', $created->c_title);
+
+        // Apply a manual edit, then locate the resulting update-operation row.
+        $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => $created->c_textid,
+            'batch_id' => $batchId,
+            'pinyin' => 'manually edited',
+        ]);
+        $this->assertSame('manually edited', DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->value('c_title'));
+
+        $updateOp = DB::table('operations')
+            ->where('resource', 'TEXT_CODES')
+            ->where('resource_id', (string) $created->c_textid)
+            ->where('op_type', 3)
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($updateOp);
+
+        $restore = $this->post(route('operations.restore', ['operation' => $updateOp->id]));
+        $restore->assertRedirect(route('operations.index'));
+
+        $reverted = DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->first();
+        $this->assertSame('ce shi gao', $reverted->c_title);
+        // c_modified_by/c_modified_date were NULL on the freshly-imported row;
+        // restore must put them back to NULL, not leave the edit's modifier on
+        // a row whose pinyin was reverted.
+        $this->assertNull($reverted->c_modified_by);
+        $this->assertNull($reverted->c_modified_date);
+
+        // The restore action also writes its own audit row (op_type=3) via
+        // recordRestoreOperation. Production schema sets operations.c_personid
+        // NOT NULL with a FK to BIOG_MAIN: this insert must therefore use the
+        // 0-sentinel for non-person resources, not null. If that coercion
+        // silently failed under exception, this row would be missing.
+        $followUpAuditCount = DB::table('operations')
+            ->where('resource', 'TEXT_CODES')
+            ->where('resource_id', (string) $created->c_textid)
+            ->where('op_type', 3)
+            ->count();
+        $this->assertSame(2, $followUpAuditCount);
+
+        $restoreAudit = DB::table('operations')
+            ->where('resource', 'TEXT_CODES')
+            ->where('op_type', 3)
+            ->orderByDesc('id')
+            ->first();
+        $this->assertSame(0, (int) $restoreAudit->c_personid);
+    }
+
+    #[Test]
+    public function test_results_page_renders_editable_pinyin_cell(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 503, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 1300, 'c_title_chn' => '來源']);
+        $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "503\t測試稿\t1300",
+        ]);
+
+        $followUp = $this->get(route('admin.batch-load-book-titles'));
+        $followUp->assertSee('class="pinyin-cell"', false);
+        $followUp->assertSee('pinyin-edit-btn', false);
+        $followUp->assertSee('pinyin-save-btn', false);
     }
 
     #[Test]

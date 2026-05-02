@@ -645,7 +645,11 @@ class ExportMysqlToSqlite extends Command {
         $rest = preg_replace('/\bZEROFILL\b/i', '', $rest);
         $rest = preg_replace('/\bCHARACTER SET\s+\w+/i', '', $rest);
         $rest = preg_replace('/\bCOLLATE\s+\w+/i', '', $rest);
-        $rest = preg_replace('/\bCOMMENT\s+\'.*?\'/i', '', $rest);
+        // SQLite 不支援 COMMENT 子句，整段移除。
+        // 必須處理 MySQL 對單引號的兩種跳脫方式：'' (SQL 標準) 與 \' (MySQL 擴充)，
+        // 否則 COMMENT 內含撇號時非貪婪 .*? 會在第一個內部單引號就提前結束，
+        // 殘留字串字面量會破壞後續 SQLite DDL 解析。
+        $rest = preg_replace('/\bCOMMENT\s+\'(?:[^\'\\\\]|\\\\.|\'\')*\'/i', '', $rest);
         $rest = preg_replace('/\bON UPDATE\b[^,]+/i', '', $rest);
         $rest = preg_replace('/\s+DEFAULT\s+NULL/i', ' DEFAULT NULL', $rest);
         $rest = preg_replace('/\s+DEFAULT\s+\'0000-00-00 00:00:00\'/i', ' DEFAULT NULL', $rest);

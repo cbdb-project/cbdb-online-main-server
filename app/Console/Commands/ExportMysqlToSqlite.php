@@ -598,13 +598,38 @@ class ExportMysqlToSqlite extends Command {
         $items = [];
         $current = '';
         $depth = 0;
+        $inString = false;
 
         $length = strlen($definitions);
 
         for ($i = 0; $i < $length; $i++) {
             $char = $definitions[$i];
 
-            if ($char === '(') {
+            if ($inString) {
+                $current .= $char;
+
+                if ($char === '\\' && $i + 1 < $length) {
+                    $current .= $definitions[++$i];
+
+                    continue;
+                }
+
+                if ($char === "'" && $i + 1 < $length && $definitions[$i + 1] === "'") {
+                    $current .= $definitions[++$i];
+
+                    continue;
+                }
+
+                if ($char === "'") {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === "'") {
+                $inString = true;
+            } elseif ($char === '(') {
                 $depth++;
             } elseif ($char === ')') {
                 if ($depth > 0) {

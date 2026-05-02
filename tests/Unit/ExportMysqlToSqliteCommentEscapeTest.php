@@ -80,6 +80,29 @@ class ExportMysqlToSqliteCommentEscapeTest extends TestCase {
     }
 
     /**
+     * COMMENT 內含逗號時，切分欄位定義的階段不能把字串字面量中的逗號當成欄位分隔符。
+     * 回歸案例如 BIOG_MAIN.c_surname_proper。
+     */
+    public function test_strips_comment_with_comma_inside_string_literal(): void {
+        $sql = "CREATE TABLE `BIOG_MAIN` (\n"
+            . "  `c_personid` int(11) NOT NULL,\n"
+            . "  `c_surname_proper` varchar(255) DEFAULT NULL COMMENT 'Surname in the person''s native language (non-Chinese), if applicable; user-editable',\n"
+            . "  `c_backslash_escape` varchar(255) DEFAULT NULL COMMENT 'Surname in the person\\'s native language, if applicable',\n"
+            . "  `c_name` varchar(255) DEFAULT NULL COMMENT 'Name after comma case',\n"
+            . "  PRIMARY KEY (`c_personid`)\n"
+            . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        $result = $this->convert($sql);
+
+        $this->assertStringNotContainsString('COMMENT', $result['table']);
+        $this->assertStringNotContainsString('if applicable', $result['table']);
+        $this->assertStringNotContainsString("person''s native language", $result['table']);
+        $this->assertMatchesRegularExpression('/"c_surname_proper"\s+\S+\s+DEFAULT NULL/', $result['table']);
+        $this->assertMatchesRegularExpression('/"c_backslash_escape"\s+\S+\s+DEFAULT NULL/', $result['table']);
+        $this->assertMatchesRegularExpression('/"c_name"\s+\S+\s+DEFAULT NULL/', $result['table']);
+    }
+
+    /**
      * 不含撇號的一般 COMMENT 仍要照常去除。
      */
     public function test_strips_plain_comment(): void {

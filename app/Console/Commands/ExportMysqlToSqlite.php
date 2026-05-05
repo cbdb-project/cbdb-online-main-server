@@ -425,6 +425,15 @@ class ExportMysqlToSqlite extends Command {
      */
     protected function convertCreateTableToSqlite($mysqlSql, $tableName) {
         $cleanSql = preg_replace('/`' . preg_quote($tableName, '/') . '`/i', '"' . $tableName . '"', $mysqlSql);
+
+        // 在拆掉 ENGINE=...$ 之前，先抽出表級 COMMENT='...'，否則 ENGINE=.*$ 的貪婪匹配會把它吃掉。
+        // 表級註解會以 SQL 區塊註解形式置於 CREATE TABLE 開頭，方便 AI agents 直接從 sqlite_master.sql 讀到。
+        // s 旗標保險起見也容許註解字面量內換行。
+        $tableComment = null;
+        if (preg_match('/\bCOMMENT\s*=\s*\'((?:[^\'\\\\]|\\\\.|\'\')*)\'/is', $cleanSql, $tableCommentMatch)) {
+            $tableComment = $this->decodeMysqlStringLiteral($tableCommentMatch[1]);
+        }
+
         $cleanSql = preg_replace('/ENGINE=.*$/is', '', $cleanSql);
         $cleanSql = preg_replace('/ROW_FORMAT=\w+/i', '', $cleanSql);
         $cleanSql = preg_replace('/AUTO_INCREMENT=\d+/i', '', $cleanSql);
@@ -547,7 +556,14 @@ class ExportMysqlToSqlite extends Command {
             throw new \RuntimeException(sprintf('无法生成 %s 的字段定义', $tableName));
         }
 
-        $tableSql = sprintf("CREATE TABLE \"%s\" (\n    %s\n);", $tableName, implode(",\n    ", $body));
+        // 表級註解必須放進括號內，否則 SQLite 解析時會丟掉位於 CREATE TABLE 之前
+        // 或分號之後的註解。放在第一個欄位前即可被原樣保存到 sqlite_master.sql。
+        $bodyText = implode(",\n    ", $body);
+        if ($tableComment !== null && $tableComment !== '') {
+            $bodyText = sprintf("/* %s */\n    %s", $this->escapeForBlockComment($tableComment), $bodyText);
+        }
+
+        $tableSql = sprintf("CREATE TABLE \"%s\" (\n    %s\n);", $tableName, $bodyText);
 
         // 根据 --with-indexes 选项决定是否包含索引
         $exportIndexes = $this->option('with-indexes') ? $indexes : [];
@@ -670,11 +686,19 @@ class ExportMysqlToSqlite extends Command {
         $rest = preg_replace('/\bZEROFILL\b/i', '', $rest);
         $rest = preg_replace('/\bCHARACTER SET\s+\w+/i', '', $rest);
         $rest = preg_replace('/\bCOLLATE\s+\w+/i', '', $rest);
-        // SQLite 不支援 COMMENT 子句，整段移除。
+        // SQLite 不支援 COMMENT 子句，但會保留 CREATE TABLE 原文於 sqlite_master.sql。
+        // 因此把 COMMENT 內容抽出後改以 SQL 區塊註解 /* ... */ 的形式接在欄位定義之後，
+        // AI agents 可直接從 schema 讀到欄位語意，毋須額外的說明文件。
         // 必須處理 MySQL 對單引號的兩種跳脫方式：'' (SQL 標準) 與 \' (MySQL 擴充)，
         // 否則 COMMENT 內含撇號時非貪婪 .*? 會在第一個內部單引號就提前結束，
         // 殘留字串字面量會破壞後續 SQLite DDL 解析。
-        $rest = preg_replace('/\bCOMMENT\s+\'(?:[^\'\\\\]|\\\\.|\'\')*\'/i', '', $rest);
+        // 用 s 旗標讓 . 也匹配換行（MySQL 雖罕見，但允許 COMMENT 字面量內含真實換行），
+        // 並用單一 regex + substr_replace 同時抽出與移除，避免兩條 regex 不同步。
+        $columnComment = null;
+        if (preg_match('/\bCOMMENT\s+\'((?:[^\'\\\\]|\\\\.|\'\')*)\'/is', $rest, $commentMatch, PREG_OFFSET_CAPTURE)) {
+            $columnComment = $this->decodeMysqlStringLiteral($commentMatch[1][0]);
+            $rest = substr_replace($rest, '', $commentMatch[0][1], strlen($commentMatch[0][0]));
+        }
         $rest = preg_replace('/\bON UPDATE\b[^,]+/i', '', $rest);
         $rest = preg_replace('/\s+DEFAULT\s+NULL/i', ' DEFAULT NULL', $rest);
         $rest = preg_replace('/\s+DEFAULT\s+\'0000-00-00 00:00:00\'/i', ' DEFAULT NULL', $rest);
@@ -687,11 +711,79 @@ class ExportMysqlToSqlite extends Command {
             $rest = 'INTEGER PRIMARY KEY AUTOINCREMENT';
         }
 
+        $definition = sprintf('"%s" %s', $columnName, trim($rest));
+
+        if ($columnComment !== null && $columnComment !== '') {
+            $definition .= sprintf(' /* %s */', $this->escapeForBlockComment($columnComment));
+        }
+
         return [
-            'definition' => sprintf('"%s" %s', $columnName, trim($rest)),
+            'definition' => $definition,
             'auto_increment' => $autoIncrement,
             'name' => $columnName,
         ];
+    }
+
+    /**
+     * 將 MySQL 字串字面量內容（去掉外圍單引號之後的字串）解碼為純文字。
+     * 處理 SQL 標準 '' 與 MySQL 擴充 \' \" \\ \n \r \t \0 \b \Z 等跳脫。
+     *
+     * 以位元組（strlen + index）迭代是 UTF-8 安全的：本函式只比對 ASCII 字元
+     * （'、\），UTF-8 多位元組續位 (0x80–0xBF) 的值不會與這些 ASCII 衝突，
+     * 因此不會把多位元組字元劈開。
+     */
+    protected function decodeMysqlStringLiteral($literal) {
+        $result = '';
+        $length = strlen($literal);
+        for ($i = 0; $i < $length; $i++) {
+            $ch = $literal[$i];
+            if ($ch === "'" && $i + 1 < $length && $literal[$i + 1] === "'") {
+                $result .= "'";
+                $i++;
+
+                continue;
+            }
+            if ($ch === '\\' && $i + 1 < $length) {
+                $next = $literal[$i + 1];
+                $map = [
+                    "'" => "'",
+                    '"' => '"',
+                    '\\' => '\\',
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    '0' => "\0",
+                    'b' => "\x08",
+                    'Z' => "\x1a",
+                ];
+                if (isset($map[$next])) {
+                    $result .= $map[$next];
+                    $i++;
+
+                    continue;
+                }
+                // 其他跳脫直接保留 next 字元（MySQL 行為）
+                $result .= $next;
+                $i++;
+
+                continue;
+            }
+            $result .= $ch;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 把字串轉義成可安全嵌入 /* ... *​/ 的內容：
+     * - 把所有 *​/ 變成 * /，避免提早結束區塊註解
+     * - 把控制字元（換行、tab 等）壓成空白，讓註解保持單行
+     */
+    protected function escapeForBlockComment($text) {
+        $text = preg_replace('/\*\//', '* /', $text);
+        $text = preg_replace('/[\x00-\x1f]+/', ' ', $text);
+
+        return trim($text);
     }
 
     /**

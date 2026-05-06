@@ -114,9 +114,7 @@ class AiFillLogController extends Controller {
             'c_ly_day_gz' => '終年干支日',
             'c_appt_code' => '除授類別',
             'c_assume_office_code' => '是否赴任',
-            'c_source' => '出處',
-            'c_inst_code' => '社會機構',
-            'c_sequence' => '次序',
+            // c_source、c_inst_code、c_sequence 不在 AI 生成範圍內，略過比較
             'c_notes' => '備註',
         ];
 
@@ -189,7 +187,6 @@ class AiFillLogController extends Controller {
             'c_ly_nh_code' => ['NIAN_HAO', 'c_nianhao_id', 'c_nianhao_chn'],
             'c_appt_code' => ['APPOINTMENT_CODES', 'c_appt_code', 'c_appt_desc_chn'],
             'c_assume_office_code' => ['ASSUME_OFFICE_CODES', 'c_assume_office_code', 'c_assume_office_desc_chn'],
-            'c_source' => ['TEXT_CODES', 'c_textid', 'c_title_chn'],
         ];
 
         foreach ($codeLookups as $field => [$table, $pk, $textCol]) {
@@ -217,22 +214,6 @@ class AiFillLogController extends Controller {
                     $names[] = $addrNames[$id] ?? (string) $id;
                 }
                 $labels['c_addr'] = implode(', ', $names);
-            }
-        }
-
-        // 社會機構特殊處理（需要透過 SOCIAL_INSTITUTION_NAME_CODES 取得名稱）
-        $instCode = $userSubmitted['c_inst_code'] ?? null;
-        if ($instCode !== null && $instCode !== '' && $instCode !== 0 && $instCode !== '0') {
-            $instNameCode = DB::table('SOCIAL_INSTITUTION_CODES')
-                ->where('c_inst_code', $instCode)
-                ->value('c_inst_name_code');
-            if ($instNameCode) {
-                $instName = DB::table('SOCIAL_INSTITUTION_NAME_CODES')
-                    ->where('c_inst_name_code', $instNameCode)
-                    ->value('c_inst_name_hz');
-                if ($instName !== null && $instName !== '') {
-                    $labels['c_inst_code'] = $instName;
-                }
             }
         }
 

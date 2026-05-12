@@ -171,12 +171,18 @@ class OperationsController extends Controller {
 
                             break;
                         case "OFFICE_CODE_TYPE_REL":
-                            $temp_l = explode("-", $resource_id);
-                            $relation = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])
-                                ->where('c_office_tree_id', $temp_l[1])
-                                ->first();
-                            if ($relation) {
-                                $arr3 = $relation->toArray();
+                            if (strpos($resource_id, '_._') !== false) {
+                                $temp_l = explode('_._', $resource_id);
+                            } else {
+                                $temp_l = explode('-', $resource_id);
+                            }
+                            if (count($temp_l) >= 2) {
+                                $relation = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])
+                                    ->where('c_office_tree_id', $temp_l[1])
+                                    ->first();
+                                if ($relation) {
+                                    $arr3 = $relation->toArray();
+                                }
                             }
 
                             break;

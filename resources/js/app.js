@@ -178,7 +178,7 @@ window.initAjaxSelect = function($el, model, options = {}) {
                 return {
                     results: data.data || [],
                     pagination: {
-                        more: (params.page * 30) < (data.total || 0)
+                        more: (params.page * 20) < (data.total || 0)
                     }
                 };
             },

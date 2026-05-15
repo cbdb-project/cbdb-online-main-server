@@ -336,7 +336,17 @@
         textperson_pair_first_load();
 
         // 使用统一的 AJAX Select2 初始化助手函数
-        window.initAjaxSelect($(".c_office_id"), 'office');
+        window.initAjaxSelect($(".c_office_id"), 'office', {
+            ajax: {
+                data: function (params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1,
+                        c_dy: '{{ $biog_dy ?? '' }}',
+                    };
+                }
+            }
+        });
         window.initAjaxSelect($(".c_source"), 'text');
         window.initAjaxSelect($(".c_inst_code"), 'socialinstcode');
         window.initAjaxSelect($(".c_addr"), 'addr', {

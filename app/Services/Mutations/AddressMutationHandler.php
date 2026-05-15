@@ -71,23 +71,25 @@ class AddressMutationHandler extends AbstractPersonSubresourceMutationHandler {
     }
 
     protected function performUpdate(array $targetPk, array $updateData): void {
-        // 若 addr_type 或 sequence 有變動，檢查新 PK 是否衝突
+        // 若任一 PK 欄位有變動，檢查新 PK 是否衝突
+        $newAddrId = $updateData['c_addr_id'] ?? $targetPk['c_addr_id'];
         $newAddrType = $updateData['c_addr_type'] ?? $targetPk['c_addr_type'];
         $newSequence = $updateData['c_sequence'] ?? $targetPk['c_sequence'];
-        $pkChanged = (string) $newAddrType !== (string) $targetPk['c_addr_type']
+        $pkChanged = (string) $newAddrId !== (string) $targetPk['c_addr_id']
+                  || (string) $newAddrType !== (string) $targetPk['c_addr_type']
                   || (string) $newSequence !== (string) $targetPk['c_sequence'];
 
         if ($pkChanged) {
             $conflict = DB::table('BIOG_ADDR_DATA')->where([
                 ['c_personid', '=', $targetPk['c_personid']],
-                ['c_addr_id', '=', $updateData['c_addr_id'] ?? $targetPk['c_addr_id']],
+                ['c_addr_id', '=', $newAddrId],
                 ['c_addr_type', '=', $newAddrType],
                 ['c_sequence', '=', $newSequence],
             ])->exists();
 
             if ($conflict) {
                 throw new \InvalidArgumentException(
-                    '目標地址類別與遷徙次序的組合已存在，請使用不同的值。'
+                    '目標地址、地址類別與遷徙次序的組合已存在，請使用不同的值。'
                 );
             }
         }

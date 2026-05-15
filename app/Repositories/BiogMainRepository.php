@@ -2883,7 +2883,7 @@ class BiogMainRepository {
         $addr_l = $this->parseAddrId($addr);
         $data = $request->all();
         $comment = $data['__proposal_comment'] ?? null;
-        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid', 'c_addr_id']);
+        $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_personid']);
         $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary'] ?? 0);
         $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary'] ?? 0);
         $data = (new ToolsRepository())->timestamp($data);
@@ -2901,22 +2901,24 @@ class BiogMainRepository {
             }
 
             // 若主鍵欄位有變動，檢查新主鍵是否與既有記錄衝突
+            $newAddrId = $data['c_addr_id'] ?? $ori->c_addr_id;
             $newAddrType = $data['c_addr_type'] ?? $ori->c_addr_type;
             $newSequence = $data['c_sequence'] ?? $ori->c_sequence;
-            $pkChanged = (string) $newAddrType !== (string) $ori->c_addr_type
+            $pkChanged = (string) $newAddrId !== (string) $ori->c_addr_id
+                      || (string) $newAddrType !== (string) $ori->c_addr_type
                       || (string) $newSequence !== (string) $ori->c_sequence;
 
             if ($pkChanged) {
                 $conflict = DB::table('BIOG_ADDR_DATA')->where([
                     ['c_personid', '=', $addr_l[0]],
-                    ['c_addr_id', '=', $addr_l[1]],
+                    ['c_addr_id', '=', $newAddrId],
                     ['c_addr_type', '=', $newAddrType],
                     ['c_sequence', '=', $newSequence],
                 ])->exists();
 
                 if ($conflict) {
                     throw new \InvalidArgumentException(
-                        '目標地址類別與遷徙次序的組合已存在，請使用不同的值。'
+                        '目標地址、地址類別與遷徙次序的組合已存在，請使用不同的值。'
                     );
                 }
             }

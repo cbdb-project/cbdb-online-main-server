@@ -208,6 +208,62 @@ class BasicInformationAddressesControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testLegacyUpdateRedirectsWithErrorOnAddrIdConflict(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'addr-legacy-conflict@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        // 原始記錄
+        DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_addr_id' => 10,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+        ]);
+
+        // 目標已存在的記錄（衝突對象）
+        DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_addr_id' => 20,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+        ]);
+
+        // 嘗試把 c_addr_id 改為 20（已存在），應回 302 並帶錯誤訊息，不得 500
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/addresses/1-10-1-1',
+            [
+                'c_addr_id' => 20,
+                'c_addr_type' => 1,
+                'c_sequence' => 1,
+                'c_fy_intercalary' => 0,
+                'c_ly_intercalary' => 0,
+            ]
+        );
+
+        // 應重導向（302），而非 500
+        $response->assertStatus(302);
+
+        // 原始記錄應未受異動
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1,
+            'c_addr_id' => 10,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+        ]);
+        $this->assertDatabaseCount('operations', 0);
+        $this->assertDatabaseCount('audit_log', 0);
+    }
+
+    #[Test]
     public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
         $user = User::create([
             'name' => 'Test User',

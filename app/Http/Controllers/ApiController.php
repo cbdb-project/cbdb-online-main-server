@@ -237,8 +237,16 @@ class ApiController extends Controller {
     }
 
     public function searchOffice(Request $request) {
-        $data = OfficeCode::where('c_office_chn', 'like', '%'.$request->q.'%')->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')->orWhere('c_office_id', $request->q)->paginate(20);
-        $data->appends(['q' => $request->q])->links();
+        $query = OfficeCode::where(function ($q) use ($request) {
+            $q->where('c_office_chn', 'like', '%'.$request->q.'%')
+                ->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')
+                ->orWhere('c_office_id', $request->q);
+        });
+        if ($request->filled('c_dy')) {
+            $query->where('c_dy', $request->c_dy);
+        }
+        $data = $query->paginate(20);
+        $data->appends(array_filter(['q' => $request->q, 'c_dy' => $request->c_dy]))->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_office_id;
             if ($item['id'] === 0) {

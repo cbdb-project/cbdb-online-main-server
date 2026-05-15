@@ -83,6 +83,8 @@ class BasicInformationOfficesController extends Controller {
         // 處理 basicinformation 可能為 null 或缺少字段的情況
         $personLabel = $id;
 
+        $biogDy = null;
+
         try {
             $basicinformation = $this->biogMainRepository->byPersonId($id);
             if ($basicinformation) {
@@ -94,6 +96,7 @@ class BasicInformationOfficesController extends Controller {
                         $personLabel .= ' (' . $name . ')';
                     }
                 }
+                $biogDy = $basicinformation->c_dy ?? null;
             }
         } catch (\Exception $e) {
             // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
@@ -101,6 +104,7 @@ class BasicInformationOfficesController extends Controller {
 
         return view('biogmains.offices.create', [
             'id' => $id,
+            'biog_dy' => $biogDy,
             'page_title' => '官名', 'page_description' => '基本信息表 官名', 'page_url' => '/basicinformation/'.$id.'/offices', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
                 ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
@@ -201,6 +205,7 @@ class BasicInformationOfficesController extends Controller {
 
         // 處理 basicinformation 可能為 null 或缺少字段的情況
         $personLabel = $id;
+        $biogDy = null;
 
         try {
             $basicinformation = $this->biogMainRepository->byPersonId($id);
@@ -213,12 +218,13 @@ class BasicInformationOfficesController extends Controller {
                         $personLabel .= ' (' . $name . ')';
                     }
                 }
+                $biogDy = $basicinformation->c_dy ?? null;
             }
         } catch (\Exception $e) {
             // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
         }
 
-        return view('biogmains.offices.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
+        return view('biogmains.offices.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res, 'biog_dy' => $biogDy,
             'page_title' => '官名', 'page_description' => '基本信息表 官名',
             'page_url' => '/basicinformation/'.$id.'/offices',
             'archer' => "<li>編輯</li>",
@@ -460,6 +466,7 @@ class BasicInformationOfficesController extends Controller {
 
         // 處理 personLabel
         $personLabel = $id;
+        $biogDy = null;
 
         try {
             $basicinformation = $this->biogMainRepository->byPersonId($id);
@@ -472,6 +479,7 @@ class BasicInformationOfficesController extends Controller {
                         $personLabel .= ' (' . $name . ')';
                     }
                 }
+                $biogDy = $basicinformation->c_dy ?? null;
             }
         } catch (\Exception $e) {
             // 忽略錯誤
@@ -482,6 +490,7 @@ class BasicInformationOfficesController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
+            'biog_dy' => $biogDy,
             'page_title' => '官名',
             'page_description' => '基本信息表 官名',
             'page_url' => '/basicinformation/'.$id.'/offices',

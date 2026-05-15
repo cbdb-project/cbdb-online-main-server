@@ -154,6 +154,60 @@ class BasicInformationAddressesControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testUpdateQueryPersistsNewAddrId(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'addr-update-addrid@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => 1,
+            'c_addr_id' => 14688,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+            'c_fy_intercalary' => 0,
+            'c_ly_intercalary' => 0,
+            'c_notes' => null,
+        ]);
+
+        // 將地名從 14688（山陰）改為 12466（山陽）
+        $response = $this->actingAs($user)->put(
+            '/basicinformation/1/addresses/update?c_personid=1&c_addr_id=14688&c_addr_type=1&c_sequence=1',
+            [
+                'c_personid' => 1,
+                'c_addr_id' => 12466,
+                'c_addr_type' => 1,
+                'c_sequence' => 1,
+                'c_fy_intercalary' => 0,
+                'c_ly_intercalary' => 0,
+            ]
+        );
+
+        $response->assertStatus(302);
+
+        // 舊記錄應已消失
+        $this->assertDatabaseMissing('BIOG_ADDR_DATA', [
+            'c_personid' => 1,
+            'c_addr_id' => 14688,
+        ]);
+
+        // 新記錄應存在
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1,
+            'c_addr_id' => 12466,
+            'c_addr_type' => 1,
+            'c_sequence' => 1,
+        ]);
+
+        $log = DB::table('audit_log')->where('table_name', 'BIOG_ADDR_DATA')->where('operation', 'UPDATE')->first();
+        $this->assertNotNull($log);
+        $this->assertSame('c_personid=1&c_addr_id=12466&c_addr_type=1&c_sequence=1', $log->row_pk_text);
+    }
+
+    #[Test]
     public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
         $user = User::create([
             'name' => 'Test User',

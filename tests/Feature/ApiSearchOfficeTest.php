@@ -102,4 +102,33 @@ class ApiSearchOfficeTest extends TestCase {
         $this->assertContains(1001, $ids);
         $this->assertContains(1002, $ids);
     }
+
+    #[Test]
+    public function search_office_falls_back_to_all_dynasties_when_current_dynasty_has_no_match(): void {
+        // 朝代 99 在 OFFICE_CODES 中没有任何官职，应 fallback 到全朝代结果
+        DB::table('DYNASTIES')->insert(['c_dy' => 99, 'c_dynasty_chn' => '測試朝']);
+
+        $response = $this->get('/api/select/search/office?q=吏部侍郎&c_dy=99');
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $ids = array_column($data, 'c_office_id');
+        $this->assertContains(1001, $ids);
+        $this->assertContains(1002, $ids);
+    }
+
+    #[Test]
+    public function search_office_with_numeric_zero_query_preserves_q_in_pagination_links(): void {
+        // q=0 是合法的 office_id 搜索，array_filter 不应丢掉它
+        DB::table('OFFICE_CODES')->insert([
+            'c_office_id' => 0, 'c_dy' => 15, 'c_office_pinyin' => 'unknown', 'c_office_chn' => '未知',
+        ]);
+
+        $response = $this->get('/api/select/search/office?q=0');
+
+        $response->assertOk();
+        // 分页链接中应保留 q=0
+        $this->assertStringContainsString('q=0', $response->getContent());
+    }
 }

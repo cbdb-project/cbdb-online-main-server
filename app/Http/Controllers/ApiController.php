@@ -242,8 +242,8 @@ class ApiController extends Controller {
                 ->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')
                 ->orWhere('c_office_id', $request->q);
         });
-        if ($request->filled('c_dy')) {
-            $query->where('c_dy', $request->c_dy);
+        if ((int) $request->c_dy > 0) {
+            $query->where('c_dy', (int) $request->c_dy);
         }
         $data = $query->paginate(20);
         $data->appends(array_filter(['q' => $request->q, 'c_dy' => $request->c_dy]))->links();

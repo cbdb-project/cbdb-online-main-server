@@ -345,7 +345,13 @@ class BasicInformationAddressesController extends Controller {
         }
 
         // 使用 Repository 進行更新（內含事務與審計）
-        $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $addr);
+        try {
+            $newPk = $this->biogMainRepository->addrUpdateById($request, $id, $addr);
+        } catch (\InvalidArgumentException $e) {
+            flash($e->getMessage(), 'error');
+
+            return redirect()->back()->withInput();
+        }
         if (!$newPk) {
             abort(404, 'BIOG_ADDR_DATA 記錄不存在');
         }

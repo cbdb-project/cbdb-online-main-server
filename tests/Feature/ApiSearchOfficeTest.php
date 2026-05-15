@@ -131,4 +131,20 @@ class ApiSearchOfficeTest extends TestCase {
         // 分页链接中应保留 q=0
         $this->assertStringContainsString('q=0', $response->getContent());
     }
+
+    #[Test]
+    public function search_office_page_two_request_with_zero_query_still_preserves_q_in_links(): void {
+        // 验证翻页请求（page=2）中 q=0 同样不被丢弃
+        DB::table('OFFICE_CODES')->insert([
+            'c_office_id' => 0, 'c_dy' => 15, 'c_office_pinyin' => 'unknown', 'c_office_chn' => '未知',
+        ]);
+
+        $response = $this->get('/api/select/search/office?q=0&page=2');
+
+        $response->assertOk();
+        // first_page_url 和 last_page_url 都必须带 q=0，确保翻页链接不丢参数
+        $firstPageUrl = $response->json('first_page_url');
+        $this->assertNotNull($firstPageUrl);
+        $this->assertStringContainsString('q=0', $firstPageUrl);
+    }
 }

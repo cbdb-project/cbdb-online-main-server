@@ -7,7 +7,7 @@
             <div class="d-flex align-items-center mb-3 flex-nowrap">
                 <form method="GET" action="{{ route('basicinformation.index') }}" class="flex-grow-1 mr-2">
                     <div class="input-group w-100">
-                        <input name="q" type="text" class="form-control" placeholder="搜尋人物 (所有 ü 在拼音中我们都以 v 替代)" aria-label="搜尋人物" value="{{ $q }}">
+                        <input name="q" type="text" class="form-control" placeholder="搜尋人物 (所有 ü 在拼音中我們都以 v 替代)" aria-label="搜尋人物" value="{{ $q }}">
                         @if(!empty($dynastyFacets) && count($dynastyFacets) > 0)
                             <select name="c_dy" class="custom-select" style="max-width: 180px;" onchange="this.form.submit()">
                                 <option value="">全部朝代 ({{ collect($dynastyFacets)->sum('count') }})</option>

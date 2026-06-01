@@ -132,25 +132,24 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 
 # 舊版 API 文檔
 
-# 使用方法
+## 使用方法
 將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu
 
 形如: [https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100](https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100)
 
-# 文檔
-# 一、根據官職類別代碼獲取其下屬官職列表
-## 輸入參數:
+## 一、根據官職類別代碼獲取其下屬官職列表
+### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | id | 數字 | 官職類別代碼|
 | start | 數字 | 開始筆數 |
 | list | 數字 | 列表長度 |
-## 輸入示例: 
+### 輸入示例: 
 `/api/post_list?id=06&start=0&list=100`獲取【唐朝】下的前100個官職(開始筆數 =0，結束筆數=99, ⻑度=100）  
 `/api/post_list?id=06&start=100&list=100` 獲取【唐朝】下的第100-200個官職 (開始筆數=100，結束筆數=199, ⻑度=100)  
 `/api/post_list?id=0601` 獲取【唐朝-帝后制度類】下的全部官職  
 
-## 輸出格式:  
+### 輸出格式:  
 數據類型：`物件`  
 ```json
 {
@@ -174,18 +173,18 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[`i`].pNameChn | 字符串 | 官職名，中文 | 
 | data[`i`].pNameChnAlt | 字符串 | 官職別名，中文 [OFFICE_CODES].[c_office_chn_alt] |  
 
-# 二、根據入仕途徑類別代碼獲取其下屬的入仕途徑
-## 輸入參數:
+## 二、根據入仕途徑類別代碼獲取其下屬的入仕途徑
+### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | id | 數字 | 入仕途徑代碼 |
 | start | 數字 | 開始筆數 |
 | list | 數字 | 列表長度 |
-## 輸入示例: 
+### 輸入示例: 
 `/api/entry_list?id=04` 獲取【科舉門】下的所有入仕途徑  
 `/api/entry_list?id=0403` 獲取【科舉門-制舉】下的所有入仕途徑    
 
-## 預期輸出:  
+### 預期輸出:  
 數據類型：`物件`  
 ```json
 {
@@ -208,7 +207,7 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[`i`].eName | 字符串 | 入仕途徑名，英文 |
 | data[`i`].eNameChn | 字符串 | 入仕途徑名，中文 |
 
-# 三、根據名稱、存在時間等條件獲取地點
+## 三、根據名稱、存在時間等條件獲取地點
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | name | 字符串 | 地點名稱，中文或英文(必須) |
@@ -218,11 +217,11 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | start | 數字 | 開始筆數|
 | list | 數字 | 列表長度 |
 
-## 輸入示例: 
+### 輸入示例: 
 `/api/place_list?name=%E6%99%AE%E6%B4%B2%E9%81%93&accurate=1` 模糊匹配地名為“普洱道”的所有地點  
 `/api/place_list?name=Puer&accurate=0` 精確匹配名稱為“Puer”的地點
 
-## 輸出格式:  
+### 輸出格式:  
 數據類型：`物件`  
 ```json
 {
@@ -262,17 +261,17 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[`i`].pBName | 字符串 | 上一級地點名稱，英文 |
 | data[`i`].pBNameChn | 字符串 | 上一級地點名稱，中文 |
 
-# 四、搜尋該地點下的所有地點
+## 四、搜尋該地點下的所有地點
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | id | 數字 | 地點代碼 |
 | start | 數字 |開始筆數 |
 | list | 數字 | 列表⻑度 |
 
-## 輸入示例: 
+### 輸入示例: 
 `/api/place_belongs_to?id=16773` 搜索屬於“安⻄都護府”的所有地點  
 
-## 輸出格式:  
+### 輸出格式:  
 數據類型：`物件`  
 ```json
 {
@@ -317,8 +316,8 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 此處亦應遵守此原則。
 * 為了保證返回數據的一致性，API返回查詢結果之前應該按照相同的標準進行排序。用輸入參數中id所對應的當前表格中的id進行排序(此處為地點的id)
 
-# 五、根據官職中英文名獲取官職列表
-## 輸入參數:
+## 五、根據官職中英文名獲取官職列表
+### 輸入參數:
 
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -327,11 +326,11 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | list | 數字 | 列表長度 |
 | accurate|數字|是否採用精確匹配，是=1，否=0|
 
-## 輸入示例: 
+### 輸入示例: 
 `/api/office_list_by_name?pName=%E5%B0%9A%E6%9B%B8%E7%9C%81%E5%B7%A5%E9%83%A8&start=1&list=2&accurate=0`搜尋所有名稱含有**尚書省工部**的官職，從第1筆開始，至多2筆結果  
 `/api/office_list_by_name?pName=%E5%B0%9A%E6%9B%B8%E7%9C%81%E5%B7%A5%E9%83%A8%E4%BE%8D%E9%83%8E&start=1&list=2&accurate=1`精確匹配名稱為**尚書省工部侍郎**的官職，從第1筆開始，至多返回2筆結果
 
-## 輸出格式示例:    
+### 輸出格式示例:    
 數據類型：`物件` 
 ```json
 {
@@ -355,8 +354,8 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[`i`].pNameChn| 字符串 | 官職名，中文 |  
 | data[`i`].pNameChnAlt | 字符串 | 官職別名，中文 [OFFICE_CODES].[c_office_chn_alt] |  
 
-# 六、根據入仕途徑中英文名獲取入仕途徑列表
-## 輸入參數:
+## 六、根據入仕途徑中英文名獲取入仕途徑列表
+### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | eName | 字符串 | 入仕途徑名稱，中文或英文，經過轉碼 |
@@ -364,11 +363,11 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | list | 數字 | 列表長度 |
 | accurate|數字|是否採用精確匹配，是=1，否=0|
 
-## 輸入示例: 
+### 輸入示例: 
 `/api/entry_list_by_name?eName=%%E7%94%9F%E5%93%A1&start=1&list=2&accurate=0`搜尋所有名稱含有**生員**的入仕途徑,從第1筆開始，至多2筆結果    
 `/api/entry_list_by_name?eName=%%E7%B8%A3%E5%AD%B8%E7%94%9F%E5%93%A1&start=1&list=2&accurate=1`精確匹配名稱為**縣學生員**的官職，從第1筆開始，至多2筆結果  
 
-## 輸出格式:    
+### 輸出格式:    
 數據類型：`物件` 
 示例：
 ```json
@@ -392,9 +391,9 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[`i`].eName | 字符串 | 入仕途徑名，英文 |
 | data[`i`].eNameChn | 字符串 | 入仕途徑名，中文 |
 
-# 七、查詢除授記錄（Office Postings）
+## 七、查詢除授記錄（Office Postings）
 
-## 輸入參數:
+### 輸入參數:
 
 | 參數名         | 參數類型 | 說明                                            |
 | -------------- | -------- | ----------------------------------------------- |
@@ -416,7 +415,7 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 **注：`useOfficePlace` `usePeoplePlace` `useDate` 的優先級高於`officePlace` `peoplePlace` `indexYearStartTime` `indexYearEndTime` `dynStart` `dynEnd`，即若以`use`開頭的三個變數取值為 0，就不使用相應的條件（不論其陣列是否為空）**
 **注：如果使用朝代作為條件，返回的結果中應包括`dynStart` `dynEnd`中指定的朝代**
 
-## 輸入示例:
+### 輸入示例:
 
 **注：採用 POST 方法，Content-Type: application/json**
 `/api/query_office_postings`
@@ -440,7 +439,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"office":[920,1022,1023],"useOfficePlace":0,"officePlace":[],"usePeoplePlace":0,"peoplePlace":[],"useDate":0,"dateType":"index","indexStartTime":960,"indexEndTime":1250,"dynStart":null,"dynEnd":null,"useXy":0,"start":0,"list":65535}
@@ -448,7 +447,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 
 說明：查找所有曾擔任宰相、左丞相、右丞相（宋朝），且人物地點為興化/興化軍，指數年介於 960 和 1250 年間的人的任官記錄。返回結果的第 11 筆到第 20 筆。
 
-## 輸出格式:
+### 輸出格式:
 
 數據類型：`物件`
 示例
@@ -502,7 +501,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 | data[`i`].AssumptionOfficeChn | 字符串   | 赴任情況，中文   |
 | data[`i`].Notes               | 字符串   | 備註             |
 
-### 補充說明：
+#### 補充說明：
 
 若要忽略地址只檢索官職，示例如下：
 
@@ -512,9 +511,9 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 
 若要忽略官職檢索本地區的所有任官者，可使用「通過地區查詢」API 進行檢索。（「查詢除授記錄（Office Postings）」API 中官職 ID 是必填項。）
 
-# 八、通過入仕途徑查詢人物
+## 八、通過入仕途徑查詢人物
 
-## 輸入參數:
+### 輸入參數:
 
 | 參數名         | 參數類型 | 說明                                                                                       |
 | -------------- | -------- | ------------------------------------------------------------------------------------------ |
@@ -535,7 +534,7 @@ https://input.cbdb.fas.harvard.edu/api/query_office_postings?RequestPayload={"of
 **注：`usePeoplePlace` `useDate` 的優先級高於`peoplePlace` `locationType` `dateType` `dateStartTime` `dateEndTime`，即若以`use`開頭的 2 個變數取值為 0，就不使用後面的條件（不論陣列是否為空）**
 **注：當 `dateType` 取值為 `entry` 或 `index` 時，僅考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值，不考慮 `dynStart` 與 `dynEnd` 的取值。反之， 當 `dateType` 取值為 `dynasty` 時，僅考慮 `dynStart` 與 `dynEnd` 的取值，不考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值**
 
-## 輸入示例:
+### 輸入示例:
 
 **注：採用 POST 方法，Content-Type: application/json**
 `/api/query_entry_postings`
@@ -558,7 +557,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"entry":[36],"usePeoplePlace":0,"peoplePlace":[],"locationType":"peAddr","useDate":1,"dateType":"entry","dateStartTime":1368,"dynStart":null,"dynEnd":null,"dateEndTime":1644,"useXy":1,"start":1,"list":10}```
 
@@ -582,7 +581,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"entry":[36],"usePeoplePlace":0,"peoplePlace":[],"locationType":"peAddr","useDate":1,"dateType":"entry","dateStartTime":1115,"dynStart":17,"dynEnd":20,"dateEndTime":1644,"useXy":1,"start":1,"list":10}
@@ -590,7 +589,7 @@ https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"ent
 
 說明：查找入仕途徑為科舉：進士（籠統）且入仕年介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
 
-## 輸出格式:
+### 輸出格式:
 
 數據類型：`物件`
 示例
@@ -645,8 +644,8 @@ https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"ent
 | data[`i`].entry_xy_count | 數字 | 結果同一入仕地點的人物數 |
 
 
-# 九、根據給定人物陣列查詢人物親屬
-## 輸入參數:
+## 九、根據給定人物陣列查詢人物親屬
+### 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -659,7 +658,7 @@ https://input.cbdb.fas.harvard.edu/api/query_entry_postings?RequestPayload={"ent
 | MLoop | 數字 | 最大循環次數 |
 
 **注：`mCircle` 的優先級高於`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `，即若以`mCircle`開頭的變數取值為0，則查詢列表人物的五服親屬，不論`MAncGen` `MDecGen` `MColLink` `MMarLink` `MLoop `取值為何**
-## 輸入示例: 
+### 輸入示例: 
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_relatives_2`
 ```json
@@ -674,7 +673,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people":[1762],"mCircle":0,"MAncGen":1,"MDecGen":1,"MColLink":1,"MMarLink":1,"MLoop":2}
@@ -682,7 +681,7 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 
 說明：查找王安石的親屬，採用自定義參數查找。最大向上1層，最大向下1層，最大同輩關係為1層，最大婚姻關係為1層   
 
-## 預期輸出示例:    
+### 預期輸出示例:    
 數據類型：`物件` 
 ```json
 {
@@ -727,18 +726,18 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 
 **注：返回中心人物記錄時`rKinship`取值為`'ego'`，以p開頭的變數返回`''`（空字符串）即可**
 
-# 十、根據社會關係類型代碼獲取社會關係
-## 輸入參數:
+## 十、根據社會關係類型代碼獲取社會關係
+### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | aType| 數字 | 社會關係類型代碼 |
 
-## 輸入示例: 
+### 輸入示例: 
 **注：採用GET方法**
 `/api/get_assoc?aType=0406`
 說明：獲取薦舉保任下的所有社會關係   
   
-## 預期輸出示例:    
+### 預期輸出示例:    
 數據類型：`物件` 
 ```json
 {
@@ -760,19 +759,19 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十一、查找社會關係
-## 輸入參數:
+## 十一、查找社會關係
+### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
 | aName| 字符串 | 社會關係名，中文或英文 |
 
-## 輸入示例: 
+### 輸入示例: 
 **注：採用GET方法**
 **注：採用模糊匹配**
 `/api/find_assoc?aName=%E9%96%80%E4%BA%BA`
 說明：匹配所有含有“門人”的記錄
   
-## 預期輸出示例:    
+### 預期輸出示例:    
 數據類型：`物件` 
 ```json
 {
@@ -796,8 +795,8 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 | data[`i`].aName | 字符串 | 社會關係名，英文 |
 | data[`i`].aNameChn | 字符串 | 社會關係名，中文 |
 
-# 十二、查詢社會關係
-## 輸入參數:
+## 十二、查詢社會關係
+### 輸入參數:
 數據類型：`物件`
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
@@ -811,7 +810,7 @@ https://input.cbdb.fas.harvard.edu/api/query_relatives_2?RequestPayload={"people
 | broad|數字|行政區域範圍是廣義的還是狹義的。廣義=1，狹義=0。廣義 `+/- 0.06` 狹義 `+/- 0.03`|
 
 **注：`usePeoplePlace` 的優先級高於`place`，即若以`usePeoplePlace`開頭的變數取值為0，則不採用人物地點列表，不論其取值是否為空**
-## 輸入示例: 
+### 輸入示例: 
 **注：採用POST方法，Content-Type: application/json**
 `/api/query_associates`
 ```json
@@ -827,7 +826,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"association":[22],"place":[101125],"usePeoplePlace":1,"useXy":1,"indexYear":1,"indexStartTime":960,"indexEndTime":1250,"broad":0}
@@ -844,7 +843,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"association":[23],"place":[101125],"usePeoplePlace":1,"useXy":1,"indexYear":0,"indexStartTime":null,"indexEndTime":null,"broad":0}
@@ -852,7 +851,7 @@ https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"associa
 
 說明：查找滿足下列關係的Y：所有地點在“建州”的人物（X），其有“為Y之老師”關係。換句話說就是要查找地點在“建州”的人物（X）的學生（Y）  
 
-## 預期輸出示例:    
+### 預期輸出示例:    
 數據類型：`物件` 
 ```json
 {
@@ -903,9 +902,9 @@ https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"associa
 | data[`i`].aKinNameChn | 字符串 | 社會關係人的親姓名，中文 |
 | data[`i`].distance | 數字 | 中心人物與社會關係人之間的距離|
 
-# 十三、查詢社會關係網路
+## 十三、查詢社會關係網路
 
-## 輸入參數:
+### 輸入參數:
 
 數據類型：`物件`
 
@@ -930,7 +929,7 @@ https://input.cbdb.fas.harvard.edu/api/query_associates?RequestPayload={"associa
 | start | 數字 | 開始筆數 |
 | list | 數字 | 列表長度 |
 
-### 輸入示例:
+#### 輸入示例:
 
 注：採用POST方法，Content-Type: application/json ```/api/query_assoc_network```
 
@@ -951,7 +950,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_assoc_network?RequestPayload={"people":[1762,3767],"assocCode":[429],"assocType":["02"],"maxNodeDist":1,"place":[13305],"usePeoplePlace":1,"broad":0,"useDy":1,"dynStart":15,"dynEnd":15,"includeMale":1,"includeFemale":1, "start":0, "list":10}
@@ -959,9 +958,9 @@ https://input.cbdb.fas.harvard.edu/api/query_assoc_network?RequestPayload={"peop
 
 說明：查找王安石（1762）和蘇軾（3767）的社會網路，查詢條件是所有和他們之間有直接（單步關係 "usePeoplePlace":1）的社會關係為：致書（ "assocCode": [429]）和學術關係（"assocType":[02]）的宋代（"dynStart":15,"dynEnd":15,）眉山（"place":[13305]）附近（"broad":0）的人物。並且查詢出這些人物之間的關係。例如，蘇軾致書的對象弟弟蘇轍 1493，以及蘇軾的老師劉巨 26417. 這兩個人物自己其實也有關係（劉巨也是蘇轍的老師）。在蘇軾的 maxNodeDist = 1 查詢中也希望呈現劉巨和蘇轍的關係。
 
-#### 查詢細節：
+##### 查詢細節：
 
-#### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）
+##### 在 ASSOC_DATA 表中透過以下多條件(and 關係)進行查詢（以 maxNodeDist = 1 為例）
 
 - c_personid 欄位的為值 1762 與 3767。（王安石和蘇軾）
 
@@ -996,7 +995,7 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
         
   - ASSOC_DATA.c_personid, ASSOC_DATA.c_assoc_id 的 c_addr_id 都需要為 13305
     
-#### 關於 maxNodeDist 的設定
+##### 關於 maxNodeDist 的設定
 
 - 當 maxNodeDist 為 0 時，查詢 people（本例中為 "people":[1762, 3767]）中相互的社會網路關係，即 ASSOC_DATA 中 c_personid 与 c_assoc_id 均为 people（本例中為 "people":[1762, 3767]）陣列裡的 id. 來自使用者的地址、時間、性別等查詢條件均有效。其地址限制條件與[過濾條件為 OR 連接的三個條件](https://github.com/cbdb-project/cbdb-online-main-server/blob/develop/API.md#%E9%81%8E%E6%BF%BE%E6%A2%9D%E4%BB%B6%E7%82%BA-or-%E9%80%A3%E6%8E%A5%E7%9A%84%E4%B8%89%E5%80%8B%E6%A2%9D%E4%BB%B6)一致
 
@@ -1006,7 +1005,7 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 
 注：在查詢結果中，希望包含被查詢出來所有人之間的關係。譬如，蘇軾的老師是劉巨，蘇軾曾經致書蘇轍，***蘇轍的老師也是劉巨***。我們在用蘇軾作為查詢對象查 maxNodeDist >= 1 的時候，不僅希望能看到蘇軾的老師是劉巨，蘇軾曾經致書蘇轍，也希望能查到蘇轍的老師也是劉巨。
 
-## 預期輸出示例:  
+### 預期輸出示例:  
 
 數據類型：`物件` 
 
@@ -1055,9 +1054,9 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 
 
 
-# 十四、通過地區查詢
+## 十四、通過地區查詢
 
-## 輸入參數:
+### 輸入參數:
 
 | 參數名        | 參數類型 | 說明                                                                                                                                                                      |
 | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1076,7 +1075,7 @@ WHERE ASSOC_CODE_TYPE_REL.c_assoc_type_id in
 **注：`useDate` 的優先級高於 `dateType` `dateStartTime` `dateEndTime` `dynStart` `dynEnd`，即若變數取值為 0，就不使用後面的條件（不論陣列是否為空）**
 **注：當 `dateType` 取值為 `entry` 或 `index` 時，僅考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值，不考慮 `dynStart` 與 `dynEnd` 的取值。反之， 當 `dateType` 取值為 `dynasty` 時，僅考慮 `dynStart` 與 `dynEnd` 的取值，不考慮 `dateStartTime` 與 `dateEndTime` 兩個字段的值**
 
-## 輸入示例:
+### 輸入示例:
 
 **注：採用 POST 方法，Content-Type: application/json**
 `/api/query_place`
@@ -1097,7 +1096,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_place?RequestPayload={"peoplePlace":[2928,10522,12553,13947,13949],"placeType":["individual","entry","officePosting"],"useDate":1,"dateType":"index","dateStartTime":1200,"dateEndTime":1644,"dynStart":null,"dynEnd":null,"useXy":1,"start":1,"list":10}
@@ -1121,7 +1120,7 @@ RequestPayload:{
 }
 ```
 
-### 查詢示例 (by POST)
+#### 查詢示例 (by POST)
 
 ```
 https://input.cbdb.fas.harvard.edu/api/query_place?RequestPayload={"peoplePlace":[2928,10522,12553,13947,13949],"placeType":["individual","entry","officePosting"],"useDate":1,"dateType":"dynasty","dateStartTime":null,"dateEndTime":null,"dynStart":17,"dynEnd":22,"useXy":1,"start":1,"list":10}
@@ -1129,7 +1128,7 @@ https://input.cbdb.fas.harvard.edu/api/query_place?RequestPayload={"peoplePlace"
 
 說明：查找人物地點為`2928` `10522` `12553` `13947` `13949`，地點類型為“人”“入仕”“職官”，朝代介於 金朝 到 清朝 的所有人物。返回第 1-10 筆結果
 
-## 輸出格式:
+### 輸出格式:
 
 數據類型：`物件`
 示例

@@ -85,9 +85,17 @@ class ApiV2OperationListTest extends TestCase {
     }
 
     public function test_accessible_without_authentication(): void {
+        $this->insertOperation();
+
         $response = $this->getJson('/api/v2/operations');
 
-        $response->assertOk()->assertJson(['ok' => true]);
+        $response->assertOk()->assertJsonStructure([
+            'ok',
+            'data' => [['id', 'user_id', 'c_personid', 'op_type', 'resource',
+                'resource_id', 'resource_data', 'crowdsourcing_status', 'created_at', 'updated_at']],
+            'pagination' => ['total', 'per_page', 'current_page', 'last_page', 'from', 'to'],
+        ]);
+        $this->assertEquals(1, $response->json('pagination.total'));
     }
 
     public function test_returns_paginated_response(): void {

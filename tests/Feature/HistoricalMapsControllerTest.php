@@ -64,7 +64,7 @@ class HistoricalMapsControllerTest extends TestCase {
     }
 
     #[Test]
-    public function test_authenticated_user_can_access_historical_maps_page(): void {
+    public function test_superadmin_can_access_historical_maps_page(): void {
         $response = $this->actingAs($this->createUser())->get('/app/maps');
 
         $response->assertOk();

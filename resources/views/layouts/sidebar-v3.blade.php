@@ -379,7 +379,7 @@
                     </li>
                 @endif
 
-                @if(Auth::check() and Auth::user()->isSuperAdmin())
+                @if(Auth::check() and Auth::user()->isActive() and Auth::user()->isSuperAdmin())
                     @php
                         $adminPages = [
                             '用戶管理',

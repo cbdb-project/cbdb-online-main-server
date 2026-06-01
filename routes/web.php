@@ -227,15 +227,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('api-tokens/{tokenId}', 'ApiTokenController@destroy')->name('api-tokens.destroy');
     Route::delete('api-tokens', 'ApiTokenController@destroyAll')->name('api-tokens.destroy-all');
 
-    // 按入仕查詢（Inertia + React）
-    Route::get('app/search-by/entry', 'SearchByEntryController@index')
-        ->middleware('inertia')
-        ->name('app.search-by.entry.index');
-    Route::get('app/search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('app.search-by.entry.types');
-    Route::get('app/search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('app.search-by.entry.codes');
-    Route::get('app/search-by/entry/places', 'SearchByEntryController@getPlaces')->name('app.search-by.entry.places');
-    Route::get('app/search-by/entry/query', 'SearchByEntryController@query')->name('app.search-by.entry.query');
-
     // 檢視表（Inertia + React）
     Route::get('app/view', 'ViewTableController@appIndex')
         ->middleware('inertia')
@@ -244,28 +235,41 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')
         ->name('app.view.show');
 
-    // 人物瀏覽工作台（Inertia + React）
-    Route::get('app/person-browser', 'PersonBrowserController@index')
-        ->middleware('inertia')
-        ->name('app.person-browser.index');
-    Route::get('app/person-browser/search', 'PersonBrowserController@search')
-        ->name('app.person-browser.search');
-    Route::get('app/person-browser/people/{personId}/summary', 'PersonBrowserController@summary')
-        ->where('personId', '[0-9]+')
-        ->name('app.person-browser.summary');
-    Route::get('app/person-browser/people/{personId}/tabs/{tabKey}', 'PersonBrowserController@tab')
-        ->where('personId', '[0-9]+')
-        ->name('app.person-browser.tab');
+    // ── 暫不公開：僅管理員可訪問 ──────────────────────────────────────
+    Route::middleware('superadmin')->group(function () {
+        // 人物瀏覽工作台（Inertia + React）
+        Route::get('app/person-browser', 'PersonBrowserController@index')
+            ->middleware('inertia')
+            ->name('app.person-browser.index');
+        Route::get('app/person-browser/search', 'PersonBrowserController@search')
+            ->name('app.person-browser.search');
+        Route::get('app/person-browser/people/{personId}/summary', 'PersonBrowserController@summary')
+            ->where('personId', '[0-9]+')
+            ->name('app.person-browser.summary');
+        Route::get('app/person-browser/people/{personId}/tabs/{tabKey}', 'PersonBrowserController@tab')
+            ->where('personId', '[0-9]+')
+            ->name('app.person-browser.tab');
 
-    // 歷史地圖
-    Route::get('app/maps', 'HistoricalMapsController@index')
-        ->name('app.maps.index');
-    Route::get('maps', 'HistoricalMapsController@legacyRedirect')
-        ->name('maps.index');
+        // 按入仕查詢（Inertia + React）
+        Route::get('app/search-by/entry', 'SearchByEntryController@index')
+            ->middleware('inertia')
+            ->name('app.search-by.entry.index');
+        Route::get('app/search-by/entry/types', 'SearchByEntryController@getEntryTypes')->name('app.search-by.entry.types');
+        Route::get('app/search-by/entry/codes', 'SearchByEntryController@getEntryCodes')->name('app.search-by.entry.codes');
+        Route::get('app/search-by/entry/places', 'SearchByEntryController@getPlaces')->name('app.search-by.entry.places');
+        Route::get('app/search-by/entry/query', 'SearchByEntryController@query')->name('app.search-by.entry.query');
+
+        // 歷史地圖（需登入且為 superadmin）
+        Route::get('app/maps', 'HistoricalMapsController@index')
+            ->name('app.maps.index');
+    });
+    // ─────────────────────────────────────────────────────────────────
+
+    // Legacy maps 重定向（需登入，目標 /app/maps 本身已有 superadmin 保護）
+    Route::get('maps', 'HistoricalMapsController@legacyRedirect')->name('maps.index');
     Route::get('maps/index.html', 'HistoricalMapsController@legacyRedirect');
     Route::get('maps/tang', 'HistoricalMapsController@legacyRedirect');
-    Route::get('maps/tang/{path?}', 'HistoricalMapsController@legacyRedirect')
-        ->where('path', '.*');
+    Route::get('maps/tang/{path?}', 'HistoricalMapsController@legacyRedirect')->where('path', '.*');
 
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');

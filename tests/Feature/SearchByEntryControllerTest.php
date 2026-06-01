@@ -16,6 +16,7 @@ class SearchByEntryControllerTest extends TestCase {
         $this->createTestTables();
         $this->user = User::factory()->create([
             'is_active' => 1,
+            'is_admin' => 3,
         ]);
         $this->seedTestData();
     }

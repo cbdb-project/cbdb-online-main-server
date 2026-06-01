@@ -52,6 +52,7 @@ class HistoricalMapsControllerTest extends TestCase {
             'institution' => 'Test Institute',
             'confirmation_token' => 'maps-test-token',
             'is_active' => 1,
+            'is_admin' => 3,
         ]);
     }
 
@@ -70,6 +71,22 @@ class HistoricalMapsControllerTest extends TestCase {
         $response->assertViewIs('maps.index');
         $response->assertSee('中國歷代行政區地圖');
         $response->assertSee('historical-layer-select', false);
+    }
+
+    #[Test]
+    public function test_non_superadmin_cannot_access_historical_maps_page(): void {
+        $regularUser = User::create([
+            'name' => 'Regular User',
+            'email' => 'regular@example.com',
+            'password' => Hash::make('password'),
+            'confirmation_token' => 'regular-token',
+            'is_active' => 1,
+            'is_admin' => 0,
+        ]);
+
+        $response = $this->actingAs($regularUser)->get('/app/maps');
+
+        $response->assertForbidden();
     }
 
     #[Test]

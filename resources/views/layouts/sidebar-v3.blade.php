@@ -47,13 +47,6 @@
                 </li>
 
                 <li class="nav-item">
-                    <a href="{{ route('app.person-browser.index') }}" class="nav-link {{ request()->routeIs('app.person-browser.*') ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-user-friends"></i>
-                        <p>人物瀏覽</p>
-                    </a>
-                </li>
-
-                <li class="nav-item">
                     <a href="{{ route('operations.index') }}" class="nav-link {{ $activePage == 'NewUpdate' ? 'active' : '' }}">
                         <i class="nav-icon fas fa-clipboard-list"></i>
                         <p>最近操作記錄</p>
@@ -337,6 +330,49 @@
                                 <a href="{{ route('app.query-playground.index') }}" class="nav-link {{ $activePage == 'Query Playground' || request()->routeIs('app.query-playground.*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-terminal"></i>
                                     <p>SQL 查詢練習場</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                @endif
+
+                @if(Auth::check() and Auth::user()->isActive() and Auth::user()->isSuperAdmin())
+                    @php
+                        $notPublicPages = [
+                            '人物瀏覽',
+                            '按入仕查詢',
+                            '歷史地圖',
+                        ];
+                        $notPublicMenuOpen = in_array($activePage, $notPublicPages, true)
+                            || request()->routeIs('app.person-browser.*')
+                            || request()->routeIs('app.search-by.entry.*')
+                            || request()->routeIs('app.maps.*');
+                    @endphp
+                    <li class="nav-item {{ $notPublicMenuOpen ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ $notPublicMenuOpen ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-lock"></i>
+                            <p>
+                                暫不公開
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('app.person-browser.index') }}" class="nav-link {{ request()->routeIs('app.person-browser.*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-user-friends"></i>
+                                    <p>人物瀏覽</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('app.search-by.entry.index') }}" class="nav-link {{ request()->routeIs('app.search-by.entry.*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-search"></i>
+                                    <p>按入仕查詢</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('app.maps.index') }}" class="nav-link {{ request()->routeIs('app.maps.*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-map"></i>
+                                    <p>歷史地圖</p>
                                 </a>
                             </li>
                         </ul>

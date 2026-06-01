@@ -1,3 +1,137 @@
+# API v2（現行版本）
+
+v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagination` 結構。基底 URL：`https://input.cbdb.fas.harvard.edu/api/v2/...`
+
+---
+
+## 一、人物清單
+
+### `GET /api/v2/persons`
+
+輸出 BIOG_MAIN 所有人物的 `c_personid`，按主鍵升序，分頁輸出。**不需要登入。**
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 預設值 | 說明 |
+| ------ | ------ | ------ | ------ |
+| per_page | 數字 | 100 | 每頁筆數，上限 1000 |
+| page | 數字 | 1 | 頁碼 |
+
+### 輸入示例
+
+`/api/v2/persons` 取第一頁（預設每頁 100 筆）  
+`/api/v2/persons?per_page=500&page=2` 取第二頁，每頁 500 筆
+
+### 輸出格式
+
+```json
+{
+  "ok": true,
+  "data": [
+    {"c_personid": 1},
+    {"c_personid": 2}
+  ],
+  "pagination": {
+    "total": 680000,
+    "per_page": 100,
+    "current_page": 1,
+    "last_page": 6800,
+    "from": 1,
+    "to": 100
+  }
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| ok | 布林 | 請求是否成功 |
+| data | 陣列 | 人物 ID 列表 |
+| data[i].c_personid | 數字 | 人物 ID |
+| pagination.total | 數字 | 資料總筆數 |
+| pagination.per_page | 數字 | 每頁筆數 |
+| pagination.current_page | 數字 | 當前頁碼 |
+| pagination.last_page | 數字 | 最後一頁頁碼 |
+| pagination.from | 數字 | 本頁第一筆的序號（空頁時為 0） |
+| pagination.to | 數字 | 本頁最後一筆的序號（空頁時為 0） |
+
+---
+
+## 二、操作記錄清單
+
+### `GET /api/v2/operations`
+
+輸出操作記錄（對應 `/operations` 頁面），分頁輸出。**需要登入（session 或 Sanctum token）。**
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 預設值 | 說明 |
+| ------ | ------ | ------ | ------ |
+| per_page | 數字 | 20 | 每頁筆數，上限 100 |
+| page | 數字 | 1 | 頁碼 |
+| proposals_only | 布林 | false | `true` 只回傳提案（op_type 8/9）；`false` 只回傳一般操作 |
+| editor | 字串 | — | 依修改者篩選；純數字視為 user_id 精確比對，否則模糊匹配使用者名稱 |
+| op_type[] | 數字陣列 | — | 操作類型篩選（僅非提案模式有效）：1=新增、2=修改全部、3=修改部分、4=刪除 |
+| status[] | 字串陣列 | — | 提案審核狀態（僅 `proposals_only=true` 有效）：`pending`、`approved`、`rejected`、`cancelled` |
+
+### 輸入示例
+
+`/api/v2/operations` 取最近 20 筆一般操作記錄  
+`/api/v2/operations?proposals_only=true&status[]=pending` 取待審核提案  
+`/api/v2/operations?op_type[]=3&op_type[]=4` 只看修改與刪除操作  
+`/api/v2/operations?editor=10` 取 user_id=10 的操作記錄
+
+### 輸出格式
+
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": 12345,
+      "user_id": 7,
+      "c_personid": 10001,
+      "op_type": 3,
+      "resource": "BIOG_MAIN",
+      "resource_id": "c_personid=10001",
+      "resource_data": {"c_name_chn": "杜甫"},
+      "resource_original": {"c_name_chn": "杜甫（舊）"},
+      "crowdsourcing_status": 0,
+      "created_at": "2026-05-30T08:00:00.000000Z",
+      "updated_at": "2026-05-30T08:00:00.000000Z"
+    }
+  ],
+  "pagination": {
+    "total": 4200,
+    "per_page": 20,
+    "current_page": 1,
+    "last_page": 210,
+    "from": 1,
+    "to": 20
+  }
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| ok | 布林 | 請求是否成功 |
+| data | 陣列 | 操作記錄列表 |
+| data[i].id | 數字 | 操作 ID |
+| data[i].user_id | 數字 | 操作者的 user ID |
+| data[i].c_personid | 數字 | 相關人物 ID |
+| data[i].op_type | 數字 | 操作類型（1=新增、2=修改全部、3=修改部分、4=刪除、8=提案新增、9=提案修改） |
+| data[i].resource | 字串 | 被操作的資料表名稱 |
+| data[i].resource_id | 字串 | 被操作的資料列識別碼 |
+| data[i].resource_data | 物件 | 操作後的資料內容（JSON 已解碼） |
+| data[i].resource_original | 物件/null | 操作前的資料快照（JSON 已解碼；新增操作為 null） |
+| data[i].crowdsourcing_status | 數字 | 眾包狀態（0=正式操作） |
+| data[i].created_at | 字串 | 建立時間（ISO 8601） |
+| data[i].updated_at | 字串 | 更新時間（ISO 8601） |
+| pagination | 物件 | 分頁資訊（欄位同人物清單） |
+
+---
+
+# 舊版 API 文檔
+
 # 使用方法
 將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu
 

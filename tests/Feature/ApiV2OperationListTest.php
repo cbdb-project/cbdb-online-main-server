@@ -84,13 +84,13 @@ class ApiV2OperationListTest extends TestCase {
         ], $overrides));
     }
 
-    public function test_requires_authentication(): void {
+    public function test_accessible_without_authentication(): void {
         $response = $this->getJson('/api/v2/operations');
 
-        $response->assertStatus(401);
+        $response->assertOk()->assertJson(['ok' => true]);
     }
 
-    public function test_authenticated_user_receives_paginated_response(): void {
+    public function test_returns_paginated_response(): void {
         $user = $this->makeUser();
         $this->insertOperation();
 

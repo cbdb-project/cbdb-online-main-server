@@ -60,7 +60,7 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 
 ### `GET /api/v2/operations`
 
-輸出操作記錄（對應 `/operations` 頁面），分頁輸出。**需要登入（session 或 Sanctum token）。**
+輸出操作記錄（對應 `/operations` 頁面），分頁輸出。**不需要登入。**
 
 ### 輸入參數
 

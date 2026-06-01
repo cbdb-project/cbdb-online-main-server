@@ -8,8 +8,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RequireSuperAdmin {
     public function handle(Request $request, Closure $next): Response {
+        $user = $request->user();
         abort_unless(
-            $request->user()?->isActive() && $request->user()?->isSuperAdmin(),
+            $user?->isActive() && $user?->isSuperAdmin(),
             403,
             '此頁面僅限管理員存取。'
         );

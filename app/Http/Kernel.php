@@ -65,6 +65,7 @@ class Kernel extends HttpKernel {
         'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.optional' => \App\Http\Middleware\OptionalAuthentication::class,
+        'superadmin' => \App\Http\Middleware\RequireSuperAdmin::class,
         'mcp.ability' => \App\Http\Middleware\EnsureMcpAbility::class,
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,

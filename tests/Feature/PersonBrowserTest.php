@@ -19,6 +19,7 @@ class PersonBrowserTest extends TestCase {
         $this->createTestTables();
         $this->user = User::factory()->create([
             'is_active' => 1,
+            'is_admin' => 3,
         ]);
         $this->seedTestData();
     }
@@ -745,6 +746,13 @@ class PersonBrowserTest extends TestCase {
     public function test_person_browser_requires_authentication(): void {
         $response = $this->get(route('app.person-browser.index'));
         $response->assertRedirect(route('login'));
+    }
+
+    #[Test]
+    public function test_person_browser_denies_non_superadmin_users(): void {
+        $regularUser = User::factory()->create(['is_active' => 1, 'is_admin' => 0]);
+        $response = $this->actingAs($regularUser)->get(route('app.person-browser.index'));
+        $response->assertForbidden();
     }
 
     #[Test]

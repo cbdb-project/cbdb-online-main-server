@@ -23,6 +23,14 @@ Route::group([
 ], function () {
     Route::get('texts', 'Api\TextLookupController@index');
     Route::get('texts/{textId}', 'Api\TextLookupController@show')->where('textId', '[0-9]+');
+    Route::get('persons', 'Api\PersonListController@index');
+});
+
+Route::group([
+    'prefix' => 'v2',
+    'middleware' => ['auth:sanctum,web'],
+], function () {
+    Route::get('operations', 'Api\OperationListController@index');
 });
 
 // Select APIs with optional authentication

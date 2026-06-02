@@ -27,7 +27,8 @@ class HandleInertiaRequests extends Middleware {
                     'name' => $request->user()->name,
                 ] : null,
             ],
-            'locale' => app()->getLocale(),
+            'locale'      => app()->getLocale(),
+            'locale_url'  => route('locale.switch', [], false),
             'translations' => [
                 'common' => is_array($t = trans('common')) ? $t : [],
                 'nav'    => is_array($t = trans('nav'))    ? $t : [],

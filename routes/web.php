@@ -22,6 +22,8 @@ Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailCont
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
 Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
 
+Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');
+
 Route::get('home', 'HomeController@index')->name('home');
 Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('dashboard');
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');

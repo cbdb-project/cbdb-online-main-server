@@ -27,6 +27,13 @@ class HandleInertiaRequests extends Middleware {
                     'name' => $request->user()->name,
                 ] : null,
             ],
+            'locale' => app()->getLocale(),
+            'translations' => [
+                'common' => is_array($t = trans('common')) ? $t : [],
+                'nav'    => is_array($t = trans('nav'))    ? $t : [],
+                'person' => is_array($t = trans('person')) ? $t : [],
+                'query'  => is_array($t = trans('query'))  ? $t : [],
+            ],
         ]);
     }
 }

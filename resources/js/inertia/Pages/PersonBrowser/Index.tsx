@@ -298,7 +298,10 @@ export default function PersonBrowserIndex() {
     // ── Register dirty checker for locale switch guard ──
     const dirtyRef = useRef(false);
     dirtyRef.current = basicInfoEditorState.dirty;
-    useEffect(() => registerDirtyChecker(() => dirtyRef.current), []);
+    useEffect(() => {
+        const unregister = registerDirtyChecker(() => dirtyRef.current);
+        return unregister; // cleanup: remove checker on unmount
+    }, []);
 
     // ── Load summary when selectedId changes ──
     useEffect(() => {
@@ -318,7 +321,7 @@ export default function PersonBrowserIndex() {
                 setSummary(data);
             })
             .catch((err) => {
-                setSummaryError(err.message || '載入失敗');
+                setSummaryError(err.message || tPerson('load_failed'));
                 setSummary(null);
             })
             .finally(() => setSummaryLoading(false));

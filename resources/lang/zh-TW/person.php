@@ -186,6 +186,8 @@ return [
     'text_type_biography'        => '傳記',
     'text_type_explanatory'      => '論說',
 
+    'load_failed'            => '載入失敗',
+
     // PersonBrowser tab labels (BrowserTabs.tsx TAB_DEFINITIONS fallback)
     'tab_basic_info'         => '基本資料',
     'tab_addresses'          => '地址',

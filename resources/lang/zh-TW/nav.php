@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'app_title'              => '中國歷代人物傳記資料庫',
+    'app_title_short'        => 'CBDB',
+    'dashboard'              => '系統總覽',
+    'person_editing'         => '人物編輯',
+    'recent_operations'      => '最近操作記錄',
+    'recent_proposals'       => '最近提案列表',
+    'pending_review'         => '待審核',
+    'crowdsourcing_records'  => '最近眾包錄入記錄',
+    'all_tables'             => '全部表格',
+    'all_tables_home'        => '全部表格首頁',
+    'views'                  => '檢視表',
+    'views_overview'         => '檢視表總覽',
+    'views_overview_new'     => '檢視表總覽（新版）',
+    'expert_tools'           => '專家工具',
+    'sql_query_playground'   => 'SQL 查詢練習場',
+    'admin_only_tools'       => '非公開工具',
+    'person_browser'         => '人物瀏覽',
+    'search_by_entry'        => '按入仕查詢',
+    'historical_maps'        => '歷史地圖',
+    'admin_tools'            => '管理員工具',
+    'user_management'        => '用戶管理',
+    'language_switch_to_en'  => 'EN',
+    'language_switch_to_zh'  => '中文',
+];

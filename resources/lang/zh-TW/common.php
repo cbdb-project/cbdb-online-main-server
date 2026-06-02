@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'save'              => '保存',
+    'confirm'           => '確定',
+    'cancel'            => '取消',
+    'search'            => '搜尋',
+    'delete'            => '刪除',
+    'add'               => '新增',
+    'edit'              => '編輯',
+    'create'            => '建立',
+    'update'            => '更新',
+    'reset'             => '重置',
+    'close'             => '關閉',
+    'back'              => '返回',
+    'submit'            => '提交',
+    'loading'           => '載入中…',
+    'no_data'           => '無資料',
+    'page_of'           => '第 :current 頁，共 :total 頁',
+    'profile_settings'  => '個人設定',
+    'sign_out'          => '登出',
+    'dark_mode_toggle'  => '切換深色模式',
+    'home'              => '首頁',
+    'yes'               => '是',
+    'no'                => '否',
+];

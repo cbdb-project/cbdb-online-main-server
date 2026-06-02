@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'app_title'              => 'China Biographical Database (CBDB)',
+    'app_title_short'        => 'CBDB',
+    'dashboard'              => 'Dashboard',
+    'person_editing'         => 'Person Editing',
+    'recent_operations'      => 'Recent Operations',
+    'recent_proposals'       => 'Recent Proposals',
+    'pending_review'         => 'Pending Review',
+    'crowdsourcing_records'  => 'Recent Crowdsourcing Records',
+    'all_tables'             => 'All Tables',
+    'all_tables_home'        => 'All Tables Home',
+    'views'                  => 'Views',
+    'views_overview'         => 'Views Overview',
+    'views_overview_new'     => 'Views Overview (New)',
+    'expert_tools'           => 'Expert Tools',
+    'sql_query_playground'   => 'SQL Query Playground',
+    'admin_only_tools'       => 'Restricted Tools',
+    'person_browser'         => 'Person Browser',
+    'search_by_entry'        => 'Search by Entry Type',
+    'historical_maps'        => 'Historical Maps',
+    'admin_tools'            => 'Admin Tools',
+    'user_management'        => 'User Management',
+    'language_switch_to_en'  => 'EN',
+    'language_switch_to_zh'  => '中文',
+];

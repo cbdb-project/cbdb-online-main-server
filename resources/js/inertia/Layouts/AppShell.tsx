@@ -27,7 +27,7 @@ export default function AppShell({ children }: AppShellProps) {
             if (!window.confirm(msg)) return;
         }
         const next = currentLocale === 'zh-TW' ? 'en' : 'zh-TW';
-        router.post(localeEndpoint, { locale: next });
+        router.post(localeEndpoint, { locale: next }, { preserveScroll: true });
     };
 
     return (

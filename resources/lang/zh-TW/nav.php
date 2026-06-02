@@ -24,4 +24,5 @@ return [
     'user_management'        => '用戶管理',
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
+    'back_to_home'           => '← 返回首頁',
 ];

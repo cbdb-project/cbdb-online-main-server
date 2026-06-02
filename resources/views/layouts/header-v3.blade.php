@@ -34,10 +34,24 @@
     <ul class="navbar-nav ml-auto">
         <!-- Dark Mode Toggle -->
         <li class="nav-item">
-            <a class="nav-link" href="#" role="button" id="darkModeToggle" title="切換深色模式"
+            <a class="nav-link" href="#" role="button" id="darkModeToggle" title="{{ __('common.dark_mode_toggle') }}"
                onclick="event.preventDefault(); window.toggleDarkMode();">
                 <i class="fas fa-moon" id="darkModeIcon"></i>
             </a>
+        </li>
+
+        <!-- Language Toggle -->
+        <li class="nav-item">
+            <form action="{{ route('locale.switch') }}" method="POST" style="display:inline">
+                @csrf
+                <input type="hidden" name="locale"
+                       value="{{ app()->getLocale() === 'zh-TW' ? 'en' : 'zh-TW' }}">
+                <button type="submit" class="btn btn-link px-2"
+                        title="{{ app()->getLocale() === 'zh-TW' ? __('nav.language_switch_to_en') : __('nav.language_switch_to_zh') }}"
+                        style="font-weight:600; letter-spacing:0.05em; color:inherit;">
+                    {{ app()->getLocale() === 'zh-TW' ? __('nav.language_switch_to_en') : __('nav.language_switch_to_zh') }}
+                </button>
+            </form>
         </li>
 
         @if (Auth::guest())

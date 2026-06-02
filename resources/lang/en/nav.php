@@ -24,4 +24,5 @@ return [
     'user_management'        => 'User Management',
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
+    'back_to_home'           => '← Home',
 ];

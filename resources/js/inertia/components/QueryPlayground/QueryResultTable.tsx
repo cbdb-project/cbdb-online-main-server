@@ -62,8 +62,13 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                                 </td>
                             </tr>
                         ) : (
-                            rows.map((row, rowIndex) => (
-                                <tr key={rowIndex} style={{ backgroundColor: rowIndex % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                            rows.map((row, rowIndex) => {
+                                // Use first-column value + index as a more stable key than index alone
+                                const rowKey = columns.length > 0
+                                    ? `${String(row[columns[0]] ?? '')}_${rowIndex}`
+                                    : String(rowIndex);
+                                return (
+                                <tr key={rowKey} style={{ backgroundColor: rowIndex % 2 === 0 ? '#fff' : '#f8f9fa' }}>
                                     {columns.map((col) => (
                                         <td
                                             key={col}
@@ -79,7 +84,8 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                                         </td>
                                     ))}
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

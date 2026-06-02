@@ -54,6 +54,7 @@ return [
     'maps_tip_year_param'     => 'Or use <code>year</code> to estimate a layer, e.g. <code>?year=741</code>.',
     'maps_tip_marker_param'   => 'Markers can be set via query params: <code>?lat=34.3416&amp;lng=108.9398&amp;label=Chang\'an</code>.',
     'maps_aria_map'           => 'Historical administrative map',
+    'maps_marker_default'     => "Chang'an",
 
     // Home page hints
     'home_nav_hint'          => 'Use the left menu to navigate, or search above to go to a specific page.',

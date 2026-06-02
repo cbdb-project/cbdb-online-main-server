@@ -342,9 +342,9 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center" style="margin-top: 20px; gap: 12px;">
                     <div class="text-muted">
                         @if(!empty($queryProfileSummary['count']))
-                            本次查詢共 {{ $queryProfileSummary['count'] }} 筆，耗時 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms
+                            {{ __('common.query_profile_count', ['count' => $queryProfileSummary['count'], 'ms' => number_format($queryProfileSummary['time_ms'], 2)]) }}
                             @if($canViewQueryDetails)
-                                <a href="#" data-toggle="modal" data-target="#query-profile-modal" style="margin-left: 8px;">查看詳細</a>
+                                <a href="#" data-toggle="modal" data-target="#query-profile-modal" style="margin-left: 8px;">{{ __('common.query_profile_view') }}</a>
                             @endif
                         @endif
                     </div>
@@ -369,24 +369,23 @@
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="queryProfileModalLabel">SQL 查詢明細</h4>
+                        <h4 class="modal-title" id="queryProfileModalLabel">{{ __('common.query_profile_title') }}</h4>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
                         <p class="text-muted">
-                            共 {{ $queryProfileSummary['count'] }} 筆查詢，累計 {{ number_format($queryProfileSummary['time_ms'], 2) }} ms。
-                            以下數據依執行順序列出，時間單位為毫秒。
+                            {{ __('common.query_profile_summary', ['count' => $queryProfileSummary['count'], 'ms' => number_format($queryProfileSummary['time_ms'], 2)]) }}
                         </p>
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped table-sm">
                                 <thead>
                                 <tr>
-                                    <th style="width: 60px;">#</th>
-                                    <th style="width: 120px;">耗時 (ms)</th>
-                                    <th>SQL</th>
-                                    <th style="width: 220px;">綁定參數</th>
+                                    <th style="width: 60px;">{{ __('common.query_profile_no') }}</th>
+                                    <th style="width: 120px;">{{ __('common.query_profile_time') }}</th>
+                                    <th>{{ __('common.query_profile_sql') }}</th>
+                                    <th style="width: 220px;">{{ __('common.query_profile_bindings') }}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -401,12 +400,12 @@
                                 </tbody>
                             </table>
                             @if(count($queryProfileSummary['queries']) > 100)
-                                <p class="text-muted">僅顯示前 100 筆查詢。</p>
+                                <p class="text-muted">{{ __('common.query_profile_truncated', ['n' => 100]) }}</p>
                             @endif
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-default" data-dismiss="modal">關閉</button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('common.close') }}</button>
                     </div>
                 </div>
             </div>

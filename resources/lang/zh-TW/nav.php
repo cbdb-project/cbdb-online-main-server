@@ -25,4 +25,5 @@ return [
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
     'back_to_home'           => '← 返回首頁',
+    'not_public_tools'       => '暫不公開',
 ];

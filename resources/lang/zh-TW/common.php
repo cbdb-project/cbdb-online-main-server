@@ -23,4 +23,15 @@ return [
     'home'              => '首頁',
     'yes'               => '是',
     'no'                => '否',
+
+    // Query Profile Modal
+    'query_profile_title'   => 'SQL 查詢明細',
+    'query_profile_count'   => '本次查詢共 :count 筆，耗時 :ms ms',
+    'query_profile_view'    => '查看詳細',
+    'query_profile_summary' => '共 :count 筆查詢，累計 :ms ms。以下數據依執行順序列出，時間單位為毫秒。',
+    'query_profile_no'      => '#',
+    'query_profile_time'    => '耗時 (ms)',
+    'query_profile_sql'     => 'SQL',
+    'query_profile_bindings' => '綁定參數',
+    'query_profile_truncated' => '僅顯示前 :n 筆查詢。',
 ];

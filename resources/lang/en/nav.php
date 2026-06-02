@@ -25,4 +25,5 @@ return [
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
     'back_to_home'           => '← Home',
+    'not_public_tools'       => 'Restricted Access',
 ];

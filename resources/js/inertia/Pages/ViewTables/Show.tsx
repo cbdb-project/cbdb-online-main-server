@@ -199,7 +199,7 @@ export default function Show({
 
                         {pagination.total > 0 && (
                             <div style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 8 }}>
-                                共 {pagination.total} 筆，顯示第 {pagination.from}–{pagination.to} 筆
+                                {t('total_records', { total: String(pagination.total), from: String(pagination.from), to: String(pagination.to) })}
                             </div>
                         )}
 

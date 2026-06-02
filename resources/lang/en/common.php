@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'save'              => 'Save',
+    'confirm'           => 'Confirm',
+    'cancel'            => 'Cancel',
+    'search'            => 'Search',
+    'delete'            => 'Delete',
+    'add'               => 'Add',
+    'edit'              => 'Edit',
+    'create'            => 'Create',
+    'update'            => 'Update',
+    'reset'             => 'Reset',
+    'close'             => 'Close',
+    'back'              => 'Back',
+    'submit'            => 'Submit',
+    'loading'           => 'Loading…',
+    'no_data'           => 'No data',
+    'page_of'           => 'Page :current of :total',
+    'profile_settings'  => 'Profile Settings',
+    'sign_out'          => 'Sign out',
+    'dark_mode_toggle'  => 'Toggle dark mode',
+    'home'              => 'Home',
+    'yes'               => 'Yes',
+    'no'                => 'No',
+];

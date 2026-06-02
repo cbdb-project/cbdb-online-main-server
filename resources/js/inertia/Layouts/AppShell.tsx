@@ -1,20 +1,44 @@
 import React from 'react';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { APP_THEME } from '../theme';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface AppShellProps {
     children: React.ReactNode;
 }
 
 export default function AppShell({ children }: AppShellProps) {
-    const { app } = usePage<{ app?: { version?: string } }>().props;
+    const { app, locale } = usePage<{ app?: { version?: string }; locale?: string }>().props;
     const version = app?.version || 'unknown';
+    const currentLocale = locale ?? 'zh-TW';
+    const tNav = useTranslation('nav');
+
+    const switchLocale = () => {
+        // Locale switch causes a full Inertia re-mount; unsaved page state will be lost.
+        const next = currentLocale === 'zh-TW' ? 'en' : 'zh-TW';
+        router.post('/locale', { locale: next });
+    };
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: APP_THEME.canvas, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', display: 'flex', flexDirection: 'column' }}>
             <header style={{ backgroundColor: APP_THEME.brand, color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>CBDB 中國歷代人物傳記資料庫</h1>
-                <a href="/" style={{ color: APP_THEME.brandOnDark, textDecoration: 'none', fontSize: '0.875rem' }}>← 返回首頁</a>
+                <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
+                    {tNav('app_title')}
+                </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <a href="/" style={{ color: APP_THEME.brandOnDark, textDecoration: 'none', fontSize: '0.875rem' }}>
+                        {tNav('back_to_home')}
+                    </a>
+                    <button
+                        onClick={switchLocale}
+                        style={{ background: 'none', border: '1px solid rgba(255,255,255,0.6)', borderRadius: 4, color: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.05em', padding: '3px 10px' }}
+                        title="Switch language / 切換語言"
+                    >
+                        {currentLocale === 'zh-TW'
+                            ? tNav('language_switch_to_en')
+                            : tNav('language_switch_to_zh')}
+                    </button>
+                </div>
             </header>
             <main style={{ padding: 0, margin: 0, flex: 1 }}>
                 {children}

@@ -61,6 +61,7 @@
         html, body {
             overscroll-behavior-x: none;
             touch-action: pan-y;
+            font-family: 'Source Sans Pro', sans-serif;
         }
 
         .wrapper {

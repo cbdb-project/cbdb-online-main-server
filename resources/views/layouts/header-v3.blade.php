@@ -6,7 +6,7 @@
             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
         </li>
         <li class="nav-item d-none d-sm-inline-block">
-            <a href="/basicinformation" class="nav-link">Home</a>
+            <a href="/basicinformation" class="nav-link">{{ __('common.home') }}</a>
         </li>
     </ul>
 
@@ -82,12 +82,12 @@
                     <!-- Menu Footer-->
                     <li class="user-footer">
                         <div class="float-left">
-                            <a href="{{ route('profile.edit') }}" class="btn btn-default btn-flat">個人設定</a>
+                            <a href="{{ route('profile.edit') }}" class="btn btn-default btn-flat">{{ __('common.profile_settings') }}</a>
                         </div>
                         <div class="float-right">
                             <a href="{{ route('logout') }}"
                                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
-                               class="btn btn-default btn-flat">Sign out</a>
+                               class="btn btn-default btn-flat">{{ __('common.sign_out') }}</a>
                             <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                                 {{ csrf_field() }}
                             </form>

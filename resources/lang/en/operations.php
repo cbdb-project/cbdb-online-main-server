@@ -60,4 +60,5 @@ return [
     'entry_time'            => 'Entry Time',
     'status_label'          => 'Status',
     'person_label'          => 'Person',
+    'editor_placeholder'    => 'Name or ID',
 ];

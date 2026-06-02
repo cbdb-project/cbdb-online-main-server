@@ -59,7 +59,7 @@
                 var editForms = document.querySelectorAll('form:not(#__locale-form)');
                 var dirty = Array.from(editForms).some(function(f) {
                     return Array.from(f.elements).some(function(el) {
-                        if (!el.name || el.name === '_token' || el.name === '_method' || el.type === 'hidden') return false;
+                        if (!el.name || el.name === '_token' || el.name === '_method') return false;
                         // For <select>: compare each option's selected vs defaultSelected
                         if (el.tagName === 'SELECT') {
                             return Array.from(el.options).some(function(opt) {

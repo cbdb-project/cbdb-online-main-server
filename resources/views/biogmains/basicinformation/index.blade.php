@@ -7,10 +7,10 @@
             <div class="d-flex align-items-center mb-3 flex-nowrap">
                 <form method="GET" action="{{ route('basicinformation.index') }}" class="flex-grow-1 mr-2">
                     <div class="input-group w-100">
-                        <input name="q" type="text" class="form-control" placeholder="搜尋人物 (所有 ü 在拼音中我們都以 v 替代)" aria-label="搜尋人物" value="{{ $q }}">
+                        <input name="q" type="text" class="form-control" placeholder="{{ __('biogmains.search_placeholder') }}" aria-label="{{ __('common.search') }}" value="{{ $q }}">
                         @if(!empty($dynastyFacets) && count($dynastyFacets) > 0)
                             <select name="c_dy" class="custom-select" style="max-width: 180px;" onchange="this.form.submit()">
-                                <option value="">全部朝代 ({{ collect($dynastyFacets)->sum('count') }})</option>
+                                <option value="">{{ __('biogmains.all_dynasties_opt') }} ({{ collect($dynastyFacets)->sum('count') }})</option>
                                 @foreach($dynastyFacets as $facet)
                                     <option value="{{ $facet->c_dy }}" {{ (string)($c_dy ?? '') === (string)$facet->c_dy ? 'selected' : '' }}>
                                         {{ $facet->c_dynasty_chn }} ({{ $facet->count }})
@@ -28,7 +28,7 @@
                 @auth
                     @if(Auth::user()->isActive())
                         <a href="{{ route('basicinformation.create') }}" class="btn btn-secondary">
-                            新增
+                            {{ __('common.add') }}
                         </a>
                     @endif
                 @endauth
@@ -37,7 +37,7 @@
             {{-- 人物列表表格 --}}
             <div class="table-responsive table-scroll-x">
                 <table class="table table-hover table-sm">
-                    <caption>共計 {{ $names->total() }} 條記錄</caption>
+                    <caption>{{ __('biogmains.total_records', ['count' => $names->total()]) }}</caption>
                     <thead>
                         <tr>
                             <th>c_personid</th>
@@ -64,14 +64,14 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center">暫無數據</td>
+                                <td colspan="8" class="text-center">{{ __('biogmains.no_data_row') }}</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
 
-            {{-- 分页 --}}
+            {{-- 分頁 --}}
             <div class="float-right">
                 {{ $names->appends(['q' => $q, 'c_dy' => $c_dy ?? ''])->links() }}
             </div>

@@ -3,7 +3,7 @@
 @section('content')
 <div class="card card-default">
     <div class="card-header">
-        <h3 class="card-title">CBDB 內部表維護</h3>
+        <h3 class="card-title">{{ __('admin.table_maint_page_title') }}</h3>
     </div>
     <div class="card-body">
 
@@ -41,19 +41,19 @@
                         </h3>
                     </div>
                     <div class="card-body">
-                        <p><strong>資料表：</strong><code>{{ $tableInfo['name'] }}</code></p>
-                        <p><strong>說明：</strong>{{ $tableInfo['description'] }}</p>
-                        <p><strong>Artisan 命令：</strong><code>{{ $tableInfo['command'] }}</code></p>
+                        <p><strong>{{ __('admin.table_maint_db_table') }}</strong><code>{{ $tableInfo['name'] }}</code></p>
+                        <p><strong>{{ __('admin.table_maint_description') }}</strong>{{ $tableInfo['description'] }}</p>
+                        <p><strong>{{ __('admin.table_maint_artisan_cmd') }}</strong><code>{{ $tableInfo['command'] }}</code></p>
 
                         @if($stats[$tableName]['exists'])
-                            <p><strong>當前記錄數：</strong>
+                            <p><strong>{{ __('admin.table_maint_record_count') }}</strong>
                                 <span class="badge bg-{{ $tableInfo['color'] }}">
-                                    {{ number_format($stats[$tableName]['count']) }} 筆
+                                    {{ number_format($stats[$tableName]['count']) }} {{ __('admin.table_maint_records_unit') }}
                                 </span>
                             </p>
                         @else
-                            <p><strong>狀態：</strong>
-                                <span class="badge badge-warning">資料表不存在</span>
+                            <p><strong>{{ __('admin.table_maint_status') }}</strong>
+                                <span class="badge badge-warning">{{ __('admin.table_maint_table_missing') }}</span>
                             </p>
                         @endif
 
@@ -72,7 +72,7 @@
                                 <div class="checkbox">
                                     <label>
                                         <input type="checkbox" name="truncate" value="1" checked>
-                                        清空後重建
+                                        {{ __('admin.table_maint_truncate_rebuild') }}
                                     </label>
                                 </div>
                             @endif
@@ -83,25 +83,25 @@
                                     <div class="checkbox">
                                         <label>
                                             <input type="checkbox" name="truncate" value="1">
-                                            清空後重建
+                                            {{ __('admin.table_maint_truncate_rebuild') }}
                                         </label>
-                                        <span class="help-block small">不勾選則為增量更新（僅更新指定範圍的記錄）</span>
+                                        <span class="help-block small">{{ __('admin.table_maint_incremental_hint') }}</span>
                                     </div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>人物 ID 範圍（可選）：</label>
+                                    <label>{{ __('admin.table_maint_id_range') }}</label>
                                     <div class="row">
                                         <div class="col-sm-6">
                                             <input type="number" name="id_from" class="form-control"
-                                                   placeholder="起始 ID (含)" min="1">
+                                                   placeholder="{{ __('admin.table_maint_id_from') }}" min="1">
                                         </div>
                                         <div class="col-sm-6">
                                             <input type="number" name="id_to" class="form-control"
-                                                   placeholder="結束 ID (含)" min="1">
+                                                   placeholder="{{ __('admin.table_maint_id_to') }}" min="1">
                                         </div>
                                     </div>
-                                    <span class="help-block small">留空則處理全部人物記錄</span>
+                                    <span class="help-block small">{{ __('admin.table_maint_id_blank_hint') }}</span>
                                 </div>
 
                                 <div class="progress-container name-fts-progress" style="display:none; margin-top:15px;">
@@ -111,16 +111,16 @@
                                             0%
                                         </div>
                                     </div>
-                                    <p class="progress-message text-muted small" style="margin-top:5px;">進度資訊會顯示於此。</p>
+                                    <p class="progress-message text-muted small" style="margin-top:5px;">{{ __('admin.table_maint_progress_placeholder') }}</p>
                                 </div>
                             @endif
 
                             <button type="submit" class="btn btn-{{ $tableInfo['color'] }} rebuild-btn">
-                                <i class="fa fa-refresh"></i> 重建資料表
+                                <i class="fa fa-refresh"></i> {{ __('admin.table_maint_rebuild_btn') }}
                             </button>
 
                             <div class="loading-message" style="display: none; margin-top: 10px;">
-                                <i class="fa fa-spinner fa-spin"></i> 正在重建，請稍候...
+                                <i class="fa fa-spinner fa-spin"></i> {{ __('admin.table_maint_rebuilding') }}
                             </div>
                         </form>
                     </div>
@@ -132,32 +132,30 @@
         {{-- 說明文字 --}}
         <div class="card card-info">
             <div class="card-header">
-                <h3 class="card-title"><i class="fa fa-info-circle"></i> 說明</h3>
+                <h3 class="card-title"><i class="fa fa-info-circle"></i> {{ __('admin.table_maint_info_title') }}</h3>
             </div>
             <div class="card-body">
-                <h4>繁簡映射表 (CBDB__TRAD_SIMP_MAP)</h4>
+                <h4>{{ __('admin.table_maint_trad_simp_h4') }}</h4>
                 <ul>
-                    <li>從 OpenCC 專案下載最新的繁簡對照資料</li>
-                    <li>用於支援繁簡體混合搜尋功能</li>
-                    <li>重建時會清空並重新導入所有映射關係</li>
-                    <li>執行時間僅需數秒，並會直接在頁面顯示結果</li>
+                    <li>{{ __('admin.table_maint_trad_simp_li1') }}</li>
+                    <li>{{ __('admin.table_maint_trad_simp_li2') }}</li>
+                    <li>{{ __('admin.table_maint_trad_simp_li3') }}</li>
+                    <li>{{ __('admin.table_maint_trad_simp_li4') }}</li>
                 </ul>
 
-                <h4>姓名搜尋倒排索引 (CBDB__NAME_FTS)</h4>
+                <h4>{{ __('admin.table_maint_name_fts_h4') }}</h4>
                 <ul>
-                    <li>根據 BIOG_MAIN 和 ALTNAME_DATA 重建姓名搜尋索引</li>
-                    <li>生成所有姓名的後綴索引（包含繁簡體變體）</li>
-                    <li>用於快速姓名搜尋功能</li>
-                    <li><strong>清空模式：</strong>清空並重新生成所有索引記錄（預設勾選）</li>
-                    <li><strong>增量模式：</strong>不勾選清空，僅更新指定 ID 範圍的記錄</li>
-                    <li><strong>ID 範圍：</strong>可指定 c_personid 的起始和結束範圍，留空則處理全部</li>
-                    <li>執行時間：全量重建約 5-10 分鐘，系統會顯示進度條並自動刷新狀態；增量更新視範圍而定</li>
+                    <li>{{ __('admin.table_maint_name_fts_li1') }}</li>
+                    <li>{{ __('admin.table_maint_name_fts_li2') }}</li>
+                    <li>{{ __('admin.table_maint_name_fts_li3') }}</li>
+                    <li>{!! __('admin.table_maint_name_fts_li4') !!}</li>
+                    <li>{!! __('admin.table_maint_name_fts_li5') !!}</li>
+                    <li>{!! __('admin.table_maint_name_fts_li6') !!}</li>
+                    <li>{{ __('admin.table_maint_name_fts_li7') }}</li>
                 </ul>
 
                 <p class="text-danger">
-                    <strong>注意：</strong>
-                    重建操作會清空目標資料表並重新生成所有資料。
-                    請在系統使用量較低時執行此操作，以避免影響正常服務。
+                    {!! __('admin.table_maint_danger_note') !!}
                 </p>
             </div>
         </div>
@@ -194,6 +192,22 @@
 @section('js')
 <script>
 onViteReady(function() {
+    var msgConfirm = {!! Js::from(__('admin.table_maint_js_confirm')) !!};
+    var msgProcessing = {!! Js::from(__('admin.table_maint_js_processing')) !!};
+    var msgSuccess = {!! Js::from(__('admin.table_maint_js_success')) !!};
+    var msgFailed = {!! Js::from(__('admin.table_maint_js_failed')) !!};
+    var msgTimeout = {!! Js::from(__('admin.table_maint_js_timeout')) !!};
+    var msgNetwork = {!! Js::from(__('admin.table_maint_js_network')) !!};
+    var msgServerError = {!! Js::from(__('admin.table_maint_js_server_error')) !!};
+    var msgErrorPrefix = {!! Js::from(__('admin.table_maint_js_error_prefix')) !!};
+    var msgNoProgressUrl = {!! Js::from(__('admin.table_maint_js_no_progress_url')) !!};
+    var msgScheduled = {!! Js::from(__('admin.table_maint_js_scheduled')) !!};
+    var msgRebuildDone = {!! Js::from(__('admin.table_maint_js_rebuild_done')) !!};
+    var msgIndexDone = {!! Js::from(__('admin.table_maint_js_index_done')) !!};
+    var msgCheckLogs = {!! Js::from(__('admin.table_maint_js_check_logs')) !!};
+    var msgProgressFail = {!! Js::from(__('admin.table_maint_js_progress_fail')) !!};
+    var msgProgressError = {!! Js::from(__('admin.table_maint_js_progress_error')) !!};
+
     var progressPollers = {};
     var PROGRESS_POLL_INTERVAL = 5000;
 
@@ -206,11 +220,11 @@ onViteReady(function() {
         var tableName = $form.data('table-name');
         var originalBtnHtml = $btn.html();
 
-        if (!confirm('確定要重建「' + tableName + '」嗎？\n\n此操作將清空資料表並重新生成所有資料，可能需要數分鐘時間。')) {
+        if (!confirm(msgConfirm.replace(':name', tableName))) {
             return false;
         }
 
-        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 處理中...');
+        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> ' + msgProcessing);
         $loadingMsg.show();
 
         $.ajax({
@@ -223,26 +237,26 @@ onViteReady(function() {
                 if (response.success && response.task_id) {
                     startNameFtsProgress($form, response.task_id, response.message, originalBtnHtml, $btn, $loadingMsg);
                 } else if (response.success) {
-                    alert('重建成功！\n\n' + response.message);
+                    alert(msgSuccess + response.message);
                     location.reload();
                 } else {
-                    alert('重建失敗：\n\n' + response.message);
+                    alert(msgFailed + response.message);
                     resetButton($btn, $loadingMsg, originalBtnHtml);
                 }
             },
             error: function(xhr, status, error) {
-                var errorMsg = '重建失敗';
+                var errorMsg = msgFailed.trim();
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     errorMsg = xhr.responseJSON.message;
                 } else if (status === 'timeout') {
-                    errorMsg = '請求超時，但任務可能仍在後台執行。請稍後刷新頁面查看結果。';
+                    errorMsg = msgTimeout;
                 } else if (xhr.status === 0) {
-                    errorMsg = '網路連接失敗';
+                    errorMsg = msgNetwork;
                 } else {
-                    errorMsg = '服務器錯誤 (' + xhr.status + ')';
+                    errorMsg = msgServerError.replace(':status', xhr.status);
                 }
 
-                alert('錯誤：' + errorMsg);
+                alert(msgErrorPrefix + errorMsg);
                 resetButton($btn, $loadingMsg, originalBtnHtml);
             }
         });
@@ -256,7 +270,7 @@ onViteReady(function() {
     function startNameFtsProgress($form, taskId, initialMessage, originalBtnHtml, $btn, $loadingMsg) {
         var template = $form.data('progress-url-template');
         if (!template) {
-            alert('未配置進度查詢 URL。');
+            alert(msgNoProgressUrl);
             resetButton($btn, $loadingMsg, originalBtnHtml);
             return;
         }
@@ -268,7 +282,7 @@ onViteReady(function() {
 
         $container.show();
         updateProgressBar($bar, 5);
-        $message.text(initialMessage || '已排程等待執行…');
+        $message.text(initialMessage || msgScheduled);
 
         var poll = function() {
             $.ajax({
@@ -278,7 +292,7 @@ onViteReady(function() {
                 cache: false,
                 success: function(resp) {
                     if (!resp.success) {
-                        handleProgressError(resp.message || '未知錯誤');
+                        handleProgressError(resp.message || msgCheckLogs);
                         return;
                     }
 
@@ -293,9 +307,9 @@ onViteReady(function() {
                             clearInterval(progressPollers[taskId]);
                             delete progressPollers[taskId];
                         }
-                        $message.text(progress.message || '重建完成！');
+                        $message.text(progress.message || msgRebuildDone);
                         setTimeout(function() {
-                            alert('重建成功！\n\n' + (progress.message || '索引已完成重建。'));
+                            alert(msgSuccess + (progress.message || msgIndexDone));
                             location.reload();
                         }, 500);
                     } else if (progress.status === 'error') {
@@ -303,12 +317,12 @@ onViteReady(function() {
                             clearInterval(progressPollers[taskId]);
                             delete progressPollers[taskId];
                         }
-                        alert('重建失敗：\n\n' + (progress.message || '請查看日誌'));
+                        alert(msgFailed + (progress.message || msgCheckLogs));
                         resetButton($btn, $loadingMsg, originalBtnHtml);
                     }
                 },
                 error: function() {
-                    handleProgressError('無法取得重建進度，請稍後再試。');
+                    handleProgressError(msgProgressFail);
                 }
             });
         };
@@ -318,7 +332,7 @@ onViteReady(function() {
                 clearInterval(progressPollers[taskId]);
                 delete progressPollers[taskId];
             }
-            alert('進度查詢失敗：\n\n' + message);
+            alert(msgProgressError + message);
             resetButton($btn, $loadingMsg, originalBtnHtml);
         };
 

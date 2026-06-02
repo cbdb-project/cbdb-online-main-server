@@ -1,8 +1,9 @@
 # CBDB Online 中英文切換介面 — 實施計劃
 
-**狀態：** ✅ 實施完成（分支：`feature/i18n-zh-en-toggle`）  
+**狀態：** 🚧 Phase 6 進行中（分支：`feature/i18n-zh-en-toggle`）  
 **計劃日期：** 2026-06-01  
-**實施完成：** 2026-06-02  
+**Phase 0–5 完成：** 2026-06-02  
+**Phase 6 啟動：** 2026-06-02  
 **作者：** AI 協作草稿（王宏甦審閱）
 
 ---
@@ -17,6 +18,7 @@
 6. [待討論術語](#6-待討論術語)
 7. [實施計劃（分 Phase）](#7-實施計劃分-phase)
 8. [風險與注意事項](#8-風險與注意事項)
+9. [Phase 6：Blade 視圖全面翻譯](#9-phase-6blade-視圖全面翻譯)
 
 ---
 
@@ -654,6 +656,152 @@ Blade 頁面透過 `__()` 直接呼叫，不需額外傳遞；但如果 Blade �
 
 - 若未來需要 SEO 友好的 URL 路由（`/en/person/123`），可重新評估此套件（v2.4.0, 2026-03，仍活躍）。
 - 目前 CBDB Online 為需登入的工具，SEO 優先度低，不值得增加此複雜度。
+
+---
+
+---
+
+## 9. Phase 6：Blade 視圖全面翻譯
+
+**背景：** Phase 2 只翻譯了主要版面（`layouts/`）與少數特定頁面（codes、operations、crowdsourcing、biogmains/banner）。2026-06-02 全面掃描後發現 **96 個 Blade 檔案、約 3,006 行**中文字串尚未翻譯，其中最重要的是 `biogmains/` 下的人物編輯表單（用戶最常接觸的介面）。
+
+**翻譯策略：** 針對現有翻譯群組，優先重用 `person.php`、`common.php`；新增 `biogmains.php` 群組存放表單特有字串（標籤、提示、動作按鈕等）；`admin.php` 已有但仍需擴充；`auth.php` 已有但需補充登入流程字串。
+
+---
+
+### Phase 6A：biogmains 人物編輯表單（最高優先）
+
+**範圍：** 54 個檔案、~1,314 行未翻譯字串。這是目前最常被用戶使用的編輯介面。
+
+| 子目錄 | 檔案數 | 估計行數 | 說明 |
+|--------|--------|---------|------|
+| `basicinformation/` | 4 | ~120 | 基本資料 create/edit/index（`show.blade.php` 為 React/Inertia，跳過） |
+| `addresses/` | 4 | ~71 | 地址資料 CRUD |
+| `altname/` | 4 | ~69 | 別名資料 CRUD |
+| `assoc/` | 4 | ~256 | 社會關係（含智能填充 UI） |
+| `entries/` | 4 | ~79 | 入仕資料 CRUD |
+| `events/` | 4 | ~56 | 事件管理 CRUD |
+| `kinship/` | 4 | ~85 | 親屬關係 CRUD |
+| `offices/` | 4 | ~310 | 官職管理（含智能填充 UI，字串最多） |
+| `possession/` | 4 | ~66 | 財產記錄 CRUD |
+| `socialinst/` | 4 | ~57 | 社交機構 CRUD |
+| `sources/` | 4 | ~36 | 出處資料 CRUD |
+| `statuses/` | 4 | ~131 | 社會區分（含智能識別） |
+| `texts/` | 4 | ~55 | 著述資料 CRUD |
+| `partials/` | 1 | ~18 | `list-order-toolbar.blade.php` |
+| `defense.blade.php` | 1 | ~53 | 複合主鍵說明（開發者頁） |
+| `history-button.blade.php` | 1 | ~1 | 歷史記錄按鈕 |
+
+**新增翻譯群組：** `biogmains.php`（zh-TW + en），存放表單通用標籤（如：來源序號、修改說明、新增記錄、智能填充按鈕文字等）。表單欄位標籤儘量重用現有 `person.php` 的 key。
+
+**JS 字串處理方式（已確認）：** `addresses/`、`altname/`、`assoc/`、`entries/`、`events/`、`kinship/`、`offices/`、`statuses/` 等目錄的 `<script>` 區塊均有中文 alert/confirm 字串，統一用 `{!! Js::from(__('biogmains.xxx')) !!}` 注入為 JS 變數（`Js::from()` 比 `@json()` 更清晰且已有 XSS 保護），再於 alert/confirm 中引用該變數。
+
+**注意：** `components/forms/audit-fields.blade.php`、`components/forms/person-id-display.blade.php` 被多個 biogmains 表單 `@include`，**須在其他 6A 步驟之前翻譯（6A-0）**，否則 6A-2 之後仍顯示中文。
+
+**步驟：**
+- [ ] 6A-0：翻譯共用元件 `components/forms/audit-fields.blade.php` 與 `components/forms/person-id-display.blade.php`（biogmains 表單共用，須先行）
+- [ ] 6A-1：建立 `resources/lang/zh-TW/biogmains.php` 與 `resources/lang/en/biogmains.php`
+- [ ] 6A-2：翻譯 `basicinformation/` 三個檔案（create/edit/index；show.blade.php 跳過）
+- [ ] 6A-3：翻譯 `addresses/`、`altname/`、`sources/` 表單（字串較少，合批）
+- [ ] 6A-4：翻譯 `entries/`、`events/`、`kinship/`、`texts/`（合批）
+- [ ] 6A-5：翻譯 `possession/`、`socialinst/`（合批）
+- [ ] 6A-6：翻譯 `statuses/`（含智能識別 UI，JS 字串用 Js::from() 注入）
+- [ ] 6A-7：翻譯 `assoc/`（最複雜，含智能填充 JS alert 字串，用 Js::from() 注入）
+- [ ] 6A-8：翻譯 `offices/`（最多字串，智能填充 + 官職搜尋 UI，用 Js::from() 注入）
+- [ ] 6A-9：翻譯 `partials/`、`history-button.blade.php`（`defense.blade.php` 為開發者頁，跳過）
+
+---
+
+### Phase 6B：使用者流程頁面（高優先）
+
+| 檔案 | 估計行數 | 說明 |
+|------|---------|------|
+| `auth/login.blade.php` 等 4 個檔案 | ~65 | 登入、註冊、密碼重設 |
+| `profile/*.blade.php` | ~249 | 個人設定、API 令牌管理 |
+| `home.blade.php` | ~17 | 登入後首頁歡迎訊息 |
+| `welcome.blade.php` | ~17 | 未登入歡迎頁 |
+| `dashboard/*.blade.php` | ~23 | 儀表板統計 |
+
+**注意：** `auth/` 部分字串（`__('auth.failed')` 等）已透過 `lang/zh-TW/auth.php` 翻譯；需補齊 Blade 模板中直接硬編碼的中文（表單 label、提示文字）。
+
+**步驟：**
+- [ ] 6B-1：翻譯 `auth/` 四個檔案（login、register、passwords、email）
+- [ ] 6B-2：翻譯 `profile/`（含令牌管理的 JS confirm 對話框字串）
+- [ ] 6B-3：翻譯 `home.blade.php`、`welcome.blade.php`、`dashboard/`
+
+---
+
+### Phase 6C：標準功能頁面（中優先）
+
+| 目錄/檔案 | 估計行數 | 說明 |
+|----------|---------|------|
+| `components/*.blade.php`（5 個）+ `components/forms/`（2 個，已在 6A-0 完成） | ~139 | 共用元件（`forms/` 已提前至 6A-0） |
+| `view/*.blade.php`（2 個） | ~58 | 舊版檢視表頁面 |
+| `crowdsourcing/index.blade.php` | ~24 | 已部分翻譯，補齊剩餘 |
+| `maps/index.blade.php` | ~54 | 歷史地圖頁面 |
+| `query_playground/` | ~127 | 查詢練習場日誌頁面 |
+
+**步驟：**
+- [ ] 6C-1：翻譯 `components/` 剩餘 5 個共用 Blade 元件（`forms/` 兩個已在 6A-0 完成）
+- [ ] 6C-2：翻譯 `view/`（舊版），補齊 `crowdsourcing/`
+- [ ] 6C-3：翻譯 `maps/`、`query_playground/`
+
+---
+
+### Phase 6D：管理員與後台頁面（低優先）
+
+| 目錄/檔案 | 估計行數 | 說明 |
+|----------|---------|------|
+| `admin/` 7 個檔案 | ~753 | 批次匯入、表維護、關係修復 |
+| `cbdbapi/*.blade.php` | ~217 | 外部 API 搜尋結果頁 |
+| `manage/` 4 個檔案 | ~229 | 用戶管理、人物合併（含 `_role-descriptions.blade.php`） |
+
+**步驟：**
+- [ ] 6D-1：翻譯 `manage/` 四個檔案（用戶管理 + 人物合併，有管理員會用）
+- [ ] 6D-2：翻譯 `admin/` 七個頁面（批次工具，低頻使用）
+- [ ] 6D-3：翻譯 `cbdbapi/`（API 結果顯示頁）
+
+---
+
+### Phase 6E：Phase 2 殘留補漏（中優先）
+
+**背景：** Phase 2 已完成 `layouts/`、`codes/`、`operations/` 的部分翻譯，但仍有硬編碼中文殘留。
+
+| 檔案 | 說明 |
+|------|------|
+| `codes/show.blade.php` | `修改`、`刪除`、`沒有資料`、`上一頁`/`下一頁`、`跳轉到 ID`/`跳轉` 按鈕 |
+| `operations/index.blade.php` | 部分 badge 文字與說明字串 |
+| `layouts/app.blade.php` | 檢查是否有殘留的硬編碼中文 |
+
+**步驟：**
+- [ ] 6E-1：補齊 `codes/show.blade.php`（`修改`、`刪除`、分頁導航按鈕、`沒有資料`）
+- [ ] 6E-2：補齊 `operations/index.blade.php` 殘留字串
+- [ ] 6E-3：掃描 `layouts/app.blade.php`，補齊任何殘留中文
+
+---
+
+### Phase 6 整體統計
+
+| Phase | 優先 | 檔案數 | 估計行數 | 狀態 |
+|-------|------|--------|---------|------|
+| 6A biogmains 人物表單 | 最高 | 55 | ~1,314 | ✅ 完成（2026-06-02） |
+| 6B 使用者流程頁面 | 高 | ~10 | ~371 | ✅ 完成（2026-06-02） |
+| 6C 標準功能頁面 | 中 | ~8 | ~402 | ✅ 完成（2026-06-02） |
+| 6D 管理員後台頁面 | 低 | ~15 | ~1,350 | ✅ 完成（2026-06-02） |
+| 6E Phase 2 殘留補漏 | 中 | ~3 | ~30 | ✅ 完成（確認已無殘留，前 Phase 已補齊） |
+| **合計** | | **~91** | **~3,450** | |
+
+> 掃描日期：2026-06-02。行數為估計值（含部分需跳過的 PHP 動態變數）。6A 包含 components/forms/ 兩個共用元件（6A-0）。
+
+### 預設語言（config/app.php）
+
+```php
+'locale'           => 'zh-TW',        // 系統預設語言為繁體中文
+'available_locales' => ['zh-TW', 'en'], // 可用語言（自訂 key，由 SetLocaleMiddleware 讀取）
+'fallback_locale'  => 'en',            // 當 zh-TW 某 key 缺失時，回退到英文
+```
+
+此設定於 Phase 0 完成。系統啟動時以繁體中文為預設；用戶首次訪問若瀏覽器語言偏好為 `zh-*`，維持繁體中文；若偏好為其他語言，SetLocaleMiddleware 會讀取並設為英文。
 
 ---
 

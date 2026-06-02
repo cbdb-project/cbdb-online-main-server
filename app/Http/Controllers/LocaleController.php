@@ -7,10 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Validation\Rule;
 
-class LocaleController extends Controller
-{
-    public function switch(Request $request): RedirectResponse
-    {
+class LocaleController extends Controller {
+    public function switch(Request $request): RedirectResponse {
         $available = config('app.available_locales', ['zh-TW', 'en']);
 
         $request->validate([

@@ -18,13 +18,13 @@
             <div class="text-center mb-4">
                 <a href="/home" class="text-decoration-none text-dark">
                     <div class="h4 mb-1">{{ config('app.name', 'Laravel') }}</div>
-                    <small class="text-muted">重設密碼 · Reset password</small>
+                    <small class="text-muted">{{ __('common.reset_password_subtitle') }}</small>
                 </a>
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h1 class="h5 text-center mb-4">發送重設連結 / Send reset link</h1>
+                    <h1 class="h5 text-center mb-4">{{ __('common.send_reset_link_title') }}</h1>
 
                     @if (session('status'))
                         <div class="alert alert-success" role="alert">
@@ -36,8 +36,8 @@
                         {{ csrf_field() }}
 
                         <div class="form-group mb-3">
-                            <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
-                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ old('email') }}" placeholder="name@example.com / 電子郵件" required autofocus>
+                            <label for="email" class="form-label small text-muted">{{ __('common.email') }}</label>
+                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ old('email') }}" placeholder="name@example.com" required autofocus>
                             @if ($errors->has('email'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('email') }}
@@ -45,11 +45,11 @@
                             @endif
                         </div>
 
-                        <button type="submit" class="btn btn-primary btn-block">寄出重設連結 / Send link</button>
+                        <button type="submit" class="btn btn-primary btn-block">{{ __('common.send_reset_link_btn') }}</button>
                     </form>
                 </div>
                 <div class="card-footer text-center bg-white">
-                    <a href="{{ route('login') }}" class="small">返回登入 / Back to login</a>
+                    <a href="{{ route('login') }}" class="small">{{ __('common.back_to_login') }}</a>
                 </div>
             </div>
         </div>

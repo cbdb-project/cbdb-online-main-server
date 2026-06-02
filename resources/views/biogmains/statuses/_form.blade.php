@@ -30,43 +30,43 @@
         <div class="card card-info mb-3" id="ai-code-lookup-section">
             <div class="card-header d-flex align-items-center">
                 <h3 class="card-title mb-0">
-                    <i class="fas fa-magic"></i> AI 智能識別社會區分類別代碼
+                    <i class="fas fa-magic"></i> {{ __('biogmains.ai_status_recognition') }}
                 </h3>
                 <a class="ml-3 text-white" style="font-size: 0.85em; opacity: 0.85; cursor: pointer;"
                    data-toggle="collapse" href="#ai-code-privacy-notice" role="button" aria-expanded="false">
-                    <i class="fas fa-exclamation-triangle"></i> 重要提示：數據收集與第三方服務
+                    <i class="fas fa-exclamation-triangle"></i> {{ __('biogmains.ai_notice_title') }}
                 </a>
             </div>
             <div class="collapse" id="ai-code-privacy-notice">
                 <div class="alert alert-warning mb-0 rounded-0 border-left-0 border-right-0" style="font-size: 0.9em;">
-                    <p class="mb-2">使用智能識別功能即表示您理解並同意：</p>
+                    <p class="mb-2">{{ __('biogmains.ai_consent_intro') }}</p>
                     <ul class="mb-0">
-                        <li>您輸入的文本及 AI 識別結果將被記錄用於研究與改進</li>
-                        <li>您的文本將發送至第三方 AI 服務進行處理</li>
-                        <li>AI 識別結果僅供參考，請務必核實後再提交</li>
+                        <li>{{ __('biogmains.ai_consent_record') }}</li>
+                        <li>{{ __('biogmains.ai_consent_third_party') }}</li>
+                        <li>{{ __('biogmains.ai_consent_verify') }}</li>
                     </ul>
-                    <p class="mb-0 mt-2">當前使用模型：<code>{{ config('services.gemini.model') }}</code></p>
+                    <p class="mb-0 mt-2">{{ __('biogmains.ai_current_model') }}<code>{{ config('services.gemini.model') }}</code></p>
                 </div>
             </div>
             <div class="card-body">
                 <div class="form-group">
-                    <label for="ai-code-query">輸入描述（AI 將從 STATUS_CODES 中識別相關代碼）</label>
+                    <label for="ai-code-query">{{ __('biogmains.ai_enter_description') }}</label>
                     <textarea class="form-control" id="ai-code-query" rows="3"
-                              placeholder="例如：通醫學"></textarea>
-                    <small class="form-text text-muted">AI 會語義理解您的描述，從社會區分類別代碼表中找出最相關的代碼</small>
+                              placeholder="{{ __('biogmains.ai_input_placeholder_status') }}"></textarea>
+                    <small class="form-text text-muted">{{ __('biogmains.ai_description_hint_status') }}</small>
                 </div>
                 <button type="button" class="btn btn-info" id="btn-ai-code-lookup">
-                    <i class="fas fa-bolt"></i> AI 智能識別
+                    <i class="fas fa-bolt"></i> {{ __('biogmains.ai_recognize_btn') }}
                 </button>
                 <span class="ml-3" id="ai-code-status"></span>
 
                 {{-- 候選結果區 --}}
                 <div id="ai-code-results" style="display:none;" class="mt-3">
-                    <h6><i class="fas fa-check-circle text-success"></i> 候選代碼（點擊填入表單）</h6>
+                    <h6><i class="fas fa-check-circle text-success"></i> {{ __('biogmains.ai_candidate_codes') }}</h6>
                     <div id="ai-code-candidates" class="mb-3"></div>
 
                     <div id="ai-code-not-found" style="display:none;">
-                        <h6 class="text-warning"><i class="fas fa-exclamation-triangle"></i> 表中未找到對應的概念</h6>
+                        <h6 class="text-warning"><i class="fas fa-exclamation-triangle"></i> {{ __('biogmains.ai_no_match') }}</h6>
                         <div id="ai-code-not-found-list"></div>
                     </div>
 
@@ -77,14 +77,14 @@
     @endif
 
     <div class="form-group row">
-        <label for="c_sequence" class="col-sm-2 col-form-label">次序(c_sequence)</label>
+        <label for="c_sequence" class="col-sm-2 col-form-label">{{ __('biogmains.sequence') }} (c_sequence)</label>
         <div class="col-sm-10">
             <input type="text" class="form-control" name="c_sequence" maxlength="4" value="{{ $isEdit ? $row->c_sequence : '0' }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="" class="col-sm-2 col-form-label">社會區分(c_status_code)</label>
+        <label for="" class="col-sm-2 col-form-label">{{ __('person.status') }} (c_status_code)</label>
         <div class="col-sm-10">
             <select class="form-control c_status_code" name="c_status_code">
                 @if($isEdit && isset($res['statuse_str']))
@@ -97,15 +97,14 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_supplement" class="col-sm-2 col-form-label">補充文字(c_supplement)</label>
+        <label for="c_supplement" class="col-sm-2 col-form-label">{{ __('biogmains.supplement_text') }} (c_supplement)</label>
         <div class="col-sm-10">
-            <input type="text" class="form-control" name="c_supplement" value="{{ $isEdit ? $row->c_supplement : '' }}">
-            請補充 "並稱/齊名" 的稱號 , 如「東南三賢」,「四俊」等
+            <input type="text" class="form-control" name="c_supplement" value="{{ $isEdit ? $row->c_supplement : '' }}" placeholder="{{ __('biogmains.supplement_placeholder') }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_firstyear" class="col-sm-2 col-form-label">始年(c_firstyear)</label>
+        <label for="c_firstyear" class="col-sm-2 col-form-label">{{ __('biogmains.start_year') }} (c_firstyear)</label>
         <x-inline-time-fields
             yearName="c_firstyear"
             :yearValue="$isEdit ? $row->c_firstyear : ''"
@@ -119,7 +118,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_lastyear" class="col-sm-2 col-form-label">終年(c_lastyear)</label>
+        <label for="c_lastyear" class="col-sm-2 col-form-label">{{ __('biogmains.end_year') }} (c_lastyear)</label>
         <x-inline-time-fields
             yearName="c_lastyear"
             :yearValue="$isEdit ? $row->c_lastyear : ''"
@@ -133,7 +132,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
+        <label for="" class="col-sm-2 col-form-label">{{ __('biogmains.source_field') }} (c_source)</label>
         <div class="col-sm-10">
             <select class="form-control c_source" name="c_source" id="c_source">
                 @if($isEdit && isset($res['text_str']))
@@ -146,14 +145,14 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
+        <label for="c_pages" class="col-sm-2 col-form-label">{{ __('biogmains.pages_entries') }}</label>
         <div class="col-sm-4">
             <input type="text" class="form-control" name="c_pages" value="{{ $isEdit ? $row->c_pages : '' }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">{{ __('biogmains.notes_field') }} (c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
@@ -161,10 +160,10 @@
     </div>
 
     <div class="form-group row">
-        <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
+        <label for="textperson_pair" class="col-sm-2 col-form-label">{{ __('biogmains.candidate_source_title') }}</label>
         <div class="col-sm-10">
             <select class="form-control textperson_pair" name="">
-                <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
+                <option value="">{{ __('biogmains.candidate_source_hint') }}</option>
             </select>
         </div>
     </div>
@@ -178,31 +177,29 @@
     />
 
     <div class="form-group row">
-        <label for="__proposal_comment" class="col-sm-2 col-form-label">修改說明 / 提案理由</label>
+        <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('biogmains.modification_note_label') }}</label>
         <div class="col-sm-10">
-            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）"></textarea>
-            <small class="text-muted">此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。</small>
+            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="{{ __('biogmains.modification_note_placeholder') }}"></textarea>
+            <small class="text-muted">{{ __('biogmains.modification_note_hint') }}</small>
         </div>
     </div>
 
     <div class="form-group row">
         <div class="offset-sm-2 col-sm-10">
             @if(Auth::check() && Auth::user()->isActive())
-                <!-- 直接儲存按鈕（非眾包用戶可見） -->
                 @if(Auth::user()->canWriteDirectly())
                     <button type="submit" name="action" value="save" class="btn btn-primary">
-                        <i class="fa fa-save"></i> 直接儲存
+                        <i class="fa fa-save"></i> {{ __('biogmains.save_directly') }}
                     </button>
                 @endif
 
-                <!-- 提交提案按鈕（所有活躍用戶可見） -->
                 <button type="submit" name="action" value="proposal" class="btn btn-info">
-                    <i class="fa fa-paper-plane"></i> 提交提案
+                    <i class="fa fa-paper-plane"></i> {{ __('biogmains.submit_proposal') }}
                 </button>
             @endif
 
             <a href="{{ route('basicinformation.statuses.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
-                <i class="fa fa-times"></i> 取消
+                <i class="fa fa-times"></i> {{ __('common.cancel') }}
             </a>
         </div>
     </div>
@@ -212,6 +209,13 @@
     <script>
 
     onViteReady(function() {
+        var updateSourceSuccess = {!! Js::from(__('biogmains.update_source_success')) !!};
+        var pleaseFillSource = {!! Js::from(__('biogmains.please_fill_source')) !!};
+        var aiEnterDescription = {!! Js::from(__('biogmains.ai_enter_description')) !!};
+        var aiProcessing = {!! Js::from(__('biogmains.ai_processing')) !!};
+        var aiRecognitionFailed = {!! Js::from(__('biogmains.ai_recognition_failed')) !!};
+        var aiNoMatch = {!! Js::from(__('biogmains.ai_no_match')) !!};
+
         $(".select2").select2();
         textperson_pair_first_load();
 
@@ -221,16 +225,13 @@
 
         function textperson_pair_first_load(){
             let person_id = $('.person_id').val();
-            //console.log(person_id);
             let data = [{
                 id: 0,
-                text: '請填寫[人物 >> 出處]'
+                text: pleaseFillSource
             }];
             $.get('/api/select/search/textperson', {q: person_id}, function (data, textStatus){
-                //console.log(data);
                 for (let i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    //console.log(item);
                     $(".textperson_pair").append(new Option(item['text'], item['value']));
                 }
             });
@@ -238,24 +239,20 @@
 
         $(".textperson_pair").change(function(){
             var hasValue = $(".textperson_pair").val();
-            //console.log(hasValue);
             var textperson_value = hasValue.split("&and&");
             $.get('/api/select/search/text', {q: textperson_value[0]}, function (data, textStatus){
-                //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
                     console.log(item);
                     var textperson_text = item['text'];
                 }
-                //console.log(textperson_value);
-                /*在這裡添加錄入表單更新的欄位與資料*/
                 $("select[name='c_source'] option[selected]").val(textperson_value[0]);
                 $("select[name='c_source']").val(textperson_value[0]);
                 $("#select2-c_source-container").text(textperson_text);
                 $("#select2-c_source-container").css("background","#FFFFBB");
                 $("input[name='c_pages']").val(textperson_value[1]);
                 $("input[name='c_pages']").css("background","#FFFFBB");
-                alert('更新[出處]與[頁數/條目]成功');
+                alert(updateSourceSuccess);
             });
         });
 
@@ -264,14 +261,14 @@
         $('#btn-ai-code-lookup').on('click', function() {
             var query = $('#ai-code-query').val().trim();
             if (!query) {
-                alert('請輸入描述文字');
+                alert(aiEnterDescription);
                 return;
             }
 
             var $btn = $(this);
             var $status = $('#ai-code-status');
             $btn.prop('disabled', true);
-            $status.html('<i class="fas fa-spinner fa-spin"></i> AI 識別中，請稍候...');
+            $status.html('<i class="fas fa-spinner fa-spin"></i> ' + aiProcessing);
             $('#ai-code-results').hide();
 
             $.ajax({
@@ -295,7 +292,7 @@
                 },
                 error: function(xhr) {
                     $btn.prop('disabled', false);
-                    var msg = (xhr.responseJSON && xhr.responseJSON.error) || '識別失敗';
+                    var msg = (xhr.responseJSON && xhr.responseJSON.error) || aiRecognitionFailed;
                     $status.html('<span class="text-danger"><i class="fas fa-times-circle"></i> ' + msg + '</span>');
                 }
             });
@@ -311,7 +308,6 @@
             $candidates.empty();
             $notFoundList.empty();
 
-            // 渲染候選代碼按鈕
             if (data.matched_codes && data.matched_codes.length > 0) {
                 data.matched_codes.forEach(function(code) {
                     var btnClass = code.relevance === '高' ? 'btn-success' : (code.relevance === '中' ? 'btn-warning' : 'btn-secondary');
@@ -325,10 +321,9 @@
                     $candidates.append($btn);
                 });
             } else {
-                $candidates.html('<span class="text-muted">未找到匹配的代碼</span>');
+                $candidates.html('<span class="text-muted">' + aiNoMatch + '</span>');
             }
 
-            // 渲染未找到的概念
             if (data.not_found && data.not_found.length > 0) {
                 $notFoundList.html(data.not_found.map(function(item) {
                     return '<span class="badge badge-light mr-1">' + item + '</span>';
@@ -338,7 +333,6 @@
                 $notFound.hide();
             }
 
-            // 渲染總結
             if (data.summary) {
                 $summary.text(data.summary).show();
             } else {
@@ -349,16 +343,13 @@
         }
 
         function applyStatusCode(code) {
-            // 填入 c_status_code
             var $select = $('select.c_status_code');
             $select.empty();
             $select.append(new Option(code.code_id + ' ' + code.desc_chn + ' ' + code.desc_en, code.code_id, true, true));
             $select.trigger('change');
 
-            // 標記已填充
             $select.closest('.form-group').find('label').css('color', '#28a745');
 
-            // 滾動到 c_status_code 欄位
             $('html, body').animate({
                 scrollTop: $select.closest('.form-group').offset().top - 100
             }, 300);

@@ -5,7 +5,7 @@
     @if($inactiveUsers->isNotEmpty())
     <div class="card card-warning card-outline mb-4">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-user-clock mr-1"></i>近 7 天未激活用戶（{{ $inactiveUsers->count() }}）</h3>
+            <h3 class="card-title"><i class="fas fa-user-clock mr-1"></i>{{ __('admin.manage_inactive_users_title', ['count' => $inactiveUsers->count()]) }}</h3>
             <div class="card-tools">
                 <button type="button" class="btn btn-tool" data-card-widget="collapse">
                     <i class="fas fa-minus"></i>
@@ -21,9 +21,9 @@
                         <th>Name</th>
                         <th>Email</th>
                         <th>Institution</th>
-                        <th>是否通過審核</th>
-                        <th>用戶角色</th>
-                        <th style="width: 120px">操作</th>
+                        <th>{{ __('admin.manage_approved_col') }}</th>
+                        <th>{{ __('admin.manage_role_col') }}</th>
+                        <th style="width: 120px">{{ __('admin.manage_actions_col') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -33,11 +33,11 @@
                             <td>{{ $inactiveUser->name }}</td>
                             <td>{{ $inactiveUser->email }}</td>
                             <td>{{ $inactiveUser->institution }}</td>
-                            <td><span class="badge badge-warning">未激活</span></td>
+                            <td><span class="badge badge-warning">{{ __('admin.manage_not_activated') }}</span></td>
                             <td><span class="badge badge-primary">{{ $inactiveUser->getRoleName() }}</span></td>
                             <td>
                                 <a class="btn btn-sm btn-primary" href="{{ route('manage.edit', $inactiveUser->id) }}">
-                                    <i class="fa fa-edit"></i> 編輯
+                                    <i class="fa fa-edit"></i> {{ __('common.edit') }}
                                 </a>
                             </td>
                         </tr>
@@ -51,20 +51,20 @@
 
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">用戶管理</h3>
+            <h3 class="card-title">{{ __('nav.user_management') }}</h3>
             <div class="card-tools">
                 <form method="GET" action="{{ route('manage.index', [], false) }}" class="form-inline">
                     <input type="hidden" name="sort_by" value="{{ request('sort_by', 'id') }}">
                     <input type="hidden" name="sort_order" value="{{ request('sort_order', 'asc') }}">
                     <input type="hidden" name="per_page" value="{{ request('per_page', 50) }}">
                     <input type="text" name="search" class="form-control form-control-sm"
-                           placeholder="搜尋姓名/郵箱/機構" value="{{ request('search') }}" style="width: 200px;">
+                           placeholder="{{ __('admin.manage_search_placeholder') }}" value="{{ request('search') }}" style="width: 200px;">
                     <button type="submit" class="btn btn-sm btn-primary ml-2">
-                        <i class="fa fa-search"></i> 搜尋
+                        <i class="fa fa-search"></i> {{ __('common.search') }}
                     </button>
                     @if(request('search'))
                         <a href="{{ route('manage.index', [], false) }}" class="btn btn-sm btn-secondary ml-1">
-                            <i class="fa fa-times"></i> 清除
+                            <i class="fa fa-times"></i> {{ __('common.clear') }}
                         </a>
                     @endif
                 </form>
@@ -72,9 +72,9 @@
         </div>
         <div class="card-body">
             <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <strong>角色說明：</strong><br>
+                <strong>{{ __('admin.manage_role_desc_title') }}</strong><br>
                 @include('manage._role-descriptions')
-                <button type="button" class="close" data-dismiss="alert" aria-label="關閉">
+                <button type="button" class="close" data-dismiss="alert" aria-label="{{ __('common.cancel') }}">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -89,7 +89,7 @@
                                 $currentSort = request('sort_by');
                                 $currentOrder = request('sort_order', 'asc');
 
-                                // 如果点击的是当前排序列，则切换排序方向
+                                // 如果點擊的是當前排序欄，則切換排序方向
                                 if ($currentSort === $column) {
                                     $params['sort_order'] = $currentOrder === 'asc' ? 'desc' : 'asc';
                                 } else {
@@ -128,15 +128,15 @@
                         </th>
                         <th>
                             <a href="{{ route('manage.index', $sortParams('is_active'), false) }}" class="text-dark">
-                                是否通過審核 {!! $sortIcon('is_active') !!}
+                                {{ __('admin.manage_approved_col') }} {!! $sortIcon('is_active') !!}
                             </a>
                         </th>
                         <th>
                             <a href="{{ route('manage.index', $sortParams('is_admin'), false) }}" class="text-dark">
-                                用戶角色 {!! $sortIcon('is_admin') !!}
+                                {{ __('admin.manage_role_col') }} {!! $sortIcon('is_admin') !!}
                             </a>
                         </th>
-                        <th style="width: 120px">操作</th>
+                        <th style="width: 120px">{{ __('admin.manage_actions_col') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -148,9 +148,9 @@
                             <td>{{ $user->institution }}</td>
                             <td>
                                 @if($user->isActive())
-                                    <span class="badge badge-success">已激活</span>
+                                    <span class="badge badge-success">{{ __('admin.manage_activated') }}</span>
                                 @else
-                                    <span class="badge badge-warning">未激活</span>
+                                    <span class="badge badge-warning">{{ __('admin.manage_not_activated') }}</span>
                                 @endif
                             </td>
                             <td>
@@ -158,7 +158,7 @@
                             </td>
                             <td>
                                 <a class="btn btn-sm btn-primary" href="{{ route('manage.edit', $user->id) }}">
-                                    <i class="fa fa-edit"></i> 編輯
+                                    <i class="fa fa-edit"></i> {{ __('common.edit') }}
                                 </a>
                             </td>
                         </tr>
@@ -166,9 +166,9 @@
                         <tr>
                             <td colspan="7" class="text-center text-muted">
                                 @if(request('search'))
-                                    沒有找到符合條件的用戶
+                                    {{ __('admin.manage_no_results') }}
                                 @else
-                                    目前沒有用戶
+                                    {{ __('admin.manage_no_users') }}
                                 @endif
                             </td>
                         </tr>
@@ -180,8 +180,7 @@
             @if($data->hasPages())
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <div class="text-muted">
-                        顯示第 {{ $data->firstItem() ?? 0 }} 至 {{ $data->lastItem() ?? 0 }} 筆，
-                        共 {{ $data->total() }} 筆
+                        {{ __('admin.manage_showing', ['from' => $data->firstItem() ?? 0, 'to' => $data->lastItem() ?? 0, 'total' => $data->total()]) }}
                     </div>
                     <div>
                         {{ $data->links() }}
@@ -194,7 +193,7 @@
                     <input type="hidden" name="search" value="{{ request('search') }}">
                     <input type="hidden" name="sort_by" value="{{ request('sort_by', 'id') }}">
                     <input type="hidden" name="sort_order" value="{{ request('sort_order', 'asc') }}">
-                    <label class="mr-2">每頁顯示：</label>
+                    <label class="mr-2">{{ __('admin.manage_per_page') }}</label>
                     <select name="per_page" class="form-control form-control-sm" onchange="this.form.submit()">
                         <option value="10" {{ request('per_page') == 10 ? 'selected' : '' }}>10</option>
                         <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>

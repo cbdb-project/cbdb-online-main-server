@@ -29,7 +29,7 @@
                         <div class="input-group-append">
                             <button class="btn btn-secondary" type="submit">{{ __('common.search') }}</button>
                             @if(!empty($search))
-                                <a class="btn btn-secondary" href="{{ route('codes.show', ['table_name' => $q]) }}">{{ __('common.cancel') }}</a>
+                                <a class="btn btn-secondary" href="{{ route('codes.show', ['table_name' => $q]) }}">{{ __('common.reset') }}</a>
                             @endif
                         </div>
                     </div>
@@ -103,12 +103,12 @@
                             @if($showActions)
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('codes.edit', ['table_name'=>$q, 'id'=>$id_]) }}">修改</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ route('codes.edit', ['table_name'=>$q, 'id'=>$id_]) }}">{{ __('common.edit') }}</a>
                                         <a href="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}"
-                                           onclick="alert('確認刪除');
+                                           onclick="alert({!! Js::from(__('codes.confirm_delete')) !!});
                                                     event.preventDefault();
                                                    document.getElementById('delete-form-{{ $id_ }}').submit();"
-                                           class="btn btn-sm btn-danger">刪除</a>
+                                           class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
                                     </div>
                                     <form id="delete-form-{{ $id_ }}" action="{{ route('codes.destroy', ['table_name'=>$q, 'id'=>$id_]) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}
@@ -119,7 +119,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ count($thead) + ($showActions ? 1 : 0) }}" class="text-center text-muted">沒有資料</td>
+                            <td colspan="{{ count($thead) + ($showActions ? 1 : 0) }}" class="text-center text-muted">{{ __('common.no_data') }}</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -148,11 +148,11 @@
                             @if($data['has_prev_pages'])
                                 <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['before' => $data['prev_cursor']])) }}"
                                    class="btn btn-secondary btn-sm">
-                                    <i class="fas fa-chevron-left"></i> 上一頁
+                                    <i class="fas fa-chevron-left"></i> {{ __('common.previous_page') }}
                                 </a>
                             @else
                                 <button class="btn btn-secondary btn-sm" disabled>
-                                    <i class="fas fa-chevron-left"></i> 上一頁
+                                    <i class="fas fa-chevron-left"></i> {{ __('common.previous_page') }}
                                 </button>
                             @endif
 
@@ -163,11 +163,11 @@
                             @if($data['has_more_pages'])
                                 <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['after' => $data['next_cursor']])) }}"
                                    class="btn btn-secondary btn-sm">
-                                    下一頁 <i class="fas fa-chevron-right"></i>
+                                    {{ __('common.next_page') }} <i class="fas fa-chevron-right"></i>
                                 </a>
                             @else
                                 <button class="btn btn-secondary btn-sm" disabled>
-                                    下一頁 <i class="fas fa-chevron-right"></i>
+                                    {{ __('common.next_page') }} <i class="fas fa-chevron-right"></i>
                                 </button>
                             @endif
                         </div>
@@ -178,10 +178,10 @@
                                 <input type="hidden" name="search" value="{{ $search }}">
                             @endif
                             <div class="input-group input-group-sm" style="width: 200px;">
-                                <input type="number" name="after" placeholder="跳轉到 ID"
+                                <input type="number" name="after" placeholder="{{ __('common.jump_to_id') }}"
                                        class="form-control" min="0">
                                 <div class="input-group-append">
-                                    <button type="submit" class="btn btn-primary">跳轉</button>
+                                    <button type="submit" class="btn btn-primary">{{ __('common.jump') }}</button>
                                 </div>
                             </div>
                         </form>

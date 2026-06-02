@@ -33,18 +33,18 @@
             <div class="text-center mb-4">
                 <a href="/home" class="text-decoration-none text-dark">
                     <div class="h4 mb-1">{{ config('app.name', 'Laravel') }}</div>
-                    <small class="text-muted">系統登入 · Sign in</small>
+                    <small class="text-muted">{{ __('common.sign_in_subtitle') }}</small>
                 </a>
             </div>
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h1 class="h5 text-center mb-4">歡迎回來 · Welcome back</h1>
+                    <h1 class="h5 text-center mb-4">{{ __('common.welcome_back') }}</h1>
                     <form action="{{ route('login') }}" method="post" novalidate>
                         {{ csrf_field() }}
                         <input type="hidden" name="redirect" value="{{ old('redirect', request('redirect', session('url.intended'))) }}">
                         <div class="form-group mb-3">
-                            <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
-                            <input type="email" id="email" name="email" value="{{ old('email') }}" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" placeholder="name@example.com / 電子郵件" required>
+                            <label for="email" class="form-label small text-muted">{{ __('common.email') }}</label>
+                            <input type="email" id="email" name="email" value="{{ old('email') }}" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" placeholder="name@example.com" required>
                             @if ($errors->has('email'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('email') }}
@@ -52,8 +52,8 @@
                             @endif
                         </div>
                         <div class="form-group mb-3">
-                            <label for="password" class="form-label small text-muted">密碼 / Password</label>
-                            <input id="password" type="password" name="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" placeholder="請輸入密碼 / Password" required>
+                            <label for="password" class="form-label small text-muted">{{ __('common.password') }}</label>
+                            <input id="password" type="password" name="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" placeholder="{{ __('common.enter_password') }}" required>
                             @if ($errors->has('password'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('password') }}
@@ -63,16 +63,16 @@
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="remember" name="remember" {{ old('remember') ? 'checked' : '' }}>
-                                <label class="form-check-label" for="remember">記住我 / Remember me</label>
+                                <label class="form-check-label" for="remember">{{ __('common.remember_me') }}</label>
                             </div>
-                            <a href="{{ url('/password/reset') }}" class="small">忘記密碼？ / Forgot password?</a>
+                            <a href="{{ url('/password/reset') }}" class="small">{{ __('common.forgot_password') }}</a>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">登入 / Sign in</button>
+                        <button type="submit" class="btn btn-primary btn-block">{{ __('common.sign_in') }}</button>
                     </form>
                 </div>
                 <div class="card-footer text-center bg-white">
-                    <span class="small text-muted">還沒有帳號？ / Need an account?</span>
-                    <a href="{{ route('register') }}" class="ml-1">立即註冊 / Register</a>
+                    <span class="small text-muted">{{ __('common.need_account') }}</span>
+                    <a href="{{ route('register') }}" class="ml-1">{{ __('common.register_now') }}</a>
                 </div>
             </div>
         </div>

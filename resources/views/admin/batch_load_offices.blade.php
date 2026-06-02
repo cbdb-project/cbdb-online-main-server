@@ -3,19 +3,16 @@
 @section('content')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">批次匯入官職</h3>
+            <h3 class="card-title">{{ __('admin.batch_offices_page_title') }}</h3>
         </div>
         <div class="card-body">
             <p class="text-muted">
-                每行輸入 <code>中文職名</code>、<code>英文職名</code>、<code>朝代（中文）</code>、
-                <code>官職類型 ID</code>、<code>所屬單位（備註用，可空白）</code>、<code>來源 TEXT_ID</code>，
-                以 <code>Tab</code> 分隔。例：<code>宗人府供事[TAB]Clerk in the Imperial Clan Court[TAB]清[TAB]200501[TAB]宗人府[TAB]4763</code>。
-                系統會自動分配 <code>c_office_id</code>，建立 <code>OFFICE_CODES</code> 與 <code>OFFICE_CODE_TYPE_REL</code>。
+                {!! __('admin.batch_offices_desc') !!}
             </p>
 
             @if(!empty($batchErrors))
                 <div class="alert alert-danger">
-                    <p class="text-bold">匯入失敗：</p>
+                    <p class="text-bold">{{ __('admin.batch_import_failed') }}</p>
                     <ul class="list-unstyled">
                         @foreach($batchErrors as $message)
                             <li>・{{ $message }}</li>
@@ -26,21 +23,21 @@
 
             @if(!empty($results))
                 <div class="alert alert-success">
-                    已新增 {{ count($results) }} 筆官職資料。
+                    {{ __('admin.batch_offices_added', ['count' => count($results)]) }}
                 </div>
             @endif
 
             <form method="post" action="{{ route('admin.batch-load-offices.store') }}">
                 {{ csrf_field() }}
                 <div class="form-group">
-                    <label for="entries">批次資料（以 Tab 分隔）</label>
-                    <textarea name="entries" id="entries" class="form-control @error('entries') is-invalid @enderror" rows="10" placeholder="職名[TAB]英文[TAB]朝代[TAB]類型ID[TAB]所屬單位[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
+                    <label for="entries">{{ __('admin.batch_data_tab_sep') }}</label>
+                    <textarea name="entries" id="entries" class="form-control @error('entries') is-invalid @enderror" rows="10" placeholder="{{ __('admin.batch_offices_placeholder') }}">{{ old('entries', $input) }}</textarea>
                     @error('entries')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
-                <button type="submit" class="btn btn-primary">送出匯入</button>
-                <a href="{{ route('admin.batch-load-offices') }}" class="btn btn-default">清除重填</a>
+                <button type="submit" class="btn btn-primary">{{ __('admin.batch_submit') }}</button>
+                <a href="{{ route('admin.batch-load-offices') }}" class="btn btn-default">{{ __('admin.batch_clear_reset') }}</a>
             </form>
 
             @if(!empty($results))
@@ -48,15 +45,15 @@
                     <table class="table table-bordered table-striped table-condensed">
                         <thead>
                         <tr>
-                            <th>行號</th>
-                            <th>分配 c_office_id</th>
-                            <th>中文職名</th>
-                            <th>英文職名</th>
-                            <th>拼音</th>
-                            <th>朝代 / 代碼</th>
-                            <th>類型 ID</th>
-                            <th>所屬單位</th>
-                            <th>來源 TEXT_ID</th>
+                            <th>{{ __('admin.batch_col_line') }}</th>
+                            <th>{{ __('admin.batch_col_office_id') }}</th>
+                            <th>{{ __('admin.batch_col_name_chn') }}</th>
+                            <th>{{ __('admin.batch_col_name_en') }}</th>
+                            <th>{{ __('admin.batch_col_pinyin') }}</th>
+                            <th>{{ __('admin.batch_col_dynasty_code') }}</th>
+                            <th>{{ __('admin.batch_col_type_id') }}</th>
+                            <th>{{ __('admin.batch_col_unit') }}</th>
+                            <th>{{ __('admin.batch_col_source_textid') }}</th>
                         </tr>
                         </thead>
                         <tbody>

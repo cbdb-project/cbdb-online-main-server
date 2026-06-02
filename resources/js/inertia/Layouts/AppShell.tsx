@@ -2,6 +2,7 @@ import React from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { APP_THEME } from '../theme';
 import { useTranslation } from '../hooks/useTranslation';
+import { hasUnsavedChanges } from '../hooks/useDirtyGuard';
 
 interface AppShellProps {
     children: React.ReactNode;
@@ -16,7 +17,12 @@ export default function AppShell({ children }: AppShellProps) {
     const tNav = useTranslation('nav');
 
     const switchLocale = () => {
-        // Locale switch causes a full Inertia re-mount; unsaved page state will be lost.
+        if (hasUnsavedChanges()) {
+            const msg = currentLocale === 'zh-TW'
+                ? '切換語言將會遺失未儲存的修改。確定要繼續嗎？'
+                : 'Switching language will discard unsaved changes. Continue?';
+            if (!window.confirm(msg)) return;
+        }
         const next = currentLocale === 'zh-TW' ? 'en' : 'zh-TW';
         router.post(localeEndpoint, { locale: next });
     };

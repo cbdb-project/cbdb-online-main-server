@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">社會區分 Status</h3>
+            <h3 class="card-title">{{ __('person.status') }}</h3>
         </div>
         <div class="card-body">
             <div class="card-body">

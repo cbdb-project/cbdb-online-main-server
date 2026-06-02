@@ -22,7 +22,7 @@
 @if($historyUrl)
     @push('page-bottom-actions')
         <a href="{{ $historyUrl }}" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">
-            <i class="fas fa-history" aria-hidden="true"></i> 查看本頁歷史記錄
+            <i class="fas fa-history" aria-hidden="true"></i> {{ __('biogmains.view_history') }}
         </a>
     @endpush
 @endif

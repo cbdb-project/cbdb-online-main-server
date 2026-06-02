@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>CBDB 人物資料庫 - {{ $personId ? $personId : '搜尋' }}</title>
+    <title>{{ __('admin.cbdb_api_page_title') }} - {{ $personId ? $personId : __('admin.cbdb_api_page_title_search') }}</title>
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -279,12 +279,12 @@
 <div class="main-container">
     <!-- Header Section -->
     <div class="header-section">
-        <h1 class="site-title">中國歷代人物傳記資料庫</h1>
+        <h1 class="site-title">{{ __('admin.cbdb_api_site_title') }}</h1>
         <p class="site-subtitle">China Biographical Database Project (CBDB)</p>
 
         @if(!empty($validationErrors ?? []))
         <div class="alert-box alert-danger">
-            <strong>錯誤：</strong>
+            <strong>{{ __('admin.cbdb_api_error_label') }}</strong>
             <ul style="margin: 10px 0 0 20px; padding: 0;">
                 @foreach($validationErrors as $error)
                     <li>{{ $error }}</li>
@@ -294,7 +294,7 @@
         @elseif(!empty($searchResults))
         <div class="search-results-section">
             <div class="search-results-title">
-                搜尋結果@if($searchTerm)：「{{ e($searchTerm) }}」@endif
+                {{ __('admin.cbdb_api_search_results') }}@if($searchTerm)：「{{ e($searchTerm) }}」@endif
             </div>
             <div>
                 @foreach($searchResults as $result)
@@ -306,7 +306,7 @@
         </div>
         @elseif($searchTerm)
         <div class="alert-box alert-warning">
-            <strong>搜尋結果：</strong>找不到符合「{{ e($searchTerm) }}」的資料。
+            <strong>{{ __('admin.cbdb_api_search_results') }}：</strong>{{ __('admin.cbdb_api_no_results', ['term' => $searchTerm]) }}
         </div>
         @endif
     </div>
@@ -315,7 +315,7 @@
     <div class="content-section">
         <div id="Div_CBDB_PersonInfo">
             <div id="person-content" class="loading-message">
-                <p>載入中…</p>
+                <p>{{ __('admin.cbdb_api_loading') }}</p>
             </div>
         </div>
     </div>
@@ -326,6 +326,60 @@
     </div>
 </div>
 
+<script>
+window.cbdbI18n = {
+    empty:             @json(__('admin.cbdb_api_empty')),
+    unknown:           @json(__('admin.cbdb_api_unknown')),
+    sectionBasic:      @json(__('admin.cbdb_api_section_basic')),
+    fieldName:         @json(__('admin.cbdb_api_field_name')),
+    fieldIndexYear:    @json(__('admin.cbdb_api_field_index_year')),
+    fieldIndexAddr:    @json(__('admin.cbdb_api_field_index_addr')),
+    fieldBirthYear:    @json(__('admin.cbdb_api_field_birth_year')),
+    fieldDeathYear:    @json(__('admin.cbdb_api_field_death_year')),
+    fieldYearsLived:   @json(__('admin.cbdb_api_field_years_lived')),
+    fieldDynasty:      @json(__('admin.cbdb_api_field_dynasty')),
+    fieldGender:       @json(__('admin.cbdb_api_field_gender')),
+    genderFemale:      @json(__('admin.cbdb_api_gender_female')),
+    genderMale:        @json(__('admin.cbdb_api_gender_male')),
+    fieldJunwang:      @json(__('admin.cbdb_api_field_junwang')),
+    fieldNotes:        @json(__('admin.cbdb_api_field_notes')),
+    fieldSourceLink:   @json(__('admin.cbdb_api_field_source_link')),
+    yearSuffix:        @json(__('admin.cbdb_api_year_suffix')),
+    pagesPrefix:       @json(__('admin.cbdb_api_pages_prefix')),
+    pagesComma:        @json(__('admin.cbdb_api_pages_comma')),
+    noteLabel:         @json(__('admin.cbdb_api_note_label')),
+    sourceLabel:       @json(__('admin.cbdb_api_source_label')),
+    sequenceLabel:     @json(__('admin.cbdb_api_sequence_label')),
+    startYearLabel:    @json(__('admin.cbdb_api_start_year_label')),
+    endYearLabel:      @json(__('admin.cbdb_api_end_year_label')),
+    yearQualifierLabel:@json(__('admin.cbdb_api_year_qualifier_label')),
+    yearLabel:         @json(__('admin.cbdb_api_year_label')),
+    ageLabel:          @json(__('admin.cbdb_api_age_label')),
+    workYearLabel:     @json(__('admin.cbdb_api_work_year_label')),
+    roleLabel:         @json(__('admin.cbdb_api_role_label')),
+    locationLabel:     @json(__('admin.cbdb_api_location_label')),
+    kinshipDefault:    @json(__('admin.cbdb_api_kinship_default')),
+    jumpToSource:      @json(__('admin.cbdb_api_jump_to_source')),
+    personNotFound:    @json(__('admin.cbdb_api_person_not_found')),
+    sectionSources:    @json(__('admin.cbdb_api_section_sources')),
+    sectionAliases:    @json(__('admin.cbdb_api_section_aliases')),
+    sectionAddresses:  @json(__('admin.cbdb_api_section_addresses')),
+    sectionEntries:    @json(__('admin.cbdb_api_section_entries')),
+    sectionPostings:   @json(__('admin.cbdb_api_section_postings')),
+    sectionStatuses:   @json(__('admin.cbdb_api_section_statuses')),
+    sectionKinships:   @json(__('admin.cbdb_api_section_kinships')),
+    sectionAssocs:     @json(__('admin.cbdb_api_section_associations')),
+    sectionTexts:      @json(__('admin.cbdb_api_section_texts')),
+    jsonHint:          @json(__('admin.cbdb_api_json_hint')),
+    jsonUse:           @json(__('admin.cbdb_api_json_use')),
+    mergeHintLabel:    @json(__('admin.cbdb_api_merge_hint_label')),
+    mergeHintText:     @json(__('admin.cbdb_api_merge_hint_text')),
+    mergeReasonLabel:  @json(__('admin.cbdb_api_merge_reason_label')),
+    noMatch:           @json(__('admin.cbdb_api_no_match')),
+    selectPerson:      @json(__('admin.cbdb_api_select_person')),
+    loadFailed:        @json(__('admin.cbdb_api_load_failed'))
+};
+</script>
 <script>
 var searchResultsData = @json($searchResults);
 var initialPersonIdData = @json($personId);
@@ -404,19 +458,19 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
     }
 
     function line(label, value) {
-        return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + (value || '<span class="empty">（空）</span>') + '</span></div>';
+        return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + (value || '<span class="empty">' + cbdbI18n.empty + '</span>') + '</span></div>';
     }
 
     function isValidValue(val) {
-        return val && val !== '0' && val !== 0 && val !== '未詳';
+        return val && val !== '0' && val !== 0 && val !== cbdbI18n.unknown;
     }
 
     function renderBasicInfo(info) {
-        var html = '<div class="section-block"><div class="section-header">基本資訊</div><div class="section-content">';
+        var html = '<div class="section-block"><div class="section-header">' + cbdbI18n.sectionBasic + '</div><div class="section-content">';
         html += line('CBDB ID', escapeHtml(info.PersonId));
         var names = escapeHtml(info.ChName || '') + ' / ' + escapeHtml(info.EngName || '');
-        html += line('中文名 / 英文名', names);
-        html += line('指數年', isValidValue(info.IndexYear) ? escapeHtml(info.IndexYear) : '未詳');
+        html += line(cbdbI18n.fieldName, names);
+        html += line(cbdbI18n.fieldIndexYear, isValidValue(info.IndexYear) ? escapeHtml(info.IndexYear) : cbdbI18n.unknown);
         var indexAddrHtml = '';
         if (info.IndexAddr) {
             indexAddrHtml = escapeHtml(info.IndexAddr);
@@ -425,43 +479,43 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             indexAddrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(info.IndexAddrId) + '" target="_blank" rel="noopener noreferrer">';
             indexAddrHtml += '<span class="badge">ID: ' + escapeHtml(info.IndexAddrId) + '</span></a>';
         }
-        html += line('指數地址', indexAddrHtml.trim() || '<span class="empty">（空）</span>');
+        html += line(cbdbI18n.fieldIndexAddr, indexAddrHtml.trim() || '<span class="empty">' + cbdbI18n.empty + '</span>');
 
         var birthParts = [];
         birthParts.push(formatIdLabel(info.DynastyBirth, info.DynastyBirthId));
         birthParts.push(formatIdLabel(info.EraBirth, info.EraBirthId));
         if (info.EraYearBirth && isValidValue(info.EraYearBirth)) {
-            birthParts.push(escapeHtml(info.EraYearBirth) + ' 年');
+            birthParts.push(escapeHtml(info.EraYearBirth) + cbdbI18n.yearSuffix);
         }
         if (info.YearBirth && isValidValue(info.YearBirth)) {
             birthParts.push('(' + escapeHtml(info.YearBirth) + ')');
         }
-        html += line('生年', joinParts(birthParts, ' '));
+        html += line(cbdbI18n.fieldBirthYear, joinParts(birthParts, ' '));
 
         var deathParts = [];
         deathParts.push(formatIdLabel(info.DynastyDeath, info.DynastyDeathId));
         deathParts.push(formatIdLabel(info.EraDeath, info.EraDeathId));
         if (info.EraYearDeath && isValidValue(info.EraYearDeath)) {
-            deathParts.push(escapeHtml(info.EraYearDeath) + ' 年');
+            deathParts.push(escapeHtml(info.EraYearDeath) + cbdbI18n.yearSuffix);
         }
         if (info.YearDeath && isValidValue(info.YearDeath)) {
             deathParts.push('(' + escapeHtml(info.YearDeath) + ')');
         }
-        html += line('卒年', joinParts(deathParts, ' '));
+        html += line(cbdbI18n.fieldDeathYear, joinParts(deathParts, ' '));
 
-        html += line('享年', isValidValue(info.YearsLived) ? escapeHtml(info.YearsLived) : '未詳');
-        html += line('朝代', formatIdLabel(info.Dynasty, info.DynastyId));
-        html += line('性別', info.Gender === '1' ? '女性' : (info.Gender === '0' ? '男性' : '<span class="empty">（空）</span>'));
-        html += line('郡望', info.JunWang ? formatIdLabel(info.JunWang, info.JunWangId) : '<span class="empty">（空）</span>');
+        html += line(cbdbI18n.fieldYearsLived, isValidValue(info.YearsLived) ? escapeHtml(info.YearsLived) : cbdbI18n.unknown);
+        html += line(cbdbI18n.fieldDynasty, formatIdLabel(info.Dynasty, info.DynastyId));
+        html += line(cbdbI18n.fieldGender, info.Gender === '1' ? cbdbI18n.genderFemale : (info.Gender === '0' ? cbdbI18n.genderMale : '<span class="empty">' + cbdbI18n.empty + '</span>'));
+        html += line(cbdbI18n.fieldJunwang, info.JunWang ? formatIdLabel(info.JunWang, info.JunWangId) : '<span class="empty">' + cbdbI18n.empty + '</span>');
 
         if (info.Notes || info.Source || info.SourcePages) {
             if (info.Notes) {
-                html += line('註', escapeHtml(info.Notes));
+                html += line(cbdbI18n.fieldNotes, escapeHtml(info.Notes));
             }
             if (info.Source || info.SourcePages) {
-                html += line('人名權威資料鏈接',
-                    (info.Source ? escapeHtml(info.Source) : '<span class="empty">（空）</span>') +
-                    (info.SourcePages ? '，頁 ' + escapeHtml(info.SourcePages) : ''));
+                html += line(cbdbI18n.fieldSourceLink,
+                    (info.Source ? escapeHtml(info.Source) : '<span class="empty">' + cbdbI18n.empty + '</span>') +
+                    (info.SourcePages ? cbdbI18n.pagesComma + escapeHtml(info.SourcePages) : ''));
             }
         }
 
@@ -488,14 +542,14 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 if (item.UrlApi) {
                     var urlPart = encodeURIComponent(item.Pages);
                     var fullUrl = item.UrlApi + urlPart + (item.UrlApiCoda || '');
-                    pieces.push('頁 <a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.Pages) + '</a>');
+                    pieces.push(cbdbI18n.pagesPrefix + '<a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.Pages) + '</a>');
                 } else {
-                    pieces.push('頁 ' + escapeHtml(item.Pages));
+                    pieces.push(cbdbI18n.pagesPrefix + escapeHtml(item.Pages));
                 }
             }
-            itemHtml += (pieces.length ? pieces.join('，') : '<span class="empty">（空）</span>');
+            itemHtml += (pieces.length ? pieces.join('，') : '<span class="empty">' + cbdbI18n.empty + '</span>');
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -565,26 +619,26 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             }
             var extra = [];
             if (item.MoveCount) {
-                extra.push('順序：' + escapeHtml(item.MoveCount));
+                extra.push(cbdbI18n.sequenceLabel + escapeHtml(item.MoveCount));
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
-                extra.push('起始年：' + escapeHtml(item.FirstYear));
+                extra.push(cbdbI18n.startYearLabel + escapeHtml(item.FirstYear));
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
-                extra.push('終止年：' + escapeHtml(item.LastYear));
+                extra.push(cbdbI18n.endYearLabel + escapeHtml(item.LastYear));
             }
             if (extra.length) {
                 itemHtml += '<div class="small-text mt-2">' + extra.join('，') + '</div>';
             }
             if (item.Source) {
-                var src = '出處：' + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '，頁 ' + escapeHtml(item.Pages);
+                    src += cbdbI18n.pagesComma + escapeHtml(item.Pages);
                 }
                 itemHtml += '<div class="small-text mt-1">' + src + '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -618,23 +672,23 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             itemHtml += pieces.join('：');
             var tail = [];
             if (item.RuShiYear && isValidValue(item.RuShiYear)) {
-                tail.push('年份：' + escapeHtml(item.RuShiYear));
+                tail.push(cbdbI18n.yearLabel + escapeHtml(item.RuShiYear));
             }
             if (item.RuShiAge && isValidValue(item.RuShiAge)) {
-                tail.push('年齡：' + escapeHtml(item.RuShiAge));
+                tail.push(cbdbI18n.ageLabel + escapeHtml(item.RuShiAge));
             }
             if (tail.length) {
                 itemHtml += '<div class="small-text mt-2">' + tail.join('，') + '</div>';
             }
             if (item.Source) {
-                itemHtml += '<div class="small-text mt-1">出處：' + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    itemHtml += '，頁 ' + escapeHtml(item.Pages);
+                    itemHtml += cbdbI18n.pagesComma + escapeHtml(item.Pages);
                 }
                 itemHtml += '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -665,17 +719,17 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 startParts.push(escapeHtml(item.FirstYearNianhao));
             }
             if (item.FirstYearNiaohaoYear && isValidValue(item.FirstYearNiaohaoYear)) {
-                startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + ' 年');
+                startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + cbdbI18n.yearSuffix);
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
                 startParts.push('(' + escapeHtml(item.FirstYear) + ')');
             }
-            var startYearText = startParts.length > 0 ? startParts.join(' ') : '未詳';
-            // 只有当年份不是"未詳"时，才添加年份限定詞
+            var startYearText = startParts.length > 0 ? startParts.join(' ') : cbdbI18n.unknown;
+            // 只有当年份不是未詳时，才添加年份限定詞
             if (startParts.length > 0 && item.FirstYearRange && isValidValue(item.FirstYearRange)) {
-                startYearText += '   年份限定詞：' + escapeHtml(item.FirstYearRange);
+                startYearText += '   ' + cbdbI18n.yearQualifierLabel + escapeHtml(item.FirstYearRange);
             }
-            details.push('起始年：' + startYearText);
+            details.push(cbdbI18n.startYearLabel + startYearText);
 
             // 終止年
             var endParts = [];
@@ -683,21 +737,21 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 endParts.push(escapeHtml(item.LastYearNianhao));
             }
             if (item.LastYearNianhaoYear && isValidValue(item.LastYearNianhaoYear)) {
-                endParts.push(escapeHtml(item.LastYearNianhaoYear) + ' 年');
+                endParts.push(escapeHtml(item.LastYearNianhaoYear) + cbdbI18n.yearSuffix);
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
                 endParts.push('(' + escapeHtml(item.LastYear) + ')');
             }
-            var endYearText = endParts.length > 0 ? endParts.join(' ') : '未詳';
-            // 只有当年份不是"未詳"时，才添加年份限定詞
+            var endYearText = endParts.length > 0 ? endParts.join(' ') : cbdbI18n.unknown;
+            // 只有当年份不是未詳时，才添加年份限定詞
             if (endParts.length > 0 && item.LastYearRange && isValidValue(item.LastYearRange)) {
-                endYearText += '   年份限定詞：' + escapeHtml(item.LastYearRange);
+                endYearText += '   ' + cbdbI18n.yearQualifierLabel + escapeHtml(item.LastYearRange);
             }
-            details.push('終止年：' + endYearText);
+            details.push(cbdbI18n.endYearLabel + endYearText);
 
             // 地點
             if (item.AddrName || item.AddrId) {
-                var addrHtml = '地點：<strong>' + escapeHtml(item.AddrName || '') + '</strong>';
+                var addrHtml = cbdbI18n.locationLabel + '<strong>' + escapeHtml(item.AddrName || '') + '</strong>';
                 if (item.AddrId) {
                     addrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(item.AddrId) + '" target="_blank" rel="noopener noreferrer">';
                     addrHtml += '<span class="badge">' + escapeHtml(item.AddrId) + '</span></a>';
@@ -707,16 +761,16 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
 
             // 出處
             if (item.Source) {
-                var src = '出處：' + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '，頁 ' + escapeHtml(item.Pages);
+                    src += cbdbI18n.pagesComma + escapeHtml(item.Pages);
                 }
                 details.push(src);
             }
 
             // 註
             if (item.Notes) {
-                details.push('註：' + escapeHtml(item.Notes));
+                details.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
             }
 
             itemHtml += '<div class="small-text mt-2">' + details.join('<br>') + '</div>';
@@ -742,12 +796,12 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 text.push(label);
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
-                text.push('起始年：' + escapeHtml(item.FirstYear));
+                text.push(cbdbI18n.startYearLabel + escapeHtml(item.FirstYear));
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
-                text.push('終止年：' + escapeHtml(item.LastYear));
+                text.push(cbdbI18n.endYearLabel + escapeHtml(item.LastYear));
             }
-            html += '<div class="item-box">' + (text.length ? text.join('，') : '<span class="empty">（空）</span>') + '</div>';
+            html += '<div class="item-box">' + (text.length ? text.join('，') : '<span class="empty">' + cbdbI18n.empty + '</span>') + '</div>';
         });
         html += '</div></div>';
         return html;
@@ -760,19 +814,19 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         var html = '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">';
         items.forEach(function (item) {
             var itemHtml = '<div class="item-box">';
-            var relation = item.KinRelName || item.KinRel || '親屬';
+            var relation = item.KinRelName || item.KinRel || cbdbI18n.kinshipDefault;
             var person = item.KinPersonName || '';
             itemHtml += '<strong>' + escapeHtml(relation) + '：</strong>' + escapeHtml(person);
             var extras = [];
             if (item.Source) {
-                var src = '出處：' + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '（頁 ' + escapeHtml(item.Pages) + '）';
+                    src += '（' + cbdbI18n.pagesPrefix + escapeHtml(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push('註：' + escapeHtml(item.Notes));
+                extras.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
             }
             if (extras.length) {
                 itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
@@ -802,19 +856,19 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 base.push('【' + escapeHtml(item.TextTitle) + '】');
             }
             if (item.Year && isValidValue(item.Year)) {
-                base.push('<span class="badge">年份：' + escapeHtml(item.Year) + '</span>');
+                base.push('<span class="badge">' + cbdbI18n.yearLabel + escapeHtml(item.Year) + '</span>');
             }
             itemHtml += base.join(' ');
             var extras = [];
             if (item.Source) {
-                var src = '出處：' + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    src += '（頁 ' + escapeHtml(item.Pages) + '）';
+                    src += '（' + cbdbI18n.pagesPrefix + escapeHtml(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push('註：' + escapeHtml(item.Notes));
+                extras.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
             }
             if (extras.length) {
                 itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
@@ -842,21 +896,21 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 line.push(name);
             }
             if (item.Year && isValidValue(item.Year)) {
-                line.push('著作年代：' + escapeHtml(item.Year));
+                line.push(cbdbI18n.workYearLabel + escapeHtml(item.Year));
             }
             if (item.Role) {
-                line.push('角色：' + escapeHtml(item.Role));
+                line.push(cbdbI18n.roleLabel + escapeHtml(item.Role));
             }
             itemHtml += line.join('，');
             if (item.Source) {
-                itemHtml += '<div class="small-text mt-1">出處：' + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + escapeHtml(item.Source);
                 if (item.Pages) {
-                    itemHtml += '，頁 ' + escapeHtml(item.Pages);
+                    itemHtml += cbdbI18n.pagesComma + escapeHtml(item.Pages);
                 }
                 itemHtml += '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">註：' + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -865,17 +919,16 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         return html;
     }
 
-    var collectionRenderers = {
-        '出處': renderSources,
-        '別名': renderAliases,
-        '地理資訊': renderAddresses,
-        '入仕': renderEntries,
-        '任官': renderPostings,
-        '社會區分': renderStatuses,
-        '親屬關係': renderKinships,
-        '社會關係': renderAssociations,
-        '著述': renderTexts
-    };
+    var collectionRenderers = {};
+    collectionRenderers[cbdbI18n.sectionSources]    = renderSources;
+    collectionRenderers[cbdbI18n.sectionAliases]    = renderAliases;
+    collectionRenderers[cbdbI18n.sectionAddresses]  = renderAddresses;
+    collectionRenderers[cbdbI18n.sectionEntries]    = renderEntries;
+    collectionRenderers[cbdbI18n.sectionPostings]   = renderPostings;
+    collectionRenderers[cbdbI18n.sectionStatuses]   = renderStatuses;
+    collectionRenderers[cbdbI18n.sectionKinships]   = renderKinships;
+    collectionRenderers[cbdbI18n.sectionAssocs]     = renderAssociations;
+    collectionRenderers[cbdbI18n.sectionTexts]      = renderTexts;
 
     function renderCollection(title, items) {
         var renderer = collectionRenderers[title];
@@ -898,7 +951,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 var label = key;
                 segments.push(escapeHtml(label) + '：' + escapeHtml(value));
             });
-            html += '<div class="item-box">' + (segments.length ? segments.join('； ') : '<span class="empty">（空）</span>') + '</div>';
+            html += '<div class="item-box">' + (segments.length ? segments.join('； ') : '<span class="empty">' + cbdbI18n.empty + '</span>') + '</div>';
         });
 
         html += '</div></div>';
@@ -914,29 +967,29 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             return '';
         }
         var href = 'https://newarchive.ihp.sinica.edu.tw/sncaccgi/sncacFtp?ACTION=TQ,sncacFtpqf,SN=' + encodeURIComponent(first.Pages) + ',2nd,search_simple';
-        var link = '<a href="' + escapeHtml(href) + '" class="btn btn-primary btn-sm" target="_blank">跳轉至來源</a>';
+        var link = '<a href="' + escapeHtml(href) + '" class="btn btn-primary btn-sm" target="_blank">' + cbdbI18n.jumpToSource + '</a>';
         return '<div class="section-block"><div class="section-header">' + title + '</div><div class="section-content">' + link + '</div></div>';
     }
 
     function renderPerson(person) {
         if (!person) {
-            return '<div class="alert-box alert-danger">找不到對應人物。</div>';
+            return '<div class="alert-box alert-danger">' + cbdbI18n.personNotFound + '</div>';
         }
 
         var html = renderBasicInfo(person.BasicInfo || {});
-        html += renderSourceLinks('人名權威資料鏈接', (person.PersonSourcesAs && person.PersonSourcesAs.SourceAs) || []);
-        html += renderCollection('出處', (person.PersonSources && person.PersonSources.Source) || []);
-        html += renderCollection('別名', (person.PersonAliases && person.PersonAliases.Alias) || []);
-        html += renderCollection('地理資訊', (person.PersonAddresses && person.PersonAddresses.Address) || []);
-        html += renderCollection('入仕', (person.PersonEntryInfo && person.PersonEntryInfo.Entry) || []);
-        html += renderCollection('任官', (person.PersonPostings && person.PersonPostings.Posting) || []);
-        html += renderCollection('社會區分', (person.PersonSocialStatus && person.PersonSocialStatus.SocialStatus) || []);
-        html += renderCollection('親屬關係', (person.PersonKinshipInfo && person.PersonKinshipInfo.Kinship) || []);
-        html += renderCollection('社會關係', (person.PersonSocialAssociation && person.PersonSocialAssociation.Association) || []);
-        html += renderCollection('著述', (person.PersonTexts && person.PersonTexts.Text) || []);
+        html += renderSourceLinks(cbdbI18n.fieldSourceLink, (person.PersonSourcesAs && person.PersonSourcesAs.SourceAs) || []);
+        html += renderCollection(cbdbI18n.sectionSources, (person.PersonSources && person.PersonSources.Source) || []);
+        html += renderCollection(cbdbI18n.sectionAliases, (person.PersonAliases && person.PersonAliases.Alias) || []);
+        html += renderCollection(cbdbI18n.sectionAddresses, (person.PersonAddresses && person.PersonAddresses.Address) || []);
+        html += renderCollection(cbdbI18n.sectionEntries, (person.PersonEntryInfo && person.PersonEntryInfo.Entry) || []);
+        html += renderCollection(cbdbI18n.sectionPostings, (person.PersonPostings && person.PersonPostings.Posting) || []);
+        html += renderCollection(cbdbI18n.sectionStatuses, (person.PersonSocialStatus && person.PersonSocialStatus.SocialStatus) || []);
+        html += renderCollection(cbdbI18n.sectionKinships, (person.PersonKinshipInfo && person.PersonKinshipInfo.Kinship) || []);
+        html += renderCollection(cbdbI18n.sectionAssocs, (person.PersonSocialAssociation && person.PersonSocialAssociation.Association) || []);
+        html += renderCollection(cbdbI18n.sectionTexts, (person.PersonTexts && person.PersonTexts.Text) || []);
 
         var jsonUrl = '?id=' + escapeHtml(String(personId)) + '&o=json';
-        html += '<div class="api-info-box"><strong>需要原始 JSON？</strong>請使用 <a href="' + jsonUrl + '" target="_blank" rel="noopener noreferrer"><code>' + jsonUrl.replace('&', '&amp;') + '</code></a></div>';
+        html += '<div class="api-info-box"><strong>' + cbdbI18n.jsonHint + '</strong> ' + cbdbI18n.jsonUse + ' <a href="' + jsonUrl + '" target="_blank" rel="noopener noreferrer"><code>' + jsonUrl.replace('&', '&amp;') + '</code></a></div>';
 
         return html;
     }
@@ -947,9 +1000,9 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         }
         var mergedId = String(hint.merged_to_person_id);
         var link = '<a href="?id=' + encodeURIComponent(mergedId) + '" class="person-link" data-person-id="' + escapeHtml(mergedId) + '">ID ' + escapeHtml(mergedId) + '</a>';
-        var html = '<div class="alert-box alert-info"><strong>提示：</strong>此 ID 已合併至 ' + link + '。';
+        var html = '<div class="alert-box alert-info"><strong>' + cbdbI18n.mergeHintLabel + '</strong> ' + cbdbI18n.mergeHintText + ' ' + link + '。';
         if (hint.reason) {
-            html += '<div class="small-text mt-2">理由：' + escapeHtml(hint.reason) + '</div>';
+            html += '<div class="small-text mt-2">' + cbdbI18n.mergeReasonLabel + escapeHtml(hint.reason) + '</div>';
         }
         html += '</div>';
         return html;
@@ -960,9 +1013,9 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
 
         if (!personId) {
             if (searchTermData && searchResultsData.length === 0) {
-                content.innerHTML = '<div class="alert-box alert-warning">找不到符合條件的資料。</div>';
+                content.innerHTML = '<div class="alert-box alert-warning">' + cbdbI18n.noMatch + '</div>';
             } else {
-                content.innerHTML = '<div class="alert-box alert-info">請選擇人物。</div>';
+                content.innerHTML = '<div class="alert-box alert-info">' + cbdbI18n.selectPerson + '</div>';
             }
             return;
         }
@@ -998,15 +1051,15 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 if (error && typeof error.json === 'function') {
                     error.json().then(function (data) {
                         var errorPayload = data && data.error ? data.error : null;
-                        var message = (errorPayload && errorPayload.message) || '載入失敗。';
+                        var message = (errorPayload && errorPayload.message) || cbdbI18n.loadFailed;
                         var html = '<div class="alert-box alert-danger">' + escapeHtml(message) + '</div>';
                         html += renderMergeHintBox(errorPayload && errorPayload.merge_hint);
                         content.innerHTML = html;
                     }).catch(function () {
-                        content.innerHTML = '<div class="alert-box alert-danger">載入失敗。</div>';
+                        content.innerHTML = '<div class="alert-box alert-danger">' + cbdbI18n.loadFailed + '</div>';
                     });
                 } else {
-                    content.innerHTML = '<div class="alert-box alert-danger">載入失敗。</div>';
+                    content.innerHTML = '<div class="alert-box alert-danger">' + cbdbI18n.loadFailed + '</div>';
                 }
             });
     }

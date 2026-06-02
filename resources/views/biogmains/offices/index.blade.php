@@ -8,30 +8,30 @@ use App\Support\CompositePrimaryKey;
     @include('biogmains.banner')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">官名清單</h3>
+            <h3 class="card-title">{{ __('biogmains.offices_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.offices.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.offices.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->offices_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->offices_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
+                    <th>{{ __('person.seq_no') }}</th>
                     <th>sequence</th>
                     <th>posting_id</th>
-                    <th style="width: 40%;">官名</th>
-                    <th>地名</th>
-                    <th>始年</th>
-                    <th>終年</th>
+                    <th style="width: 40%;">{{ __('biogmains.office_name_field') }}</th>
+                    <th>{{ __('biogmains.place_name') }}</th>
+                    <th>{{ __('biogmains.start_year') }}</th>
+                    <th>{{ __('biogmains.end_year') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -57,17 +57,16 @@ use App\Support\CompositePrimaryKey;
                                     $officeFormId = 'delete-form-' . $value->pivot->c_office_id . '-' . $value->pivot->c_posting_id;
                                     @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.edit.query', ['id' => $basicinformation->c_personid], $officePk) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.edit.query', ['id' => $basicinformation->c_personid], $officePk) }}">{{ __('common.edit') }}</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                                   if (confirm(msg)===true){
+                                                   if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                        event.preventDefault();
                                                        document.getElementById('{{ $officeFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }"
-                                           class="btn btn-sm btn-danger">delete</a>
+                                           class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
 
                                     </div>
                                     <form id="{{ $officeFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.offices.destroy.query', ['id' => $basicinformation->c_personid], $officePk) }}" method="POST" style="display: none;">

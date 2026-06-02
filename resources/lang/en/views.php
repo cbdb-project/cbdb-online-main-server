@@ -43,4 +43,12 @@ return [
     'records_per_page'       => 'Showing :from–:to',
     'views_count_summary'    => ':total views, showing :shown',
     'clear'                  => 'Clear',
+
+    // ViewTables/Show.tsx summary card labels
+    'current_view_label'     => 'Current View',
+    'result_count_label'     => 'Result Count',
+    'search_condition_label' => 'Search Condition',
+    'column_count_help'      => 'Output per current view definition',
+    'result_range'           => ':from–:to records',
+    'view_pagination'        => 'Page :current / :total',
 ];

@@ -54,6 +54,38 @@ return [
     'history_label'         => 'Showing history for this person',
     'view_history'          => 'View page history',
 
+    'modification_desc'      => 'Modification Note',
+    'withdraw_confirm'       => 'Are you sure you want to withdraw this proposal?',
+    'approve_confirm'        => 'Approve this proposal and save to database?',
+    'remarks'                => 'Notes',
+    'unknown_table'          => 'Unknown table',
+    'cancelled_by'           => 'Withdrawn by',
+    'audit_log_count_item'   => 'Audit Log (:count records)',
+    'reject_modal_title'     => 'Reject Proposal',
+
+    // Diff table components
+    'diff_field'              => 'Field',
+    'diff_before'             => 'Before',
+    'diff_after'              => 'After',
+    'diff_current'            => 'Current',
+    'no_diff_records'         => 'No comparison records',
+    'not_retrieved'           => '(Not retrieved)',
+    'ai_match_result'         => 'AI Match Result',
+    'user_submitted'          => 'User Submitted',
+    'ai_matched_badge'        => 'Matched',
+    'ai_matched_badge_title'  => 'AI confirmed match',
+    'ai_suggested_badge'      => 'Suggested',
+    'ai_suggested_badge_title' => 'AI suggestion',
+    'addr_id'                 => 'Address ID',
+    'no_addr_data'            => 'No address data',
+    'content_col'             => 'Content',
+
+    // Crowdsourcing description notes
+    'crowdsourcing_op_type_desc' => '* Op type: 0=crowdsourcing record, 1=insert, 2=full overwrite (replaces existing record, primarily for code table changes), 3=update, 4=delete, 8=create proposal, 9=update proposal',
+    'crowdsourcing_status_desc'  => '* Status: 1=crowdsourcing record inserted to DB, 2=pending processing, 3=rejected, 4=processing failed.',
+    'confirm_btn'                => 'Confirm',
+    'reject_btn'                 => 'Reject',
+
     // Crowdsourcing table headers
     'resource_tts'          => 'Resource TTS',
     'count'                 => 'Count',

@@ -25,47 +25,47 @@
     <x-forms.person-id-display :personId="$id" />
 
     <div class="form-group row">
-        <label for="c_sequence" class="col-sm-2 col-form-label">次序(entry_sequence)</label>
+        <label for="c_sequence" class="col-sm-2 col-form-label">{{ __('biogmains.sequence') }} (entry_sequence)</label>
         <div class="col-sm-10">
             <input type="text" class="form-control" name="c_sequence" value="{{ $isEdit ? $row->c_sequence : '' }}" maxlength="4">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_possession_act_code" class="col-sm-2 col-form-label">行為&#60;擁有、捐出等&#62;(possession_act_code)</label>
+        <label for="c_possession_act_code" class="col-sm-2 col-form-label">{{ __('biogmains.possession_action_field') }} (possession_act_code)</label>
         <div class="col-sm-10">
             <select-vue name="c_possession_act_code" model="possact" selected="{{ $isEdit ? $row->c_possession_act_code : '0' }}"></select-vue>
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_possession_desc" class="col-sm-2 col-form-label">財產&#60;英文描述&#62;(possession_desc)</label>
+        <label for="c_possession_desc" class="col-sm-2 col-form-label">{{ __('biogmains.possession_english') }} (possession_desc)</label>
         <div class="col-sm-10">
             <input type="text" class="form-control" name="c_possession_desc" value="{{ $isEdit ? $row->c_possession_desc : '' }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_possession_desc_chn" class="col-sm-2 col-form-label">財產&#60;中文描述&#62;(possession_desc_chn)</label>
+        <label for="c_possession_desc_chn" class="col-sm-2 col-form-label">{{ __('biogmains.possession_chinese') }} (possession_desc_chn)</label>
         <div class="col-sm-10">
             <input type="text" class="form-control" name="c_possession_desc_chn" value="{{ $isEdit ? $row->c_possession_desc_chn : '' }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_quantity" class="col-sm-2 col-form-label">數量(quantity)</label>
+        <label for="c_quantity" class="col-sm-2 col-form-label">{{ __('biogmains.quantity') }} (quantity)</label>
         <div class="col-md-1">
             <input type="text" name="c_quantity" class="form-control"
                    value="{{ $isEdit ? $row->c_quantity : '' }}">
         </div>
         <div class="col-md-5 from-inline">
-            <label for="c_measure_code">度量單位(measure_code)</label>
+            <label for="c_measure_code">{{ __('biogmains.unit') }} (measure_code)</label>
             <select-vue name="c_measure_code" model="measure" selected="{{ $isEdit ? $row->c_measure_code : '' }}"></select-vue>
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_possession_yr" class="col-sm-2 col-form-label">年份(possession_yr)</label>
+        <label for="c_possession_yr" class="col-sm-2 col-form-label">{{ __('biogmains.year_field') }} (possession_yr)</label>
         <x-inline-time-fields
             yearName="c_possession_yr"
             :yearValue="$isEdit ? $row->c_possession_yr : ''"
@@ -79,7 +79,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_addr_id" class="col-sm-2 col-form-label">地名</label>
+        <label for="c_addr_id" class="col-sm-2 col-form-label">{{ __('biogmains.place_name') }}</label>
         <div class="col-sm-10">
             <select class="form-control c_addr_id" name="c_addr_id[]" multiple="multiple">
                 @if($isEdit && isset($res['addr_str']))
@@ -94,7 +94,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="" class="col-sm-2 col-form-label">出處(c_source)</label>
+        <label for="" class="col-sm-2 col-form-label">{{ __('biogmains.source_field') }} (c_source)</label>
         <div class="col-sm-10">
             <select class="form-control c_source" name="c_source" id="c_source">
                 @if($isEdit && isset($res['text_str']))
@@ -107,14 +107,14 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
+        <label for="c_pages" class="col-sm-2 col-form-label">{{ __('biogmains.pages_entries') }}</label>
         <div class="col-sm-4">
             <input type="text" class="form-control" name="c_pages" value="{{ $isEdit ? $row->c_pages : '' }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">{{ __('biogmains.notes_field') }} (c_notes)</label>
         <div class="col-sm-10">
             <textarea class="form-control" name="c_notes" id="" cols="30"
                       rows="5">{{ $isEdit ? $row->c_notes : '' }}</textarea>
@@ -122,10 +122,10 @@
     </div>
 
     <div class="form-group row">
-        <label for="textperson_pair" class="col-sm-2 col-form-label">候選出處與頁數</label>
+        <label for="textperson_pair" class="col-sm-2 col-form-label">{{ __('biogmains.candidate_source_title') }}</label>
         <div class="col-sm-10">
             <select class="form-control textperson_pair" name="">
-                <option value="">由此選取[出處]頁面中的出處與頁碼資訊</option>
+                <option value="">{{ __('biogmains.candidate_source_hint') }}</option>
             </select>
         </div>
     </div>
@@ -139,31 +139,29 @@
     />
 
     <div class="form-group row">
-        <label for="__proposal_comment" class="col-sm-2 col-form-label">修改說明 / 提案理由</label>
+        <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('biogmains.modification_note_label') }}</label>
         <div class="col-sm-10">
-            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）"></textarea>
-            <small class="text-muted">此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。</small>
+            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="{{ __('biogmains.modification_note_placeholder') }}"></textarea>
+            <small class="text-muted">{{ __('biogmains.modification_note_hint') }}</small>
         </div>
     </div>
 
     <div class="form-group row">
         <div class="offset-sm-2 col-sm-10">
             @if(Auth::check() && Auth::user()->isActive())
-                <!-- 直接儲存按鈕（非眾包用戶可見） -->
                 @if(Auth::user()->canWriteDirectly())
                     <button type="submit" name="action" value="save" class="btn btn-primary">
-                        <i class="fa fa-save"></i> 直接儲存
+                        <i class="fa fa-save"></i> {{ __('biogmains.save_directly') }}
                     </button>
                 @endif
 
-                <!-- 提交提案按鈕（所有活躍用戶可見） -->
                 <button type="submit" name="action" value="proposal" class="btn btn-info">
-                    <i class="fa fa-paper-plane"></i> 提交提案
+                    <i class="fa fa-paper-plane"></i> {{ __('biogmains.submit_proposal') }}
                 </button>
             @endif
 
             <a href="{{ route('basicinformation.possession.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
-                <i class="fa fa-times"></i> 取消
+                <i class="fa fa-times"></i> {{ __('common.cancel') }}
             </a>
         </div>
     </div>
@@ -173,6 +171,9 @@
     <script>
 
     onViteReady(function() {
+        var updateSourceSuccess = {!! Js::from(__('biogmains.update_source_success')) !!};
+        var pleaseFillSource = {!! Js::from(__('biogmains.please_fill_source')) !!};
+
         $(".select2").select2();
         textperson_pair_first_load();
 
@@ -193,16 +194,13 @@
 
         function textperson_pair_first_load(){
             let person_id = $('.person_id').val();
-            //console.log(person_id);
             let data = [{
                 id: 0,
-                text: '請填寫[人物 >> 出處]'
+                text: pleaseFillSource
             }];
             $.get('/api/select/search/textperson', {q: person_id}, function (data, textStatus){
-                //console.log(data);
                 for (let i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
-                    //console.log(item);
                     $(".textperson_pair").append(new Option(item['text'], item['value']));
                 }
             });
@@ -210,24 +208,20 @@
 
         $(".textperson_pair").change(function(){
             var hasValue = $(".textperson_pair").val();
-            //console.log(hasValue);
             var textperson_value = hasValue.split("&and&");
             $.get('/api/select/search/text', {q: textperson_value[0]}, function (data, textStatus){
-                //console.log(data);
                 for (var i=data.data.length-1; i>-1; i--){
                     item = data.data[i];
                     console.log(item);
                     var textperson_text = item['text'];
                 }
-                //console.log(textperson_value);
-                /*在這裡添加錄入表單更新的欄位與資料*/
                 $("select[name='c_source'] option[selected]").val(textperson_value[0]);
                 $("select[name='c_source']").val(textperson_value[0]);
                 $("#select2-c_source-container").text(textperson_text);
                 $("#select2-c_source-container").css("background","#FFFFBB");
                 $("input[name='c_pages']").val(textperson_value[1]);
                 $("input[name='c_pages']").css("background","#FFFFBB");
-                alert('更新[出處]與[頁數/條目]成功');
+                alert(updateSourceSuccess);
             });
         });
     });

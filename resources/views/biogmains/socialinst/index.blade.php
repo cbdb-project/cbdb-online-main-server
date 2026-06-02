@@ -8,28 +8,28 @@ use App\Support\CompositePrimaryKey;
     @include('biogmains.banner')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">社交機構清單</h3>
+            <h3 class="card-title">{{ __('biogmains.socialinst_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.socialinst.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.socialinst.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->inst_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->inst_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
-                    <th>社交機構</th>
-                    <th>社交機構角色</th>
-                    <th>始年</th>
-                    <th>終年</th>
+                    <th>{{ __('person.seq_no') }}</th>
+                    <th>{{ __('biogmains.socialinst_field') }}</th>
+                    <th>{{ __('biogmains.socialinst_role') }}</th>
+                    <th>{{ __('biogmains.start_year') }}</th>
+                    <th>{{ __('biogmains.end_year') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -55,18 +55,17 @@ use App\Support\CompositePrimaryKey;
                                     $instFormId = 'delete-form-' . $key;
                                     @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.socialinst.edit.query', ['id' => $basicinformation->c_personid], $instPk) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.socialinst.edit.query', ['id' => $basicinformation->c_personid], $instPk) }}">{{ __('common.edit') }}</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                                   if (confirm(msg)===true){
+                                                   if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                        event.preventDefault();
                                                        document.getElementById('{{ $instFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
                                                    "
-                                           class="btn btn-sm btn-danger">delete</a>
+                                           class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
 
                                     </div>
                                     <form id="{{ $instFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.socialinst.destroy.query', ['id' => $basicinformation->c_personid], $instPk) }}" method="POST" style="display: none;">

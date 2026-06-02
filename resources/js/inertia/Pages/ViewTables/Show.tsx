@@ -69,7 +69,7 @@ export default function Show({
     const alternateAliases = aliases.slice(1);
     const searchSummary = filters.search ? `「${filters.search}」` : t('filter_applied');
     const resultsLabel = pagination.total > 0
-        ? `第 ${pagination.from}–${pagination.to} 筆`
+        ? t('result_range', { from: String(pagination.from), to: String(pagination.to) })
         : t('no_data_in_view');
 
     const paginationData: PaginationData<unknown> = {
@@ -84,24 +84,24 @@ export default function Show({
 
     const summaryCards = [
         {
-            label: '目前檢視',
+            label: t('current_view_label'),
             value: primary_alias,
             help: `key: ${key}`,
         },
         {
             label: t('column_count'),
             value: String(column_count),
-            help: '依目前 view 定義輸出',
+            help: t('column_count_help'),
         },
         {
-            label: '結果筆數',
+            label: t('result_count_label'),
             value: String(pagination.total),
             help: resultsLabel,
         },
         {
-            label: '搜尋條件',
+            label: t('search_condition_label'),
             value: searchSummary,
-            help: `第 ${pagination.current_page} / ${pagination.last_page || 1} 頁`,
+            help: t('view_pagination', { current: String(pagination.current_page), total: String(pagination.last_page || 1) }),
         },
     ];
 

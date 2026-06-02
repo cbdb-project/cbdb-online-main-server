@@ -3,24 +3,22 @@
 @section('content')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">批次匯入書稿資料</h3>
+            <h3 class="card-title">{{ __('admin.batch_book_title_page_title') }}</h3>
         </div>
         <div class="card-body">
             <p class="text-muted">
-                將作者 CBDB ID、書名、來源 <code>TEXT_ID</code> 貼在下方文字框，每行以 <code>Tab</code> 分隔三欄。
-                範例：<code>12345[TAB]某某書名[TAB]67890</code>。系統會依序建立 <code>TEXT_CODES</code>，
-                自動排定 <code>c_textid</code>、轉換拼音並標記書籍朝代，預設 <code>c_text_type_id</code> 為 <code>01</code>。
+                {!! __('admin.batch_book_title_desc') !!}
             </p>
 
             @if(!empty($batchId))
                 <div class="alert alert-info">
-                    本次批次編號：<code>{{ $batchId }}</code>
+                    {{ __('admin.batch_this_batch_id') }} <code>{{ $batchId }}</code>
                 </div>
             @endif
 
             @if(!empty($batchErrors))
                 <div class="alert alert-danger">
-                    <p class="text-bold">匯入失敗：</p>
+                    <p class="text-bold">{{ __('admin.batch_import_failed') }}</p>
                     <ul class="list-unstyled">
                         @foreach($batchErrors as $message)
                             <li>・{{ $message }}</li>
@@ -32,21 +30,21 @@
             <form method="post" action="{{ route('admin.batch-load-book-titles.store') }}">
                 {{ csrf_field() }}
                 <div class="form-group">
-                    <label for="entries">批次資料（以 Tab 分隔）</label>
+                    <label for="entries">{{ __('admin.batch_data_tab_sep') }}</label>
                     <div class="entries-editor">
                         <pre id="entries-line-numbers" class="entries-line-numbers" aria-hidden="true">1</pre>
-                        <textarea name="entries" id="entries" class="form-control entries-textarea @error('entries') is-invalid @enderror" rows="10" spellcheck="false" placeholder="作者ID[TAB]書名[TAB]來源TEXT_ID">{{ old('entries', $input) }}</textarea>
+                        <textarea name="entries" id="entries" class="form-control entries-textarea @error('entries') is-invalid @enderror" rows="10" spellcheck="false" placeholder="{{ __('admin.batch_book_placeholder') }}">{{ old('entries', $input) }}</textarea>
                     </div>
                     @error('entries')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
                 </div>
-                <button type="submit" class="btn btn-primary mr-2">送出匯入</button>
+                <button type="submit" class="btn btn-primary mr-2">{{ __('admin.batch_submit') }}</button>
                 <button type="submit" name="force" value="1" class="btn btn-warning mr-2"
-                        onclick="return confirm('強制送出將略過拼音檢查（人和書的 ID 仍會檢查）。確定繼續？');">
-                    強制送出匯入（略過拼音檢查）
+                        onclick="return confirm({!! Js::from(__('admin.batch_force_confirm')) !!});">
+                    {{ __('admin.batch_force_submit') }}
                 </button>
-                <a href="{{ route('admin.batch-load-book-titles') }}" class="btn btn-default">清除重填</a>
+                <a href="{{ route('admin.batch-load-book-titles') }}" class="btn btn-default">{{ __('admin.batch_clear_reset') }}</a>
             </form>
 
             @push('styles')
@@ -172,15 +170,15 @@
                 @endphp
                 <div class="d-flex align-items-center" style="margin-top: 20px; gap: 8px;">
                     <button type="button" id="copy-textid-title" class="btn btn-outline-primary">
-                        Copy textid and title
+                        {{ __('admin.batch_copy_textid_btn') }}
                     </button>
                     <textarea id="copy-textid-title-source" hidden>{{ $copyPayload }}</textarea>
                     @if(!empty($batchId))
                         <form method="post" action="{{ route('admin.batch-load-book-titles.undo') }}" class="m-0"
-                              onsubmit="return confirm('將刪除此次批次新增的全部 TEXT_CODES 資料與對應 operations 紀錄。確定撤回？');">
+                              onsubmit="return confirm({!! Js::from(__('admin.batch_undo_confirm')) !!});">
                             {{ csrf_field() }}
                             <input type="hidden" name="batch_id" value="{{ $batchId }}">
-                            <button type="submit" class="btn btn-outline-danger">撤回此次匯入</button>
+                            <button type="submit" class="btn btn-outline-danger">{{ __('admin.batch_undo_import') }}</button>
                         </form>
                     @endif
                 </div>
@@ -188,17 +186,17 @@
                     <table class="table table-bordered table-striped table-condensed">
                         <thead>
                         <tr>
-                            <th>行號</th>
-                            <th>作者 ID</th>
-                            <th>書名（已清理）</th>
-                            <th>書名拼音</th>
-                            <th>來源 TEXT_ID</th>
-                            <th>書籍朝代</th>
-                            <th>文本類型</th>
-                            <th>批次編號</th>
-                            <th>建立者</th>
-                            <th>建立日期</th>
-                            <th>新 c_textid</th>
+                            <th>{{ __('admin.batch_col_line') }}</th>
+                            <th>{{ __('admin.batch_col_author_id') }}</th>
+                            <th>{{ __('admin.batch_col_title_cleaned') }}</th>
+                            <th>{{ __('admin.batch_col_title_pinyin') }}</th>
+                            <th>{{ __('admin.batch_col_source_textid') }}</th>
+                            <th>{{ __('admin.batch_col_dynasty') }}</th>
+                            <th>{{ __('admin.batch_col_text_type') }}</th>
+                            <th>{{ __('admin.batch_col_batch_id') }}</th>
+                            <th>{{ __('admin.batch_col_created_by') }}</th>
+                            <th>{{ __('admin.batch_col_created_date') }}</th>
+                            <th>{{ __('admin.batch_col_new_textid') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -211,9 +209,9 @@
                                     <span class="pinyin-display">{{ $row['title_pinyin'] }}</span>
                                     <input type="text" class="form-control form-control-sm pinyin-input" value="{{ $row['title_pinyin'] }}" hidden>
                                     <div class="pinyin-actions mt-1">
-                                        <button type="button" class="btn btn-xs btn-outline-secondary pinyin-edit-btn" title="編輯拼音" aria-label="編輯拼音"><i class="fa fa-edit" aria-hidden="true"></i></button>
-                                        <button type="button" class="btn btn-xs btn-primary pinyin-save-btn" hidden>保存</button>
-                                        <button type="button" class="btn btn-xs btn-default pinyin-cancel-btn" hidden>取消</button>
+                                        <button type="button" class="btn btn-xs btn-outline-secondary pinyin-edit-btn" title="{{ __('admin.batch_pinyin_edit_title') }}" aria-label="{{ __('admin.batch_pinyin_edit_title') }}"><i class="fa fa-edit" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-xs btn-primary pinyin-save-btn" hidden>{{ __('admin.batch_pinyin_save') }}</button>
+                                        <button type="button" class="btn btn-xs btn-default pinyin-cancel-btn" hidden>{{ __('common.cancel') }}</button>
                                         <span class="pinyin-status text-muted small ml-2"></span>
                                     </div>
                                 </td>
@@ -238,10 +236,16 @@
                             var endpoint = @json(route('admin.batch-load-book-titles.update-pinyin', [], false));
                             var tokenInput = document.querySelector('input[name="_token"]');
                             var csrfToken = tokenInput ? tokenInput.value : '';
+                            var msgSaving = {!! Js::from(__('admin.batch_pinyin_saving')) !!};
+                            var msgSaved = {!! Js::from(__('admin.batch_pinyin_saved')) !!};
+                            var msgEmpty = {!! Js::from(__('admin.batch_pinyin_empty')) !!};
+                            var msgSaveFailed = {!! Js::from(__('admin.batch_pinyin_save_failed')) !!};
+                            var msgUpdated = {!! Js::from(__('admin.batch_pinyin_updated')) !!};
+                            var msgNetworkError = {!! Js::from(__('admin.batch_network_error')) !!};
 
                             function setBusy(cell, busy) {
                                 var status = cell.querySelector('.pinyin-status');
-                                if (status) status.textContent = busy ? '保存中…' : '';
+                                if (status) status.textContent = busy ? msgSaving : '';
                                 cell.querySelectorAll('button').forEach(function (b) { b.disabled = busy; });
                             }
 
@@ -270,7 +274,7 @@
                                 cell.querySelector('.pinyin-input').value = storedValue;
                                 var status = cell.querySelector('.pinyin-status');
                                 if (status) {
-                                    status.textContent = '已寫入：' + storedValue;
+                                    status.textContent = msgSaved + storedValue;
                                     status.classList.remove('text-danger');
                                     status.classList.add('text-success');
                                     setTimeout(function () {
@@ -309,7 +313,7 @@
                                     var input = cell.querySelector('.pinyin-input');
                                     var newValue = (input.value || '').trim();
                                     if (newValue === '') {
-                                        showError(cell, '拼音不可為空');
+                                        showError(cell, msgEmpty);
                                         return;
                                     }
                                     setBusy(cell, true);
@@ -331,18 +335,18 @@
                                     .then(function (result) {
                                         setBusy(cell, false);
                                         if (!result.ok || !result.json || result.json.ok === false) {
-                                            var msg = (result.json && result.json.message) || '保存失敗';
+                                            var msg = (result.json && result.json.message) || msgSaveFailed;
                                             showError(cell, msg);
                                             window.showBatchToast && window.showBatchToast(msg, 'error');
                                             return;
                                         }
                                         applyStored(cell, result.json.c_title || '');
                                         leaveEdit(cell);
-                                        window.showBatchToast && window.showBatchToast('已更新 c_textid ' + result.json.c_textid, 'success');
+                                        window.showBatchToast && window.showBatchToast(msgUpdated + result.json.c_textid, 'success');
                                     })
                                     .catch(function () {
                                         setBusy(cell, false);
-                                        showError(cell, '網路錯誤，請重試');
+                                        showError(cell, msgNetworkError);
                                     });
                                 }
                             });
@@ -356,53 +360,58 @@
                         // extensions (e.g. inline page translators that clone form controls).
                         // Binding directly to #copy-textid-title would break in those cases
                         // because the listener stays attached to the orphaned original node.
-                        document.addEventListener('click', function (ev) {
-                            if (!ev.target.closest('#copy-textid-title')) return;
-                            var source = document.getElementById('copy-textid-title-source');
-                            if (!source) return;
-                            var text = source.value || '';
-                            if (!text) return;
+                        (function () {
+                            var msgCopied = {!! Js::from(__('admin.batch_copied_n')) !!};
+                            var msgCopyFailed = {!! Js::from(__('admin.batch_copy_failed')) !!};
 
-                            function fallbackCopy(t) {
-                                var ta = document.createElement('textarea');
-                                ta.value = t;
-                                ta.setAttribute('readonly', '');
-                                ta.style.position = 'fixed';
-                                ta.style.top = '0';
-                                ta.style.left = '0';
-                                ta.style.opacity = '0';
-                                document.body.appendChild(ta);
-                                ta.focus();
-                                ta.select();
-                                var ok = false;
-                                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-                                document.body.removeChild(ta);
-                                return ok;
-                            }
+                            document.addEventListener('click', function (ev) {
+                                if (!ev.target.closest('#copy-textid-title')) return;
+                                var source = document.getElementById('copy-textid-title-source');
+                                if (!source) return;
+                                var text = source.value || '';
+                                if (!text) return;
 
-                            function done(ok) {
-                                if (ok) {
-                                    window.showBatchToast('已複製 ' + text.split('\n').length + ' 筆', 'success');
-                                } else {
-                                    source.removeAttribute('hidden');
-                                    source.style.display = 'block';
-                                    source.style.width = '100%';
-                                    source.style.minHeight = '8em';
-                                    source.style.marginTop = '8px';
-                                    source.focus();
-                                    source.select();
-                                    window.showBatchToast('自動複製失敗，已展開下方文字框，請 Ctrl+C 手動複製', 'error');
+                                function fallbackCopy(t) {
+                                    var ta = document.createElement('textarea');
+                                    ta.value = t;
+                                    ta.setAttribute('readonly', '');
+                                    ta.style.position = 'fixed';
+                                    ta.style.top = '0';
+                                    ta.style.left = '0';
+                                    ta.style.opacity = '0';
+                                    document.body.appendChild(ta);
+                                    ta.focus();
+                                    ta.select();
+                                    var ok = false;
+                                    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                                    document.body.removeChild(ta);
+                                    return ok;
                                 }
-                            }
 
-                            if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
-                                navigator.clipboard.writeText(text)
-                                    .then(function () { done(true); })
-                                    .catch(function () { done(fallbackCopy(text)); });
-                            } else {
-                                done(fallbackCopy(text));
-                            }
-                        });
+                                function done(ok) {
+                                    if (ok) {
+                                        window.showBatchToast(msgCopied.replace(':count', text.split('\n').length), 'success');
+                                    } else {
+                                        source.removeAttribute('hidden');
+                                        source.style.display = 'block';
+                                        source.style.width = '100%';
+                                        source.style.minHeight = '8em';
+                                        source.style.marginTop = '8px';
+                                        source.focus();
+                                        source.select();
+                                        window.showBatchToast(msgCopyFailed, 'error');
+                                    }
+                                }
+
+                                if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+                                    navigator.clipboard.writeText(text)
+                                        .then(function () { done(true); })
+                                        .catch(function () { done(fallbackCopy(text)); });
+                                } else {
+                                    done(fallbackCopy(text));
+                                }
+                            });
+                        })();
                     </script>
                 @endpush
             @endif

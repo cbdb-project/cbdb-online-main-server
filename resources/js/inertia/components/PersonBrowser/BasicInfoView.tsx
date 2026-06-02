@@ -150,7 +150,7 @@ export default function BasicInfoView({
 
     const handleDelete = useCallback(() => {
         if (!canEdit || !personId) return;
-        if (!window.confirm('您真的確定要刪除此人物嗎？\n\n此操作無法撤銷，請確認！')) return;
+        if (!window.confirm(t('delete_confirm'))) return;
         deleteFormRef.current?.submit();
     }, [canEdit, personId]);
 
@@ -190,9 +190,9 @@ export default function BasicInfoView({
             ]);
 
             setFormState((prev) => applyGeneratedPinyin(prev, initialState, surname, mingzi));
-            setMessage('生成拼音已完成。');
+            setMessage(t('pinyin_generated'));
         } catch (err) {
-            setError(err instanceof Error ? err.message : '生成拼音失敗');
+            setError(err instanceof Error ? err.message : t('pinyin_failed'));
         } finally {
             setGeneratingPinyin(false);
         }
@@ -238,15 +238,15 @@ export default function BasicInfoView({
                 if (json?.errors && typeof json.errors === 'object') {
                     setFieldErrors(json.errors as FieldErrors);
                 }
-                throw new Error(firstErrorMessage(json) || `儲存失敗（HTTP ${response.status}）`);
+                throw new Error(firstErrorMessage(json) || `${t('save_failed')}（HTTP ${response.status}）`);
             }
 
             setEditing(false);
-            setMessage('基本信息已儲存。');
+            setMessage(t('saved_success'));
             onSaved?.();
             return true;
         } catch (err) {
-            setError(err instanceof Error ? err.message : '儲存失敗');
+            setError(err instanceof Error ? err.message : t('save_failed'));
             scrollPanelToTop(panelRef);
             return false;
         } finally {
@@ -268,7 +268,7 @@ export default function BasicInfoView({
                 <div style={toolbarStyle}>
                     <div>
                         <div style={toolbarTitleStyle}>{t('basic_info')}</div>
-                        {editing ? <div style={editingHintStyle}>編輯模式：可修改欄位已切換為高亮輸入框</div> : null}
+                        {editing ? <div style={editingHintStyle}>{t('editing_hint')}</div> : null}
                     </div>
                     <div style={toolbarButtonGroupStyle}>
                         {!editing && canEdit ? (
@@ -380,7 +380,7 @@ function renderEditor(
                                     onClick={onGeneratePinyin}
                                     disabled={generatingPinyin || saving}
                                 >
-                                    {generatingPinyin ? '生成中…' : '生成人名拼音'}
+                                    {generatingPinyin ? (t ? t('generating_pinyin') : '生成中…') : (t ? t('generate_pinyin') : '生成人名拼音')}
                                 </button>
                             </div>
                         ) : null}
@@ -600,7 +600,7 @@ function renderEditor(
             </div>
 
             <div style={editorBottomBarStyle}>
-                <div style={editorBottomBarHintStyle}>確認內容後再整頁儲存，儲存將調用 `/api/v2/mutate` 更新 BIOG_MAIN。</div>
+                <div style={editorBottomBarHintStyle}>{t ? t('save_hint') : '確認內容後再整頁儲存，儲存將調用 /api/v2/mutate 更新 BIOG_MAIN。'}</div>
                 <div style={editorBottomBarButtonsStyle}>
                     <button
                         type="button"

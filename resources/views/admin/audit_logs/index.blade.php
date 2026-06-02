@@ -12,7 +12,7 @@
                 @if(!empty($history_context))
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
-                        正在顯示人物 {{ $history_context['person_id'] }} 的「{{ $history_context['label'] }}」審計日誌。
+                        {{ __('admin.audit_history_context', ['person_id' => $history_context['person_id'], 'label' => $history_context['label']]) }}
                     </div>
                 @endif
                 <form method="GET" action="{{ route('admin.audit-logs') }}" class="mb-3">
@@ -23,7 +23,7 @@
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label for="search">關鍵字</label>
+                                <label for="search">{{ __('admin.audit_keyword') }}</label>
                                 <input type="text" class="form-control" id="search" name="search"
                                        value="{{ $filters['search'] ?? '' }}"
                                        placeholder="operation_id / row_pk_text / table_name">
@@ -31,9 +31,9 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="table_name">資料表</label>
+                                <label for="table_name">{{ __('admin.audit_table') }}</label>
                                 <select class="form-control" id="table_name" name="table_name">
-                                    <option value="">全部</option>
+                                    <option value="">{{ __('admin.audit_all') }}</option>
                                     @foreach($table_names as $tableName)
                                         <option value="{{ $tableName }}" {{ ($filters['table_name'] ?? '') == $tableName ? 'selected' : '' }}>
                                             {{ $tableName }}
@@ -44,9 +44,9 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="operation">操作</label>
+                                <label for="operation">{{ __('admin.audit_operation') }}</label>
                                 <select class="form-control" id="operation" name="operation">
-                                    <option value="">全部</option>
+                                    <option value="">{{ __('admin.audit_all') }}</option>
                                     @foreach(['INSERT', 'UPDATE', 'DELETE'] as $op)
                                         <option value="{{ $op }}" {{ ($filters['operation'] ?? '') == $op ? 'selected' : '' }}>
                                             {{ $op }}
@@ -57,9 +57,9 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="actor_type">角色</label>
+                                <label for="actor_type">{{ __('admin.audit_actor_type') }}</label>
                                 <select class="form-control" id="actor_type" name="actor_type">
-                                    <option value="">全部</option>
+                                    <option value="">{{ __('admin.audit_all') }}</option>
                                     @foreach($actor_types as $actorType)
                                         <option value="{{ $actorType }}" {{ ($filters['actor_type'] ?? '') == $actorType ? 'selected' : '' }}>
                                             {{ $actorType }}
@@ -70,24 +70,24 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="actor_id">操作者 ID</label>
+                                <label for="actor_id">{{ __('admin.audit_actor_id') }}</label>
                                 <input type="text" class="form-control" id="actor_id" name="actor_id"
                                        value="{{ $filters['actor_id'] ?? '' }}"
-                                       placeholder="例如 1">
+                                       placeholder="{{ __('admin.audit_actor_id_placeholder') }}">
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-12">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i> 搜尋
+                                <i class="fas fa-search"></i> {{ __('admin.audit_search_btn') }}
                             </button>
                             @if(($filters['search'] ?? '') || ($filters['table_name'] ?? '') || ($filters['operation'] ?? '') || ($filters['actor_type'] ?? '') || ($filters['actor_id'] ?? ''))
                                 <a href="{{ route('admin.audit-logs', !empty($history_context) ? [
                                     'c_personid' => $history_context['person_id'],
                                     'history_page' => $history_context['page'],
                                 ] : []) }}" class="btn btn-secondary ml-1">
-                                    <i class="fas fa-times"></i> 清除
+                                    <i class="fas fa-times"></i> {{ __('admin.audit_clear_btn') }}
                                 </a>
                             @endif
                         </div>
@@ -96,12 +96,12 @@
 
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
-                    共 {{ $logs->total() }} 筆記錄，顯示第 {{ $logs->firstItem() ?? 0 }} - {{ $logs->lastItem() ?? 0 }} 筆
+                    {{ __('admin.audit_summary', ['total' => $logs->total(), 'first' => $logs->firstItem() ?? 0, 'last' => $logs->lastItem() ?? 0]) }}
                 </div>
 
                 @if($logs->isEmpty())
                     <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> 暫無記錄
+                        <i class="fas fa-exclamation-triangle"></i> {{ __('admin.audit_no_records') }}
                     </div>
                 @else
                     <div class="table-responsive">
@@ -109,13 +109,13 @@
                             <thead class="thead-light">
                                 <tr>
                                     <th>#</th>
-                                    <th>時間</th>
-                                    <th>表名</th>
-                                    <th>操作</th>
-                                    <th>操作者</th>
+                                    <th>{{ __('admin.audit_col_time') }}</th>
+                                    <th>{{ __('admin.audit_col_table') }}</th>
+                                    <th>{{ __('admin.audit_col_operation') }}</th>
+                                    <th>{{ __('admin.audit_col_actor') }}</th>
                                     <th>PK</th>
                                     <th>operation_id</th>
-                                    <th>資料</th>
+                                    <th>{{ __('admin.audit_col_data') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,7 +165,7 @@
                                                 'field' => $key,
                                                 'before' => $formatValue($beforeRaw),
                                                 'after' => $formatValue($afterRaw),
-                                                'current' => '(未取得)',
+                                                'current' => __('admin.audit_current_unknown'),
                                                 'matches_current' => false,
                                                 'matches_before' => false,
                                             ];
@@ -240,7 +240,7 @@
                                             </div>
                                             @if($log->created_at !== $log->occurred_at)
                                                 <small class="text-muted js-utc-datetime" data-utc="{{ $createdUtc }}">
-                                                    寫入：{{ $createdDisplay }}
+                                                    {{ __('admin.audit_written_at') }}{{ $createdDisplay }}
                                                 </small>
                                             @endif
                                         </td>
@@ -266,7 +266,7 @@
                                             <div class="btn-group mb-2" role="group">
                                                 <button type="button" class="btn btn-info btn-sm" data-toggle="modal" data-target="#audit-diff-{{ $log->id }}"
                                                     {{ $diffSource ? '' : 'disabled' }}>
-                                                    比較
+                                                    {{ __('admin.audit_diff_btn') }}
                                                 </button>
                                                 <button type="button" class="btn btn-secondary btn-sm" data-toggle="modal" data-target="#audit-old-{{ $log->id }}"
                                                     {{ $oldData ? '' : 'disabled' }}>
@@ -285,14 +285,14 @@
                                                 <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                                     <div class="modal-content">
                                                         <div class="modal-header">
-                                                            <h4 class="modal-title">比較</h4>
+                                                            <h4 class="modal-title">{{ __('admin.audit_diff_btn') }}</h4>
                                                             <button type="button" class="close" data-dismiss="modal">&times;</button>
                                                         </div>
                                                         <div class="modal-body" style="word-break: break-all;">
                                                             @include('components.diff-table', ['diff' => $diffSource])
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -309,7 +309,7 @@
                                                             @include('components.key-value-table', ['data' => $oldData])
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -326,7 +326,7 @@
                                                             @include('components.key-value-table', ['data' => $newData])
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                                         </div>
                                                     </div>
                                                 </div>

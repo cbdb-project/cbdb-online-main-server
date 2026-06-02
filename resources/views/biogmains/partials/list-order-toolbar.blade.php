@@ -1,14 +1,16 @@
 @php
     $targetTableId = $targetTableId ?? null;
-    $toolbarLabel = $toolbarLabel ?? '次序調整';
+    $toolbarLabel = $toolbarLabel ?? __('biogmains.seq_adjust_title');
 @endphp
 
 @if(!empty($targetTableId))
     <div class="js-biog-sequence-toolbar mb-2" data-target-table="{{ $targetTableId }}" style="clear: both;">
         <div class="d-flex flex-wrap align-items-center">
             <label class="mb-0 mr-2 text-sm text-muted">{{ $toolbarLabel }}</label>
-            <button type="button" class="btn btn-sm btn-outline-primary mr-2 mb-1" data-sequence-toggle>調整次序</button>
-            <small class="text-muted mb-1 d-none" data-sequence-hint>顯示「新次序」欄位後，可逐條修改並提交。</small>
+            <button type="button" class="btn btn-sm btn-outline-primary mr-2 mb-1" data-sequence-toggle
+                    data-label-open="{{ __('biogmains.seq_collapse_btn') }}"
+                    data-label-closed="{{ __('biogmains.seq_adjust_btn') }}">{{ __('biogmains.seq_adjust_btn') }}</button>
+            <small class="text-muted mb-1 d-none" data-sequence-hint>{{ __('biogmains.seq_adjust_hint') }}</small>
         </div>
     </div>
 @endif
@@ -51,7 +53,9 @@
                         var opened = toggleBtn.dataset.opened === '1';
                         var nextOpened = !opened;
                         toggleBtn.dataset.opened = nextOpened ? '1' : '0';
-                        toggleBtn.textContent = nextOpened ? '收起次序調整' : '調整次序';
+                        toggleBtn.textContent = nextOpened
+                            ? (toggleBtn.dataset.labelOpen || toggleBtn.textContent)
+                            : (toggleBtn.dataset.labelClosed || toggleBtn.textContent);
 
                         setSequenceColumnVisible(table, nextOpened);
 
@@ -96,7 +100,9 @@
                     var opened = toggleBtn.dataset.opened === '1';
                     var nextOpened = !opened;
                     toggleBtn.dataset.opened = nextOpened ? '1' : '0';
-                    toggleBtn.textContent = nextOpened ? '收起次序調整' : '調整次序';
+                    toggleBtn.textContent = nextOpened
+                        ? (toggleBtn.dataset.labelOpen || toggleBtn.textContent)
+                        : (toggleBtn.dataset.labelClosed || toggleBtn.textContent);
                     setSequenceColumnVisible(table, nextOpened);
 
                     var hint = toolbar.querySelector('[data-sequence-hint]');
@@ -108,4 +114,3 @@
         </script>
     @endpush
 @endonce
-

@@ -18,13 +18,13 @@
             <div class="text-center mb-4">
                 <a href="/home" class="text-decoration-none text-dark">
                     <div class="h4 mb-1">{{ config('app.name', 'Laravel') }}</div>
-                    <small class="text-muted">設定新密碼 · Set new password</small>
+                    <small class="text-muted">{{ __('common.set_new_password_subtitle') }}</small>
                 </a>
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h1 class="h5 text-center mb-4">更新密碼 / Update password</h1>
+                    <h1 class="h5 text-center mb-4">{{ __('common.update_password_title') }}</h1>
 
                     @if (session('status'))
                         <div class="alert alert-success" role="alert">
@@ -38,8 +38,8 @@
                         <input type="hidden" name="token" value="{{ $token }}">
 
                         <div class="form-group mb-3">
-                            <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
-                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ $email ?? old('email') }}" placeholder="name@example.com / 電子郵件" required autofocus>
+                            <label for="email" class="form-label small text-muted">{{ __('common.email') }}</label>
+                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ $email ?? old('email') }}" placeholder="name@example.com" required autofocus>
                             @if ($errors->has('email'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('email') }}
@@ -48,8 +48,8 @@
                         </div>
 
                         <div class="form-group mb-3">
-                            <label for="password" class="form-label small text-muted">新密碼 / New password</label>
-                            <input id="password" type="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" name="password" placeholder="請設定新密碼 / Choose a password" required>
+                            <label for="password" class="form-label small text-muted">{{ __('common.new_password') }}</label>
+                            <input id="password" type="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" name="password" placeholder="{{ __('common.choose_password') }}" required>
                             @if ($errors->has('password'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('password') }}
@@ -58,8 +58,8 @@
                         </div>
 
                         <div class="form-group mb-4">
-                            <label for="password-confirm" class="form-label small text-muted">確認密碼 / Confirm password</label>
-                            <input id="password-confirm" type="password" class="form-control{{ $errors->has('password_confirmation') ? ' is-invalid' : '' }}" name="password_confirmation" placeholder="再次輸入密碼 / Confirm password" required>
+                            <label for="password-confirm" class="form-label small text-muted">{{ __('common.confirm_password') }}</label>
+                            <input id="password-confirm" type="password" class="form-control{{ $errors->has('password_confirmation') ? ' is-invalid' : '' }}" name="password_confirmation" placeholder="{{ __('common.confirm_password') }}" required>
                             @if ($errors->has('password_confirmation'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('password_confirmation') }}
@@ -67,11 +67,11 @@
                             @endif
                         </div>
 
-                        <button type="submit" class="btn btn-primary btn-block">重設密碼 / Reset password</button>
+                        <button type="submit" class="btn btn-primary btn-block">{{ __('common.reset_password_btn') }}</button>
                     </form>
                 </div>
                 <div class="card-footer text-center bg-white">
-                    <a href="{{ route('login') }}" class="small">返回登入 / Back to login</a>
+                    <a href="{{ route('login') }}" class="small">{{ __('common.back_to_login') }}</a>
                 </div>
             </div>
         </div>

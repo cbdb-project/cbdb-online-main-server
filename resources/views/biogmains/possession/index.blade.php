@@ -9,35 +9,35 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
     @include('biogmains.banner')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">財產清單</h3>
+            <h3 class="card-title">{{ __('biogmains.possession_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.possession.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.possession.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             @if($canEditSequence)
                 @include('biogmains.partials.list-order-toolbar', [
                     'targetTableId' => 'possession-list-table',
-                    'toolbarLabel' => '財產次序調整',
+                    'toolbarLabel' => __('biogmains.possession_seq_title'),
                 ])
             @endif
             <div class="table-responsive">
                 <table id="possession-list-table" class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->possession_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->possession_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
+                    <th>{{ __('person.seq_no') }}</th>
                     @if($canEditSequence)
-                        <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
+                        <th data-sequence-demo-col style="min-width: 180px; display: none;">{{ __('biogmains.new_sequence') }}</th>
                     @endif
-                    <th>行為</th>
-                    <th>財產</th>
+                    <th>{{ __('biogmains.action_col') }}</th>
+                    <th>{{ __('biogmains.possession_col') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -69,7 +69,7 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                                     style="width: 78px;"
                                     value="{{ $value->pivot->c_sequence ?? '' }}"
                                 >
-                                <button type="submit" class="btn btn-sm btn-outline-primary js-possession-sequence-submit">提交</button>
+                                <button type="submit" class="btn btn-sm btn-outline-primary js-possession-sequence-submit">{{ __('biogmains.submit_btn') }}</button>
                                 <small class="text-muted ml-2 d-none js-possession-sequence-status"></small>
                             </form>
                         </td>
@@ -83,18 +83,17 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                                     $possessionFormId = 'delete-form-' . $value->pivot->c_possession_record_id;
                                     @endphp
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.possession.edit.query', ['id' => $basicinformation->c_personid], $possessionPk) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.possession.edit.query', ['id' => $basicinformation->c_personid], $possessionPk) }}">{{ __('common.edit') }}</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                                   if (confirm(msg)===true){
+                                                   if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                        event.preventDefault();
                                                        document.getElementById('{{ $possessionFormId }}').submit();
                                                    }else{
                                                        return false;
                                                    }
                                                    "
-                                           class="btn btn-sm btn-danger">delete</a>
+                                           class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
 
                                     </div>
                                     <form id="{{ $possessionFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.possession.destroy.query', ['id' => $basicinformation->c_personid], $possessionPk) }}" method="POST" style="display: none;">
@@ -118,6 +117,13 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
 @push('scripts')
 <script>
     (function() {
+        var __i18n = {
+            nonJsonResponse: {!! Js::from(__('biogmains.non_json_response')) !!},
+            submitFailed:    {!! Js::from(__('biogmains.submit_failed')) !!},
+            networkError:    {!! Js::from(__('biogmains.network_error')) !!},
+            submitted:       {!! Js::from(__('biogmains.submitted_ok')) !!},
+        };
+
         function getCsrfToken() {
             var tokenEl = document.querySelector('meta[name="csrf-token"]');
             return tokenEl ? tokenEl.getAttribute('content') : '';
@@ -188,20 +194,20 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
                 });
 
                 var data = await response.json().catch(function() {
-                    return { ok: false, message: '非 JSON 回應' };
+                    return { ok: false, message: __i18n.nonJsonResponse };
                 });
 
                 if (!response.ok || !data.ok) {
-                    setStatus(form, (data && data.message) ? data.message : '提交失敗', 'error');
+                    setStatus(form, (data && data.message) ? data.message : __i18n.submitFailed, 'error');
                     return;
                 }
 
                 if (row && row.cells && row.cells[0]) {
                     row.cells[0].textContent = seqInput.value;
                 }
-                setStatus(form, '已提交', 'success');
+                setStatus(form, __i18n.submitted, 'success');
             } catch (error) {
-                setStatus(form, '網路或伺服器錯誤', 'error');
+                setStatus(form, __i18n.networkError, 'error');
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;

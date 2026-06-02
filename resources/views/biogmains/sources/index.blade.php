@@ -9,26 +9,26 @@ use App\Support\CompositePrimaryKey;
     @include('biogmains.defense')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">出處</h3>
+            <h3 class="card-title">{{ __('biogmains.sources_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.sources.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.sources.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->sources_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->sources_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
-                    <th>出處</th>
-                    <th>頁碼</th>
+                    <th>{{ __('person.seq_no') }}</th>
+                    <th>{{ __('biogmains.source_field') }}</th>
+                    <th>{{ __('biogmains.page_no') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -67,18 +67,17 @@ $c_pages_view = unionPKDef_decode_for_convert($value->pivot->c_pages);
                                         'c_pages' => $value->pivot->c_pages ?? '',
                                     ];
                                 @endphp
-                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.sources.edit.query', ['id' => $basicinformation->c_personid], $sourcePk) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.sources.edit.query', ['id' => $basicinformation->c_personid], $sourcePk) }}">{{ __('common.edit') }}</a>
                                 <a href=""
                                    onclick="
-                                           let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                           if (confirm(msg)===true){
+                                           if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                event.preventDefault();
                                                document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_textid."-".($value->pivot->c_pages ?? '') }}').submit();
                                            }else{
                                                return false;
                                            }
                                            "
-                                   class="btn btn-sm btn-danger">delete</a>
+                                   class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
                                     </div>
                                     <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_textid.'-'.($value->pivot->c_pages ?? '') }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.sources.destroy.query', ['id' => $basicinformation->c_personid], $sourcePk) }}" method="POST" style="display: none;">
                                         {{ method_field('DELETE') }}

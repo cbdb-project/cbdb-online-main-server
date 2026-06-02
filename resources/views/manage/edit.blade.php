@@ -5,10 +5,10 @@
     <div class="col-md-12">
         <div class="card card-primary">
             <div class="card-header">
-                <h3 class="card-title">編輯用戶設定</h3>
+                <h3 class="card-title">{{ __('admin.manage_edit_user_title') }}</h3>
                 <div class="card-tools">
                     <a href="{{ route('manage.index') }}" class="btn btn-sm btn-secondary">
-                        <i class="fa fa-arrow-left"></i> 返回列表
+                        <i class="fa fa-arrow-left"></i> {{ __('common.back') }}
                     </a>
                 </div>
             </div>
@@ -18,17 +18,17 @@
                 @method('PUT')
 
                 <div class="card-body">
-                    <!-- 基本信息（只读） -->
+                    <!-- 基本資訊（唯讀） -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>用戶 ID</label>
+                                <label>{{ __('admin.manage_user_id') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->id }}" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>用戶名</label>
+                                <label>{{ __('admin.manage_username') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->name }}" readonly>
                             </div>
                         </div>
@@ -37,13 +37,13 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>电子邮箱</label>
+                                <label>{{ __('common.email') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->email }}" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>机构</label>
+                                <label>{{ __('common.institution') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->institution }}" readonly>
                             </div>
                         </div>
@@ -52,13 +52,13 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>注册时间</label>
+                                <label>{{ __('admin.manage_registered_at') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->created_at }}" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>最后更新时间</label>
+                                <label>{{ __('admin.manage_updated_at') }}</label>
                                 <input type="text" class="form-control" value="{{ $user->updated_at }}" readonly>
                             </div>
                         </div>
@@ -67,28 +67,28 @@
                     <hr>
 
                     <!-- 可編輯的設定 -->
-                    <h4>用戶設定</h4>
+                    <h4>{{ __('admin.manage_user_settings') }}</h4>
 
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="is_active">账号状态</label>
+                                <label for="is_active">{{ __('admin.manage_account_status') }}</label>
                                 <select name="is_active" id="is_active" class="form-control">
-                                    <option value="1" {{ $user->is_active == 1 ? 'selected' : '' }}>已激活</option>
-                                    <option value="0" {{ $user->is_active == 0 ? 'selected' : '' }}>未激活</option>
+                                    <option value="1" {{ $user->is_active == 1 ? 'selected' : '' }}>{{ __('admin.manage_activated_opt') }}</option>
+                                    <option value="0" {{ $user->is_active == 0 ? 'selected' : '' }}>{{ __('admin.manage_not_activated_opt') }}</option>
                                 </select>
-                                <small class="form-text text-muted">未激活的用戶无法登录系统</small>
+                                <small class="form-text text-muted">{{ __('admin.manage_inactive_login_hint') }}</small>
                             </div>
                         </div>
 
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="is_admin">用戶角色</label>
+                                <label for="is_admin">{{ __('admin.manage_role_col') }}</label>
                                 <select name="is_admin" id="is_admin" class="form-control">
-                                    <option value="0" {{ $user->is_admin == 0 ? 'selected' : '' }}>一般用戶</option>
-                                    <option value="1" {{ $user->is_admin == 1 ? 'selected' : '' }}>专家</option>
-                                    <option value="2" {{ $user->is_admin == 2 ? 'selected' : '' }}>眾包</option>
-                                    <option value="3" {{ $user->is_admin == 3 ? 'selected' : '' }}>系统管理员</option>
+                                    <option value="0" {{ $user->is_admin == 0 ? 'selected' : '' }}>{{ __('admin.manage_role_general') }}</option>
+                                    <option value="1" {{ $user->is_admin == 1 ? 'selected' : '' }}>{{ __('admin.manage_role_expert') }}</option>
+                                    <option value="2" {{ $user->is_admin == 2 ? 'selected' : '' }}>{{ __('admin.manage_role_crowdsource') }}</option>
+                                    <option value="3" {{ $user->is_admin == 3 ? 'selected' : '' }}>{{ __('admin.manage_role_sysadmin') }}</option>
                                 </select>
                                 <small class="form-text text-muted">
                                     @include('manage._role-descriptions')
@@ -99,17 +99,17 @@
 
                     <hr>
 
-                    <!-- 危险操作区 -->
-                    <h4 class="text-danger">危险操作</h4>
+                    <!-- 危險操作區 -->
+                    <h4 class="text-danger">{{ __('admin.manage_dangerous_ops') }}</h4>
                     <div class="row">
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>
                                     <input type="checkbox" name="delete_user" id="delete_user" value="1">
-                                    刪除此用戶
+                                    {{ __('admin.manage_delete_user') }}
                                 </label>
                                 <small class="form-text text-danger">
-                                    <strong>警告：</strong>勾選此項並儲存將會刪除該用戶帳號。此操作不可恢復！
+                                    {!! __('admin.manage_delete_warning') !!}
                                 </small>
                             </div>
                         </div>
@@ -118,10 +118,10 @@
 
                 <div class="card-footer">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa fa-save"></i> 儲存修改
+                        <i class="fa fa-save"></i> {{ __('common.save_changes') }}
                     </button>
                     <a href="{{ route('manage.index') }}" class="btn btn-secondary">
-                        <i class="fa fa-times"></i> 取消
+                        <i class="fa fa-times"></i> {{ __('common.cancel') }}
                     </a>
                 </div>
             </form>
@@ -130,9 +130,12 @@
 </div>
 
 <script>
+var _confirmDelete1 = {!! Js::from(__('admin.manage_confirm_delete_1')) !!};
+var _confirmDelete2 = {!! Js::from(__('admin.manage_confirm_delete_2')) !!};
+
 document.getElementById('delete_user').addEventListener('change', function() {
     if (this.checked) {
-        if (!confirm('您真的確定要刪除此用戶嗎？\n\n此操作不可恢復！\n\n請確認！')) {
+        if (!confirm(_confirmDelete1)) {
             this.checked = false;
         }
     }
@@ -141,7 +144,7 @@ document.getElementById('delete_user').addEventListener('change', function() {
 document.querySelector('form').addEventListener('submit', function(e) {
     const deleteCheckbox = document.getElementById('delete_user');
     if (deleteCheckbox.checked) {
-        if (!confirm('最後確認：您真的要刪除此用戶嗎？')) {
+        if (!confirm(_confirmDelete2)) {
             e.preventDefault();
             return false;
         }

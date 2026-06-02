@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import AppShell from '../../Layouts/AppShell';
 import { useTranslation } from '../../hooks/useTranslation';
+import { registerDirtyChecker } from '../../hooks/useDirtyGuard';
 import PeopleSearchPanel from '../../components/PersonBrowser/PeopleSearchPanel';
 import PeopleList, { PersonListItem, Pagination, SortOrder } from '../../components/PersonBrowser/PeopleList';
 import PersonSummaryPanel, { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
@@ -293,6 +294,11 @@ export default function PersonBrowserIndex() {
 
         action();
     }, [basicInfoEditorState.dirty]);
+
+    // ── Register dirty checker for locale switch guard ──
+    const dirtyRef = useRef(false);
+    dirtyRef.current = basicInfoEditorState.dirty;
+    useEffect(() => registerDirtyChecker(() => dirtyRef.current), []);
 
     // ── Load summary when selectedId changes ──
     useEffect(() => {

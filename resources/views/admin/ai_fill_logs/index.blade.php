@@ -14,17 +14,17 @@
                     <div class="row">
                         <div class="col-md-5">
                             <div class="form-group">
-                                <label for="search">關鍵字搜尋</label>
+                                <label for="search">{{ __('admin.ai_log_keyword') }}</label>
                                 <input type="text" class="form-control" id="search" name="search"
                                        value="{{ $filters['search'] ?? '' }}"
-                                       placeholder="搜尋原始文本、用戶名稱或郵箱">
+                                       placeholder="{{ __('admin.ai_log_search_placeholder') }}">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label for="user_id">用戶</label>
+                                <label for="user_id">{{ __('admin.ai_log_user') }}</label>
                                 <select class="form-control" id="user_id" name="user_id">
-                                    <option value="">全部用戶</option>
+                                    <option value="">{{ __('admin.ai_log_all_users') }}</option>
                                     @foreach($users as $user)
                                         <option value="{{ $user->id }}" {{ ($filters['user_id'] ?? '') == $user->id ? 'selected' : '' }}>
                                             {{ $user->name }}
@@ -35,12 +35,12 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="category">類別</label>
+                                <label for="category">{{ __('admin.ai_log_category') }}</label>
                                 <select class="form-control" id="category" name="category">
-                                    <option value="">全部類別</option>
-                                    <option value="posting" {{ ($filters['category'] ?? '') === 'posting' ? 'selected' : '' }}>任官</option>
-                                    <option value="assoc" {{ ($filters['category'] ?? '') === 'assoc' ? 'selected' : '' }}>社會關係</option>
-                                    <option value="status" {{ ($filters['category'] ?? '') === 'status' ? 'selected' : '' }}>社會區分</option>
+                                    <option value="">{{ __('admin.ai_log_all_categories') }}</option>
+                                    <option value="posting" {{ ($filters['category'] ?? '') === 'posting' ? 'selected' : '' }}>{{ __('admin.ai_log_cat_posting') }}</option>
+                                    <option value="assoc" {{ ($filters['category'] ?? '') === 'assoc' ? 'selected' : '' }}>{{ __('admin.ai_log_cat_assoc') }}</option>
+                                    <option value="status" {{ ($filters['category'] ?? '') === 'status' ? 'selected' : '' }}>{{ __('admin.ai_log_cat_status') }}</option>
                                 </select>
                             </div>
                         </div>
@@ -49,11 +49,11 @@
                                 <label>&nbsp;</label>
                                 <div>
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-search"></i> 搜尋
+                                        <i class="fas fa-search"></i> {{ __('admin.ai_log_search_btn') }}
                                     </button>
                                     @if(($filters['search'] ?? '') || ($filters['user_id'] ?? '') || ($filters['category'] ?? ''))
                                         <a href="{{ route('admin.ai-fill-logs') }}" class="btn btn-secondary ml-1">
-                                            <i class="fas fa-times"></i> 清除
+                                            <i class="fas fa-times"></i> {{ __('admin.ai_log_clear_btn') }}
                                         </a>
                                     @endif
                                 </div>
@@ -65,13 +65,13 @@
                 <!-- 統計信息 -->
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
-                    共 {{ $logs->total() }} 筆記錄，顯示第 {{ $logs->firstItem() ?? 0 }} - {{ $logs->lastItem() ?? 0 }} 筆
+                    {{ __('admin.ai_log_summary', ['total' => $logs->total(), 'first' => $logs->firstItem() ?? 0, 'last' => $logs->lastItem() ?? 0]) }}
                 </div>
 
                 <!-- 日誌列表 -->
                 @if($logs->isEmpty())
                     <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> 暫無記錄
+                        <i class="fas fa-exclamation-triangle"></i> {{ __('admin.ai_log_no_records') }}
                     </div>
                 @else
                     @foreach($logs as $log)
@@ -81,7 +81,7 @@
                             $statistics = $aiMatched['statistics'] ?? null;
                             $cardBorderClass = $log->user_submitted ? 'border-success' : 'border-info';
                             $cardHeaderClass = $log->user_submitted ? 'bg-success' : 'bg-info';
-                            $categoryLabels = ['posting' => '任官', 'assoc' => '社會關係', 'status' => '社會區分'];
+                            $categoryLabels = ['posting' => __('admin.ai_log_cat_posting'), 'assoc' => __('admin.ai_log_cat_assoc'), 'status' => __('admin.ai_log_cat_status')];
                             $categoryBadgeClasses = ['posting' => 'badge-primary', 'assoc' => 'badge-info', 'status' => 'badge-warning'];
                             $logCategory = $log->category ?? 'posting';
                         @endphp
@@ -93,7 +93,7 @@
                                         <span class="badge {{ $categoryBadgeClasses[$logCategory] ?? 'badge-secondary' }} ml-2">{{ $categoryLabels[$logCategory] ?? $logCategory }}</span>
                                         <span class="ml-2">
                                             <i class="fas fa-user"></i>
-                                            {{ $log->user_name ?? '未知用戶' }}
+                                            {{ $log->user_name ?? __('admin.ai_log_unknown_user') }}
                                             @if($log->user_email)
                                                 <small>({{ $log->user_email }})</small>
                                             @endif
@@ -102,15 +102,15 @@
                                             <i class="fas fa-id-badge"></i>
                                             @if($logCategory === 'assoc')
                                                 <a href="{{ route('basicinformation.assoc.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    人物 #{{ $log->c_personid }}
+                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
                                                 </a>
                                             @elseif($logCategory === 'status')
                                                 <a href="{{ route('basicinformation.statuses.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    人物 #{{ $log->c_personid }}
+                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
                                                 </a>
                                             @else
                                                 <a href="{{ route('basicinformation.offices.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    人物 #{{ $log->c_personid }}
+                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
                                                 </a>
                                             @endif
                                         </span>
@@ -127,9 +127,9 @@
                                     </div>
                                     <div>
                                         @if($log->user_submitted)
-                                            <span class="badge badge-light">已提交</span>
+                                            <span class="badge badge-light">{{ __('admin.ai_log_submitted') }}</span>
                                         @else
-                                            <span class="badge badge-light">未提交</span>
+                                            <span class="badge badge-light">{{ __('admin.ai_log_not_submitted') }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -137,7 +137,7 @@
                             <div class="card-body">
                                 <!-- 原始文本 -->
                                 <div class="mb-3">
-                                    <h6><i class="fas fa-file-alt text-primary"></i> 原始史料：</h6>
+                                    <h6><i class="fas fa-file-alt text-primary"></i> {{ __('admin.ai_log_source_text') }}</h6>
                                     <div class="alert alert-light mb-2">
                                         {{ $log->source_text }}
                                     </div>
@@ -146,14 +146,14 @@
                                 <!-- 匹配統計 -->
                                 @if($statistics)
                                     <div class="mb-3">
-                                        <span class="badge badge-success">匹配 {{ $statistics['matched_count'] ?? 0 }}</span>
+                                        <span class="badge badge-success">{{ __('admin.ai_log_matched', ['count' => $statistics['matched_count'] ?? 0]) }}</span>
                                         @if(($statistics['suggested_count'] ?? 0) > 0)
-                                            <span class="badge badge-warning">建議 {{ $statistics['suggested_count'] }}</span>
+                                            <span class="badge badge-warning">{{ __('admin.ai_log_suggested', ['count' => $statistics['suggested_count']]) }}</span>
                                         @endif
                                         @if(($statistics['not_found_count'] ?? 0) > 0)
-                                            <span class="badge badge-info">未匹配 {{ $statistics['not_found_count'] }}</span>
+                                            <span class="badge badge-info">{{ __('admin.ai_log_not_matched', ['count' => $statistics['not_found_count']]) }}</span>
                                         @endif
-                                        <span class="badge badge-secondary">空 {{ $statistics['empty_count'] ?? 0 }}</span>
+                                        <span class="badge badge-secondary">{{ __('admin.ai_log_empty', ['count' => $statistics['empty_count'] ?? 0]) }}</span>
                                     </div>
                                 @endif
 
@@ -173,7 +173,7 @@
                                 <!-- 比較按鈕 -->
                                 @if($hasComparison)
                                     <button type="button" class="btn btn-info mb-3" data-toggle="modal" data-target="#modal-compare-{{ $log->id }}">
-                                        <i class="fas fa-columns"></i> 比較
+                                        <i class="fas fa-columns"></i> {{ __('admin.ai_log_compare_btn') }}
                                     </button>
                                 @endif
 
@@ -182,8 +182,8 @@
                                     <div class="mb-3">
                                         <h6>
                                             <a class="collapsed" data-toggle="collapse" href="#ai-raw-{{ $log->id }}" role="button">
-                                                <i class="fas fa-chevron-right"></i> AI 原始回應
-                                                <small class="text-muted">({{ strlen($log->ai_raw) }} 字符)</small>
+                                                <i class="fas fa-chevron-right"></i> {{ __('admin.ai_log_ai_raw') }}
+                                                <small class="text-muted">({{ __('admin.ai_log_chars', ['count' => strlen($log->ai_raw)]) }})</small>
                                             </a>
                                         </h6>
                                         <div class="collapse" id="ai-raw-{{ $log->id }}">
@@ -197,8 +197,8 @@
                                     <div class="mb-3">
                                         <h6>
                                             <a class="collapsed" data-toggle="collapse" href="#ai-matched-{{ $log->id }}" role="button">
-                                                <i class="fas fa-chevron-right"></i> AI 匹配結果
-                                                <small class="text-muted">({{ strlen($log->ai_matched) }} 字符)</small>
+                                                <i class="fas fa-chevron-right"></i> {{ __('admin.ai_log_ai_matched') }}
+                                                <small class="text-muted">({{ __('admin.ai_log_chars', ['count' => strlen($log->ai_matched)]) }})</small>
                                             </a>
                                         </h6>
                                         <div class="collapse" id="ai-matched-{{ $log->id }}">
@@ -212,8 +212,8 @@
                                     <div class="mb-3">
                                         <h6>
                                             <a class="collapsed" data-toggle="collapse" href="#user-submitted-{{ $log->id }}" role="button">
-                                                <i class="fas fa-chevron-right"></i> 用戶提交數據
-                                                <small class="text-muted">({{ strlen($log->user_submitted) }} 字符)</small>
+                                                <i class="fas fa-chevron-right"></i> {{ __('admin.ai_log_user_submitted') }}
+                                                <small class="text-muted">({{ __('admin.ai_log_chars', ['count' => strlen($log->user_submitted)]) }})</small>
                                             </a>
                                         </h6>
                                         <div class="collapse" id="user-submitted-{{ $log->id }}">
@@ -232,19 +232,19 @@
                                         <div class="modal-header">
                                             <h4 class="modal-title">
                                                 <i class="fas fa-columns"></i>
-                                                #{{ $log->id }} - AI 匹配結果 vs 用戶提交 比較
+                                                {{ __('admin.ai_log_modal_title', ['id' => $log->id]) }}
                                             </h4>
                                             <button type="button" class="close" data-dismiss="modal">&times;</button>
                                         </div>
                                         <div class="modal-body" style="word-break: break-all;">
                                             <div class="alert alert-light mb-3">
-                                                <strong><i class="fas fa-file-alt text-primary"></i> 原始史料：</strong>
+                                                <strong><i class="fas fa-file-alt text-primary"></i> {{ __('admin.ai_log_modal_source') }}</strong>
                                                 {{ $log->source_text }}
                                             </div>
                                             @include('components.ai-fill-diff-table', ['rows' => $log->comparison_rows])
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">關閉</button>
+                                            <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('admin.ai_log_close') }}</button>
                                         </div>
                                     </div>
                                 </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Validation\Rule;
 
 class LocaleController extends Controller
 {
@@ -13,7 +14,7 @@ class LocaleController extends Controller
         $available = config('app.available_locales', ['zh-TW', 'en']);
 
         $request->validate([
-            'locale' => ['required', 'string', 'in:' . implode(',', $available)],
+            'locale' => ['required', 'string', Rule::in($available)],
         ]);
 
         $locale = $request->input('locale');

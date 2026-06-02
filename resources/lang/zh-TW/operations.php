@@ -53,4 +53,11 @@ return [
     'revert_confirm'        => '將以你的名義對該資源進行一次修改，恢復至本次改動之前，是否繼續？',
     'history_label'         => '正在顯示人物的歷史記錄',
     'view_history'          => '查看本頁歷史記錄',
+
+    // Crowdsourcing table headers
+    'resource_tts'          => '資源 TTS',
+    'count'                 => '次數',
+    'entry_time'            => '錄入時間',
+    'status_label'          => '狀態',
+    'person_label'          => '人物',
 ];

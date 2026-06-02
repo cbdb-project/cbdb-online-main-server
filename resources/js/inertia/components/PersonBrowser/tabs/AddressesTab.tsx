@@ -11,6 +11,7 @@ import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface AddressItem {
     pk: {
@@ -42,6 +43,7 @@ interface Props {
 }
 
 export default function AddressesTab({ data, canEdit, postCE }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
 
     return (
@@ -50,10 +52,10 @@ export default function AddressesTab({ data, canEdit, postCE }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="地址 ID" value={item.addr_id} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('addr_id')} value={item.addr_id} />
                     <MetaRow
-                        label="地址"
+                        label={t('address_label')}
                         value={(
                             <AddressDisplayWithMap
                                 labelChn={item.addr_chn}
@@ -66,13 +68,13 @@ export default function AddressesTab({ data, canEdit, postCE }: Props) {
                             />
                         )}
                     />
-                    <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
+                    <MetaRow label={t('type_label')} value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
+                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
                     <MetaRow
-                        label="經緯度"
+                        label={t('coordinates')}
                         value={item.latitude !== null && item.longitude !== null ? `${item.longitude}, ${item.latitude}` : null}
                     />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />

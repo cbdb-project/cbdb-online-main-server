@@ -7,6 +7,7 @@ import QueryResultTable from '../../components/QueryPlayground/QueryResultTable'
 import QbeBuilder from '../../components/QueryPlayground/QbeBuilder';
 import NlQueryPanel from '../../components/QueryPlayground/NlQueryPanel';
 import HistoricalQaPanel from '../../components/QueryPlayground/HistoricalQaPanel';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface QbeTable {
     name: string;
@@ -48,6 +49,8 @@ export default function Index() {
         answerFromNlEndpoint,
         answerFromNlStreamEndpoint,
     } = props;
+
+    const t = useTranslation('query');
 
     // Determine initial mode from URL
     const getInitialMode = (): PlaygroundMode => {
@@ -199,10 +202,10 @@ export default function Index() {
                 {/* Header */}
                 <div style={{ marginBottom: 20 }}>
                     <h2 style={{ margin: '0 0 4px', fontSize: '1.4rem', fontWeight: 700, color: '#212529' }}>
-                        SQL 查詢練習場
+                        {t('page_title')}
                     </h2>
                     <p style={{ margin: 0, color: '#6c757d', fontSize: '0.85rem' }}>
-                        本功能目前處於測試階段，請適度使用以維護系統穩定
+                        {t('beta_notice')}
                     </p>
                 </div>
 
@@ -268,7 +271,7 @@ export default function Index() {
                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                         zIndex: 1000,
                     }}>
-                        ✓ 連結已複製到剪貼簿
+                        {t('link_copied')}
                     </div>
                 )}
 
@@ -283,7 +286,7 @@ export default function Index() {
                         fontSize: '0.85rem',
                         color: '#721c24',
                     }}>
-                        <strong>⚠ 錯誤：</strong>{error}
+                        <strong>{t('error_prefix')}</strong>{error}
                     </div>
                 )}
 
@@ -303,11 +306,11 @@ export default function Index() {
                                 marginBottom: 12,
                             }}>
                                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#212529' }}>
-                                    查詢結果
+                                    {t('query_results_title')}
                                 </h3>
                                 {result && (
                                     <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                                        {result.rows.length} 筆結果
+                                        {result.rows.length} {t('results_count_suffix')}
                                     </span>
                                 )}
                             </div>
@@ -315,7 +318,7 @@ export default function Index() {
                             {loading ? (
                                 <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
                                     <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
-                                    查詢執行中…
+                                    {t('query_executing')}
                                 </div>
                             ) : result ? (
                                 <QueryResultTable

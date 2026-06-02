@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import AppShell from '../../Layouts/AppShell';
+import { useTranslation } from '../../hooks/useTranslation';
 import PeopleSearchPanel from '../../components/PersonBrowser/PeopleSearchPanel';
 import PeopleList, { PersonListItem, Pagination, SortOrder } from '../../components/PersonBrowser/PeopleList';
 import PersonSummaryPanel, { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
@@ -47,6 +48,8 @@ export default function PersonBrowserIndex() {
         initialTab,
         initialPage,
     } = usePage<PageProps>().props;
+
+    const tPerson = useTranslation('person');
 
     // ── Core state ──
     const [keyword, setKeyword] = useState(initialKeyword || '');
@@ -458,13 +461,13 @@ export default function PersonBrowserIndex() {
                 >
                     {isMobile ? (
                         <div style={mobileSidebarHeaderStyle}>
-                            <div style={mobileSidebarTitleStyle}>人物列表</div>
+                            <div style={mobileSidebarTitleStyle}>{tPerson('person_list')}</div>
                             <button
                                 type="button"
                                 style={mobileSidebarCloseButtonStyle}
                                 onClick={() => setSidebarOpen(false)}
                             >
-                                收起
+                                {tPerson('collapse')}
                             </button>
                         </div>
                     ) : null}
@@ -490,10 +493,10 @@ export default function PersonBrowserIndex() {
                                 style={mobileSidebarToggleButtonStyle}
                                 onClick={() => setSidebarOpen(true)}
                             >
-                                人物列表
+                                {tPerson('person_list')}
                             </button>
                             <div style={mobileToolbarMetaStyle}>
-                                {selectedId != null ? `人物 #${selectedId}` : '尚未選擇人物'}
+                                {selectedId != null ? `${tPerson('person')} #${selectedId}` : tPerson('no_person_selected')}
                             </div>
                         </div>
                     ) : null}
@@ -527,16 +530,16 @@ export default function PersonBrowserIndex() {
 
             <SelectionDialog
                 isOpen={showUnsavedDialog}
-                title="尚有未儲存的修改"
+                title={tPerson('unsaved_changes')}
                 width={560}
                 onClose={handleStayOnPage}
                 footer={(
                     <>
                         <button type="button" style={dialogSecondaryButtonStyle} onClick={handleStayOnPage}>
-                            留在本頁
+                            {tPerson('stay_on_page')}
                         </button>
                         <button type="button" style={dialogNeutralButtonStyle} onClick={handleDiscardAndContinue}>
-                            不儲存並離開
+                            {tPerson('leave_without_saving')}
                         </button>
                         <button
                             type="button"
@@ -546,13 +549,13 @@ export default function PersonBrowserIndex() {
                             }}
                             disabled={savingBeforeNavigate || !basicInfoEditorState.dirty}
                         >
-                            {savingBeforeNavigate ? '儲存中…' : '儲存並繼續'}
+                            {savingBeforeNavigate ? tPerson('saving') : tPerson('save_and_continue')}
                         </button>
                     </>
                 )}
             >
                 <div style={dialogBodyTextStyle}>
-                    目前的人物基本信息仍在編輯中，且有未儲存的修改。如果你希望保留這次修改，請先儲存，再切換到其他人物或頁籤。
+                    {tPerson('unsaved_changes_warning')}
                 </div>
             </SelectionDialog>
         </AppShell>

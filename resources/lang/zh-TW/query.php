@@ -59,4 +59,12 @@ return [
     'qa_model'                 => '📚 模型補充',
     'qa_hide_details'          => '▼ 隱藏詳細資訊',
     'qa_show_details'          => '▶ 顯示詳細資訊（SQL、證據來源）',
+
+    'page_title'            => 'SQL 查詢練習場',
+    'beta_notice'           => '本功能目前處於測試階段，請適度使用以維護系統穩定',
+    'link_copied'           => '✓ 連結已複製到剪貼簿',
+    'error_prefix'          => '⚠ 錯誤：',
+    'query_results_title'   => '查詢結果',
+    'results_count_suffix'  => '筆結果',
+    'query_executing'       => '查詢執行中…',
 ];

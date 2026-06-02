@@ -10,6 +10,7 @@ import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface EntryItem {
     pk: {
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export default function EntriesTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
 
     return (
@@ -49,12 +51,12 @@ export default function EntriesTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="入仕方式" value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
-                    <MetaRow label="入仕代碼" value={item.entry_code} />
-                    <MetaRow label="年份" value={item.year} />
-                    <MetaRow label="親屬關聯" value={item.kin_summary} />
-                    <MetaRow label="社會關聯" value={item.assoc_summary} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('entry_type_label')} value={formatBilingualLabel(item.entry_desc_chn, item.entry_desc)} />
+                    <MetaRow label={t('entry_code_label')} value={item.entry_code} />
+                    <MetaRow label={t('year_label')} value={item.year} />
+                    <MetaRow label={t('kin_relation')} value={item.kin_summary} />
+                    <MetaRow label={t('social_relation')} value={item.assoc_summary} />
                     <CardActions>
                         <LegacyEditButton tabKey="entries" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="entries" pk={item.pk} canEdit={canEdit} />

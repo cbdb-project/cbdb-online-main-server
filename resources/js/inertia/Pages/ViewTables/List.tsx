@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import AppShell from '../../Layouts/AppShell';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface ViewDefinition {
     key: string;
@@ -18,6 +19,7 @@ interface Props {
 
 export default function List({ views }: Props) {
     const [query, setQuery] = useState('');
+    const t = useTranslation('views');
 
     const filteredViews = useMemo(() => {
         const keyword = query.trim().toLowerCase();
@@ -42,26 +44,26 @@ export default function List({ views }: Props) {
         <AppShell>
             <div style={{ padding: '24px 24px 48px' }}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>檢視表總覽</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>{t('views_overview_title')}</h2>
                 </div>
 
                 <div style={sectionStyle}>
                     <div style={sectionBodyStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                             <div style={{ color: '#6c757d', fontSize: '0.85rem' }}>
-                                共 {views.length} 個檢視，目前顯示 {filteredViews.length} 個
+                                {t('views_count_summary', { total: String(views.length), shown: String(filteredViews.length) })}
                             </div>
                             <div style={filterBarStyle}>
                                 <input
                                     type="text"
                                     value={query}
                                     onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="搜尋 key、別名、中文名稱或說明"
+                                    placeholder={t('search_placeholder')}
                                     style={searchInputStyle}
                                 />
                                 {query !== '' && (
                                     <button type="button" onClick={() => setQuery('')} style={clearButtonStyle}>
-                                        清除
+                                        {t('clear')}
                                     </button>
                                 )}
                             </div>
@@ -70,7 +72,7 @@ export default function List({ views }: Props) {
                 </div>
 
                 <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>檢視列表</div>
+                    <div style={sectionHeaderStyle}>{t('view_list')}</div>
                     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                         <table style={{
                             width: '100%',
@@ -80,17 +82,17 @@ export default function List({ views }: Props) {
                         }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                    <th style={thStyle}>檢視名稱 (ENG)</th>
-                                    <th style={thStyle}>檢視名稱 (CHN)</th>
-                                    <th style={thStyle}>說明</th>
-                                    <th style={thStyle}>欄位數</th>
+                                    <th style={thStyle}>{t('view_name_en')}</th>
+                                    <th style={thStyle}>{t('view_name_zh')}</th>
+                                    <th style={thStyle}>{t('description')}</th>
+                                    <th style={thStyle}>{t('column_count')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredViews.length === 0 && (
                                     <tr>
                                         <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: '#6c757d', padding: '28px 12px' }}>
-                                            找不到符合條件的檢視表。
+                                            {t('no_views_found')}
                                         </td>
                                     </tr>
                                 )}

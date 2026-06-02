@@ -10,6 +10,7 @@ import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface TextItem {
     pk: {
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function TextsTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
 
     return (
@@ -40,10 +42,10 @@ export default function TextsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="著作 ID" value={item.text_id} />
-                    <MetaRow label="著作" value={formatBilingualLabel(item.title_chn, item.title)} />
-                    <MetaRow label="年份" value={item.year} />
-                    <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
+                    <MetaRow label={t('text_id')} value={item.text_id} />
+                    <MetaRow label={t('text_title')} value={formatBilingualLabel(item.title_chn, item.title)} />
+                    <MetaRow label={t('year_label')} value={item.year} />
+                    <MetaRow label={t('role_label')} value={formatBilingualLabel(item.role_chn, item.role)} />
                     <CardActions>
                         <LegacyEditButton tabKey="texts" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="texts" pk={item.pk} canEdit={canEdit} />

@@ -13,6 +13,7 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface PostingItem {
     pk: {
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export default function PostingsTab({ data, canEdit, postCE }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -58,13 +60,13 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="官職 ID" value={item.office_id} />
-                    <MetaRow label="官名" value={formatBilingualLabel(item.office_chn, item.office)} />
-                    <MetaRow label="任期" value={item.tenure_summary} />
-                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('office_id')} value={item.office_id} />
+                    <MetaRow label={t('office_name')} value={formatBilingualLabel(item.office_chn, item.office)} />
+                    <MetaRow label={t('tenure')} value={item.tenure_summary} />
+                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
                     <MetaRow
-                        label="地址"
+                        label={t('address_label')}
                         value={item.addresses.length > 0 ? (
                             <span style={addressListStyle}>
                                 {item.addresses.map((address, index) => (
@@ -84,9 +86,9 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
                             </span>
                         ) : item.address_summary}
                     />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="postings" pk={item.pk} canEdit={canEdit} />

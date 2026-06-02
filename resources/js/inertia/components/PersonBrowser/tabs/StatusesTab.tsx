@@ -12,6 +12,7 @@ import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface StatusItem {
     pk: {
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export default function StatusesTab({ data, canEdit, postCE }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -46,13 +48,13 @@ export default function StatusesTab({ data, canEdit, postCE }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="身份" value={formatBilingualLabel(item.status_chn, item.status)} />
-                    <MetaRow label="身份代碼" value={item.status_code} />
-                    <MetaRow label="時間範圍" value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('status_label')} value={formatBilingualLabel(item.status_chn, item.status)} />
+                    <MetaRow label={t('status_code_label')} value={item.status_code} />
+                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="statuses" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="statuses" pk={item.pk} canEdit={canEdit} />

@@ -1075,7 +1075,7 @@ function formatCodePreview(selectedCodes: number[], allCodes: EntryCode[], t: TF
     });
 
     return selectedCodes.length > 3
-        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedCodes.length) })}`
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedCodes.length - 3) })}`
         : preview.join('、');
 }
 
@@ -1086,7 +1086,7 @@ function formatPlacePreview(places: PlaceOption[], includeSubUnits: boolean, t: 
 
     const preview = places.slice(0, 3).map((place) => place.c_name_chn || place.c_name || `ADDR ${place.c_addr_id}`);
     const label = places.length > 3
-        ? `${preview.join('、')} ${t('and_n_more', { count: String(places.length) })}`
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(places.length - 3) })}`
         : preview.join('、');
 
     return includeSubUnits ? `${label}${t('includes_subunits_suffix')}` : label;
@@ -1104,7 +1104,7 @@ function formatDynastyPreview(selectedDynastyCodes: string[], dynasties: Dynasty
     });
 
     return selectedDynastyCodes.length > 3
-        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedDynastyCodes.length) })}`
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedDynastyCodes.length - 3) })}`
         : preview.join('、');
 }
 

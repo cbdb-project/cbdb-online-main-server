@@ -7,6 +7,7 @@ interface ViewDefinition {
     key: string;
     primary_alias: string;
     title: string;
+    title_en: string;
     title_chn: string;
     description: string;
     aliases: string[];
@@ -32,7 +33,7 @@ export default function List({ views }: Props) {
             const haystack = [
                 view.key,
                 view.primary_alias,
-                view.title,
+                view.title_en,
                 view.title_chn,
                 view.description,
                 ...view.aliases,
@@ -110,7 +111,10 @@ export default function List({ views }: Props) {
                                             >
                                                 {view.primary_alias}
                                             </Link>
-                                            <div style={{ color: '#6c757d', fontSize: '0.78rem', marginTop: 4 }}>
+                                            <div style={{ color: '#444', fontSize: '0.8rem', marginTop: 3 }}>
+                                                {view.title_en}
+                                            </div>
+                                            <div style={{ color: '#6c757d', fontSize: '0.78rem', marginTop: 2 }}>
                                                 key: <code>{view.key}</code>
                                             </div>
                                             {view.aliases.length > 1 && (

@@ -8,15 +8,17 @@ interface AppShellProps {
 }
 
 export default function AppShell({ children }: AppShellProps) {
-    const { app, locale } = usePage<{ app?: { version?: string }; locale?: string }>().props;
+    const { app, locale, locale_url } =
+        usePage<{ app?: { version?: string }; locale?: string; locale_url?: string }>().props;
     const version = app?.version || 'unknown';
     const currentLocale = locale ?? 'zh-TW';
+    const localeEndpoint = locale_url ?? '/locale';
     const tNav = useTranslation('nav');
 
     const switchLocale = () => {
         // Locale switch causes a full Inertia re-mount; unsaved page state will be lost.
         const next = currentLocale === 'zh-TW' ? 'en' : 'zh-TW';
-        router.post('/locale', { locale: next });
+        router.post(localeEndpoint, { locale: next });
     };
 
     return (

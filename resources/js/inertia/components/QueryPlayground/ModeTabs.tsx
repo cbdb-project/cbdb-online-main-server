@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export type PlaygroundMode = 'sql' | 'nl' | 'qbe' | 'qa';
 
@@ -7,14 +8,23 @@ interface Props {
     onModeChange: (mode: PlaygroundMode) => void;
 }
 
-const modes: { key: PlaygroundMode; label: string; icon: string }[] = [
-    { key: 'sql', label: 'SQL 查詢', icon: '⌨' },
-    { key: 'nl', label: '自然語言', icon: '💬' },
-    { key: 'qbe', label: '查詢設計 (QBE)', icon: '🔧' },
-    { key: 'qa', label: '歷史問答', icon: '📖' },
-];
+const MODE_ICONS: Record<PlaygroundMode, string> = {
+    sql: '⌨',
+    nl: '💬',
+    qbe: '🔧',
+    qa: '📖',
+};
 
 export default function ModeTabs({ activeMode, onModeChange }: Props) {
+    const t = useTranslation('query');
+
+    const modes = useMemo(() => [
+        { key: 'sql' as PlaygroundMode, label: t('mode_sql'), icon: MODE_ICONS.sql },
+        { key: 'nl'  as PlaygroundMode, label: t('mode_nl'),  icon: MODE_ICONS.nl  },
+        { key: 'qbe' as PlaygroundMode, label: t('mode_qbe'), icon: MODE_ICONS.qbe },
+        { key: 'qa'  as PlaygroundMode, label: t('mode_qa'),  icon: MODE_ICONS.qa  },
+    ], [t]);
+
     return (
         <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #dee2e6' }}>
             {modes.map(({ key, label, icon }) => {

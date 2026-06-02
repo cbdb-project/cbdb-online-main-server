@@ -1,5 +1,6 @@
 import React from 'react';
 import { APP_THEME } from '../../theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface TabDef {
     key: string;
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Props) {
+    const tPerson = useTranslation('person');
+
     const handleTabClick = (event: React.MouseEvent<HTMLButtonElement>, key: string) => {
         event.currentTarget.blur();
         onTabChange(key);
@@ -21,23 +24,27 @@ export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Pr
 
     return (
         <div style={barStyle}>
-            {tabs.map((t) => {
-                const isActive = t.key === activeTab;
-                const count = counts[t.key];
+            {tabs.map((tab) => {
+                const isActive = tab.key === activeTab;
+                const count = counts[tab.key];
+                // Try translated label first (tab_<key>), fall back to static label
+                const translationKey = `tab_${tab.key}`;
+                const translated = tPerson(translationKey);
+                const label = translated !== translationKey ? translated : tab.label;
                 return (
                     <button
                         type="button"
-                        key={t.key}
+                        key={tab.key}
                         onPointerDown={(event) => event.preventDefault()}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={(event) => handleTabClick(event, t.key)}
+                        onClick={(event) => handleTabClick(event, tab.key)}
                         style={{
                             ...tabStyle,
                             ...(isActive ? activeTabStyle : {}),
                         }}
                     >
-                        {t.label}
-                        {count != null && count > 0 && t.key !== 'basic_info' && (
+                        {label}
+                        {count != null && count > 0 && tab.key !== 'basic_info' && (
                             <span style={badgeStyle}>{count}</span>
                         )}
                     </button>

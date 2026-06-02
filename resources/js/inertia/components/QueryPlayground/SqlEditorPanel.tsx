@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { formatSql } from '../../../utils/sqlFormatter';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface Props {
     sql: string;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default function SqlEditorPanel({ sql, onSqlChange, onExecute, onShare, loading, disabled }: Props) {
+    const t = useTranslation('query');
+
     const handleFormat = useCallback(() => {
         if (sql.trim()) {
             onSqlChange(formatSql(sql));
@@ -29,17 +32,17 @@ export default function SqlEditorPanel({ sql, onSqlChange, onExecute, onShare, l
         <div>
             <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40' }}>
-                    SQL 語句
+                    {t('sql_label')}
                 </label>
                 <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
-                    Ctrl+Enter 執行
+                    {t('sql_shortcut')}
                 </span>
             </div>
             <textarea
                 value={sql}
                 onChange={(e) => onSqlChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="輸入 SQL 查詢語句，例如：SELECT * FROM DYNASTIES"
+                placeholder={t('sql_editor_placeholder')}
                 rows={6}
                 disabled={disabled}
                 style={{
@@ -62,21 +65,21 @@ export default function SqlEditorPanel({ sql, onSqlChange, onExecute, onShare, l
                     disabled={loading || !sql.trim() || disabled}
                     style={primaryBtnStyle(loading || !sql.trim() || !!disabled)}
                 >
-                    {loading ? '查詢中…' : '▶ 執行查詢'}
+                    {loading ? t('querying') : t('run_query')}
                 </button>
                 <button
                     onClick={handleFormat}
                     disabled={!sql.trim() || disabled}
                     style={secondaryBtnStyle(!sql.trim() || !!disabled)}
                 >
-                    格式化 SQL
+                    {t('sql_format')}
                 </button>
                 <button
                     onClick={onShare}
                     disabled={!sql.trim()}
                     style={secondaryBtnStyle(!sql.trim())}
                 >
-                    🔗 分享連結
+                    {t('sql_share')}
                 </button>
             </div>
         </div>

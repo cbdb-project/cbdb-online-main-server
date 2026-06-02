@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface Props {
     columns: string[];
@@ -10,10 +11,12 @@ interface Props {
 }
 
 export default function QueryResultTable({ columns, rows, page, hasMore, loading, onPageChange }: Props) {
+    const t = useTranslation('query');
+
     if (columns.length === 0 && rows.length === 0) {
         return (
             <div style={{ padding: 24, textAlign: 'center', color: '#6c757d', fontSize: '0.9rem' }}>
-                尚無查詢結果。請輸入 SQL 並執行查詢。
+                {t('results_empty_hint')}
             </div>
         );
     }
@@ -55,7 +58,7 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                                     colSpan={columns.length}
                                     style={{ padding: '24px 10px', textAlign: 'center', color: '#6c757d', borderBottom: '1px solid #dee2e6' }}
                                 >
-                                    查詢結果為空
+                                    {t('empty_results')}
                                 </td>
                             </tr>
                         ) : (
@@ -93,7 +96,9 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                 color: '#495057',
             }}>
                 <span>
-                    第 {page} 頁 · 顯示 {rows.length} 筆{hasMore ? '（還有更多）' : ''}
+                    {hasMore
+                        ? t('results_page_info_more', { page: String(page), rows: String(rows.length) })
+                        : t('results_page_info', { page: String(page), rows: String(rows.length) })}
                 </span>
                 <div style={{ display: 'flex', gap: 4 }}>
                     <button
@@ -101,14 +106,14 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                         onClick={() => onPageChange(page - 1)}
                         style={paginationBtnStyle(page <= 1 || loading)}
                     >
-                        ‹ 上一頁
+                        {t('prev_page')}
                     </button>
                     <button
                         disabled={!hasMore || loading}
                         onClick={() => onPageChange(page + 1)}
                         style={paginationBtnStyle(!hasMore || loading)}
                     >
-                        下一頁 ›
+                        {t('next_page')}
                     </button>
                 </div>
             </div>

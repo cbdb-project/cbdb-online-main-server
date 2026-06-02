@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { APP_THEME } from '../../theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface DynastyOption {
     c_dy: number;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function PeopleSearchPanel({ keyword, dynasty, dynastyOptions, onSearch, onClear }: Props) {
+    const t = useTranslation('person');
     const [input, setInput] = useState(keyword);
     const [selectedDynasty, setSelectedDynasty] = useState(dynasty);
 
@@ -59,7 +61,7 @@ export default function PeopleSearchPanel({ keyword, dynasty, dynastyOptions, on
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="搜尋人物（ID / 姓名 / 拼音）"
+                placeholder={t('search_placeholder')}
                 style={inputStyle}
             />
             <select
@@ -67,7 +69,7 @@ export default function PeopleSearchPanel({ keyword, dynasty, dynastyOptions, on
                 onChange={handleDynastyChange}
                 style={selectStyle}
             >
-                <option value="">全部朝代{total > 0 ? ` (${total})` : ''}</option>
+                <option value="">{t('all_dynasties')}{total > 0 ? ` (${total})` : ''}</option>
                 {dynastyOptions.map((d) => (
                     <option key={d.c_dy} value={String(d.c_dy)}>
                         {d.label} ({d.count})
@@ -76,11 +78,11 @@ export default function PeopleSearchPanel({ keyword, dynasty, dynastyOptions, on
             </select>
             <div style={btnGroupStyle}>
                 <button type="submit" style={searchBtnStyle}>
-                    搜尋
+                    {t('search_btn')}
                 </button>
                 {(keyword || dynasty) && (
                     <button type="button" onClick={handleClear} style={clearBtnStyle}>
-                        清除
+                        {t('clear_btn')}
                     </button>
                 )}
             </div>

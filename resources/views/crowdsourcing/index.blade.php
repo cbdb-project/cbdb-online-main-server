@@ -9,7 +9,7 @@
 
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">最近眾包錄入記錄</h3>
+            <h3 class="card-title">{{ __('nav.crowdsourcing_records') }}</h3>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -20,15 +20,15 @@
                 <thead>
                 <tr>
 
-                    <th>修改資源</th>
-                    <th>修改值</th>
-                    <th>資源 TTS</th>
-                    <th>修改類型</th>
-                    <th>修改人</th>
-                    <th>次數</th>
-                    <th>錄入時間</th>
-                    <th>狀態</th>
-                    <th>操作</th>
+                    <th>{{ __('operations.modified_resource') }}</th>
+                    <th>{{ __('operations.modified_value') }}</th>
+                    <th>{{ __('operations.resource_tts') }}</th>
+                    <th>{{ __('operations.operation_type') }}</th>
+                    <th>{{ __('operations.modified_by') }}</th>
+                    <th>{{ __('operations.count') }}</th>
+                    <th>{{ __('operations.entry_time') }}</th>
+                    <th>{{ __('operations.status_label') }}</th>
+                    <th>{{ __('codes.actions') }}</th>
                 </tr>
                 </thead>
                 <tbody>

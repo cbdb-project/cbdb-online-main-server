@@ -36,7 +36,7 @@ use App\Support\CompositePrimaryKey;
         <div class="card-body">
             @if(!empty($history_context))
                 <div class="alert alert-info py-2 px-3">
-                    正在顯示人物 {{ $history_context['person_id'] }} 的「{{ $history_context['label'] }}」歷史記錄。
+                    {{ __('operations.history_label') }} {{ $history_context['person_id'] }}「{{ $history_context['label'] }}」
                 </div>
             @endif
             <form method="GET" action="{{ route('operations.index') }}" class="form-inline" style="margin-bottom: 15px;" id="operations-filters">
@@ -50,7 +50,7 @@ use App\Support\CompositePrimaryKey;
 
                 {{-- 修改人篩選 --}}
                 <div class="form-group mr-3">
-                    <label class="mr-1">修改人：</label>
+                    <label class="mr-1">{{ __('operations.modified_by') }}：</label>
                     <input type="text" name="editor" class="form-control form-control-sm"
                            placeholder="名稱或 ID" value="{{ request('editor', '') }}" style="width: 150px;">
                 </div>
@@ -59,15 +59,15 @@ use App\Support\CompositePrimaryKey;
                     {{-- 提案狀態篩選 --}}
                     @php
                         $statusOptions = [
-                            'pending' => '待審核',
-                            'approved' => '已核准',
-                            'rejected' => '已退修',
-                            'cancelled' => '已撤回',
+                            'pending'   => __('operations.status_pending'),
+                            'approved'  => __('operations.status_approved'),
+                            'rejected'  => __('operations.status_rejected'),
+                            'cancelled' => __('operations.status_withdrawn'),
                         ];
                         $selectedStatuses = $status_filters ?? [];
                     @endphp
                     <div class="form-group mr-3">
-                        <label class="mr-1">提案狀態：</label>
+                        <label class="mr-1">{{ __('operations.proposal_desc') }}：</label>
                         @foreach($statusOptions as $value => $label)
                             <label class="form-check-inline mr-2">
                                 <input type="checkbox" name="status[]" value="{{ $value }}" {{ in_array($value, $selectedStatuses, true) ? 'checked' : '' }}>
@@ -79,15 +79,15 @@ use App\Support\CompositePrimaryKey;
                     {{-- 修改類型篩選（僅一般模式） --}}
                     @php
                         $opTypeOptions = [
-                            1 => '新增',
-                            2 => '整體覆寫',
-                            3 => '修改',
-                            4 => '刪除',
+                            1 => __('operations.op_create'),
+                            2 => __('operations.op_overwrite'),
+                            3 => __('operations.op_update'),
+                            4 => __('operations.op_delete'),
                         ];
                         $selectedOpTypes = array_map('intval', (array) request('op_type', []));
                     @endphp
                     <div class="form-group mr-3">
-                        <label class="mr-1">修改類型：</label>
+                        <label class="mr-1">{{ __('operations.operation_type') }}：</label>
                         @foreach($opTypeOptions as $val => $lbl)
                             <label class="form-check-inline mr-2">
                                 <input type="checkbox" name="op_type[]" value="{{ $val }}"
@@ -98,7 +98,7 @@ use App\Support\CompositePrimaryKey;
                     </div>
                 @endif
 
-                <button type="submit" class="btn btn-primary btn-sm mr-2">篩選</button>
+                <button type="submit" class="btn btn-primary btn-sm mr-2">{{ __('operations.filter') }}</button>
                 <a href="{{ route('operations.index', array_merge(
                     !empty($proposals_only) ? ['proposals_only' => 1] : [],
                     !empty($history_context) ? [
@@ -106,19 +106,19 @@ use App\Support\CompositePrimaryKey;
                         'history_page' => $history_context['page'],
                     ] : [],
                 )) }}"
-                   class="btn btn-secondary btn-sm">清除篩選</a>
+                   class="btn btn-secondary btn-sm">{{ __('operations.clear_filter') }}</a>
             </form>
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
                 <thead>
                 <tr>
-                    <th>人物</th>
-                    <th>修改資源</th>
-                    <th>資源定位</th>
-                    <th>修改值</th>
-                    <th>操作類型</th>
-                    <th>修改人</th>
-                    <th>修改時間</th>
+                    <th>{{ __('operations.person_label') }}</th>
+                    <th>{{ __('operations.modified_resource') }}</th>
+                    <th>{{ __('operations.resource_location') }}</th>
+                    <th>{{ __('operations.modified_value') }}</th>
+                    <th>{{ __('operations.operation_type') }}</th>
+                    <th>{{ __('operations.modified_by') }}</th>
+                    <th>{{ __('operations.modified_time') }}</th>
                 </tr>
                 </thead>
                 <tbody>

@@ -53,4 +53,11 @@ return [
     'revert_confirm'        => 'This will create a revert operation on this resource. Continue?',
     'history_label'         => 'Showing history for this person',
     'view_history'          => 'View page history',
+
+    // Crowdsourcing table headers
+    'resource_tts'          => 'Resource TTS',
+    'count'                 => 'Count',
+    'entry_time'            => 'Entry Time',
+    'status_label'          => 'Status',
+    'person_label'          => 'Person',
 ];

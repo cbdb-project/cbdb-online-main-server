@@ -24,18 +24,18 @@
                         <input type="text"
                                name="search"
                                class="form-control"
-                               placeholder="搜尋"
+                               placeholder="{{ __('common.search') }}"
                                value="{{ $search ?? '' }}">
                         <div class="input-group-append">
-                            <button class="btn btn-secondary" type="submit">搜尋</button>
+                            <button class="btn btn-secondary" type="submit">{{ __('common.search') }}</button>
                             @if(!empty($search))
-                                <a class="btn btn-secondary" href="{{ route('codes.show', ['table_name' => $q]) }}">清除</a>
+                                <a class="btn btn-secondary" href="{{ route('codes.show', ['table_name' => $q]) }}">{{ __('common.cancel') }}</a>
                             @endif
                         </div>
                     </div>
                 </form>
                 @if($showActions)
-                    <a class="btn btn-sm btn-secondary" href="/codes/{{ $q }}/create">新增</a>
+                    <a class="btn btn-sm btn-secondary" href="/codes/{{ $q }}/create">{{ __('common.add') }}</a>
                 @endif
             </div>
             <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
@@ -55,7 +55,7 @@
                             </th>
                         @endforeach
                         @if($showActions)
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('codes.actions') }}</th>
                         @endif
                     </tr>
                     </thead>
@@ -134,7 +134,7 @@
                             </th>
                         @endforeach
                         @if($showActions)
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('codes.actions') }}</th>
                         @endif
                     </tr>
                     </tfoot>

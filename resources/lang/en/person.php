@@ -186,6 +186,8 @@ return [
     'text_type_biography'        => 'Biographical Texts',
     'text_type_explanatory'      => 'Explanatory Texts',
 
+    'load_failed'            => 'Load failed',
+
     // PersonBrowser tab labels (BrowserTabs.tsx TAB_DEFINITIONS fallback)
     'tab_basic_info'         => 'Basic Information',
     'tab_addresses'          => 'Addresses',

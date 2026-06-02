@@ -17,10 +17,13 @@ export default function AppShell({ children }: AppShellProps) {
     const tNav = useTranslation('nav');
 
     const switchLocale = () => {
+        // NOTE: hasUnsavedChanges() only covers components that explicitly call
+        // registerDirtyChecker() (currently PersonBrowser). Pages like QueryPlayground
+        // and SearchByEntry keep drafts in local React state only — locale switch will
+        // discard them. This is intentional (transient input, not saved data).
+        // See i18n-work-plan.md for rationale.
         if (hasUnsavedChanges()) {
-            const msg = currentLocale === 'zh-TW'
-                ? '切換語言將會遺失未儲存的修改。確定要繼續嗎？'
-                : 'Switching language will discard unsaved changes. Continue?';
+            const msg = tNav('locale_switch_unsaved_warning');
             if (!window.confirm(msg)) return;
         }
         const next = currentLocale === 'zh-TW' ? 'en' : 'zh-TW';

@@ -48,6 +48,8 @@ class SetLocaleMiddleware {
             }
         }
 
-        return $available[0];
+        // 4. Fall back to the configured app default locale
+        $configured = config('app.locale', $available[0]);
+        return in_array($configured, $available, true) ? $configured : $available[0];
     }
 }

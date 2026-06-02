@@ -21,14 +21,18 @@ class ViewTableService {
 
             $translationKey = 'views.view_' . str_replace('posessions', 'possessions', str_replace('-', '_', $key));
             $translatedTitle = trans($translationKey);
+            // Localized title (follows current locale, used for ENG column)
             $title = (is_string($translatedTitle) && $translatedTitle !== $translationKey)
                 ? $translatedTitle
                 : Arr::get($definition, 'title', $key);
+            // Original Chinese title from config (always zh-TW, used for CHN column)
+            $titleChn = Arr::get($definition, 'title', $key);
 
             return [
                 'key' => $key,
                 'primary_alias' => $primaryAlias,
                 'title' => $title,
+                'title_chn' => $titleChn,
                 'description' => Arr::get($definition, 'description', ''),
                 'aliases' => $aliases,
                 'column_count' => count(Arr::get($definition, 'columns', [])),

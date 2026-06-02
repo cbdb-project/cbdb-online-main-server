@@ -7,6 +7,7 @@ interface ViewDefinition {
     key: string;
     primary_alias: string;
     title: string;
+    title_chn: string;
     description: string;
     aliases: string[];
     column_count: number;
@@ -32,6 +33,7 @@ export default function List({ views }: Props) {
                 view.key,
                 view.primary_alias,
                 view.title,
+                view.title_chn,
                 view.description,
                 ...view.aliases,
             ].join(' ').toLowerCase();
@@ -117,7 +119,7 @@ export default function List({ views }: Props) {
                                                 </div>
                                             )}
                                         </td>
-                                        <td style={tdStyle}>{view.title}</td>
+                                        <td style={tdStyle}>{view.title_chn}</td>
                                         <td style={tdStyle}>{view.description || '—'}</td>
                                         <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{view.column_count}</td>
                                     </tr>

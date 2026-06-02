@@ -56,13 +56,16 @@
             <script>
             function __submitLocaleForm() {
                 // Check if any other form on the page has unsaved changes.
-                // <select> is excluded: defaultValue is unreliable for PHP-pre-selected
-                // options and would trigger false positives on untouched edit forms.
                 var editForms = document.querySelectorAll('form:not(#__locale-form)');
                 var dirty = Array.from(editForms).some(function(f) {
                     return Array.from(f.elements).some(function(el) {
-                        if (!el.name || el.name === '_token' || el.name === '_method') return false;
-                        if (el.type === 'hidden' || el.tagName === 'SELECT') return false;
+                        if (!el.name || el.name === '_token' || el.name === '_method' || el.type === 'hidden') return false;
+                        // For <select>: compare each option's selected vs defaultSelected
+                        if (el.tagName === 'SELECT') {
+                            return Array.from(el.options).some(function(opt) {
+                                return opt.selected !== opt.defaultSelected;
+                            });
+                        }
                         if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
                         return el.value !== el.defaultValue;
                     });

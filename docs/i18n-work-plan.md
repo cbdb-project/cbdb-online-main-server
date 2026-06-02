@@ -290,8 +290,8 @@ const switchLocale = () => {
 | `app_title` | 中國歷代人物傳記資料庫 | China Biographical Database (CBDB) | 官方英文名 |
 | `app_title_short` | CBDB | CBDB | — |
 | `dashboard` | 系統總覽 | Dashboard | — |
-| `person_editing` | 人物編輯 | Person Editing | — |
-| `recent_operations` | 最近操作記錄 | Recent Operations | — |
+| `person_editing` | 人物編輯 | Edit Person | — |
+| `recent_operations` | 最近操作記錄 | Recent Changes | — |
 | `recent_proposals` | 最近提案列表 | Recent Proposals | — |
 | `pending_review` | 待審核 | Pending Review | — |
 | `crowdsourcing_records` | 最近眾包錄入記錄 | Recent Crowdsourcing Records | ✓ |

@@ -104,18 +104,18 @@
                     @endforeach
                     @if(Auth::check() && Auth::user()->isActive())
                     <div class="form-group row">
-                        <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
+                        <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('codes.proposal_desc') }}</label>
                         <div class="col-sm-10">
-                            <textarea name="__proposal_comment" id="__proposal_comment" class="form-control" rows="3" placeholder="僅在提交提案時填寫（選填）">{{ old('__proposal_comment') }}</textarea>
+                            <textarea name="__proposal_comment" id="__proposal_comment" class="form-control" rows="3" placeholder="{{ __('codes.proposal_desc_hint') }}">{{ old('__proposal_comment') }}</textarea>
                             <p class="help-block">如果直接儲存，此欄位會被忽略。</p>
                         </div>
                     </div>
                     <div class="form-group row">
                         <div class="col-sm-10 offset-sm-2">
-                            <button type="submit" class="btn btn-primary">直接儲存</button>
+                            <button type="submit" class="btn btn-primary">{{ __('codes.save_direct') }}</button>
                             <button type="submit" class="btn btn-info"
                                     formaction="{{ route('codes.propose.update', ['table_name' => $table, 'id' => $id], false) }}">
-                                提交提案
+                                {{ __('codes.submit_proposal') }}
                             </button>
                         </div>
                     </div>

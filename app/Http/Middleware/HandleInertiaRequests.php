@@ -29,6 +29,9 @@ class HandleInertiaRequests extends Middleware {
             ],
             'locale'      => app()->getLocale(),
             'locale_url'  => route('locale.switch', [], false),
+            // ⚠️ 頁面特定翻譯群組（views、codes、operations、admin）
+            //   請由控制器以 'page_translations' key 傳入，不可複用此 'translations' key，
+            //   否則 inertia-laravel 的淺合併會覆蓋此處的 shared 翻譯。
             'translations' => [
                 'common' => is_array($t = trans('common')) ? $t : [],
                 'nav'    => is_array($t = trans('nav'))    ? $t : [],

@@ -903,7 +903,7 @@ function SelectedPlaceChips({
                         type="button"
                         onClick={() => onRemove(place.c_addr_id)}
                         style={chipRemoveButtonStyle}
-                        aria-label={t('remove_place_aria', { id: String(place.c_addr_id) })}
+                        aria-label={tPlace('remove_place_aria', { id: String(place.c_addr_id) })}
                     >
                         ×
                     </button>

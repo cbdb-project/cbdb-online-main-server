@@ -34,10 +34,17 @@ class SetLocaleMiddleware {
             return $fromCookie;
         }
 
-        // 3. Accept-Language header。
-        // Symfony 內部將 locale 正規化為底線形式（如 zh_TW），但 Laravel 翻譯目錄
-        // 使用連字號（zh-TW）。此處將結果對映回 $available 中的原始鍵，確保
-        // App::setLocale() 能正確載入翻譯檔。
+        // 3. Configured app default locale (deterministic; must come before Accept-Language
+        //    so that test requests and API calls without explicit session/cookie always
+        //    resolve to the configured default rather than the environment's header).
+        $configured = config('app.locale', $available[0]);
+        if (in_array($configured, $available, true)) {
+            return $configured;
+        }
+
+        // 4. Accept-Language header (only reached when config locale is not in $available).
+        // Symfony normalizes locale to underscore form (e.g. zh_TW); map back to the
+        // original key so App::setLocale() loads the correct translation files.
         $fromHeader = $request->getPreferredLanguage($available);
         if ($fromHeader !== null) {
             $normalized = str_replace('_', '-', $fromHeader);
@@ -48,8 +55,6 @@ class SetLocaleMiddleware {
             }
         }
 
-        // 4. Fall back to the configured app default locale
-        $configured = config('app.locale', $available[0]);
-        return in_array($configured, $available, true) ? $configured : $available[0];
+        return $available[0];
     }
 }

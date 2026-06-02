@@ -60,4 +60,5 @@ return [
     'entry_time'            => '錄入時間',
     'status_label'          => '狀態',
     'person_label'          => '人物',
+    'editor_placeholder'    => '名稱或 ID',
 ];

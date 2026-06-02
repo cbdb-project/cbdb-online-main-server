@@ -52,7 +52,7 @@ use App\Support\CompositePrimaryKey;
                 <div class="form-group mr-3">
                     <label class="mr-1">{{ __('operations.modified_by') }}：</label>
                     <input type="text" name="editor" class="form-control form-control-sm"
-                           placeholder="名稱或 ID" value="{{ request('editor', '') }}" style="width: 150px;">
+                           placeholder="{{ __('operations.editor_placeholder') }}" value="{{ request('editor', '') }}" style="width: 150px;">
                 </div>
 
                 @if(!empty($proposals_only))

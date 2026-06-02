@@ -9,7 +9,7 @@
 
 @if($show && ($createdBy || $modifiedBy))
     <div class="form-group row">
-        <label class="col-sm-2 col-form-label">建檔</label>
+        <label class="col-sm-2 col-form-label">{{ __('biogmains.audit_created') }}</label>
         <div class="col-sm-10">
             <input type="text"
                    class="form-control"
@@ -19,7 +19,7 @@
     </div>
 
     <div class="form-group row">
-        <label class="col-sm-2 col-form-label">更新</label>
+        <label class="col-sm-2 col-form-label">{{ __('biogmains.audit_updated') }}</label>
         <div class="col-sm-10">
             <input type="text"
                    class="form-control"

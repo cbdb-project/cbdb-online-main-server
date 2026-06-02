@@ -67,7 +67,7 @@ use App\Support\CompositePrimaryKey;
                         $selectedStatuses = $status_filters ?? [];
                     @endphp
                     <div class="form-group mr-3">
-                        <label class="mr-1">{{ __('operations.proposal_desc') }}：</label>
+                        <label class="mr-1">{{ __('operations.status_label') }}：</label>
                         @foreach($statusOptions as $value => $label)
                             <label class="form-check-inline mr-2">
                                 <input type="checkbox" name="status[]" value="{{ $value }}" {{ in_array($value, $selectedStatuses, true) ? 'checked' : '' }}>
@@ -205,14 +205,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $showPerPersonResourceButtons = in_array(strtoupper($item->resource), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
                             @endphp
                             @if(empty($firstPerson['id']))
-                                <span class="text-muted">(本修改不涉及人物)</span>
+                                <span class="text-muted">{{ __('operations.no_person_involved') }}</span>
                             @else
                                 <a href="/basicinformation/{{ $firstPerson['id'] }}/edit">
                                     {{ trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) !== '' ? trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) : $firstPerson['id'] }}
                                 </a>
                                 @if($personRowspan > 1)
                                     <span class="badge badge-secondary" style="margin-left:4px;">
-                                        {{ !empty($firstPerson['is_primary']) ? '主操作' : '連動' }}
+                                        {{ !empty($firstPerson['is_primary']) ? __('operations.main_op') : __('operations.linked_op') }}
                                     </span>
                                 @endif
                             @endif
@@ -236,8 +236,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $hasResourceNoteIcon = false;
                                 $resourceDataForIcon = json_decode($item->resource_data, true);
                                 $summaryNoteLabel = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true)
-                                    ? '提案說明'
-                                    : '修改說明';
+                                    ? __('operations.proposal_desc')
+                                    : __('operations.modification_desc');
                                 if (is_array($resourceDataForIcon)) {
                                     $notesForIcon = [];
                                     $iconDirectNote = trim((string) ($resourceDataForIcon['__note'] ?? ''));
@@ -248,16 +248,16 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     if (is_array($iconProposalMeta)) {
                                         $iconProposalComment = trim((string) ($iconProposalMeta['comment'] ?? ''));
                                         if ($iconProposalComment !== '') {
-                                            $notesForIcon[] = '提案說明：'.$iconProposalComment;
+                                            $notesForIcon[] = __('operations.proposal_desc').'：'.$iconProposalComment;
                                         }
                                         $iconCancelReason = trim((string) ($iconProposalMeta['cancel_reason'] ?? ''));
                                         if ($iconCancelReason !== '') {
-                                            $notesForIcon[] = '撤回原因：'.$iconCancelReason;
+                                            $notesForIcon[] = __('operations.withdrawal_reason').'：'.$iconCancelReason;
                                         }
                                     }
                                     $iconReviewComment = trim((string) ($resourceDataForIcon['__review_comment'] ?? ''));
                                     if ($iconReviewComment !== '') {
-                                        $notesForIcon[] = '審核備註：'.$iconReviewComment;
+                                        $notesForIcon[] = __('operations.review_notes').'：'.$iconReviewComment;
                                     }
                                     if (!empty($notesForIcon)) {
                                         $hasResourceNoteIcon = true;
@@ -280,9 +280,9 @@ $item->resource_data = unionPKDef($item->resource_data);
                             @if($showPerPersonResourceButtons)
                                 <td>
                                     @if(!empty($firstPerson['resource_link']))
-                                        <a href="{{ $firstPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                        <a href="{{ $firstPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">{{ __('operations.view_page') }}</a>
                                     @else
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>{{ __('operations.no_resource_page') }}</button>
                                     @endif
                                     @if(!empty($firstPerson['resource_id']))
                                         <div class="small text-muted mt-1" style="word-break: break-all;">
@@ -314,7 +314,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $reviewedBy = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_by'] ?? null) : null;
                                 $reviewedAt = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_at'] ?? null) : null;
                                 $isProposal = in_array((int) $item->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true);
-                                $primaryNoteLabel = $isProposal ? '提案說明' : '修改說明';
+                                $primaryNoteLabel = $isProposal ? __('operations.proposal_desc') : __('operations.modification_desc');
                                 $operationNotes = [];
                                 $directNote = is_array($resourceDataParsed) ? trim((string) ($resourceDataParsed['__note'] ?? '')) : '';
                                 if ($directNote !== '') {
@@ -322,19 +322,19 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 }
                                 $proposalComment = is_array($proposalMeta) ? trim((string) ($proposalMeta['comment'] ?? '')) : '';
                                 if ($proposalComment !== '') {
-                                    $operationNotes[] = ['label' => '提案說明', 'content' => $proposalComment];
+                                    $operationNotes[] = ['label' => __('operations.proposal_desc'), 'content' => $proposalComment];
                                 }
                                 $reviewCommentText = trim((string) ($reviewComment ?? ''));
                                 if ($reviewCommentText !== '') {
-                                    $operationNotes[] = ['label' => '審核備註', 'content' => $reviewCommentText];
+                                    $operationNotes[] = ['label' => __('operations.review_notes'), 'content' => $reviewCommentText];
                                 }
                                 $cancelReasonText = is_array($proposalMeta) ? trim((string) ($proposalMeta['cancel_reason'] ?? '')) : '';
                                 if ($cancelReasonText !== '') {
-                                    $operationNotes[] = ['label' => '撤回原因', 'content' => $cancelReasonText];
+                                    $operationNotes[] = ['label' => __('operations.withdrawal_reason'), 'content' => $cancelReasonText];
                                 }
                                 $hasOperationNotes = !empty($operationNotes);
                                 $noteTooltip = implode(' ｜ ', array_map(function ($note) {
-                                    return ($note['label'] ?? '備註') . '：' . ($note['content'] ?? '');
+                                    return ($note['label'] ?? __('operations.remarks')) . '：' . ($note['content'] ?? '');
                                 }, $operationNotes));
                                 $noteTooltipShort = mb_strimwidth($noteTooltip, 0, 120, '…', 'UTF-8');
                                 $submittedDisplay = '';
@@ -390,9 +390,9 @@ $item->resource_data = unionPKDef($item->resource_data);
                             @if(!$showPerPersonResourceButtons)
                                 <td rowspan="{{ $personRowspan }}">
                                     @if($resourceLink)
-                                        <a href="{{ $resourceLink }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                        <a href="{{ $resourceLink }}" class="btn btn-outline-primary btn-sm">{{ __('operations.view_page') }}</a>
                                     @else
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>{{ __('operations.no_resource_page') }}</button>
                                     @endif
                                     @if($resourceDescription !== '')
                                         <div class="small text-muted mt-1" style="word-break: break-all;">
@@ -405,22 +405,22 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 @if($isProposal)
                                     <div class="proposal-status" style="margin-bottom:6px;">
                                         @if($reviewStatus === 'approved')
-                                            <span class="badge badge-success">已核准</span>
+                                            <span class="badge badge-success">{{ __('operations.status_approved') }}</span>
                                         @elseif($reviewStatus === 'rejected')
-                                            <span class="badge badge-danger">已退修</span>
+                                            <span class="badge badge-danger">{{ __('operations.status_rejected') }}</span>
                                         @elseif($reviewStatus === 'cancelled')
-                                            <span class="badge badge-secondary">已撤回</span>
+                                            <span class="badge badge-secondary">{{ __('operations.status_withdrawn') }}</span>
                                         @else
-                                            <span class="badge badge-warning">待審核</span>
+                                            <span class="badge badge-warning">{{ __('operations.status_pending') }}</span>
                                         @endif
                                 @if(!empty($proposalMeta['comment']))
                                     <small class="text-muted" style="display:block;">
-                                        提案說明：{{ $proposalMeta['comment'] }}
+                                        {{ __('operations.proposal_desc') }}：{{ $proposalMeta['comment'] }}
                                     </small>
                                 @endif
                                 @if(!empty($proposalMeta['submitted_by']))
                                             <small class="text-muted" style="display:block;">
-                                                提案者：{{ $proposalMeta['submitted_by'] }}
+                                                {{ __('operations.proposer') }}：{{ $proposalMeta['submitted_by'] }}
                                                 @if($submittedUtc)
                                                     （<span class="js-utc-datetime" data-utc="{{ $submittedUtc }}">{{ $submittedDisplay }}</span>）
                                                 @endif
@@ -428,21 +428,21 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @endif
                                         @if($reviewStatus === 'cancelled')
                                             <small class="text-muted" style="display:block;">
-                                                撤回者：{{ $cancelledBy ?? '（未知）' }}
+                                                {{ __('operations.cancelled_by') }}：{{ $cancelledBy ?? '—' }}
                                                 @if($cancelledUtc)
                                                     （<span class="js-utc-datetime" data-utc="{{ $cancelledUtc }}">{{ $cancelledDisplay }}</span>）
                                                 @endif
                                             </small>
                                             @if(!empty($proposalMeta['cancel_reason']))
-                                                <small class="text-muted" style="display:block;">撤回原因：{{ $proposalMeta['cancel_reason'] }}</small>
+                                                <small class="text-muted" style="display:block;">{{ __('operations.withdrawal_reason') }}：{{ $proposalMeta['cancel_reason'] }}</small>
                                             @endif
                                         @endif
                                         @if($reviewComment)
-                                            <small class="text-muted" style="display:block;">審核備註：{{ $reviewComment }}</small>
+                                            <small class="text-muted" style="display:block;">{{ __('operations.review_notes') }}：{{ $reviewComment }}</small>
                                         @endif
                                         @if($reviewedBy)
                                             <small class="text-muted" style="display:block;">
-                                                審核者：{{ $reviewedBy }}
+                                                {{ __('operations.reviewer') }}：{{ $reviewedBy }}
                                                 @if($reviewedUtc)
                                                     （<span class="js-utc-datetime" data-utc="{{ $reviewedUtc }}">{{ $reviewedDisplay }}</span>）
                                                 @endif
@@ -455,7 +455,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             class="btn btn-outline-primary btn-sm operations-action-btn"
                                             data-toggle="modal"
                                             data-target="#myModal{{ $item->id }}">
-                                        <span>內容快照</span>
+                                        <span>{{ __('operations.content_snapshot') }}</span>
                                     </button>
                                     <button type="button"
                                             class="btn btn-outline-info btn-sm operations-action-btn"
@@ -463,21 +463,21 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             data-target="#myModal-mapping{{ $item->id }}"
                                             {{ $canCompare ? '' : 'disabled' }}>
                                         <i class="fas fa-code-compare" aria-hidden="true"></i>
-                                        <span>比較</span>
+                                        <span>{{ __('operations.compare') }}</span>
                                     </button>
                                 </div>
                                 <div id="myModal{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
                                   <div class="modal-dialog">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <h4 class="modal-title">內容快照</h4>
+                                        <h4 class="modal-title">{{ __('operations.content_snapshot') }}</h4>
                                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @include('components.key-value-table', ['data' => $resourceDataDisplay])
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                       </div>
                                     </div>
                                   </div>
@@ -487,16 +487,16 @@ $item->resource_data = unionPKDef($item->resource_data);
                                   <div class="modal-dialog modal-lg" style="width:80vw;max-width:80vw;">
                                     <div class="modal-content">
                                       <div class="modal-header">
-                                        <h4 class="modal-title">比較</h4>
+                                        <h4 class="modal-title">{{ __('operations.compare') }}</h4>
                                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                                       </div>
                                       <div class="modal-body" style="word-break: break-all;">
                                         @if($hasAuditLogs)
-                                            <div class="text-muted small" style="margin-bottom: 8px;">審計記錄（{{ count($auditLogs) }} 筆）</div>
+                                            <div class="text-muted small" style="margin-bottom: 8px;">{{ __('operations.audit_log_count_item', ['count' => count($auditLogs)]) }}</div>
                                             @foreach($auditLogs as $audit)
                                                 <div class="border rounded p-2" style="margin-bottom: 10px;">
                                                     <div class="small" style="margin-bottom: 6px;">
-                                                        <strong>{{ $audit['table_name'] ?? '未知資料表' }}</strong>
+                                                        <strong>{{ $audit['table_name'] ?? __('operations.unknown_table') }}</strong>
                                                         · {{ strtoupper($audit['operation'] ?? 'UNKNOWN') }}
                                                         · <span class="text-monospace">{{ $audit['row_pk_text'] ?? '' }}</span>
                                                     </div>
@@ -510,7 +510,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @endif
                                       </div>
                                       <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                       </div>
                                     </div>
                                   </div>
@@ -527,14 +527,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             @foreach($operationNotes as $note)
                                                 <div style="margin-bottom: 12px;">
                                                     @if(($note['label'] ?? '') !== $primaryNoteLabel)
-                                                        <strong>{{ $note['label'] ?? '備註' }}</strong>
+                                                        <strong>{{ $note['label'] ?? __('operations.remarks') }}</strong>
                                                     @endif
                                                     <div>{!! nl2br(e($note['content'] ?? '')) !!}</div>
                                                 </div>
                                             @endforeach
                                           </div>
                                           <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.close') }}</button>
                                           </div>
                                         </div>
                                       </div>
@@ -544,9 +544,9 @@ $item->resource_data = unionPKDef($item->resource_data);
                                     <form method="post" action="{{ route('operations.restore', $item->id) }}" class="operations-action-form">
                                         {{ csrf_field() }}
                                         <button type="submit" class="btn btn-outline-warning btn-sm operations-action-btn"
-                                            onclick="return confirm('將以你的名義對該資源進行一次修改，恢復至本次改動之前，是否繼續？');">
+                                            onclick="return confirm({!! Js::from(__('operations.revert_confirm')) !!});">
                                             <i class="fas fa-history" aria-hidden="true"></i>
-                                            復原
+                                            {{ __('operations.revert') }}
                                         </button>
                                     </form>
                                 @endif
@@ -555,7 +555,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         <a href="{{ route('codes.proposals.edit', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
                                            class="btn btn-outline-secondary btn-sm operations-action-btn">
                                             <i class="far fa-pen-to-square" aria-hidden="true"></i>
-                                            修改提案
+                                            {{ __('operations.edit_proposal') }}
                                         </a>
                                         <form method="post"
                                               action="{{ route('codes.proposals.cancel', ['table_name' => $item->resource, 'operation' => $item->id]) }}"
@@ -563,9 +563,9 @@ $item->resource_data = unionPKDef($item->resource_data);
                                             {{ csrf_field() }}
                                             {{ method_field('DELETE') }}
                                             <button type="submit" class="btn btn-outline-warning btn-sm operations-action-btn"
-                                                    onclick="return confirm('確定要撤回此提案？');">
+                                                    onclick="return confirm({!! Js::from(__('operations.withdraw_confirm')) !!});">
                                                 <i class="fas fa-ban" aria-hidden="true"></i>
-                                                撤回提案
+                                                {{ __('operations.revoke') }}
                                             </button>
                                         </form>
                                     </div>
@@ -575,14 +575,14 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         <form method="post" action="{{ route('operations.proposals.approve', $item->id) }}" class="operations-action-form">
                                             {{ csrf_field() }}
                                             <input type="hidden" name="review_comment" value="">
-                                            <button type="submit" class="btn btn-outline-success btn-sm operations-action-btn" onclick="return confirm('確定核准此提案並寫入資料表？');">
+                                            <button type="submit" class="btn btn-outline-success btn-sm operations-action-btn" onclick="return confirm({!! Js::from(__('operations.approve_confirm')) !!});">
                                                 <i class="fas fa-check" aria-hidden="true"></i>
-                                                核准
+                                                {{ __('operations.approve') }}
                                             </button>
                                         </form>
                                         <button type="button" class="btn btn-outline-danger btn-sm operations-action-btn" data-toggle="modal" data-target="#proposal-reject-{{ $item->id }}">
                                             <i class="fas fa-reply" aria-hidden="true"></i>
-                                            退修
+                                            {{ __('operations.reject_proposal') }}
                                         </button>
                                     </div>
                                     <div id="proposal-reject-{{ $item->id }}" class="modal fade" role="dialog" tabindex="-1">
@@ -591,18 +591,18 @@ $item->resource_data = unionPKDef($item->resource_data);
                                           <form method="post" action="{{ route('operations.proposals.reject', $item->id) }}">
                                               {{ csrf_field() }}
                                               <div class="modal-header">
-                                                <h4 class="modal-title">退修提案</h4>
+                                                <h4 class="modal-title">{{ __('operations.reject_modal_title') }}</h4>
                                                 <button type="button" class="close" data-dismiss="modal">&times;</button>
                                               </div>
                                               <div class="modal-body">
                                                 <div class="form-group">
-                                                    <label for="proposal-review-comment-{{ $item->id }}">退修原因（選填）</label>
+                                                    <label for="proposal-review-comment-{{ $item->id }}">{{ __('operations.reject_reason_opt') }}</label>
                                                     <textarea name="review_comment" id="proposal-review-comment-{{ $item->id }}" class="form-control" rows="3"></textarea>
                                                 </div>
                                               </div>
                                               <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                                                <button type="submit" class="btn btn-danger">確認退修</button>
+                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('common.cancel') }}</button>
+                                                <button type="submit" class="btn btn-danger">{{ __('operations.confirm_reject') }}</button>
                                               </div>
                                           </form>
                                         </div>
@@ -613,12 +613,12 @@ $item->resource_data = unionPKDef($item->resource_data);
                             <td rowspan="{{ $personRowspan }}">
                                 @php
                                     $opTypeLabels = [
-                                        1 => '1-新增',
-                                        2 => '2-整體覆寫',
-                                        3 => '3-修改',
-                                        4 => '4-刪除',
-                                        \App\Models\Operation::TYPE_PROPOSAL_CREATE => '8-提案（新增）',
-                                        \App\Models\Operation::TYPE_PROPOSAL_UPDATE => '9-提案（修改）',
+                                        1 => '1-'.__('operations.op_create'),
+                                        2 => '2-'.__('operations.op_overwrite'),
+                                        3 => '3-'.__('operations.op_update'),
+                                        4 => '4-'.__('operations.op_delete'),
+                                        \App\Models\Operation::TYPE_PROPOSAL_CREATE => '8-'.__('operations.op_proposal_create'),
+                                        \App\Models\Operation::TYPE_PROPOSAL_UPDATE => '9-'.__('operations.op_proposal_update'),
                                     ];
                                 @endphp
                                 {{ $opTypeLabels[$item->op_type] ?? $item->op_type }}
@@ -660,22 +660,22 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 <tr>
                                     <td>
                                         @if(empty($relatedPerson['id']))
-                                            <span class="text-muted">(本修改不涉及人物)</span>
+                                            <span class="text-muted">{{ __('operations.no_person_involved') }}</span>
                                         @else
                                             <a href="/basicinformation/{{ $relatedPerson['id'] }}/edit">
                                                 {{ trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) !== '' ? trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) : $relatedPerson['id'] }}
                                             </a>
                                             <span class="badge badge-secondary" style="margin-left:4px;">
-                                                {{ !empty($relatedPerson['is_primary']) ? '主操作' : '連動' }}
+                                                {{ !empty($relatedPerson['is_primary']) ? __('operations.main_op') : __('operations.linked_op') }}
                                             </span>
                                         @endif
                                     </td>
                                     @if($showPerPersonResourceButtons)
                                         <td>
                                             @if(!empty($relatedPerson['resource_link']))
-                                                <a href="{{ $relatedPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">查閱</a>
+                                                <a href="{{ $relatedPerson['resource_link'] }}" class="btn btn-outline-primary btn-sm">{{ __('operations.view_page') }}</a>
                                             @else
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled>無資源頁面</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled>{{ __('operations.no_resource_page') }}</button>
                                             @endif
                                             @if(!empty($relatedPerson['resource_id']))
                                                 <div class="small text-muted mt-1" style="word-break: break-all;">

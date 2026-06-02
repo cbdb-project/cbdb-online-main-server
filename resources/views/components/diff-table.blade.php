@@ -20,10 +20,10 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>欄位</th>
-                        <th>原本的</th>
-                        <th>修改後</th>
-                        <th>目前資料</th>
+                        <th>{{ __('operations.diff_field') }}</th>
+                        <th>{{ __('operations.diff_before') }}</th>
+                        <th>{{ __('operations.diff_after') }}</th>
+                        <th>{{ __('operations.diff_current') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -37,17 +37,17 @@
                            <td>{{ $row['field'] }}</td>
                             <td class="{{ $beforeMatchesCurrent ? 'info' : '' }}">{{ $row['before'] }}</td>
                             <td class="{{ $afterMatchesCurrent ? 'success' : '' }}">{{ $row['after'] }}</td>
-                            <td class="{{ $currentClass }}">{{ $row['current'] ?? '(未取得)' }}</td>
+                            <td class="{{ $currentClass }}">{{ $row['current'] ?? __('operations.not_retrieved') }}</td>
                        </tr>
                    @endforeach
                 </tbody>
             </table>
         </div>
     @else
-        <p class="text-muted small">沒有比對紀錄</p>
+        <p class="text-muted small">{{ __('operations.no_diff_records') }}</p>
     @endif
 @elseif (is_string($diff) && trim($diff) !== '')
     {!! $diff !!}
 @else
-    <p class="text-muted small">沒有比對紀錄</p>
+    <p class="text-muted small">{{ __('operations.no_diff_records') }}</p>
 @endif

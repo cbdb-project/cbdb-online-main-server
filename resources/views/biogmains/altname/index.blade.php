@@ -10,36 +10,36 @@ $canEditSequence = Auth::check() && Auth::user()->canWriteDirectly();
     @include('biogmains.defense')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">別名</h3>
+            <h3 class="card-title">{{ __('biogmains.altname_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.altnames.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.altnames.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             @if($canEditSequence)
                 @include('biogmains.partials.list-order-toolbar', [
                     'targetTableId' => 'altname-list-table',
-                    'toolbarLabel' => '別名次序調整',
+                    'toolbarLabel' => __('biogmains.altname_seq_title'),
                 ])
             @endif
             <div class="table-responsive">
                 <table id="altname-list-table" class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->altnames_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->altnames_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
+                    <th>{{ __('person.seq_no') }}</th>
                     @if($canEditSequence)
-                        <th data-sequence-demo-col style="min-width: 180px; display: none;">新次序</th>
+                        <th data-sequence-demo-col style="min-width: 180px; display: none;">{{ __('biogmains.new_sequence') }}</th>
                     @endif
-                    <th>別名拼音</th>
-                    <th>別名漢字</th>
-                    <th>別名類型</th>
+                    <th>{{ __('biogmains.altname_pinyin_label') }}</th>
+                    <th>{{ __('biogmains.altname_chinese') }}</th>
+                    <th>{{ __('person.alt_name_type') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -53,7 +53,7 @@ $c_alt_name_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name);
 $c_alt_name_chn_view = unionPKDef_decode_for_convert($value->pivot->c_alt_name_chn);
 
 //20210715新增錯別字過濾
-$errWord = array('?', '', '�');
+$errWord = array('?', '', '&#65533;');
 $value->pivot->c_alt_name_chn = str_replace($errWord, '', $value->pivot->c_alt_name_chn);
 
 //別名類型顯示
@@ -95,7 +95,7 @@ if ($altTypeLabel === '') {
                                     style="width: 78px;"
                                     value="{{ $value->pivot->c_sequence ?? '' }}"
                                 >
-                                <button type="submit" class="btn btn-sm btn-outline-primary js-altname-sequence-submit">提交</button>
+                                <button type="submit" class="btn btn-sm btn-outline-primary js-altname-sequence-submit">{{ __('biogmains.submit_btn') }}</button>
                                 <small class="text-muted ml-2 d-none js-altname-sequence-status"></small>
                             </form>
                         </td>
@@ -107,18 +107,17 @@ if ($altTypeLabel === '') {
                             @if(Auth::user()->isActive())
                                 <td>
                                     <div class="btn-group">
-                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}">edit</a>
+                                        <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.edit.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}">{{ __('common.edit') }}</a>
                                         <a href=""
                                            onclick="
-                                                   let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                                   if (confirm(msg)===true){
+                                                   if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                        event.preventDefault();
                                                        document.getElementById('delete-form-{{ $value->pivot->c_personid."-".$value->pivot->c_alt_name_chn."-".$value->pivot->c_alt_name_type_code }}').submit();
                                                    }else{
                                                        return false;
                                                    }
-                                        "
-                                           class="btn btn-sm btn-danger">delete</a>
+                                           "
+                                           class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
 
                                     </div>
                                     <form id="delete-form-{{ $value->pivot->c_personid.'-'.$value->pivot->c_alt_name_chn.'-'.$value->pivot->c_alt_name_type_code }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.altnames.destroy.query', ['id' => $basicinformation->c_personid], ['c_personid' => $value->pivot->c_personid, 'c_alt_name_chn' => unionPKDef_decode($value->pivot->c_alt_name_chn), 'c_alt_name_type_code' => $value->pivot->c_alt_name_type_code]) }}" method="POST" style="display: none;">
@@ -141,6 +140,13 @@ if ($altTypeLabel === '') {
 @push('scripts')
 <script>
     (function() {
+        var __i18n = {
+            nonJsonResponse: {!! Js::from(__('biogmains.non_json_response')) !!},
+            submitFailed:    {!! Js::from(__('biogmains.submit_failed')) !!},
+            networkError:    {!! Js::from(__('biogmains.network_error')) !!},
+            submitted:       {!! Js::from(__('biogmains.submitted_ok')) !!},
+        };
+
         function getCsrfToken() {
             var tokenEl = document.querySelector('meta[name="csrf-token"]');
             return tokenEl ? tokenEl.getAttribute('content') : '';
@@ -213,20 +219,20 @@ if ($altTypeLabel === '') {
                 });
 
                 var data = await response.json().catch(function() {
-                    return { ok: false, message: '非 JSON 回應' };
+                    return { ok: false, message: __i18n.nonJsonResponse };
                 });
 
                 if (!response.ok || !data.ok) {
-                    setStatus(form, (data && data.message) ? data.message : '提交失敗', 'error');
+                    setStatus(form, (data && data.message) ? data.message : __i18n.submitFailed, 'error');
                     return;
                 }
 
                 if (row && row.cells && row.cells[0]) {
                     row.cells[0].textContent = seqInput.value;
                 }
-                setStatus(form, '已提交', 'success');
+                setStatus(form, __i18n.submitted, 'success');
             } catch (error) {
-                setStatus(form, '網路或伺服器錯誤', 'error');
+                setStatus(form, __i18n.networkError, 'error');
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;

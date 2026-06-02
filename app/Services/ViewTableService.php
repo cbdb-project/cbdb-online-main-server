@@ -19,10 +19,16 @@ class ViewTableService {
             $aliases = Arr::get($definition, 'aliases', []);
             $primaryAlias = $aliases[0] ?? ('View_' . Str::studly(str_replace('-', '_', $key)));
 
+            $translationKey = 'views.view_' . str_replace('posessions', 'possessions', str_replace('-', '_', $key));
+            $translatedTitle = trans($translationKey);
+            $title = (is_string($translatedTitle) && $translatedTitle !== $translationKey)
+                ? $translatedTitle
+                : Arr::get($definition, 'title', $key);
+
             return [
                 'key' => $key,
                 'primary_alias' => $primaryAlias,
-                'title' => Arr::get($definition, 'title', $key),
+                'title' => $title,
                 'description' => Arr::get($definition, 'description', ''),
                 'aliases' => $aliases,
                 'column_count' => count(Arr::get($definition, 'columns', [])),
@@ -116,8 +122,14 @@ class ViewTableService {
             return $item;
         })->all();
 
+        $translationKey = 'views.view_' . str_replace('posessions', 'possessions', str_replace('-', '_', $effectiveKey));
+        $translatedTitle = trans($translationKey);
+        $localizedTitle = (is_string($translatedTitle) && $translatedTitle !== $translationKey)
+            ? $translatedTitle
+            : ($definition['title'] ?? $effectiveKey);
+
         return [
-            'title' => $definition['title'] ?? $effectiveKey,
+            'title' => $localizedTitle,
             'description' => $definition['description'] ?? null,
             'columns' => $columns,
             'rows' => $rows,

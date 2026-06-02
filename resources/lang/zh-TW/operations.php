@@ -54,6 +54,38 @@ return [
     'history_label'         => '正在顯示人物的歷史記錄',
     'view_history'          => '查看本頁歷史記錄',
 
+    'modification_desc'      => '修改說明',
+    'withdraw_confirm'       => '確定要撤回此提案？',
+    'approve_confirm'        => '確定核准此提案並寫入資料表？',
+    'remarks'                => '備註',
+    'unknown_table'          => '未知資料表',
+    'cancelled_by'           => '撤回者',
+    'audit_log_count_item'   => '審計記錄（:count 筆）',
+    'reject_modal_title'     => '退修提案',
+
+    // Diff table components
+    'diff_field'              => '欄位',
+    'diff_before'             => '原本的',
+    'diff_after'              => '修改後',
+    'diff_current'            => '目前資料',
+    'no_diff_records'         => '沒有比對紀錄',
+    'not_retrieved'           => '(未取得)',
+    'ai_match_result'         => 'AI 匹配結果',
+    'user_submitted'          => '用戶提交',
+    'ai_matched_badge'        => '匹配',
+    'ai_matched_badge_title'  => 'AI 確認匹配',
+    'ai_suggested_badge'      => '建議',
+    'ai_suggested_badge_title' => 'AI 建議',
+    'addr_id'                 => '地址 ID',
+    'no_addr_data'            => '沒有地址資料',
+    'content_col'             => '內容',
+
+    // Crowdsourcing description notes
+    'crowdsourcing_op_type_desc' => '* 修改類型 0表示crowdsourcing記錄，1表示新增，2表示整體覆寫（完整替換現有記錄，主要用於 code 表修改），3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案',
+    'crowdsourcing_status_desc'  => '* 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄尚未處理，3表示記錄reject，4表示記錄處理失敗。',
+    'confirm_btn'                => '確認',
+    'reject_btn'                 => '拒絕',
+
     // Crowdsourcing table headers
     'resource_tts'          => '資源 TTS',
     'count'                 => '次數',

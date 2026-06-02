@@ -24,6 +24,40 @@ return [
     'user_management'        => '用戶管理',
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
+    'locale_switch_unsaved_warning' => '切換語言將會重新載入此頁面，未保存的修改將會遺失。確定要繼續嗎？',
     'back_to_home'           => '← 返回首頁',
     'not_public_tools'       => '暫不公開',
+
+    // Welcome page
+    'welcome_system_title'   => '中國歷代人物傳記 錄入系統',
+    'welcome_search_label'   => '搜尋人物（可輸入人物 ID 或姓名）',
+    'welcome_search_placeholder' => '例如：3144 或 張孝祥',
+    'welcome_search_btn'     => '搜尋',
+
+    // Maps page
+    'maps_page_title'         => '中國歷代行政區地圖',
+    'maps_page_desc'          => '使用 Sinica CCTS 歷史地圖服務，支援切換歷代行政區圖層，並可在指定座標加上 marker。',
+    'maps_toggle_panel'       => '切換控制面板',
+    'maps_layer_label'        => '歷史地圖圖層',
+    'maps_lat_label'          => '緯度 Latitude',
+    'maps_lng_label'          => '經度 Longitude',
+    'maps_marker_label'       => '標題',
+    'maps_add_marker'         => '加入 Marker',
+    'maps_reset_view'         => '重設視角',
+    'maps_clear_markers'      => '清除 Marker',
+    'maps_basemap_opacity'    => '現代底圖透明度',
+    'maps_current_basemap'    => '目前選取的現代底圖',
+    'maps_tips_title'         => '說明',
+    'maps_tip_source'         => '底圖來源：Sinica CCTS 歷史地圖 WMTS / tile 服務。',
+    'maps_tip_coords'         => '輸入 WGS84 經緯度即可加點。',
+    'maps_tip_map_param'      => '可用 <code>map</code> 指定圖層，例如 <code>?map=ad0741</code>。',
+    'maps_tip_year_param'     => '也可用 <code>year</code> 推定圖層，例如 <code>?year=741</code>。',
+    'maps_tip_marker_param'   => 'marker 可由 query param 指定：<code>?lat=34.3416&amp;lng=108.9398&amp;label=長安</code>。',
+    'maps_aria_map'           => '歷史行政區地圖',
+
+    // Home page hints
+    'home_nav_hint'          => '請從左側選單進入對應功能，或使用上方搜尋前往目標頁面。',
+    'home_admin_hint'        => '若需要管理帳號，請前往「用戶管理」或「管理工具」。',
+    'home_query_hint'        => '資料查詢可使用「檢視表」或「代碼表」。',
+    'home_ops_hint'          => '最近操作紀錄可在「操作紀錄」中查看與復原。',
 ];

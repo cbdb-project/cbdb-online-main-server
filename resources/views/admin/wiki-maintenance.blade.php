@@ -3,7 +3,7 @@
 @section('content')
 <div class="card card-default">
     <div class="card-header">
-        <h3 class="card-title">Wiki 對照資料維護</h3>
+        <h3 class="card-title">{{ __('admin.wiki_page_title') }}</h3>
     </div>
     <div class="card-body">
 
@@ -18,7 +18,7 @@
                         </span>
                         <div class="info-box-content">
                             <span class="info-box-text">{{ $sourceNames[$id] }}</span>
-                            <span class="info-box-number">{{ number_format($stats[$id]) }} 筆記錄</span>
+                            <span class="info-box-number">{{ number_format($stats[$id]) }} {{ __('admin.wiki_records_unit') }}</span>
                         </div>
                     </div>
                 </a>
@@ -33,7 +33,7 @@
                 <div class="card card-info">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fa fa-download"></i> 從 URL 導入 Wiki 對照資料
+                            <i class="fa fa-download"></i> {{ __('admin.wiki_import_title') }}
                         </h3>
                     </div>
                     <div class="card-body">
@@ -41,26 +41,26 @@
                             {{ csrf_field() }}
 
                             <div class="form-group">
-                                <label for="import_url" class="col-sm-2 control-label">資料 URL：</label>
+                                <label for="import_url" class="col-sm-2 control-label">{{ __('admin.wiki_import_url_label') }}</label>
                                 <div class="col-sm-8">
                                     <input type="text" name="import_url" id="import_url" class="form-control"
                                            placeholder="https://cbdb-dev.linshuang.net/wikidata_20251105.json.gz"
                                            required>
                                     <span class="help-block">
-                                        請輸入包含 Wiki 對照資料的 JSON 或 JSON.gz 檔案 URL
+                                        {{ __('admin.wiki_import_url_hint') }}
                                     </span>
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label class="col-sm-2 control-label">目標來源：</label>
+                                <label class="col-sm-2 control-label">{{ __('admin.wiki_target_source_label') }}</label>
                                 <div class="col-sm-4">
                                     <p class="form-control-static">
                                         <strong>{{ $sourceNames[$currentSourceId] }}</strong>
                                     </p>
                                     <input type="hidden" name="target_source" value="{{ $currentSourceId }}">
                                     <span class="help-block">
-                                        <small class="text-muted">目標來源會根據當前選擇的資料來源自動設定</small>
+                                        <small class="text-muted">{{ __('admin.wiki_target_source_hint') }}</small>
                                     </span>
                                 </div>
                             </div>
@@ -70,7 +70,7 @@
                                     <div class="btn-toolbar" role="toolbar">
                                         <div class="btn-group" role="group">
                                             <button type="submit" class="btn btn-info" id="import-btn">
-                                                <i class="fa fa-download"></i> 下載並導入資料
+                                                <i class="fa fa-download"></i> {{ __('admin.wiki_import_btn') }}
                                             </button>
                                         </div>
                                         <div class="btn-group float-right" role="group">
@@ -78,15 +78,15 @@
                                                 {{ csrf_field() }}
                                                 <input type="hidden" name="source_id" value="{{ $currentSourceId }}">
                                                 <button type="submit" class="btn btn-danger"
-                                                        onclick="return confirm('確定要刪除「{{ $sourceNames[$currentSourceId] }}」的所有 {{ number_format($stats[$currentSourceId]) }} 筆記錄嗎？此操作無法復原！')">
-                                                    <i class="fa fa-trash"></i> 全部刪除 ({{ $sourceNames[$currentSourceId] }})
+                                                        onclick="return confirm({!! Js::from(__('admin.wiki_delete_all_confirm', ['source' => $sourceNames[$currentSourceId], 'count' => number_format($stats[$currentSourceId])])) !!})">
+                                                    <i class="fa fa-trash"></i> {{ __('admin.wiki_delete_all_btn', ['source' => $sourceNames[$currentSourceId]]) }}
                                                 </button>
                                             </form>
                                         </div>
                                     </div>
                                     <div class="clearfix"></div>
                                     <span class="help-block" style="margin-top: 10px;">
-                                        <strong>注意：</strong>此操作將先清空目標來源的所有現有記錄，然後導入新資料。請確保備份重要資料。
+                                        {!! __('admin.wiki_import_note') !!}
                                     </span>
                                 </div>
                             </div>
@@ -96,20 +96,20 @@
                                 <div class="col-sm-offset-2 col-sm-10">
                                     <div class="card card-default">
                                         <div class="card-body">
-                                            <h4 id="progress-title">正在處理導入任務...</h4>
+                                            <h4 id="progress-title">{{ __('admin.wiki_progress_title') }}</h4>
                                             <div class="progress">
                                                 <div id="progress-bar" class="progress-bar progress-bar-info progress-bar-striped progress-bar-animated"
                                                      role="progressbar" style="width: 0%">
                                                     <span id="progress-text">0%</span>
                                                 </div>
                                             </div>
-                                            <p id="progress-message" class="text-muted">準備開始...</p>
+                                            <p id="progress-message" class="text-muted">{{ __('admin.wiki_progress_ready') }}</p>
                                             <div id="progress-details" class="small text-muted">
-                                                <span id="task-id"></span> | 開始時間: <span id="start-time"></span>
+                                                <span id="task-id"></span> | {{ __('admin.wiki_start_time') }} <span id="start-time"></span>
                                             </div>
                                             <div class="text-center" style="margin-top: 15px;">
                                                 <button id="cancel-btn" class="btn btn-warning" style="display: none;">
-                                                    <i class="fa fa-stop"></i> 取消導入
+                                                    <i class="fa fa-stop"></i> {{ __('admin.wiki_cancel_btn') }}
                                                 </button>
                                             </div>
                                         </div>
@@ -149,10 +149,10 @@
             <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
-                        <th>人物 ID</th>
-                        <th>人名(CHN)</th>
-                        <th>文本 ID</th>
-                        <th>頁碼（標題/ID）</th>
+                        <th>{{ __('admin.wiki_col_person_id') }}</th>
+                        <th>{{ __('admin.wiki_col_name_chn') }}</th>
+                        <th>{{ __('admin.wiki_col_text_id') }}</th>
+                        <th>{{ __('admin.wiki_col_page') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -182,7 +182,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center text-muted">沒有找到記錄</td>
+                            <td colspan="4" class="text-center text-muted">{{ __('admin.wiki_no_records') }}</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -194,12 +194,11 @@
             <div class="row">
                 <div class="col-md-6">
                     <p class="text-muted">
-                        顯示第 {{ ($page - 1) * $perPage + 1 }} - {{ min($page * $perPage, $total) }} 筆，
-                        共 {{ number_format($total) }} 筆記錄
+                        {{ __('admin.wiki_showing', ['from' => ($page - 1) * $perPage + 1, 'to' => min($page * $perPage, $total), 'total' => number_format($total)]) }}
                     </p>
                 </div>
                 <div class="col-md-6">
-                    <nav aria-label="分頁導航" class="float-right">
+                    <nav aria-label="{{ __('admin.wiki_pagination_label') }}" class="float-right">
                         <ul class="pagination">
                             {{-- 上一頁 --}}
                             @if($hasPrev)
@@ -308,6 +307,22 @@ a:hover {
 @section('js')
 <script>
 onViteReady(function() {
+    var msgImportConfirm = {!! Js::from(__('admin.wiki_import_confirm')) !!};
+    var msgPreparing = {!! Js::from(__('admin.wiki_js_preparing')) !!};
+    var msgTaskId = {!! Js::from(__('admin.wiki_js_task_id')) !!};
+    var msgImportFailed = {!! Js::from(__('admin.wiki_js_import_failed')) !!};
+    var msgNetworkFail = {!! Js::from(__('admin.wiki_js_network_fail')) !!};
+    var msgServerError = {!! Js::from(__('admin.wiki_js_server_error')) !!};
+    var msgImportSuccess = {!! Js::from(__('admin.wiki_js_import_success')) !!};
+    var msgImportCancelled = {!! Js::from(__('admin.wiki_js_import_cancelled')) !!};
+    var msgImportError = {!! Js::from(__('admin.wiki_js_import_error')) !!};
+    var msgErrorPrefix = {!! Js::from(__('admin.wiki_js_error_prefix')) !!};
+    var msgCancelFailed = {!! Js::from(__('admin.wiki_js_cancel_failed')) !!};
+    var msgCancelBtnLabel = {!! Js::from(__('admin.wiki_cancel_btn')) !!};
+    var msgImportDoneTitle = {!! Js::from(__('admin.wiki_js_import_done_title')) !!};
+    var msgImportCancelledTitle = {!! Js::from(__('admin.wiki_js_import_cancelled_title')) !!};
+    var msgImportFailedTitle = {!! Js::from(__('admin.wiki_js_import_failed_title')) !!};
+
     let progressInterval;
     let currentTaskId;
 
@@ -320,13 +335,13 @@ onViteReady(function() {
         var originalText = $btn.html();
 
         // 如果用戶確認，開始導入
-        if (!confirm('確定要從指定 URL 導入資料嗎？此操作將清空目標來源的所有現有記錄！')) {
+        if (!confirm(msgImportConfirm)) {
             return false;
         }
 
         // 禁用按鈕並顯示進度區域
         $btn.prop('disabled', true)
-            .html('<i class="fa fa-spinner fa-spin"></i> 正在準備導入...');
+            .html('<i class="fa fa-spinner fa-spin"></i> ' + msgPreparing);
         $('#progress-container').show();
 
         // 提交表單並開始進度跟踪
@@ -352,13 +367,13 @@ onViteReady(function() {
                 console.log('響應文本:', xhr.responseText);
                 console.log('響應 JSON:', xhr.responseJSON);
 
-                var errorMsg = '導入失敗';
+                var errorMsg = msgImportFailed;
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     errorMsg = xhr.responseJSON.message;
                 } else if (xhr.status === 0) {
-                    errorMsg = '網路連接失敗，請檢查網路連接';
+                    errorMsg = msgNetworkFail;
                 } else {
-                    errorMsg = '服務器錯誤 (' + xhr.status + ')';
+                    errorMsg = msgServerError.replace(':status', xhr.status);
                 }
                 showError(errorMsg);
                 resetInterface();
@@ -366,7 +381,7 @@ onViteReady(function() {
         });
 
         function startProgressTracking(taskId) {
-            $('#task-id').text('任務 ID: ' + taskId);
+            $('#task-id').text(msgTaskId + taskId);
             $('#start-time').text(new Date().toLocaleString());
             $('#cancel-btn').show().off('click').on('click', function() {
                 cancelImport(taskId);
@@ -411,8 +426,8 @@ onViteReady(function() {
         }
 
         function cancelImport(taskId) {
-            if (confirm('確定要取消導入任務嗎？已完成的部分將無法恢復。')) {
-                $('#cancel-btn').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> 正在取消...');
+            if (confirm(msgImportConfirm)) {
+                $('#cancel-btn').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> ' + msgPreparing);
 
                 $.post('/admin/wiki-maintenance/cancel/' + taskId)
                     .done(function(response) {
@@ -423,8 +438,8 @@ onViteReady(function() {
                     })
                     .fail(function(xhr) {
                         console.log('取消失敗:', xhr);
-                        alert('取消請求失敗，請重試');
-                        $('#cancel-btn').prop('disabled', false).html('<i class="fa fa-stop"></i> 取消導入');
+                        alert(msgCancelFailed);
+                        $('#cancel-btn').prop('disabled', false).html('<i class="fa fa-stop"></i> ' + msgCancelBtnLabel);
                     });
             }
         }
@@ -457,38 +472,38 @@ onViteReady(function() {
 
         function handleTaskCompletion(progress) {
             var $btn = $('#import-btn');
-            var originalText = '<i class="fa fa-download"></i> 下載並導入資料';
+            var originalText = '<i class="fa fa-download"></i> ' + {!! Js::from(__('admin.wiki_import_btn')) !!};
 
             if (progress.status === 'completed') {
                 $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-success');
-                $('#progress-title').text('導入完成！').addClass('text-success');
+                $('#progress-title').text(msgImportDoneTitle).addClass('text-success');
 
                 // 顯示成功消息
                 setTimeout(function() {
-                    alert('導入成功！\n\n' + progress.message);
+                    alert(msgImportSuccess + progress.message);
                     location.reload(); // 重新載入頁面以更新統計
                 }, 1000);
 
             } else if (progress.status === 'cancelled') {
                 $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-warning');
-                $('#progress-title').text('導入已取消').addClass('text-warning');
+                $('#progress-title').text(msgImportCancelledTitle).addClass('text-warning');
 
                 // 顯示取消消息
                 setTimeout(function() {
-                    alert('導入任務已取消\n\n' + progress.message);
+                    alert(msgImportCancelled + progress.message);
                     resetInterface();
                 }, 1000);
 
             } else {
                 $('#progress-bar').removeClass('progress-bar-info progress-bar-striped progress-bar-animated')
                     .addClass('progress-bar-danger');
-                $('#progress-title').text('導入失敗').addClass('text-danger');
+                $('#progress-title').text(msgImportFailedTitle).addClass('text-danger');
 
                 // 顯示錯誤消息
                 setTimeout(function() {
-                    alert('導入失敗：\n\n' + progress.message);
+                    alert(msgImportError + progress.message);
                     resetInterface();
                 }, 1000);
             }
@@ -497,16 +512,16 @@ onViteReady(function() {
         }
 
         function showError(message) {
-            alert('錯誤：' + message);
+            alert(msgErrorPrefix + message);
         }
 
         function resetInterface() {
             var $btn = $('#import-btn');
-            var originalText = '<i class="fa fa-download"></i> 下載並導入資料';
+            var originalText = '<i class="fa fa-download"></i> ' + {!! Js::from(__('admin.wiki_import_btn')) !!};
 
             $btn.prop('disabled', false).html(originalText);
             $('#progress-container').hide();
-            $('#cancel-btn').hide().prop('disabled', false).html('<i class="fa fa-stop"></i> 取消導入');
+            $('#cancel-btn').hide().prop('disabled', false).html('<i class="fa fa-stop"></i> ' + msgCancelBtnLabel);
 
             if (progressInterval) {
                 clearInterval(progressInterval);

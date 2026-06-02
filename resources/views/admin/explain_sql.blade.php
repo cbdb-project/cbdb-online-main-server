@@ -7,20 +7,19 @@
         </div>
         <div class="card-body">
             <p class="text-muted">
-                這個工具僅供管理員用於診斷查詢效能。請輸入只讀 SQL（僅支援 SELECT / WITH），系統會送出
-                <code>EXPLAIN</code> 並顯示 MySQL 回傳的執行計畫，方便評估索引或查詢設計是否需要調整。
+                {{ __('admin.explain_sql_desc') }}
             </p>
 
             <form method="post" action="{{ route('admin.explainsql') }}" class="form">
                 {{ csrf_field() }}
                 <div class="form-group">
-                    <label for="sql">SQL 語句（僅支援 SELECT / WITH）</label>
+                    <label for="sql">{{ __('admin.explain_sql_label') }}</label>
                     <textarea name="sql" id="sql" rows="5" class="form-control @error('sql') is-invalid @enderror" placeholder="SELECT ...">{{ old('sql', $sql) }}</textarea>
                     @error('sql')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
-                <button type="submit" class="btn btn-primary">執行 EXPLAIN</button>
+                <button type="submit" class="btn btn-primary">{{ __('admin.explain_sql_btn') }}</button>
             </form>
 
             @if($error)
@@ -51,7 +50,7 @@
                     </table>
                 </div>
             @elseif($results !== null && empty($results))
-                <p style="margin-top: 20px;">查無資料。</p>
+                <p style="margin-top: 20px;">{{ __('admin.explain_no_results') }}</p>
             @endif
         </div>
     </div>

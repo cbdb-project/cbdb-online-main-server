@@ -198,18 +198,18 @@
 
             <div class="content">
                 <div class="title m-b-md">
-                    中國歷代人物傳記 錄入系統
+                    {{ __('nav.welcome_system_title') }}
                 </div>
 
                 <div class="search-box">
                     <form id="person-search-form">
                         <label for="person-search" class="search-label">
-                            搜尋人物（可輸入人物 ID 或姓名）
+                            {{ __('nav.welcome_search_label') }}
                         </label>
                         <div class="search-row">
-                            <input type="text" id="person-search" name="q" placeholder="例如：3144 或 張孝祥" autocomplete="off">
+                            <input type="text" id="person-search" name="q" placeholder="{{ __('nav.welcome_search_placeholder') }}" autocomplete="off">
                             <div class="search-actions">
-                                <button type="submit">搜尋</button>
+                                <button type="submit">{{ __('nav.welcome_search_btn') }}</button>
                             </div>
                         </div>
                     </form>

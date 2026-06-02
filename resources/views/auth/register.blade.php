@@ -33,19 +33,19 @@
             <div class="text-center mb-4">
                 <a href="/home" class="text-decoration-none text-dark">
                     <div class="h4 mb-1">{{ config('app.name', 'Laravel') }}</div>
-                    <small class="text-muted">建立新帳號 · Create account</small>
+                    <small class="text-muted">{{ __('common.create_account') }}</small>
                 </a>
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h1 class="h5 text-center mb-4">加入我們 · Join us</h1>
+                    <h1 class="h5 text-center mb-4">{{ __('common.join_us') }}</h1>
 
                     <form action="{{ route('register') }}" method="post" novalidate>
                         {{ csrf_field() }}
                         <div class="form-group mb-3">
-                            <label for="name" class="form-label small text-muted">姓名 / Name</label>
-                            <input id="name" type="text" class="form-control{{ $errors->has('name') ? ' is-invalid' : '' }}" name="name" value="{{ old('name') }}" placeholder="您的姓名 / Full name" required autofocus>
+                            <label for="name" class="form-label small text-muted">{{ __('common.name') }}</label>
+                            <input id="name" type="text" class="form-control{{ $errors->has('name') ? ' is-invalid' : '' }}" name="name" value="{{ old('name') }}" placeholder="{{ __('common.name') }}" required autofocus>
                             @if ($errors->has('name'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('name') }}
@@ -53,8 +53,8 @@
                             @endif
                         </div>
                         <div class="form-group mb-3">
-                            <label for="email" class="form-label small text-muted">電子郵件 / Email</label>
-                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ old('email') }}" placeholder="name@example.com / 電子郵件" required>
+                            <label for="email" class="form-label small text-muted">{{ __('common.email') }}</label>
+                            <input id="email" type="email" class="form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" name="email" value="{{ old('email') }}" placeholder="name@example.com" required>
                             @if ($errors->has('email'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('email') }}
@@ -62,8 +62,8 @@
                             @endif
                         </div>
                         <div class="form-group mb-3">
-                            <label for="institution" class="form-label small text-muted">服務單位 / Institution</label>
-                            <input id="institution" type="text" class="form-control{{ $errors->has('institution') ? ' is-invalid' : '' }}" name="institution" value="{{ old('institution') }}" placeholder="例如：某某大學 / Your institution" required>
+                            <label for="institution" class="form-label small text-muted">{{ __('common.institution') }}</label>
+                            <input id="institution" type="text" class="form-control{{ $errors->has('institution') ? ' is-invalid' : '' }}" name="institution" value="{{ old('institution') }}" placeholder="{{ __('common.institution_placeholder') }}" required>
                             @if ($errors->has('institution'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('institution') }}
@@ -71,8 +71,8 @@
                             @endif
                         </div>
                         <div class="form-group mb-3">
-                            <label for="password" class="form-label small text-muted">密碼 / Password</label>
-                            <input id="password" type="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" name="password" placeholder="請設定密碼 / Choose a password" required>
+                            <label for="password" class="form-label small text-muted">{{ __('common.password') }}</label>
+                            <input id="password" type="password" class="form-control{{ $errors->has('password') ? ' is-invalid' : '' }}" name="password" placeholder="{{ __('common.choose_password') }}" required>
                             @if ($errors->has('password'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('password') }}
@@ -80,15 +80,15 @@
                             @endif
                         </div>
                         <div class="form-group mb-4">
-                            <label for="password-confirm" class="form-label small text-muted">確認密碼 / Confirm password</label>
-                            <input id="password-confirm" type="password" class="form-control" name="password_confirmation" placeholder="再次輸入密碼 / Confirm password" required>
+                            <label for="password-confirm" class="form-label small text-muted">{{ __('common.confirm_password') }}</label>
+                            <input id="password-confirm" type="password" class="form-control" name="password_confirmation" placeholder="{{ __('common.confirm_password') }}" required>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">建立帳號 / Create account</button>
+                        <button type="submit" class="btn btn-primary btn-block">{{ __('common.create_account') }}</button>
                     </form>
                 </div>
                 <div class="card-footer text-center bg-white">
-                    <span class="small text-muted">已經有帳號？ / Already have an account?</span>
-                    <a href="{{ route('login') }}" class="ml-1">直接登入 / Sign in</a>
+                    <span class="small text-muted">{{ __('common.have_account') }}</span>
+                    <a href="{{ route('login') }}" class="ml-1">{{ __('common.sign_in') }}</a>
                 </div>
             </div>
         </div>

@@ -97,9 +97,10 @@ class AdminExplainSqlTest extends TestCase {
 
         DB::statement('CREATE TABLE sample (id INTEGER)');
 
-        $response = $this->post('/admin/explainsql', [
-            'sql' => 'SELECT * FROM sample',
-        ]);
+        $response = $this->withSession(['locale' => 'zh-TW'])
+            ->post('/admin/explainsql', [
+                'sql' => 'SELECT * FROM sample',
+            ]);
 
         $response->assertStatus(200)
             ->assertSee('MySQL EXPLAIN')

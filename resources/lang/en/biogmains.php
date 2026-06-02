@@ -1,0 +1,272 @@
+<?php
+
+return [
+    // ─── Common form actions ────────────────────────────────────────
+    'save_directly'           => 'Save Directly',
+    'submit_proposal'         => 'Submit Proposal',
+    'save_as'                 => 'Save As',
+
+    // ─── Modification note ─────────────────────────────────────────
+    'modification_note_label'       => 'Modification Note / Proposal Reason',
+    'modification_note_placeholder' => 'Briefly describe the reason for this change (recorded for both direct saves and proposals)',
+    'modification_note_hint'        => 'This will be recorded in the operation history. Required when submitting a proposal; optional when saving directly.',
+
+    // ─── Record counts ─────────────────────────────────────────────
+    'record_count'            => 'Found :count records',
+    'total_records'           => ':count records total',
+    'no_data_row'             => 'No data',
+
+    // ─── Candidate source helper ───────────────────────────────────
+    'candidate_source_title'  => 'Candidate Sources & Pages',
+    'candidate_source_hint'   => 'Select source and page info from the [Source] panel',
+    'please_fill_source'      => 'Please fill in [Person → Source]',
+    'update_source_success'   => 'Updated [Source] and [Pages/Entries] successfully',
+
+    // ─── Common field labels ───────────────────────────────────────
+    'sequence'                => 'Sequence',
+    'start_year'              => 'Start Year',
+    'end_year'                => 'End Year',
+    'pages_entries'           => 'Pages/Entries',
+    'notes_field'             => 'Notes',
+    'please_select'           => 'Please select',
+    'please_search'           => 'Search',
+    'actions'                 => 'Actions',
+    'source_field'            => 'Source',
+    'place_name'              => 'Place Name',
+    'year_field'              => 'Year',
+    'quantity'                => 'Quantity',
+
+    // ─── JS confirm dialogs ────────────────────────────────────────
+    'delete_confirm_js'       => "Are you sure you want to delete?\n\nPlease confirm!",
+
+    // ─── Audit fields component ────────────────────────────────────
+    'audit_created'           => 'Created By',
+    'audit_updated'           => 'Last Modified By',
+    'audit_display_hint'      => 'Display only — not included in form submission',
+
+    // ─── Person ID display component ──────────────────────────────
+    'person_basic_info'       => 'Person Information',
+    'person_id_colon'         => 'Person ID:',
+    'person_name_pinyin'      => 'Name (Pinyin):',
+    'person_dynasty'          => 'Dynasty:',
+    'person_name_chinese'     => 'Name (Chinese):',
+
+    // ─── Basic Information ─────────────────────────────────────────
+    'basic_info_title'        => 'Basic Information',
+    'basic_info_readonly'     => 'Basic Information (read-only)',
+    'generate_pinyin_btn'     => 'Generate Pinyin',
+    'surname_chn'             => 'Surname (Chinese)',
+    'mingzi_chn'              => 'Given Name (Chinese)',
+    'foreign_surname'         => 'Foreign Surname',
+    'foreign_mingzi'          => 'Foreign Given Name',
+    'foreign_rm_surname'      => 'Foreign Romanized Surname',
+    'foreign_rm_mingzi'       => 'Foreign Romanized Given Name',
+    'foreign_full_name'       => 'Foreign Full Name',
+    'foreign_rm_full_name'    => 'Foreign Romanized Full Name',
+    'name_auto_hint'          => 'Auto-generated from Surname and Given Name. No manual entry needed.',
+    'pinyin_auto_hint'        => 'Auto-generated from Xing and Ming. No manual entry needed.',
+    'foreign_full_auto_hint'  => 'Auto-generated from Foreign Given Name + Surname. No manual entry needed.',
+    'rm_auto_hint'            => 'Auto-generated from Foreign Romanized Surname and Given Name. No manual entry needed.',
+    'auto_calc_hint'          => 'Auto-calculated periodically by algorithm. No manual entry needed.',
+    'index_year_method'       => 'Index Year Method',
+    'index_year_source_col'   => 'Index Year Source',
+    'index_addr'              => 'Index Address',
+    'index_addr_type'         => 'Index Address Type',
+    'death_age_label'         => 'Age at Death',
+    'range_label'             => 'Range',
+    'fl_earliest_notes'       => 'Active From Notes',
+    'fl_latest_notes'         => 'Active Until Notes',
+    'choronym_field'          => 'Choronym',
+    'household_field'         => 'Household Status',
+    'person_name_chn_label'   => 'Name (Chinese)',
+    'search_placeholder'      => 'Search Person (use v for ü in pinyin)',
+    'all_dynasties_opt'       => 'All Dynasties',
+    'basicinfo_check_alert'   => 'Before leaving: please confirm that [Given Name] and [Ming] are filled in.',
+    'basicinfo_pinyin_alert'  => 'Pinyin generation complete.',
+
+    // ─── Addresses module ─────────────────────────────────────────
+    'addresses_list'          => 'Addresses',
+    'migration_sequence'      => 'Migration Sequence',
+    'address_type'            => 'Address Type',
+    'maiden_addr'             => 'Maiden Name Address',
+    'other_upper_info'        => 'Other Superior Attribution Info',
+
+    // ─── Alt Name module ──────────────────────────────────────────
+    'altname_list'            => 'Alternative Names',
+    'altname_seq_title'       => 'Alt. Name Sequence Adjustment',
+    'new_sequence'            => 'New Sequence',
+    'altname_chinese'         => 'Alt. Name (Chinese)',
+    'altname_pinyin_label'    => 'Alt. Name (Pinyin)',
+    'altname_type_code'       => 'Alt. Name Type Code',
+    'submit_btn'              => 'Submit',
+    'submitted_ok'            => 'Submitted',
+    'submit_failed'           => 'Submission failed',
+    'non_json_response'       => 'Non-JSON response',
+    'network_error'           => 'Network or server error',
+
+    // ─── Sources module ───────────────────────────────────────────
+    'sources_list'            => 'Sources',
+    'primary_source'          => 'Primary Source',
+    'self_biography'          => 'Self-Written Biography',
+    'wiki_warning'            => 'Warning',
+    'wiki_warning_text'       => 'This record is bulk-imported Wiki reference data. If modified, your changes will be lost on the next import. Please confirm if manual modification is needed.',
+    'options'                 => 'Options',
+    'page_no'                 => 'Page No.',
+
+    // ─── Entries module ───────────────────────────────────────────
+    'entries_list'            => 'Entries',
+    'entry_method'            => 'Entry Method',
+    'entry_year_field'        => 'Entry Year',
+    'exam_ranking'            => 'Exam Ranking',
+    'nth_attempt'             => 'Nth Attempt',
+    'arabic_numerals_hint'    => 'Enter Arabic numerals (half-width)',
+    'exam_subject'            => 'Exam Subject',
+    'parental_status'         => 'Parental Status',
+    'location'                => 'Location',
+    'entry_age'               => 'Entry Age',
+    'official_appt'           => 'Official Appointment',
+    'kinship_type'            => 'Kinship Type',
+    'relative_field'          => 'Relative',
+    'social_rel_type'         => 'Social Relation Type',
+    'social_rel_person'       => 'Social Relation Person',
+    'social_inst_field'       => 'Social Institution',
+
+    // ─── Events module ────────────────────────────────────────────
+    'events_list'             => 'Events',
+    'event_name'              => 'Event Name',
+    'event_role'              => "Subject's Role in This Event",
+    'event_year_field'        => 'Event Year',
+    'event_reign_year'        => 'Reign Year (Event)',
+    'major_event'             => 'Major Event',
+    'not_specified'           => 'Not specified',
+
+    // ─── Kinship module ───────────────────────────────────────────
+    'kinship_list'            => 'Kinship',
+    'kinship_relation'        => 'Kinship Relation',
+    'relative_name'           => 'Relative Name',
+    'paired_kinship'          => 'Paired Kinship',
+    'no_paired_kinship'       => 'No corresponding kinship',
+
+    // ─── Texts module ─────────────────────────────────────────────
+    'texts_list'              => 'Texts',
+    'text_code'               => 'Text Code',
+    'text_role'               => 'Text Role',
+    'book_title_field'        => 'Book Title',
+
+    // ─── Possession module ────────────────────────────────────────
+    'possession_list'         => 'Possessions',
+    'possession_seq_title'    => 'Possession Sequence Adjustment',
+    'possession_action_field' => 'Action (own, donate, etc.)',
+    'possession_english'      => 'Possession (English)',
+    'possession_chinese'      => 'Possession (Chinese)',
+    'unit'                    => 'Unit',
+    'action_col'              => 'Action',
+    'possession_col'          => 'Possession',
+
+    // ─── Social Institution module ────────────────────────────────
+    'socialinst_list'         => 'Social Institutions',
+    'socialinst_field'        => 'Social Institution',
+    'socialinst_role'         => 'Social Institution Role',
+
+    // ─── Statuses module ──────────────────────────────────────────
+    'statuses_list'           => 'Status Records',
+    'status_en_col'           => 'Status (EN)',
+    'status_zh_col'           => 'Status (ZH)',
+    'supplement_text'         => 'Supplementary Text',
+    'supplement_placeholder'  => 'Add peer name titles, e.g. "Three Sages of Southeast", "Four Talents"',
+
+    // ─── Assoc module ─────────────────────────────────────────────
+    'assoc_list'              => 'Associations',
+    'assoc_category_col'      => 'Association Type',
+    'assoc_person_y'          => 'Associated Person (Y)',
+    'assoc_relative'          => "Associated Person's Relative",
+    'assoc_start_year'        => 'Association Start Year',
+    'assoc_end_year'          => 'Association End Year',
+    'academic_topic'          => 'Academic Topic',
+    'occasion'                => 'Occasion',
+    'work_title'              => 'Work Title',
+    'assoc_count_field'       => 'Relation Count',
+    'assoc_count_hint'        => 'For correspondence only: when letters cannot be distinguished by title and date, create one association record and enter the total letter count here. Use Arabic numerals.',
+    'intermediary'            => 'Intermediary',
+    'intermediary_type'       => 'Intermediary Type',
+    'witness'                 => 'Witness',
+    'assoc_location'          => 'Association Location',
+    'paired_assoc'            => 'Paired Association',
+    'no_paired_assoc'         => 'No corresponding association',
+    'paired_assoc_kinship'    => 'Kinship of Paired Association Person',
+    'paired_label'            => 'Paired:',
+    'no_matching_codes'       => 'No matching codes found',
+    'assoc_person_col'        => 'Associated Person',
+
+    // ─── Offices module ───────────────────────────────────────────
+    'offices_list'            => 'Postings',
+    'office_name_field'       => 'Office',
+    'appt_type'               => 'Appointment Type',
+    'assume_office'           => 'Assumed Office',
+    'office_category'         => 'Office Category',
+    'sequence_same_note'      => 'Note: for simultaneous appointments, assign the same sequence number',
+
+    // ─── AI Features ──────────────────────────────────────────────
+    'ai_status_recognition'   => 'AI Status Recognition',
+    'ai_assoc_recognition'    => 'AI Association Recognition',
+    'ai_offices_autofill'     => 'AI Autofill',
+    'ai_consent_intro'        => 'By using the AI recognition feature you agree to the following:',
+    'ai_fill_consent_intro'   => 'By using the AI autofill feature you agree to the following:',
+    'ai_notice_title'         => 'Notice: Data Collection & Third-Party Services',
+    'ai_input_placeholder_status'  => 'e.g. physician',
+    'ai_description_hint_status'   => 'AI will semantically search STATUS_CODES for the most relevant codes',
+    'ai_input_placeholder_assoc'   => 'e.g. wrote a pagoda inscription for Master Xianda',
+    'ai_description_hint_assoc'    => 'AI will semantically search ASSOC_CODES for the most relevant codes',
+    'ai_input_placeholder_offices' => 'e.g. Yongzheng 1st year, 1st month, 3rd day appointed to Zhuozhou, died in office 6th month 15th day',
+    'ai_description_hint_offices'  => 'AI will extract office title, place name, dates and fill the form automatically',
+    'ai_consent_record'       => 'Your input text and AI results will be recorded for research and improvement',
+    'ai_consent_third_party'  => 'Your text will be sent to third-party AI services for processing',
+    'ai_consent_fill_third_party' => 'Your text will be sent to third-party AI services (Google Gemini API, OpenAI API, etc.) for processing',
+    'ai_consent_verify'       => 'AI results are for reference only — please verify before submitting',
+    'ai_current_model'        => 'Current model:',
+    'ai_recognize_btn'        => 'AI Recognition',
+    'ai_fill_btn'             => 'AI Autofill',
+    'ai_clear_btn'            => 'Clear AI Suggestions',
+    'ai_processing'           => 'AI recognition in progress…',
+    'ai_fill_processing'      => 'AI processing…',
+    'ai_recognition_failed'   => 'Recognition failed',
+    'ai_fill_complete'        => 'AI autofill complete',
+    'ai_fields_matched'       => ':count fields matched successfully',
+    'ai_fields_confirm'       => ':count fields need confirmation (highlighted yellow — review before submitting)',
+    'ai_fields_manual'        => ':count fields need manual search (keywords extracted but no match found)',
+    'ai_fields_failed'        => ':count fields could not be extracted',
+    'ai_no_match'             => 'No corresponding concept found in table',
+    'ai_candidate_codes'      => 'Candidate Codes (click to fill)',
+    'ai_enter_description'    => 'Please enter a description',
+    'ai_enter_text_first'     => 'Please enter the original text first',
+    'ai_clear_confirm'        => 'Clear all AI autofilled content?',
+    'ai_original_text_label'  => 'Original Text (paste text containing official appointment records)',
+
+    // ─── Sequence adjustment partial ──────────────────────────────
+    'seq_adjust_title'        => 'Sequence Adjustment',
+    'seq_adjust_btn'          => 'Adjust Sequence',
+    'seq_adjust_hint'         => 'After revealing the "New Sequence" field, modify and submit each entry individually.',
+    'seq_collapse_btn'        => 'Collapse Sequence Adjustment',
+
+    // ─── Inline time fields component ────────────────────────────
+    'convert_to_reign_year'   => 'Convert AD year to reign year',
+    'convert_to_ad_year'      => 'Convert reign year to AD year',
+    'year_unit'               => 'Year',
+    'month_unit'              => 'Month',
+    'day_unit'                => 'Day',
+    'month_range_hint'        => 'Enter 1–12 or leave blank',
+    'day_range_hint'          => 'Enter 1–30 or leave blank',
+    'time_range_label'        => 'Time Range',
+    'intercalary_month_label' => 'Intercalary Month',
+    'day_ganzhi_label'        => 'Day (Ganzhi)',
+
+    // ─── History button ───────────────────────────────────────────
+    'view_history'            => 'View Page History',
+
+    // ─── AI result summary suffixes (HTML count placeholders) ─────
+    'ai_fields_matched_suffix'  => 'fields matched',
+    'ai_fields_confirm_suffix'  => 'fields need confirmation (highlighted yellow — review before submitting)',
+    'ai_fields_manual_suffix'   => 'fields need manual search (AI extracted keywords but found no match)',
+    'ai_fields_failed_suffix'   => 'fields could not be extracted',
+    'ai_fill_done_status'       => 'Autofill done',
+];

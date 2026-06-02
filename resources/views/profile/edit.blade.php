@@ -5,7 +5,7 @@
 @if(session('success'))
             <div class="alert alert-success alert-dismissible">
                 <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                <h4><i class="icon fa fa-check"></i> 成功！</h4>
+                <h4><i class="icon fa fa-check"></i> {{ __('common.success_title') }}</h4>
                 {{ session('success') }}
             </div>
         @endif
@@ -13,13 +13,13 @@
         @if(session('token'))
             <div class="alert alert-info alert-dismissible">
                 <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                <h4><i class="icon fa fa-key"></i> API Token 已創建</h4>
-                <p>請妥善保存以下 Token，它只會顯示一次：</p>
+                <h4><i class="icon fa fa-key"></i> {{ __('common.api_token_created') }}</h4>
+                <p>{{ __('common.api_token_save_once') }}</p>
                 <div class="input-group">
                     <input type="text" class="form-control" value="{{ session('token') }}" id="new-token" readonly>
                     <div class="input-group-append">
                         <button class="btn btn-outline-secondary" type="button" onclick="copyToken(event)">
-                            <i class="fa fa-copy"></i> 複製
+                            <i class="fa fa-copy"></i> {{ __('common.copy') }}
                         </button>
                     </div>
                 </div>
@@ -29,7 +29,7 @@
         @if ($errors->any())
             <div class="alert alert-danger alert-dismissible">
                 <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-                <h4><i class="icon fa fa-ban"></i> 錯誤！</h4>
+                <h4><i class="icon fa fa-ban"></i> {{ __('common.error_title') }}</h4>
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -47,11 +47,11 @@
 
             <div class="card card-primary">
                 <div class="card-header">
-                    <h3 class="card-title">基本資料</h3>
+                    <h3 class="card-title">{{ __('common.basic_info_section') }}</h3>
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label for="name" class="col-sm-2 control-label">姓名 <span class="text-red">*</span></label>
+                        <label for="name" class="col-sm-2 control-label">{{ __('common.name') }} <span class="text-red">*</span></label>
                         <div class="col-sm-10">
                             <input type="text" name="name" id="name" class="form-control"
                                    value="{{ old('name', $user->name) }}" required>
@@ -67,7 +67,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="institution" class="col-sm-2 control-label">所屬機構</label>
+                        <label for="institution" class="col-sm-2 control-label">{{ __('common.institution_label') }}</label>
                         <div class="col-sm-10">
                             <input type="text" name="institution" id="institution" class="form-control"
                                    value="{{ old('institution', $user->institution) }}">
@@ -75,13 +75,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="col-sm-2 control-label">頭像</label>
+                        <label class="col-sm-2 control-label">{{ __('common.avatar') }}</label>
                         <div class="col-sm-10">
                             <!-- 當前頭像預覽 -->
                             <div class="current-avatar-preview">
-                                <div class="preview-label">當前使用：</div>
+                                <div class="preview-label">{{ __('common.current_using') }}</div>
                                 <div class="preview-container">
-                                    <img id="current-avatar-img" src="/images/avatar/{{ old('avatar', $user->avatar) }}" alt="當前頭像">
+                                    <img id="current-avatar-img" src="/images/avatar/{{ old('avatar', $user->avatar) }}" alt="{{ __('common.avatar') }}">
                                     <div class="preview-name" id="current-avatar-name">{{ old('avatar', $user->avatar) }}</div>
                                 </div>
                             </div>
@@ -89,7 +89,7 @@
                             <!-- 選擇提示 -->
                             <div class="avatar-selection-hint">
                                 <i class="fas fa-info-circle"></i>
-                                點擊下方頭像進行選擇，選擇後請點擊頁面底部的「儲存變更」按鈕以保存設定
+                                {{ __('common.avatar_select_hint_msg') }}
                             </div>
 
                             <input type="hidden" name="avatar" id="avatar-input" value="{{ old('avatar', $user->avatar) }}">
@@ -99,16 +99,16 @@
                                 <!-- CBDB Logo 作為默認頭像 -->
                                 <div class="avatar-option {{ old('avatar', $user->avatar) === 'avatar0.png' ? 'selected' : '' }}"
                                      data-avatar="avatar0.png"
-                                     title="點擊選擇 CBDB 默認頭像">
-                                    <img src="/images/avatar/avatar0.png" alt="CBDB 默認頭像">
-                                    <div class="avatar-number">默認</div>
+                                     title="{{ __('common.default_avatar_title') }}">
+                                    <img src="/images/avatar/avatar0.png" alt="{{ __('common.default_avatar_title') }}">
+                                    <div class="avatar-number">{{ __('common.avatar_default') }}</div>
                                 </div>
 
                                 @for ($i = 1; $i <= 18; $i++)
                                     <div class="avatar-option {{ old('avatar', $user->avatar) === 'avatar' . $i . '.png' ? 'selected' : '' }}"
                                          data-avatar="avatar{{ $i }}.png"
-                                         title="點擊選擇頭像 {{ $i }}">
-                                        <img src="/images/avatar/avatar{{ $i }}.png" alt="頭像 {{ $i }}">
+                                         title="{{ __('common.avatar') }} {{ $i }}">
+                                        <img src="/images/avatar/avatar{{ $i }}.png" alt="{{ __('common.avatar') }} {{ $i }}">
                                         <div class="avatar-number">{{ $i }}</div>
                                     </div>
                                 @endfor
@@ -120,30 +120,30 @@
 
             <div class="card card-warning">
                 <div class="card-header">
-                    <h3 class="card-title">修改密碼</h3>
+                    <h3 class="card-title">{{ __('common.change_password') }}</h3>
                     <div class="card-tools">
-                        <p class="help-block" style="margin: 0;">如果不需要修改密碼，請留空以下欄位</p>
+                        <p class="help-block" style="margin: 0;">{{ __('common.password_no_change_hint') }}</p>
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label for="current_password" class="col-sm-2 control-label">當前密碼</label>
+                        <label for="current_password" class="col-sm-2 control-label">{{ __('common.current_password') }}</label>
                         <div class="col-sm-10">
                             <input type="password" name="current_password" id="current_password" class="form-control">
-                            <p class="help-block">如需修改密碼，請先輸入當前密碼</p>
+                            <p class="help-block">{{ __('common.current_password_hint') }}</p>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="new_password" class="col-sm-2 control-label">新密碼</label>
+                        <label for="new_password" class="col-sm-2 control-label">{{ __('common.new_password') }}</label>
                         <div class="col-sm-10">
                             <input type="password" name="new_password" id="new_password" class="form-control">
-                            <p class="help-block">密碼至少需要 6 個字符</p>
+                            <p class="help-block">{{ __('common.new_password_hint') }}</p>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="new_password_confirmation" class="col-sm-2 control-label">確認新密碼</label>
+                        <label for="new_password_confirmation" class="col-sm-2 control-label">{{ __('common.confirm_new_password') }}</label>
                         <div class="col-sm-10">
                             <input type="password" name="new_password_confirmation" id="new_password_confirmation" class="form-control">
                         </div>
@@ -153,8 +153,8 @@
 
             <div class="form-group">
                 <div class="col-sm-offset-2 col-sm-10">
-                    <button type="submit" class="btn btn-primary">儲存變更</button>
-                    <a href="{{ url('/home') }}" class="btn btn-secondary">取消</a>
+                    <button type="submit" class="btn btn-primary">{{ __('common.save_changes') }}</button>
+                    <a href="{{ url('/home') }}" class="btn btn-secondary">{{ __('common.cancel') }}</a>
                 </div>
             </div>
     </form>
@@ -163,15 +163,15 @@
 @if(Route::has('api-tokens.index'))
 <div class="card card-info mt-3">
     <div class="card-header">
-        <h3 class="card-title">API 訪問令牌管理</h3>
+        <h3 class="card-title">{{ __('common.api_token_management') }}</h3>
     </div>
     <div class="card-body">
-        <p>API Token 可用於在外部應用程序或腳本中訪問 CBDB API。請妥善保管您的 Token。</p>
+        <p>{{ __('common.api_token_description') }}</p>
 
         <!-- 創建新 Token 表單 -->
         <div class="card card-default collapsed-card">
             <div class="card-header">
-                <h3 class="card-title">創建新 Token</h3>
+                <h3 class="card-title">{{ __('common.create_new_token') }}</h3>
                 <div class="card-tools">
                     <button type="button" class="btn btn-tool" data-card-widget="collapse">
                         <i class="fas fa-plus"></i>
@@ -181,25 +181,25 @@
             <div class="card-body" style="display: none;">
                 <form id="create-token-form">
                     <div class="form-group">
-                        <label for="token-name">Token 名稱 <span class="text-red">*</span></label>
+                        <label for="token-name">{{ __('common.token_name') }} <span class="text-red">*</span></label>
                         <input type="text" class="form-control" id="token-name" name="name"
-                               placeholder="例如：我的 Python 腳本" required>
-                        <small class="form-text text-muted">為這個 Token 取一個容易識別的名稱</small>
+                               placeholder="{{ __('common.token_name_placeholder') }}" required>
+                        <small class="form-text text-muted">{{ __('common.token_name_hint') }}</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="token-expires">有效期限</label>
+                        <label for="token-expires">{{ __('common.token_expiry') }}</label>
                         <select class="form-control" id="token-expires" name="expires_in">
-                            <option value="">永久有效</option>
-                            <option value="30">30 天</option>
-                            <option value="90">90 天</option>
-                            <option value="180">180 天</option>
-                            <option value="365">1 年</option>
+                            <option value="">{{ __('common.token_never_expires') }}</option>
+                            <option value="30">{{ __('common.token_30_days') }}</option>
+                            <option value="90">{{ __('common.token_90_days') }}</option>
+                            <option value="180">{{ __('common.token_180_days') }}</option>
+                            <option value="365">{{ __('common.token_1_year') }}</option>
                         </select>
                     </div>
 
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa fa-key"></i> 創建 Token
+                        <i class="fa fa-key"></i> {{ __('common.create_token_btn') }}
                     </button>
                 </form>
             </div>
@@ -207,9 +207,9 @@
 
         <!-- Token 列表 -->
         <div class="mt-3">
-            <h5>現有 Token</h5>
+            <h5>{{ __('common.existing_tokens') }}</h5>
             <div id="tokens-list">
-                <p class="text-muted">正在載入...</p>
+                <p class="text-muted">{{ __('common.tokens_loading') }}</p>
             </div>
         </div>
     </div>
@@ -526,6 +526,29 @@ onViteReady(function() {
 
 @if(Route::has('api-tokens.index'))
 <script>
+const i18n = {
+    copied:               {!! Js::from(__('common.copied')) !!},
+    copyManually:         {!! Js::from(__('common.copy_manually')) !!},
+    noTokensYet:          {!! Js::from(__('common.no_tokens_yet')) !!},
+    tokenColName:         {!! Js::from(__('common.token_col_name')) !!},
+    tokenColCreated:      {!! Js::from(__('common.token_col_created')) !!},
+    tokenColLastUsed:     {!! Js::from(__('common.token_col_last_used')) !!},
+    tokenColExpires:      {!! Js::from(__('common.token_col_expires')) !!},
+    tokenColActions:      {!! Js::from(__('common.token_col_actions')) !!},
+    tokenNeverUsed:       {!! Js::from(__('common.token_never_used')) !!},
+    tokenPermanent:       {!! Js::from(__('common.token_permanent')) !!},
+    tokenRevoke:          {!! Js::from(__('common.token_revoke')) !!},
+    tokenRevokeAll:       {!! Js::from(__('common.token_revoke_all')) !!},
+    tokenLoadFailed:      {!! Js::from(__('common.token_load_failed')) !!},
+    tokenRevokeConfirm:   {!! Js::from(__('common.token_revoke_confirm')) !!},
+    tokenRevoked:         {!! Js::from(__('common.token_revoked')) !!},
+    networkErrorRetry:    {!! Js::from(__('common.network_error_retry')) !!},
+    tokenRevokeAllConfirm:{!! Js::from(__('common.token_revoke_all_confirm')) !!},
+    tokenAllRevoked:      {!! Js::from(__('common.token_all_revoked')) !!},
+    tokenCreatedSuccess:  {!! Js::from(__('common.token_created_success')) !!},
+    tokenSaveWarning:     {!! Js::from(__('common.token_save_warning')) !!},
+};
+
 // 時區相關函數（動態取得，避免 Vite 模組尚未載入時抓不到）
 function getFormatTimestampFn() {
     return typeof window.formatTimestamp === 'function'
@@ -566,16 +589,16 @@ function copyToken(event) {
         navigator.clipboard.writeText(text)
             .then(() => {
                 const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<i class="fa fa-check"></i> 已複製';
+                btn.innerHTML = '<i class="fa fa-check"></i> ' + i18n.copied;
                 setTimeout(() => {
                     btn.innerHTML = originalHTML;
                 }, 2000);
             })
             .catch(err => {
-                console.error('複製失敗:', err);
+                console.error('Copy failed:', err);
                 // Fallback to select
                 tokenInput.select();
-                showMessage('請使用 Ctrl+C / ⌘+C 手動複製', 'warning');
+                showMessage(i18n.copyManually, 'warning');
             });
     } else {
         // Fallback for older browsers
@@ -583,12 +606,12 @@ function copyToken(event) {
         try {
             document.execCommand('copy');
             const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fa fa-check"></i> 已複製';
+            btn.innerHTML = '<i class="fa fa-check"></i> ' + i18n.copied;
             setTimeout(() => {
                 btn.innerHTML = originalHTML;
             }, 2000);
         } catch (err) {
-            showMessage('請使用 Ctrl+C / ⌘+C 手動複製', 'warning');
+            showMessage(i18n.copyManually, 'warning');
         }
     }
 }
@@ -601,28 +624,28 @@ function loadTokens() {
             const listDiv = document.getElementById('tokens-list');
 
             if (tokens.length === 0) {
-                listDiv.innerHTML = '<p class="text-muted">尚未創建任何 Token</p>';
+                listDiv.innerHTML = '<p class="text-muted">' + i18n.noTokensYet + '</p>';
                 return;
             }
 
             let html = '<div class="table-responsive"><table class="table table-bordered table-sm">';
-            html += '<thead><tr><th>名稱</th><th>創建時間</th><th>最後使用</th><th>到期時間</th><th>操作</th></tr></thead><tbody>';
+            html += '<thead><tr><th>' + i18n.tokenColName + '</th><th>' + i18n.tokenColCreated + '</th><th>' + i18n.tokenColLastUsed + '</th><th>' + i18n.tokenColExpires + '</th><th>' + i18n.tokenColActions + '</th></tr></thead><tbody>';
 
             tokens.forEach(token => {
                 html += '<tr>';
                 html += '<td>' + escapeHtml(token.name) + '</td>';
                 html += '<td>' + formatDate(token.created_at) + '</td>';
-                html += '<td>' + (token.last_used_at ? formatDate(token.last_used_at) : '從未使用') + '</td>';
-                html += '<td>' + (token.expires_at ? formatDate(token.expires_at) : '永久') + '</td>';
+                html += '<td>' + (token.last_used_at ? formatDate(token.last_used_at) : i18n.tokenNeverUsed) + '</td>';
+                html += '<td>' + (token.expires_at ? formatDate(token.expires_at) : i18n.tokenPermanent) + '</td>';
                 // Use data attributes to prevent XSS
-                html += '<td><button class="btn btn-sm btn-danger revoke-token-btn" data-token-id="' + token.id + '" data-token-name="' + escapeHtml(token.name) + '"><i class="fa fa-trash"></i> 撤銷</button></td>';
+                html += '<td><button class="btn btn-sm btn-danger revoke-token-btn" data-token-id="' + token.id + '" data-token-name="' + escapeHtml(token.name) + '"><i class="fa fa-trash"></i> ' + i18n.tokenRevoke + '</button></td>';
                 html += '</tr>';
             });
 
             html += '</tbody></table></div>';
 
             if (tokens.length > 1) {
-                html += '<button class="btn btn-sm btn-warning mt-2" id="revoke-all-tokens-btn"><i class="fa fa-trash-alt"></i> 撤銷所有 Token</button>';
+                html += '<button class="btn btn-sm btn-warning mt-2" id="revoke-all-tokens-btn"><i class="fa fa-trash-alt"></i> ' + i18n.tokenRevokeAll + '</button>';
             }
 
             listDiv.innerHTML = html;
@@ -631,8 +654,8 @@ function loadTokens() {
             attachTokenEventListeners();
         })
         .catch(error => {
-            console.error('載入 Token 失敗:', error);
-            document.getElementById('tokens-list').innerHTML = '<p class="text-danger">載入失敗</p>';
+            console.error('Token load failed:', error);
+            document.getElementById('tokens-list').innerHTML = '<p class="text-danger">' + i18n.tokenLoadFailed + '</p>';
         });
 }
 
@@ -659,42 +682,42 @@ function attachTokenEventListeners() {
 function revokeToken(tokenId, tokenName) {
     // Validate tokenId is numeric
     if (!/^\d+$/.test(String(tokenId))) {
-        console.error('無效的 Token ID:', tokenId);
-        showMessage('<i class="fa fa-ban"></i> 撤銷失敗：無效的 Token ID', 'danger');
+        console.error('Invalid token ID:', tokenId);
+        showMessage('<i class="fa fa-ban"></i> ' + i18n.tokenLoadFailed, 'danger');
         return;
     }
 
-    if (!confirm(`確定要撤銷 Token "${tokenName}" 嗎？此操作無法撤銷。`)) {
+    if (!confirm(i18n.tokenRevokeConfirm.replace(':name', tokenName))) {
         return;
     }
 
     axios.delete(`{{ route('api-tokens.destroy', ['tokenId' => '__TOKEN_ID__'], false) }}`.replace('__TOKEN_ID__', tokenId))
         .then(response => {
-            showMessage('<i class="fa fa-check"></i> Token 已撤銷', 'success');
+            showMessage('<i class="fa fa-check"></i> ' + i18n.tokenRevoked, 'success');
             loadTokens();
         })
         .catch(error => {
-            console.error('撤銷 Token 失敗:', error);
-            const errorMsg = error.response?.data?.message || error.message || '網絡錯誤，請稍後重試';
-            showMessage(`<i class="fa fa-ban"></i> 撤銷失敗：${errorMsg}`, 'danger');
+            console.error('Token revoke failed:', error);
+            const errorMsg = error.response?.data?.message || error.message || i18n.networkErrorRetry;
+            showMessage('<i class="fa fa-ban"></i> ' + errorMsg, 'danger');
         });
 }
 
 // Revoke all tokens
 function revokeAllTokens() {
-    if (!confirm('確定要撤銷所有 Token 嗎？此操作無法撤銷。')) {
+    if (!confirm(i18n.tokenRevokeAllConfirm)) {
         return;
     }
 
     axios.delete('{{ route('api-tokens.destroy-all', [], false) }}')
         .then(response => {
-            showMessage('<i class="fa fa-check"></i> 所有 Token 已撤銷', 'success');
+            showMessage('<i class="fa fa-check"></i> ' + i18n.tokenAllRevoked, 'success');
             loadTokens();
         })
         .catch(error => {
-            console.error('撤銷所有 Token 失敗:', error);
-            const errorMsg = error.response?.data?.message || error.message || '網絡錯誤，請稍後重試';
-            showMessage(`<i class="fa fa-ban"></i> 批量撤銷失敗：${errorMsg}`, 'danger');
+            console.error('Revoke all tokens failed:', error);
+            const errorMsg = error.response?.data?.message || error.message || i18n.networkErrorRetry;
+            showMessage('<i class="fa fa-ban"></i> ' + errorMsg, 'danger');
         });
 }
 
@@ -753,9 +776,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // 顯示成功訊息和新 Token
                     const tokenValue = response.data?.token?.plainTextToken || response.data?.plainTextToken;
-                    let message = '<i class="fa fa-check"></i> <strong>Token 創建成功！</strong>';
+                    let message = '<i class="fa fa-check"></i> <strong>' + i18n.tokenCreatedSuccess + '</strong>';
                     if (tokenValue) {
-                        message += '<br><br><strong class="text-danger">⚠️ 請立即複製並保存以下 Token，關閉此訊息後將無法再次查看：</strong><br>';
+                        message += '<br><br><strong class="text-danger">' + i18n.tokenSaveWarning + '</strong><br>';
                         message += '<div class="mt-2 p-2" style="background: #f8f9fa; border: 2px solid #28a745; border-radius: 4px;"><code style="font-size: 14px; word-break: break-all; user-select: all;">' + escapeHtml(tokenValue) + '</code></div>';
                         // Token 消息不自動消失，需要用戶手動關閉
                         showMessage(message, 'success', false);
@@ -774,17 +797,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(error => {
-                    console.error('創建 Token 失敗:', error);
+                    console.error('Token creation failed:', error);
                     console.error('Error response:', error.response);
                     console.error('Error status:', error.response?.status);
                     console.error('Error data:', error.response?.data);
 
-                    let errorMsg = '網絡錯誤，請檢查輸入並重試';
-                    if (error.response?.status === 401) {
-                        errorMsg = '未授權：請刷新頁面重新登入';
-                    } else if (error.response?.status === 419) {
-                        errorMsg = 'CSRF Token 過期，請刷新頁面後重試';
-                    } else if (error.response?.data?.message) {
+                    let errorMsg = i18n.networkErrorRetry;
+                    if (error.response?.data?.message) {
                         errorMsg = error.response.data.message;
                     } else if (error.response?.data?.errors) {
                         errorMsg = Object.values(error.response.data.errors).flat().join(', ');
@@ -792,7 +811,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         errorMsg = error.message;
                     }
 
-                    showMessage(`<i class="fa fa-ban"></i> 創建失敗：${errorMsg}`, 'danger');
+                    showMessage('<i class="fa fa-ban"></i> ' + errorMsg, 'danger');
                 });
         });
     } else {
@@ -832,9 +851,9 @@ if (window.onViteReady) {
                         loadTokens();
 
                         const tokenValue = response.data?.token?.plainTextToken || response.data?.plainTextToken;
-                        let message = '<i class="fa fa-check"></i> <strong>Token 創建成功！</strong>';
+                        let message = '<i class="fa fa-check"></i> <strong>' + i18n.tokenCreatedSuccess + '</strong>';
                         if (tokenValue) {
-                            message += '<br><br><strong class="text-danger">⚠️ 請立即複製並保存以下 Token，關閉此訊息後將無法再次查看：</strong><br>';
+                            message += '<br><br><strong class="text-danger">' + i18n.tokenSaveWarning + '</strong><br>';
                             message += '<div class="mt-2 p-2" style="background: #f8f9fa; border: 2px solid #28a745; border-radius: 4px;"><code style="font-size: 14px; word-break: break-all; user-select: all;">' + escapeHtml(tokenValue) + '</code></div>';
                             // Token 消息不自動消失，需要用戶手動關閉
                             showMessage(message, 'success', false);
@@ -852,17 +871,13 @@ if (window.onViteReady) {
                         }
                     })
                     .catch(error => {
-                        console.error('創建 Token 失敗:', error);
+                        console.error('Token creation failed:', error);
                         console.error('Error response:', error.response);
                         console.error('Error status:', error.response?.status);
                         console.error('Error data:', error.response?.data);
 
-                        let errorMsg = '網絡錯誤，請檢查輸入並重試';
-                        if (error.response?.status === 401) {
-                            errorMsg = '未授權：請刷新頁面重新登入';
-                        } else if (error.response?.status === 419) {
-                            errorMsg = 'CSRF Token 過期，請刷新頁面後重試';
-                        } else if (error.response?.data?.message) {
+                        let errorMsg = i18n.networkErrorRetry;
+                        if (error.response?.data?.message) {
                             errorMsg = error.response.data.message;
                         } else if (error.response?.data?.errors) {
                             errorMsg = Object.values(error.response.data.errors).flat().join(', ');
@@ -870,7 +885,7 @@ if (window.onViteReady) {
                             errorMsg = error.message;
                         }
 
-                        showMessage(`<i class="fa fa-ban"></i> 創建失敗：${errorMsg}`, 'danger');
+                        showMessage('<i class="fa fa-ban"></i> ' + errorMsg, 'danger');
                     });
             });
         }

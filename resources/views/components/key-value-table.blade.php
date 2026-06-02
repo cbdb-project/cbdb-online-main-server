@@ -30,14 +30,14 @@
     @endphp
 
     @if (empty($rows))
-        <p class="text-muted small">沒有資料</p>
+        <p class="text-muted small">{{ __('common.no_data') }}</p>
     @else
         <div class="table-responsive">
             <table class="table table-bordered table-striped table-condensed">
                 <thead>
                     <tr>
-                        <th>欄位</th>
-                        <th>內容</th>
+                        <th>{{ __('operations.diff_field') }}</th>
+                        <th>{{ __('operations.content_col') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,5 +54,5 @@
 @elseif (is_string($dataset) && trim($dataset) !== '')
     <pre>{{ $dataset }}</pre>
 @else
-    <p class="text-muted small">沒有資料</p>
+    <p class="text-muted small">{{ __('common.no_data') }}</p>
 @endif

@@ -36,16 +36,15 @@
             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
-            <strong><i class="fa fa-exclamation-triangle"></i> 警告：</strong>
-            本記錄為批量導入的 Wiki 對照資料，如果修改此記錄，下次導入時會丟失您的修改。
-            請確認是否需要進行手動修改。
+            <strong><i class="fa fa-exclamation-triangle"></i> {{ __('biogmains.wiki_warning') }}：</strong>
+            {{ __('biogmains.wiki_warning_text') }}
         </div>
     @endif
 
     <x-forms.person-id-display :personId="$id" />
 
     <div class="form-group row">
-        <label for="c_textid" class="col-sm-2 col-form-label">出處(c_source)</label>
+        <label for="c_textid" class="col-sm-2 col-form-label">{{ __('biogmains.source_field') }} (c_source)</label>
         <div class="col-sm-10">
             <select class="form-control c_source" name="c_textid" required>
                 @if($isEdit && isset($res['text_str']))
@@ -56,7 +55,7 @@
     </div>
 
     <div class="form-group row">
-        <label for="c_pages" class="col-sm-2 col-form-label">頁數/條目</label>
+        <label for="c_pages" class="col-sm-2 col-form-label">{{ __('biogmains.pages_entries') }}</label>
         <div class="col-sm-4">
             @php
                 $pages_value = $isEdit ? unionPKDef_decode_for_convert($row->c_pages) : '0';
@@ -66,7 +65,7 @@
     </div>
 
     <div class="form-group row">
-        <label class="col-sm-2 col-form-label">選項</label>
+        <label class="col-sm-2 col-form-label">{{ __('biogmains.options') }}</label>
         <div class="col-sm-10">
             <div class="custom-control custom-checkbox">
                 <input type="hidden" name="c_main_source" value="0">
@@ -76,7 +75,7 @@
                        name="c_main_source"
                        value="1"
                        {{ ($isEdit && $row->c_main_source == 1) ? 'checked' : '' }}>
-                <label class="custom-control-label" for="c_main_source">主要出處</label>
+                <label class="custom-control-label" for="c_main_source">{{ __('biogmains.primary_source') }}</label>
             </div>
             <div class="custom-control custom-checkbox mt-2">
                 <input type="hidden" name="c_self_bio" value="0">
@@ -86,13 +85,13 @@
                        name="c_self_bio"
                        value="1"
                        {{ ($isEdit && $row->c_self_bio == 1) ? 'checked' : '' }}>
-                <label class="custom-control-label" for="c_self_bio">本人傳記</label>
+                <label class="custom-control-label" for="c_self_bio">{{ __('biogmains.self_biography') }}</label>
             </div>
         </div>
     </div>
 
     <div class="form-group row">
-        <label for="c_notes" class="col-sm-2 col-form-label">註(c_notes)</label>
+        <label for="c_notes" class="col-sm-2 col-form-label">{{ __('biogmains.notes_field') }} (c_notes)</label>
         <div class="col-sm-10">
             @php
                 $notes_value = $isEdit ? unionPKDef_decode_for_convert($row->c_notes) : '';
@@ -110,31 +109,29 @@
     />
 
     <div class="form-group row">
-        <label for="__proposal_comment" class="col-sm-2 col-form-label">修改說明 / 提案理由</label>
+        <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('biogmains.modification_note_label') }}</label>
         <div class="col-sm-10">
-            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）"></textarea>
-            <small class="text-muted">此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。</small>
+            <textarea class="form-control" name="__proposal_comment" rows="3" placeholder="{{ __('biogmains.modification_note_placeholder') }}"></textarea>
+            <small class="text-muted">{{ __('biogmains.modification_note_hint') }}</small>
         </div>
     </div>
 
     <div class="form-group row">
         <div class="offset-sm-2 col-sm-10">
             @if(Auth::check() && Auth::user()->isActive())
-                <!-- 直接儲存按鈕（非眾包用戶可見） -->
                 @if(Auth::user()->canWriteDirectly())
                     <button type="submit" name="action" value="save" class="btn btn-primary">
-                        <i class="fa fa-save"></i> 直接儲存
+                        <i class="fa fa-save"></i> {{ __('biogmains.save_directly') }}
                     </button>
                 @endif
 
-                <!-- 提交提案按鈕（所有活躍用戶可見） -->
                 <button type="submit" name="action" value="proposal" class="btn btn-info">
-                    <i class="fa fa-paper-plane"></i> 提交提案
+                    <i class="fa fa-paper-plane"></i> {{ __('biogmains.submit_proposal') }}
                 </button>
             @endif
 
             <a href="{{ route('basicinformation.sources.index', ['basicinformation' => $id]) }}" class="btn btn-secondary">
-                <i class="fa fa-times"></i> 取消
+                <i class="fa fa-times"></i> {{ __('common.cancel') }}
             </a>
         </div>
     </div>

@@ -19,10 +19,10 @@
     'dayValue' => '',
     'dayGzName' => null,
     'dayGzValue' => '',
-    'nhLabel' => '年號',
-    'rangeLabel' => '時限',
-    'intercalaryLabel' => '閏月',
-    'dayGzLabel' => '日(干支)',
+    'nhLabel' => null,
+    'rangeLabel' => null,
+    'intercalaryLabel' => null,
+    'dayGzLabel' => null,
     'showLunarPlaceholder' => false,
     'notesName' => null,
     'notesValue' => '',
@@ -33,6 +33,10 @@
 
 @php
     $disabledAttr = $disabled ? 'disabled' : '';
+    $nhLabel         = $nhLabel         ?? __('person.reign_year');
+    $rangeLabel      = $rangeLabel      ?? __('biogmains.time_range_label');
+    $intercalaryLabel = $intercalaryLabel ?? __('biogmains.intercalary_month_label');
+    $dayGzLabel      = $dayGzLabel      ?? __('biogmains.day_ganzhi_label');
 @endphp
 
 <div class="col-sm-10">
@@ -53,13 +57,13 @@
             <div class="d-flex mr-3">
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary era-convert-btn"
-                        title="將西元年份轉換為年號"
+                        title="{{ __('biogmains.convert_to_reign_year') }}"
                         data-toggle="tooltip">
                     <i class="fas fa-arrow-right"></i>
                 </button>
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary era-reverse-convert-btn ml-1"
-                        title="將年號轉換為西元年份"
+                        title="{{ __('biogmains.convert_to_ad_year') }}"
                         data-toggle="tooltip">
                     <i class="fas fa-arrow-left"></i>
                 </button>
@@ -76,7 +80,7 @@
                    style="width: 8ch; min-width: 8ch;"
                    value="{{ $nhYearValue }}"
                    {{ $disabledAttr }}>
-            <span>年</span>
+            <span>{{ __('biogmains.year_unit') }}</span>
         </div>
         @if($rangeName)
             <div class="d-flex align-items-center flex-wrap mr-3" style="min-width: 28ch; flex: 1 1 28ch;">
@@ -107,9 +111,9 @@
                            max="12"
                            value="{{ $monthValue }}"
                            {{ $disabledAttr }}>
-                    <div class="invalid-feedback">請輸入 1-12 或留空</div>
+                    <div class="invalid-feedback">{{ __('biogmains.month_range_hint') }}</div>
                 </div>
-                <span class="mr-2">月</span>
+                <span class="mr-2">{{ __('biogmains.month_unit') }}</span>
                 <div class="d-flex flex-column mr-2" style="width: 8ch; min-width: 8ch;">
                     <input type="number"
                            name="{{ $dayName }}"
@@ -118,9 +122,9 @@
                            max="30"
                            value="{{ $dayValue }}"
                            {{ $disabledAttr }}>
-                    <div class="invalid-feedback">請輸入 1-30 或留空</div>
+                    <div class="invalid-feedback">{{ __('biogmains.day_range_hint') }}</div>
                 </div>
-                <span class="mr-2">日</span>
+                <span class="mr-2">{{ __('biogmains.day_unit') }}</span>
                 <div class="d-flex align-items-center" style="min-width: 0; flex: 1 1 auto;">
                     <label class="mb-0 mr-2 text-nowrap" for="{{ $dayGzName }}">{{ $dayGzLabel }}</label>
                     <div class="flex-grow-1" style="min-width: 12ch;">

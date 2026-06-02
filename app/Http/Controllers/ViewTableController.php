@@ -127,6 +127,9 @@ class ViewTableController extends Controller {
         return Inertia::render('ViewTables/List', [
             'views' => $views,
             'listUrl' => route('app.view.index', [], false),
+            'page_translations' => [
+                'views' => is_array($t = trans('views')) ? $t : [],
+            ],
         ]);
     }
 
@@ -150,6 +153,10 @@ class ViewTableController extends Controller {
             })
             ->values()
             ->all();
+
+        $data['page_translations'] = [
+            'views' => is_array($t = trans('views')) ? $t : [],
+        ];
 
         return Inertia::render('ViewTables/Show', $data);
     }

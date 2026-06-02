@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>中國歷代行政區地圖</title>
+    <title>{{ __('nav.maps_page_title') }}</title>
     <link rel="icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -23,7 +23,7 @@
         class="panel-toggle"
         aria-expanded="false"
         aria-controls="control-panel"
-        aria-label="切換控制面板"
+        aria-label="{{ __('nav.maps_toggle_panel') }}"
     >
         <span class="panel-toggle-bars" aria-hidden="true">
             <span></span>
@@ -33,56 +33,56 @@
     </button>
     <div class="layout">
         <aside id="control-panel" class="panel">
-            <h1>中國歷代行政區地圖</h1>
+            <h1>{{ __('nav.maps_page_title') }}</h1>
             <p class="lead">
-                使用 Sinica CCTS 歷史地圖服務，支援切換歷代行政區圖層，並可在指定座標加上 marker。
+                {{ __('nav.maps_page_desc') }}
             </p>
 
             <form id="marker-form" class="form">
                 <label>
-                    <span>歷史地圖圖層</span>
+                    <span>{{ __('nav.maps_layer_label') }}</span>
                     <select id="historical-layer-select" name="historical-layer"></select>
                 </label>
 
                 <label>
-                    <span>緯度 Latitude</span>
+                    <span>{{ __('nav.maps_lat_label') }}</span>
                     <input id="lat-input" name="lat" type="number" step="any" value="34.3416" required>
                 </label>
 
                 <label>
-                    <span>經度 Longitude</span>
+                    <span>{{ __('nav.maps_lng_label') }}</span>
                     <input id="lng-input" name="lng" type="number" step="any" value="108.9398" required>
                 </label>
 
                 <label>
-                    <span>標題</span>
+                    <span>{{ __('nav.maps_marker_label') }}</span>
                     <input id="label-input" name="label" type="text" value="長安" maxlength="100">
                 </label>
 
                 <div class="actions">
-                    <button type="submit">加入 Marker</button>
-                    <button type="button" id="reset-view">重設視角</button>
-                    <button type="button" id="clear-markers">清除 Marker</button>
+                    <button type="submit">{{ __('nav.maps_add_marker') }}</button>
+                    <button type="button" id="reset-view">{{ __('nav.maps_reset_view') }}</button>
+                    <button type="button" id="clear-markers">{{ __('nav.maps_clear_markers') }}</button>
                 </div>
             </form>
 
             <section class="layer-controls">
-                <h2>現代底圖透明度</h2>
+                <h2>{{ __('nav.maps_basemap_opacity') }}</h2>
                 <label>
-                    <span>目前選取的現代底圖</span>
+                    <span>{{ __('nav.maps_current_basemap') }}</span>
                     <input id="osm-opacity" type="range" min="0" max="100" step="5" value="50">
                 </label>
                 <p id="osm-opacity-value" class="slider-value">50%</p>
             </section>
 
             <div class="tips">
-                <h2>說明</h2>
+                <h2>{{ __('nav.maps_tips_title') }}</h2>
                 <ul>
-                    <li>底圖來源：Sinica CCTS 歷史地圖 WMTS / tile 服務。</li>
-                    <li>輸入 WGS84 經緯度即可加點。</li>
-                    <li>可用 <code>map</code> 指定圖層，例如 <code>?map=ad0741</code>。</li>
-                    <li>也可用 <code>year</code> 推定圖層，例如 <code>?year=741</code>。</li>
-                    <li>marker 可由 query param 指定：<code>?lat=34.3416&amp;lng=108.9398&amp;label=長安</code>。</li>
+                    <li>{{ __('nav.maps_tip_source') }}</li>
+                    <li>{{ __('nav.maps_tip_coords') }}</li>
+                    <li>{!! __('nav.maps_tip_map_param') !!}</li>
+                    <li>{!! __('nav.maps_tip_year_param') !!}</li>
+                    <li>{!! __('nav.maps_tip_marker_param') !!}</li>
                 </ul>
             </div>
 
@@ -90,7 +90,7 @@
         </aside>
 
         <main class="map-shell">
-            <div id="map" aria-label="歷史行政區地圖"></div>
+            <div id="map" aria-label="{{ __('nav.maps_aria_map') }}"></div>
         </main>
     </div>
 

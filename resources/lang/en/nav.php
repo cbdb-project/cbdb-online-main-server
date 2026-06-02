@@ -24,6 +24,40 @@ return [
     'user_management'        => 'User Management',
     'language_switch_to_en'  => 'EN',
     'language_switch_to_zh'  => '中文',
+    'locale_switch_unsaved_warning' => 'Switching language will reload the page and unsaved changes will be lost. Continue?',
     'back_to_home'           => '← Home',
     'not_public_tools'       => 'Restricted Access',
+
+    // Welcome page
+    'welcome_system_title'   => 'CBDB Data Entry System',
+    'welcome_search_label'   => 'Search for a person (enter Person ID or name)',
+    'welcome_search_placeholder' => 'e.g.: 3144 or Zhang Xiaoxiang',
+    'welcome_search_btn'     => 'Search',
+
+    // Maps page
+    'maps_page_title'         => 'Historical Administrative Map of China',
+    'maps_page_desc'          => 'Powered by Sinica CCTS Historical Maps. Switch dynastic administrative layers and place markers at coordinates.',
+    'maps_toggle_panel'       => 'Toggle control panel',
+    'maps_layer_label'        => 'Historical Map Layer',
+    'maps_lat_label'          => 'Latitude',
+    'maps_lng_label'          => 'Longitude',
+    'maps_marker_label'       => 'Label',
+    'maps_add_marker'         => 'Add Marker',
+    'maps_reset_view'         => 'Reset View',
+    'maps_clear_markers'      => 'Clear Markers',
+    'maps_basemap_opacity'    => 'Base Map Opacity',
+    'maps_current_basemap'    => 'Current base map',
+    'maps_tips_title'         => 'Tips',
+    'maps_tip_source'         => 'Base map source: Sinica CCTS Historical Maps WMTS/tile service.',
+    'maps_tip_coords'         => 'Enter WGS84 coordinates to place a marker.',
+    'maps_tip_map_param'      => 'Use <code>map</code> to specify a layer, e.g. <code>?map=ad0741</code>.',
+    'maps_tip_year_param'     => 'Or use <code>year</code> to estimate a layer, e.g. <code>?year=741</code>.',
+    'maps_tip_marker_param'   => 'Markers can be set via query params: <code>?lat=34.3416&amp;lng=108.9398&amp;label=Chang\'an</code>.',
+    'maps_aria_map'           => 'Historical administrative map',
+
+    // Home page hints
+    'home_nav_hint'          => 'Use the left menu to navigate, or search above to go to a specific page.',
+    'home_admin_hint'        => 'To manage accounts, go to "User Management" or "Admin Tools".',
+    'home_query_hint'        => 'For data queries, use "Views" or "Code Tables".',
+    'home_ops_hint'          => 'Recent operation logs can be viewed and reverted under "Operations".',
 ];

@@ -12,9 +12,9 @@
             </colgroup>
             <thead>
                 <tr>
-                    <th>欄位</th>
-                    <th>AI 匹配結果</th>
-                    <th>用戶提交</th>
+                    <th>{{ __('operations.diff_field') }}</th>
+                    <th>{{ __('operations.ai_match_result') }}</th>
+                    <th>{{ __('operations.user_submitted') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -22,22 +22,20 @@
                     @php
                         $matches = !empty($row['matches']);
                         $aiType = $row['ai_type'] ?? 'empty';
-                        // AI 欄位背景色：匹配(綠)、建議(黃)、空(無)
                         $aiTypeClass = match($aiType) {
                             'matched' => 'ai-diff-matched',
                             'suggested' => 'ai-diff-suggested',
                             default => '',
                         };
-                        // 比較結果：相同→綠色，不同→警告色
                         $matchClass = $matches ? 'table-success' : 'table-warning';
                     @endphp
                     <tr>
                         <td>
                             {{ $row['field'] }}
                             @if($aiType === 'matched')
-                                <span class="badge badge-success badge-sm" title="AI 確認匹配">匹配</span>
+                                <span class="badge badge-success badge-sm" title="{{ __('operations.ai_matched_badge_title') }}">{{ __('operations.ai_matched_badge') }}</span>
                             @elseif($aiType === 'suggested')
-                                <span class="badge badge-warning badge-sm" title="AI 建議">建議</span>
+                                <span class="badge badge-warning badge-sm" title="{{ __('operations.ai_suggested_badge_title') }}">{{ __('operations.ai_suggested_badge') }}</span>
                             @endif
                         </td>
                         <td class="{{ $aiTypeClass }}">{{ $row['ai_value'] !== '' ? $row['ai_value'] : '-' }}</td>
@@ -48,7 +46,7 @@
         </table>
     </div>
 @else
-    <p class="text-muted small">沒有比對紀錄</p>
+    <p class="text-muted small">{{ __('operations.no_diff_records') }}</p>
 @endif
 
 <style>

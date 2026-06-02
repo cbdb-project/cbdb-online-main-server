@@ -28,7 +28,7 @@
 @endphp
 
 <div class="form-group row person-id-display-component">
-    <label for="person_id_display" class="col-sm-2 col-form-label">人物基本信息</label>
+    <label for="person_id_display" class="col-sm-2 col-form-label">{{ __('biogmains.person_basic_info') }}</label>
     <div class="col-sm-10">
         <input type="hidden" class="person_id" value="{{ $personId }}">
         <input type="hidden" class="dynasty_name" value="{{ $dynastyName }}">
@@ -39,30 +39,30 @@
             <div class="card-body p-3">
                 <div class="row">
                     <div class="col-md-4">
-                        <strong>人物 ID：</strong>
+                        <strong>{{ __('biogmains.person_id_colon') }}</strong>
                         <span class="text-primary">{{ $personId }}</span>
                     </div>
                     @if($person)
                         <div class="col-md-4">
-                            <strong>姓名（拼音）：</strong>
+                            <strong>{{ __('biogmains.person_name_pinyin') }}</strong>
                             <span>{{ $person->c_name ?? '—' }}</span>
                         </div>
                         <div class="col-md-4">
-                            <strong>朝代：</strong>
-                            <span>{{ $dynastyName ?: '—' }}@if($dynastyStart !== null || $dynastyEnd !== null)（{{ $dynastyStart }}–{{ $dynastyEnd }}）@endif</span>
+                            <strong>{{ __('biogmains.person_dynasty') }}</strong>
+                            <span>{{ $dynastyName ?: '—' }}@if($dynastyStart !== null || $dynastyEnd !== null)({{ $dynastyStart }}–{{ $dynastyEnd }})@endif</span>
                         </div>
                     @endif
                 </div>
                 @if($person && $person->c_name_chn)
                     <div class="row mt-2">
                         <div class="col-12">
-                            <strong>姓名（中文）：</strong>
+                            <strong>{{ __('biogmains.person_name_chinese') }}</strong>
                             <span>{{ $person->c_name_chn }}</span>
                         </div>
                     </div>
                 @endif
             </div>
         </div>
-        <small class="text-muted">此為顯示用資訊，不會包含在表單提交中</small>
+        <small class="text-muted">{{ __('biogmains.audit_display_hint') }}</small>
     </div>
 </div>

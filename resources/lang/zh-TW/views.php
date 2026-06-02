@@ -43,4 +43,12 @@ return [
     'records_per_page'       => '第 :from–:to 筆',
     'views_count_summary'    => '共 :total 個檢視，目前顯示 :shown 個',
     'clear'                  => '清除',
+
+    // ViewTables/Show.tsx summary card labels
+    'current_view_label'     => '目前檢視',
+    'result_count_label'     => '結果筆數',
+    'search_condition_label' => '搜尋條件',
+    'column_count_help'      => '依目前 view 定義輸出',
+    'result_range'           => '第 :from–:to 筆',
+    'view_pagination'        => '第 :current / :total 頁',
 ];

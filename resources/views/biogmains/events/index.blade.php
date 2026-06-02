@@ -8,26 +8,26 @@ use App\Support\CompositePrimaryKey;
     @include('biogmains.banner')
     <div class="card card-default">
         <div class="card-header">
-            <h3 class="card-title">事件清單</h3>
+            <h3 class="card-title">{{ __('biogmains.events_list') }}</h3>
         </div>
 
         <div class="card-body">
             @auth
                 @if(Auth::user()->isActive())
-                    <a href="{{ route('basicinformation.events.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">新增</a>
+                    <a href="{{ route('basicinformation.events.create', ['basicinformation' => $basicinformation->c_personid]) }}" class="btn btn-secondary float-right">{{ __('common.add') }}</a>
                 @endif
             @endauth
             <div class="table-responsive">
                 <table class="table table-hover table-sm">
-                <caption>共查詢到{{ $basicinformation->events_count }}筆記錄</caption>
+                <caption>{{ __('biogmains.record_count', ['count' => $basicinformation->events_count]) }}</caption>
                 <thead>
                 <tr>
-                    <th>序號</th>
-                    <th>SEQUENCE</th>
-                    <th>事件名稱</th>
+                    <th>{{ __('person.seq_no') }}</th>
+                    <th>sequence</th>
+                    <th>{{ __('biogmains.event_name') }}</th>
                     @auth
                         @if(Auth::user()->isActive())
-                            <th style="width: 120px">操作</th>
+                            <th style="width: 120px">{{ __('biogmains.actions') }}</th>
                         @endif
                     @endauth
                 </tr>
@@ -48,18 +48,17 @@ use App\Support\CompositePrimaryKey;
                             $eventFormId = 'delete-form-' . $value->pivot->c_sequence . '-' . $value->pivot->c_event_code;
                             @endphp
                             <div class="btn-group">
-                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.events.edit.query', ['id' => $basicinformation->c_personid], $eventPk) }}">edit</a>
+                                <a type="button" class="btn btn-sm btn-info" href="{{ CompositePrimaryKey::buildUrl('basicinformation.events.edit.query', ['id' => $basicinformation->c_personid], $eventPk) }}">{{ __('common.edit') }}</a>
                                 <a href=""
                                    onclick="
-                                           let msg = '您真的確定要刪除嗎？\n\n請確認！';
-                                           if (confirm(msg)===true){
+                                           if (confirm({!! Js::from(__('biogmains.delete_confirm_js')) !!})===true){
                                                event.preventDefault();
                                                document.getElementById('{{ $eventFormId }}').submit();
                                            }else{
                                                return false;
                                            }
                                            "
-                                   class="btn btn-sm btn-danger">delete</a>
+                                   class="btn btn-sm btn-danger">{{ __('common.delete') }}</a>
 
                             </div>
                             <form id="{{ $eventFormId }}" action="{{ CompositePrimaryKey::buildUrl('basicinformation.events.destroy.query', ['id' => $basicinformation->c_personid], $eventPk) }}" method="POST" style="display: none;">

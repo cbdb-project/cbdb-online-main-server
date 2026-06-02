@@ -42,16 +42,35 @@
 
         <!-- Language Toggle -->
         <li class="nav-item">
-            <form action="{{ route('locale.switch', [], false) }}" method="POST" style="display:inline">
+            <form id="__locale-form" action="{{ route('locale.switch', [], false) }}" method="POST" style="display:inline">
                 @csrf
                 <input type="hidden" name="locale"
                        value="{{ app()->getLocale() === 'zh-TW' ? 'en' : 'zh-TW' }}">
-                <button type="submit" class="btn btn-link px-2"
+                <button type="button" class="btn btn-link px-2"
                         title="{{ app()->getLocale() === 'zh-TW' ? __('nav.language_switch_to_en') : __('nav.language_switch_to_zh') }}"
-                        style="font-weight:600; letter-spacing:0.05em; color:inherit;">
+                        style="font-weight:600; letter-spacing:0.05em; color:inherit;"
+                        onclick="__submitLocaleForm()">
                     {{ app()->getLocale() === 'zh-TW' ? __('nav.language_switch_to_en') : __('nav.language_switch_to_zh') }}
                 </button>
             </form>
+            <script>
+            function __submitLocaleForm() {
+                // Check if any other form on the page has unsaved changes
+                var editForms = document.querySelectorAll('form:not(#__locale-form)');
+                var dirty = Array.from(editForms).some(function(f) {
+                    return Array.from(f.elements).some(function(el) {
+                        if (!el.name || el.name === '_token' || el.name === '_method' || el.type === 'hidden') return false;
+                        if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+                        return el.value !== el.defaultValue;
+                    });
+                });
+                if (dirty) {
+                    var msg = {!! Js::from(__('nav.locale_switch_unsaved_warning')) !!};
+                    if (!window.confirm(msg)) return;
+                }
+                document.getElementById('__locale-form').submit();
+            }
+            </script>
         </li>
 
         @if (Auth::guest())

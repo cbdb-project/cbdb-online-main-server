@@ -1,14 +1,14 @@
 @php
     $columns = [
-        'before' => '原本的',
-        'after' => '修改後',
-        'current' => '目前資料',
+        'before'  => __('operations.diff_before'),
+        'after'   => __('operations.diff_after'),
+        'current' => __('operations.diff_current'),
     ];
 
     $keyLabels = [
-        'c_personid' => '人物 ID',
-        'c_office_id' => '官名 ID',
-        'c_posting_id' => 'Posting ID',
+        'c_personid'   => __('person.person_id'),
+        'c_office_id'  => __('person.office_id'),
+        'c_posting_id' => __('person.posting_id'),
     ];
 
     $keys = $diff['keys'] ?? [];
@@ -57,7 +57,7 @@
         <table class="table table-bordered table-striped table-condensed">
             <thead>
                 <tr>
-                    <th>欄位</th>
+                    <th>{{ __('operations.diff_field') }}</th>
                     @foreach ($columns as $columnLabel)
                         <th>{{ $columnLabel }}</th>
                     @endforeach
@@ -97,7 +97,7 @@
         <table class="table table-bordered table-striped table-condensed">
             <thead>
                 <tr>
-                    <th>地址 ID</th>
+                    <th>{{ __('operations.addr_id') }}</th>
                     @foreach ($columns as $columnLabel)
                         <th>{{ $columnLabel }}</th>
                     @endforeach
@@ -106,7 +106,7 @@
             <tbody>
                 @if (empty($addresses))
                     <tr>
-                        <td colspan="{{ count($columns) + 1 }}"><span class="text-muted small">沒有地址資料</span></td>
+                        <td colspan="{{ count($columns) + 1 }}"><span class="text-muted small">{{ __('operations.no_addr_data') }}</span></td>
                     </tr>
                 @else
                     @foreach ($addresses as $row)

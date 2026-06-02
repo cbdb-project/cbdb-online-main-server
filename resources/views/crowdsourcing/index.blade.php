@@ -14,8 +14,8 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table id="example1" class="table table-bordered table-striped table-sm">
-                <p>* 修改類型 0表示crowdsourcing記錄，1表示新增，2表示整體覆寫（完整替換現有記錄，主要用於 code 表修改），3表示修改，4表示刪除，8表示記錄新增提案，9表示記錄修改提案<br />
-                * 狀態 1表示crowdsourcing記錄並已插入數據庫，2表示記錄尚未處理，3表示記錄reject，4表示記錄處理失敗。
+                <p>{{ __('operations.crowdsourcing_op_type_desc') }}<br>
+                {{ __('operations.crowdsourcing_status_desc') }}
                 </p>
                 <thead>
                 <tr>
@@ -123,8 +123,8 @@
                             <td>{{ $item->crowdsourcing_status }}</td>
                             <td>
                                 @if($item->crowdsourcing_status == 2 and Auth::check() and !Auth::user()->isCrowdsourcingUser())
-                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">confirm</a>
-                                <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">reject</a>
+                                <a href="../../crowdsourcing/{{$item->id}}/confirm" type="button" class="btn btn-success">{{ __('operations.confirm_btn') }}</a>
+                                <a href="../../crowdsourcing/{{$item->id}}/reject" type="button" class="btn btn-danger">{{ __('operations.reject_btn') }}</a>
                                 @endif
                             </td>
                         </tr>

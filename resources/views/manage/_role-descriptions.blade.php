@@ -1,4 +1,4 @@
-<strong>一般用戶</strong> — 通過了兩週至一個月錄入訓練、具備專業知識的 CBDB 錄入者。可直接編輯資料、提交與審核提案，並使用專家工具。<br>
-<strong>專家</strong> — CBDB 編輯小組負責人，擁有用戶管理、批次匯入、操作復原等管理權限。<br>
-<strong>眾包</strong> — CBDB 的合作者（研究助理、訪問學者、數據合作者等），可提交提案與使用專家工具，但不可直接編輯資料。<br>
-<strong>系統管理員</strong> — CBDB 委員會成員、平台開發與維護者，以及需要完整管理權限的同事，擁有所有功能的存取權限。
+{!! __('admin.manage_role_desc_general') !!}<br>
+{!! __('admin.manage_role_desc_expert') !!}<br>
+{!! __('admin.manage_role_desc_crowdsource') !!}<br>
+{!! __('admin.manage_role_desc_sysadmin') !!}

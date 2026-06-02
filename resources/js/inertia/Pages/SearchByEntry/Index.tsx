@@ -372,7 +372,7 @@ export default function Index() {
 
             if (!response.ok) {
                 setResults(null);
-                setResultsError(data.message ?? '查詢失敗');
+                setResultsError(data.message ?? t('query_failed'));
                 setQueryErrors(data.errors ?? {});
                 return;
             }
@@ -381,7 +381,7 @@ export default function Index() {
             setResults(data.data);
         } catch (error) {
             setResults(null);
-            setResultsError('查詢時發生錯誤，請稍後再試。');
+            setResultsError(t('query_error'));
         } finally {
             setSubmitting(false);
         }
@@ -390,21 +390,21 @@ export default function Index() {
     const selectedTypeLabel = findSelectedTypeLabel(entryTypes, filters.type_id);
     const errorMessages = collectErrorMessages(queryErrors);
     const displayErrorMessages = errorMessages.filter((message) => message !== resultsError);
-    const selectedCodePreview = formatCodePreview(filters.entry_codes, allKnownCodes);
-    const selectedPlacePreview = formatPlacePreview(selectedPlaces, filters.include_sub_units);
-    const selectedDynastyPreview = formatDynastyPreview(filters.dynasty_codes, dynasties);
+    const selectedCodePreview = formatCodePreview(filters.entry_codes, allKnownCodes, t);
+    const selectedPlacePreview = formatPlacePreview(selectedPlaces, filters.include_sub_units, t);
+    const selectedDynastyPreview = formatDynastyPreview(filters.dynasty_codes, dynasties, t);
 
     return (
         <AppShell>
             <div style={workspaceStyle}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>按入仕查詢</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>{t('search_by_entry_title')}</h2>
                 </div>
 
                 <div style={workspaceSummaryCardStyle}>
                     <div style={{ display: 'grid', gap: 12 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div style={{ fontWeight: 700, fontSize: '1rem' }}>目前篩選摘要</div>
+                                <div style={{ fontWeight: 700, fontSize: '1rem' }}>{t('filter_summary_title')}</div>
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                     <button
                                         type="button"
@@ -421,37 +421,37 @@ export default function Index() {
                         </div>
                         <div style={summaryGridStyle}>
                             <FilterSummaryTile
-                                label="入仕類型與代碼"
-                                value={selectedTypeLabel || '不限'}
+                                label={t('entry_and_type_label')}
+                                value={selectedTypeLabel || t('no_limit')}
                                 detail={selectedCodePreview}
                                 size="large"
                                 onClick={() => setActiveDialog('entry')}
                             />
                             <FilterSummaryTile
-                                label="人物關鍵字"
-                                value={filters.person_keyword || '不限'}
+                                label={t('person_keyword')}
+                                value={filters.person_keyword || t('no_limit')}
                                 onClick={() => setActiveDialog('personKeyword')}
                             />
                             <FilterSummaryTile
-                                label="地點"
-                                value={selectedPlaces.length > 0 ? `${selectedPlaces.length} 項` : '不限'}
+                                label={t('addresses')}
+                                value={selectedPlaces.length > 0 ? t('n_items', { count: String(selectedPlaces.length) }) : t('no_limit')}
                                 detail={selectedPlacePreview}
                                 size="large"
                                 onClick={() => setActiveDialog('places')}
                             />
                             <FilterSummaryTile
-                                label="指數年"
-                                value={filters.use_index_year_range ? `${filters.index_year_from ?? '-200'} 至 ${filters.index_year_to ?? '1911'}` : '不限'}
+                                label={t('index_year')}
+                                value={filters.use_index_year_range ? t('year_range', { from: String(filters.index_year_from ?? '-200'), to: String(filters.index_year_to ?? '1911') }) : t('no_limit')}
                                 onClick={() => setActiveDialog('indexYear')}
                             />
                             <FilterSummaryTile
-                                label="入仕年"
-                                value={filters.use_entry_year_range ? `${filters.entry_year_from ?? '-200'} 至 ${filters.entry_year_to ?? '1911'}` : '不限'}
+                                label={t('entry_year')}
+                                value={filters.use_entry_year_range ? t('year_range', { from: String(filters.entry_year_from ?? '-200'), to: String(filters.entry_year_to ?? '1911') }) : t('no_limit')}
                                 onClick={() => setActiveDialog('entryYear')}
                             />
                             <FilterSummaryTile
-                                label="朝代"
-                                value={filters.dynasty_codes.length > 0 ? `${filters.dynasty_codes.length} 項` : '不限'}
+                                label={t('dynasty')}
+                                value={filters.dynasty_codes.length > 0 ? t('n_items', { count: String(filters.dynasty_codes.length) }) : t('no_limit')}
                                 detail={selectedDynastyPreview}
                                 onClick={() => setActiveDialog('dynasty')}
                             />
@@ -470,7 +470,7 @@ export default function Index() {
 
                 <div ref={resultsSectionRef} style={resultsWorkspaceStyle}>
                     <div style={{ ...panelHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                        <span>查詢結果工作區</span>
+                        <span>{t('results_workspace')}</span>
                         {results && (
                             <span style={{ color: '#6c757d', fontSize: '0.82rem', fontWeight: 500 }}>
                                 記錄 {results.summary.record_count} 筆 / 人物 {results.summary.person_count} 位
@@ -518,8 +518,8 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'entry'}
-                title="選擇入仕類型與代碼"
-                description="先選類型，再勾選代碼；右側摘要會即時顯示目前已選內容。"
+                title={t('select_entry_type_title')}
+                description={t('select_entry_type_desc')}
                 width={1240}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -530,10 +530,10 @@ export default function Index() {
                             disabled={!filters.type_id && filters.entry_codes.length === 0}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空選擇
+                            {t('clear_selection')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
@@ -556,14 +556,14 @@ export default function Index() {
                         onDeselectAll={handleDeselectAllCodes}
                     />
                     <div style={entrySelectionSummaryPanelStyle}>
-                        <div style={panelHeaderStyle}>目前已選</div>
+                        <div style={panelHeaderStyle}>{t('currently_selected')}</div>
                         <div style={{ padding: 16, display: 'grid', gap: 14 }}>
                             <div>
-                                <div style={selectionCaptionStyle}>入仕類型</div>
-                                <div style={selectionValueStyle}>{selectedTypeLabel || '尚未選擇'}</div>
+                                <div style={selectionCaptionStyle}>{t('entry_type_label')}</div>
+                                <div style={selectionValueStyle}>{selectedTypeLabel || t('not_selected')}</div>
                             </div>
                             <div>
-                                <div style={selectionCaptionStyle}>入仕代碼</div>
+                                <div style={selectionCaptionStyle}>{t('entry_code_label')}</div>
                                 <SelectedCodeChips
                                     selectedCodes={filters.entry_codes}
                                     allCodes={allKnownCodes}
@@ -572,10 +572,10 @@ export default function Index() {
                             </div>
                             <div style={modalHintBoxStyle}>
                                 {loadingCodes
-                                    ? '正在載入該類型的代碼...'
+                                    ? t('loading_codes')
                                     : (filters.type_id
-                                        ? `目前已選 ${filters.entry_codes.length} 項代碼`
-                                        : '請先選擇入仕類型，再到中間勾選代碼。')}
+                                        ? t('selected_n_codes', { count: String(filters.entry_codes.length) })
+                                        : t('select_type_first'))}
                             </div>
                         </div>
                     </div>
@@ -584,8 +584,8 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'personKeyword'}
-                title="設定人物關鍵字"
-                description="會比對人物姓名與 ALTNAME_DATA 異名。"
+                title={t('set_person_keyword_title')}
+                description={t('set_person_keyword_desc')}
                 width={560}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -596,31 +596,31 @@ export default function Index() {
                             disabled={filters.person_keyword.trim() === ''}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空關鍵字
+                            {t('clear_keyword')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
             >
                 <div style={{ display: 'grid', gap: 10 }}>
-                    <label style={labelStyle}>人物關鍵字</label>
+                    <label style={labelStyle}>{t('person_keyword')}</label>
                     <input
                         type="text"
                         value={filters.person_keyword}
                         onChange={(event) => updateFilter('person_keyword', event.target.value)}
-                        placeholder="姓名、別名或人物關鍵字"
+                        placeholder={t('person_keyword_placeholder')}
                         style={textInputStyle}
                     />
-                    <div style={hintStyle}>留空表示不限。</div>
+                    <div style={hintStyle}>{t('leave_blank_for_all')}</div>
                 </div>
             </SelectionDialog>
 
             <SelectionDialog
                 isOpen={activeDialog === 'places'}
-                title="選擇入仕地點"
-                description="可多選地點，搜尋結果會比對 ENTRY_DATA.c_entry_addr_id。"
+                title={t('select_places_title')}
+                description={t('select_places_desc')}
                 width={860}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -631,10 +631,10 @@ export default function Index() {
                             disabled={selectedPlaces.length === 0}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空地點
+                            {t('clear_places')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
@@ -655,7 +655,7 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'indexYear'}
-                title="設定指數年範圍"
+                title={t('set_index_year_title')}
                 width={620}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -670,10 +670,10 @@ export default function Index() {
                             disabled={!filters.use_index_year_range && filters.index_year_from === null && filters.index_year_to === null}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空指數年
+                            {t('clear_index_year')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
@@ -685,7 +685,7 @@ export default function Index() {
                             checked={filters.use_index_year_range}
                             onChange={(event) => updateFilter('use_index_year_range', event.target.checked)}
                         />
-                        啟用指數年範圍
+                        {t('enable_index_year')}
                     </label>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <input
@@ -710,7 +710,7 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'entryYear'}
-                title="設定入仕年範圍"
+                title={t('set_entry_year_title')}
                 width={620}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -725,10 +725,10 @@ export default function Index() {
                             disabled={!filters.use_entry_year_range && filters.entry_year_from === null && filters.entry_year_to === null}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空入仕年
+                            {t('clear_entry_year')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
@@ -740,7 +740,7 @@ export default function Index() {
                             checked={filters.use_entry_year_range}
                             onChange={(event) => updateFilter('use_entry_year_range', event.target.checked)}
                         />
-                        啟用入仕年範圍
+                        {t('enable_entry_year')}
                     </label>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <input
@@ -765,7 +765,7 @@ export default function Index() {
 
             <SelectionDialog
                 isOpen={activeDialog === 'dynasty'}
-                title="設定朝代範圍"
+                title={t('set_dynasty_title')}
                 width={760}
                 onClose={() => setActiveDialog(null)}
                 footer={(
@@ -778,10 +778,10 @@ export default function Index() {
                             disabled={filters.dynasty_codes.length === 0}
                             style={dialogSecondaryButtonStyle}
                         >
-                            清空朝代
+                            {t('clear_dynasty')}
                         </button>
                         <button type="button" onClick={() => setActiveDialog(null)} style={dialogPrimaryButtonStyle}>
-                            完成
+                            {t('done_btn')}
                         </button>
                     </div>
                 )}
@@ -889,8 +889,9 @@ function SelectedPlaceChips({
     places: PlaceOption[];
     onRemove: (placeId: number) => void;
 }) {
+    const tPlace = useTranslation('person');
     if (places.length === 0) {
-        return <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>尚未選擇</span>;
+        return <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>{tPlace('not_selected')}</span>;
     }
 
     return (
@@ -1060,9 +1061,11 @@ function collectErrorMessages(errors: Record<string, string[]>) {
     return Array.from(messages);
 }
 
-function formatCodePreview(selectedCodes: number[], allCodes: EntryCode[]) {
+type TFn = (key: string, replace?: Record<string, string>) => string;
+
+function formatCodePreview(selectedCodes: number[], allCodes: EntryCode[], t: TFn) {
     if (selectedCodes.length === 0) {
-        return '點擊後開啟入仕方式選擇';
+        return t('open_entry_type_picker');
     }
 
     const codeMap = new Map(allCodes.map((code) => [code.c_entry_code, code]));
@@ -1072,24 +1075,26 @@ function formatCodePreview(selectedCodes: number[], allCodes: EntryCode[]) {
     });
 
     return selectedCodes.length > 3
-        ? `${preview.join('、')} 等 ${selectedCodes.length} 項`
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedCodes.length) })}`
         : preview.join('、');
 }
 
-function formatPlacePreview(places: PlaceOption[], includeSubUnits: boolean) {
+function formatPlacePreview(places: PlaceOption[], includeSubUnits: boolean, t: TFn) {
     if (places.length === 0) {
-        return includeSubUnits ? '包含下屬地點' : '點擊後開啟地點選擇';
+        return includeSubUnits ? t('includes_subunits') : t('open_place_picker');
     }
 
     const preview = places.slice(0, 3).map((place) => place.c_name_chn || place.c_name || `ADDR ${place.c_addr_id}`);
-    const label = places.length > 3 ? `${preview.join('、')} 等 ${places.length} 項` : preview.join('、');
+    const label = places.length > 3
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(places.length) })}`
+        : preview.join('、');
 
-    return includeSubUnits ? `${label}；含下屬地點` : label;
+    return includeSubUnits ? `${label}${t('includes_subunits_suffix')}` : label;
 }
 
-function formatDynastyPreview(selectedDynastyCodes: string[], dynasties: DynastyOption[]) {
+function formatDynastyPreview(selectedDynastyCodes: string[], dynasties: DynastyOption[], t: TFn) {
     if (selectedDynastyCodes.length === 0) {
-        return '點擊後開啟朝代多選';
+        return t('open_dynasty_picker');
     }
 
     const dynastyMap = new Map(dynasties.map((dynasty) => [dynasty.c_dy, dynasty]));
@@ -1099,7 +1104,7 @@ function formatDynastyPreview(selectedDynastyCodes: string[], dynasties: Dynasty
     });
 
     return selectedDynastyCodes.length > 3
-        ? `${preview.join('、')} 等 ${selectedDynastyCodes.length} 項`
+        ? `${preview.join('、')} ${t('and_n_more', { count: String(selectedDynastyCodes.length) })}`
         : preview.join('、');
 }
 

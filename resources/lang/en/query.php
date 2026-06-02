@@ -59,4 +59,12 @@ return [
     'qa_model'                 => '📚 Model',
     'qa_hide_details'          => '▼ Hide Details',
     'qa_show_details'          => '▶ Show Details (SQL, Evidence)',
+
+    'page_title'            => 'SQL Query Playground',
+    'beta_notice'           => 'This feature is in beta. Please use it responsibly.',
+    'link_copied'           => '✓ Link copied to clipboard',
+    'error_prefix'          => '⚠ Error: ',
+    'query_results_title'   => 'Query Results',
+    'results_count_suffix'  => 'results',
+    'query_executing'       => 'Executing query…',
 ];

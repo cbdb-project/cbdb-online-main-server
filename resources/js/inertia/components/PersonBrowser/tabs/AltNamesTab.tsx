@@ -12,6 +12,7 @@ import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface AltNameItem {
     pk: {
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function AltNamesTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -45,12 +47,12 @@ export default function AltNamesTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="別名" value={formatBilingualLabel(item.name_chn, item.name)} />
-                    <MetaRow label="類型" value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('alt_name')} value={formatBilingualLabel(item.name_chn, item.name)} />
+                    <MetaRow label={t('type_label')} value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />

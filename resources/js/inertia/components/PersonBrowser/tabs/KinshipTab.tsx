@@ -13,6 +13,7 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { APP_THEME } from '../../../theme';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface KinshipItem {
     pk: {
@@ -42,6 +43,7 @@ interface Props {
  * 僅顯示直接關係，不做親屬的親屬展開（kinship network expansion）。
  */
 export default function KinshipTab({ data, canEdit, onSelectPerson }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -51,12 +53,12 @@ export default function KinshipTab({ data, canEdit, onSelectPerson }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="關係" value={formatBilingualLabel(item.relation_chn, item.relation)} />
-                    <MetaRow label="關係代碼" value={item.kin_code} />
-                    <MetaRow label="親屬" value={renderKinshipPerson(item, onSelectPerson)} />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('relation')} value={formatBilingualLabel(item.relation_chn, item.relation)} />
+                    <MetaRow label={t('relation_code')} value={item.kin_code} />
+                    <MetaRow label={t('kin_person')} value={renderKinshipPerson(item, onSelectPerson)} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />

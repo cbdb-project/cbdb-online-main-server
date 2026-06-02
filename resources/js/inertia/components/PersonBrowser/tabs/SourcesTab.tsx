@@ -13,6 +13,7 @@ import { stableKey } from '../shared/stableKey';
 import { buildTextUrl, formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { APP_THEME } from '../../../theme';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface SourceItem {
     pk: {
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export default function SourcesTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.text_id));
 
@@ -49,14 +51,14 @@ export default function SourcesTab({ data, canEdit }: Props) {
                 const titleUrl = record?.c_url_homepage ?? null;
                 const url = buildTextUrl(record, item.pages);
                 const tags = [
-                    item.is_main_source ? '主出處' : null,
-                    item.is_self_bio ? '本人傳記' : null,
+                    item.is_main_source ? t('main_source') : null,
+                    item.is_self_bio ? t('self_bio') : null,
                 ].filter((value): value is string => Boolean(value));
 
                 return (
                     <TabCard key={stableKey(item.pk)}>
                         <MetaRow
-                            label="書名"
+                            label={t('book_title')}
                             value={
                                 titleUrl && title ? (
                                     <a href={titleUrl} target="_blank" rel="noreferrer" style={linkStyle}>
@@ -67,20 +69,20 @@ export default function SourcesTab({ data, canEdit }: Props) {
                                 )
                             }
                         />
-                        <MetaRow label="著作 ID" value={item.text_id} />
-                        <MetaRow label="標記" value={tags.length > 0 ? (
+                        <MetaRow label={t('text_id')} value={item.text_id} />
+                        <MetaRow label={t('tag_label')} value={tags.length > 0 ? (
                             <span style={badgesStyle}>
                                 {tags.map((tag) => (
-                                    <span key={tag} style={tag === '本人傳記' ? badgeBioStyle : badgeMainStyle}>
+                                    <span key={tag} style={tag === t('self_bio') ? badgeBioStyle : badgeMainStyle}>
                                         {tag}
                                     </span>
                                 ))}
                             </span>
                         ) : null}
                         />
-                        <MetaRow label="頁碼" value={item.pages} />
+                        <MetaRow label={t('pages_label')} value={item.pages} />
                         <MetaRow
-                            label="連結"
+                            label={t('link_label')}
                             value={
                                 url ? (
                                     <a href={url} target="_blank" rel="noreferrer" style={linkStyle}>
@@ -89,7 +91,7 @@ export default function SourcesTab({ data, canEdit }: Props) {
                                 ) : null
                             }
                         />
-                        <MetaRow label="備註" value={item.notes} />
+                        <MetaRow label={t('remarks')} value={item.notes} />
                         <CardActions>
                             <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
                             <LegacyDeleteButton tabKey="sources" pk={item.pk} canEdit={canEdit} />

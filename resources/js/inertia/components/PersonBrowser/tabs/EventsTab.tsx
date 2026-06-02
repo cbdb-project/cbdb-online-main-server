@@ -12,6 +12,7 @@ import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface EventItem {
     pk: {
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export default function EventsTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -47,13 +49,13 @@ export default function EventsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="序號" value={item.sequence ?? '—'} />
-                    <MetaRow label="事件" value={formatBilingualLabel(item.event_chn, item.event)} />
-                    <MetaRow label="事件代碼" value={item.event_code} />
-                    <MetaRow label="日期" value={item.date_summary} />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
+                    <MetaRow label={t('event_label')} value={formatBilingualLabel(item.event_chn, item.event)} />
+                    <MetaRow label={t('event_code')} value={item.event_code} />
+                    <MetaRow label={t('date_label')} value={item.date_summary} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="events" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="events" pk={item.pk} canEdit={canEdit} />

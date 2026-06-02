@@ -12,6 +12,7 @@ import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 interface InstitutionItem {
     pk: {
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export default function InstitutionsTab({ data, canEdit }: Props) {
+    const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
@@ -47,12 +49,12 @@ export default function InstitutionsTab({ data, canEdit }: Props) {
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label="機構 ID" value={item.inst_code} />
-                    <MetaRow label="機構" value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
-                    <MetaRow label="角色" value={formatBilingualLabel(item.role_chn, item.role)} />
-                    <MetaRow label="出處" value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label="頁碼" value={item.pages} />
-                    <MetaRow label="備註" value={item.notes} />
+                    <MetaRow label={t('institution_id')} value={item.inst_code} />
+                    <MetaRow label={t('institution_label')} value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
+                    <MetaRow label={t('role_label')} value={formatBilingualLabel(item.role_chn, item.role)} />
+                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
+                    <MetaRow label={t('pages_label')} value={item.pages} />
+                    <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
                         <LegacyEditButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />

@@ -473,14 +473,14 @@ export default function Index() {
                         <span>{t('results_workspace')}</span>
                         {results && (
                             <span style={{ color: '#6c757d', fontSize: '0.82rem', fontWeight: 500 }}>
-                                記錄 {results.summary.record_count} 筆 / 人物 {results.summary.person_count} 位
+                                {t('results_record_summary', { record_count: String(results.summary.record_count), person_count: String(results.summary.person_count) })}
                             </span>
                         )}
                     </div>
                     <div style={{ padding: 16, display: 'grid', gap: 14 }}>
                         {!results && !resultsError && (
                             <div style={{ color: '#6c757d', fontSize: '0.92rem' }}>
-                                先在上方設定條件；每一格都可以直接點開 modal 編輯，再執行查詢。
+                                    {t('results_empty_hint')}
                             </div>
                         )}
 
@@ -488,10 +488,10 @@ export default function Index() {
                             <>
                                 <div style={tabStripStyle}>
                                     <button type="button" onClick={() => setActiveTab('records')} style={tabButtonStyle(activeTab === 'records')}>
-                                        入仕記錄
+                                        {t('tab_entry_records')}
                                     </button>
                                     <button type="button" onClick={() => setActiveTab('people')} style={tabButtonStyle(activeTab === 'people')}>
-                                        人物摘要
+                                        {t('tab_person_summary')}
                                     </button>
                                 </div>
 
@@ -903,7 +903,7 @@ function SelectedPlaceChips({
                         type="button"
                         onClick={() => onRemove(place.c_addr_id)}
                         style={chipRemoveButtonStyle}
-                        aria-label={`移除地點 ${place.c_addr_id}`}
+                        aria-label={t('remove_place_aria', { id: String(place.c_addr_id) })}
                     >
                         ×
                     </button>

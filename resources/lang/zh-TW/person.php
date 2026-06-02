@@ -187,6 +187,12 @@ return [
     'text_type_explanatory'      => '論說',
 
     'load_failed'            => '載入失敗',
+    'query_failed'           => '查詢失敗',
+    'results_record_summary' => '記錄 :record_count 筆 / 人物 :person_count 位',
+    'results_empty_hint'     => '先在上方設定條件；每一格都可以直接點開 modal 編輯，再執行查詢。',
+    'tab_entry_records'      => '入仕記錄',
+    'tab_person_summary'     => '人物摘要',
+    'remove_place_aria'      => '移除地點 :id',
 
     // PersonBrowser tab labels (BrowserTabs.tsx TAB_DEFINITIONS fallback)
     'tab_basic_info'         => '基本資料',

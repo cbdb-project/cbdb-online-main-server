@@ -187,6 +187,12 @@ return [
     'text_type_explanatory'      => 'Explanatory Texts',
 
     'load_failed'            => 'Load failed',
+    'query_failed'           => 'Query failed',
+    'results_record_summary' => 'Records: :record_count / Persons: :person_count',
+    'results_empty_hint'     => 'Set filters above; click any tile to open the filter dialog, then run the query.',
+    'tab_entry_records'      => 'Entry Records',
+    'tab_person_summary'     => 'Person Summary',
+    'remove_place_aria'      => 'Remove place :id',
 
     // PersonBrowser tab labels (BrowserTabs.tsx TAB_DEFINITIONS fallback)
     'tab_basic_info'         => 'Basic Information',

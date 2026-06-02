@@ -29,7 +29,7 @@ return [
     'edit_basic_info'           => '編輯基本資料',
     'delete_person'             => '刪除人物',
     'create_or_modify'          => '建立 / 修改資訊',
-    'search_person_placeholder' => '搜尋人物（ID / 姓名 / 拼音）',
+    'search_person_placeholder' => '搜尋人物（ID / 姓名 / 拼音）', // 保留：Blade 頁面使用
 
     // 關係欄位
     'kinship'                        => '親屬關係',
@@ -58,6 +58,33 @@ return [
     'sources'                        => '來源',
     'events'                         => '事件',
     'possessions'                    => '財產',
+
+    // PersonBrowser Tab 標籤
+    'tab_basic_info'          => '基本資料',
+    'tab_addresses'           => '地址',
+    'tab_alt_names'           => '別名',
+    'tab_texts'               => '著述',
+    'tab_postings'            => '官名',
+    'tab_entries'             => '入仕',
+    'tab_events'              => '事件',
+    'tab_statuses'            => '社會區分',
+    'tab_kinship'             => '親屬',
+    'tab_associations'        => '社會關係',
+    'tab_possessions'         => '財產',
+    'tab_social_institutions' => '社交機構',
+    'tab_sources'             => '出處',
+
+    // PersonBrowser UI
+    'search_placeholder'      => '搜尋人物（ID / 姓名 / 拼音）',
+    'all_dynasties'           => '全部朝代',
+    'search_btn'              => '搜尋',
+    'clear_btn'               => '清除',
+    'no_results'              => '無結果',
+    'loading'                 => '載入中…',
+    'no_basic_data'           => '無基本資料',
+    'select_person'           => '請在左側選擇一位人物',
+    'loading_summary'         => '載入摘要中…',
+    'unsaved_changes_warning' => '目前的人物基本信息仍在編輯中，且有未儲存的修改。如果你希望保留這次修改，請先儲存，再切換到其他人物或頁籤。',
 
     // 著作類型
     'text_type_commemorative'    => '記詠',

@@ -59,6 +59,33 @@ return [
     'events'                         => 'Events',
     'possessions'                    => 'Possessions',
 
+    // PersonBrowser Tab labels
+    'tab_basic_info'          => 'Basic Info',
+    'tab_addresses'           => 'Addresses',
+    'tab_alt_names'           => 'Alt. Names',
+    'tab_texts'               => 'Texts',
+    'tab_postings'            => 'Postings',
+    'tab_entries'             => 'Entries',
+    'tab_events'              => 'Events',
+    'tab_statuses'            => 'Status',
+    'tab_kinship'             => 'Kinship',
+    'tab_associations'        => 'Associations',
+    'tab_possessions'         => 'Possessions',
+    'tab_social_institutions' => 'Social Inst.',
+    'tab_sources'             => 'Sources',
+
+    // PersonBrowser UI
+    'search_placeholder'      => 'Search Person (ID / Name / Pinyin)',
+    'all_dynasties'           => 'All Dynasties',
+    'search_btn'              => 'Search',
+    'clear_btn'               => 'Clear',
+    'no_results'              => 'No results',
+    'loading'                 => 'Loading…',
+    'no_basic_data'           => 'No basic data',
+    'select_person'           => 'Select a person from the list',
+    'loading_summary'         => 'Loading summary…',
+    'unsaved_changes_warning' => 'The person\'s basic info is still being edited with unsaved changes. Please save first before switching to another person or tab.',
+
     // Text types
     'text_type_commemorative'    => 'Commemorative Texts',
     'text_type_epitaph'          => 'Epitaphs',

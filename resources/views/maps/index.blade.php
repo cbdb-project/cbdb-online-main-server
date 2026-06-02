@@ -56,7 +56,7 @@
 
                 <label>
                     <span>{{ __('nav.maps_marker_label') }}</span>
-                    <input id="label-input" name="label" type="text" value="長安" maxlength="100">
+                    <input id="label-input" name="label" type="text" value="{{ __('nav.maps_marker_default') }}" maxlength="100">
                 </label>
 
                 <div class="actions">

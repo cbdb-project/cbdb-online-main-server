@@ -54,6 +54,7 @@ return [
     'maps_tip_year_param'     => '也可用 <code>year</code> 推定圖層，例如 <code>?year=741</code>。',
     'maps_tip_marker_param'   => 'marker 可由 query param 指定：<code>?lat=34.3416&amp;lng=108.9398&amp;label=長安</code>。',
     'maps_aria_map'           => '歷史行政區地圖',
+    'maps_marker_default'     => '長安',
 
     // Home page hints
     'home_nav_hint'          => '請從左側選單進入對應功能，或使用上方搜尋前往目標頁面。',

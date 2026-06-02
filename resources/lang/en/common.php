@@ -23,4 +23,15 @@ return [
     'home'              => 'Home',
     'yes'               => 'Yes',
     'no'                => 'No',
+
+    // Query Profile Modal
+    'query_profile_title'   => 'SQL Query Details',
+    'query_profile_count'   => ':count queries, :ms ms total',
+    'query_profile_view'    => 'View Details',
+    'query_profile_summary' => ':count queries, :ms ms total. Listed in execution order, time in milliseconds.',
+    'query_profile_no'      => '#',
+    'query_profile_time'    => 'Time (ms)',
+    'query_profile_sql'     => 'SQL',
+    'query_profile_bindings' => 'Bindings',
+    'query_profile_truncated' => 'Showing first :n queries only.',
 ];

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { APP_THEME } from '../../theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface Props {
     sections: Section[];
@@ -67,6 +68,8 @@ export default function BasicInfoView({
     onEditorStateChange,
     onRegisterSaveHandler,
 }: Props) {
+    const t = useTranslation('person');
+    const tCommon = useTranslation('common');
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [editing, setEditing] = useState(false);
     const [formState, setFormState] = useState<FormState>({});
@@ -128,7 +131,7 @@ export default function BasicInfoView({
     }, [onEditorStateChange, onRegisterSaveHandler]);
 
     if ((!sections || sections.length === 0) && !form) {
-        return <div style={emptyStyle}>無基本資料</div>;
+        return <div style={emptyStyle}>{t('no_basic_data')}</div>;
     }
 
     const beginEdit = () => {
@@ -264,14 +267,14 @@ export default function BasicInfoView({
             {form ? (
                 <div style={toolbarStyle}>
                     <div>
-                        <div style={toolbarTitleStyle}>人物基本信息</div>
+                        <div style={toolbarTitleStyle}>{t('basic_info')}</div>
                         {editing ? <div style={editingHintStyle}>編輯模式：可修改欄位已切換為高亮輸入框</div> : null}
                     </div>
                     <div style={toolbarButtonGroupStyle}>
                         {!editing && canEdit ? (
                             <>
                                 <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
-                                    編輯基本信息
+                                    {t('edit_basic_info')}
                                 </button>
                                 <form ref={deleteFormRef} method="POST" action={`/basicinformation/${personId}`} style={{ display: 'none' }}>
                                     <input type="hidden" name="_method" value="DELETE" />
@@ -286,7 +289,7 @@ export default function BasicInfoView({
                                     onClick={cancelEdit}
                                     disabled={saving}
                                 >
-                                    取消
+                                    {tCommon('cancel')}
                                 </button>
                                 <button
                                     type="button"
@@ -294,7 +297,7 @@ export default function BasicInfoView({
                                     onClick={save}
                                     disabled={saving}
                                 >
-                                    {saving ? '儲存中…' : '整頁儲存'}
+                                    {saving ? t('saving') : t('save_and_continue')}
                                 </button>
                             </>
                         ) : null}
@@ -316,6 +319,8 @@ export default function BasicInfoView({
                 save,
                 saving,
                 cancelEdit,
+                t,
+                tCommon,
             ) : (
                 <div style={{ paddingBottom: 16 }}>
                     {sections.map((section, index) => (
@@ -326,7 +331,7 @@ export default function BasicInfoView({
                     {!editing && canEdit ? (
                         <div style={dangerActionWrapStyle}>
                             <button type="button" style={dangerButtonStyle} onClick={handleDelete}>
-                                刪除人物
+                                {t('delete_person')}
                             </button>
                         </div>
                     ) : null}
@@ -347,6 +352,8 @@ function renderEditor(
     onSave?: () => void,
     saving?: boolean,
     onCancel?: () => void,
+    t?: (key: string) => string,
+    tCommon?: (key: string) => string,
 ) {
     return (
         <>
@@ -572,7 +579,7 @@ function renderEditor(
             </div>
 
             <div style={sectionWithDividerStyle}>
-                <SectionHeading title="建立 / 修改資訊" />
+                <SectionHeading title={t ? t('create_or_modify') : '建立 / 修改資訊'} />
                 <div style={editorCompactGridStyle}>
                     {[
                         'c_created_by',
@@ -601,7 +608,7 @@ function renderEditor(
                         onClick={onCancel}
                         disabled={saving}
                     >
-                        取消
+                        {tCommon ? tCommon('cancel') : '取消'}
                     </button>
                     <button
                         type="button"
@@ -609,7 +616,7 @@ function renderEditor(
                         onClick={onSave}
                         disabled={saving}
                     >
-                        {saving ? '儲存中…' : '整頁儲存'}
+                        {saving ? (t ? t('saving') : '儲存中…') : (t ? t('save_and_continue') : '整頁儲存')}
                     </button>
                 </div>
             </div>

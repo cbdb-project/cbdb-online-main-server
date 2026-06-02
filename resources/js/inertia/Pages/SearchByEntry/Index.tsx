@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
+import { useTranslation } from '../../hooks/useTranslation';
 import AppShell from '../../Layouts/AppShell';
 import EntryCodeList, { EntryCode } from '../../components/EntryCodeList';
 import EntryPeopleTable, { EntryPersonRow } from '../../components/EntryPeopleTable';
@@ -83,6 +84,9 @@ export default function Index() {
         placesEndpoint,
         queryEndpoint,
     } = usePage<PageProps>().props;
+
+    const t = useTranslation('person');
+    const tCommon = useTranslation('common');
 
     const [filters, setFilters] = useState<FiltersState>({
         person_keyword: initialFilters.person_keyword ?? '',
@@ -408,10 +412,10 @@ export default function Index() {
                                         disabled={submitting}
                                         style={toolbarPrimaryButtonStyle(submitting)}
                                     >
-                                        {submitting ? '查詢中...' : '執行查詢'}
+                                        {submitting ? tCommon('loading') : tCommon('search')}
                                     </button>
                                 <button type="button" onClick={handleReset} style={toolbarSecondaryButtonStyle}>
-                                    重置
+                                    {tCommon('reset')}
                                 </button>
                             </div>
                         </div>

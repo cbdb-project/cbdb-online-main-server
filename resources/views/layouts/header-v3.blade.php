@@ -42,7 +42,7 @@
 
         <!-- Language Toggle -->
         <li class="nav-item">
-            <form action="{{ route('locale.switch') }}" method="POST" style="display:inline">
+            <form action="{{ route('locale.switch', [], false) }}" method="POST" style="display:inline">
                 @csrf
                 <input type="hidden" name="locale"
                        value="{{ app()->getLocale() === 'zh-TW' ? 'en' : 'zh-TW' }}">

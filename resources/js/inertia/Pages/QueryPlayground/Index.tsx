@@ -138,7 +138,7 @@ export default function Index() {
             }, 100);
         } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') return;
-            setError(err instanceof Error ? err.message : '查詢失敗');
+            setError(err instanceof Error ? err.message : t('query_failed'));
             setResult(null);
         } finally {
             setLoading(false);

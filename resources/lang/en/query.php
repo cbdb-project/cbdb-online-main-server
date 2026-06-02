@@ -110,4 +110,5 @@ return [
     'query_results_title'   => 'Query Results',
     'results_count_suffix'  => 'results',
     'query_executing'       => 'Executing query…',
+    'query_failed'          => 'Query failed',
 ];

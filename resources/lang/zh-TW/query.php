@@ -110,4 +110,5 @@ return [
     'query_results_title'   => '查詢結果',
     'results_count_suffix'  => '筆結果',
     'query_executing'       => '查詢執行中…',
+    'query_failed'          => '查詢失敗',
 ];

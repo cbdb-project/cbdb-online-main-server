@@ -142,7 +142,7 @@ php artisan config:clear
 
 根據 `AGENTS.md` 第 161 行：
 - ✅ 所有 Git commit message **必須使用繁體中文**
-- ✅ 使用者介面使用繁體中文
+- ✅ 使用者介面支援繁體中文／英文切換（預設 zh-TW）；Blade 字串用 `__()` helper，禁止硬編碼中文
 - ✅ commit message 需包含 Claude Code 署名（如適用）
 
 ## 檢查清單

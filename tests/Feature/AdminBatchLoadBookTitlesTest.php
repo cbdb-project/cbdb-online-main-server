@@ -843,7 +843,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
 
         $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('Copy textid and title');
+        $followUp->assertSee('複製 textid 與書名');
         $followUp->assertSee("801\t某某書", false);
         $followUp->assertSee('id="copy-textid-title-source"', false);
     }

@@ -7,7 +7,7 @@
 - 版面系統：全站使用 AdminLTE 3 + Bootstrap 4，前端資源由 Vite 載入。
 - 現行 Query Playground 主路徑是 React/Inertia 版本：`/app/query-playground`。
 - 舊版 Blade Query Playground 仍在相容期內，但不應再新增功能；新功能請只做在 React/Inertia 路徑。
-- 使用者介面、文件與 commit message 一律使用繁體中文。
+- 使用者介面支援繁體中文／英文切換（預設 zh-TW），文件與 commit message 一律使用繁體中文。
 
 ## 關鍵原則
 
@@ -37,6 +37,14 @@
 - 不要重新引入外部 CDN 的 jQuery、Bootstrap、DataTables。
 - 修改 `resources/js/**` 後，提交前需重新編譯前端。
 - React 列表不要使用 index 當 key；若資料有複合主鍵，請使用穩定 `pk`。
+
+### 6. i18n（繁體中文 / 英文切換）
+- 系統預設語言為繁體中文（`zh-TW`），使用者可透過 navbar 切換至英文（`en`）。
+- Blade 字串一律使用 `__('group.key')` 翻譯 helper；禁止在 Blade 中硬編碼中文字串。
+- 翻譯檔：`resources/lang/zh-TW/*.php` 與 `resources/lang/en/*.php`；兩者必須同步。
+- JS 字串透過 `{!! Js::from(__('group.key')) !!}` 注入；React/Inertia 元件從 `usePage().props.locale` 讀取 locale。
+- Locale 切換由 `SetLocaleMiddleware`（`web` middleware group）處理，優先順序：session → cookie → Accept-Language。
+- 測試環境中 Symfony 預設 `Accept-Language: en-us,en;q=0.5`；`TestCase::setUp()` 已覆蓋為 `zh-TW`，保持測試一致性。若個別測試需要英文語境，請用 `withSession(['locale' => 'en'])`。
 
 ### 5. 授權與安全
 - 新路由必須有後端授權檢查，不能只靠前端隱藏。

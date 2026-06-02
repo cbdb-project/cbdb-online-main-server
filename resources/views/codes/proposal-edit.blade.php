@@ -8,12 +8,12 @@
         <div class="card-body">
             @if($reviewStatus === 'rejected' && !empty($reviewComment))
                 <div class="alert alert-warning">
-                    <strong>退修說明：</strong> {{ $reviewComment }}
+                    <strong>{{ __('codes.rejection_reason') }}：</strong> {{ $reviewComment }}
                 </div>
             @endif
             @if(isset($proposalMeta['cancel_reason']) && $reviewStatus === 'cancelled')
                 <div class="alert alert-info">
-                    <strong>撤回原因：</strong> {{ $proposalMeta['cancel_reason'] }}
+                    <strong>{{ __('codes.withdrawal_reason') }}：</strong> {{ $proposalMeta['cancel_reason'] }}
                 </div>
             @endif
             <form method="post"
@@ -42,16 +42,16 @@
                     </div>
                 @endforeach
                 <div class="form-group row">
-                    <label for="__proposal_comment" class="col-sm-2 col-form-label">提案說明</label>
+                    <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('codes.proposal_desc') }}</label>
                     <div class="col-sm-10">
                         <textarea name="__proposal_comment" id="__proposal_comment" class="form-control" rows="3" placeholder="補充此提案的說明（選填）">{{ old('__proposal_comment', $proposalMeta['comment'] ?? '') }}</textarea>
-                        <p class="help-block">修改後將重新送審，審核狀態會回到「待審核」。</p>
+                        <p class="help-block">{{ __('codes.resubmit_notice') }}</p>
                     </div>
                 </div>
                 <div class="form-group row">
                     <div class="col-sm-10 offset-sm-2">
-                        <button type="submit" class="btn btn-info">更新提案</button>
-                        <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-secondary" style="margin-left:8px;">返回提案列表</a>
+                        <button type="submit" class="btn btn-info">{{ __('codes.update_proposal') }}</button>
+                        <a href="{{ route('operations.index', ['proposals_only' => 1]) }}" class="btn btn-secondary" style="margin-left:8px;">{{ __('codes.return_to_proposals') }}</a>
                     </div>
                 </div>
             </form>

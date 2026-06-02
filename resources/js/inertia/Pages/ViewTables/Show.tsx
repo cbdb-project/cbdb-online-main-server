@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, router } from '@inertiajs/react';
 import AppShell from '../../Layouts/AppShell';
+import { useTranslation } from '../../hooks/useTranslation';
 import DataTable from '../../components/DataTable';
 import SearchToolbar from '../../components/SearchToolbar';
 import SqlDebugPanel from '../../components/SqlDebugPanel';
@@ -54,6 +55,7 @@ export default function Show({
     listUrl,
     availableViews,
 }: Props) {
+    const t = useTranslation('views');
     const [search, setSearch] = useState(filters.search || '');
 
     useEffect(() => {
@@ -65,10 +67,10 @@ export default function Show({
     };
 
     const alternateAliases = aliases.slice(1);
-    const searchSummary = filters.search ? `「${filters.search}」` : '未套用';
+    const searchSummary = filters.search ? `「${filters.search}」` : t('filter_applied');
     const resultsLabel = pagination.total > 0
         ? `第 ${pagination.from}–${pagination.to} 筆`
-        : '目前無資料';
+        : t('no_data_in_view');
 
     const paginationData: PaginationData<unknown> = {
         data: rows,
@@ -87,7 +89,7 @@ export default function Show({
             help: `key: ${key}`,
         },
         {
-            label: '欄位數',
+            label: t('column_count'),
             value: String(column_count),
             help: '依目前 view 定義輸出',
         },
@@ -129,12 +131,12 @@ export default function Show({
             <div style={{ padding: '24px 24px 48px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
                     <Link href={listUrl} style={{ color: '#007bff', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500 }}>
-                        ← 檢視表總覽
+                        {t('back_to_overview')}
                     </Link>
 
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ fontSize: '0.82rem', color: '#6c757d' }}>
-                            快速切換
+                            {t('quick_switch')}
                         </label>
                         <select
                             value={pageUrl}
@@ -151,16 +153,16 @@ export default function Show({
                 </div>
 
                 <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>檢視資訊</div>
+                    <div style={sectionHeaderStyle}>{t('view_info')}</div>
                     <div style={sectionBodyStyle}>
                         <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700, color: '#212529' }}>
                             {title}
                         </h2>
                         <div style={{ marginTop: 8, color: '#6c757d', fontSize: '0.85rem', lineHeight: 1.7 }}>
-                            <div>檢視名稱：<code>{primary_alias}</code></div>
+                            <div>{t('view_name_label')}<code>{primary_alias}</code></div>
                             <div>key：<code>{key}</code></div>
                             {alternateAliases.length > 0 && (
-                                <div>別名：{alternateAliases.map((alias) => <code key={alias} style={{ marginRight: 8 }}>{alias}</code>)}</div>
+                                <div>{t('alias_label')}{alternateAliases.map((alias) => <code key={alias} style={{ marginRight: 8 }}>{alias}</code>)}</div>
                             )}
                         </div>
                         {description && (
@@ -172,7 +174,7 @@ export default function Show({
                 </div>
 
                 <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>目前狀態</div>
+                    <div style={sectionHeaderStyle}>{t('current_status')}</div>
                     <div style={summaryGridStyle}>
                         {summaryCards.map((card) => (
                             <div key={card.label} style={summaryItemStyle}>
@@ -185,14 +187,14 @@ export default function Show({
                 </div>
 
                 <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>檢視內容</div>
+                    <div style={sectionHeaderStyle}>{t('view_content')}</div>
                     <div style={sectionBodyStyle}>
                         <SearchToolbar
                             search={search}
                             onSearchChange={setSearch}
                             onSubmit={handleSearch}
                             onClear={handleClear}
-                            placeholder="輸入關鍵字搜尋當前檢視"
+                            placeholder={t('search_in_view')}
                         />
 
                         {pagination.total > 0 && (

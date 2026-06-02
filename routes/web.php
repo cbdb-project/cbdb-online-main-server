@@ -20,8 +20,6 @@ Auth::routes();
 
 Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
-Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
-
 Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');
 
 Route::get('home', 'HomeController@index')->name('home');
@@ -208,17 +206,6 @@ Route::resource('operations', 'OperationsController', ['name' => [
 ]]);
 Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
-Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
-    'show' => 'crowdsourcing.show',
-    'create' => 'crowdsourcing.create',
-    'edit' => 'crowdsourcing.edit',
-    'update' => 'crowdsourcing.update',
-]]);
-
-
-Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
-Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
-
 Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
     Route::patch('profile', 'UserProfileController@update')->name('profile.update');
@@ -239,6 +226,17 @@ Route::middleware('auth')->group(function () {
 
     // ── 暫不公開：僅管理員可訪問 ──────────────────────────────────────
     Route::middleware('superadmin')->group(function () {
+        // 最近眾包錄入記錄
+        Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
+        Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
+            'show' => 'crowdsourcing.show',
+            'create' => 'crowdsourcing.create',
+            'edit' => 'crowdsourcing.edit',
+            'update' => 'crowdsourcing.update',
+        ]]);
+        Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
+        Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
+
         // 人物瀏覽工作台（Inertia + React）
         Route::get('app/person-browser', 'PersonBrowserController@index')
             ->middleware('inertia')

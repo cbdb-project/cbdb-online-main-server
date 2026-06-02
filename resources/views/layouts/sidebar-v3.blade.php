@@ -63,13 +63,6 @@
                     </a>
                 </li>
 
-                <li class="nav-item">
-                    <a href="{{ route('crowdsourcing.index') }}" class="nav-link {{ $activePage == 'Crowdsourcing' ? 'active' : '' }}">
-                        <i class="nav-icon fas fa-users-cog"></i>
-                        <p>{{ __('nav.crowdsourcing_records') }}</p>
-                    </a>
-                </li>
-
                 @php
                     $codesPages = [
                         'Codes',
@@ -337,11 +330,13 @@
                 @if(Auth::check() and Auth::user()->isActive() and Auth::user()->isSuperAdmin())
                     @php
                         $notPublicPages = [
+                            'Crowdsourcing',
                             '人物瀏覽',
                             '按入仕查詢',
                             '歷史地圖',
                         ];
                         $notPublicMenuOpen = in_array($activePage, $notPublicPages, true)
+                            || request()->routeIs('crowdsourcing.*')
                             || request()->routeIs('app.person-browser.*')
                             || request()->routeIs('app.search-by.entry.*')
                             || request()->routeIs('app.maps.*');
@@ -355,6 +350,12 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('crowdsourcing.index') }}" class="nav-link {{ $activePage == 'Crowdsourcing' ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-users-cog"></i>
+                                    <p>{{ __('nav.crowdsourcing_records') }}</p>
+                                </a>
+                            </li>
                             <li class="nav-item">
                                 <a href="{{ route('app.person-browser.index') }}" class="nav-link {{ request()->routeIs('app.person-browser.*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-user-friends"></i>

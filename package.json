@@ -25,6 +25,7 @@
     "vue": "^3.0.0"
   },
   "dependencies": {
+    "@fontsource/noto-sans-tc": "^5.2.9",
     "@inertiajs/react": "^2.3.18",
     "@ttskch/select2-bootstrap4-theme": "^1.5.2",
     "@vitejs/plugin-react": "^4.7.0",

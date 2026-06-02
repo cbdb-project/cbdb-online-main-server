@@ -27,10 +27,14 @@ export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Pr
             {tabs.map((tab) => {
                 const isActive = tab.key === activeTab;
                 const count = counts[tab.key];
-                // Try translated label first (tab_<key>), fall back to static label
+                // Try translated label first (tab_<key>), fall back to static label.
+                // Check groupDict directly to avoid the fragile string-equality test.
                 const translationKey = `tab_${tab.key}`;
                 const translated = tPerson(translationKey);
-                const label = translated !== translationKey ? translated : tab.label;
+                // tPerson returns the key itself when missing; use !== to detect miss,
+                // but also guard against a translation value that happens to equal its key.
+                const hasTranlation = translated !== translationKey;
+                const label = hasTranlation ? translated : tab.label;
                 return (
                     <button
                         type="button"

@@ -79,20 +79,19 @@ class LocaleControllerTest extends TestCase
     /** @test */
     public function set_locale_middleware_reads_session_locale(): void
     {
-        // 在 session 設定 zh-TW，再訪問頁面，middleware 應應用 zh-TW
+        // HomeController::index() 回傳 redirect，驗證 middleware 不阻擋請求即可
         $response = $this->withSession(['locale' => 'zh-TW'])
             ->get(route('home'));
 
-        // 只需確認請求能完成，不報錯
-        $response->assertStatus(200);
+        $response->assertRedirect();
     }
 
     /** @test */
     public function set_locale_middleware_falls_back_to_default_when_no_preference(): void
     {
-        // 無 session / cookie / header，使用預設 locale
+        // 無 session / cookie / header，middleware 應用預設 locale 並正常放行
         $response = $this->get(route('home'));
 
-        $response->assertStatus(200);
+        $response->assertRedirect();
     }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface QbeTable {
     name: string;
@@ -67,6 +68,7 @@ const QBE_HISTORY_STORAGE_KEY = 'query-playground:qbe:history:v1';
 const QBE_MAX_HISTORY_ENTRIES = 8;
 
 export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Props) {
+    const t = useTranslation('query');
     const [baseTable, setBaseTable] = useState('');
     const [schemas, setSchemas] = useState<Record<string, TableSchema>>({});
     const [loadingSchema, setLoadingSchema] = useState(false);
@@ -108,7 +110,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
     const fetchSchema = useCallback(async (tableNames: string[]) => {
         if (tableNames.length === 0) return;
         // Only fetch tables not already loaded
-        const toFetch = tableNames.filter((t) => !schemasRef.current[t]);
+        const toFetch = tableNames.filter((tableName) => !schemasRef.current[tableName]);
         if (toFetch.length === 0) return;
 
         setLoadingSchema(true);
@@ -124,11 +126,11 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
             const data = await response.json();
             setSchemas((prev) => ({ ...prev, ...(data.tables || {}) }));
         } catch (err) {
-            setSchemaError(err instanceof Error ? err.message : 'Schema 載入失敗');
+            setSchemaError(err instanceof Error ? err.message : t('qbe_schema_failed'));
         } finally {
             setLoadingSchema(false);
         }
-    }, [schemaEndpoint]);
+    }, [schemaEndpoint, t]);
 
     useEffect(() => {
         if (baseTable) {
@@ -172,7 +174,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         if (storedDraft && !isEmptyDraftState(storedDraft.state)) {
             applyDraftState(storedDraft.state);
             setLastSavedAt(storedDraft.savedAt);
-            setPersistenceNotice(`已還原 ${formatSavedAt(storedDraft.savedAt)} 的 QBE 草稿`);
+            setPersistenceNotice(t('qbe_notice_restored_draft', { time: formatSavedAt(storedDraft.savedAt) }));
         }
 
         hasRestoredDraftRef.current = true;
@@ -227,12 +229,12 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         persistHistoryEntries(nextHistory);
         setPersistenceNotice(
             reason === 'manual'
-                ? `已儲存目前版本（${formatSavedAt(savedAt)}）`
+                ? t('qbe_notice_saved', { time: formatSavedAt(savedAt) })
                 : reason === 'generate'
-                    ? `已儲存產生 SQL 前的版本（${formatSavedAt(savedAt)}）`
-                    : `已儲存重設前的版本（${formatSavedAt(savedAt)}）`,
+                    ? t('qbe_notice_saved_before_sql', { time: formatSavedAt(savedAt) })
+                    : t('qbe_notice_saved_before_reset', { time: formatSavedAt(savedAt) }),
         );
-    }, [buildDraftState, historyEntries]);
+    }, [buildDraftState, historyEntries, t]);
 
     const handleBaseTableChange = (tableName: string) => {
         if (baseTable && baseTable !== tableName && !isEmptyDraftState(buildDraftState())) {
@@ -382,7 +384,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
             state: entry.state,
         });
         setLastSavedAt(entry.savedAt);
-        setPersistenceNotice(`已還原 ${formatSavedAt(entry.savedAt)} 的版本`);
+        setPersistenceNotice(t('qbe_notice_restored_version', { time: formatSavedAt(entry.savedAt) }));
     };
 
     const clearSavedQbeHistory = () => {
@@ -391,11 +393,11 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
         setHistoryEntries([]);
         setSelectedHistoryId('');
         setLastSavedAt('');
-        setPersistenceNotice('已清除 QBE 草稿與歷史紀錄');
+        setPersistenceNotice(t('qbe_notice_cleared'));
     };
 
-    const nonInternalTables = tables.filter((t) => !t.internal);
-    const internalTables = tables.filter((t) => t.internal);
+    const nonInternalTables = tables.filter((tbl) => !tbl.internal);
+    const internalTables = tables.filter((tbl) => tbl.internal);
 
     return (
         <div>
@@ -407,8 +409,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 backgroundColor: '#f8f9fa',
             }}>
                 <div style={{ fontSize: '0.85rem', color: '#495057', marginBottom: 8 }}>
-                    QBE 草稿會自動儲存在目前瀏覽器，離開頁面後可回來繼續編輯。
-                    {lastSavedAt ? ` 最近儲存：${formatSavedAt(lastSavedAt)}` : ''}
+                    {t('qbe_autosave_hint')}
+                    {lastSavedAt ? ` ${t('qbe_last_saved', { time: formatSavedAt(lastSavedAt) })}` : ''}
                 </div>
                 {persistenceNotice && (
                     <div style={{ fontSize: '0.8rem', color: '#0c5460', marginBottom: 8 }}>
@@ -417,7 +419,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button onClick={() => saveHistorySnapshot('manual')} style={smallBtnStyle}>
-                        儲存目前版本
+                        {t('qbe_save_current')}
                     </button>
                     <select
                         value={selectedHistoryId}
@@ -425,7 +427,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                         style={{ ...selectStyle, minWidth: 260 }}
                         disabled={historyEntries.length === 0}
                     >
-                        <option value="">{historyEntries.length === 0 ? '-- 尚無歷史版本 --' : '-- 選擇歷史版本 --'}</option>
+                        <option value="">{historyEntries.length === 0 ? t('qbe_no_history') : t('qbe_select_history')}</option>
                         {historyEntries.map((entry) => (
                             <option key={entry.id} value={entry.id}>
                                 {formatSavedAt(entry.savedAt)}{entry.state.baseTable ? ` — ${entry.state.baseTable}` : ''}
@@ -437,35 +439,35 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                         disabled={!selectedHistoryId}
                         style={{ ...smallBtnStyle, opacity: selectedHistoryId ? 1 : 0.6 }}
                     >
-                        還原版本
+                        {t('qbe_restore_version')}
                     </button>
                     <button onClick={clearSavedQbeHistory} style={removeBtnStyle}>
-                        清除草稿與歷史
+                        {t('qbe_clear_history')}
                     </button>
                 </div>
             </div>
 
             {/* Base table selection */}
             <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>主表 (Base Table)</label>
+                <label style={labelStyle}>{t('qbe_base_table')}</label>
                 <select
                     value={baseTable}
                     onChange={(e) => handleBaseTableChange(e.target.value)}
                     style={selectStyle}
                 >
-                    <option value="">-- 選擇主表 --</option>
-                    <optgroup label="資料表">
-                        {nonInternalTables.map((t) => (
-                            <option key={t.name} value={t.name}>
-                                {t.name}{t.description ? ` — ${t.description}` : ''}
+                    <option value="">{t('qbe_select_base_table')}</option>
+                    <optgroup label={t('qbe_tables_group')}>
+                        {nonInternalTables.map((tbl) => (
+                            <option key={tbl.name} value={tbl.name}>
+                                {tbl.name}{tbl.description ? ` — ${tbl.description}` : ''}
                             </option>
                         ))}
                     </optgroup>
                     {internalTables.length > 0 && (
-                        <optgroup label="內部表 (CBDB__)">
-                            {internalTables.map((t) => (
-                                <option key={t.name} value={t.name}>
-                                    {t.name}{t.description ? ` — ${t.description}` : ''}
+                        <optgroup label={t('qbe_internal_tables_group')}>
+                            {internalTables.map((tbl) => (
+                                <option key={tbl.name} value={tbl.name}>
+                                    {tbl.name}{tbl.description ? ` — ${tbl.description}` : ''}
                                 </option>
                             ))}
                         </optgroup>
@@ -473,7 +475,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 </select>
             </div>
 
-            {loadingSchema && <div style={{ color: '#6c757d', fontSize: '0.85rem', marginBottom: 8 }}>載入 Schema 中…</div>}
+            {loadingSchema && <div style={{ color: '#6c757d', fontSize: '0.85rem', marginBottom: 8 }}>{t('qbe_loading_schema')}</div>}
             {schemaError && <div style={{ color: '#dc3545', fontSize: '0.85rem', marginBottom: 8 }}>⚠ {schemaError}</div>}
 
             {baseTable && schemas[baseTable] && (
@@ -481,8 +483,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                     {/* Joins */}
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <label style={labelStyle}>JOIN（可選）</label>
-                            <button onClick={addJoin} style={smallBtnStyle}>+ 新增 JOIN</button>
+                            <label style={labelStyle}>{t('qbe_join_optional')}</label>
+                            <button onClick={addJoin} style={smallBtnStyle}>{t('qbe_add_join')}</button>
                         </div>
                         {joins.map((join, i) => (
                             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -500,16 +502,16 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                     onChange={(e) => updateJoin(i, 'table', e.target.value)}
                                     style={{ ...selectStyle, flex: 1, minWidth: 150 }}
                                 >
-                                    <option value="">-- 選擇表 --</option>
-                                    {tables.map((t) => (
-                                        <option key={t.name} value={t.name}>{t.name}</option>
+                                    <option value="">{t('qbe_select_join_table')}</option>
+                                    {tables.map((tbl) => (
+                                        <option key={tbl.name} value={tbl.name}>{tbl.name}</option>
                                     ))}
                                 </select>
                                 <input
                                     type="text"
                                     value={join.alias}
                                     onChange={(e) => updateJoin(i, 'alias', e.target.value)}
-                                    placeholder="別名，例如 ALTNAME_DATA_2"
+                                    placeholder={t('qbe_join_alias_hint')}
                                     style={{ ...inputStyle, flex: '0 0 180px' }}
                                 />
                                 <select
@@ -517,7 +519,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                     onChange={(e) => updateJoin(i, 'leftColumn', e.target.value)}
                                     style={{ ...selectStyle, flex: 1, minWidth: 180 }}
                                 >
-                                    <option value="">-- 左欄位 --</option>
+                                    <option value="">{t('qbe_left_col')}</option>
                                     {availableColumns.map((col) => (
                                         <option key={`left-${i}-${col.name}`} value={col.name}>{col.name}</option>
                                     ))}
@@ -539,7 +541,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                     onChange={(e) => updateJoin(i, 'rightColumn', e.target.value)}
                                     style={{ ...selectStyle, flex: 1, minWidth: 180 }}
                                 >
-                                    <option value="">-- 右欄位 --</option>
+                                    <option value="">{t('qbe_right_col')}</option>
                                     {availableColumns.map((col) => (
                                         <option key={`right-${i}-${col.name}`} value={col.name}>{col.name}</option>
                                     ))}
@@ -551,7 +553,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
 
                     {/* SELECT columns */}
                     <div style={{ marginBottom: 16 }}>
-                        <label style={labelStyle}>SELECT 欄位（不選則為 *）</label>
+                        <label style={labelStyle}>{t('qbe_select_cols')}</label>
                         <div style={{
                             maxHeight: 180,
                             overflowY: 'auto',
@@ -561,7 +563,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                             backgroundColor: '#fff',
                         }}>
                             {availableColumns.length === 0 ? (
-                                <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>無可用欄位</span>
+                                <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>{t('qbe_no_cols')}</span>
                             ) : (
                                 availableColumns.map((col) => (
                                     <label key={col.name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -587,8 +589,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                     {/* WHERE conditions */}
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <label style={labelStyle}>WHERE 條件</label>
-                            <button onClick={addWhereCondition} disabled={availableColumns.length === 0} style={smallBtnStyle}>+ 新增條件</button>
+                            <label style={labelStyle}>{t('qbe_where_conditions')}</label>
+                            <button onClick={addWhereCondition} disabled={availableColumns.length === 0} style={smallBtnStyle}>{t('qbe_add_condition')}</button>
                         </div>
                         {whereConditions.map((cond, i) => (
                             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -615,7 +617,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                         type="text"
                                         value={cond.value}
                                         onChange={(e) => updateWhereCondition(i, 'value', e.target.value)}
-                                        placeholder="值"
+                                        placeholder={t('qbe_value_placeholder')}
                                         style={{ ...inputStyle, flex: 1, minWidth: 120 }}
                                     />
                                 )}
@@ -626,7 +628,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
 
                     {/* GROUP BY */}
                     <div style={{ marginBottom: 16 }}>
-                        <label style={labelStyle}>GROUP BY（可選）</label>
+                        <label style={labelStyle}>{t('qbe_group_by_optional')}</label>
                         <div style={{
                             maxHeight: 120,
                             overflowY: 'auto',
@@ -657,8 +659,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                     {/* ORDER BY */}
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <label style={labelStyle}>ORDER BY（可選）</label>
-                            <button onClick={addOrderBy} disabled={availableColumns.length === 0} style={smallBtnStyle}>+ 新增排序</button>
+                            <label style={labelStyle}>{t('qbe_order_by_optional')}</label>
+                            <button onClick={addOrderBy} disabled={availableColumns.length === 0} style={smallBtnStyle}>{t('qbe_add_order_by')}</button>
                         </div>
                         {orderByColumns.map((ob, i) => (
                             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -704,7 +706,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                 type="number"
                                 value={limit}
                                 onChange={(e) => setLimit(e.target.value)}
-                                placeholder="不限"
+                                placeholder={t('qbe_limit_placeholder')}
                                 min={0}
                                 style={{ ...inputStyle, width: 80 }}
                             />
@@ -725,7 +727,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                             cursor: 'pointer',
                         }}
                     >
-                        產生 SQL 並切換至 SQL 模式
+                        {t('qbe_generate_sql_btn')}
                     </button>
                 </>
             )}

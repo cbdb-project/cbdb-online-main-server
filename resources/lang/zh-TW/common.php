@@ -18,7 +18,7 @@ return [
     'loading'           => '載入中…',
     'no_data'           => '無資料',
     'page_of'           => '第 :current 頁，共 :total 頁',
-    'profile_settings'  => '個人設定',
+    'profile_settings'  => '個人資料設定',
     'profile_settings_desc'   => '修改您的個人資料',
     'sign_out'          => '登出',
     'dark_mode_toggle'  => '切換深色模式',

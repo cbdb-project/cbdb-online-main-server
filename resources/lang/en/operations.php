@@ -93,4 +93,19 @@ return [
     'status_label'          => 'Status',
     'person_label'          => 'Person',
     'editor_placeholder'    => 'Name or ID',
+
+    // Restore operation messages
+    'page_desc_proposals'        => 'Recent Proposals',
+    'page_desc_operations'       => 'Recent Edit History',
+    'restore_login_required'     => 'Please log in first.',
+    'restore_permission_denied'  => 'This user does not have permission. Please contact an administrator.',
+    'restore_not_supported'      => 'Revert is not supported for this operation type.',
+    'restore_success'            => 'Restore succeeded @ :time',
+    'restore_failed'             => 'Restore failed: :error @ :time',
+    'restore_unsupported_type'   => 'Unsupported operation type',
+    'restore_no_data'            => 'No recoverable data found',
+    'restore_no_pk'              => 'Missing primary key conditions, cannot update record',
+    'restore_empty_data'         => 'Recovered content is empty after filtering',
+    'restore_row_not_found'      => 'Cannot find data row to restore',
+    'restore_no_delete_data'     => 'No deleted data to restore',
 ];

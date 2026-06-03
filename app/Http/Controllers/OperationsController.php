@@ -648,8 +648,8 @@ class OperationsController extends Controller {
         //echo "<pre><code>";
         //print_r($lists[0]['resource_original']); //成功
         //echo "</code></pre>";
-        $pageTitle = $proposalsOnly ? '最近提案列表' : '最近操作記錄';
-        $pageDescription = $proposalsOnly ? '最近提案列表' : '最近編輯列表';
+        $pageTitle = $proposalsOnly ? __('nav.recent_proposals') : __('nav.recent_operations');
+        $pageDescription = $proposalsOnly ? __('operations.page_desc_proposals') : __('operations.page_desc_operations');
         $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
         $pageTitleKey = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
 
@@ -667,18 +667,18 @@ class OperationsController extends Controller {
 
     public function restore(Request $request, Operation $operation) {
         if (!Auth::check()) {
-            flash('請登入後再試。', 'error');
+            flash(__('operations.restore_login_required'), 'error');
 
             return redirect()->back();
         }
         if (!Auth::user()->canRestoreOperations()) {
-            flash('該用戶沒有權限，請聯絡管理員。', 'error');
+            flash(__('operations.restore_permission_denied'), 'error');
 
             return redirect()->back();
         }
 
         if ($operation->resource === 'POSTED_TO_ADDR_DATA') {
-            flash('該類操作暫不支援復原。', 'warning');
+            flash(__('operations.restore_not_supported'), 'warning');
 
             return redirect()->back();
         }
@@ -688,13 +688,13 @@ class OperationsController extends Controller {
                 return $this->performRestore($operation);
             });
             $this->recordRestoreOperation($operation, (array) $result);
-            flash('恢復成功 @ '.Carbon::now(), 'success');
+            flash(__('operations.restore_success', ['time' => Carbon::now()]), 'success');
         } catch (\Throwable $e) {
             Log::error('Operation restore failed', [
                 'operation_id' => $operation->id,
                 'error' => $e->getMessage(),
             ]);
-            flash('恢復失敗：'.$e->getMessage().' @ '.Carbon::now(), 'error');
+            flash(__('operations.restore_failed', ['error' => $e->getMessage(), 'time' => Carbon::now()]), 'error');
         }
 
         return redirect()->route('operations.index');
@@ -707,7 +707,7 @@ class OperationsController extends Controller {
             case 4:
                 return $this->restoreDelete($operation);
             default:
-                throw new \RuntimeException('尚未支援的操作類型');
+                throw new \RuntimeException(__('operations.restore_unsupported_type'));
         }
     }
 
@@ -725,15 +725,15 @@ class OperationsController extends Controller {
             $target = $this->getPreviousSnapshot($operation);
         }
         if (empty($target)) {
-            throw new \RuntimeException('找不到可恢復的資料內容');
+            throw new \RuntimeException(__('operations.restore_no_data'));
         }
         $conditions = $this->buildKeyConditions($operation, $current, $target);
         if (empty($conditions)) {
-            throw new \RuntimeException('缺少主鍵條件，無法更新記錄');
+            throw new \RuntimeException(__('operations.restore_no_pk'));
         }
         $payload = $this->filterColumns($table, $target);
         if (empty($payload)) {
-            throw new \RuntimeException('恢復內容經過過濾後為空');
+            throw new \RuntimeException(__('operations.restore_empty_data'));
         }
         if (in_array('updated_at', array_keys($payload))) {
             $payload['updated_at'] = Carbon::now();
@@ -742,7 +742,7 @@ class OperationsController extends Controller {
         }
         $query = DB::table($table)->where($conditions);
         if (!$query->exists()) {
-            throw new \RuntimeException('無法找到要恢復的資料列');
+            throw new \RuntimeException(__('operations.restore_row_not_found'));
         }
         $query->update($payload);
 
@@ -756,7 +756,7 @@ class OperationsController extends Controller {
         $table = $operation->resource;
         $target = $this->decodeJson($operation->resource_data);
         if (empty($target)) {
-            throw new \RuntimeException('找不到可還原的刪除資料');
+            throw new \RuntimeException(__('operations.restore_no_delete_data'));
         }
         $payload = $this->filterColumns($table, $target);
         if ($this->hasColumn($table, 'created_at') && !isset($payload['created_at'])) {

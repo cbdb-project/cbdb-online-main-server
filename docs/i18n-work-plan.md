@@ -1,10 +1,11 @@
 # CBDB Online 中英文切換介面 — 實施計劃
 
-**狀態：** ✅ Phase 7 完成（分支：`feature/i18n-phase7-controller-strings`）  
+**狀態：** 🔄 Phase 8 計劃中（分支：`feature/i18n-phase8-react-components-operations`）  
 **計劃日期：** 2026-06-01  
 **Phase 0–5 完成：** 2026-06-02  
 **Phase 6 完成：** 2026-06-02  
 **Phase 7 完成：** 2026-06-03  
+**Phase 8 計劃：** 2026-06-03  
 **作者：** AI 協作草稿（王宏甦審閱）
 
 ---
@@ -1080,6 +1081,219 @@ $viewLangKey = 'view_' . str_replace('-', '_', $effectiveKey);
 | 7F 其他低頻控制器 | 低 | 12 controllers | 管理員工具等 | ✅ 完成（2026-06-03） |
 
 > 掃描日期：2026-06-03。優先級依使用者接觸頻率排序；7D 因為使用者指定 ADDR_BELONGS_DATA 問題，特別提升為高優先。
+
+---
+
+---
+
+## 11. Phase 8：QueryPlayground React 元件 + Operations 控制器 i18n
+
+**背景：** Phase 7 完成了控制器字串翻譯，但以下兩個區塊被遺漏：  
+（1）QueryPlayground 的三個核心 React 元件（`NlQueryPanel.tsx`、`QbeBuilder.tsx`、`HistoricalQaPanel.tsx`）完全未接入 `useTranslation`，所有 UI 字串仍為硬編碼中文。`en/query.php` 中已存在許多對應的翻譯 key，但元件從未呼叫 `t()`。  
+（2）`OperationsController` 的 `index` 方法 `page_title`／`page_description` 與 `revert` 方法的 flash 訊息及 RuntimeException 訊息，仍以硬編碼中文傳遞。
+
+**發現日期：** 2026-06-03（基於 https://input.cbdb.fas.harvard.edu/operations 與 /app/query-playground 的實際截圖）  
+**分支：** `feature/i18n-phase8-react-components-operations`
+
+---
+
+### Phase 8A：NlQueryPanel.tsx i18n 接入（高優先）
+
+**問題：** `resources/js/inertia/components/QueryPlayground/NlQueryPanel.tsx` 無任何 `useTranslation` 呼叫，所有字串均硬編碼。
+
+**已存在於 `en/query.php` 的 key（只需接線，不須新增）：**
+
+| 元件中的中文字串 | 對應現有 key |
+|----------------|------------|
+| `用自然語言描述您想查詢的內容`（label） | `nl_query_placeholder` |
+| `例如：找出所有宋朝進士的姓名和籍貫`（textarea placeholder） | `nl_example` |
+| `我已閱讀並同意上述隱私提示` | `nl_agree_privacy` |
+| `使用工具輔助（可查看資料表結構）` | `nl_use_tools` |
+| `串流模式` | `nl_stream` |
+| `生成中…`（按鈕 loading 狀態） | `nl_generating` |
+| `🤖 生成 SQL`（按鈕正常狀態） | `nl_generate` |
+| `取消` | `nl_cancel` |
+| `生成的 SQL`（結果區標題） | `nl_generated_sql` |
+| `▶ 帶到 SQL 模式執行` | `nl_send_to_sql` |
+| `說明：` | `nl_explanation` |
+
+**需新增至 `resources/lang/zh-TW/query.php` 與 `resources/lang/en/query.php` 的 key：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `nl_privacy_label` | `'⚠ 隱私提示：'` | `'⚠ Privacy Notice:'` |
+| `nl_privacy_body` | `'此功能使用 AI 模型（:model）生成 SQL。您的問題內容將傳送至 Google Gemini API 進行處理，並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。'` | `'This feature uses the AI model (:model) to generate SQL. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
+| `nl_stream_failed` | `'無法讀取回應串流'` | `'Unable to read response stream'` |
+| `nl_generate_failed` | `'生成失敗'` | `'Generation failed'` |
+| `nl_generate_error` | `'生成發生錯誤'` | `'Generation error occurred'` |
+
+**接線方式：**
+```tsx
+// 在元件頂層加入
+const t = useTranslation('query');
+
+// 隱私提示框
+<strong>{t('nl_privacy_label')}</strong>{t('nl_privacy_body', { model: nlModel })}
+
+// 錯誤訊息（async callback 中可直接呼叫 t，因為 t 是穩定 useMemo 引用）
+setError(t('nl_generate_failed'));
+```
+
+**步驟：**
+- [ ] 8A-1：新增上述 5 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8A-2：在 NlQueryPanel.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串
+
+---
+
+### Phase 8B：HistoricalQaPanel.tsx i18n 接入（高優先）
+
+**問題：** `resources/js/inertia/components/QueryPlayground/HistoricalQaPanel.tsx` 無任何 `useTranslation` 呼叫。
+
+**已存在於 `en/query.php` 的 key（只需接線）：**
+
+| 元件中的中文字串 | 對應現有 key |
+|----------------|------------|
+| `請輸入您的歷史人物問題`（label） | `qa_placeholder` |
+| `例如：李白是什麼時代的人？…`（textarea placeholder） | `qa_example` |
+| `我已閱讀並同意上述隱私提示` | `qa_agree_privacy` |
+| `使用工具查詢資料庫（建議開啟）` | `qa_use_tools` |
+| `串流模式` | `qa_stream` |
+| `回答生成中…`（按鈕 loading 狀態） | `qa_answering` |
+| `📖 回答問題`（按鈕正常狀態） | `qa_ask` |
+| `取消` | `nl_cancel`（共用）或加 `qa_cancel` |
+| `📖 回答`（回答區標題） | `qa_answer` |
+| `▼ 隱藏詳細資訊` | `qa_hide_details` |
+| `▶ 顯示詳細資訊（SQL、證據來源）` | `qa_show_details` |
+| `使用的 SQL 查詢` | `qa_sql_used` |
+| `資料來源` | `qa_sources` |
+| `📋 資料庫` | `qa_db` |
+| `📚 模型補充` | `qa_model` |
+
+**需新增的 key：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `qa_privacy_label` | `'⚠ 隱私提示：'` | `'⚠ Privacy Notice:'` |
+| `qa_privacy_body` | `'此功能使用 AI 模型（:model）回答歷史人物問題。您的問題內容將傳送至 Google Gemini API 進行處理，並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。'` | `'This feature uses the AI model (:model) to answer historical questions. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
+| `qa_stream_failed` | `'無法讀取回應串流'` | `'Unable to read response stream'` |
+| `qa_failed` | `'問答生成失敗'` | `'Q&A generation failed'` |
+| `qa_error` | `'生成發生錯誤'` | `'Generation error occurred'` |
+| `qa_querying` | `'正在查詢資料庫並生成回答…'` | `'Querying database and generating answer…'` |
+
+**步驟：**
+- [ ] 8B-1：新增上述 6 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8B-2：在 HistoricalQaPanel.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串
+
+---
+
+### Phase 8C：QbeBuilder.tsx i18n 接入（高優先）
+
+**問題：** `resources/js/inertia/components/QueryPlayground/QbeBuilder.tsx` 無任何 `useTranslation` 呼叫。此元件字串最多，且大多數 key 尚不存在於翻譯檔中。
+
+**需新增至 zh-TW 與 en query.php 的 key（按元件中出現順序）：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `qbe_schema_failed` | `'Schema 載入失敗'` | `'Schema loading failed'` |
+| `qbe_notice_restored_draft` | `'已還原 :time 的 QBE 草稿'` | `'Restored QBE draft from :time'` |
+| `qbe_notice_saved` | `'已儲存目前版本（:time）'` | `'Saved current version (:time)'` |
+| `qbe_notice_saved_before_sql` | `'已儲存產生 SQL 前的版本（:time）'` | `'Saved version before SQL generation (:time)'` |
+| `qbe_notice_saved_before_reset` | `'已儲存重設前的版本（:time）'` | `'Saved version before reset (:time)'` |
+| `qbe_notice_restored_version` | `'已還原 :time 的版本'` | `'Restored version from :time'` |
+| `qbe_notice_cleared` | `'已清除 QBE 草稿與歷史紀錄'` | `'QBE draft and history cleared'` |
+| `qbe_autosave_hint` | `'QBE 草稿會自動儲存在目前瀏覽器，離開頁面後可回來繼續編輯。'` | `'QBE draft is auto-saved in your browser. You can return to continue editing after leaving the page.'` |
+| `qbe_last_saved` | `'最近儲存：:time'` | `'Last saved: :time'` |
+| `qbe_save_current` | `'儲存目前版本'` | `'Save current version'` |
+| `qbe_no_history` | `'-- 尚無歷史版本 --'` | `'-- No history versions --'` |
+| `qbe_select_history` | `'-- 選擇歷史版本 --'` | `'-- Select history version --'` |
+| `qbe_restore_version` | `'還原版本'` | `'Restore version'` |
+| `qbe_clear_history` | `'清除草稿與歷史'` | `'Clear draft and history'` |
+| `qbe_base_table` | `'主表 (Base Table)'` | `'Base Table'` |
+| `qbe_select_base_table` | `'-- 選擇主表 --'` | `'-- Select base table --'` |
+| `qbe_tables_group` | `'資料表'` | `'Tables'` |
+| `qbe_internal_tables_group` | `'內部表 (CBDB__)'` | `'Internal tables (CBDB__)'` |
+| `qbe_loading_schema` | `'載入 Schema 中…'` | `'Loading schema…'` |
+| `qbe_join_optional` | `'JOIN（可選）'` | `'JOIN (optional)'` |
+| `qbe_add_join` | `'+ 新增 JOIN'` | `'+ Add JOIN'` |
+| `qbe_select_join_table` | `'-- 選擇表 --'` | `'-- Select table --'` |
+| `qbe_join_alias_hint` | `'別名，例如 ALTNAME_DATA_2'` | `'Alias, e.g. ALTNAME_DATA_2'` |
+| `qbe_left_col` | `'-- 左欄位 --'` | `'-- Left column --'` |
+| `qbe_right_col` | `'-- 右欄位 --'` | `'-- Right column --'` |
+| `qbe_select_cols` | `'SELECT 欄位（不選則為 *）'` | `'SELECT columns (default: all *)'` |
+| `qbe_no_cols` | `'無可用欄位'` | `'No available columns'` |
+| `qbe_where_conditions` | `'WHERE 條件'` | `'WHERE conditions'` |
+| `qbe_add_condition` | `'+ 新增條件'` | `'+ Add condition'` |
+| `qbe_generate_sql_btn` | `'產生 SQL 並切換至 SQL 模式'` | `'Generate SQL and switch to SQL mode'` |
+
+> **注意：** 現有 `qbe_autosave` key（值為短句 `'QBE draft is auto-saved'`）與元件中實際顯示的完整句子不同，新增 `qbe_autosave_hint` key 使用完整句子；舊 key 不刪除（可能仍被其他地方使用）。
+
+**persistenceNotice 處理方式：** `persistenceNotice` 是一個狀態字串，在多個地方的 `setPersistenceNotice(...)` 中設定。由於 `t` 是穩定的 `useMemo` 引用，可以直接在 setter 呼叫中使用：
+```tsx
+const t = useTranslation('query');
+setPersistenceNotice(t('qbe_notice_saved', { time: formatSavedAt(savedAt) }));
+```
+
+**步驟：**
+- [ ] 8C-1：新增上述 30 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8C-2：在 QbeBuilder.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串（含 async callback 及 setter 中的字串）
+
+---
+
+### Phase 8D：OperationsController 字串翻譯（中優先）
+
+**問題：** `app/Http/Controllers/OperationsController.php` 中仍有硬編碼中文：
+
+| 位置 | 當前硬編碼 | 改用 |
+|------|-----------|------|
+| L651（page_title） | `'最近提案列表'` / `'最近操作記錄'` | `__('nav.recent_proposals')` / `__('nav.recent_operations')` |
+| L652（page_description） | `'最近提案列表'` / `'最近編輯列表'` | `__('operations.page_desc_proposals')` / `__('operations.page_desc_operations')` |
+| L670（flash error） | `'請登入後再試。'` | `__('operations.restore_login_required')` |
+| L675（flash error） | `'該用戶沒有權限，請聯絡管理員。'` | `__('operations.restore_permission_denied')` |
+| L681（flash warning） | `'該類操作暫不支援復原。'` | `__('operations.restore_not_supported')` |
+| L691（flash success） | `'恢復成功 @ '.Carbon::now()` | `__('operations.restore_success', ['time' => Carbon::now()])` |
+| L697（flash error） | `'恢復失敗：'.$e->getMessage().' @ '.Carbon::now()` | `__('operations.restore_failed', ['error' => $e->getMessage(), 'time' => Carbon::now()])` |
+| L710（RuntimeException） | `'尚未支援的操作類型'` | `__('operations.restore_unsupported_type')` |
+| L728（RuntimeException） | `'找不到可恢復的資料內容'` | `__('operations.restore_no_data')` |
+| L732（RuntimeException） | `'缺少主鍵條件，無法更新記錄'` | `__('operations.restore_no_pk')` |
+| L736（RuntimeException） | `'恢復內容經過過濾後為空'` | `__('operations.restore_empty_data')` |
+| L745（RuntimeException） | `'找不到可還原的刪除資料'` | `__('operations.restore_no_delete_data')` |
+
+**需新增至 `resources/lang/zh-TW/operations.php` 與 `resources/lang/en/operations.php` 的 key：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `page_desc_proposals` | `'最近提案列表'` | `'Recent Proposals'` |
+| `page_desc_operations` | `'最近編輯列表'` | `'Recent Edit History'` |
+| `restore_login_required` | `'請登入後再試。'` | `'Please log in first.'` |
+| `restore_permission_denied` | `'該用戶沒有權限，請聯絡管理員。'` | `'This user does not have permission. Please contact an administrator.'` |
+| `restore_not_supported` | `'該類操作暫不支援復原。'` | `'Revert is not supported for this operation type.'` |
+| `restore_success` | `'恢復成功 @ :time'` | `'Restore succeeded @ :time'` |
+| `restore_failed` | `'恢復失敗：:error @ :time'` | `'Restore failed: :error @ :time'` |
+| `restore_unsupported_type` | `'尚未支援的操作類型'` | `'Unsupported operation type'` |
+| `restore_no_data` | `'找不到可恢復的資料內容'` | `'No recoverable data found'` |
+| `restore_no_pk` | `'缺少主鍵條件，無法更新記錄'` | `'Missing primary key conditions, cannot update record'` |
+| `restore_empty_data` | `'恢復內容經過濾後為空'` | `'Recovered content is empty after filtering'` |
+| `restore_no_delete_data` | `'找不到可還原的刪除資料'` | `'No deleted data to restore'` |
+
+> **注意：** `nav.recent_operations` = `'Recent Changes'` 與 `nav.recent_proposals` = `'Recent Proposals'` 已存在，直接使用。  
+> RuntimeException 訊息會在 catch 中被 `$e->getMessage()` 取出，最終出現在 flash 訊息中（`restore_failed` 的 `:error` 參數）。若要讓錯誤訊息本身也翻譯，需要在 throw 前用 `__()` 包裝，並在 `restore_failed` 的英文值中只保留 `:error` 部分。
+
+**步驟：**
+- [ ] 8D-1：新增上述 12 個 lang key 至 zh-TW 與 en operations.php
+- [ ] 8D-2：更新 `OperationsController`（L651、L652、L670、L675、L681、L691、L697、L710、L728、L732、L736、L745）
+
+---
+
+### Phase 8 整體統計
+
+| Sub-phase | 優先 | 涉及檔案 | 說明 | 狀態 |
+|-----------|------|---------|------|------|
+| 8A NlQueryPanel.tsx | 高 | 1 component + 2 lang | 5 個新 key + 11 個現有 key 接線 | ☐ 待實施 |
+| 8B HistoricalQaPanel.tsx | 高 | 1 component + 2 lang | 6 個新 key + 15 個現有 key 接線 | ☐ 待實施 |
+| 8C QbeBuilder.tsx | 高 | 1 component + 2 lang | 30 個新 key，全部接線 | ☐ 待實施 |
+| 8D OperationsController | 中 | 1 controller + 2 lang | 12 個新 key，page title + flash 訊息 | ☐ 待實施 |
+
+> 掃描日期：2026-06-03。發現依據：https://input.cbdb.fas.harvard.edu/operations 和 /app/query-playground 的實際截圖。
 
 ---
 

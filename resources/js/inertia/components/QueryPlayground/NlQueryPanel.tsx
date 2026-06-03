@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ToolTracePanel, { type ToolCallTrace, type ToolResultSummary } from './ToolTracePanel';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface Props {
     nlModel: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generateFromNlStreamEndpoint, onSqlGenerated }: Props) {
+    const t = useTranslation('query');
     const [question, setQuestion] = useState('');
     const [consent, setConsent] = useState(false);
     const [useTools, setUseTools] = useState(true);
@@ -52,7 +54,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                 }
 
                 const reader = response.body?.getReader();
-                if (!reader) throw new Error('無法讀取回應串流');
+                if (!reader) throw new Error(t('nl_stream_failed'));
 
                 const decoder = new TextDecoder();
                 let buffer = '';
@@ -116,7 +118,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                 }
             } catch (err) {
                 if (err instanceof Error && err.name === 'AbortError') return;
-                setError(err instanceof Error ? err.message : '生成失敗');
+                setError(err instanceof Error ? err.message : t('nl_generate_failed'));
             } finally {
                 setLoading(false);
                 abortControllerRef.current = null;
@@ -136,7 +138,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
 
                 const data = await response.json();
                 if (!response.ok || !data.success) {
-                    throw new Error(data.error || '生成失敗');
+                    throw new Error(data.error || t('nl_generate_failed'));
                 }
 
                 setGeneratedSql(data.sql || '');
@@ -154,12 +156,12 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                     setToolCalls(traces);
                 }
             } catch (err) {
-                setError(err instanceof Error ? err.message : '生成失敗');
+                setError(err instanceof Error ? err.message : t('nl_generate_failed'));
             } finally {
                 setLoading(false);
             }
         }
-    }, [question, consent, useTools, useStreaming, generateFromNlEndpoint, generateFromNlStreamEndpoint]);
+    }, [question, consent, useTools, useStreaming, generateFromNlEndpoint, generateFromNlStreamEndpoint, t]);
 
     const handleStreamEvent = (event: string, data: Record<string, unknown>) => {
         switch (event) {
@@ -199,7 +201,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                 setExplanation(String(data.explanation || ''));
                 break;
             case 'error':
-                setError(String(data.error || '生成發生錯誤'));
+                setError(String(data.error || t('nl_generate_error')));
                 break;
         }
     };
@@ -221,18 +223,17 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                 fontSize: '0.85rem',
                 color: '#856404',
             }}>
-                <strong>⚠ 隱私提示：</strong>此功能使用 AI 模型（{nlModel}）生成 SQL。您的問題內容將傳送至 Google Gemini API 進行處理，
-                並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。
+                <strong>{t('nl_privacy_label')}</strong>{' '}{t('nl_privacy_body', { model: nlModel })}
             </div>
 
             <div style={{ marginBottom: 12 }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40', display: 'block', marginBottom: 4 }}>
-                    用自然語言描述您想查詢的內容
+                    {t('nl_query_placeholder')}
                 </label>
                 <textarea
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="例如：找出所有宋朝進士的姓名和籍貫"
+                    placeholder={t('nl_example')}
                     rows={3}
                     maxLength={1000}
                     disabled={loading}
@@ -255,15 +256,15 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
             <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                    我已閱讀並同意上述隱私提示
+                    {t('nl_agree_privacy')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={useTools} onChange={(e) => setUseTools(e.target.checked)} />
-                    使用工具輔助（可查看資料表結構）
+                    {t('nl_use_tools')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-                    串流模式
+                    {t('nl_stream')}
                 </label>
             </div>
 
@@ -283,7 +284,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                         cursor: loading || !question.trim() || !consent ? 'default' : 'pointer',
                     }}
                 >
-                    {loading ? '生成中…' : '🤖 生成 SQL'}
+                    {loading ? t('nl_generating') : t('nl_generate')}
                 </button>
                 {loading && (
                     <button
@@ -298,7 +299,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                             cursor: 'pointer',
                         }}
                     >
-                        取消
+                        {t('nl_cancel')}
                     </button>
                 )}
             </div>
@@ -332,7 +333,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40' }}>
-                            生成的 SQL
+                            {t('nl_generated_sql')}
                         </label>
                         <button
                             onClick={() => onSqlGenerated(generatedSql)}
@@ -347,7 +348,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                                 cursor: 'pointer',
                             }}
                         >
-                            ▶ 帶到 SQL 模式執行
+                            {t('nl_send_to_sql')}
                         </button>
                     </div>
                     <pre style={{
@@ -365,7 +366,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                     </pre>
                     {explanation && (
                         <div style={{ marginTop: 12, fontSize: '0.85rem', color: '#495057' }}>
-                            <strong>說明：</strong> {explanation}
+                            <strong>{t('nl_explanation')}</strong> {explanation}
                         </div>
                     )}
                 </div>

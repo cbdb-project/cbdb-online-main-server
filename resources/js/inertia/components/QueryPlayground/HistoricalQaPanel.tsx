@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ToolTracePanel, { type ToolCallTrace, type ToolResultSummary } from './ToolTracePanel';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface Evidence {
     type: 'database' | 'model_background';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answerFromNlStreamEndpoint }: Props) {
+    const t = useTranslation('query');
     const [question, setQuestion] = useState('');
     const [consent, setConsent] = useState(false);
     const [useTools, setUseTools] = useState(true);
@@ -67,7 +69,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 }
 
                 const reader = response.body?.getReader();
-                if (!reader) throw new Error('無法讀取回應串流');
+                if (!reader) throw new Error(t('qa_stream_failed'));
 
                 const decoder = new TextDecoder();
                 let buffer = '';
@@ -123,7 +125,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 }
             } catch (err) {
                 if (err instanceof Error && err.name === 'AbortError') return;
-                setError(err instanceof Error ? err.message : '問答生成失敗');
+                setError(err instanceof Error ? err.message : t('qa_failed'));
             } finally {
                 setLoading(false);
                 abortControllerRef.current = null;
@@ -143,7 +145,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
 
                 const data = await response.json();
                 if (!response.ok || !data.success) {
-                    throw new Error(data.error || '問答生成失敗');
+                    throw new Error(data.error || t('qa_failed'));
                 }
 
                 setAnswerMarkdown(data.answer_markdown || '');
@@ -164,12 +166,12 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     setToolCalls(traces);
                 }
             } catch (err) {
-                setError(err instanceof Error ? err.message : '問答生成失敗');
+                setError(err instanceof Error ? err.message : t('qa_failed'));
             } finally {
                 setLoading(false);
             }
         }
-    }, [question, consent, useTools, useStreaming, answerFromNlEndpoint, answerFromNlStreamEndpoint]);
+    }, [question, consent, useTools, useStreaming, answerFromNlEndpoint, answerFromNlStreamEndpoint, t]);
 
     const handleStreamEvent = (event: string, data: Record<string, unknown>) => {
         switch (event) {
@@ -190,8 +192,8 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 const resultSummary = (data.result_summary as ToolResultSummary) ?? undefined;
                 setToolCalls((prev) => {
                     const updated = [...prev];
-                    let idx = toolCallId ? updated.findLastIndex(t => t.tool_call_id === toolCallId) : -1;
-                    if (idx < 0) idx = updated.findLastIndex(t => t.status === 'running');
+                    let idx = toolCallId ? updated.findLastIndex(tc => tc.tool_call_id === toolCallId) : -1;
+                    if (idx < 0) idx = updated.findLastIndex(tc => tc.status === 'running');
                     if (idx >= 0) {
                         updated[idx] = {
                             ...updated[idx],
@@ -212,7 +214,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 setCaveat(String(data.caveat || ''));
                 break;
             case 'error':
-                setError(String(data.error || '問答生成發生錯誤'));
+                setError(String(data.error || t('qa_error')));
                 break;
         }
     };
@@ -234,19 +236,18 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 fontSize: '0.85rem',
                 color: '#856404',
             }}>
-                <strong>⚠ 隱私提示：</strong>此功能使用 AI 模型（{nlModel}）回答歷史人物問題。您的問題內容將傳送至 Google Gemini API 進行處理，
-                並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。
+                <strong>{t('qa_privacy_label')}</strong>{' '}{t('qa_privacy_body', { model: nlModel })}
             </div>
 
             {/* Question input */}
             <div style={{ marginBottom: 12 }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40', display: 'block', marginBottom: 4 }}>
-                    請輸入您的歷史人物問題
+                    {t('qa_placeholder')}
                 </label>
                 <textarea
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="例如：李白是什麼時代的人？王安石有哪些常見別名？韓愈與哪些人物有社會關係？"
+                    placeholder={t('qa_example')}
                     rows={3}
                     maxLength={1000}
                     disabled={loading}
@@ -269,15 +270,15 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                    我已閱讀並同意上述隱私提示
+                    {t('qa_agree_privacy')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={useTools} onChange={(e) => setUseTools(e.target.checked)} />
-                    使用工具查詢資料庫（建議開啟）
+                    {t('qa_use_tools')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-                    串流模式
+                    {t('qa_stream')}
                 </label>
             </div>
 
@@ -297,7 +298,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         cursor: loading || !question.trim() || !consent ? 'default' : 'pointer',
                     }}
                 >
-                    {loading ? '回答生成中…' : '📖 回答問題'}
+                    {loading ? t('qa_answering') : t('qa_ask')}
                 </button>
                 {loading && (
                     <button
@@ -312,7 +313,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             cursor: 'pointer',
                         }}
                     >
-                        取消
+                        {t('qa_cancel')}
                     </button>
                 )}
             </div>
@@ -339,7 +340,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             {loading && !answerMarkdown && toolCalls.length === 0 && (
                 <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
-                    正在查詢資料庫並生成回答…
+                    {t('qa_querying')}
                 </div>
             )}
 
@@ -353,7 +354,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     marginBottom: 16,
                 }}>
                     <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: '#212529' }}>
-                        📖 回答
+                        {t('qa_answer')}
                     </h4>
                     <div
                         style={{
@@ -396,7 +397,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             cursor: 'pointer',
                         }}
                     >
-                        {showDetails ? '▼ 隱藏詳細資訊' : '▶ 顯示詳細資訊（SQL、證據來源）'}
+                        {showDetails ? t('qa_hide_details') : t('qa_show_details')}
                     </button>
 
                     {showDetails && (
@@ -411,7 +412,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             {sqlUsed.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
                                     <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', display: 'block', marginBottom: 6 }}>
-                                        使用的 SQL 查詢
+                                        {t('qa_sql_used')}
                                     </label>
                                     {sqlUsed.map((sql, i) => (
                                         <pre key={i} style={{
@@ -435,7 +436,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             {evidence.length > 0 && (
                                 <div>
                                     <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', display: 'block', marginBottom: 6 }}>
-                                        資料來源
+                                        {t('qa_sources')}
                                     </label>
                                     {evidence.map((ev, i) => (
                                         <div key={i} style={{
@@ -454,7 +455,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                                                 backgroundColor: ev.type === 'database' ? '#d4edda' : '#cce5ff',
                                                 color: ev.type === 'database' ? '#155724' : '#004085',
                                             }}>
-                                                {ev.type === 'database' ? '📋 資料庫' : '📚 模型補充'}
+                                                {ev.type === 'database' ? t('qa_db') : t('qa_model')}
                                             </span>
                                             <strong>{ev.label}</strong>
                                             <span style={{ color: '#6c757d' }}>— {ev.detail}</span>

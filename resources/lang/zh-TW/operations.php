@@ -93,4 +93,19 @@ return [
     'status_label'          => '狀態',
     'person_label'          => '人物',
     'editor_placeholder'    => '名稱或 ID',
+
+    // Restore operation messages
+    'page_desc_proposals'        => '最近提案列表',
+    'page_desc_operations'       => '最近編輯列表',
+    'restore_login_required'     => '請登入後再試。',
+    'restore_permission_denied'  => '該用戶沒有權限，請聯絡管理員。',
+    'restore_not_supported'      => '該類操作暫不支援復原。',
+    'restore_success'            => '恢復成功 @ :time',
+    'restore_failed'             => '恢復失敗：:error @ :time',
+    'restore_unsupported_type'   => '尚未支援的操作類型',
+    'restore_no_data'            => '找不到可恢復的資料內容',
+    'restore_no_pk'              => '缺少主鍵條件，無法更新記錄',
+    'restore_empty_data'         => '恢復內容經過過濾後為空',
+    'restore_row_not_found'      => '無法找到要恢復的資料列',
+    'restore_no_delete_data'     => '找不到可還原的刪除資料',
 ];

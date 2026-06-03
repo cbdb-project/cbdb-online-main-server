@@ -1,187 +1,187 @@
-﻿# CBDB Online ä¸­è‹±æ–‡åˆ‡æ›ä»‹é¢ â€” å¯¦æ–½è¨ˆåŠƒ
+# CBDB Online 中英文切換介面 — 實施計劃
 
-**ç‹€æ…‹ï¼š** ðŸ”„ Phase 8 è¨ˆåŠƒä¸­ï¼ˆåˆ†æ”¯ï¼š`feature/i18n-phase8-react-components-operations`ï¼‰  
-**è¨ˆåŠƒæ—¥æœŸï¼š** 2026-06-01  
-**Phase 0â€“5 å®Œæˆï¼š** 2026-06-02  
-**Phase 6 å®Œæˆï¼š** 2026-06-02  
-**Phase 7 å®Œæˆï¼š** 2026-06-03  
-**Phase 8 è¨ˆåŠƒï¼š** 2026-06-03  
-**ä½œè€…ï¼š** AI å”ä½œè‰ç¨¿ï¼ˆçŽ‹å®ç”¦å¯©é–±ï¼‰
-
----
-
-## ç›®éŒ„
-
-1. [èƒŒæ™¯èˆ‡ç›®æ¨™](#1-èƒŒæ™¯èˆ‡ç›®æ¨™)
-2. [ç¾ç‹€åˆ†æž](#2-ç¾ç‹€åˆ†æž)
-3. [æ–¹æ¡ˆæ¯”è¼ƒèˆ‡é¸åž‹](#3-æ–¹æ¡ˆæ¯”è¼ƒèˆ‡é¸åž‹)
-4. [æŽ¨è–¦æž¶æ§‹è¨­è¨ˆ](#4-æŽ¨è–¦æž¶æ§‹è¨­è¨ˆ)
-5. [ç¿»è­¯è¡“èªžå°ç…§è¡¨](#5-ç¿»è­¯è¡“èªžå°ç…§è¡¨)
-6. [å¾…è¨Žè«–è¡“èªž](#6-å¾…è¨Žè«–è¡“èªž)
-7. [å¯¦æ–½è¨ˆåŠƒï¼ˆåˆ† Phaseï¼‰](#7-å¯¦æ–½è¨ˆåŠƒåˆ†-phase)
-8. [é¢¨éšªèˆ‡æ³¨æ„äº‹é …](#8-é¢¨éšªèˆ‡æ³¨æ„äº‹é …)
-9. [Phase 6ï¼šBlade è¦–åœ–å…¨é¢ç¿»è­¯](#9-phase-6blade-è¦–åœ–å…¨é¢ç¿»è­¯)
+**狀態：** 🔄 Phase 8 計劃中（分支：`feature/i18n-phase8-react-components-operations`）  
+**計劃日期：** 2026-06-01  
+**Phase 0–5 完成：** 2026-06-02  
+**Phase 6 完成：** 2026-06-02  
+**Phase 7 完成：** 2026-06-03  
+**Phase 8 計劃：** 2026-06-03  
+**作者：** AI 協作草稿（王宏甦審閱）
 
 ---
 
-## 1. èƒŒæ™¯èˆ‡ç›®æ¨™
+## 目錄
 
-CBDB Online ç›®å‰ä»‹é¢ä»¥ç¹é«”ä¸­æ–‡ç‚ºä¸»ï¼Œä½† CBDBï¼ˆä¸­åœ‹æ­·ä»£äººç‰©å‚³è¨˜è³‡æ–™åº«ï¼‰çš„ä½¿ç”¨è€…ç¾¤é«”è·¨è¶Šäºžæ´²ã€åŒ—ç¾Žã€æ­æ´²ç­‰åœ°ï¼Œè¨±å¤šéžä¸­æ–‡ä½¿ç”¨è€…éœ€è¦æ“ä½œé€™å¥—ç³»çµ±ã€‚
-
-**ç›®æ¨™ï¼š**
-- åœ¨ç¾æœ‰ä»‹é¢é ‚éƒ¨æˆ–å´æ¬„æ–°å¢žä¸€å€‹èªžè¨€åˆ‡æ›æŒ‰éˆ•ï¼ˆç¹é«”ä¸­æ–‡ â‡„ Englishï¼‰
-- åˆ‡æ›å¾Œé é¢æ›´æ–°ç¿»è­¯ï¼Œä¸éœ€å®Œæ•´é‡æ–°æ•´ç†é é¢
-- ä½¿ç”¨è€…èªžè¨€åå¥½ä»¥ session å„²å­˜ï¼Œè·¨é é¢ä¿æŒ
-- ç¿»è­¯è¡“èªžä»¥ FormLabels.xlsx åŠå…©ä»½ä½¿ç”¨è€…æ‰‹å†Šï¼ˆ2025/2026 ç‰ˆï¼‰ç‚ºä¾æ“šï¼Œç¢ºä¿è¡“èªžèˆ‡å­¸è¡“æ…£ä¾‹ä¸€è‡´
-
-**ç¯„åœï¼š**
-- å‰å°ä»‹é¢ï¼ˆBlade ç‰ˆé¢ + React/Inertia é é¢ï¼‰
-- å¾Œç«¯å›žå‚³çš„è¨Šæ¯ï¼ˆFlash è¨Šæ¯ã€é©—è­‰éŒ¯èª¤ç­‰ï¼‰
-- **ä¸åŒ…å«** è³‡æ–™åº«å…§å®¹æœ¬èº«ï¼ˆäººç‰©å§“åã€æœä»£åç­‰æ­·å²è³‡æ–™ä¸åšç¿»è­¯ï¼‰
+1. [背景與目標](#1-背景與目標)
+2. [現狀分析](#2-現狀分析)
+3. [方案比較與選型](#3-方案比較與選型)
+4. [推薦架構設計](#4-推薦架構設計)
+5. [翻譯術語對照表](#5-翻譯術語對照表)
+6. [待討論術語](#6-待討論術語)
+7. [實施計劃（分 Phase）](#7-實施計劃分-phase)
+8. [風險與注意事項](#8-風險與注意事項)
+9. [Phase 6：Blade 視圖全面翻譯](#9-phase-6blade-視圖全面翻譯)
 
 ---
 
-## 2. ç¾ç‹€åˆ†æž
+## 1. 背景與目標
 
-### 2.1 ç¾æœ‰ i18n åŸºç¤Ž
+CBDB Online 目前介面以繁體中文為主，但 CBDB（中國歷代人物傳記資料庫）的使用者群體跨越亞洲、北美、歐洲等地，許多非中文使用者需要操作這套系統。
 
-| é …ç›® | ç¾æ³ |
+**目標：**
+- 在現有介面頂部或側欄新增一個語言切換按鈕（繁體中文 ⇄ English）
+- 切換後頁面更新翻譯，不需完整重新整理頁面
+- 使用者語言偏好以 session 儲存，跨頁面保持
+- 翻譯術語以 FormLabels.xlsx 及兩份使用者手冊（2025/2026 版）為依據，確保術語與學術慣例一致
+
+**範圍：**
+- 前台介面（Blade 版面 + React/Inertia 頁面）
+- 後端回傳的訊息（Flash 訊息、驗證錯誤等）
+- **不包含** 資料庫內容本身（人物姓名、朝代名等歷史資料不做翻譯）
+
+---
+
+## 2. 現狀分析
+
+### 2.1 現有 i18n 基礎
+
+| 項目 | 現況 |
 |------|------|
-| `config/app.php` locale | è¨­ç‚º `'en'`ï¼Œä½† UI å…¨æ˜¯ç¹é«”ä¸­æ–‡ï¼ˆä¸ä¸€è‡´ï¼‰ |
-| `resources/lang/` | åªæœ‰ `en/`ï¼ˆauthã€validationã€paginationã€passwordsï¼‰ï¼Œç„¡ç¹é«”ä¸­æ–‡è³‡æ–™å¤¾ |
-| Blade å­—ä¸² | å…¨éƒ¨ç¡¬ç·¨ç¢¼ç¹é«”ä¸­æ–‡ï¼Œä¼°è¨ˆ 300â€“500 å€‹å­—ä¸² |
-| React/Inertia å­—ä¸² | å…¨éƒ¨ç¡¬ç·¨ç¢¼ç¹é«”ä¸­æ–‡ï¼Œä¼°è¨ˆ 150â€“200 å€‹å­—ä¸² |
-| HandleInertiaRequests | åªå…±äº« app version å’Œ auth userï¼Œç„¡ locale è³‡è¨Š |
-| Composer å¥—ä»¶ | ç„¡ä»»ä½• i18n å¥—ä»¶ |
-| npm å¥—ä»¶ | ç„¡ä»»ä½• i18n å¥—ä»¶ |
+| `config/app.php` locale | 設為 `'en'`，但 UI 全是繁體中文（不一致） |
+| `resources/lang/` | 只有 `en/`（auth、validation、pagination、passwords），無繁體中文資料夾 |
+| Blade 字串 | 全部硬編碼繁體中文，估計 300–500 個字串 |
+| React/Inertia 字串 | 全部硬編碼繁體中文，估計 150–200 個字串 |
+| HandleInertiaRequests | 只共享 app version 和 auth user，無 locale 資訊 |
+| Composer 套件 | 無任何 i18n 套件 |
+| npm 套件 | 無任何 i18n 套件 |
 
-### 2.2 å­—ä¸²åˆ†ä½ˆ
+### 2.2 字串分佈
 
-**Blade é‡é»žæ–‡ä»¶ï¼š**
-- `resources/views/layouts/sidebar-v3.blade.php`ï¼ˆ490 è¡Œï¼Œ~60 å€‹å°Žè¦½æ–‡å­—ï¼‰
-- `resources/views/layouts/header-v3.blade.php`ï¼ˆ87 è¡Œï¼Œå°‘é‡ UI æ–‡å­—ï¼‰
-- `resources/views/biogmains/`ï¼ˆ50+ å€‹äººç‰©ç·¨è¼¯è¡¨å–®ï¼‰
-- `resources/views/codes/`ï¼ˆä»£ç¢¼è¡¨ç®¡ç†ï¼‰
-- `resources/views/operations/`ï¼ˆæ“ä½œè¨˜éŒ„ï¼‰
+**Blade 重點文件：**
+- `resources/views/layouts/sidebar-v3.blade.php`（490 行，~60 個導覽文字）
+- `resources/views/layouts/header-v3.blade.php`（87 行，少量 UI 文字）
+- `resources/views/biogmains/`（50+ 個人物編輯表單）
+- `resources/views/codes/`（代碼表管理）
+- `resources/views/operations/`（操作記錄）
 
-**React/Inertia é‡é»žæ–‡ä»¶ï¼š**
-- `resources/js/inertia/Layouts/AppShell.tsx`ï¼ˆç³»çµ±æ¨™é¡Œï¼‰
-- `resources/js/inertia/components/PersonBrowser/`ï¼ˆ14 å€‹çµ„ä»¶ï¼‰
-- `resources/js/inertia/components/QueryPlayground/`ï¼ˆ8 å€‹çµ„ä»¶ï¼‰
-- `resources/js/inertia/Pages/`ï¼ˆ5 å€‹é é¢æ–‡ä»¶ï¼‰
+**React/Inertia 重點文件：**
+- `resources/js/inertia/Layouts/AppShell.tsx`（系統標題）
+- `resources/js/inertia/components/PersonBrowser/`（14 個組件）
+- `resources/js/inertia/components/QueryPlayground/`（8 個組件）
+- `resources/js/inertia/Pages/`（5 個頁面文件）
 
 ---
 
-## 3. æ–¹æ¡ˆæ¯”è¼ƒèˆ‡é¸åž‹
+## 3. 方案比較與選型
 
-### 3.1 å¾Œç«¯æ–¹æ¡ˆ
+### 3.1 後端方案
 
-| æ–¹æ¡ˆ | ç¶­è­·ç‹€æ…‹ | å„ªé»ž | ç¼ºé»ž | é©åˆåº¦ |
+| 方案 | 維護狀態 | 優點 | 缺點 | 適合度 |
 |------|----------|------|------|--------|
-| **Laravel å…§å»º i18n**ï¼ˆ`lang/` ç›®éŒ„ï¼‰ | æ¡†æž¶æ ¸å¿ƒï¼Œé•·æœŸç¶­è­· | é›¶å¤–éƒ¨ä¾è³´ï¼›Blade `__()` åŽŸç”Ÿæ”¯æ´ï¼›JSON æ ¼å¼å¯é¸ | ä¸å« URL è·¯ç”±å‰ç¶´ï¼›éœ€æ‰‹å‹•å‚³éžçµ¦ React | **â˜…â˜…â˜…â˜…â˜…** |
-| `mcamara/laravel-localization` | æ´»èºï¼ˆv2.4.0, 2026-03ï¼‰ | URL å‰ç¶´ï¼ˆ`/en/...`ï¼‰ï¼›SEO å‹å¥½ï¼›è‡ªå‹•è·¯ç”±ç”Ÿæˆ | ç„¡æ³•ä½¿ç”¨ `route:cache`ï¼›Inertia æ•´åˆè¤‡é›œï¼›å°ç´” session åˆ‡æ›åè€ŒéŽé‡ | **â˜…â˜…â˜…** |
-| `spatie/laravel-translation-loader` | è¼ƒå°‘æ›´æ–° | è³‡æ–™åº«é©…å‹•ï¼Œå¯ç†±æ›´æ–° | å­¸è¡“å·¥å…·ï¼Œç¿»è­¯å…§å®¹ç©©å®šï¼Œç„¡éœ€ç†±æ›´æ–°ï¼›å¢žåŠ  DB æŸ¥è©¢ | **â˜…â˜…** |
+| **Laravel 內建 i18n**（`lang/` 目錄） | 框架核心，長期維護 | 零外部依賴；Blade `__()` 原生支援；JSON 格式可選 | 不含 URL 路由前綴；需手動傳遞給 React | **★★★★★** |
+| `mcamara/laravel-localization` | 活躍（v2.4.0, 2026-03） | URL 前綴（`/en/...`）；SEO 友好；自動路由生成 | 無法使用 `route:cache`；Inertia 整合複雜；對純 session 切換反而過重 | **★★★** |
+| `spatie/laravel-translation-loader` | 較少更新 | 資料庫驅動，可熱更新 | 學術工具，翻譯內容穩定，無需熱更新；增加 DB 查詢 | **★★** |
 
-**å¾Œç«¯æ±ºç­–ï¼šä½¿ç”¨ Laravel å…§å»º i18n**ï¼Œä¸å¼•å…¥å¤–éƒ¨å¥—ä»¶ã€‚
+**後端決策：使用 Laravel 內建 i18n**，不引入外部套件。
 
-### 3.2 å‰ç«¯æ–¹æ¡ˆï¼ˆReact/Inertiaï¼‰
+### 3.2 前端方案（React/Inertia）
 
-| æ–¹æ¡ˆ | ç¶­è­·ç‹€æ…‹ | å„ªé»ž | ç¼ºé»ž | é©åˆåº¦ |
+| 方案 | 維護狀態 | 優點 | 缺點 | 適合度 |
 |------|----------|------|------|--------|
-| **Inertia shared data + è‡ªè¨‚ Hook** | Inertia æ ¸å¿ƒåŠŸèƒ½ | é›¶ä¾è³´ï¼›Laravel ç‚ºå–®ä¸€çœŸå¯¦ä¾†æºï¼›bundle å½±éŸ¿æ¥µå° | éœ€æ‰‹å‹•ç®¡ç†ç¿»è­¯ Key æ¸…å–®ï¼›ç„¡å…§å»ºè¤‡æ•¸è¦å‰‡ | **â˜…â˜…â˜…â˜…â˜…** |
-| `react-i18next` + `i18next` | æ´»èºï¼ˆv14.x, 2025ï¼‰ | æ¥­ç•Œæ¨™æº–ï¼›å®Œæ•´è¤‡æ•¸/æ’å€¼æ”¯æ´ | ç¿»è­¯èˆ‡ Laravel é‡è¤‡ç®¡ç†ï¼›bundle å¢žåŠ  50â€“60 KBï¼›å°æœ¬å°ˆæ¡ˆåé‡ | **â˜…â˜…â˜…** |
-| `eramitgupta/laravel-lang-sync-inertia` | è¼ƒæ–°ï¼ˆ2025 å¹´ï¼‰| è‡ªå‹•åŒæ­¥ Laravel lang è‡³ Inertia | ç¤¾ç¾¤å°ï¼›ç©©å®šæ€§å¾…é©—è­‰ | **â˜…â˜…â˜…** |
+| **Inertia shared data + 自訂 Hook** | Inertia 核心功能 | 零依賴；Laravel 為單一真實來源；bundle 影響極小 | 需手動管理翻譯 Key 清單；無內建複數規則 | **★★★★★** |
+| `react-i18next` + `i18next` | 活躍（v14.x, 2025） | 業界標準；完整複數/插值支援 | 翻譯與 Laravel 重複管理；bundle 增加 50–60 KB；對本專案偏重 | **★★★** |
+| `eramitgupta/laravel-lang-sync-inertia` | 較新（2025 年）| 自動同步 Laravel lang 至 Inertia | 社群小；穩定性待驗證 | **★★★** |
 
-**å‰ç«¯æ±ºç­–ï¼šInertia shared data + è‡ªè¨‚ `useTranslation()` Hook**ï¼Œä¸å¼•å…¥æ–° npm å¥—ä»¶ã€‚
+**前端決策：Inertia shared data + 自訂 `useTranslation()` Hook**，不引入新 npm 套件。
 
-### 3.3 Locale åˆ‡æ›æ©Ÿåˆ¶
+### 3.3 Locale 切換機制
 
-| æ©Ÿåˆ¶ | SEO | å¯¦ç¾è¤‡é›œåº¦ | Inertia å‹å¥½åº¦ |
+| 機制 | SEO | 實現複雜度 | Inertia 友好度 |
 |------|-----|------------|----------------|
-| URL å‰ç¶´ï¼ˆ`/en/...`ï¼‰ | æœ€ä½³ | é«˜ï¼ˆéœ€é‡æ–°ç”Ÿæˆè·¯ç”±ï¼‰ | ä¸€èˆ¬ï¼ˆéœ€å…¨é åˆ·æ–°ï¼‰ |
-| Query Stringï¼ˆ`?locale=en`ï¼‰ | æ™®é€š | ä½Ž | ä½³ |
-| **Session + Cookieï¼ˆæŽ¨è–¦ï¼‰** | æ™®é€š | ä½Ž | **æœ€ä½³**ï¼ˆInertia partial reloadï¼‰ |
+| URL 前綴（`/en/...`） | 最佳 | 高（需重新生成路由） | 一般（需全頁刷新） |
+| Query String（`?locale=en`） | 普通 | 低 | 佳 |
+| **Session + Cookie（推薦）** | 普通 | 低 | **最佳**（Inertia partial reload） |
 
-**åˆ‡æ›æ©Ÿåˆ¶æ±ºç­–ï¼šSession + Cookie å„²å­˜èªžè¨€åå¥½ï¼›åˆ‡æ›æ™‚ä»¥ `router.post('/locale')` è§¸ç™¼ä¸€æ¬¡ Inertia visitï¼ŒInertia v2 åœ¨ `back()` redirect å¾Œè‡ªå‹•æ›´æ–°æ‰€æœ‰ shared propsï¼ˆä¸éœ€è¦é¡å¤– `router.reload()`ï¼‰ã€‚**
+**切換機制決策：Session + Cookie 儲存語言偏好；切換時以 `router.post('/locale')` 觸發一次 Inertia visit，Inertia v2 在 `back()` redirect 後自動更新所有 shared props（不需要額外 `router.reload()`）。**
 
 ---
 
-## 4. æŽ¨è–¦æž¶æ§‹è¨­è¨ˆ
+## 4. 推薦架構設計
 
-### 4.1 ç›®éŒ„çµæ§‹
+### 4.1 目錄結構
 
 ```
 resources/lang/
-â”œâ”€â”€ en/
-â”‚   â”œâ”€â”€ common.php        # é€šç”¨æŒ‰éˆ•ã€æ¨™ç±¤ã€è¨Šæ¯
-â”‚   â”œâ”€â”€ nav.php           # å´æ¬„èˆ‡é ‚éƒ¨å°Žè¦½
-â”‚   â”œâ”€â”€ person.php        # äººç‰©ç›¸é—œæ¬„ä½èˆ‡å‹•ä½œ
-â”‚   â”œâ”€â”€ codes.php         # ä»£ç¢¼è¡¨é é¢
-â”‚   â”œâ”€â”€ views.php         # æª¢è¦–è¡¨é é¢
-â”‚   â”œâ”€â”€ query.php         # Query Playground
-â”‚   â”œâ”€â”€ operations.php    # æ“ä½œè¨˜éŒ„/ææ¡ˆ
-â”‚   â”œâ”€â”€ admin.php         # ç®¡ç†å“¡å·¥å…·ï¼ˆä½Žå„ªå…ˆï¼Œè¦‹ Â§5.10ï¼‰
-â”‚   â”œâ”€â”€ auth.php          # ï¼ˆå·²æœ‰ï¼Œä¿ç•™ï¼‰
-â”‚   â”œâ”€â”€ validation.php    # ï¼ˆå·²æœ‰ï¼Œä¿ç•™ï¼‰
-â”‚   â””â”€â”€ pagination.php    # ï¼ˆå·²æœ‰ï¼Œä¿ç•™ï¼‰
-â””â”€â”€ zh-TW/
-    â”œâ”€â”€ common.php
-    â”œâ”€â”€ nav.php
-    â”œâ”€â”€ person.php
-    â”œâ”€â”€ codes.php
-    â”œâ”€â”€ views.php
-    â”œâ”€â”€ query.php
-    â”œâ”€â”€ operations.php
-    â”œâ”€â”€ admin.php         # ä½Žå„ªå…ˆ
-    â”œâ”€â”€ auth.php
-    â”œâ”€â”€ validation.php
-    â””â”€â”€ pagination.php
+├── en/
+│   ├── common.php        # 通用按鈕、標籤、訊息
+│   ├── nav.php           # 側欄與頂部導覽
+│   ├── person.php        # 人物相關欄位與動作
+│   ├── codes.php         # 代碼表頁面
+│   ├── views.php         # 檢視表頁面
+│   ├── query.php         # Query Playground
+│   ├── operations.php    # 操作記錄/提案
+│   ├── admin.php         # 管理員工具（低優先，見 §5.10）
+│   ├── auth.php          # （已有，保留）
+│   ├── validation.php    # （已有，保留）
+│   └── pagination.php    # （已有，保留）
+└── zh-TW/
+    ├── common.php
+    ├── nav.php
+    ├── person.php
+    ├── codes.php
+    ├── views.php
+    ├── query.php
+    ├── operations.php
+    ├── admin.php         # 低優先
+    ├── auth.php
+    ├── validation.php
+    └── pagination.php
 ```
 
-> ç¹é«”ä¸­æ–‡ä½¿ç”¨ `zh-TW` ä½œç‚º locale keyï¼ˆç¬¦åˆ IETF BCP 47 æ¨™æº–ï¼‰ã€‚
+> 繁體中文使用 `zh-TW` 作為 locale key（符合 IETF BCP 47 標準）。
 
-### 4.2 å¾Œç«¯ Locale æµç¨‹
+### 4.2 後端 Locale 流程
 
 ```
-è«‹æ±‚é€²å…¥
-  â””â”€â”€ SetLocaleMiddleware
-        â”œâ”€â”€ è®€å– Session key 'locale'
-        â”œâ”€â”€ è‹¥ç„¡ï¼Œè®€å– Cookie 'locale'
-        â”œâ”€â”€ è‹¥ç„¡ï¼Œè®€å– Accept-Language headerï¼ˆå„ªå…ˆ zh-TW/zh â†’ zh-TWï¼›å…¶ä»– â†’ enï¼‰
-        â””â”€â”€ App::setLocale($locale)
+請求進入
+  └── SetLocaleMiddleware
+        ├── 讀取 Session key 'locale'
+        ├── 若無，讀取 Cookie 'locale'
+        ├── 若無，讀取 Accept-Language header（優先 zh-TW/zh → zh-TW；其他 → en）
+        └── App::setLocale($locale)
 
-åˆ‡æ›è«‹æ±‚ï¼ˆPOST /localeï¼‰
-  â””â”€â”€ LocaleController@switch
-        â”œâ”€â”€ é©—è­‰ locale âˆˆ ['zh-TW', 'en']
-        â”œâ”€â”€ Session::put('locale', $locale)
-        â”œâ”€â”€ Cookie::queue('locale', $locale, 525600)  // ä¸€å¹´
-        â””â”€â”€ return redirect()->back(fallback: url('/'))
-              // âš ï¸ åªå¯å›žå‚³ redirect()->back()ï¼Œä¸å¯ç”¨ Inertia::location()ï¼ˆå…¨é è·³è½‰ï¼‰ã€‚
-              // å¿…é ˆåŠ  fallback åƒæ•¸ï¼šè‹¥ Referer header éºå¤±ï¼ˆéš±ç§è¨­å®šã€proxy æ¸…é™¤ï¼‰ï¼Œ
-              //   back() æœƒéœé»˜é‡å°Žè‡³ /ï¼›æŒ‡å®š fallback: url('/') è®“è¡Œç‚ºæ˜Žç¢ºã€‚
-              // back() å° Blade è¡¨å–® POST â†’ 302 â†’ ç€è¦½å™¨è·Ÿéš¨ redirectï¼ˆæ­£å¸¸é‡æ•´ï¼‰ã€‚
-              // back() å° Inertia XHR POST â†’ 302 â†’ Inertia v2 è¦–ç‚ºä¸€æ¬¡ visitï¼Œ
-              //   è‡ªå‹•æ›´æ–°æ‰€æœ‰ shared propsï¼ˆå« localeã€translationsï¼‰ï¼Œä¿æŒ SPA æ¨¡å¼ã€‚
+切換請求（POST /locale）
+  └── LocaleController@switch
+        ├── 驗證 locale ∈ ['zh-TW', 'en']
+        ├── Session::put('locale', $locale)
+        ├── Cookie::queue('locale', $locale, 525600)  // 一年
+        └── return redirect()->back(fallback: url('/'))
+              // ⚠️ 只可回傳 redirect()->back()，不可用 Inertia::location()（全頁跳轉）。
+              // 必須加 fallback 參數：若 Referer header 遺失（隱私設定、proxy 清除），
+              //   back() 會靜默重導至 /；指定 fallback: url('/') 讓行為明確。
+              // back() 對 Blade 表單 POST → 302 → 瀏覽器跟隨 redirect（正常重整）。
+              // back() 對 Inertia XHR POST → 302 → Inertia v2 視為一次 visit，
+              //   自動更新所有 shared props（含 locale、translations），保持 SPA 模式。
 ```
 
-### 4.3 Inertia å…±äº«è³‡æ–™
+### 4.3 Inertia 共享資料
 
 ```php
-// app/Http/Middleware/HandleInertiaRequests.phpï¼ˆä¿®æ”¹å¾Œï¼‰
+// app/Http/Middleware/HandleInertiaRequests.php（修改後）
 public function share(Request $request): array {
     return array_merge(parent::share($request), [
         'app' => ['version' => get_app_version()],
         'auth' => [...],
         'locale' => app()->getLocale(),
-        // æ³¨æ„ï¼štrans('group') åƒ…åœ¨ lang/{locale}/group.php å­˜åœ¨æ™‚æ‰å›žå‚³ arrayã€‚
-        // è‹¥æª”æ¡ˆä¸å­˜åœ¨ï¼ŒLaravel å›žå‚³å­—ä¸² 'group'ï¼ˆfallback_locale å°æ•´æª”å–ç”¨ä¸ç”Ÿæ•ˆï¼‰ã€‚
-        // å› æ­¤ Phase 1 å»ºç«‹ zh-TW lang æª”ä¹‹å‰ï¼Œä¸å¯å°‡ locale åˆ‡æ›ç‚º zh-TWï¼ˆè¦‹ Â§7 Phase 0 æ³¨æ„ï¼‰ã€‚
-        // inertia-laravel ä»¥ array_mergeï¼ˆæ·ºåˆä½µï¼‰åˆå¹¶ shared props èˆ‡é é¢ propsã€‚
-        // è‹¥é é¢ props ä¹Ÿæœ‰ 'translations' keyï¼Œæœƒå®Œå…¨è¦†è“‹æ­¤è™•çš„ shared translationsï¼Œ
-        // å°Žè‡´ common/nav/person/query åœ¨è©²é æ¶ˆå¤±ã€‚
-        // âš ï¸ è§£æ±ºæ–¹æ¡ˆï¼šshared props å›ºå®šç”¨ 'translations' keyï¼›
-        //   é é¢ç‰¹å®šç¾¤çµ„ï¼ˆviews, codes, operationsï¼‰ç”±æŽ§åˆ¶å™¨ä»¥ç¨ç«‹ key å‚³å…¥ï¼Œ
-        //   ä¾‹å¦‚ 'page_translations'ï¼Œå‰ç«¯ä»¥ useTranslation() çš„ group åƒæ•¸å€åˆ†ã€‚
+        // 注意：trans('group') 僅在 lang/{locale}/group.php 存在時才回傳 array。
+        // 若檔案不存在，Laravel 回傳字串 'group'（fallback_locale 對整檔取用不生效）。
+        // 因此 Phase 1 建立 zh-TW lang 檔之前，不可將 locale 切換為 zh-TW（見 §7 Phase 0 注意）。
+        // inertia-laravel 以 array_merge（淺合併）合并 shared props 與頁面 props。
+        // 若頁面 props 也有 'translations' key，會完全覆蓋此處的 shared translations，
+        // 導致 common/nav/person/query 在該頁消失。
+        // ⚠️ 解決方案：shared props 固定用 'translations' key；
+        //   頁面特定群組（views, codes, operations）由控制器以獨立 key 傳入，
+        //   例如 'page_translations'，前端以 useTranslation() 的 group 參數區分。
         'translations' => [
             'common'     => (array) trans('common'),
             'nav'        => (array) trans('nav'),
@@ -192,9 +192,9 @@ public function share(Request $request): array {
 }
 ```
 
-> **é‡è¦ï¼š** `(array) trans('group')` æ˜¯é˜²ç¦¦æ€§åž‹åˆ¥è½‰æ›ã€‚PHP è¡Œç‚ºï¼š`(array) 'string'` ç”¢ç”Ÿ `[0 => 'string']`ï¼ˆç´¢å¼•é™£åˆ—ï¼‰ï¼Œ**ä¸æ˜¯ç©º dict**ã€‚ä½†å‰ç«¯çš„ `translations?.[group]?.[key]` ç”¨å­—ä¸² key æŸ¥è©¢æ™‚ï¼Œæ­¤é™£åˆ—ä¸­ä¸å­˜åœ¨å°æ‡‰ keyï¼Œæœƒå›žå‚³ `undefined` ä¸¦é€€åŒ–ç‚º key æœ¬èº«â€”â€”è¡Œç‚ºå®‰å…¨ï¼Œä¸æœƒå´©æ½°ã€‚æ ¹æœ¬è§£æ³•æ˜¯**å‹™å¿…åœ¨ Phase 1 å®Œæˆå¾Œæ‰åœ¨ç”Ÿç”¢ç’°å¢ƒå•Ÿç”¨ zh-TW locale**ï¼ˆè¦‹ Â§7 Phase 0 æ³¨æ„äº‹é …ï¼‰ã€‚
+> **重要：** `(array) trans('group')` 是防禦性型別轉換。PHP 行為：`(array) 'string'` 產生 `[0 => 'string']`（索引陣列），**不是空 dict**。但前端的 `translations?.[group]?.[key]` 用字串 key 查詢時，此陣列中不存在對應 key，會回傳 `undefined` 並退化為 key 本身——行為安全，不會崩潰。根本解法是**務必在 Phase 1 完成後才在生產環境啟用 zh-TW locale**（見 §7 Phase 0 注意事項）。
 
-### 4.4 React è‡ªè¨‚ Hook
+### 4.4 React 自訂 Hook
 
 ```typescript
 // resources/js/inertia/hooks/useTranslation.ts
@@ -205,17 +205,17 @@ type TranslationGroup = Record<string, string>;
 type Translations = Record<string, TranslationGroup>;
 
 interface PageProps {
-    translations?: Translations;       // shared propsï¼ˆHandleInertiaRequestsï¼‰
-    page_translations?: Translations;  // é é¢ç‰¹å®š propsï¼ˆå„æŽ§åˆ¶å™¨å‚³å…¥ï¼‰
+    translations?: Translations;       // shared props（HandleInertiaRequests）
+    page_translations?: Translations;  // 頁面特定 props（各控制器傳入）
 }
 
 export function useTranslation(group: string) {
     const { translations, page_translations } =
         usePage<PageProps>().props;
-    // å„ªå…ˆæŸ¥ page_translationsï¼ˆé é¢ç‰¹å®šï¼‰ï¼Œå†æŸ¥ shared translationsã€‚
-    // å…©è€…ä½¿ç”¨ä¸åŒ key æ˜¯ç‚ºäº†é¿å… inertia-laravel æ·ºåˆä½µæ™‚ shared props è¢«è¦†è“‹ã€‚
+    // 優先查 page_translations（頁面特定），再查 shared translations。
+    // 兩者使用不同 key 是為了避免 inertia-laravel 淺合併時 shared props 被覆蓋。
     const groupDict = page_translations?.[group] ?? translations?.[group];
-    // useMemo ç¢ºä¿ t å‡½å¼å¼•ç”¨ç©©å®šï¼Œé¿å…ä¸‹æ¸¸ useCallback/useEffect dep array æ¯æ¬¡å¤±æ•ˆã€‚
+    // useMemo 確保 t 函式引用穩定，避免下游 useCallback/useEffect dep array 每次失效。
     return useMemo(() => {
         return (key: string, replace?: Record<string, string>): string => {
             let value = groupDict?.[key] ?? key;
@@ -230,317 +230,317 @@ export function useTranslation(group: string) {
 }
 ```
 
-**ä½¿ç”¨æ–¹å¼ï¼š**
+**使用方式：**
 ```tsx
-// åœ¨ React çµ„ä»¶ä¸­
+// 在 React 組件中
 const t = useTranslation('person');
-<button>{t('edit_basic_info')}</button>  // è¼¸å‡ºï¼šEdit Basic Info / ç·¨è¼¯åŸºæœ¬ä¿¡æ¯
+<button>{t('edit_basic_info')}</button>  // 輸出：Edit Basic Info / 編輯基本信息
 ```
 
-### 4.5 èªžè¨€åˆ‡æ›æŒ‰éˆ•ä½ç½®
+### 4.5 語言切換按鈕位置
 
-æ”¾ç½®æ–¼ `header-v3.blade.php` é ‚éƒ¨å³å´ï¼Œç·Šé„°ç¾æœ‰æ·±è‰²æ¨¡å¼åˆ‡æ›æŒ‰éˆ•ï¼š
+放置於 `header-v3.blade.php` 頂部右側，緊鄰現有深色模式切換按鈕：
 
 ```html
-<!-- èªžè¨€åˆ‡æ›æŒ‰éˆ•ï¼ˆæ”¾åœ¨æ·±è‰²æ¨¡å¼æŒ‰éˆ•æ—ï¼‰ -->
+<!-- 語言切換按鈕（放在深色模式按鈕旁） -->
 <li class="nav-item">
     <form action="{{ route('locale.switch') }}" method="POST" style="display:inline">
         @csrf
         <input type="hidden" name="locale"
                value="{{ app()->getLocale() === 'zh-TW' ? 'en' : 'zh-TW' }}">
         <button type="submit" class="nav-link btn btn-link" title="Switch language">
-            {{ app()->getLocale() === 'zh-TW' ? 'EN' : 'ä¸­æ–‡' }}
+            {{ app()->getLocale() === 'zh-TW' ? 'EN' : '中文' }}
         </button>
     </form>
 </li>
 ```
 
-**âš ï¸ å…©å€‹ layout å„è‡ªè² è²¬å„è‡ªçš„åˆ‡æ›æŒ‰éˆ•ï¼š**
-- Blade é é¢ï¼ˆdashboardã€biogmainsã€codesã€operations ç­‰ï¼‰â†’ æŒ‰éˆ•åœ¨ `header-v3.blade.php`
-- Inertia é é¢ï¼ˆPersonBrowserã€QueryPlaygroundã€ViewTablesã€SearchByEntryï¼‰â†’ æŒ‰éˆ•åœ¨ `AppShell.tsx`ï¼ˆé€™äº›é é¢å®Œå…¨ä¸æ¸²æŸ“ `header-v3.blade.php`ï¼Œå®ƒå€‘ä½¿ç”¨ç¨ç«‹çš„ React layoutï¼‰
+**⚠️ 兩個 layout 各自負責各自的切換按鈕：**
+- Blade 頁面（dashboard、biogmains、codes、operations 等）→ 按鈕在 `header-v3.blade.php`
+- Inertia 頁面（PersonBrowser、QueryPlayground、ViewTables、SearchByEntry）→ 按鈕在 `AppShell.tsx`（這些頁面完全不渲染 `header-v3.blade.php`，它們使用獨立的 React layout）
 
-å° Inertia é é¢ï¼Œåˆ‡æ›æŒ‰éˆ•æ”¾åœ¨ `AppShell.tsx` ä¸¦ä½¿ç”¨ Inertia routerï¼š
+對 Inertia 頁面，切換按鈕放在 `AppShell.tsx` 並使用 Inertia router：
 
 ```tsx
-// åœ¨ AppShell.tsx çš„èªžè¨€åˆ‡æ›ï¼ˆInertia router ç‰ˆï¼‰
+// 在 AppShell.tsx 的語言切換（Inertia router 版）
 import { router, usePage } from '@inertiajs/react';
 
 const { locale } = usePage<{ locale: string }>().props;
 const switchLocale = () => {
     const next = locale === 'zh-TW' ? 'en' : 'zh-TW';
-    // LocaleController å›žå‚³ back()ï¼ˆInertia redirectï¼‰æ™‚ï¼ŒInertia v2 æœƒè‡ªå‹•å®Œæˆ
-    // ä¸€æ¬¡å®Œæ•´çš„ Inertia visit ä¸¦æ›´æ–°æ‰€æœ‰ shared propsï¼ˆå« translationsã€localeï¼‰ã€‚
-    // ä¸éœ€è¦åœ¨ onSuccess å†å‘¼å« router.reload()â€”â€”é‚£æœƒé€ æˆç¬¬äºŒæ¬¡å¤šé¤˜è«‹æ±‚ã€‚
+    // LocaleController 回傳 back()（Inertia redirect）時，Inertia v2 會自動完成
+    // 一次完整的 Inertia visit 並更新所有 shared props（含 translations、locale）。
+    // 不需要在 onSuccess 再呼叫 router.reload()——那會造成第二次多餘請求。
     router.post('/locale', { locale: next }, { preserveScroll: true });
-    // æ³¨æ„ï¼šLocaleController ä¸å¯å›žå‚³ Inertia::location()ï¼ˆå…¨é è·³è½‰ï¼‰ï¼Œ
-    // æ‡‰å›žå‚³ back()ï¼Œè®“ Inertia ä¿æŒ SPA æ¨¡å¼ä¸¦æ›´æ–° propsã€‚
+    // 注意：LocaleController 不可回傳 Inertia::location()（全頁跳轉），
+    // 應回傳 back()，讓 Inertia 保持 SPA 模式並更新 props。
 };
 ```
 
 ---
 
-## 5. ç¿»è­¯è¡“èªžå°ç…§è¡¨
+## 5. 翻譯術語對照表
 
-> **ä¾æ“šï¼š** FormLabels.xlsxï¼ˆä¸‰èªžå°ç…§è¡¨ï¼‰ã€è‹±æ–‡ç‰ˆç”¨æˆ¶æ‰‹å†Šï¼ˆ2026-04-13ï¼‰ã€ä¸­æ–‡ç‰ˆç”¨æˆ¶æ‰‹å†Šï¼ˆ2025 å¹´å¼µè‹¥æºªè­¯ã€çŽ‹å®ç”¦æ ¡ï¼‰
+> **依據：** FormLabels.xlsx（三語對照表）、英文版用戶手冊（2026-04-13）、中文版用戶手冊（2025 年張若溪譯、王宏甦校）
 >
-> **æ¨™è¨˜èªªæ˜Žï¼š** `[?]` = æœ‰ç–‘å•ï¼Œè¦‹ç¬¬ 6 ç¯€è¨Žè«–
+> **標記說明：** `[?]` = 有疑問，見第 6 節討論
 
-### 5.1 ç³»çµ±èˆ‡å°Žè¦½ï¼ˆnav.phpï¼‰
+### 5.1 系統與導覽（nav.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `app_title` | ä¸­åœ‹æ­·ä»£äººç‰©å‚³è¨˜è³‡æ–™åº« | China Biographical Database (CBDB) | å®˜æ–¹è‹±æ–‡å |
-| `app_title_short` | CBDB | CBDB | â€” |
-| `dashboard` | ç³»çµ±ç¸½è¦½ | Dashboard | â€” |
-| `person_editing` | äººç‰©ç·¨è¼¯ | Edit Person | â€” |
-| `recent_operations` | æœ€è¿‘æ“ä½œè¨˜éŒ„ | Recent Changes | â€” |
-| `recent_proposals` | æœ€è¿‘ææ¡ˆåˆ—è¡¨ | Recent Proposals | â€” |
-| `pending_review` | å¾…å¯©æ ¸ | Pending Review | â€” |
-| `crowdsourcing_records` | æœ€è¿‘çœ¾åŒ…éŒ„å…¥è¨˜éŒ„ | Recent Crowdsourcing Records | âœ“ |
-| `all_tables` | å…¨éƒ¨è¡¨æ ¼ | All Tables | â€” |
-| `all_tables_home` | å…¨éƒ¨è¡¨æ ¼é¦–é  | All Tables Home | â€” |
-| `views` | æª¢è¦–è¡¨ | Views | â€” |
-| `views_overview` | æª¢è¦–è¡¨ç¸½è¦½ | Views Overview | â€” |
-| `views_overview_new` | æª¢è¦–è¡¨ç¸½è¦½ï¼ˆæ–°ç‰ˆï¼‰ | Views Overview (New) | â€” |
-| `expert_tools` | å°ˆå®¶å·¥å…· | Expert Tools | â€” |
-| `sql_query_playground` | SQL æŸ¥è©¢ç·´ç¿’å ´ | SQL Query Playground | â€” |
-| `admin_only_tools` | éžå…¬é–‹å·¥å…· | Restricted Tools | âœ“ï¼ˆå´æ¬„ç„¡ç¨ç«‹æ¨™ç±¤ï¼Œåƒ…å­é …é¡¯ç¤ºï¼‰ |
-| `person_browser` | äººç‰©ç€è¦½ | Person Browser | â€” |
-| `search_by_entry` | æŒ‰å…¥ä»•æŸ¥è©¢ | Search by Entry Type | âœ“ |
-| `historical_maps` | æ­·å²åœ°åœ– | Historical Maps | â€” |
-| `admin_tools` | ç®¡ç†å“¡å·¥å…· | Admin Tools | â€” |
-| `user_management` | ç”¨æˆ¶ç®¡ç† | User Management | â€” |
-| `language_switch_to_en` | EN | EN | æŒ‰éˆ•æ¨™ç±¤ |
-| `language_switch_to_zh` | ä¸­æ–‡ | ä¸­æ–‡ | æŒ‰éˆ•æ¨™ç±¤ |
+| `app_title` | 中國歷代人物傳記資料庫 | China Biographical Database (CBDB) | 官方英文名 |
+| `app_title_short` | CBDB | CBDB | — |
+| `dashboard` | 系統總覽 | Dashboard | — |
+| `person_editing` | 人物編輯 | Edit Person | — |
+| `recent_operations` | 最近操作記錄 | Recent Changes | — |
+| `recent_proposals` | 最近提案列表 | Recent Proposals | — |
+| `pending_review` | 待審核 | Pending Review | — |
+| `crowdsourcing_records` | 最近眾包錄入記錄 | Recent Crowdsourcing Records | ✓ |
+| `all_tables` | 全部表格 | All Tables | — |
+| `all_tables_home` | 全部表格首頁 | All Tables Home | — |
+| `views` | 檢視表 | Views | — |
+| `views_overview` | 檢視表總覽 | Views Overview | — |
+| `views_overview_new` | 檢視表總覽（新版） | Views Overview (New) | — |
+| `expert_tools` | 專家工具 | Expert Tools | — |
+| `sql_query_playground` | SQL 查詢練習場 | SQL Query Playground | — |
+| `admin_only_tools` | 非公開工具 | Restricted Tools | ✓（側欄無獨立標籤，僅子項顯示） |
+| `person_browser` | 人物瀏覽 | Person Browser | — |
+| `search_by_entry` | 按入仕查詢 | Search by Entry Type | ✓ |
+| `historical_maps` | 歷史地圖 | Historical Maps | — |
+| `admin_tools` | 管理員工具 | Admin Tools | — |
+| `user_management` | 用戶管理 | User Management | — |
+| `language_switch_to_en` | EN | EN | 按鈕標籤 |
+| `language_switch_to_zh` | 中文 | 中文 | 按鈕標籤 |
 
-### 5.2 é€šç”¨æŒ‰éˆ•èˆ‡æ¨™ç±¤ï¼ˆcommon.phpï¼‰
+### 5.2 通用按鈕與標籤（common.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `save` | ä¿å­˜ | Save | â€” |
-| `confirm` | ç¢ºå®š | Confirm | â€” |
-| `cancel` | å–æ¶ˆ | Cancel | â€” |
-| `search` | æœå°‹ | Search | â€” |
-| `delete` | åˆªé™¤ | Delete | â€” |
-| `add` | æ–°å¢ž | Add | â€” |
-| `edit` | ç·¨è¼¯ | Edit | â€” |
-| `create` | å»ºç«‹ | Create | â€” |
-| `update` | æ›´æ–° | Update | â€” |
-| `reset` | é‡ç½® | Reset | â€” |
-| `close` | é—œé–‰ | Close | â€” |
-| `back` | è¿”å›ž | Back | â€” |
-| `submit` | æäº¤ | Submit | â€” |
-| `loading` | è¼‰å…¥ä¸­â€¦ | Loadingâ€¦ | â€” |
-| `no_data` | ç„¡è³‡æ–™ | No data | â€” |
-| `page_of` | ç¬¬ :current é ï¼Œå…± :total é  | Page :current of :total | â€” |
-| `profile_settings` | å€‹äººè¨­å®š | Profile Settings | â€” |
-| `sign_out` | ç™»å‡º | Sign out | â€” |
-| `dark_mode_toggle` | åˆ‡æ›æ·±è‰²æ¨¡å¼ | Toggle dark mode | â€” |
-| `home` | é¦–é  | Home | â€” |
-| `yes` | æ˜¯ | Yes | â€” |
-| `no` | å¦ | No | â€” |
+| `save` | 保存 | Save | — |
+| `confirm` | 確定 | Confirm | — |
+| `cancel` | 取消 | Cancel | — |
+| `search` | 搜尋 | Search | — |
+| `delete` | 刪除 | Delete | — |
+| `add` | 新增 | Add | — |
+| `edit` | 編輯 | Edit | — |
+| `create` | 建立 | Create | — |
+| `update` | 更新 | Update | — |
+| `reset` | 重置 | Reset | — |
+| `close` | 關閉 | Close | — |
+| `back` | 返回 | Back | — |
+| `submit` | 提交 | Submit | — |
+| `loading` | 載入中… | Loading… | — |
+| `no_data` | 無資料 | No data | — |
+| `page_of` | 第 :current 頁，共 :total 頁 | Page :current of :total | — |
+| `profile_settings` | 個人設定 | Profile Settings | — |
+| `sign_out` | 登出 | Sign out | — |
+| `dark_mode_toggle` | 切換深色模式 | Toggle dark mode | — |
+| `home` | 首頁 | Home | — |
+| `yes` | 是 | Yes | — |
+| `no` | 否 | No | — |
 
-### 5.3 äººç‰©è³‡æ–™æ¬„ä½ï¼ˆperson.phpï¼‰
+### 5.3 人物資料欄位（person.php）
 
-> å‡æºè‡ª FormLabels.xlsx çš„ `c_english`ã€`c_fanti` æ¬„ä½ã€‚
+> 均源自 FormLabels.xlsx 的 `c_english`、`c_fanti` 欄位。
 
-| Key | ç¹é«”ä¸­æ–‡ | English | FormLabels ä¾æ“š |
+| Key | 繁體中文 | English | FormLabels 依據 |
 |-----|---------|---------|----------------|
-| `person` | äººç‰© | Person | â€” |
-| `person_id` | äººç‰© ID | Person ID | â€” |
-| `full_name` | å…¨å | Full Name | `Full Name` |
-| `name` | å§“å | Name | â€” |
-| `alt_name` | åˆ¥å | Alternative Name | â€” |
-| `alt_name_type` | åˆ¥åé¡žåž‹ | Alt. Name Type | â€” |
-| `pinyin` | æ‹¼éŸ³ | Pinyin | â€” |
-| `gender` | æ€§åˆ¥ | Gender | â€” |
-| `female` | å¥³ | Female | `Female` |
-| `male` | ç”· | Male | â€” |
-| `birth_year` | ç”Ÿå¹´ | Birth Year | `Born` |
-| `death_year` | å’å¹´ | Death Year | `Died` |
-| `age_at_death` | äº«å¹´ | Age at Death | `Age at Death` |
-| `active_from` | åœ¨ä¸–å§‹å¹´ | Active From | `Active from` |
-| `active_until` | åœ¨ä¸–çµ‚å¹´ | Active Until | `Active until` |
-| `index_year` | æŒ‡æ•¸å¹´ | Index Year | `Index Year` |
-| `dynasty` | æœä»£ | Dynasty | `Dynasty` |
-| `choronym` | éƒ¡æœ› | Choronym | `Choronym` âœ“ |
-| `ethnicity` | ç¨®æ— | Ethnicity | `Ethnicity` |
-| `source` | å‡ºè™• | Source | `Source` |
-| `pages` | é ç¢¼/æ¢ç›® | Pages | `Pages`ï¼ˆé¿å…èˆ‡ `Entry`=å…¥ä»• æ··æ·†ï¼Œä¸å¯«æ–œç·šé›™ç¾©ï¼‰ |
-| `reign_year` | å¹´è™Ÿ | Reign Year | `Reign Year` âœ“ |
-| `tribe` | éƒ¨ã€æ— | Tribe | `Tribe` |
-| `basic_info` | åŸºæœ¬è³‡æ–™ | Basic Information | â€” |
-| `edit_basic_info` | ç·¨è¼¯åŸºæœ¬ä¿¡æ¯ | Edit Basic Information | â€” |
-| `delete_person` | åˆªé™¤äººç‰© | Delete Person | â€” |
-| `create_or_modify` | å»ºç«‹ / ä¿®æ”¹è³‡è¨Š | Create / Modify Information | â€” |
-| `search_person_placeholder` | æœå°‹äººç‰©ï¼ˆID / å§“å / æ‹¼éŸ³ï¼‰ | Search Person (ID / Name / Pinyin) | â€” |
+| `person` | 人物 | Person | — |
+| `person_id` | 人物 ID | Person ID | — |
+| `full_name` | 全名 | Full Name | `Full Name` |
+| `name` | 姓名 | Name | — |
+| `alt_name` | 別名 | Alternative Name | — |
+| `alt_name_type` | 別名類型 | Alt. Name Type | — |
+| `pinyin` | 拼音 | Pinyin | — |
+| `gender` | 性別 | Gender | — |
+| `female` | 女 | Female | `Female` |
+| `male` | 男 | Male | — |
+| `birth_year` | 生年 | Birth Year | `Born` |
+| `death_year` | 卒年 | Death Year | `Died` |
+| `age_at_death` | 享年 | Age at Death | `Age at Death` |
+| `active_from` | 在世始年 | Active From | `Active from` |
+| `active_until` | 在世終年 | Active Until | `Active until` |
+| `index_year` | 指數年 | Index Year | `Index Year` |
+| `dynasty` | 朝代 | Dynasty | `Dynasty` |
+| `choronym` | 郡望 | Choronym | `Choronym` ✓ |
+| `ethnicity` | 種族 | Ethnicity | `Ethnicity` |
+| `source` | 出處 | Source | `Source` |
+| `pages` | 頁碼/條目 | Pages | `Pages`（避免與 `Entry`=入仕 混淆，不寫斜線雙義） |
+| `reign_year` | 年號 | Reign Year | `Reign Year` ✓ |
+| `tribe` | 部、族 | Tribe | `Tribe` |
+| `basic_info` | 基本資料 | Basic Information | — |
+| `edit_basic_info` | 編輯基本信息 | Edit Basic Information | — |
+| `delete_person` | 刪除人物 | Delete Person | — |
+| `create_or_modify` | 建立 / 修改資訊 | Create / Modify Information | — |
+| `search_person_placeholder` | 搜尋人物（ID / 姓名 / 拼音） | Search Person (ID / Name / Pinyin) | — |
 
-### 5.4 äººç‰©é—œä¿‚æ¬„ä½ï¼ˆperson.php çºŒï¼‰
+### 5.4 人物關係欄位（person.php 續）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | FormLabels ä¾æ“š |
+| Key | 繁體中文 | English | FormLabels 依據 |
 |-----|---------|---------|----------------|
-| `kinship` | è¦ªå±¬é—œä¿‚ | Kinship | `Kinship` |
-| `associations` | ç¤¾æœƒé—œä¿‚ | Associations | `Associations` |
-| `assoc_type_friendship` | æœ‹å‹ | Friendship | `Friendship` |
-| `assoc_type_family` | å®¶åº­ | Family | `Family` |
-| `assoc_type_religion` | å®—æ•™ | Religion | `Religion` |
-| `assoc_type_finance` | è²¡å‹™ | Finance | `Finance` |
-| `assoc_type_medicine` | é†«ç™‚ | Medicine | `Medicine` |
-| `assoc_type_military` | è»äº‹ | Military | `Military` |
-| `assoc_type_scholarship` | å­¸è¡“ | Scholarship | `Scholarship` |
-| `assoc_type_teacher_student` | å¸«ç”Ÿé—œä¿‚ | Teacher-Student | `Teacher-Student` |
-| `assoc_type_scholarly_affiliation` | å­¸è¡“äº¤å¾€ | Scholarly Affiliation | `Scholarly Affiliation` |
-| `assoc_type_scholarly_topic` | ä¸»é¡Œç›¸è¿‘ | Scholarly Topic | `Scholarly Topic` |
-| `assoc_type_literary_artistic` | æ–‡å­¸è—è¡“äº¤å¾€ | Literary/Artistic Affiliations | `Literary / Artistic Affiliations` |
-| `assoc_type_politics` | æ”¿æ²» | Politics | `Politics` |
-| `assoc_type_equal_relation` | å®˜å ´å¹³ç­‰é—œä¿‚ | Equal Relations (Official Sphere) | `Equal Relations` |
-| `assoc_type_subordinate` | å®˜å ´ä¸‹å±¬é—œä¿‚ | Subordinate Relation | `Subordinate Relation` |
-| `assoc_type_superior` | å®˜å ´ä¸Šå¸é—œä¿‚ | Superior Relation | `Superior Relation` |
-| `assoc_type_recommendation` | è–¦èˆ‰ä¿ä»» | Recommendation/Sponsorship | `Recommendation / Sponsorship` |
-| `postings` | è·å®˜ | Postings | `Postings` |
-| `status` | ç¤¾æœƒå€åˆ† | Status | `Status` âœ“ |
-| `entry` | å…¥ä»• | Entry | `Entry` âœ“ |
-| `addresses` | åœ°å€ | Addresses | â€” |
-| `texts` | è‘—ä½œ | Texts | âœ“ |
-| `sources` | ä¾†æº | Sources | â€” |
-| `events` | äº‹ä»¶ | Events | â€” |
-| `possessions` | è²¡ç”¢ | Possessions | â€” |
+| `kinship` | 親屬關係 | Kinship | `Kinship` |
+| `associations` | 社會關係 | Associations | `Associations` |
+| `assoc_type_friendship` | 朋友 | Friendship | `Friendship` |
+| `assoc_type_family` | 家庭 | Family | `Family` |
+| `assoc_type_religion` | 宗教 | Religion | `Religion` |
+| `assoc_type_finance` | 財務 | Finance | `Finance` |
+| `assoc_type_medicine` | 醫療 | Medicine | `Medicine` |
+| `assoc_type_military` | 軍事 | Military | `Military` |
+| `assoc_type_scholarship` | 學術 | Scholarship | `Scholarship` |
+| `assoc_type_teacher_student` | 師生關係 | Teacher-Student | `Teacher-Student` |
+| `assoc_type_scholarly_affiliation` | 學術交往 | Scholarly Affiliation | `Scholarly Affiliation` |
+| `assoc_type_scholarly_topic` | 主題相近 | Scholarly Topic | `Scholarly Topic` |
+| `assoc_type_literary_artistic` | 文學藝術交往 | Literary/Artistic Affiliations | `Literary / Artistic Affiliations` |
+| `assoc_type_politics` | 政治 | Politics | `Politics` |
+| `assoc_type_equal_relation` | 官場平等關係 | Equal Relations (Official Sphere) | `Equal Relations` |
+| `assoc_type_subordinate` | 官場下屬關係 | Subordinate Relation | `Subordinate Relation` |
+| `assoc_type_superior` | 官場上司關係 | Superior Relation | `Superior Relation` |
+| `assoc_type_recommendation` | 薦舉保任 | Recommendation/Sponsorship | `Recommendation / Sponsorship` |
+| `postings` | 職官 | Postings | `Postings` |
+| `status` | 社會區分 | Status | `Status` ✓ |
+| `entry` | 入仕 | Entry | `Entry` ✓ |
+| `addresses` | 地址 | Addresses | — |
+| `texts` | 著作 | Texts | ✓ |
+| `sources` | 來源 | Sources | — |
+| `events` | 事件 | Events | — |
+| `possessions` | 財產 | Possessions | — |
 
-### 5.5 è‘—ä½œé¡žåž‹ï¼ˆperson.php çºŒï¼‰
+### 5.5 著作類型（person.php 續）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | FormLabels ä¾æ“š |
+| Key | 繁體中文 | English | FormLabels 依據 |
 |-----|---------|---------|----------------|
-| `text_type_commemorative` | è¨˜è©  | Commemorative Texts | `Commemorative Texts` |
-| `text_type_epitaph` | å¢“èªŒé¡ž | Epitaphs | `Epitaphs` |
-| `text_type_preface_postface` | åºè·‹ | Prefaces/Postfaces | `Prefaces / Postfaces` |
-| `text_type_biography` | å‚³è¨˜ | Biographical Texts | `Biographical Texts` |
-| `text_type_explanatory` | è«–èªª | Explanatory Texts | `Explanatory Texts` |
+| `text_type_commemorative` | 記詠 | Commemorative Texts | `Commemorative Texts` |
+| `text_type_epitaph` | 墓誌類 | Epitaphs | `Epitaphs` |
+| `text_type_preface_postface` | 序跋 | Prefaces/Postfaces | `Prefaces / Postfaces` |
+| `text_type_biography` | 傳記 | Biographical Texts | `Biographical Texts` |
+| `text_type_explanatory` | 論說 | Explanatory Texts | `Explanatory Texts` |
 
-### 5.6 ä»£ç¢¼è¡¨ï¼ˆcodes.phpï¼‰
+### 5.6 代碼表（codes.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `codes_home` | å…¨éƒ¨è¡¨æ ¼é¦–é  | Tables Home | â€” |
-| `addr_belongs_data` | åœ°å€å¾žå±¬è¡¨ | Address Hierarchy Table | â€” |
-| `addr_codes` | åœ°å€ç·¨ç¢¼è¡¨ | Address Codes | â€” |
-| `altname_codes` | åˆ¥åç·¨ç¢¼è¡¨ | Alternative Name Codes | â€” |
-| `appointment_codes` | ä»»å‘½é¡žåž‹ç·¨ç¢¼è¡¨ | Appointment Type Codes | â€” |
-| `office_codes` | ä»»å®˜ç·¨ç¢¼è¡¨ | Office Codes | â€” |
-| `social_institution_codes` | ç¤¾æœƒæ©Ÿæ§‹ç·¨ç¢¼è¡¨ | Social Institution Codes | â€” |
-| `text_codes` | è‘—ä½œç·¨ç¢¼è¡¨ | Text Codes | â€” |
-| `text_instance_data` | è‘—ä½œç‰ˆæœ¬è¡¨ | Text Instance Data | â€” |
+| `codes_home` | 全部表格首頁 | Tables Home | — |
+| `addr_belongs_data` | 地址從屬表 | Address Hierarchy Table | — |
+| `addr_codes` | 地址編碼表 | Address Codes | — |
+| `altname_codes` | 別名編碼表 | Alternative Name Codes | — |
+| `appointment_codes` | 任命類型編碼表 | Appointment Type Codes | — |
+| `office_codes` | 任官編碼表 | Office Codes | — |
+| `social_institution_codes` | 社會機構編碼表 | Social Institution Codes | — |
+| `text_codes` | 著作編碼表 | Text Codes | — |
+| `text_instance_data` | 著作版本表 | Text Instance Data | — |
 
-### 5.7 æª¢è¦–è¡¨ï¼ˆviews.phpï¼‰
+### 5.7 檢視表（views.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `view_altname_data` | åˆ¥åè³‡æ–™æª¢è¦– | Alternative Names View | â€” |
-| `view_assoc_data` | ç¤¾æœƒé—œä¿‚è³‡æ–™æª¢è¦– | Associations View | â€” |
-| `view_biog_addr_data` | äººç‰©åœ°å€è³‡æ–™æª¢è¦– | Person Addresses View | â€” |
-| `view_biog_inst_addr_data` | äººç‰©/ç¤¾æœƒæ©Ÿæ§‹/åœ°å€è³‡æ–™æª¢è¦– | Person / Institution / Address View | â€” |
-| `view_biog_inst_data` | äººç‰©ç¤¾æœƒæ©Ÿæ§‹è³‡æ–™æª¢è¦– | Person Social Institutions View | â€” |
-| `view_biog_source_data` | äººç‰©ä¾†æºè³‡æ–™æª¢è¦– | Person Sources View | â€” |
-| `view_biog_text_data` | äººç‰©è‘—ä½œè³‡æ–™æª¢è¦– | Person Texts View | â€” |
-| `view_entry_data` | äººç‰©å…¥ä»•è³‡æ–™æª¢è¦– | Person Entries View | â€” |
-| `view_event_addr_data` | äººç‰©äº‹ä»¶åœ°å€æª¢è¦– | Person Event Addresses View | â€” |
-| `view_events_data` | äººç‰©äº‹ä»¶è³‡æ–™æª¢è¦– | Person Events View | â€” |
-| `view_kin_addr_data` | äººç‰©è¦ªå±¬è³‡æ–™æª¢è¦– | Person Kinship View | â€” |
-| `view_people_data` | äººç‰©åŸºæœ¬è³‡æ–™æª¢è¦– | Person Basic Data View | â€” |
-| `view_people_addr_data` | äººç‰©ç´¢å¼•åœ°å€æª¢è¦– | Person Index Addresses View | â€” |
-| `view_possessions_addr_data` | äººç‰©è²¡ç”¢åœ°å€æª¢è¦– | Person Possessions Addresses View | â€” |
-| `view_possessions_data` | äººç‰©è²¡ç”¢è³‡æ–™æª¢è¦– | Person Possessions View | â€” |
-| `view_posting_addr_data` | ä»»å®˜åœ°å€è³‡æ–™æª¢è¦– | Posting Addresses View | â€” |
-| `view_posting_office_data` | ä»»å®˜è·å‹™è³‡æ–™æª¢è¦– | Posting Offices View | â€” |
-| `view_status_data` | äººç‰©èº«ä»½è³‡æ–™æª¢è¦– | Person Status View | â€” |
+| `view_altname_data` | 別名資料檢視 | Alternative Names View | — |
+| `view_assoc_data` | 社會關係資料檢視 | Associations View | — |
+| `view_biog_addr_data` | 人物地址資料檢視 | Person Addresses View | — |
+| `view_biog_inst_addr_data` | 人物/社會機構/地址資料檢視 | Person / Institution / Address View | — |
+| `view_biog_inst_data` | 人物社會機構資料檢視 | Person Social Institutions View | — |
+| `view_biog_source_data` | 人物來源資料檢視 | Person Sources View | — |
+| `view_biog_text_data` | 人物著作資料檢視 | Person Texts View | — |
+| `view_entry_data` | 人物入仕資料檢視 | Person Entries View | — |
+| `view_event_addr_data` | 人物事件地址檢視 | Person Event Addresses View | — |
+| `view_events_data` | 人物事件資料檢視 | Person Events View | — |
+| `view_kin_addr_data` | 人物親屬資料檢視 | Person Kinship View | — |
+| `view_people_data` | 人物基本資料檢視 | Person Basic Data View | — |
+| `view_people_addr_data` | 人物索引地址檢視 | Person Index Addresses View | — |
+| `view_possessions_addr_data` | 人物財產地址檢視 | Person Possessions Addresses View | — |
+| `view_possessions_data` | 人物財產資料檢視 | Person Possessions View | — |
+| `view_posting_addr_data` | 任官地址資料檢視 | Posting Addresses View | — |
+| `view_posting_office_data` | 任官職務資料檢視 | Posting Offices View | — |
+| `view_status_data` | 人物身份資料檢視 | Person Status View | — |
 
-### 5.8 Query Playgroundï¼ˆquery.phpï¼‰
+### 5.8 Query Playground（query.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `query_playground_title` | SQL æŸ¥è©¢ç·´ç¿’å ´ | SQL Query Playground | â€” |
-| `mode_sql` | SQL æŸ¥è©¢ | SQL Query | â€” |
-| `mode_qbe` | æŸ¥è©¢è¨­è¨ˆ (QBE) | Query Builder (QBE) | â€” |
-| `nl_query_placeholder` | ç”¨è‡ªç„¶èªžè¨€æè¿°æ‚¨æƒ³æŸ¥è©¢çš„å…§å®¹ | Describe what you want to query in natural language | â€” |
-| `sql_editor_placeholder` | è¼¸å…¥ SQL æŸ¥è©¢èªžå¥ | Enter SQL query | â€” |
-| `querying` | æŸ¥è©¢ä¸­â€¦ | Queryingâ€¦ | â€” |
-| `run_query` | â–¶ åŸ·è¡ŒæŸ¥è©¢ | â–¶ Run Query | â€” |
-| `no_results_yet` | å°šç„¡æŸ¥è©¢çµæžœ | No results yet | â€” |
-| `empty_results` | æŸ¥è©¢çµæžœç‚ºç©º | Query returned no results | â€” |
-| `qbe_autosave` | QBE è‰ç¨¿æœƒè‡ªå‹•å„²å­˜ | QBE draft is auto-saved | â€” |
-| `account_inactive` | æ‚¨çš„å¸³è™Ÿå°šæœªå•Ÿç”¨ï¼Œç„¡æ³•ä½¿ç”¨æ­¤åŠŸèƒ½ã€‚ | Your account is not yet activated. | å¾Œç«¯ Flash è¨Šæ¯ |
-| `historical_qa_log_note` | ä¸¦æœƒè¨˜éŒ„æŸ¥è©¢æ—¥èªŒ | Query logs will be recorded | â€” |
+| `query_playground_title` | SQL 查詢練習場 | SQL Query Playground | — |
+| `mode_sql` | SQL 查詢 | SQL Query | — |
+| `mode_qbe` | 查詢設計 (QBE) | Query Builder (QBE) | — |
+| `nl_query_placeholder` | 用自然語言描述您想查詢的內容 | Describe what you want to query in natural language | — |
+| `sql_editor_placeholder` | 輸入 SQL 查詢語句 | Enter SQL query | — |
+| `querying` | 查詢中… | Querying… | — |
+| `run_query` | ▶ 執行查詢 | ▶ Run Query | — |
+| `no_results_yet` | 尚無查詢結果 | No results yet | — |
+| `empty_results` | 查詢結果為空 | Query returned no results | — |
+| `qbe_autosave` | QBE 草稿會自動儲存 | QBE draft is auto-saved | — |
+| `account_inactive` | 您的帳號尚未啟用，無法使用此功能。 | Your account is not yet activated. | 後端 Flash 訊息 |
+| `historical_qa_log_note` | 並會記錄查詢日誌 | Query logs will be recorded | — |
 
-### 5.9 æ“ä½œè¨˜éŒ„èˆ‡ææ¡ˆï¼ˆoperations.phpï¼‰
+### 5.9 操作記錄與提案（operations.php）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `operations_title` | æ“ä½œè¨˜éŒ„ | Operations | â€” |
-| `proposals_title` | ææ¡ˆåˆ—è¡¨ | Proposals | â€” |
-| `pending_review` | å¾…å¯©æ ¸ | Pending Review | â€” |
-| `proposal_create` | å»ºç«‹ææ¡ˆ | Create Proposal | â€” |
-| `proposal_update` | æ›´æ–°ææ¡ˆ | Update Proposal | â€” |
-| `approved` | å·²æ‰¹å‡† | Approved | â€” |
-| `rejected` | å·²æ‹’çµ• | Rejected | â€” |
-| `crowdsourcing` | çœ¾åŒ…éŒ„å…¥ | Crowdsourcing | [?] |
+| `operations_title` | 操作記錄 | Operations | — |
+| `proposals_title` | 提案列表 | Proposals | — |
+| `pending_review` | 待審核 | Pending Review | — |
+| `proposal_create` | 建立提案 | Create Proposal | — |
+| `proposal_update` | 更新提案 | Update Proposal | — |
+| `approved` | 已批准 | Approved | — |
+| `rejected` | 已拒絕 | Rejected | — |
+| `crowdsourcing` | 眾包錄入 | Crowdsourcing | [?] |
 
-### 5.10 ç®¡ç†å“¡å·¥å…·ï¼ˆadmin.phpï¼Œä½Žå„ªå…ˆï¼‰
+### 5.10 管理員工具（admin.php，低優先）
 
-| Key | ç¹é«”ä¸­æ–‡ | English | å‚™è¨» |
+| Key | 繁體中文 | English | 備註 |
 |-----|---------|---------|------|
-| `batch_load_books` | æ‰¹æ¬¡è¼‰å…¥æ›¸ç±æ¨™é¡Œ | Batch Load Book Titles | â€” |
-| `batch_load_offices` | æ‰¹æ¬¡è¼‰å…¥å®˜è· | Batch Load Offices | â€” |
-| `wiki_maintenance` | ç¶­åŸºç¶­è­· | Wiki Maintenance | â€” |
-| `table_maintenance` | è¡¨æ ¼ç¶­è­· | Table Maintenance | â€” |
-| `audit_logs` | ç¨½æ ¸æ—¥èªŒ | Audit Logs | â€” |
-| `ai_fill_logs` | AI å¡«å……æ—¥èªŒ | AI Fill Logs | â€” |
+| `batch_load_books` | 批次載入書籍標題 | Batch Load Book Titles | — |
+| `batch_load_offices` | 批次載入官職 | Batch Load Offices | — |
+| `wiki_maintenance` | 維基維護 | Wiki Maintenance | — |
+| `table_maintenance` | 表格維護 | Table Maintenance | — |
+| `audit_logs` | 稽核日誌 | Audit Logs | — |
+| `ai_fill_logs` | AI 填充日誌 | AI Fill Logs | — |
 
 ---
 
-## 6. è¡“èªžç¢ºèªè¨˜éŒ„
+## 6. 術語確認記錄
 
-ä»¥ä¸‹è¡“èªžå·²æ–¼ 2026-06-01 èˆ‡çŽ‹å®ç”¦ç¢ºèªï¼Œå¯ç›´æŽ¥é€²å…¥å¯¦æ–½ã€‚
+以下術語已於 2026-06-01 與王宏甦確認，可直接進入實施。
 
-| # | ç¹é«”ä¸­æ–‡ | æœ€çµ‚è‹±æ–‡è­¯å | èªªæ˜Ž |
+| # | 繁體中文 | 最終英文譯名 | 說明 |
 |---|---------|------------|------|
-| 6.1 | éƒ¡æœ› | **Choronym** | èˆ‡ Harvard CBDB è‹±æ–‡ç‰ˆåŠç”¨æˆ¶æ‰‹å†Šä¸€è‡´ |
-| 6.2 | å…¥ä»• | **Entry** | çµ±ä¸€ç”¨ `Entry`ï¼Œæ²¿ç”¨ FormLabelsï¼›ä¸åœ¨ä¸åŒèªžå¢ƒåˆ†ç”¨ Government Entry |
-| 6.3 | ç¤¾æœƒå€åˆ† | **Status** | ä»‹é¢çµ±ä¸€ç”¨ `Status`ï¼ˆFormLabels æ¨™æº–ï¼‰ |
-| 6.4 | è‘—ä½œ | **Texts** | èˆ‡ Harvard CBDB è‹±æ–‡ç‰ˆä¸€è‡´ï¼›`Writings` èªžç¾©åçª„ |
-| 6.5 | çœ¾åŒ…éŒ„å…¥ | **Crowdsourcing** | ç³»çµ±åŠŸèƒ½ç”¨èªž |
-| 6.6 | æŒ‰å…¥ä»•æŸ¥è©¢ | **Search by Entry Type** | é¿å…èˆ‡ã€Œè¨˜éŒ„æ¢ç›®ã€çš„ Entry æ··æ·† |
-| 6.7 | éžå…¬é–‹å·¥å…·ï¼ˆå´æ¬„ç¾¤çµ„ï¼‰ | ç„¡ç¨ç«‹æ¨™ç±¤ | ç¶­æŒç¾è¡Œï¼šç„¡çˆ¶é¸å–®æ¨™ç±¤ï¼Œå­é …ç›´æŽ¥é¡¯ç¤º |
-| 6.8 | å¹´è™Ÿ | **Reign Year** | æ²¿ç”¨ FormLabelsï¼›è¡¨ç¤ºã€ŒæŸå¹´è™Ÿä¸‹çš„å¹´ä»½ã€è€Œéžå¹´è™Ÿæœ¬èº« |
+| 6.1 | 郡望 | **Choronym** | 與 Harvard CBDB 英文版及用戶手冊一致 |
+| 6.2 | 入仕 | **Entry** | 統一用 `Entry`，沿用 FormLabels；不在不同語境分用 Government Entry |
+| 6.3 | 社會區分 | **Status** | 介面統一用 `Status`（FormLabels 標準） |
+| 6.4 | 著作 | **Texts** | 與 Harvard CBDB 英文版一致；`Writings` 語義偏窄 |
+| 6.5 | 眾包錄入 | **Crowdsourcing** | 系統功能用語 |
+| 6.6 | 按入仕查詢 | **Search by Entry Type** | 避免與「記錄條目」的 Entry 混淆 |
+| 6.7 | 非公開工具（側欄群組） | 無獨立標籤 | 維持現行：無父選單標籤，子項直接顯示 |
+| 6.8 | 年號 | **Reign Year** | 沿用 FormLabels；表示「某年號下的年份」而非年號本身 |
 
 ---
 
-## 7. å¯¦æ–½è¨ˆåŠƒï¼ˆåˆ† Phaseï¼‰
+## 7. 實施計劃（分 Phase）
 
-### Phase 0ï¼šåŸºç¤Žè¨­æ–½ï¼ˆç´„ 2 å¤©ï¼‰
+### Phase 0：基礎設施（約 2 天）
 
-- [ ] ä¿®æ”¹ `config/app.php`ï¼šlocale æ”¹ç‚º `zh-TW`ï¼ˆèˆ‡ç¾æœ‰ UI ä¸€è‡´ï¼‰ï¼ŒåŠ å…¥ `'available_locales' => ['zh-TW', 'en']`ï¼ˆè‡ªè¨‚ keyï¼Œéœ€åœ¨ SetLocaleMiddleware ä¸­ä»¥ `config('app.available_locales')` è®€å–ï¼‰
-  - **âš ï¸ æ³¨æ„ï¼š** locale æ”¹ç‚º zh-TW å¾Œï¼Œè‹¥ `lang/zh-TW/` ç›®éŒ„å°šæœªå»ºç«‹ï¼Œ`trans('group')` æ•´æª”å–ç”¨æœƒå›žå‚³å­—ä¸²è€Œéž arrayï¼ˆ`fallback_locale` åƒ…å°é»žè¨˜æ³• key ç”Ÿæ•ˆï¼‰ã€‚**Phase 0 éƒ¨ç½²å¾Œè«‹ç«‹å³æš«åœï¼Œç­‰ Phase 1 å®Œæˆ lang/zh-TW/ å…¨éƒ¨æª”æ¡ˆå¾Œå†å•Ÿç”¨ zh-TW localeã€‚**
-- [ ] å»ºç«‹ `app/Http/Middleware/SetLocaleMiddleware.php`
-- [ ] åœ¨ `app/Http/Kernel.php` çš„ `$middlewareGroups['web']` ä¸­æ³¨å†Š `SetLocaleMiddleware`ï¼ˆæœ¬å°ˆæ¡ˆä½¿ç”¨ Laravel 8.x èˆŠå¼ bootstrapï¼Œ**ä¸æ”¯æ´** L11+ çš„ `bootstrap/app.php â†’withMiddleware()` APIï¼‰
-  - **âš ï¸ é †åºï¼š** å¿…é ˆæ”¾åœ¨ `StartSession::class` **ä¹‹å¾Œ**ï¼ˆå¦å‰‡ `Session::get('locale')` è®€åˆ°çš„æ˜¯æœªå•Ÿå‹•çš„ sessionï¼Œæ°¸é å›žå‚³ nullï¼‰ã€‚å»ºè­°æ’åœ¨ `ShareErrorsFromSession::class` ä¹‹å‰ã€‚
-- [ ] å»ºç«‹ `app/Http/Controllers/LocaleController.php`ï¼ˆPOST `/locale`ï¼‰
-- [ ] æ–°å¢žè·¯ç”±ï¼š`Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch')`
-  - **âš ï¸ ä½ç½®ï¼š** å¿…é ˆæ”¾åœ¨ `routes/web.php` çš„ `auth` middleware group **ä¹‹å¤–**ï¼ˆè®“è¨ªå®¢åœ¨ç™»å…¥é ä¹Ÿèƒ½åˆ‡æ›èªžè¨€ï¼‰ã€‚æ”¾åœ¨ `Route::middleware(['auth'])->group(...)` å…§éƒ¨æœƒå°Žè‡´ guest æ”¶åˆ° 302 é‡å°Žè‡³ `/login`ï¼Œåˆ‡æ›éœé»˜å¤±æ•—ã€‚
-  - **âš ï¸ CSRFï¼š** Inertia çš„ `router.post()` è‡ªå‹•å¸¶ X-XSRF-TOKENï¼›Blade çš„ `<form>` å¸¶ `@csrf`ã€‚**ä¸è¦å°‡ `/locale` åŠ å…¥ `VerifyCsrfToken::$except`**ï¼Œå¦å‰‡ç§»é™¤ CSRF ä¿è­·ï¼Œå…è¨±ä»»æ„ç«™é»žéœé»˜åˆ‡æ›ä½¿ç”¨è€…èªžè¨€åå¥½ã€‚
-- [ ] ä¿®æ”¹ `HandleInertiaRequests::share()` åŠ å…¥ `locale` å’Œ `translations`
-- [ ] å»ºç«‹ `resources/js/inertia/hooks/useTranslation.ts`
+- [ ] 修改 `config/app.php`：locale 改為 `zh-TW`（與現有 UI 一致），加入 `'available_locales' => ['zh-TW', 'en']`（自訂 key，需在 SetLocaleMiddleware 中以 `config('app.available_locales')` 讀取）
+  - **⚠️ 注意：** locale 改為 zh-TW 後，若 `lang/zh-TW/` 目錄尚未建立，`trans('group')` 整檔取用會回傳字串而非 array（`fallback_locale` 僅對點記法 key 生效）。**Phase 0 部署後請立即暫停，等 Phase 1 完成 lang/zh-TW/ 全部檔案後再啟用 zh-TW locale。**
+- [ ] 建立 `app/Http/Middleware/SetLocaleMiddleware.php`
+- [ ] 在 `app/Http/Kernel.php` 的 `$middlewareGroups['web']` 中注冊 `SetLocaleMiddleware`（本專案使用 Laravel 8.x 舊式 bootstrap，**不支援** L11+ 的 `bootstrap/app.php →withMiddleware()` API）
+  - **⚠️ 順序：** 必須放在 `StartSession::class` **之後**（否則 `Session::get('locale')` 讀到的是未啟動的 session，永遠回傳 null）。建議插在 `ShareErrorsFromSession::class` 之前。
+- [ ] 建立 `app/Http/Controllers/LocaleController.php`（POST `/locale`）
+- [ ] 新增路由：`Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch')`
+  - **⚠️ 位置：** 必須放在 `routes/web.php` 的 `auth` middleware group **之外**（讓訪客在登入頁也能切換語言）。放在 `Route::middleware(['auth'])->group(...)` 內部會導致 guest 收到 302 重導至 `/login`，切換靜默失敗。
+  - **⚠️ CSRF：** Inertia 的 `router.post()` 自動帶 X-XSRF-TOKEN；Blade 的 `<form>` 帶 `@csrf`。**不要將 `/locale` 加入 `VerifyCsrfToken::$except`**，否則移除 CSRF 保護，允許任意站點靜默切換使用者語言偏好。
+- [ ] 修改 `HandleInertiaRequests::share()` 加入 `locale` 和 `translations`
+- [ ] 建立 `resources/js/inertia/hooks/useTranslation.ts`
 
-### Phase 1ï¼šå»ºç«‹ç¿»è­¯æª”æ¡ˆï¼ˆç´„ 3 å¤©ï¼‰
+### Phase 1：建立翻譯檔案（約 3 天）
 
-- [ ] å»ºç«‹ `resources/lang/zh-TW/` ç›®éŒ„åŠæ‰€æœ‰æ¨¡çµ„æ–‡ä»¶ï¼ˆnav, common, person, codes, views, query, operationsï¼‰
-- [ ] å»ºç«‹ `resources/lang/en/` ç›®éŒ„åŠå°æ‡‰è‹±æ–‡æ–‡ä»¶
-- [ ] ç¿»è­¯ä¾†æºä»¥æœ¬æ–‡ä»¶ç¬¬ 5 ç¯€è¡“èªžè¡¨ç‚ºä¾æ“š
-- [ ] å»ºç«‹ `resources/lang/zh-TW/auth.php`ã€`validation.php`ã€`pagination.php`ã€`passwords.php`ï¼ˆå¾Œè€…ç”¨æ–¼å¯†ç¢¼é‡è¨­æµç¨‹ flash è¨Šæ¯ï¼ŒLaravel PasswordBroker å…§éƒ¨å‘¼å« `trans('passwords.sent')` ç­‰ keyï¼‰
+- [ ] 建立 `resources/lang/zh-TW/` 目錄及所有模組文件（nav, common, person, codes, views, query, operations）
+- [ ] 建立 `resources/lang/en/` 目錄及對應英文文件
+- [ ] 翻譯來源以本文件第 5 節術語表為依據
+- [ ] 建立 `resources/lang/zh-TW/auth.php`、`validation.php`、`pagination.php`、`passwords.php`（後者用於密碼重設流程 flash 訊息，Laravel PasswordBroker 內部呼叫 `trans('passwords.sent')` 等 key）
 
-### Phase 1.5ï¼šé é¢ç´šç¿»è­¯ prop è¦åŠƒï¼ˆå«æ–¼ Phase 1ï¼Œå‹¿è·³éŽï¼‰
+### Phase 1.5：頁面級翻譯 prop 規劃（含於 Phase 1，勿跳過）
 
-`views`ã€`codes`ã€`operations`ã€`admin` å››å€‹ç¾¤çµ„**ä¸æ”¾å…¥** `HandleInertiaRequests::share()`ï¼ŒåŽŸå› æ˜¯ inertia-laravel ç”¨ `array_merge`ï¼ˆæ·ºåˆä½µï¼‰åˆå¹¶ shared props èˆ‡é é¢ propsâ€”â€”è‹¥é é¢ props ä½¿ç”¨åŒä¸€å€‹ `'translations'` keyï¼Œshared translations æœƒè¢«å®Œå…¨è¦†è“‹ï¼Œ`common`/`nav` ç­‰é—œéµç¾¤çµ„æ¶ˆå¤±ã€‚
+`views`、`codes`、`operations`、`admin` 四個群組**不放入** `HandleInertiaRequests::share()`，原因是 inertia-laravel 用 `array_merge`（淺合併）合并 shared props 與頁面 props——若頁面 props 使用同一個 `'translations'` key，shared translations 會被完全覆蓋，`common`/`nav` 等關鍵群組消失。
 
-**è§£æ±ºæ–¹æ¡ˆï¼šé é¢ç‰¹å®šç¾¤çµ„ç”¨ç¨ç«‹çš„ `page_translations` key å‚³å…¥ï¼š**
+**解決方案：頁面特定群組用獨立的 `page_translations` key 傳入：**
 
 ```php
 // ViewTableController::appIndex
@@ -550,7 +550,7 @@ return Inertia::render('ViewTables/List', [
 ]);
 ```
 
-å°æ‡‰ `useTranslation` hook åŒæ™‚æ”¯æ´å…©å€‹ prop keyï¼š
+對應 `useTranslation` hook 同時支援兩個 prop key：
 
 ```typescript
 export function useTranslation(group: string) {
@@ -558,7 +558,7 @@ export function useTranslation(group: string) {
         translations?: Translations;
         page_translations?: Translations;
     }>().props;
-    // å…ˆæŸ¥ page_translationsï¼ˆé é¢ç‰¹å®šï¼‰ï¼Œå†æŸ¥ shared translations
+    // 先查 page_translations（頁面特定），再查 shared translations
     const groupDict = page_translations?.[group] ?? translations?.[group];
     return useMemo(() => {
         return (key: string, replace?: Record<string, string>): string => {
@@ -574,289 +574,289 @@ export function useTranslation(group: string) {
 }
 ```
 
-### Phase 2ï¼šBlade æ¨¡æ¿æå–ï¼ˆç´„ 5 å¤©ï¼‰
+### Phase 2：Blade 模板提取（約 5 天）
 
-ä¾å„ªå…ˆåº¦æŽ’åºï¼š
+依優先度排序：
 
-| å„ªå…ˆ | æ–‡ä»¶ | ä¼°è¨ˆå­—ä¸²æ•¸ |
+| 優先 | 文件 | 估計字串數 |
 |------|------|-----------|
-| é«˜ | `sidebar-v3.blade.php` | ~60 |
-| é«˜ | `header-v3.blade.php` | ~10 |
-| é«˜ | `dashboard-v3.blade.php` | ~20 |
-| ä¸­ | `biogmains/*.blade.php` | ~150 |
-| ä¸­ | `codes/*.blade.php` | ~40 |
-| ä¸­ | `operations/*.blade.php` | ~30 |
-| ä½Ž | `admin/*.blade.php` | ~50 |
-| ä½Ž | `crowdsourcing/*.blade.php` | ~30 |
+| 高 | `sidebar-v3.blade.php` | ~60 |
+| 高 | `header-v3.blade.php` | ~10 |
+| 高 | `dashboard-v3.blade.php` | ~20 |
+| 中 | `biogmains/*.blade.php` | ~150 |
+| 中 | `codes/*.blade.php` | ~40 |
+| 中 | `operations/*.blade.php` | ~30 |
+| 低 | `admin/*.blade.php` | ~50 |
+| 低 | `crowdsourcing/*.blade.php` | ~30 |
 
-**æ“ä½œæ–¹å¼ï¼š** ç”¨æ­£å‰‡æœå°‹æ‰€æœ‰ `>ä¸­æ–‡æ–‡å­—<` åŠ `"ä¸­æ–‡æ–‡å­—"` æ¨¡å¼ï¼Œé€ä¸€æå–ç‚º `{{ __('nav.dashboard') }}` ç­‰å½¢å¼ã€‚
+**操作方式：** 用正則搜尋所有 `>中文文字<` 及 `"中文文字"` 模式，逐一提取為 `{{ __('nav.dashboard') }}` 等形式。
 
-### Phase 3ï¼šReact/Inertia æå–ï¼ˆç´„ 4 å¤©ï¼‰
+### Phase 3：React/Inertia 提取（約 4 天）
 
-ä¾å„ªå…ˆåº¦æŽ’åºï¼š
+依優先度排序：
 
-| å„ªå…ˆ | æ–‡ä»¶/çµ„ä»¶ | ä¼°è¨ˆå­—ä¸²æ•¸ |
+| 優先 | 文件/組件 | 估計字串數 |
 |------|---------|-----------|
-| é«˜ | `Layouts/AppShell.tsx` | ~10 |
-| é«˜ | `components/QueryPlayground/*.tsx` | ~30 |
-| é«˜ | `components/PersonBrowser/PeopleSearchPanel.tsx` | ~10 |
-| é«˜ | `components/PersonBrowser/BasicInfoView.tsx` | ~15 |
-| é«˜ | `components/PersonBrowser/BrowserTabs.tsx` | ~10 |
-| ä¸­ | `components/PersonBrowser/*Tab.tsx`ï¼ˆ9 å€‹ Tabï¼‰ | ~60 |
-| ä¸­ | `Pages/QueryPlayground/Index.tsx` | ~20 |
-| ä¸­ | `Pages/PersonBrowser/Index.tsx` | ~10 |
-| ä½Ž | `Pages/ViewTables/*.tsx` | ~20 |
-| ä½Ž | `Pages/SearchByEntry/Index.tsx` | ~10 |
+| 高 | `Layouts/AppShell.tsx` | ~10 |
+| 高 | `components/QueryPlayground/*.tsx` | ~30 |
+| 高 | `components/PersonBrowser/PeopleSearchPanel.tsx` | ~10 |
+| 高 | `components/PersonBrowser/BasicInfoView.tsx` | ~15 |
+| 高 | `components/PersonBrowser/BrowserTabs.tsx` | ~10 |
+| 中 | `components/PersonBrowser/*Tab.tsx`（9 個 Tab） | ~60 |
+| 中 | `Pages/QueryPlayground/Index.tsx` | ~20 |
+| 中 | `Pages/PersonBrowser/Index.tsx` | ~10 |
+| 低 | `Pages/ViewTables/*.tsx` | ~20 |
+| 低 | `Pages/SearchByEntry/Index.tsx` | ~10 |
 
-**æ“ä½œæ–¹å¼ï¼š** åœ¨æ¯å€‹çµ„ä»¶åŠ  `const t = useTranslation('person')` ç­‰ï¼Œæ›¿æ›å­—ä¸²å­—é¢å€¼ã€‚
+**操作方式：** 在每個組件加 `const t = useTranslation('person')` 等，替換字串字面值。
 
-### Phase 4ï¼šèªžè¨€åˆ‡æ› UIï¼ˆç´„ 1 å¤©ï¼‰
+### Phase 4：語言切換 UI（約 1 天）
 
-- [ ] åœ¨ `header-v3.blade.php` åŠ å…¥èªžè¨€åˆ‡æ›æŒ‰éˆ•ï¼ˆBlade form submit ç‰ˆï¼Œç”¨æ–¼éž Inertia é é¢ï¼‰
-- [ ] åœ¨ `AppShell.tsx` åŠ å…¥ `router.post('/locale')` ç‰ˆï¼ˆç”¨æ–¼ Inertia é é¢ï¼Œç„¡å…¨é åˆ·æ–°ï¼‰
-- [ ] ç¢ºèªåˆ‡æ›å¾Œ URL ä¸è®Šï¼ˆåƒ… session/cookie æ”¹è®Šï¼‰
+- [ ] 在 `header-v3.blade.php` 加入語言切換按鈕（Blade form submit 版，用於非 Inertia 頁面）
+- [ ] 在 `AppShell.tsx` 加入 `router.post('/locale')` 版（用於 Inertia 頁面，無全頁刷新）
+- [ ] 確認切換後 URL 不變（僅 session/cookie 改變）
 
-### Phase 5ï¼šæ¸¬è©¦èˆ‡ QAï¼ˆç´„ 2 å¤©ï¼‰
+### Phase 5：測試與 QA（約 2 天）
 
-- [ ] æ¯å€‹ Blade é é¢åˆ†åˆ¥ä»¥ `zh-TW` å’Œ `en` ç€è¦½ï¼Œç¢ºèªç„¡ç¼ºæ¼ï¼ˆmissing key é¡¯ç¤ºç‚º key æœ¬èº«ï¼‰
-- [ ] æ¯å€‹ Inertia é é¢åˆ‡æ›èªžè¨€å¾Œç¢ºèª translations props æ›´æ–°ï¼Œä¸”ç‚ºå–®æ¬¡è«‹æ±‚ï¼ˆä¸è§¸ç™¼ç¬¬äºŒæ¬¡ reloadï¼‰
-- [ ] æ–°å¢ž `LocaleControllerTest`ï¼šé©—è­‰ POST /locale è¨­å®š sessionã€cookieï¼Œä»¥åŠç„¡æ•ˆ locale è¢«æ‹’çµ•
-- [ ] **âš ï¸ æ¸¬è©¦ç’°å¢ƒ locale å›ºå®šï¼š** åœ¨ `tests/TestCase.php` çš„ `setUp()` ä¸­åŠ å…¥ `App::setLocale('en')`ï¼Œé¿å…ç¾æœ‰æ¸¬è©¦å›  zh-TW æˆç‚ºé è¨­ locale è€Œæ–·è¨€å¤±æ•—ã€‚Phase 1 å»ºç«‹ zh-TW ç¿»è­¯æª”å¾Œï¼Œä»»ä½•æ–·è¨€è‹±æ–‡ Flash è¨Šæ¯æˆ–é©—è­‰éŒ¯èª¤å­—ä¸²çš„æ¸¬è©¦éƒ½éœ€è¦è¤‡æŸ¥ã€‚
-- [ ] å…¨è·‘ `./vendor/bin/phpunit`ï¼Œç¢ºèªç„¡ locale ç›¸é—œå›žæ­¸
-
----
-
-## 8. é¢¨éšªèˆ‡æ³¨æ„äº‹é …
-
-### 8.1 `config/app.php` locale ç›®å‰ç‚º `'en'`
-
-ç›®å‰ `locale` è¨­å®šå€¼èˆ‡å¯¦éš› UI èªžè¨€çŸ›ç›¾ï¼ˆUI æ˜¯ç¹é«”ä¸­æ–‡ï¼‰ã€‚Phase 0 éœ€è¦æ”¹ç‚º `'zh-TW'`ã€‚
-
-**fallback_locale çš„ä½œç”¨ç¯„åœï¼š** `fallback_locale = 'en'` å°**é»žè¨˜æ³• key æŸ¥è©¢**ï¼ˆå¦‚ `trans('auth.failed')`ï¼‰ç”Ÿæ•ˆâ€”â€”è‹¥ `lang/zh-TW/auth.php` ä¸å­˜åœ¨ï¼ŒLaravel æœƒæ”¹è®€ `lang/en/auth.php` ä¸­çš„åŒå keyï¼Œæ­£å¸¸å›žå‚³è‹±æ–‡å­—ä¸²ã€‚ä½† Â§4.3 æŽ¡ç”¨çš„**æ•´æª”å–ç”¨**ï¼ˆ`trans('common')` ç„¡é»žè¨˜æ³•ï¼‰ä¸åœ¨ fallback æ©Ÿåˆ¶çš„ä¿è­·ç¯„åœå…§ï¼šè‹¥ `lang/zh-TW/common.php` ä¸å­˜åœ¨ï¼Œå›žå‚³å€¼æ˜¯å­—ä¸² `'common'` è€Œéž arrayï¼Œå°Žè‡´ Inertia translations prop å´©æ½°ã€‚
-
-**çµè«–ï¼š** locale æ”¹ç‚º zh-TW å¾Œï¼Œ**å¿…é ˆç«‹å³å»ºç«‹ `lang/zh-TW/` ç›®éŒ„çš„æ‰€æœ‰æª”æ¡ˆï¼ˆPhase 1ï¼‰**ï¼Œä¸å¯åœ¨å…©å€‹ Phase ä¹‹é–“ä¸Šç·šã€‚Phase 1 çš„å»ºç«‹é †åºï¼šå…ˆå»º common.php å’Œ nav.phpï¼ˆæœ€å…ˆè¢« Inertia shared data å¼•ç”¨ï¼‰ï¼Œå†å»ºå…¶é¤˜æª”æ¡ˆã€‚
-
-### 8.2 Blade é é¢çš„ç¿»è­¯å‚³éž
-
-Blade é é¢é€éŽ `__()` ç›´æŽ¥å‘¼å«ï¼Œä¸éœ€é¡å¤–å‚³éžï¼›ä½†å¦‚æžœ Blade å…§æœ‰å‹•æ…‹ç”Ÿæˆçš„ JS å­—ä¸²ï¼ˆ`@json`ã€`<script>` å€å¡Šï¼‰ï¼Œéœ€è¦å¦å¤–è™•ç†ã€‚
-
-### 8.3 æ··åˆç¹/ç°¡ä¸­æ–‡å•é¡Œ
-
-`FormLabels.xlsx` çš„ `c_jianti`ï¼ˆç°¡é«”ï¼‰èˆ‡ `c_fanti`ï¼ˆç¹é«”ï¼‰éƒ¨åˆ†æœ‰å·®ç•°ï¼Œæœ¬è¨ˆåŠƒä»¥ç¹é«”ä¸­æ–‡ï¼ˆ`zh-TW`ï¼‰ç‚ºæº–ã€‚å¾ŒçºŒè‹¥éœ€æ”¯æ´ç°¡é«”ï¼Œå¯ç›´æŽ¥æ–°å¢ž `lang/zh-CN/` ç›®éŒ„ã€‚
-
-**Accept-Language æ˜ å°„è¦å‰‡ï¼š** `SetLocaleMiddleware` è®€å– header æ™‚ï¼Œå»ºè­°ä½¿ç”¨ `str_starts_with($lang, 'zh')` å°‡**æ‰€æœ‰** `zh-*` å­æ¨™ç±¤ï¼ˆåŒ…å« `zh-CN`ã€`zh-Hans`ã€`zh-SG`ï¼‰çµ±ä¸€æ˜ å°„è‡³ `zh-TW`ã€‚ç†ç”±ï¼šç›®å‰åƒ…æœ‰ç¹é«”ä¸­æ–‡ç‰ˆï¼Œè®“ç°¡é«”ä½¿ç”¨è€…çœ‹ç¹é«”ä¸­æ–‡å„ªæ–¼çœ‹è‹±æ–‡ã€‚è‹¥æ—¥å¾Œæ–°å¢ž `zh-CN` èªžè¨€æ”¯æ´ï¼Œå†ç´°åŒ–æ­¤è¦å‰‡ã€‚
-
-### 8.4 Flash è¨Šæ¯èˆ‡å¾Œç«¯éŒ¯èª¤
-
-`laracasts/flash` å¥—ä»¶çš„ Flash è¨Šæ¯ç”±å¾Œç«¯æŽ§åˆ¶å™¨ç”¢ç”Ÿï¼Œé€™äº›å­—ä¸²ä¹Ÿéœ€è¦æå–é€²ç¿»è­¯æ–‡ä»¶ã€‚å·²åœ¨ Phase 1 æé†’ï¼Œä½†æ•¸é‡è¼ƒå°ï¼ˆ~20 æ¢ï¼‰ï¼Œå¯åœ¨ Phase 2 ä¸€ä½µè™•ç†ã€‚
-
-### 8.5 å‰ç«¯é‡æ–°ç·¨è­¯
-
-ä¿®æ”¹ `resources/js/` å¾Œéœ€åŸ·è¡Œ `npm run build`ã€‚å»ºè­°åœ¨ Phase 3 çµæŸæ™‚çµ±ä¸€åŸ·è¡Œï¼Œé¿å…å¤šæ¬¡ç·¨è­¯ã€‚
-
-### 8.6 `mcamara/laravel-localization` æ”¾æ£„ç†ç”±å­˜æª”
-
-- è‹¥æœªä¾†éœ€è¦ SEO å‹å¥½çš„ URL è·¯ç”±ï¼ˆ`/en/person/123`ï¼‰ï¼Œå¯é‡æ–°è©•ä¼°æ­¤å¥—ä»¶ï¼ˆv2.4.0, 2026-03ï¼Œä»æ´»èºï¼‰ã€‚
-- ç›®å‰ CBDB Online ç‚ºéœ€ç™»å…¥çš„å·¥å…·ï¼ŒSEO å„ªå…ˆåº¦ä½Žï¼Œä¸å€¼å¾—å¢žåŠ æ­¤è¤‡é›œåº¦ã€‚
+- [ ] 每個 Blade 頁面分別以 `zh-TW` 和 `en` 瀏覽，確認無缺漏（missing key 顯示為 key 本身）
+- [ ] 每個 Inertia 頁面切換語言後確認 translations props 更新，且為單次請求（不觸發第二次 reload）
+- [ ] 新增 `LocaleControllerTest`：驗證 POST /locale 設定 session、cookie，以及無效 locale 被拒絕
+- [ ] **⚠️ 測試環境 locale 固定：** 在 `tests/TestCase.php` 的 `setUp()` 中加入 `App::setLocale('en')`，避免現有測試因 zh-TW 成為預設 locale 而斷言失敗。Phase 1 建立 zh-TW 翻譯檔後，任何斷言英文 Flash 訊息或驗證錯誤字串的測試都需要複查。
+- [ ] 全跑 `./vendor/bin/phpunit`，確認無 locale 相關回歸
 
 ---
 
+## 8. 風險與注意事項
+
+### 8.1 `config/app.php` locale 目前為 `'en'`
+
+目前 `locale` 設定值與實際 UI 語言矛盾（UI 是繁體中文）。Phase 0 需要改為 `'zh-TW'`。
+
+**fallback_locale 的作用範圍：** `fallback_locale = 'en'` 對**點記法 key 查詢**（如 `trans('auth.failed')`）生效——若 `lang/zh-TW/auth.php` 不存在，Laravel 會改讀 `lang/en/auth.php` 中的同名 key，正常回傳英文字串。但 §4.3 採用的**整檔取用**（`trans('common')` 無點記法）不在 fallback 機制的保護範圍內：若 `lang/zh-TW/common.php` 不存在，回傳值是字串 `'common'` 而非 array，導致 Inertia translations prop 崩潰。
+
+**結論：** locale 改為 zh-TW 後，**必須立即建立 `lang/zh-TW/` 目錄的所有檔案（Phase 1）**，不可在兩個 Phase 之間上線。Phase 1 的建立順序：先建 common.php 和 nav.php（最先被 Inertia shared data 引用），再建其餘檔案。
+
+### 8.2 Blade 頁面的翻譯傳遞
+
+Blade 頁面透過 `__()` 直接呼叫，不需額外傳遞；但如果 Blade 內有動態生成的 JS 字串（`@json`、`<script>` 區塊），需要另外處理。
+
+### 8.3 混合繁/簡中文問題
+
+`FormLabels.xlsx` 的 `c_jianti`（簡體）與 `c_fanti`（繁體）部分有差異，本計劃以繁體中文（`zh-TW`）為準。後續若需支援簡體，可直接新增 `lang/zh-CN/` 目錄。
+
+**Accept-Language 映射規則：** `SetLocaleMiddleware` 讀取 header 時，建議使用 `str_starts_with($lang, 'zh')` 將**所有** `zh-*` 子標籤（包含 `zh-CN`、`zh-Hans`、`zh-SG`）統一映射至 `zh-TW`。理由：目前僅有繁體中文版，讓簡體使用者看繁體中文優於看英文。若日後新增 `zh-CN` 語言支援，再細化此規則。
+
+### 8.4 Flash 訊息與後端錯誤
+
+`laracasts/flash` 套件的 Flash 訊息由後端控制器產生，這些字串也需要提取進翻譯文件。已在 Phase 1 提醒，但數量較小（~20 條），可在 Phase 2 一併處理。
+
+### 8.5 前端重新編譯
+
+修改 `resources/js/` 後需執行 `npm run build`。建議在 Phase 3 結束時統一執行，避免多次編譯。
+
+### 8.6 `mcamara/laravel-localization` 放棄理由存檔
+
+- 若未來需要 SEO 友好的 URL 路由（`/en/person/123`），可重新評估此套件（v2.4.0, 2026-03，仍活躍）。
+- 目前 CBDB Online 為需登入的工具，SEO 優先度低，不值得增加此複雜度。
+
 ---
 
-## 9. Phase 6ï¼šBlade è¦–åœ–å…¨é¢ç¿»è­¯
+---
 
-**èƒŒæ™¯ï¼š** Phase 2 åªç¿»è­¯äº†ä¸»è¦ç‰ˆé¢ï¼ˆ`layouts/`ï¼‰èˆ‡å°‘æ•¸ç‰¹å®šé é¢ï¼ˆcodesã€operationsã€crowdsourcingã€biogmains/bannerï¼‰ã€‚2026-06-02 å…¨é¢æŽƒæå¾Œç™¼ç¾ **96 å€‹ Blade æª”æ¡ˆã€ç´„ 3,006 è¡Œ**ä¸­æ–‡å­—ä¸²å°šæœªç¿»è­¯ï¼Œå…¶ä¸­æœ€é‡è¦çš„æ˜¯ `biogmains/` ä¸‹çš„äººç‰©ç·¨è¼¯è¡¨å–®ï¼ˆç”¨æˆ¶æœ€å¸¸æŽ¥è§¸çš„ä»‹é¢ï¼‰ã€‚
+## 9. Phase 6：Blade 視圖全面翻譯
 
-**ç¿»è­¯ç­–ç•¥ï¼š** é‡å°ç¾æœ‰ç¿»è­¯ç¾¤çµ„ï¼Œå„ªå…ˆé‡ç”¨ `person.php`ã€`common.php`ï¼›æ–°å¢ž `biogmains.php` ç¾¤çµ„å­˜æ”¾è¡¨å–®ç‰¹æœ‰å­—ä¸²ï¼ˆæ¨™ç±¤ã€æç¤ºã€å‹•ä½œæŒ‰éˆ•ç­‰ï¼‰ï¼›`admin.php` å·²æœ‰ä½†ä»éœ€æ“´å……ï¼›`auth.php` å·²æœ‰ä½†éœ€è£œå……ç™»å…¥æµç¨‹å­—ä¸²ã€‚
+**背景：** Phase 2 只翻譯了主要版面（`layouts/`）與少數特定頁面（codes、operations、crowdsourcing、biogmains/banner）。2026-06-02 全面掃描後發現 **96 個 Blade 檔案、約 3,006 行**中文字串尚未翻譯，其中最重要的是 `biogmains/` 下的人物編輯表單（用戶最常接觸的介面）。
+
+**翻譯策略：** 針對現有翻譯群組，優先重用 `person.php`、`common.php`；新增 `biogmains.php` 群組存放表單特有字串（標籤、提示、動作按鈕等）；`admin.php` 已有但仍需擴充；`auth.php` 已有但需補充登入流程字串。
 
 ---
 
-### Phase 6Aï¼šbiogmains äººç‰©ç·¨è¼¯è¡¨å–®ï¼ˆæœ€é«˜å„ªå…ˆï¼‰
+### Phase 6A：biogmains 人物編輯表單（最高優先）
 
-**ç¯„åœï¼š** 54 å€‹æª”æ¡ˆã€~1,314 è¡Œæœªç¿»è­¯å­—ä¸²ã€‚é€™æ˜¯ç›®å‰æœ€å¸¸è¢«ç”¨æˆ¶ä½¿ç”¨çš„ç·¨è¼¯ä»‹é¢ã€‚
+**範圍：** 54 個檔案、~1,314 行未翻譯字串。這是目前最常被用戶使用的編輯介面。
 
-| å­ç›®éŒ„ | æª”æ¡ˆæ•¸ | ä¼°è¨ˆè¡Œæ•¸ | èªªæ˜Ž |
+| 子目錄 | 檔案數 | 估計行數 | 說明 |
 |--------|--------|---------|------|
-| `basicinformation/` | 4 | ~120 | åŸºæœ¬è³‡æ–™ create/edit/indexï¼ˆ`show.blade.php` ç‚º React/Inertiaï¼Œè·³éŽï¼‰ |
-| `addresses/` | 4 | ~71 | åœ°å€è³‡æ–™ CRUD |
-| `altname/` | 4 | ~69 | åˆ¥åè³‡æ–™ CRUD |
-| `assoc/` | 4 | ~256 | ç¤¾æœƒé—œä¿‚ï¼ˆå«æ™ºèƒ½å¡«å…… UIï¼‰ |
-| `entries/` | 4 | ~79 | å…¥ä»•è³‡æ–™ CRUD |
-| `events/` | 4 | ~56 | äº‹ä»¶ç®¡ç† CRUD |
-| `kinship/` | 4 | ~85 | è¦ªå±¬é—œä¿‚ CRUD |
-| `offices/` | 4 | ~310 | å®˜è·ç®¡ç†ï¼ˆå«æ™ºèƒ½å¡«å…… UIï¼Œå­—ä¸²æœ€å¤šï¼‰ |
-| `possession/` | 4 | ~66 | è²¡ç”¢è¨˜éŒ„ CRUD |
-| `socialinst/` | 4 | ~57 | ç¤¾äº¤æ©Ÿæ§‹ CRUD |
-| `sources/` | 4 | ~36 | å‡ºè™•è³‡æ–™ CRUD |
-| `statuses/` | 4 | ~131 | ç¤¾æœƒå€åˆ†ï¼ˆå«æ™ºèƒ½è­˜åˆ¥ï¼‰ |
-| `texts/` | 4 | ~55 | è‘—è¿°è³‡æ–™ CRUD |
+| `basicinformation/` | 4 | ~120 | 基本資料 create/edit/index（`show.blade.php` 為 React/Inertia，跳過） |
+| `addresses/` | 4 | ~71 | 地址資料 CRUD |
+| `altname/` | 4 | ~69 | 別名資料 CRUD |
+| `assoc/` | 4 | ~256 | 社會關係（含智能填充 UI） |
+| `entries/` | 4 | ~79 | 入仕資料 CRUD |
+| `events/` | 4 | ~56 | 事件管理 CRUD |
+| `kinship/` | 4 | ~85 | 親屬關係 CRUD |
+| `offices/` | 4 | ~310 | 官職管理（含智能填充 UI，字串最多） |
+| `possession/` | 4 | ~66 | 財產記錄 CRUD |
+| `socialinst/` | 4 | ~57 | 社交機構 CRUD |
+| `sources/` | 4 | ~36 | 出處資料 CRUD |
+| `statuses/` | 4 | ~131 | 社會區分（含智能識別） |
+| `texts/` | 4 | ~55 | 著述資料 CRUD |
 | `partials/` | 1 | ~18 | `list-order-toolbar.blade.php` |
-| `defense.blade.php` | 1 | ~53 | è¤‡åˆä¸»éµèªªæ˜Žï¼ˆé–‹ç™¼è€…é ï¼‰ |
-| `history-button.blade.php` | 1 | ~1 | æ­·å²è¨˜éŒ„æŒ‰éˆ• |
+| `defense.blade.php` | 1 | ~53 | 複合主鍵說明（開發者頁） |
+| `history-button.blade.php` | 1 | ~1 | 歷史記錄按鈕 |
 
-**æ–°å¢žç¿»è­¯ç¾¤çµ„ï¼š** `biogmains.php`ï¼ˆzh-TW + enï¼‰ï¼Œå­˜æ”¾è¡¨å–®é€šç”¨æ¨™ç±¤ï¼ˆå¦‚ï¼šä¾†æºåºè™Ÿã€ä¿®æ”¹èªªæ˜Žã€æ–°å¢žè¨˜éŒ„ã€æ™ºèƒ½å¡«å……æŒ‰éˆ•æ–‡å­—ç­‰ï¼‰ã€‚è¡¨å–®æ¬„ä½æ¨™ç±¤å„˜é‡é‡ç”¨ç¾æœ‰ `person.php` çš„ keyã€‚
+**新增翻譯群組：** `biogmains.php`（zh-TW + en），存放表單通用標籤（如：來源序號、修改說明、新增記錄、智能填充按鈕文字等）。表單欄位標籤儘量重用現有 `person.php` 的 key。
 
-**JS å­—ä¸²è™•ç†æ–¹å¼ï¼ˆå·²ç¢ºèªï¼‰ï¼š** `addresses/`ã€`altname/`ã€`assoc/`ã€`entries/`ã€`events/`ã€`kinship/`ã€`offices/`ã€`statuses/` ç­‰ç›®éŒ„çš„ `<script>` å€å¡Šå‡æœ‰ä¸­æ–‡ alert/confirm å­—ä¸²ï¼Œçµ±ä¸€ç”¨ `{!! Js::from(__('biogmains.xxx')) !!}` æ³¨å…¥ç‚º JS è®Šæ•¸ï¼ˆ`Js::from()` æ¯” `@json()` æ›´æ¸…æ™°ä¸”å·²æœ‰ XSS ä¿è­·ï¼‰ï¼Œå†æ–¼ alert/confirm ä¸­å¼•ç”¨è©²è®Šæ•¸ã€‚
+**JS 字串處理方式（已確認）：** `addresses/`、`altname/`、`assoc/`、`entries/`、`events/`、`kinship/`、`offices/`、`statuses/` 等目錄的 `<script>` 區塊均有中文 alert/confirm 字串，統一用 `{!! Js::from(__('biogmains.xxx')) !!}` 注入為 JS 變數（`Js::from()` 比 `@json()` 更清晰且已有 XSS 保護），再於 alert/confirm 中引用該變數。
 
-**æ³¨æ„ï¼š** `components/forms/audit-fields.blade.php`ã€`components/forms/person-id-display.blade.php` è¢«å¤šå€‹ biogmains è¡¨å–® `@include`ï¼Œ**é ˆåœ¨å…¶ä»– 6A æ­¥é©Ÿä¹‹å‰ç¿»è­¯ï¼ˆ6A-0ï¼‰**ï¼Œå¦å‰‡ 6A-2 ä¹‹å¾Œä»é¡¯ç¤ºä¸­æ–‡ã€‚
+**注意：** `components/forms/audit-fields.blade.php`、`components/forms/person-id-display.blade.php` 被多個 biogmains 表單 `@include`，**須在其他 6A 步驟之前翻譯（6A-0）**，否則 6A-2 之後仍顯示中文。
 
-**æ­¥é©Ÿï¼š**
-- [ ] 6A-0ï¼šç¿»è­¯å…±ç”¨å…ƒä»¶ `components/forms/audit-fields.blade.php` èˆ‡ `components/forms/person-id-display.blade.php`ï¼ˆbiogmains è¡¨å–®å…±ç”¨ï¼Œé ˆå…ˆè¡Œï¼‰
-- [ ] 6A-1ï¼šå»ºç«‹ `resources/lang/zh-TW/biogmains.php` èˆ‡ `resources/lang/en/biogmains.php`
-- [ ] 6A-2ï¼šç¿»è­¯ `basicinformation/` ä¸‰å€‹æª”æ¡ˆï¼ˆcreate/edit/indexï¼›show.blade.php è·³éŽï¼‰
-- [ ] 6A-3ï¼šç¿»è­¯ `addresses/`ã€`altname/`ã€`sources/` è¡¨å–®ï¼ˆå­—ä¸²è¼ƒå°‘ï¼Œåˆæ‰¹ï¼‰
-- [ ] 6A-4ï¼šç¿»è­¯ `entries/`ã€`events/`ã€`kinship/`ã€`texts/`ï¼ˆåˆæ‰¹ï¼‰
-- [ ] 6A-5ï¼šç¿»è­¯ `possession/`ã€`socialinst/`ï¼ˆåˆæ‰¹ï¼‰
-- [ ] 6A-6ï¼šç¿»è­¯ `statuses/`ï¼ˆå«æ™ºèƒ½è­˜åˆ¥ UIï¼ŒJS å­—ä¸²ç”¨ Js::from() æ³¨å…¥ï¼‰
-- [ ] 6A-7ï¼šç¿»è­¯ `assoc/`ï¼ˆæœ€è¤‡é›œï¼Œå«æ™ºèƒ½å¡«å…… JS alert å­—ä¸²ï¼Œç”¨ Js::from() æ³¨å…¥ï¼‰
-- [ ] 6A-8ï¼šç¿»è­¯ `offices/`ï¼ˆæœ€å¤šå­—ä¸²ï¼Œæ™ºèƒ½å¡«å…… + å®˜è·æœå°‹ UIï¼Œç”¨ Js::from() æ³¨å…¥ï¼‰
-- [ ] 6A-9ï¼šç¿»è­¯ `partials/`ã€`history-button.blade.php`ï¼ˆ`defense.blade.php` ç‚ºé–‹ç™¼è€…é ï¼Œè·³éŽï¼‰
+**步驟：**
+- [ ] 6A-0：翻譯共用元件 `components/forms/audit-fields.blade.php` 與 `components/forms/person-id-display.blade.php`（biogmains 表單共用，須先行）
+- [ ] 6A-1：建立 `resources/lang/zh-TW/biogmains.php` 與 `resources/lang/en/biogmains.php`
+- [ ] 6A-2：翻譯 `basicinformation/` 三個檔案（create/edit/index；show.blade.php 跳過）
+- [ ] 6A-3：翻譯 `addresses/`、`altname/`、`sources/` 表單（字串較少，合批）
+- [ ] 6A-4：翻譯 `entries/`、`events/`、`kinship/`、`texts/`（合批）
+- [ ] 6A-5：翻譯 `possession/`、`socialinst/`（合批）
+- [ ] 6A-6：翻譯 `statuses/`（含智能識別 UI，JS 字串用 Js::from() 注入）
+- [ ] 6A-7：翻譯 `assoc/`（最複雜，含智能填充 JS alert 字串，用 Js::from() 注入）
+- [ ] 6A-8：翻譯 `offices/`（最多字串，智能填充 + 官職搜尋 UI，用 Js::from() 注入）
+- [ ] 6A-9：翻譯 `partials/`、`history-button.blade.php`（`defense.blade.php` 為開發者頁，跳過）
 
 ---
 
-### Phase 6Bï¼šä½¿ç”¨è€…æµç¨‹é é¢ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 6B：使用者流程頁面（高優先）
 
-| æª”æ¡ˆ | ä¼°è¨ˆè¡Œæ•¸ | èªªæ˜Ž |
+| 檔案 | 估計行數 | 說明 |
 |------|---------|------|
-| `auth/login.blade.php` ç­‰ 4 å€‹æª”æ¡ˆ | ~65 | ç™»å…¥ã€è¨»å†Šã€å¯†ç¢¼é‡è¨­ |
-| `profile/*.blade.php` | ~249 | å€‹äººè¨­å®šã€API ä»¤ç‰Œç®¡ç† |
-| `home.blade.php` | ~17 | ç™»å…¥å¾Œé¦–é æ­¡è¿Žè¨Šæ¯ |
-| `welcome.blade.php` | ~17 | æœªç™»å…¥æ­¡è¿Žé  |
-| `dashboard/*.blade.php` | ~23 | å„€è¡¨æ¿çµ±è¨ˆ |
+| `auth/login.blade.php` 等 4 個檔案 | ~65 | 登入、註冊、密碼重設 |
+| `profile/*.blade.php` | ~249 | 個人設定、API 令牌管理 |
+| `home.blade.php` | ~17 | 登入後首頁歡迎訊息 |
+| `welcome.blade.php` | ~17 | 未登入歡迎頁 |
+| `dashboard/*.blade.php` | ~23 | 儀表板統計 |
 
-**æ³¨æ„ï¼š** `auth/` éƒ¨åˆ†å­—ä¸²ï¼ˆ`__('auth.failed')` ç­‰ï¼‰å·²é€éŽ `lang/zh-TW/auth.php` ç¿»è­¯ï¼›éœ€è£œé½Š Blade æ¨¡æ¿ä¸­ç›´æŽ¥ç¡¬ç·¨ç¢¼çš„ä¸­æ–‡ï¼ˆè¡¨å–® labelã€æç¤ºæ–‡å­—ï¼‰ã€‚
+**注意：** `auth/` 部分字串（`__('auth.failed')` 等）已透過 `lang/zh-TW/auth.php` 翻譯；需補齊 Blade 模板中直接硬編碼的中文（表單 label、提示文字）。
 
-**æ­¥é©Ÿï¼š**
-- [ ] 6B-1ï¼šç¿»è­¯ `auth/` å››å€‹æª”æ¡ˆï¼ˆloginã€registerã€passwordsã€emailï¼‰
-- [ ] 6B-2ï¼šç¿»è­¯ `profile/`ï¼ˆå«ä»¤ç‰Œç®¡ç†çš„ JS confirm å°è©±æ¡†å­—ä¸²ï¼‰
-- [ ] 6B-3ï¼šç¿»è­¯ `home.blade.php`ã€`welcome.blade.php`ã€`dashboard/`
+**步驟：**
+- [ ] 6B-1：翻譯 `auth/` 四個檔案（login、register、passwords、email）
+- [ ] 6B-2：翻譯 `profile/`（含令牌管理的 JS confirm 對話框字串）
+- [ ] 6B-3：翻譯 `home.blade.php`、`welcome.blade.php`、`dashboard/`
 
 ---
 
-### Phase 6Cï¼šæ¨™æº–åŠŸèƒ½é é¢ï¼ˆä¸­å„ªå…ˆï¼‰
+### Phase 6C：標準功能頁面（中優先）
 
-| ç›®éŒ„/æª”æ¡ˆ | ä¼°è¨ˆè¡Œæ•¸ | èªªæ˜Ž |
+| 目錄/檔案 | 估計行數 | 說明 |
 |----------|---------|------|
-| `components/*.blade.php`ï¼ˆ5 å€‹ï¼‰+ `components/forms/`ï¼ˆ2 å€‹ï¼Œå·²åœ¨ 6A-0 å®Œæˆï¼‰ | ~139 | å…±ç”¨å…ƒä»¶ï¼ˆ`forms/` å·²æå‰è‡³ 6A-0ï¼‰ |
-| `view/*.blade.php`ï¼ˆ2 å€‹ï¼‰ | ~58 | èˆŠç‰ˆæª¢è¦–è¡¨é é¢ |
-| `crowdsourcing/index.blade.php` | ~24 | å·²éƒ¨åˆ†ç¿»è­¯ï¼Œè£œé½Šå‰©é¤˜ |
-| `maps/index.blade.php` | ~54 | æ­·å²åœ°åœ–é é¢ |
-| `query_playground/` | ~127 | æŸ¥è©¢ç·´ç¿’å ´æ—¥èªŒé é¢ |
+| `components/*.blade.php`（5 個）+ `components/forms/`（2 個，已在 6A-0 完成） | ~139 | 共用元件（`forms/` 已提前至 6A-0） |
+| `view/*.blade.php`（2 個） | ~58 | 舊版檢視表頁面 |
+| `crowdsourcing/index.blade.php` | ~24 | 已部分翻譯，補齊剩餘 |
+| `maps/index.blade.php` | ~54 | 歷史地圖頁面 |
+| `query_playground/` | ~127 | 查詢練習場日誌頁面 |
 
-**æ­¥é©Ÿï¼š**
-- [ ] 6C-1ï¼šç¿»è­¯ `components/` å‰©é¤˜ 5 å€‹å…±ç”¨ Blade å…ƒä»¶ï¼ˆ`forms/` å…©å€‹å·²åœ¨ 6A-0 å®Œæˆï¼‰
-- [ ] 6C-2ï¼šç¿»è­¯ `view/`ï¼ˆèˆŠç‰ˆï¼‰ï¼Œè£œé½Š `crowdsourcing/`
-- [ ] 6C-3ï¼šç¿»è­¯ `maps/`ã€`query_playground/`
+**步驟：**
+- [ ] 6C-1：翻譯 `components/` 剩餘 5 個共用 Blade 元件（`forms/` 兩個已在 6A-0 完成）
+- [ ] 6C-2：翻譯 `view/`（舊版），補齊 `crowdsourcing/`
+- [ ] 6C-3：翻譯 `maps/`、`query_playground/`
 
 ---
 
-### Phase 6Dï¼šç®¡ç†å“¡èˆ‡å¾Œå°é é¢ï¼ˆä½Žå„ªå…ˆï¼‰
+### Phase 6D：管理員與後台頁面（低優先）
 
-| ç›®éŒ„/æª”æ¡ˆ | ä¼°è¨ˆè¡Œæ•¸ | èªªæ˜Ž |
+| 目錄/檔案 | 估計行數 | 說明 |
 |----------|---------|------|
-| `admin/` 7 å€‹æª”æ¡ˆ | ~753 | æ‰¹æ¬¡åŒ¯å…¥ã€è¡¨ç¶­è­·ã€é—œä¿‚ä¿®å¾© |
-| `cbdbapi/*.blade.php` | ~217 | å¤–éƒ¨ API æœå°‹çµæžœé  |
-| `manage/` 4 å€‹æª”æ¡ˆ | ~229 | ç”¨æˆ¶ç®¡ç†ã€äººç‰©åˆä½µï¼ˆå« `_role-descriptions.blade.php`ï¼‰ |
+| `admin/` 7 個檔案 | ~753 | 批次匯入、表維護、關係修復 |
+| `cbdbapi/*.blade.php` | ~217 | 外部 API 搜尋結果頁 |
+| `manage/` 4 個檔案 | ~229 | 用戶管理、人物合併（含 `_role-descriptions.blade.php`） |
 
-**æ­¥é©Ÿï¼š**
-- [ ] 6D-1ï¼šç¿»è­¯ `manage/` å››å€‹æª”æ¡ˆï¼ˆç”¨æˆ¶ç®¡ç† + äººç‰©åˆä½µï¼Œæœ‰ç®¡ç†å“¡æœƒç”¨ï¼‰
-- [ ] 6D-2ï¼šç¿»è­¯ `admin/` ä¸ƒå€‹é é¢ï¼ˆæ‰¹æ¬¡å·¥å…·ï¼Œä½Žé »ä½¿ç”¨ï¼‰
-- [ ] 6D-3ï¼šç¿»è­¯ `cbdbapi/`ï¼ˆAPI çµæžœé¡¯ç¤ºé ï¼‰
+**步驟：**
+- [ ] 6D-1：翻譯 `manage/` 四個檔案（用戶管理 + 人物合併，有管理員會用）
+- [ ] 6D-2：翻譯 `admin/` 七個頁面（批次工具，低頻使用）
+- [ ] 6D-3：翻譯 `cbdbapi/`（API 結果顯示頁）
 
 ---
 
-### Phase 6Eï¼šPhase 2 æ®˜ç•™è£œæ¼ï¼ˆä¸­å„ªå…ˆï¼‰
+### Phase 6E：Phase 2 殘留補漏（中優先）
 
-**èƒŒæ™¯ï¼š** Phase 2 å·²å®Œæˆ `layouts/`ã€`codes/`ã€`operations/` çš„éƒ¨åˆ†ç¿»è­¯ï¼Œä½†ä»æœ‰ç¡¬ç·¨ç¢¼ä¸­æ–‡æ®˜ç•™ã€‚
+**背景：** Phase 2 已完成 `layouts/`、`codes/`、`operations/` 的部分翻譯，但仍有硬編碼中文殘留。
 
-| æª”æ¡ˆ | èªªæ˜Ž |
+| 檔案 | 說明 |
 |------|------|
-| `codes/show.blade.php` | `ä¿®æ”¹`ã€`åˆªé™¤`ã€`æ²’æœ‰è³‡æ–™`ã€`ä¸Šä¸€é `/`ä¸‹ä¸€é `ã€`è·³è½‰åˆ° ID`/`è·³è½‰` æŒ‰éˆ• |
-| `operations/index.blade.php` | éƒ¨åˆ† badge æ–‡å­—èˆ‡èªªæ˜Žå­—ä¸² |
-| `layouts/app.blade.php` | æª¢æŸ¥æ˜¯å¦æœ‰æ®˜ç•™çš„ç¡¬ç·¨ç¢¼ä¸­æ–‡ |
+| `codes/show.blade.php` | `修改`、`刪除`、`沒有資料`、`上一頁`/`下一頁`、`跳轉到 ID`/`跳轉` 按鈕 |
+| `operations/index.blade.php` | 部分 badge 文字與說明字串 |
+| `layouts/app.blade.php` | 檢查是否有殘留的硬編碼中文 |
 
-**æ­¥é©Ÿï¼š**
-- [ ] 6E-1ï¼šè£œé½Š `codes/show.blade.php`ï¼ˆ`ä¿®æ”¹`ã€`åˆªé™¤`ã€åˆ†é å°ŽèˆªæŒ‰éˆ•ã€`æ²’æœ‰è³‡æ–™`ï¼‰
-- [ ] 6E-2ï¼šè£œé½Š `operations/index.blade.php` æ®˜ç•™å­—ä¸²
-- [ ] 6E-3ï¼šæŽƒæ `layouts/app.blade.php`ï¼Œè£œé½Šä»»ä½•æ®˜ç•™ä¸­æ–‡
+**步驟：**
+- [ ] 6E-1：補齊 `codes/show.blade.php`（`修改`、`刪除`、分頁導航按鈕、`沒有資料`）
+- [ ] 6E-2：補齊 `operations/index.blade.php` 殘留字串
+- [ ] 6E-3：掃描 `layouts/app.blade.php`，補齊任何殘留中文
 
 ---
 
-### Phase 6 æ•´é«”çµ±è¨ˆ
+### Phase 6 整體統計
 
-| Phase | å„ªå…ˆ | æª”æ¡ˆæ•¸ | ä¼°è¨ˆè¡Œæ•¸ | ç‹€æ…‹ |
+| Phase | 優先 | 檔案數 | 估計行數 | 狀態 |
 |-------|------|--------|---------|------|
-| 6A biogmains äººç‰©è¡¨å–® | æœ€é«˜ | 55 | ~1,314 | âœ… å®Œæˆï¼ˆ2026-06-02ï¼‰ |
-| 6B ä½¿ç”¨è€…æµç¨‹é é¢ | é«˜ | ~10 | ~371 | âœ… å®Œæˆï¼ˆ2026-06-02ï¼‰ |
-| 6C æ¨™æº–åŠŸèƒ½é é¢ | ä¸­ | ~8 | ~402 | âœ… å®Œæˆï¼ˆ2026-06-02ï¼‰ |
-| 6D ç®¡ç†å“¡å¾Œå°é é¢ | ä½Ž | ~15 | ~1,350 | âœ… å®Œæˆï¼ˆ2026-06-02ï¼‰ |
-| 6E Phase 2 æ®˜ç•™è£œæ¼ | ä¸­ | ~3 | ~30 | âœ… å®Œæˆï¼ˆç¢ºèªå·²ç„¡æ®˜ç•™ï¼Œå‰ Phase å·²è£œé½Šï¼‰ |
-| **åˆè¨ˆ** | | **~91** | **~3,450** | |
+| 6A biogmains 人物表單 | 最高 | 55 | ~1,314 | ✅ 完成（2026-06-02） |
+| 6B 使用者流程頁面 | 高 | ~10 | ~371 | ✅ 完成（2026-06-02） |
+| 6C 標準功能頁面 | 中 | ~8 | ~402 | ✅ 完成（2026-06-02） |
+| 6D 管理員後台頁面 | 低 | ~15 | ~1,350 | ✅ 完成（2026-06-02） |
+| 6E Phase 2 殘留補漏 | 中 | ~3 | ~30 | ✅ 完成（確認已無殘留，前 Phase 已補齊） |
+| **合計** | | **~91** | **~3,450** | |
 
-> æŽƒææ—¥æœŸï¼š2026-06-02ã€‚è¡Œæ•¸ç‚ºä¼°è¨ˆå€¼ï¼ˆå«éƒ¨åˆ†éœ€è·³éŽçš„ PHP å‹•æ…‹è®Šæ•¸ï¼‰ã€‚6A åŒ…å« components/forms/ å…©å€‹å…±ç”¨å…ƒä»¶ï¼ˆ6A-0ï¼‰ã€‚
+> 掃描日期：2026-06-02。行數為估計值（含部分需跳過的 PHP 動態變數）。6A 包含 components/forms/ 兩個共用元件（6A-0）。
 
-### é è¨­èªžè¨€ï¼ˆconfig/app.phpï¼‰
+### 預設語言（config/app.php）
 
 ```php
-'locale'           => 'zh-TW',        // ç³»çµ±é è¨­èªžè¨€ç‚ºç¹é«”ä¸­æ–‡
-'available_locales' => ['zh-TW', 'en'], // å¯ç”¨èªžè¨€ï¼ˆè‡ªè¨‚ keyï¼Œç”± SetLocaleMiddleware è®€å–ï¼‰
-'fallback_locale'  => 'en',            // ç•¶ zh-TW æŸ key ç¼ºå¤±æ™‚ï¼Œå›žé€€åˆ°è‹±æ–‡
+'locale'           => 'zh-TW',        // 系統預設語言為繁體中文
+'available_locales' => ['zh-TW', 'en'], // 可用語言（自訂 key，由 SetLocaleMiddleware 讀取）
+'fallback_locale'  => 'en',            // 當 zh-TW 某 key 缺失時，回退到英文
 ```
 
-æ­¤è¨­å®šæ–¼ Phase 0 å®Œæˆã€‚ç³»çµ±å•Ÿå‹•æ™‚ä»¥ç¹é«”ä¸­æ–‡ç‚ºé è¨­ï¼›ç”¨æˆ¶é¦–æ¬¡è¨ªå•è‹¥ç€è¦½å™¨èªžè¨€åå¥½ç‚º `zh-*`ï¼Œç¶­æŒç¹é«”ä¸­æ–‡ï¼›è‹¥åå¥½ç‚ºå…¶ä»–èªžè¨€ï¼ŒSetLocaleMiddleware æœƒè®€å–ä¸¦è¨­ç‚ºè‹±æ–‡ã€‚
+此設定於 Phase 0 完成。系統啟動時以繁體中文為預設；用戶首次訪問若瀏覽器語言偏好為 `zh-*`，維持繁體中文；若偏好為其他語言，SetLocaleMiddleware 會讀取並設為英文。
 
 ---
 
 ---
 
-## 10. Phase 7ï¼šæŽ§åˆ¶å™¨å­—ä¸²ç¿»è­¯ + æ®˜ç•™ä¿®è£œ
+## 10. Phase 7：控制器字串翻譯 + 殘留修補
 
-**èƒŒæ™¯ï¼š** 2026-06-03 ç³»çµ±æ€§æŽƒæç™¼ç¾ï¼ŒPhase 6 é›–ç„¶æ¶µè“‹äº† Blade è¦–åœ–çš„ç¿»è­¯ï¼Œä½†ä»¥ä¸‹å…©å¤§é¡žåˆ¥è¢«éºæ¼ï¼š  
-ï¼ˆ1ï¼‰æŽ§åˆ¶å™¨é€éŽ `page_title`ã€`page_description`ã€`breadcrumbs` ç­‰ PHP å­—ä¸²å‚³å…¥è¦–åœ–çš„ç¡¬ç·¨ç¢¼ä¸­æ–‡ï¼›  
-ï¼ˆ2ï¼‰codes/edit.blade.php çš„è¡¨å–®èªªæ˜Žæ–‡å­—åŠéƒ¨åˆ† JS å­—ä¸²ã€‚  
-æ­¤å¤–ä½¿ç”¨è€…ä¹Ÿè¦æ±‚èª¿æ•´è‹¥å¹² UI ç´°ç¯€ï¼ˆAdd â†’ New æŒ‰éˆ•ç­‰ï¼‰ã€‚
+**背景：** 2026-06-03 系統性掃描發現，Phase 6 雖然涵蓋了 Blade 視圖的翻譯，但以下兩大類別被遺漏：  
+（1）控制器透過 `page_title`、`page_description`、`breadcrumbs` 等 PHP 字串傳入視圖的硬編碼中文；  
+（2）codes/edit.blade.php 的表單說明文字及部分 JS 字串。  
+此外使用者也要求調整若干 UI 細節（Add → New 按鈕等）。
 
-**åˆ†æ”¯ï¼š** `feature/i18n-phase7-controller-strings`  
-**è¨ˆåŠƒæ—¥æœŸï¼š** 2026-06-03  
+**分支：** `feature/i18n-phase7-controller-strings`  
+**計劃日期：** 2026-06-03  
 
 ---
 
-### Phase 7Aï¼šBasicInformation åŠå­æŽ§åˆ¶å™¨ï¼ˆæœ€é«˜å„ªå…ˆï¼‰
+### Phase 7A：BasicInformation 及子控制器（最高優先）
 
-**ç¯„åœï¼š** ä¸‹åˆ— 13 å€‹æŽ§åˆ¶å™¨çš„ `index`ï¼`create`ï¼`show`ï¼`edit` å››å€‹æ–¹æ³•ï¼Œå‡ä»¥ PHP å­—ä¸²å‚³éž `page_title`ã€`page_description`ã€`breadcrumbs`ï¼Œå°Žè‡´èªžè¨€åˆ‡æ›å¾Œä»é¡¯ç¤ºä¸­æ–‡ã€‚
+**範圍：** 下列 13 個控制器的 `index`／`create`／`show`／`edit` 四個方法，均以 PHP 字串傳遞 `page_title`、`page_description`、`breadcrumbs`，導致語言切換後仍顯示中文。
 
-| æŽ§åˆ¶å™¨ï¼ˆ`app/Http/Controllers/`ï¼‰ | ç•¶å‰ `page_title`ï¼ˆzh-TW ç¡¬ç·¨ç¢¼ï¼‰ | æ”¹ç”¨çš„ lang key |
+| 控制器（`app/Http/Controllers/`） | 當前 `page_title`（zh-TW 硬編碼） | 改用的 lang key |
 |----------------------------------|----------------------------------|----------------|
-| `BasicInformationController` | `'äººç‰©åŸºæœ¬è³‡æ–™'` | `person.person_records`ï¼ˆæ–°å¢žï¼‰ |
-| `BasicInformationOfficesController` | `'å®˜å'` | `person.tab_postings` |
-| `BasicInformationAddressesController` | `'åœ°å€'` | `person.addresses` |
-| `BasicInformationAltnamesController` | `'åˆ¥å'` | `person.alt_name` |
-| `BasicInformationAssocController` | `'ç¤¾æœƒé—œä¿‚'` | `person.associations` |
-| `BasicInformationEntriesController` | `'å…¥ä»•'` | `person.entry` |
-| `BasicInformationEventsController` | `'äº‹ä»¶'` | `person.events` |
-| `BasicInformationKinshipController` | `'è¦ªå±¬'` | `person.tab_kinship` |
-| `BasicInformationPossessionController` | `'è²¡ç”¢'` | `person.possessions` |
-| `BasicInformationSocialInstController` | `'ç¤¾äº¤æ©Ÿæ§‹'` | `person.tab_social_institutions` |
-| `BasicInformationSourcesController` | `'å‡ºè™•'` | `person.tab_sources` |
-| `BasicInformationStatusesController` | `'ç¤¾æœƒå€åˆ†'` | `person.status` |
-| `BasicInformationTextsController` | `'è‘—è¿°'` | `person.tab_texts` |
+| `BasicInformationController` | `'人物基本資料'` | `person.person_records`（新增） |
+| `BasicInformationOfficesController` | `'官名'` | `person.tab_postings` |
+| `BasicInformationAddressesController` | `'地址'` | `person.addresses` |
+| `BasicInformationAltnamesController` | `'別名'` | `person.alt_name` |
+| `BasicInformationAssocController` | `'社會關係'` | `person.associations` |
+| `BasicInformationEntriesController` | `'入仕'` | `person.entry` |
+| `BasicInformationEventsController` | `'事件'` | `person.events` |
+| `BasicInformationKinshipController` | `'親屬'` | `person.tab_kinship` |
+| `BasicInformationPossessionController` | `'財產'` | `person.possessions` |
+| `BasicInformationSocialInstController` | `'社交機構'` | `person.tab_social_institutions` |
+| `BasicInformationSourcesController` | `'出處'` | `person.tab_sources` |
+| `BasicInformationStatusesController` | `'社會區分'` | `person.status` |
+| `BasicInformationTextsController` | `'著述'` | `person.tab_texts` |
 
-**Breadcrumb æ›¿æ›è¦å‰‡ï¼ˆæ¯å€‹æŽ§åˆ¶å™¨çš„æ¯å€‹ action å‡é©ç”¨ï¼‰ï¼š**
+**Breadcrumb 替換規則（每個控制器的每個 action 均適用）：**
 
 ```php
-// æ”¹å‰ï¼ˆç¡¬ç·¨ç¢¼ç¤ºä¾‹ï¼Œä»¥ Offices ç‚ºä¾‹ï¼‰
-'page_title'       => 'å®˜å',
-'page_description' => 'åŸºæœ¬ä¿¡æ¯è¡¨ å®˜å',
+// 改前（硬編碼示例，以 Offices 為例）
+'page_title'       => '官名',
+'page_description' => '基本信息表 官名',
 'breadcrumbs' => [
-    ['label' => 'äººç‰©åŸºæœ¬è³‡æ–™', 'url' => route('basicinformation.index')],
+    ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
     ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-    ['label' => 'å®˜å', 'url' => route('basicinformation.offices.index', $id)],
-    ['label' => 'æ–°å¢ž', 'url' => '#'],
+    ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
+    ['label' => '新增', 'url' => '#'],
 ],
 
-// æ”¹å¾Œï¼ˆä½¿ç”¨ __() ç¿»è­¯ helperï¼‰
+// 改後（使用 __() 翻譯 helper）
 'page_title'       => __('person.tab_postings'),
-'page_description' => __('person.person_records') . ' â€“ ' . __('person.tab_postings'),
+'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'),
 'breadcrumbs' => [
     ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
     ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
@@ -865,52 +865,52 @@ Blade é é¢é€éŽ `__()` ç›´æŽ¥å‘¼å«ï¼Œä¸é�
 ],
 ```
 
-**éœ€æ–°å¢ž lang keyï¼š**
+**需新增 lang key：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `person.person_records` | `'äººç‰©åŸºæœ¬è³‡æ–™'` | `'Person Records'` |
+| `person.person_records` | `'人物基本資料'` | `'Person Records'` |
 
-> **æ³¨æ„ï¼š** `page_title` å‚³å…¥è¦–åœ–å¾Œç›´æŽ¥è¼¸å‡ºç‚º PHP å­—ä¸²ï¼Œåœ¨æŽ§åˆ¶å™¨ä¸­å‘¼å« `__()` æ™‚å·²æ ¹æ“šç•¶å‰ locale ç¿»è­¯ï¼Œä¸éœ€è¦é¡å¤–è™•ç†ã€‚
+> **注意：** `page_title` 傳入視圖後直接輸出為 PHP 字串，在控制器中呼叫 `__()` 時已根據當前 locale 翻譯，不需要額外處理。
 
-**æ­¥é©Ÿï¼š**
-- [x] 7A-0ï¼šåœ¨ `resources/lang/zh-TW/person.php` èˆ‡ `resources/lang/en/person.php` æ–°å¢ž `person_records` key
-- [x] 7A-1ï¼šæ›´æ–° `BasicInformationController` å››å€‹ action
-- [x] 7A-2ï¼šæ›´æ–° `BasicInformationOfficesController` å››å€‹ action
-- [x] 7A-3ï¼šæ›´æ–° `BasicInformationAddressesController` å››å€‹ action
-- [x] 7A-4ï¼šæ›´æ–° `BasicInformationAltnamesController` å››å€‹ action
-- [x] 7A-5ï¼šæ›´æ–° `BasicInformationAssocController` å››å€‹ action
-- [x] 7A-6ï¼šæ›´æ–° `BasicInformationEntriesController` å››å€‹ action
-- [x] 7A-7ï¼šæ›´æ–° `BasicInformationEventsController` å››å€‹ action
-- [x] 7A-8ï¼šæ›´æ–° `BasicInformationKinshipController` å››å€‹ action
-- [x] 7A-9ï¼šæ›´æ–° `BasicInformationPossessionController` å››å€‹ action
-- [x] 7A-10ï¼šæ›´æ–° `BasicInformationSocialInstController` å››å€‹ action
-- [x] 7A-11ï¼šæ›´æ–° `BasicInformationSourcesController` å››å€‹ action
-- [x] 7A-12ï¼šæ›´æ–° `BasicInformationStatusesController` å››å€‹ action
-- [x] 7A-13ï¼šæ›´æ–° `BasicInformationTextsController` å››å€‹ action
+**步驟：**
+- [x] 7A-0：在 `resources/lang/zh-TW/person.php` 與 `resources/lang/en/person.php` 新增 `person_records` key
+- [x] 7A-1：更新 `BasicInformationController` 四個 action
+- [x] 7A-2：更新 `BasicInformationOfficesController` 四個 action
+- [x] 7A-3：更新 `BasicInformationAddressesController` 四個 action
+- [x] 7A-4：更新 `BasicInformationAltnamesController` 四個 action
+- [x] 7A-5：更新 `BasicInformationAssocController` 四個 action
+- [x] 7A-6：更新 `BasicInformationEntriesController` 四個 action
+- [x] 7A-7：更新 `BasicInformationEventsController` 四個 action
+- [x] 7A-8：更新 `BasicInformationKinshipController` 四個 action
+- [x] 7A-9：更新 `BasicInformationPossessionController` 四個 action
+- [x] 7A-10：更新 `BasicInformationSocialInstController` 四個 action
+- [x] 7A-11：更新 `BasicInformationSourcesController` 四個 action
+- [x] 7A-12：更新 `BasicInformationStatusesController` 四個 action
+- [x] 7A-13：更新 `BasicInformationTextsController` 四個 action
 
 ---
 
-### Phase 7Bï¼šDashboard æ“ä½œé¡žåž‹æ¨™ç±¤ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 7B：Dashboard 操作類型標籤（高優先）
 
-**å•é¡Œï¼š** `DashboardController` ä¸­çš„ `$typeNames` å°ç…§è¡¨ä½¿ç”¨ç¡¬ç·¨ç¢¼ä¸­æ–‡ï¼Œå°Žè‡´ Dashboard çš„ã€Œæ“ä½œé¡žåž‹çµ±è¨ˆã€å¡ç‰‡åœ¨è‹±æ–‡æ¨¡å¼ä¸‹ä»é¡¯ç¤ºã€Œæ–°å¢žã€ã€ã€Œä¿®æ”¹ã€ã€ã€Œåˆªé™¤ã€ç­‰ä¸­æ–‡ã€‚
+**問題：** `DashboardController` 中的 `$typeNames` 對照表使用硬編碼中文，導致 Dashboard 的「操作類型統計」卡片在英文模式下仍顯示「新增」、「修改」、「刪除」等中文。
 
-**ä½ç½®ï¼š** `app/Http/Controllers/DashboardController.php`ï¼Œ`page_title` åŠ `$typeNames` é™£åˆ—
+**位置：** `app/Http/Controllers/DashboardController.php`，`page_title` 及 `$typeNames` 陣列
 
 ```php
-// æ”¹å‰
-'page_title' => 'ç³»çµ±ç¸½è¦½',
+// 改前
+'page_title' => '系統總覽',
 $typeNames = [
-    Operation::TYPE_CREATE       => 'æ–°å¢ž',
-    Operation::TYPE_UPDATE_FULL  => 'ä¿®æ”¹',
-    Operation::TYPE_UPDATE       => 'ä¿®æ”¹',
-    Operation::TYPE_DELETE       => 'åˆªé™¤',
-    Operation::TYPE_PROPOSAL_CREATE => 'ææ¡ˆï¼ˆæ–°å¢žï¼‰',
-    Operation::TYPE_PROPOSAL_UPDATE => 'ææ¡ˆï¼ˆä¿®æ”¹ï¼‰',
+    Operation::TYPE_CREATE       => '新增',
+    Operation::TYPE_UPDATE_FULL  => '修改',
+    Operation::TYPE_UPDATE       => '修改',
+    Operation::TYPE_DELETE       => '刪除',
+    Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
+    Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
 ];
-$typeName = $typeNames[$item->op_type] ?? 'æœªçŸ¥';
+$typeName = $typeNames[$item->op_type] ?? '未知';
 
-// æ”¹å¾Œ
+// 改後
 'page_title' => __('nav.dashboard'),
 $typeNames = [
     Operation::TYPE_CREATE       => __('operations.op_create'),
@@ -923,385 +923,385 @@ $typeNames = [
 $typeName = $typeNames[$item->op_type] ?? __('common.unknown');
 ```
 
-> **æ³¨æ„ï¼š** `operations.php` å·²æœ‰ `op_create`ã€`op_update`ã€`op_delete`ã€`op_proposal_create`ã€`op_proposal_update` ç­‰ keyï¼ˆzh-TW èˆ‡ en å‡å·²å­˜åœ¨ï¼‰ï¼Œä¸éœ€æ–°å¢ž lang keyã€‚
+> **注意：** `operations.php` 已有 `op_create`、`op_update`、`op_delete`、`op_proposal_create`、`op_proposal_update` 等 key（zh-TW 與 en 均已存在），不需新增 lang key。
 
-**æ­¥é©Ÿï¼š**
-- [x] 7B-1ï¼šæ›´æ–° `DashboardController`ï¼ˆpage_title + typeNamesï¼‰
+**步驟：**
+- [x] 7B-1：更新 `DashboardController`（page_title + typeNames）
 
 ---
 
-### Phase 7Cï¼šViewTableController é é¢æ¨™é¡Œï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 7C：ViewTableController 頁面標題（高優先）
 
-**å•é¡Œï¼š**
-1. `/view` æ¸…å–®é ï¼š`page_title => 'æª¢è¦–è¡¨ç¸½è¦½'` ç¡¬ç·¨ç¢¼
-2. `/view/{key}` è©³ç´°é ï¼ˆå¦‚ `/view/biog-addr-data`ï¼‰ï¼š`page_title` åŠ `page_description` å–è‡ª `$definition['title']`ï¼`$definition['description']`ï¼ˆä¸­æ–‡ç¡¬ç·¨ç¢¼ï¼‰ï¼›Archer éºµåŒ…å±‘ `<a href='/view'>æª¢è¦–è¡¨ç¸½è¦½</a>` ç¡¬ç·¨ç¢¼
+**問題：**
+1. `/view` 清單頁：`page_title => '檢視表總覽'` 硬編碼
+2. `/view/{key}` 詳細頁（如 `/view/biog-addr-data`）：`page_title` 及 `page_description` 取自 `$definition['title']`／`$definition['description']`（中文硬編碼）；Archer 麵包屑 `<a href='/view'>檢視表總覽</a>` 硬編碼
 
-**ä½ç½®ï¼š** `app/Http/Controllers/ViewTableController.php`
+**位置：** `app/Http/Controllers/ViewTableController.php`
 
 ```php
-// æ”¹å‰ï¼ˆæ¸…å–®é ï¼‰
-'page_title' => 'æª¢è¦–è¡¨ç¸½è¦½',
+// 改前（清單頁）
+'page_title' => '檢視表總覽',
 
-// æ”¹å¾Œ
+// 改後
 'page_title' => __('nav.views_overview'),
 ```
 
 ```php
-// æ”¹å‰ï¼ˆè©³ç´°é ï¼Œarrow = breadcrumbï¼‰
+// 改前（詳細頁，arrow = breadcrumb）
 'page_title'       => $definition['title'] ?? $effectiveKey,
 'page_description' => $definition['description'] ?? '',
-'archer'           => "<li class='breadcrumb-item'><a href='/view'>æª¢è¦–è¡¨ç¸½è¦½</a></li>",
+'archer'           => "<li class='breadcrumb-item'><a href='/view'>檢視表總覽</a></li>",
 
-// æ”¹å¾Œï¼šåˆ©ç”¨ views.php å·²æœ‰çš„ç¿»è­¯
+// 改後：利用 views.php 已有的翻譯
 $viewLangKey = 'view_' . str_replace('-', '_', $effectiveKey);
-// views.php å·²æœ‰æ‰€æœ‰ view_* çš„æ¨™é¡Œç¿»è­¯ï¼Œkey ä¸å­˜åœ¨æ™‚ __() å›žå‚³ key æœ¬èº«
+// views.php 已有所有 view_* 的標題翻譯，key 不存在時 __() 回傳 key 本身
 'page_title'       => __('views.' . $viewLangKey) !== 'views.' . $viewLangKey
                           ? __('views.' . $viewLangKey)
                           : ($definition['title'] ?? $effectiveKey),
-'page_description' => __('views.' . $viewLangKey . '_desc', [], null)  // å¾…è£œï¼ˆè¦‹ä¸‹æ–¹èªªæ˜Žï¼‰
+'page_description' => __('views.' . $viewLangKey . '_desc', [], null)  // 待補（見下方說明）
                           ?: ($definition['description'] ?? ''),
 'archer'           => "<li class='breadcrumb-item'><a href='/view'>" . __('nav.views_overview') . "</a></li>",
 ```
 
-**å¾…è£œèªªæ˜Žï¼š** `views.php` ç›®å‰åªæœ‰æ¨™é¡Œï¼ˆ`view_biog_addr_data`ï¼‰ç„¡èªªæ˜Žï¼ˆ`view_biog_addr_data_desc`ï¼‰ã€‚èªªæ˜Žç¿»è­¯ç‚º 17 æ¢é•·å¥ï¼Œéœ€äººå·¥æ’°å¯«å¾Œæ–°å¢žè‡³ `resources/lang/zh-TW/views.php` èˆ‡ `resources/lang/en/views.php`ã€‚å¯å…ˆä»¥ `''`ï¼ˆç©ºå­—ä¸²ï¼‰ä½œç‚ºè‹±æ–‡èªªæ˜Žï¼Œå¾…ç¿»è­¯å¾Œè£œé½Šã€‚
+**待補說明：** `views.php` 目前只有標題（`view_biog_addr_data`）無說明（`view_biog_addr_data_desc`）。說明翻譯為 17 條長句，需人工撰寫後新增至 `resources/lang/zh-TW/views.php` 與 `resources/lang/en/views.php`。可先以 `''`（空字串）作為英文說明，待翻譯後補齊。
 
-**æ­¥é©Ÿï¼š**
-- [x] 7C-1ï¼šæ›´æ–° `ViewTableController`ï¼ˆæ¸…å–®é  page_titleï¼Œè©³ç´°é  title/breadcrumbï¼‰
-- [x] 7C-2ï¼šæ–°å¢ž `views.php` èªªæ˜Ž keyï¼ˆ`view_*_desc`ï¼Œ18 æ¢ï¼‰ä¸¦è£œé½Š enï¼zh-TW ç¿»è­¯
+**步驟：**
+- [x] 7C-1：更新 `ViewTableController`（清單頁 page_title，詳細頁 title/breadcrumb）
+- [x] 7C-2：新增 `views.php` 說明 key（`view_*_desc`，18 條）並補齊 en／zh-TW 翻譯
 
 ---
 
-### Phase 7Dï¼šcodes/edit.blade.php è¡¨å–®èªªæ˜Žæ–‡å­—ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 7D：codes/edit.blade.php 表單說明文字（高優先）
 
-**å•é¡Œï¼š** `resources/views/codes/edit.blade.php` ä¸­å¤šè™•ç¡¬ç·¨ç¢¼ä¸­æ–‡èªªæ˜Žï¼ŒåŒ…å«ï¼š
+**問題：** `resources/views/codes/edit.blade.php` 中多處硬編碼中文說明，包含：
 
-| ä½ç½® | ç•¶å‰ç¡¬ç·¨ç¢¼ä¸­æ–‡ | æ”¹ç”¨ key |
+| 位置 | 當前硬編碼中文 | 改用 key |
 |------|---------------|---------|
-| L21ï¼š`TEXT_CODES` è¡¨çš„ä½œè€…æ¨™ç±¤ | `ä½œè€…` | `codes.author_label` |
-| L23ï¼šè¼‰å…¥ä½œè€…ç‹€æ…‹ | `è¼‰å…¥ä½œè€…ä¸­...` | `codes.loading_author` |
-| L39/41ï¼šmodified_by/date æç¤ºï¼ˆPHP å­—ä¸²ï¼‰ | `'æ¬„ä½å…§å®¹æäº¤å¾Œæœƒè¢«æ›¿æ›ç‚ºï¼š'` | `codes.field_will_be_replaced` |
-| L56ï¼šTEXT_INSTANCE_DATA c_textid èªªæ˜Ž | `è«‹ç¢ºä¿ TEXT_CODES è¡¨ä¸­å­˜åœ¨é€™æœ¬æ›¸çš„ c_textidï¼Œå†è¤‡è£½ ID å¡«å…¥` | `codes.text_codes_copy_hint` |
-| L80/89ï¼šADDR_BELONGS_DATA c_addr_id / c_belongs_to èªªæ˜Ž | `è«‹å¾ž ADDR_CODES è¡¨ä¸­è¤‡è£½ c_addr_id å¡«å…¥` | `codes.addr_copy_hint` |
-| L110ï¼šææ¡ˆèªªæ˜Žæ¬„ä½å¿½ç•¥æç¤º | `å¦‚æžœç›´æŽ¥å„²å­˜ï¼Œæ­¤æ¬„ä½æœƒè¢«å¿½ç•¥ã€‚` | `codes.proposal_ignore_hint` |
+| L21：`TEXT_CODES` 表的作者標籤 | `作者` | `codes.author_label` |
+| L23：載入作者狀態 | `載入作者中...` | `codes.loading_author` |
+| L39/41：modified_by/date 提示（PHP 字串） | `'欄位內容提交後會被替換為：'` | `codes.field_will_be_replaced` |
+| L56：TEXT_INSTANCE_DATA c_textid 說明 | `請確保 TEXT_CODES 表中存在這本書的 c_textid，再複製 ID 填入` | `codes.text_codes_copy_hint` |
+| L80/89：ADDR_BELONGS_DATA c_addr_id / c_belongs_to 說明 | `請從 ADDR_CODES 表中複製 c_addr_id 填入` | `codes.addr_copy_hint` |
+| L110：提案說明欄位忽略提示 | `如果直接儲存，此欄位會被忽略。` | `codes.proposal_ignore_hint` |
 
-> **æ³¨æ„ï¼š** L56ã€L80ã€L89 çš„èªªæ˜Žå«æœ‰ HTML é€£çµï¼Œä½¿ç”¨ `{!! __('codes.xxx') !!}` æ³¨å…¥ï¼ˆlang æª”ç”±æˆ‘å€‘æŽ§åˆ¶ï¼Œç„¡ XSS é¢¨éšªï¼‰ã€‚
+> **注意：** L56、L80、L89 的說明含有 HTML 連結，使用 `{!! __('codes.xxx') !!}` 注入（lang 檔由我們控制，無 XSS 風險）。
 
-**å¦ï¼šJS å­—ä¸²ï¼ˆ`<script>` å€å¡Šå…§ï¼‰ï¼š**
+**另：JS 字串（`<script>` 區塊內）：**
 
-| ä½ç½® | ç•¶å‰ç¡¬ç·¨ç¢¼ | å»ºè­°è™•ç†æ–¹å¼ |
+| 位置 | 當前硬編碼 | 建議處理方式 |
 |------|-----------|------------|
-| L159ï¼šç„¡ c_textid æç¤º | `ç„¡ c_textidï¼Œç„¡æ³•è¼‰å…¥ä½œè€…` | `{!! Js::from(__('codes.no_textid_msg')) !!}` æ³¨å…¥ |
-| L205/208ï¼šç„¡ä½œè€…è³‡æ–™ / è¼‰å…¥å¤±æ•— | `ç„¡ä½œè€…è³‡æ–™` / `è¼‰å…¥å¤±æ•—` | åŒä¸Š |
-| L248/256/259ï¼šLoad Data çµæžœ alert | æ··ç”¨ä¸­è‹± | åŒä¸Š |
-| L284ï¼šäººç‰©æœå°‹ placeholder | `è¼¸å…¥å§“åæˆ– ID æœå°‹äººç‰©` | åŒä¸Š |
+| L159：無 c_textid 提示 | `無 c_textid，無法載入作者` | `{!! Js::from(__('codes.no_textid_msg')) !!}` 注入 |
+| L205/208：無作者資料 / 載入失敗 | `無作者資料` / `載入失敗` | 同上 |
+| L248/256/259：Load Data 結果 alert | 混用中英 | 同上 |
+| L284：人物搜尋 placeholder | `輸入姓名或 ID 搜尋人物` | 同上 |
 
-**éœ€æ–°å¢ž lang keyï¼ˆ`resources/lang/zh-TW/codes.php` èˆ‡ `resources/lang/en/codes.php`ï¼‰ï¼š**
+**需新增 lang key（`resources/lang/zh-TW/codes.php` 與 `resources/lang/en/codes.php`）：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `author_label` | `'ä½œè€…'` | `'Author'` |
-| `loading_author` | `'è¼‰å…¥ä½œè€…ä¸­...'` | `'Loading author...'` |
-| `field_will_be_replaced` | `'æ¬„ä½å…§å®¹æäº¤å¾Œæœƒè¢«æ›¿æ›ç‚ºï¼š'` | `'This field will be replaced upon submission with: '` |
-| `text_codes_copy_hint` | `'è«‹ç¢ºä¿ <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> è¡¨ä¸­å­˜åœ¨é€™æœ¬æ›¸çš„ c_textidï¼Œå†è¤‡è£½ ID å¡«å…¥'` | `'Make sure the book\'s c_textid exists in the <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> table, then copy the ID here.'` |
-| `addr_copy_hint` | `'è«‹å¾ž <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> è¡¨ä¸­è¤‡è£½ c_addr_id å¡«å…¥'` | `'Copy c_addr_id from the <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> table.'` |
-| `proposal_ignore_hint` | `'å¦‚æžœç›´æŽ¥å„²å­˜ï¼Œæ­¤æ¬„ä½æœƒè¢«å¿½ç•¥ã€‚'` | `'If you save directly, this field will be ignored.'` |
-| `no_textid_msg` | `'ç„¡ c_textidï¼Œç„¡æ³•è¼‰å…¥ä½œè€…'` | `'No c_textid, cannot load author.'` |
-| `no_author_data` | `'ç„¡ä½œè€…è³‡æ–™'` | `'No author data'` |
-| `load_failed` | `'è¼‰å…¥å¤±æ•—'` | `'Load failed'` |
-| `load_no_data_alert` | `'Load Dataï¼šç„¡æŸ¥è©¢çµæžœ'` | `'Load Data: No results found'` |
-| `load_success_alert` | `'Load Dataï¼šå·²æ›´æ–° c_instance_title_chn èˆ‡ c_instance_title'` | `'Load Data: Updated c_instance_title_chn and c_instance_title'` |
-| `load_failed_alert` | `'Load Dataï¼šæŸ¥è©¢å¤±æ•—'` | `'Load Data: Query failed'` |
-| `person_search_placeholder` | `'è¼¸å…¥å§“åæˆ– ID æœå°‹äººç‰©'` | `'Enter name or ID to search'` |
+| `author_label` | `'作者'` | `'Author'` |
+| `loading_author` | `'載入作者中...'` | `'Loading author...'` |
+| `field_will_be_replaced` | `'欄位內容提交後會被替換為：'` | `'This field will be replaced upon submission with: '` |
+| `text_codes_copy_hint` | `'請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入'` | `'Make sure the book\'s c_textid exists in the <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> table, then copy the ID here.'` |
+| `addr_copy_hint` | `'請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入'` | `'Copy c_addr_id from the <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> table.'` |
+| `proposal_ignore_hint` | `'如果直接儲存，此欄位會被忽略。'` | `'If you save directly, this field will be ignored.'` |
+| `no_textid_msg` | `'無 c_textid，無法載入作者'` | `'No c_textid, cannot load author.'` |
+| `no_author_data` | `'無作者資料'` | `'No author data'` |
+| `load_failed` | `'載入失敗'` | `'Load failed'` |
+| `load_no_data_alert` | `'Load Data：無查詢結果'` | `'Load Data: No results found'` |
+| `load_success_alert` | `'Load Data：已更新 c_instance_title_chn 與 c_instance_title'` | `'Load Data: Updated c_instance_title_chn and c_instance_title'` |
+| `load_failed_alert` | `'Load Data：查詢失敗'` | `'Load Data: Query failed'` |
+| `person_search_placeholder` | `'輸入姓名或 ID 搜尋人物'` | `'Enter name or ID to search'` |
 
-**æ­¥é©Ÿï¼š**
-- [x] 7D-1ï¼šæ–°å¢žä¸Šè¿° 13 å€‹ lang key è‡³ zh-TW/codes.php èˆ‡ en/codes.php
-- [x] 7D-2ï¼šæ›´æ–° `codes/edit.blade.php`ï¼ˆBlade èªªæ˜Žæ–‡å­— 6 è™• + JS å­—ä¸² 7 è™•ï¼‰
-
----
-
-### Phase 7Eï¼šUI ç´°ç¯€èª¿æ•´ï¼ˆä¸­å„ªå…ˆï¼‰
-
-#### 7E-1ï¼šAdd â†’ New æŒ‰éˆ•ï¼ˆä½¿ç”¨è€…æŒ‡å®šï¼‰âœ…
-
-**å•é¡Œï¼š** `basicinformation/index.blade.php`ï¼ˆåŠæ‰€æœ‰å­æ¨¡çµ„ index é é¢ï¼‰çš„ã€Œæ–°å¢žã€æŒ‰éˆ•ï¼Œè‹±æ–‡æ¨¡å¼é¡¯ç¤º `Add`ï¼Œä½¿ç”¨è€…å¸Œæœ›æ”¹ç‚º `New`ã€‚
-
-**æ–¹æ¡ˆï¼š** å°‡ `resources/lang/en/common.php` çš„ `'add' => 'Add'` æ”¹ç‚º `'add' => 'New'`ã€‚  
-ï¼ˆzh-TW `'add' => 'æ–°å¢ž'` ä¸è®Šï¼›æ‰€æœ‰ä½¿ç”¨ `__('common.add')` çš„æŒ‰éˆ•çµ±ä¸€å—ç›Šã€‚ï¼‰
-
-**å·²å®Œæˆï¼š** 2026-06-03
-
-#### 7E-2ï¼šoffices/index.blade.php è¡¨é ­ï¼ˆä½Žå„ªå…ˆï¼‰âœ…
-
-**å•é¡Œï¼š** `resources/views/biogmains/offices/index.blade.php` L26â€“27 çš„è¡¨é ­ `sequence`ã€`posting_id` ç‚ºè‹±æ–‡è³‡æ–™åº«æ¬„ä½åç¨±ï¼Œæœªä½¿ç”¨ç¿»è­¯ helperã€‚  
-**ä¿®æ­£ï¼š**  
-- `<th>sequence</th>` â†’ `<th>{{ __('biogmains.sequence') }}</th>`ï¼ˆ`biogmains.sequence` å·²æœ‰ç¿»è­¯ï¼šzh-TW 'æ¬¡åº' / en 'Sequence'ï¼‰  
-- `<th>posting_id</th>` â†’ `<th>{{ __('person.posting_id') }}</th>`ï¼ˆ`person.posting_id` å·²æœ‰ç¿»è­¯ï¼šzh-TW 'ä»»å®˜ ID' / en 'Posting ID'ï¼‰
-
-**å·²å®Œæˆï¼š** 2026-06-03
-
-#### 7E-3ï¼šbasicinformation/edit.blade.php Xing/Ming æ¨™ç±¤ï¼ˆä½Žå„ªå…ˆï¼‰
-
-**å•é¡Œï¼š** L55ã€L65 æœ‰ç¡¬ç·¨ç¢¼è‹±æ–‡æ¨™ç±¤ `Xing`ã€`Ming`ï¼ˆå¤–æ–‡å§“/åæ¬„ä½ï¼‰ã€‚  
-**ç¾ç‹€ï¼š** é€™å…©å€‹æ¬„ä½æ˜¯æ¼¢èªžæ‹¼éŸ³å­¸è¡“è¡“èªžï¼Œè‹±æ–‡ä½¿ç”¨è€…åŒæ¨£ä»¥ Xing/Ming ç†è§£ï¼›ä¸éœ€ç¿»è­¯ï¼Œä½†å¯åŠ  title æç¤ºã€‚  
-**æ±ºå®šï¼š** æš«ä¸ä¿®æ”¹ï¼Œå¯åœ¨ Phase 7 å¾ŒæœŸè¦–éœ€è¦è£œå……ã€‚
+**步驟：**
+- [x] 7D-1：新增上述 13 個 lang key 至 zh-TW/codes.php 與 en/codes.php
+- [x] 7D-2：更新 `codes/edit.blade.php`（Blade 說明文字 6 處 + JS 字串 7 處）
 
 ---
 
-### Phase 7Fï¼šå…¶ä»–æ®˜ç•™æŽ§åˆ¶å™¨ï¼ˆä½Žå„ªå…ˆï¼Œå¯æ‰¹æ¬¡ï¼‰
+### Phase 7E：UI 細節調整（中優先）
 
-ä»¥ä¸‹æŽ§åˆ¶å™¨åŒæ¨£æœ‰ `page_title`ï¼`page_description` ç¡¬ç·¨ç¢¼ä¸­æ–‡ï¼Œä½†ä½¿ç”¨é »çŽ‡è¼ƒä½Žï¼š
+#### 7E-1：Add → New 按鈕（使用者指定）✅
 
-| æŽ§åˆ¶å™¨ | ç•¶å‰ page_title | å»ºè­° key |
+**問題：** `basicinformation/index.blade.php`（及所有子模組 index 頁面）的「新增」按鈕，英文模式顯示 `Add`，使用者希望改為 `New`。
+
+**方案：** 將 `resources/lang/en/common.php` 的 `'add' => 'Add'` 改為 `'add' => 'New'`。  
+（zh-TW `'add' => '新增'` 不變；所有使用 `__('common.add')` 的按鈕統一受益。）
+
+**已完成：** 2026-06-03
+
+#### 7E-2：offices/index.blade.php 表頭（低優先）✅
+
+**問題：** `resources/views/biogmains/offices/index.blade.php` L26–27 的表頭 `sequence`、`posting_id` 為英文資料庫欄位名稱，未使用翻譯 helper。  
+**修正：**  
+- `<th>sequence</th>` → `<th>{{ __('biogmains.sequence') }}</th>`（`biogmains.sequence` 已有翻譯：zh-TW '次序' / en 'Sequence'）  
+- `<th>posting_id</th>` → `<th>{{ __('person.posting_id') }}</th>`（`person.posting_id` 已有翻譯：zh-TW '任官 ID' / en 'Posting ID'）
+
+**已完成：** 2026-06-03
+
+#### 7E-3：basicinformation/edit.blade.php Xing/Ming 標籤（低優先）
+
+**問題：** L55、L65 有硬編碼英文標籤 `Xing`、`Ming`（外文姓/名欄位）。  
+**現狀：** 這兩個欄位是漢語拼音學術術語，英文使用者同樣以 Xing/Ming 理解；不需翻譯，但可加 title 提示。  
+**決定：** 暫不修改，可在 Phase 7 後期視需要補充。
+
+---
+
+### Phase 7F：其他殘留控制器（低優先，可批次）
+
+以下控制器同樣有 `page_title`／`page_description` 硬編碼中文，但使用頻率較低：
+
+| 控制器 | 當前 page_title | 建議 key |
 |--------|----------------|---------|
-| `CrowdsourcingController` | `'æœ€è¿‘çœ¾åŒ…éŒ„å…¥è¨˜éŒ„'` | `nav.crowdsourcing_records` |
-| `ManagementController` | `'ç”¨æˆ¶ç®¡ç†'` | `nav.user_management` |
-| `UserProfileController` | `'å€‹äººè³‡æ–™è¨­å®š'` | `common.profile_settings` |
-| `AdminAuditLogController` | `'å¯©è¨ˆæ—¥èªŒ'` | `admin.audit_logs` |
-| `AiFillLogController` | `'AI å¡«å……æ—¥èªŒ'` | `admin.ai_fill_logs` |
-| `CbdbTableMaintenanceController` | `'CBDB å…§éƒ¨è¡¨ç¶­è­·'` | `admin.table_maintenance` |
-| `AdminBatchLoad*Controller` (3 å€‹) | å„è‡ªçš„æ‰¹æ¬¡å·¥å…·æ¨™é¡Œ | `admin.*` |
-| `WikiMaintenanceController` | `'Wiki å°ç…§è³‡æ–™ç¶­è­·'` | `admin.wiki_maintenance` |
-| `CodesController` | `'å…¨éƒ¨è¡¨æ ¼'` | `nav.all_tables` |
-| `UnidirectionalRelationshipRepairController` | `'å–®å‘é—œä¿‚ä¿®å¾©'` | ï¼ˆå¯æ–°å¢ž admin keyï¼‰ |
+| `CrowdsourcingController` | `'最近眾包錄入記錄'` | `nav.crowdsourcing_records` |
+| `ManagementController` | `'用戶管理'` | `nav.user_management` |
+| `UserProfileController` | `'個人資料設定'` | `common.profile_settings` |
+| `AdminAuditLogController` | `'審計日誌'` | `admin.audit_logs` |
+| `AiFillLogController` | `'AI 填充日誌'` | `admin.ai_fill_logs` |
+| `CbdbTableMaintenanceController` | `'CBDB 內部表維護'` | `admin.table_maintenance` |
+| `AdminBatchLoad*Controller` (3 個) | 各自的批次工具標題 | `admin.*` |
+| `WikiMaintenanceController` | `'Wiki 對照資料維護'` | `admin.wiki_maintenance` |
+| `CodesController` | `'全部表格'` | `nav.all_tables` |
+| `UnidirectionalRelationshipRepairController` | `'單向關係修復'` | （可新增 admin key） |
 
-**æ­¥é©Ÿï¼š**
-- [x] 7F-1ï¼šé€ä¸€æ›´æ–°ä¸Šè¿°æŽ§åˆ¶å™¨ï¼ˆåƒè€ƒ 7A çš„æ›¿æ›è¦å‰‡ï¼‰
+**步驟：**
+- [x] 7F-1：逐一更新上述控制器（參考 7A 的替換規則）
 
 ---
 
-### Phase 7 æ•´é«”çµ±è¨ˆ
+### Phase 7 整體統計
 
-| Sub-phase | å„ªå…ˆ | æ¶‰åŠæª”æ¡ˆ | èªªæ˜Ž | ç‹€æ…‹ |
+| Sub-phase | 優先 | 涉及檔案 | 說明 | 狀態 |
 |-----------|------|---------|------|------|
-| 7A biogmains 13 å€‹æŽ§åˆ¶å™¨ | æœ€é«˜ | 13 controllers + 2 lang | page_title/description/breadcrumbs | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
-| 7B Dashboard æ“ä½œé¡žåž‹ | é«˜ | 1 controller | typeNames + page_title | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
-| 7C ViewTableController | é«˜ | 1 controller + 2 lang | æ¸…å–®é  + è©³ç´°é  title/breadcrumb | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
-| 7D codes/edit.blade.php | é«˜ | 1 view + 2 lang | è¡¨å–®èªªæ˜Ž + JS å­—ä¸² | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
-| 7E UI ç´°ç¯€ï¼ˆAddâ†’New ç­‰ï¼‰ | ä¸­ | 1 lang + 2 view | æŒ‰éˆ•æ–‡å­—ã€è¡¨é ­ | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
-| 7F å…¶ä»–ä½Žé »æŽ§åˆ¶å™¨ | ä½Ž | 12 controllers | ç®¡ç†å“¡å·¥å…·ç­‰ | âœ… å®Œæˆï¼ˆ2026-06-03ï¼‰ |
+| 7A biogmains 13 個控制器 | 最高 | 13 controllers + 2 lang | page_title/description/breadcrumbs | ✅ 完成（2026-06-03） |
+| 7B Dashboard 操作類型 | 高 | 1 controller | typeNames + page_title | ✅ 完成（2026-06-03） |
+| 7C ViewTableController | 高 | 1 controller + 2 lang | 清單頁 + 詳細頁 title/breadcrumb | ✅ 完成（2026-06-03） |
+| 7D codes/edit.blade.php | 高 | 1 view + 2 lang | 表單說明 + JS 字串 | ✅ 完成（2026-06-03） |
+| 7E UI 細節（Add→New 等） | 中 | 1 lang + 2 view | 按鈕文字、表頭 | ✅ 完成（2026-06-03） |
+| 7F 其他低頻控制器 | 低 | 12 controllers | 管理員工具等 | ✅ 完成（2026-06-03） |
 
-> æŽƒææ—¥æœŸï¼š2026-06-03ã€‚å„ªå…ˆç´šä¾ä½¿ç”¨è€…æŽ¥è§¸é »çŽ‡æŽ’åºï¼›7D å› ç‚ºä½¿ç”¨è€…æŒ‡å®š ADDR_BELONGS_DATA å•é¡Œï¼Œç‰¹åˆ¥æå‡ç‚ºé«˜å„ªå…ˆã€‚
-
----
+> 掃描日期：2026-06-03。優先級依使用者接觸頻率排序；7D 因為使用者指定 ADDR_BELONGS_DATA 問題，特別提升為高優先。
 
 ---
 
-## 11. Phase 8ï¼šQueryPlayground React å…ƒä»¶ + Operations æŽ§åˆ¶å™¨ i18n
+---
 
-**èƒŒæ™¯ï¼š** Phase 7 å®Œæˆäº†æŽ§åˆ¶å™¨å­—ä¸²ç¿»è­¯ï¼Œä½†ä»¥ä¸‹å…©å€‹å€å¡Šè¢«éºæ¼ï¼š  
-ï¼ˆ1ï¼‰QueryPlayground çš„ä¸‰å€‹æ ¸å¿ƒ React å…ƒä»¶ï¼ˆ`NlQueryPanel.tsx`ã€`QbeBuilder.tsx`ã€`HistoricalQaPanel.tsx`ï¼‰å®Œå…¨æœªæŽ¥å…¥ `useTranslation`ï¼Œæ‰€æœ‰ UI å­—ä¸²ä»ç‚ºç¡¬ç·¨ç¢¼ä¸­æ–‡ã€‚`en/query.php` ä¸­å·²å­˜åœ¨è¨±å¤šå°æ‡‰çš„ç¿»è­¯ keyï¼Œä½†å…ƒä»¶å¾žæœªå‘¼å« `t()`ã€‚  
-ï¼ˆ2ï¼‰`OperationsController` çš„ `index` æ–¹æ³• `page_title`ï¼`page_description` èˆ‡ `revert` æ–¹æ³•çš„ flash è¨Šæ¯åŠ RuntimeException è¨Šæ¯ï¼Œä»ä»¥ç¡¬ç·¨ç¢¼ä¸­æ–‡å‚³éžã€‚
+## 11. Phase 8：QueryPlayground React 元件 + Operations 控制器 i18n
 
-**ç™¼ç¾æ—¥æœŸï¼š** 2026-06-03ï¼ˆåŸºæ–¼ https://input.cbdb.fas.harvard.edu/operations èˆ‡ /app/query-playground çš„å¯¦éš›æˆªåœ–ï¼‰  
-**åˆ†æ”¯ï¼š** `feature/i18n-phase8-react-components-operations`
+**背景：** Phase 7 完成了控制器字串翻譯，但以下兩個區塊被遺漏：  
+（1）QueryPlayground 的三個核心 React 元件（`NlQueryPanel.tsx`、`QbeBuilder.tsx`、`HistoricalQaPanel.tsx`）完全未接入 `useTranslation`，所有 UI 字串仍為硬編碼中文。`en/query.php` 中已存在許多對應的翻譯 key，但元件從未呼叫 `t()`。  
+（2）`OperationsController` 的 `index` 方法 `page_title`／`page_description` 與 `revert` 方法的 flash 訊息及 RuntimeException 訊息，仍以硬編碼中文傳遞。
+
+**發現日期：** 2026-06-03（基於 https://input.cbdb.fas.harvard.edu/operations 與 /app/query-playground 的實際截圖）  
+**分支：** `feature/i18n-phase8-react-components-operations`
 
 ---
 
-### Phase 8Aï¼šNlQueryPanel.tsx i18n æŽ¥å…¥ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 8A：NlQueryPanel.tsx i18n 接入（高優先）
 
-**å•é¡Œï¼š** `resources/js/inertia/components/QueryPlayground/NlQueryPanel.tsx` ç„¡ä»»ä½• `useTranslation` å‘¼å«ï¼Œæ‰€æœ‰å­—ä¸²å‡ç¡¬ç·¨ç¢¼ã€‚
+**問題：** `resources/js/inertia/components/QueryPlayground/NlQueryPanel.tsx` 無任何 `useTranslation` 呼叫，所有字串均硬編碼。
 
-**å·²å­˜åœ¨æ–¼ `en/query.php` çš„ keyï¼ˆåªéœ€æŽ¥ç·šï¼Œä¸é ˆæ–°å¢žï¼‰ï¼š**
+**已存在於 `en/query.php` 的 key（只需接線，不須新增）：**
 
-| å…ƒä»¶ä¸­çš„ä¸­æ–‡å­—ä¸² | å°æ‡‰ç¾æœ‰ key |
+| 元件中的中文字串 | 對應現有 key |
 |----------------|------------|
-| `ç”¨è‡ªç„¶èªžè¨€æè¿°æ‚¨æƒ³æŸ¥è©¢çš„å…§å®¹`ï¼ˆlabelï¼‰ | `nl_query_placeholder` |
-| `ä¾‹å¦‚ï¼šæ‰¾å‡ºæ‰€æœ‰å®‹æœé€²å£«çš„å§“åå’Œç±è²«`ï¼ˆtextarea placeholderï¼‰ | `nl_example` |
-| `æˆ‘å·²é–±è®€ä¸¦åŒæ„ä¸Šè¿°éš±ç§æç¤º` | `nl_agree_privacy` |
-| `ä½¿ç”¨å·¥å…·è¼”åŠ©ï¼ˆå¯æŸ¥çœ‹è³‡æ–™è¡¨çµæ§‹ï¼‰` | `nl_use_tools` |
-| `ä¸²æµæ¨¡å¼` | `nl_stream` |
-| `ç”Ÿæˆä¸­â€¦`ï¼ˆæŒ‰éˆ• loading ç‹€æ…‹ï¼‰ | `nl_generating` |
-| `ðŸ¤– ç”Ÿæˆ SQL`ï¼ˆæŒ‰éˆ•æ­£å¸¸ç‹€æ…‹ï¼‰ | `nl_generate` |
-| `å–æ¶ˆ` | `nl_cancel` |
-| `ç”Ÿæˆçš„ SQL`ï¼ˆçµæžœå€æ¨™é¡Œï¼‰ | `nl_generated_sql` |
-| `â–¶ å¸¶åˆ° SQL æ¨¡å¼åŸ·è¡Œ` | `nl_send_to_sql` |
-| `èªªæ˜Žï¼š` | `nl_explanation` |
+| `用自然語言描述您想查詢的內容`（label） | `nl_query_placeholder` |
+| `例如：找出所有宋朝進士的姓名和籍貫`（textarea placeholder） | `nl_example` |
+| `我已閱讀並同意上述隱私提示` | `nl_agree_privacy` |
+| `使用工具輔助（可查看資料表結構）` | `nl_use_tools` |
+| `串流模式` | `nl_stream` |
+| `生成中…`（按鈕 loading 狀態） | `nl_generating` |
+| `🤖 生成 SQL`（按鈕正常狀態） | `nl_generate` |
+| `取消` | `nl_cancel` |
+| `生成的 SQL`（結果區標題） | `nl_generated_sql` |
+| `▶ 帶到 SQL 模式執行` | `nl_send_to_sql` |
+| `說明：` | `nl_explanation` |
 
-**éœ€æ–°å¢žè‡³ `resources/lang/zh-TW/query.php` èˆ‡ `resources/lang/en/query.php` çš„ keyï¼š**
+**需新增至 `resources/lang/zh-TW/query.php` 與 `resources/lang/en/query.php` 的 key：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `nl_privacy_label` | `'âš  éš±ç§æç¤ºï¼š'` | `'âš  Privacy Notice:'` |
-| `nl_privacy_body` | `'æ­¤åŠŸèƒ½ä½¿ç”¨ AI æ¨¡åž‹ï¼ˆ:modelï¼‰ç”Ÿæˆ SQLã€‚æ‚¨çš„å•é¡Œå…§å®¹å°‡å‚³é€è‡³ Google Gemini API é€²è¡Œè™•ç†ï¼Œä¸¦æœƒè¨˜éŒ„æŸ¥è©¢æ—¥èªŒä»¥æ”¹å–„æœå‹™å“è³ªã€‚è«‹å‹¿è¼¸å…¥æ•æ„Ÿå€‹äººè³‡è¨Šã€‚'` | `'This feature uses the AI model (:model) to generate SQL. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
-| `nl_stream_failed` | `'ç„¡æ³•è®€å–å›žæ‡‰ä¸²æµ'` | `'Unable to read response stream'` |
-| `nl_generate_failed` | `'ç”Ÿæˆå¤±æ•—'` | `'Generation failed'` |
-| `nl_generate_error` | `'ç”Ÿæˆç™¼ç”ŸéŒ¯èª¤'` | `'Generation error occurred'` |
+| `nl_privacy_label` | `'⚠ 隱私提示：'` | `'⚠ Privacy Notice:'` |
+| `nl_privacy_body` | `'此功能使用 AI 模型（:model）生成 SQL。您的問題內容將傳送至 Google Gemini API 進行處理，並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。'` | `'This feature uses the AI model (:model) to generate SQL. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
+| `nl_stream_failed` | `'無法讀取回應串流'` | `'Unable to read response stream'` |
+| `nl_generate_failed` | `'生成失敗'` | `'Generation failed'` |
+| `nl_generate_error` | `'生成發生錯誤'` | `'Generation error occurred'` |
 
-**æŽ¥ç·šæ–¹å¼ï¼š**
+**接線方式：**
 ```tsx
-// åœ¨å…ƒä»¶é ‚å±¤åŠ å…¥
+// 在元件頂層加入
 const t = useTranslation('query');
 
-// éš±ç§æç¤ºæ¡†
+// 隱私提示框
 <strong>{t('nl_privacy_label')}</strong>{t('nl_privacy_body', { model: nlModel })}
 
-// éŒ¯èª¤è¨Šæ¯ï¼ˆasync callback ä¸­å¯ç›´æŽ¥å‘¼å« tï¼Œå› ç‚º t æ˜¯ç©©å®š useMemo å¼•ç”¨ï¼‰
+// 錯誤訊息（async callback 中可直接呼叫 t，因為 t 是穩定 useMemo 引用）
 setError(t('nl_generate_failed'));
 ```
 
-**æ­¥é©Ÿï¼š**
-- [ ] 8A-1ï¼šæ–°å¢žä¸Šè¿° 5 å€‹ lang key è‡³ zh-TW èˆ‡ en query.php
-- [ ] 8A-2ï¼šåœ¨ NlQueryPanel.tsx é ‚å±¤åŠ å…¥ `const t = useTranslation('query')`ï¼Œæ›¿æ›æ‰€æœ‰ä¸­æ–‡å­—ä¸²
+**步驟：**
+- [ ] 8A-1：新增上述 5 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8A-2：在 NlQueryPanel.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串
 
 ---
 
-### Phase 8Bï¼šHistoricalQaPanel.tsx i18n æŽ¥å…¥ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 8B：HistoricalQaPanel.tsx i18n 接入（高優先）
 
-**å•é¡Œï¼š** `resources/js/inertia/components/QueryPlayground/HistoricalQaPanel.tsx` ç„¡ä»»ä½• `useTranslation` å‘¼å«ã€‚
+**問題：** `resources/js/inertia/components/QueryPlayground/HistoricalQaPanel.tsx` 無任何 `useTranslation` 呼叫。
 
-**å·²å­˜åœ¨æ–¼ `en/query.php` çš„ keyï¼ˆåªéœ€æŽ¥ç·šï¼‰ï¼š**
+**已存在於 `en/query.php` 的 key（只需接線）：**
 
-| å…ƒä»¶ä¸­çš„ä¸­æ–‡å­—ä¸² | å°æ‡‰ç¾æœ‰ key |
+| 元件中的中文字串 | 對應現有 key |
 |----------------|------------|
-| `è«‹è¼¸å…¥æ‚¨çš„æ­·å²äººç‰©å•é¡Œ`ï¼ˆlabelï¼‰ | `qa_placeholder` |
-| `ä¾‹å¦‚ï¼šæŽç™½æ˜¯ä»€éº¼æ™‚ä»£çš„äººï¼Ÿâ€¦`ï¼ˆtextarea placeholderï¼‰ | `qa_example` |
-| `æˆ‘å·²é–±è®€ä¸¦åŒæ„ä¸Šè¿°éš±ç§æç¤º` | `qa_agree_privacy` |
-| `ä½¿ç”¨å·¥å…·æŸ¥è©¢è³‡æ–™åº«ï¼ˆå»ºè­°é–‹å•Ÿï¼‰` | `qa_use_tools` |
-| `ä¸²æµæ¨¡å¼` | `qa_stream` |
-| `å›žç­”ç”Ÿæˆä¸­â€¦`ï¼ˆæŒ‰éˆ• loading ç‹€æ…‹ï¼‰ | `qa_answering` |
-| `ðŸ“– å›žç­”å•é¡Œ`ï¼ˆæŒ‰éˆ•æ­£å¸¸ç‹€æ…‹ï¼‰ | `qa_ask` |
-| `å–æ¶ˆ` | `nl_cancel`ï¼ˆå…±ç”¨ï¼‰æˆ–åŠ  `qa_cancel` |
-| `ðŸ“– å›žç­”`ï¼ˆå›žç­”å€æ¨™é¡Œï¼‰ | `qa_answer` |
-| `â–¼ éš±è—è©³ç´°è³‡è¨Š` | `qa_hide_details` |
-| `â–¶ é¡¯ç¤ºè©³ç´°è³‡è¨Šï¼ˆSQLã€è­‰æ“šä¾†æºï¼‰` | `qa_show_details` |
-| `ä½¿ç”¨çš„ SQL æŸ¥è©¢` | `qa_sql_used` |
-| `è³‡æ–™ä¾†æº` | `qa_sources` |
-| `ðŸ“‹ è³‡æ–™åº«` | `qa_db` |
-| `ðŸ“š æ¨¡åž‹è£œå……` | `qa_model` |
+| `請輸入您的歷史人物問題`（label） | `qa_placeholder` |
+| `例如：李白是什麼時代的人？…`（textarea placeholder） | `qa_example` |
+| `我已閱讀並同意上述隱私提示` | `qa_agree_privacy` |
+| `使用工具查詢資料庫（建議開啟）` | `qa_use_tools` |
+| `串流模式` | `qa_stream` |
+| `回答生成中…`（按鈕 loading 狀態） | `qa_answering` |
+| `📖 回答問題`（按鈕正常狀態） | `qa_ask` |
+| `取消` | `nl_cancel`（共用）或加 `qa_cancel` |
+| `📖 回答`（回答區標題） | `qa_answer` |
+| `▼ 隱藏詳細資訊` | `qa_hide_details` |
+| `▶ 顯示詳細資訊（SQL、證據來源）` | `qa_show_details` |
+| `使用的 SQL 查詢` | `qa_sql_used` |
+| `資料來源` | `qa_sources` |
+| `📋 資料庫` | `qa_db` |
+| `📚 模型補充` | `qa_model` |
 
-**éœ€æ–°å¢žçš„ keyï¼š**
+**需新增的 key：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `qa_privacy_label` | `'âš  éš±ç§æç¤ºï¼š'` | `'âš  Privacy Notice:'` |
-| `qa_privacy_body` | `'æ­¤åŠŸèƒ½ä½¿ç”¨ AI æ¨¡åž‹ï¼ˆ:modelï¼‰å›žç­”æ­·å²äººç‰©å•é¡Œã€‚æ‚¨çš„å•é¡Œå…§å®¹å°‡å‚³é€è‡³ Google Gemini API é€²è¡Œè™•ç†ï¼Œä¸¦æœƒè¨˜éŒ„æŸ¥è©¢æ—¥èªŒä»¥æ”¹å–„æœå‹™å“è³ªã€‚è«‹å‹¿è¼¸å…¥æ•æ„Ÿå€‹äººè³‡è¨Šã€‚'` | `'This feature uses the AI model (:model) to answer historical questions. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
-| `qa_stream_failed` | `'ç„¡æ³•è®€å–å›žæ‡‰ä¸²æµ'` | `'Unable to read response stream'` |
-| `qa_failed` | `'å•ç­”ç”Ÿæˆå¤±æ•—'` | `'Q&A generation failed'` |
-| `qa_error` | `'ç”Ÿæˆç™¼ç”ŸéŒ¯èª¤'` | `'Generation error occurred'` |
-| `qa_querying` | `'æ­£åœ¨æŸ¥è©¢è³‡æ–™åº«ä¸¦ç”Ÿæˆå›žç­”â€¦'` | `'Querying database and generating answerâ€¦'` |
+| `qa_privacy_label` | `'⚠ 隱私提示：'` | `'⚠ Privacy Notice:'` |
+| `qa_privacy_body` | `'此功能使用 AI 模型（:model）回答歷史人物問題。您的問題內容將傳送至 Google Gemini API 進行處理，並會記錄查詢日誌以改善服務品質。請勿輸入敏感個人資訊。'` | `'This feature uses the AI model (:model) to answer historical questions. Your question will be sent to Google Gemini API for processing, and query logs will be recorded to improve service quality. Please do not enter sensitive personal information.'` |
+| `qa_stream_failed` | `'無法讀取回應串流'` | `'Unable to read response stream'` |
+| `qa_failed` | `'問答生成失敗'` | `'Q&A generation failed'` |
+| `qa_error` | `'生成發生錯誤'` | `'Generation error occurred'` |
+| `qa_querying` | `'正在查詢資料庫並生成回答…'` | `'Querying database and generating answer…'` |
 
-**æ­¥é©Ÿï¼š**
-- [ ] 8B-1ï¼šæ–°å¢žä¸Šè¿° 6 å€‹ lang key è‡³ zh-TW èˆ‡ en query.php
-- [ ] 8B-2ï¼šåœ¨ HistoricalQaPanel.tsx é ‚å±¤åŠ å…¥ `const t = useTranslation('query')`ï¼Œæ›¿æ›æ‰€æœ‰ä¸­æ–‡å­—ä¸²
+**步驟：**
+- [ ] 8B-1：新增上述 6 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8B-2：在 HistoricalQaPanel.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串
 
 ---
 
-### Phase 8Cï¼šQbeBuilder.tsx i18n æŽ¥å…¥ï¼ˆé«˜å„ªå…ˆï¼‰
+### Phase 8C：QbeBuilder.tsx i18n 接入（高優先）
 
-**å•é¡Œï¼š** `resources/js/inertia/components/QueryPlayground/QbeBuilder.tsx` ç„¡ä»»ä½• `useTranslation` å‘¼å«ã€‚æ­¤å…ƒä»¶å­—ä¸²æœ€å¤šï¼Œä¸”å¤§å¤šæ•¸ key å°šä¸å­˜åœ¨æ–¼ç¿»è­¯æª”ä¸­ã€‚
+**問題：** `resources/js/inertia/components/QueryPlayground/QbeBuilder.tsx` 無任何 `useTranslation` 呼叫。此元件字串最多，且大多數 key 尚不存在於翻譯檔中。
 
-**éœ€æ–°å¢žè‡³ zh-TW èˆ‡ en query.php çš„ keyï¼ˆæŒ‰å…ƒä»¶ä¸­å‡ºç¾é †åºï¼‰ï¼š**
+**需新增至 zh-TW 與 en query.php 的 key（按元件中出現順序）：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `qbe_schema_failed` | `'Schema è¼‰å…¥å¤±æ•—'` | `'Schema loading failed'` |
-| `qbe_notice_restored_draft` | `'å·²é‚„åŽŸ :time çš„ QBE è‰ç¨¿'` | `'Restored QBE draft from :time'` |
-| `qbe_notice_saved` | `'å·²å„²å­˜ç›®å‰ç‰ˆæœ¬ï¼ˆ:timeï¼‰'` | `'Saved current version (:time)'` |
-| `qbe_notice_saved_before_sql` | `'å·²å„²å­˜ç”¢ç”Ÿ SQL å‰çš„ç‰ˆæœ¬ï¼ˆ:timeï¼‰'` | `'Saved version before SQL generation (:time)'` |
-| `qbe_notice_saved_before_reset` | `'å·²å„²å­˜é‡è¨­å‰çš„ç‰ˆæœ¬ï¼ˆ:timeï¼‰'` | `'Saved version before reset (:time)'` |
-| `qbe_notice_restored_version` | `'å·²é‚„åŽŸ :time çš„ç‰ˆæœ¬'` | `'Restored version from :time'` |
-| `qbe_notice_cleared` | `'å·²æ¸…é™¤ QBE è‰ç¨¿èˆ‡æ­·å²ç´€éŒ„'` | `'QBE draft and history cleared'` |
-| `qbe_autosave_hint` | `'QBE è‰ç¨¿æœƒè‡ªå‹•å„²å­˜åœ¨ç›®å‰ç€è¦½å™¨ï¼Œé›¢é–‹é é¢å¾Œå¯å›žä¾†ç¹¼çºŒç·¨è¼¯ã€‚'` | `'QBE draft is auto-saved in your browser. You can return to continue editing after leaving the page.'` |
-| `qbe_last_saved` | `'æœ€è¿‘å„²å­˜ï¼š:time'` | `'Last saved: :time'` |
-| `qbe_save_current` | `'å„²å­˜ç›®å‰ç‰ˆæœ¬'` | `'Save current version'` |
-| `qbe_no_history` | `'-- å°šç„¡æ­·å²ç‰ˆæœ¬ --'` | `'-- No history versions --'` |
-| `qbe_select_history` | `'-- é¸æ“‡æ­·å²ç‰ˆæœ¬ --'` | `'-- Select history version --'` |
-| `qbe_restore_version` | `'é‚„åŽŸç‰ˆæœ¬'` | `'Restore version'` |
-| `qbe_clear_history` | `'æ¸…é™¤è‰ç¨¿èˆ‡æ­·å²'` | `'Clear draft and history'` |
-| `qbe_base_table` | `'ä¸»è¡¨ (Base Table)'` | `'Base Table'` |
-| `qbe_select_base_table` | `'-- é¸æ“‡ä¸»è¡¨ --'` | `'-- Select base table --'` |
-| `qbe_tables_group` | `'è³‡æ–™è¡¨'` | `'Tables'` |
-| `qbe_internal_tables_group` | `'å…§éƒ¨è¡¨ (CBDB__)'` | `'Internal tables (CBDB__)'` |
-| `qbe_loading_schema` | `'è¼‰å…¥ Schema ä¸­â€¦'` | `'Loading schemaâ€¦'` |
-| `qbe_join_optional` | `'JOINï¼ˆå¯é¸ï¼‰'` | `'JOIN (optional)'` |
-| `qbe_add_join` | `'+ æ–°å¢ž JOIN'` | `'+ Add JOIN'` |
-| `qbe_select_join_table` | `'-- é¸æ“‡è¡¨ --'` | `'-- Select table --'` |
-| `qbe_join_alias_hint` | `'åˆ¥åï¼Œä¾‹å¦‚ ALTNAME_DATA_2'` | `'Alias, e.g. ALTNAME_DATA_2'` |
-| `qbe_left_col` | `'-- å·¦æ¬„ä½ --'` | `'-- Left column --'` |
-| `qbe_right_col` | `'-- å³æ¬„ä½ --'` | `'-- Right column --'` |
-| `qbe_select_cols` | `'SELECT æ¬„ä½ï¼ˆä¸é¸å‰‡ç‚º *ï¼‰'` | `'SELECT columns (default: all *)'` |
-| `qbe_no_cols` | `'ç„¡å¯ç”¨æ¬„ä½'` | `'No available columns'` |
-| `qbe_where_conditions` | `'WHERE æ¢ä»¶'` | `'WHERE conditions'` |
-| `qbe_add_condition` | `'+ æ–°å¢žæ¢ä»¶'` | `'+ Add condition'` |
-| `qbe_generate_sql_btn` | `'ç”¢ç”Ÿ SQL ä¸¦åˆ‡æ›è‡³ SQL æ¨¡å¼'` | `'Generate SQL and switch to SQL mode'` |
+| `qbe_schema_failed` | `'Schema 載入失敗'` | `'Schema loading failed'` |
+| `qbe_notice_restored_draft` | `'已還原 :time 的 QBE 草稿'` | `'Restored QBE draft from :time'` |
+| `qbe_notice_saved` | `'已儲存目前版本（:time）'` | `'Saved current version (:time)'` |
+| `qbe_notice_saved_before_sql` | `'已儲存產生 SQL 前的版本（:time）'` | `'Saved version before SQL generation (:time)'` |
+| `qbe_notice_saved_before_reset` | `'已儲存重設前的版本（:time）'` | `'Saved version before reset (:time)'` |
+| `qbe_notice_restored_version` | `'已還原 :time 的版本'` | `'Restored version from :time'` |
+| `qbe_notice_cleared` | `'已清除 QBE 草稿與歷史紀錄'` | `'QBE draft and history cleared'` |
+| `qbe_autosave_hint` | `'QBE 草稿會自動儲存在目前瀏覽器，離開頁面後可回來繼續編輯。'` | `'QBE draft is auto-saved in your browser. You can return to continue editing after leaving the page.'` |
+| `qbe_last_saved` | `'最近儲存：:time'` | `'Last saved: :time'` |
+| `qbe_save_current` | `'儲存目前版本'` | `'Save current version'` |
+| `qbe_no_history` | `'-- 尚無歷史版本 --'` | `'-- No history versions --'` |
+| `qbe_select_history` | `'-- 選擇歷史版本 --'` | `'-- Select history version --'` |
+| `qbe_restore_version` | `'還原版本'` | `'Restore version'` |
+| `qbe_clear_history` | `'清除草稿與歷史'` | `'Clear draft and history'` |
+| `qbe_base_table` | `'主表 (Base Table)'` | `'Base Table'` |
+| `qbe_select_base_table` | `'-- 選擇主表 --'` | `'-- Select base table --'` |
+| `qbe_tables_group` | `'資料表'` | `'Tables'` |
+| `qbe_internal_tables_group` | `'內部表 (CBDB__)'` | `'Internal tables (CBDB__)'` |
+| `qbe_loading_schema` | `'載入 Schema 中…'` | `'Loading schema…'` |
+| `qbe_join_optional` | `'JOIN（可選）'` | `'JOIN (optional)'` |
+| `qbe_add_join` | `'+ 新增 JOIN'` | `'+ Add JOIN'` |
+| `qbe_select_join_table` | `'-- 選擇表 --'` | `'-- Select table --'` |
+| `qbe_join_alias_hint` | `'別名，例如 ALTNAME_DATA_2'` | `'Alias, e.g. ALTNAME_DATA_2'` |
+| `qbe_left_col` | `'-- 左欄位 --'` | `'-- Left column --'` |
+| `qbe_right_col` | `'-- 右欄位 --'` | `'-- Right column --'` |
+| `qbe_select_cols` | `'SELECT 欄位（不選則為 *）'` | `'SELECT columns (default: all *)'` |
+| `qbe_no_cols` | `'無可用欄位'` | `'No available columns'` |
+| `qbe_where_conditions` | `'WHERE 條件'` | `'WHERE conditions'` |
+| `qbe_add_condition` | `'+ 新增條件'` | `'+ Add condition'` |
+| `qbe_generate_sql_btn` | `'產生 SQL 並切換至 SQL 模式'` | `'Generate SQL and switch to SQL mode'` |
 
-> **æ³¨æ„ï¼š** ç¾æœ‰ `qbe_autosave` keyï¼ˆå€¼ç‚ºçŸ­å¥ `'QBE draft is auto-saved'`ï¼‰èˆ‡å…ƒä»¶ä¸­å¯¦éš›é¡¯ç¤ºçš„å®Œæ•´å¥å­ä¸åŒï¼Œæ–°å¢ž `qbe_autosave_hint` key ä½¿ç”¨å®Œæ•´å¥å­ï¼›èˆŠ key ä¸åˆªé™¤ï¼ˆå¯èƒ½ä»è¢«å…¶ä»–åœ°æ–¹ä½¿ç”¨ï¼‰ã€‚
+> **注意：** 現有 `qbe_autosave` key（值為短句 `'QBE draft is auto-saved'`）與元件中實際顯示的完整句子不同，新增 `qbe_autosave_hint` key 使用完整句子；舊 key 不刪除（可能仍被其他地方使用）。
 
-**persistenceNotice è™•ç†æ–¹å¼ï¼š** `persistenceNotice` æ˜¯ä¸€å€‹ç‹€æ…‹å­—ä¸²ï¼Œåœ¨å¤šå€‹åœ°æ–¹çš„ `setPersistenceNotice(...)` ä¸­è¨­å®šã€‚ç”±æ–¼ `t` æ˜¯ç©©å®šçš„ `useMemo` å¼•ç”¨ï¼Œå¯ä»¥ç›´æŽ¥åœ¨ setter å‘¼å«ä¸­ä½¿ç”¨ï¼š
+**persistenceNotice 處理方式：** `persistenceNotice` 是一個狀態字串，在多個地方的 `setPersistenceNotice(...)` 中設定。由於 `t` 是穩定的 `useMemo` 引用，可以直接在 setter 呼叫中使用：
 ```tsx
 const t = useTranslation('query');
 setPersistenceNotice(t('qbe_notice_saved', { time: formatSavedAt(savedAt) }));
 ```
 
-**æ­¥é©Ÿï¼š**
-- [ ] 8C-1ï¼šæ–°å¢žä¸Šè¿° 30 å€‹ lang key è‡³ zh-TW èˆ‡ en query.php
-- [ ] 8C-2ï¼šåœ¨ QbeBuilder.tsx é ‚å±¤åŠ å…¥ `const t = useTranslation('query')`ï¼Œæ›¿æ›æ‰€æœ‰ä¸­æ–‡å­—ä¸²ï¼ˆå« async callback åŠ setter ä¸­çš„å­—ä¸²ï¼‰
+**步驟：**
+- [ ] 8C-1：新增上述 30 個 lang key 至 zh-TW 與 en query.php
+- [ ] 8C-2：在 QbeBuilder.tsx 頂層加入 `const t = useTranslation('query')`，替換所有中文字串（含 async callback 及 setter 中的字串）
 
 ---
 
-### Phase 8Dï¼šOperationsController å­—ä¸²ç¿»è­¯ï¼ˆä¸­å„ªå…ˆï¼‰
+### Phase 8D：OperationsController 字串翻譯（中優先）
 
-**å•é¡Œï¼š** `app/Http/Controllers/OperationsController.php` ä¸­ä»æœ‰ç¡¬ç·¨ç¢¼ä¸­æ–‡ï¼š
+**問題：** `app/Http/Controllers/OperationsController.php` 中仍有硬編碼中文：
 
-| ä½ç½® | ç•¶å‰ç¡¬ç·¨ç¢¼ | æ”¹ç”¨ |
+| 位置 | 當前硬編碼 | 改用 |
 |------|-----------|------|
-| L651ï¼ˆpage_titleï¼‰ | `'æœ€è¿‘ææ¡ˆåˆ—è¡¨'` / `'æœ€è¿‘æ“ä½œè¨˜éŒ„'` | `__('nav.recent_proposals')` / `__('nav.recent_operations')` |
-| L652ï¼ˆpage_descriptionï¼‰ | `'æœ€è¿‘ææ¡ˆåˆ—è¡¨'` / `'æœ€è¿‘ç·¨è¼¯åˆ—è¡¨'` | `__('operations.page_desc_proposals')` / `__('operations.page_desc_operations')` |
-| L670ï¼ˆflash errorï¼‰ | `'è«‹ç™»å…¥å¾Œå†è©¦ã€‚'` | `__('operations.restore_login_required')` |
-| L675ï¼ˆflash errorï¼‰ | `'è©²ç”¨æˆ¶æ²’æœ‰æ¬Šé™ï¼Œè«‹è¯çµ¡ç®¡ç†å“¡ã€‚'` | `__('operations.restore_permission_denied')` |
-| L681ï¼ˆflash warningï¼‰ | `'è©²é¡žæ“ä½œæš«ä¸æ”¯æ´å¾©åŽŸã€‚'` | `__('operations.restore_not_supported')` |
-| L691ï¼ˆflash successï¼‰ | `'æ¢å¾©æˆåŠŸ @ '.Carbon::now()` | `__('operations.restore_success', ['time' => Carbon::now()])` |
-| L697ï¼ˆflash errorï¼‰ | `'æ¢å¾©å¤±æ•—ï¼š'.$e->getMessage().' @ '.Carbon::now()` | `__('operations.restore_failed', ['error' => $e->getMessage(), 'time' => Carbon::now()])` |
-| L710ï¼ˆRuntimeExceptionï¼‰ | `'å°šæœªæ”¯æ´çš„æ“ä½œé¡žåž‹'` | `__('operations.restore_unsupported_type')` |
-| L728ï¼ˆRuntimeExceptionï¼‰ | `'æ‰¾ä¸åˆ°å¯æ¢å¾©çš„è³‡æ–™å…§å®¹'` | `__('operations.restore_no_data')` |
-| L732ï¼ˆRuntimeExceptionï¼‰ | `'ç¼ºå°‘ä¸»éµæ¢ä»¶ï¼Œç„¡æ³•æ›´æ–°è¨˜éŒ„'` | `__('operations.restore_no_pk')` |
-| L736ï¼ˆRuntimeExceptionï¼‰ | `'æ¢å¾©å…§å®¹ç¶“éŽéŽæ¿¾å¾Œç‚ºç©º'` | `__('operations.restore_empty_data')` |
-| L745ï¼ˆRuntimeExceptionï¼‰ | `'æ‰¾ä¸åˆ°å¯é‚„åŽŸçš„åˆªé™¤è³‡æ–™'` | `__('operations.restore_no_delete_data')` |
+| L651（page_title） | `'最近提案列表'` / `'最近操作記錄'` | `__('nav.recent_proposals')` / `__('nav.recent_operations')` |
+| L652（page_description） | `'最近提案列表'` / `'最近編輯列表'` | `__('operations.page_desc_proposals')` / `__('operations.page_desc_operations')` |
+| L670（flash error） | `'請登入後再試。'` | `__('operations.restore_login_required')` |
+| L675（flash error） | `'該用戶沒有權限，請聯絡管理員。'` | `__('operations.restore_permission_denied')` |
+| L681（flash warning） | `'該類操作暫不支援復原。'` | `__('operations.restore_not_supported')` |
+| L691（flash success） | `'恢復成功 @ '.Carbon::now()` | `__('operations.restore_success', ['time' => Carbon::now()])` |
+| L697（flash error） | `'恢復失敗：'.$e->getMessage().' @ '.Carbon::now()` | `__('operations.restore_failed', ['error' => $e->getMessage(), 'time' => Carbon::now()])` |
+| L710（RuntimeException） | `'尚未支援的操作類型'` | `__('operations.restore_unsupported_type')` |
+| L728（RuntimeException） | `'找不到可恢復的資料內容'` | `__('operations.restore_no_data')` |
+| L732（RuntimeException） | `'缺少主鍵條件，無法更新記錄'` | `__('operations.restore_no_pk')` |
+| L736（RuntimeException） | `'恢復內容經過過濾後為空'` | `__('operations.restore_empty_data')` |
+| L745（RuntimeException） | `'找不到可還原的刪除資料'` | `__('operations.restore_no_delete_data')` |
 
-**éœ€æ–°å¢žè‡³ `resources/lang/zh-TW/operations.php` èˆ‡ `resources/lang/en/operations.php` çš„ keyï¼š**
+**需新增至 `resources/lang/zh-TW/operations.php` 與 `resources/lang/en/operations.php` 的 key：**
 
 | Key | zh-TW | en |
 |-----|-------|----|
-| `page_desc_proposals` | `'æœ€è¿‘ææ¡ˆåˆ—è¡¨'` | `'Recent Proposals'` |
-| `page_desc_operations` | `'æœ€è¿‘ç·¨è¼¯åˆ—è¡¨'` | `'Recent Edit History'` |
-| `restore_login_required` | `'è«‹ç™»å…¥å¾Œå†è©¦ã€‚'` | `'Please log in first.'` |
-| `restore_permission_denied` | `'è©²ç”¨æˆ¶æ²’æœ‰æ¬Šé™ï¼Œè«‹è¯çµ¡ç®¡ç†å“¡ã€‚'` | `'This user does not have permission. Please contact an administrator.'` |
-| `restore_not_supported` | `'è©²é¡žæ“ä½œæš«ä¸æ”¯æ´å¾©åŽŸã€‚'` | `'Revert is not supported for this operation type.'` |
-| `restore_success` | `'æ¢å¾©æˆåŠŸ @ :time'` | `'Restore succeeded @ :time'` |
-| `restore_failed` | `'æ¢å¾©å¤±æ•—ï¼š:error @ :time'` | `'Restore failed: :error @ :time'` |
-| `restore_unsupported_type` | `'å°šæœªæ”¯æ´çš„æ“ä½œé¡žåž‹'` | `'Unsupported operation type'` |
-| `restore_no_data` | `'æ‰¾ä¸åˆ°å¯æ¢å¾©çš„è³‡æ–™å…§å®¹'` | `'No recoverable data found'` |
-| `restore_no_pk` | `'ç¼ºå°‘ä¸»éµæ¢ä»¶ï¼Œç„¡æ³•æ›´æ–°è¨˜éŒ„'` | `'Missing primary key conditions, cannot update record'` |
-| `restore_empty_data` | `'æ¢å¾©å…§å®¹ç¶“éŽæ¿¾å¾Œç‚ºç©º'` | `'Recovered content is empty after filtering'` |
-| `restore_no_delete_data` | `'æ‰¾ä¸åˆ°å¯é‚„åŽŸçš„åˆªé™¤è³‡æ–™'` | `'No deleted data to restore'` |
+| `page_desc_proposals` | `'最近提案列表'` | `'Recent Proposals'` |
+| `page_desc_operations` | `'最近編輯列表'` | `'Recent Edit History'` |
+| `restore_login_required` | `'請登入後再試。'` | `'Please log in first.'` |
+| `restore_permission_denied` | `'該用戶沒有權限，請聯絡管理員。'` | `'This user does not have permission. Please contact an administrator.'` |
+| `restore_not_supported` | `'該類操作暫不支援復原。'` | `'Revert is not supported for this operation type.'` |
+| `restore_success` | `'恢復成功 @ :time'` | `'Restore succeeded @ :time'` |
+| `restore_failed` | `'恢復失敗：:error @ :time'` | `'Restore failed: :error @ :time'` |
+| `restore_unsupported_type` | `'尚未支援的操作類型'` | `'Unsupported operation type'` |
+| `restore_no_data` | `'找不到可恢復的資料內容'` | `'No recoverable data found'` |
+| `restore_no_pk` | `'缺少主鍵條件，無法更新記錄'` | `'Missing primary key conditions, cannot update record'` |
+| `restore_empty_data` | `'恢復內容經過濾後為空'` | `'Recovered content is empty after filtering'` |
+| `restore_no_delete_data` | `'找不到可還原的刪除資料'` | `'No deleted data to restore'` |
 
-> **æ³¨æ„ï¼š** `nav.recent_operations` = `'Recent Changes'` èˆ‡ `nav.recent_proposals` = `'Recent Proposals'` å·²å­˜åœ¨ï¼Œç›´æŽ¥ä½¿ç”¨ã€‚  
-> RuntimeException è¨Šæ¯æœƒåœ¨ catch ä¸­è¢« `$e->getMessage()` å–å‡ºï¼Œæœ€çµ‚å‡ºç¾åœ¨ flash è¨Šæ¯ä¸­ï¼ˆ`restore_failed` çš„ `:error` åƒæ•¸ï¼‰ã€‚è‹¥è¦è®“éŒ¯èª¤è¨Šæ¯æœ¬èº«ä¹Ÿç¿»è­¯ï¼Œéœ€è¦åœ¨ throw å‰ç”¨ `__()` åŒ…è£ï¼Œä¸¦åœ¨ `restore_failed` çš„è‹±æ–‡å€¼ä¸­åªä¿ç•™ `:error` éƒ¨åˆ†ã€‚
+> **注意：** `nav.recent_operations` = `'Recent Changes'` 與 `nav.recent_proposals` = `'Recent Proposals'` 已存在，直接使用。  
+> RuntimeException 訊息會在 catch 中被 `$e->getMessage()` 取出，最終出現在 flash 訊息中（`restore_failed` 的 `:error` 參數）。若要讓錯誤訊息本身也翻譯，需要在 throw 前用 `__()` 包裝，並在 `restore_failed` 的英文值中只保留 `:error` 部分。
 
-**æ­¥é©Ÿï¼š**
-- [ ] 8D-1ï¼šæ–°å¢žä¸Šè¿° 12 å€‹ lang key è‡³ zh-TW èˆ‡ en operations.php
-- [ ] 8D-2ï¼šæ›´æ–° `OperationsController`ï¼ˆL651ã€L652ã€L670ã€L675ã€L681ã€L691ã€L697ã€L710ã€L728ã€L732ã€L736ã€L745ï¼‰
+**步驟：**
+- [ ] 8D-1：新增上述 12 個 lang key 至 zh-TW 與 en operations.php
+- [ ] 8D-2：更新 `OperationsController`（L651、L652、L670、L675、L681、L691、L697、L710、L728、L732、L736、L745）
 
 ---
 
-### Phase 8 æ•´é«”çµ±è¨ˆ
+### Phase 8 整體統計
 
-| Sub-phase | å„ªå…ˆ | æ¶‰åŠæª”æ¡ˆ | èªªæ˜Ž | ç‹€æ…‹ |
+| Sub-phase | 優先 | 涉及檔案 | 說明 | 狀態 |
 |-----------|------|---------|------|------|
-| 8A NlQueryPanel.tsx | é«˜ | 1 component + 2 lang | 5 å€‹æ–° key + 11 å€‹ç¾æœ‰ key æŽ¥ç·š | â˜ å¾…å¯¦æ–½ |
-| 8B HistoricalQaPanel.tsx | é«˜ | 1 component + 2 lang | 6 å€‹æ–° key + 15 å€‹ç¾æœ‰ key æŽ¥ç·š | â˜ å¾…å¯¦æ–½ |
-| 8C QbeBuilder.tsx | é«˜ | 1 component + 2 lang | 30 å€‹æ–° keyï¼Œå…¨éƒ¨æŽ¥ç·š | â˜ å¾…å¯¦æ–½ |
-| 8D OperationsController | ä¸­ | 1 controller + 2 lang | 12 å€‹æ–° keyï¼Œpage title + flash è¨Šæ¯ | â˜ å¾…å¯¦æ–½ |
+| 8A NlQueryPanel.tsx | 高 | 1 component + 2 lang | 5 個新 key + 11 個現有 key 接線 | ☐ 待實施 |
+| 8B HistoricalQaPanel.tsx | 高 | 1 component + 2 lang | 6 個新 key + 15 個現有 key 接線 | ☐ 待實施 |
+| 8C QbeBuilder.tsx | 高 | 1 component + 2 lang | 30 個新 key，全部接線 | ☐ 待實施 |
+| 8D OperationsController | 中 | 1 controller + 2 lang | 12 個新 key，page title + flash 訊息 | ☐ 待實施 |
 
-> æŽƒææ—¥æœŸï¼š2026-06-03ã€‚ç™¼ç¾ä¾æ“šï¼šhttps://input.cbdb.fas.harvard.edu/operations å’Œ /app/query-playground çš„å¯¦éš›æˆªåœ–ã€‚
+> 掃描日期：2026-06-03。發現依據：https://input.cbdb.fas.harvard.edu/operations 和 /app/query-playground 的實際截圖。
 
 ---
 
-## é™„éŒ„ï¼šåƒè€ƒæ–‡ä»¶
+## 附錄：參考文件
 
-| æ–‡ä»¶ | è·¯å¾‘ | ç”¨é€” |
+| 文件 | 路徑 | 用途 |
 |------|------|------|
-| FormLabels.xlsx | `C:\Users\how612\Desktop\translation\FormLabels.xlsx` | ä¸‰èªžè¡“èªžå°ç…§ï¼ˆè‹±/ç°¡/ç¹ï¼‰ |
-| è‹±æ–‡ç”¨æˆ¶æ‰‹å†Š | `C:\Users\how612\Desktop\translation\Users Guide 20260413 draft.docx` | è‹±æ–‡è¡“èªžèˆ‡èªªæ˜Ž |
-| ä¸­æ–‡ç”¨æˆ¶æ‰‹å†Š | `C:\Users\how612\Desktop\translation\ã€Chineseã€‘User's Guideä¸­æ–‡ç‰ˆ update_2025_Zhang_Ruoxi.docx` | ä¸­æ–‡è¡“èªžåŸºæº– |
-| Harvard CBDB è‹±æ–‡ç•Œé¢ | https://cbdb.fas.harvard.edu/ | ç•Œé¢è¡“èªžåƒè€ƒ |
+| FormLabels.xlsx | `C:\Users\how612\Desktop\translation\FormLabels.xlsx` | 三語術語對照（英/簡/繁） |
+| 英文用戶手冊 | `C:\Users\how612\Desktop\translation\Users Guide 20260413 draft.docx` | 英文術語與說明 |
+| 中文用戶手冊 | `C:\Users\how612\Desktop\translation\【Chinese】User's Guide中文版 update_2025_Zhang_Ruoxi.docx` | 中文術語基準 |
+| Harvard CBDB 英文界面 | https://cbdb.fas.harvard.edu/ | 界面術語參考 |

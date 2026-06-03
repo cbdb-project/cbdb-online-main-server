@@ -23,8 +23,8 @@ use App\Support\CompositePrimaryKey;
                 <thead>
                 <tr>
                     <th>{{ __('person.seq_no') }}</th>
-                    <th>sequence</th>
-                    <th>posting_id</th>
+                    <th>{{ __('biogmains.sequence') }}</th>
+                    <th>{{ __('person.posting_id') }}</th>
                     <th style="width: 40%;">{{ __('biogmains.office_name_field') }}</th>
                     <th>{{ __('biogmains.place_name') }}</th>
                     <th>{{ __('biogmains.start_year') }}</th>

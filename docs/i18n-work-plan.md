@@ -1,9 +1,10 @@
 # CBDB Online 中英文切換介面 — 實施計劃
 
-**狀態：** 🚧 Phase 6 進行中（分支：`feature/i18n-zh-en-toggle`）  
+**狀態：** ✅ Phase 7 完成（分支：`feature/i18n-phase7-controller-strings`）  
 **計劃日期：** 2026-06-01  
 **Phase 0–5 完成：** 2026-06-02  
-**Phase 6 啟動：** 2026-06-02  
+**Phase 6 完成：** 2026-06-02  
+**Phase 7 完成：** 2026-06-03  
 **作者：** AI 協作草稿（王宏甦審閱）
 
 ---
@@ -802,6 +803,283 @@ Blade 頁面透過 `__()` 直接呼叫，不需額外傳遞；但如果 Blade �
 ```
 
 此設定於 Phase 0 完成。系統啟動時以繁體中文為預設；用戶首次訪問若瀏覽器語言偏好為 `zh-*`，維持繁體中文；若偏好為其他語言，SetLocaleMiddleware 會讀取並設為英文。
+
+---
+
+---
+
+## 10. Phase 7：控制器字串翻譯 + 殘留修補
+
+**背景：** 2026-06-03 系統性掃描發現，Phase 6 雖然涵蓋了 Blade 視圖的翻譯，但以下兩大類別被遺漏：  
+（1）控制器透過 `page_title`、`page_description`、`breadcrumbs` 等 PHP 字串傳入視圖的硬編碼中文；  
+（2）codes/edit.blade.php 的表單說明文字及部分 JS 字串。  
+此外使用者也要求調整若干 UI 細節（Add → New 按鈕等）。
+
+**分支：** `feature/i18n-phase7-controller-strings`  
+**計劃日期：** 2026-06-03  
+
+---
+
+### Phase 7A：BasicInformation 及子控制器（最高優先）
+
+**範圍：** 下列 13 個控制器的 `index`／`create`／`show`／`edit` 四個方法，均以 PHP 字串傳遞 `page_title`、`page_description`、`breadcrumbs`，導致語言切換後仍顯示中文。
+
+| 控制器（`app/Http/Controllers/`） | 當前 `page_title`（zh-TW 硬編碼） | 改用的 lang key |
+|----------------------------------|----------------------------------|----------------|
+| `BasicInformationController` | `'人物基本資料'` | `person.person_records`（新增） |
+| `BasicInformationOfficesController` | `'官名'` | `person.tab_postings` |
+| `BasicInformationAddressesController` | `'地址'` | `person.addresses` |
+| `BasicInformationAltnamesController` | `'別名'` | `person.alt_name` |
+| `BasicInformationAssocController` | `'社會關係'` | `person.associations` |
+| `BasicInformationEntriesController` | `'入仕'` | `person.entry` |
+| `BasicInformationEventsController` | `'事件'` | `person.events` |
+| `BasicInformationKinshipController` | `'親屬'` | `person.tab_kinship` |
+| `BasicInformationPossessionController` | `'財產'` | `person.possessions` |
+| `BasicInformationSocialInstController` | `'社交機構'` | `person.tab_social_institutions` |
+| `BasicInformationSourcesController` | `'出處'` | `person.tab_sources` |
+| `BasicInformationStatusesController` | `'社會區分'` | `person.status` |
+| `BasicInformationTextsController` | `'著述'` | `person.tab_texts` |
+
+**Breadcrumb 替換規則（每個控制器的每個 action 均適用）：**
+
+```php
+// 改前（硬編碼示例，以 Offices 為例）
+'page_title'       => '官名',
+'page_description' => '基本信息表 官名',
+'breadcrumbs' => [
+    ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+    ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+    ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
+    ['label' => '新增', 'url' => '#'],
+],
+
+// 改後（使用 __() 翻譯 helper）
+'page_title'       => __('person.tab_postings'),
+'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'),
+'breadcrumbs' => [
+    ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
+    ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
+    ['label' => __('person.tab_postings'), 'url' => route('basicinformation.offices.index', $id)],
+    ['label' => __('common.add'), 'url' => '#'],
+],
+```
+
+**需新增 lang key：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `person.person_records` | `'人物基本資料'` | `'Person Records'` |
+
+> **注意：** `page_title` 傳入視圖後直接輸出為 PHP 字串，在控制器中呼叫 `__()` 時已根據當前 locale 翻譯，不需要額外處理。
+
+**步驟：**
+- [x] 7A-0：在 `resources/lang/zh-TW/person.php` 與 `resources/lang/en/person.php` 新增 `person_records` key
+- [x] 7A-1：更新 `BasicInformationController` 四個 action
+- [x] 7A-2：更新 `BasicInformationOfficesController` 四個 action
+- [x] 7A-3：更新 `BasicInformationAddressesController` 四個 action
+- [x] 7A-4：更新 `BasicInformationAltnamesController` 四個 action
+- [x] 7A-5：更新 `BasicInformationAssocController` 四個 action
+- [x] 7A-6：更新 `BasicInformationEntriesController` 四個 action
+- [x] 7A-7：更新 `BasicInformationEventsController` 四個 action
+- [x] 7A-8：更新 `BasicInformationKinshipController` 四個 action
+- [x] 7A-9：更新 `BasicInformationPossessionController` 四個 action
+- [x] 7A-10：更新 `BasicInformationSocialInstController` 四個 action
+- [x] 7A-11：更新 `BasicInformationSourcesController` 四個 action
+- [x] 7A-12：更新 `BasicInformationStatusesController` 四個 action
+- [x] 7A-13：更新 `BasicInformationTextsController` 四個 action
+
+---
+
+### Phase 7B：Dashboard 操作類型標籤（高優先）
+
+**問題：** `DashboardController` 中的 `$typeNames` 對照表使用硬編碼中文，導致 Dashboard 的「操作類型統計」卡片在英文模式下仍顯示「新增」、「修改」、「刪除」等中文。
+
+**位置：** `app/Http/Controllers/DashboardController.php`，`page_title` 及 `$typeNames` 陣列
+
+```php
+// 改前
+'page_title' => '系統總覽',
+$typeNames = [
+    Operation::TYPE_CREATE       => '新增',
+    Operation::TYPE_UPDATE_FULL  => '修改',
+    Operation::TYPE_UPDATE       => '修改',
+    Operation::TYPE_DELETE       => '刪除',
+    Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
+    Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
+];
+$typeName = $typeNames[$item->op_type] ?? '未知';
+
+// 改後
+'page_title' => __('nav.dashboard'),
+$typeNames = [
+    Operation::TYPE_CREATE       => __('operations.op_create'),
+    Operation::TYPE_UPDATE_FULL  => __('operations.op_update'),
+    Operation::TYPE_UPDATE       => __('operations.op_update'),
+    Operation::TYPE_DELETE       => __('operations.op_delete'),
+    Operation::TYPE_PROPOSAL_CREATE => __('operations.op_proposal_create'),
+    Operation::TYPE_PROPOSAL_UPDATE => __('operations.op_proposal_update'),
+];
+$typeName = $typeNames[$item->op_type] ?? __('common.unknown');
+```
+
+> **注意：** `operations.php` 已有 `op_create`、`op_update`、`op_delete`、`op_proposal_create`、`op_proposal_update` 等 key（zh-TW 與 en 均已存在），不需新增 lang key。
+
+**步驟：**
+- [x] 7B-1：更新 `DashboardController`（page_title + typeNames）
+
+---
+
+### Phase 7C：ViewTableController 頁面標題（高優先）
+
+**問題：**
+1. `/view` 清單頁：`page_title => '檢視表總覽'` 硬編碼
+2. `/view/{key}` 詳細頁（如 `/view/biog-addr-data`）：`page_title` 及 `page_description` 取自 `$definition['title']`／`$definition['description']`（中文硬編碼）；Archer 麵包屑 `<a href='/view'>檢視表總覽</a>` 硬編碼
+
+**位置：** `app/Http/Controllers/ViewTableController.php`
+
+```php
+// 改前（清單頁）
+'page_title' => '檢視表總覽',
+
+// 改後
+'page_title' => __('nav.views_overview'),
+```
+
+```php
+// 改前（詳細頁，arrow = breadcrumb）
+'page_title'       => $definition['title'] ?? $effectiveKey,
+'page_description' => $definition['description'] ?? '',
+'archer'           => "<li class='breadcrumb-item'><a href='/view'>檢視表總覽</a></li>",
+
+// 改後：利用 views.php 已有的翻譯
+$viewLangKey = 'view_' . str_replace('-', '_', $effectiveKey);
+// views.php 已有所有 view_* 的標題翻譯，key 不存在時 __() 回傳 key 本身
+'page_title'       => __('views.' . $viewLangKey) !== 'views.' . $viewLangKey
+                          ? __('views.' . $viewLangKey)
+                          : ($definition['title'] ?? $effectiveKey),
+'page_description' => __('views.' . $viewLangKey . '_desc', [], null)  // 待補（見下方說明）
+                          ?: ($definition['description'] ?? ''),
+'archer'           => "<li class='breadcrumb-item'><a href='/view'>" . __('nav.views_overview') . "</a></li>",
+```
+
+**待補說明：** `views.php` 目前只有標題（`view_biog_addr_data`）無說明（`view_biog_addr_data_desc`）。說明翻譯為 17 條長句，需人工撰寫後新增至 `resources/lang/zh-TW/views.php` 與 `resources/lang/en/views.php`。可先以 `''`（空字串）作為英文說明，待翻譯後補齊。
+
+**步驟：**
+- [x] 7C-1：更新 `ViewTableController`（清單頁 page_title，詳細頁 title/breadcrumb）
+- [x] 7C-2：新增 `views.php` 說明 key（`view_*_desc`，18 條）並補齊 en／zh-TW 翻譯
+
+---
+
+### Phase 7D：codes/edit.blade.php 表單說明文字（高優先）
+
+**問題：** `resources/views/codes/edit.blade.php` 中多處硬編碼中文說明，包含：
+
+| 位置 | 當前硬編碼中文 | 改用 key |
+|------|---------------|---------|
+| L21：`TEXT_CODES` 表的作者標籤 | `作者` | `codes.author_label` |
+| L23：載入作者狀態 | `載入作者中...` | `codes.loading_author` |
+| L39/41：modified_by/date 提示（PHP 字串） | `'欄位內容提交後會被替換為：'` | `codes.field_will_be_replaced` |
+| L56：TEXT_INSTANCE_DATA c_textid 說明 | `請確保 TEXT_CODES 表中存在這本書的 c_textid，再複製 ID 填入` | `codes.text_codes_copy_hint` |
+| L80/89：ADDR_BELONGS_DATA c_addr_id / c_belongs_to 說明 | `請從 ADDR_CODES 表中複製 c_addr_id 填入` | `codes.addr_copy_hint` |
+| L110：提案說明欄位忽略提示 | `如果直接儲存，此欄位會被忽略。` | `codes.proposal_ignore_hint` |
+
+> **注意：** L56、L80、L89 的說明含有 HTML 連結，使用 `{!! __('codes.xxx') !!}` 注入（lang 檔由我們控制，無 XSS 風險）。
+
+**另：JS 字串（`<script>` 區塊內）：**
+
+| 位置 | 當前硬編碼 | 建議處理方式 |
+|------|-----------|------------|
+| L159：無 c_textid 提示 | `無 c_textid，無法載入作者` | `{!! Js::from(__('codes.no_textid_msg')) !!}` 注入 |
+| L205/208：無作者資料 / 載入失敗 | `無作者資料` / `載入失敗` | 同上 |
+| L248/256/259：Load Data 結果 alert | 混用中英 | 同上 |
+| L284：人物搜尋 placeholder | `輸入姓名或 ID 搜尋人物` | 同上 |
+
+**需新增 lang key（`resources/lang/zh-TW/codes.php` 與 `resources/lang/en/codes.php`）：**
+
+| Key | zh-TW | en |
+|-----|-------|----|
+| `author_label` | `'作者'` | `'Author'` |
+| `loading_author` | `'載入作者中...'` | `'Loading author...'` |
+| `field_will_be_replaced` | `'欄位內容提交後會被替換為：'` | `'This field will be replaced upon submission with: '` |
+| `text_codes_copy_hint` | `'請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入'` | `'Make sure the book\'s c_textid exists in the <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> table, then copy the ID here.'` |
+| `addr_copy_hint` | `'請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入'` | `'Copy c_addr_id from the <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> table.'` |
+| `proposal_ignore_hint` | `'如果直接儲存，此欄位會被忽略。'` | `'If you save directly, this field will be ignored.'` |
+| `no_textid_msg` | `'無 c_textid，無法載入作者'` | `'No c_textid, cannot load author.'` |
+| `no_author_data` | `'無作者資料'` | `'No author data'` |
+| `load_failed` | `'載入失敗'` | `'Load failed'` |
+| `load_no_data_alert` | `'Load Data：無查詢結果'` | `'Load Data: No results found'` |
+| `load_success_alert` | `'Load Data：已更新 c_instance_title_chn 與 c_instance_title'` | `'Load Data: Updated c_instance_title_chn and c_instance_title'` |
+| `load_failed_alert` | `'Load Data：查詢失敗'` | `'Load Data: Query failed'` |
+| `person_search_placeholder` | `'輸入姓名或 ID 搜尋人物'` | `'Enter name or ID to search'` |
+
+**步驟：**
+- [x] 7D-1：新增上述 13 個 lang key 至 zh-TW/codes.php 與 en/codes.php
+- [x] 7D-2：更新 `codes/edit.blade.php`（Blade 說明文字 6 處 + JS 字串 7 處）
+
+---
+
+### Phase 7E：UI 細節調整（中優先）
+
+#### 7E-1：Add → New 按鈕（使用者指定）✅
+
+**問題：** `basicinformation/index.blade.php`（及所有子模組 index 頁面）的「新增」按鈕，英文模式顯示 `Add`，使用者希望改為 `New`。
+
+**方案：** 將 `resources/lang/en/common.php` 的 `'add' => 'Add'` 改為 `'add' => 'New'`。  
+（zh-TW `'add' => '新增'` 不變；所有使用 `__('common.add')` 的按鈕統一受益。）
+
+**已完成：** 2026-06-03
+
+#### 7E-2：offices/index.blade.php 表頭（低優先）✅
+
+**問題：** `resources/views/biogmains/offices/index.blade.php` L26–27 的表頭 `sequence`、`posting_id` 為英文資料庫欄位名稱，未使用翻譯 helper。  
+**修正：**  
+- `<th>sequence</th>` → `<th>{{ __('biogmains.sequence') }}</th>`（`biogmains.sequence` 已有翻譯：zh-TW '次序' / en 'Sequence'）  
+- `<th>posting_id</th>` → `<th>{{ __('person.posting_id') }}</th>`（`person.posting_id` 已有翻譯：zh-TW '任官 ID' / en 'Posting ID'）
+
+**已完成：** 2026-06-03
+
+#### 7E-3：basicinformation/edit.blade.php Xing/Ming 標籤（低優先）
+
+**問題：** L55、L65 有硬編碼英文標籤 `Xing`、`Ming`（外文姓/名欄位）。  
+**現狀：** 這兩個欄位是漢語拼音學術術語，英文使用者同樣以 Xing/Ming 理解；不需翻譯，但可加 title 提示。  
+**決定：** 暫不修改，可在 Phase 7 後期視需要補充。
+
+---
+
+### Phase 7F：其他殘留控制器（低優先，可批次）
+
+以下控制器同樣有 `page_title`／`page_description` 硬編碼中文，但使用頻率較低：
+
+| 控制器 | 當前 page_title | 建議 key |
+|--------|----------------|---------|
+| `CrowdsourcingController` | `'最近眾包錄入記錄'` | `nav.crowdsourcing_records` |
+| `ManagementController` | `'用戶管理'` | `nav.user_management` |
+| `UserProfileController` | `'個人資料設定'` | `common.profile_settings` |
+| `AdminAuditLogController` | `'審計日誌'` | `admin.audit_logs` |
+| `AiFillLogController` | `'AI 填充日誌'` | `admin.ai_fill_logs` |
+| `CbdbTableMaintenanceController` | `'CBDB 內部表維護'` | `admin.table_maintenance` |
+| `AdminBatchLoad*Controller` (3 個) | 各自的批次工具標題 | `admin.*` |
+| `WikiMaintenanceController` | `'Wiki 對照資料維護'` | `admin.wiki_maintenance` |
+| `CodesController` | `'全部表格'` | `nav.all_tables` |
+| `UnidirectionalRelationshipRepairController` | `'單向關係修復'` | （可新增 admin key） |
+
+**步驟：**
+- [x] 7F-1：逐一更新上述控制器（參考 7A 的替換規則）
+
+---
+
+### Phase 7 整體統計
+
+| Sub-phase | 優先 | 涉及檔案 | 說明 | 狀態 |
+|-----------|------|---------|------|------|
+| 7A biogmains 13 個控制器 | 最高 | 13 controllers + 2 lang | page_title/description/breadcrumbs | ✅ 完成（2026-06-03） |
+| 7B Dashboard 操作類型 | 高 | 1 controller | typeNames + page_title | ✅ 完成（2026-06-03） |
+| 7C ViewTableController | 高 | 1 controller + 2 lang | 清單頁 + 詳細頁 title/breadcrumb | ✅ 完成（2026-06-03） |
+| 7D codes/edit.blade.php | 高 | 1 view + 2 lang | 表單說明 + JS 字串 | ✅ 完成（2026-06-03） |
+| 7E UI 細節（Add→New 等） | 中 | 1 lang + 2 view | 按鈕文字、表頭 | ✅ 完成（2026-06-03） |
+| 7F 其他低頻控制器 | 低 | 12 controllers | 管理員工具等 | ✅ 完成（2026-06-03） |
+
+> 掃描日期：2026-06-03。優先級依使用者接觸頻率排序；7D 因為使用者指定 ADDR_BELONGS_DATA 問題，特別提升為高優先。
 
 ---
 

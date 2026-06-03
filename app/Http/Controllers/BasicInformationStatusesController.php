@@ -51,11 +51,11 @@ class BasicInformationStatusesController extends Controller {
         }
 
         return view('biogmains.statuses.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '社會區分', 'page_description' => '基本信息表 社會區分', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.status'), 'page_description' => __('person.person_records') . ' – ' . __('person.status'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會區分', 'url' => '#'],
+                ['label' => __('person.status'), 'url' => '#'],
             ],
         ]);
     }
@@ -87,12 +87,12 @@ class BasicInformationStatusesController extends Controller {
 
         return view('biogmains.statuses.create', [
             'id' => $id,
-            'page_title' => '社會區分', 'page_description' => '基本信息表 社會區分', 'page_url' => '/basicinformation/'.$id.'/statuses', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.status'), 'page_description' => __('person.person_records') . ' – ' . __('person.status'), 'page_url' => '/basicinformation/'.$id.'/statuses', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會區分', 'url' => route('basicinformation.statuses.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.status'), 'url' => route('basicinformation.statuses.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -190,15 +190,15 @@ class BasicInformationStatusesController extends Controller {
         }
 
         return view('biogmains.statuses.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '社會區分', 'page_description' => '基本信息表 社會區分',
+            'page_title' => __('person.status'), 'page_description' => __('person.person_records') . ' – ' . __('person.status'),
             'page_url' => '/basicinformation/'.$id.'/statuses',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會區分', 'url' => route('basicinformation.statuses.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.status'), 'url' => route('basicinformation.statuses.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -342,16 +342,16 @@ class BasicInformationStatusesController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '社會區分',
-            'page_description' => '基本信息表 社會區分',
+            'page_title' => __('person.status'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.status'),
             'page_url' => '/basicinformation/'.$id.'/statuses',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會區分', 'url' => route('basicinformation.statuses.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.status'), 'url' => route('basicinformation.statuses.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

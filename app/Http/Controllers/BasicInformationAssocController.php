@@ -78,11 +78,11 @@ class BasicInformationAssocController extends Controller {
         //dd($biogbasicinformation);
         //dd($assoc_name);
         return view('biogmains.assoc.index', ['basicinformation' => $biogbasicinformation,
-            'assoc_name' => $assoc_name, 'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'breadcrumb_home' => '人物基本資料',
+            'assoc_name' => $assoc_name, 'page_title' => __('person.associations'), 'page_description' => __('person.person_records') . ' – ' . __('person.associations'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會關係', 'url' => '#'],
+                ['label' => __('person.associations'), 'url' => '#'],
             ],
         ]);
     }
@@ -114,12 +114,12 @@ class BasicInformationAssocController extends Controller {
 
         return view('biogmains.assoc.create', [
             'id' => $id,
-            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係', 'page_url' => '/basicinformation/'.$id.'/assoc', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.associations'), 'page_description' => __('person.person_records') . ' – ' . __('person.associations'), 'page_url' => '/basicinformation/'.$id.'/assoc', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會關係', 'url' => route('basicinformation.assoc.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.associations'), 'url' => route('basicinformation.assoc.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -257,15 +257,15 @@ class BasicInformationAssocController extends Controller {
         }
 
         return view('biogmains.assoc.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '社會關係', 'page_description' => '基本信息表 社會關係',
+            'page_title' => __('person.associations'), 'page_description' => __('person.person_records') . ' – ' . __('person.associations'),
             'page_url' => '/basicinformation/'.$id.'/assoc',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會關係', 'url' => route('basicinformation.assoc.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.associations'), 'url' => route('basicinformation.assoc.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -414,16 +414,16 @@ class BasicInformationAssocController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '社會關係',
-            'page_description' => '基本信息表 社會關係',
+            'page_title' => __('person.associations'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.associations'),
             'page_url' => '/basicinformation/'.$id.'/assoc',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社會關係', 'url' => route('basicinformation.assoc.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.associations'), 'url' => route('basicinformation.assoc.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

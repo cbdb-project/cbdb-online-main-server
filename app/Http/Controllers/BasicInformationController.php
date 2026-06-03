@@ -108,8 +108,8 @@ class BasicInformationController extends Controller {
         $names = $this->biogMainRepository->namesByQuery($request, $num);
 
         return view('biogmains.basicinformation.index', [
-            'page_title' => '人物基本資料',
-            'page_description' => '編輯人物基本資料',
+            'page_title' => __('person.person_records'),
+            'page_description' => __('person.person_records'),
             'names' => $names,
             'q' => $q,
             'c_dy' => $cDy,
@@ -126,12 +126,12 @@ class BasicInformationController extends Controller {
         $temp_id = BiogMain::max('c_personid') + 1;
 
         return view('biogmains.basicinformation.create', [
-            'page_title' => '人物基本資料',
-            'page_description' => '新建人物基本資料',
+            'page_title' => __('person.person_records'),
+            'page_description' => __('person.person_records') . ' – ' . __('common.add'),
             'temp_id' => $temp_id,
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -227,13 +227,13 @@ class BasicInformationController extends Controller {
             'dynasties' => $dynasties,
             'nianhaos' => $nianhaos,
             'yearRange' => $yearRange,
-            'page_title' => '人物基本資料',
-            'page_description' => '基本信息表 基本资料（只读）',
+            'page_title' => __('person.person_records'),
+            'page_description' => __('person.person_records') . ' – ' . __('common.view'),
             'readonly' => true,
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.show', $personId)],
-                ['label' => '查看', 'url' => '#'],
+                ['label' => __('common.view'), 'url' => '#'],
             ],
         ]);
     }
@@ -280,12 +280,12 @@ class BasicInformationController extends Controller {
             'dynasties' => $dynasties,
             'nianhaos' => $nianhaos,
             'yearRange' => $yearRange,
-            'page_title' => '人物基本資料',
-            'page_description' => '基本信息表 基本资料',
+            'page_title' => __('person.person_records'),
+            'page_description' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $personId)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

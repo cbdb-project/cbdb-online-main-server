@@ -25,8 +25,8 @@ class UserProfileController extends Controller {
     public function edit() {
         return view('profile.edit', [
             'user' => Auth::user(),
-            'page_title' => '個人資料設定',
-            'page_description' => '修改您的個人資料',
+            'page_title' => __('common.profile_settings'),
+            'page_description' => __('common.profile_settings_desc'),
         ]);
     }
 

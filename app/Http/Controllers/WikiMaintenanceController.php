@@ -61,8 +61,9 @@ class WikiMaintenanceController extends Controller {
         }
 
         return view('admin.wiki-maintenance', [
-            'page_title' => 'Wiki 對照資料維護',
-            'page_description' => '管理 BIOG_SOURCE_DATA 中的 Wiki 對照資料',
+            'page_title' => __('admin.wiki_maintenance'),
+            'page_title_key' => 'Wiki 對照資料維護',
+            'page_description' => __('admin.wiki_maintenance_desc'),
             'page_url' => route('admin.wiki-maintenance'),
             'records' => $records,
             'currentSourceId' => $sourceId,

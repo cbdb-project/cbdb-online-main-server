@@ -70,7 +70,7 @@ class AdminAuditLogController extends Controller {
         $logs = $query->paginate(20)->withQueryString();
 
         return view('admin.audit_logs.index', [
-            'page_title' => '審計日誌',
+            'page_title' => __('admin.audit_logs'),
             'page_title_key' => '審計日誌',
             'page_url' => route('admin.audit-logs'),
             'logs' => $logs,

@@ -50,11 +50,11 @@ class BasicInformationPossessionController extends Controller {
         }
 
         return view('biogmains.possession.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.possessions'), 'page_description' => __('person.person_records') . ' – ' . __('person.possessions'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '財產', 'url' => '#'],
+                ['label' => __('person.possessions'), 'url' => '#'],
             ],
         ]);
     }
@@ -86,12 +86,12 @@ class BasicInformationPossessionController extends Controller {
 
         return view('biogmains.possession.create', [
             'id' => $id,
-            'page_title' => '財產', 'page_description' => '基本信息表 財產', 'page_url' => '/basicinformation/'.$id.'/possession', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.possessions'), 'page_description' => __('person.person_records') . ' – ' . __('person.possessions'), 'page_url' => '/basicinformation/'.$id.'/possession', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.possessions'), 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -177,15 +177,15 @@ class BasicInformationPossessionController extends Controller {
 
         //        dd($res);
         return view('biogmains.possession.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '財產', 'page_description' => '基本信息表 財產',
+            'page_title' => __('person.possessions'), 'page_description' => __('person.person_records') . ' – ' . __('person.possessions'),
             'page_url' => '/basicinformation/'.$id.'/possession',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.possessions'), 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -274,16 +274,16 @@ class BasicInformationPossessionController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '財產',
-            'page_description' => '基本信息表 財產',
+            'page_title' => __('person.possessions'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.possessions'),
             'page_url' => '/basicinformation/'.$id.'/possession',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '財產', 'url' => route('basicinformation.possession.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.possessions'), 'url' => route('basicinformation.possession.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

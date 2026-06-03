@@ -50,11 +50,11 @@ class BasicInformationEventsController extends Controller {
         }
 
         return view('biogmains.events.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '事件', 'page_description' => '基本信息表 事件', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.events'), 'page_description' => __('person.person_records') . ' – ' . __('person.events'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '事件', 'url' => '#'],
+                ['label' => __('person.events'), 'url' => '#'],
             ],
         ]);
     }
@@ -86,12 +86,12 @@ class BasicInformationEventsController extends Controller {
 
         return view('biogmains.events.create', [
             'id' => $id,
-            'page_title' => '事件', 'page_description' => '基本信息表 事件', 'page_url' => '/basicinformation/'.$id.'/events', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.events'), 'page_description' => __('person.person_records') . ' – ' . __('person.events'), 'page_url' => '/basicinformation/'.$id.'/events', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '事件', 'url' => route('basicinformation.events.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.events'), 'url' => route('basicinformation.events.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -181,15 +181,15 @@ class BasicInformationEventsController extends Controller {
         }
 
         return view('biogmains.events.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '事件', 'page_description' => '基本信息表 事件',
+            'page_title' => __('person.events'), 'page_description' => __('person.person_records') . ' – ' . __('person.events'),
             'page_url' => '/basicinformation/'.$id.'/events',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '事件', 'url' => route('basicinformation.events.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.events'), 'url' => route('basicinformation.events.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -286,16 +286,16 @@ class BasicInformationEventsController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '事件',
-            'page_description' => '基本信息表 事件',
+            'page_title' => __('person.events'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.events'),
             'page_url' => '/basicinformation/'.$id.'/events',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '事件', 'url' => route('basicinformation.events.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.events'), 'url' => route('basicinformation.events.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

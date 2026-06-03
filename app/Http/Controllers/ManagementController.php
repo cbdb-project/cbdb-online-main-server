@@ -68,8 +68,9 @@ class ManagementController extends Controller {
         return view('manage.index', [
             'data' => $data,
             'inactiveUsers' => $inactiveUsers,
-            'page_title' => '用戶管理',
-            'page_description' => '管理用戶',
+            'page_title' => __('nav.user_management'),
+            'page_title_key' => '用戶管理',
+            'page_description' => __('nav.user_management_desc'),
         ]);
     }
 
@@ -126,7 +127,7 @@ class ManagementController extends Controller {
         return view('manage.edit', [
             'user' => $user,
             'page_title' => '編輯用戶',
-            'page_description' => '編輯用戶 ' . $user->name . ' 的設置',
+            'page_description' => __('admin.manage_edit_desc', ['name' => $user->name]),
         ]);
     }
 

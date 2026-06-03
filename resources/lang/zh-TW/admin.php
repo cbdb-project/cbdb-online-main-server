@@ -12,6 +12,14 @@ return [
     'sql_explain'                 => 'SQL EXPLAIN',
     'unidirectional_repair'       => '單向關係修復',
     'merge_records'               => '人物記錄合併',
+    'table_maintenance_desc'       => '管理 CBDB 內部資料表（繁簡映射表、姓名搜尋索引等）',
+    'wiki_maintenance_desc'        => '管理 BIOG_SOURCE_DATA 中的 Wiki 對照資料',
+    'batch_load_books_desc'        => '貼上以 tab 分隔的作者 ID、書名與來源 TEXT_ID，新增至 TEXT_CODES',
+    'batch_load_offices_desc'      => '貼上以 tab 分隔的官職資料，依序建立 OFFICE_CODES 與 OFFICE_CODE_TYPE_REL',
+    'batch_load_social_institutes_desc' => '貼上以 tab 分隔的社會機構資料，依序新增 NAME / CODE / ADDR 資料',
+    'unidirectional_repair_desc'   => '修復 CBDB 資料庫中的單向親屬關係和社會關係',
+    'manage_edit_desc'             => '編輯用戶 :name 的設置',
+    'proposal_adjustment'          => '提案調整',
 
     // manage/ — 用戶列表
     'manage_inactive_users_title'  => '近 7 天未激活用戶（:count）',

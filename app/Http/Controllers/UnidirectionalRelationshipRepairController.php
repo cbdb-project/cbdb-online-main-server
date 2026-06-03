@@ -35,8 +35,9 @@ class UnidirectionalRelationshipRepairController extends Controller {
 
     public function index(Request $request) {
         return view('admin.unidirectional-relationship-repair', [
-            'page_title' => '單向關係修復',
-            'page_description' => '修復 CBDB 資料庫中的單向親屬關係和社會關係',
+            'page_title' => __('admin.unidirectional_repair'),
+            'page_title_key' => '單向關係修復',
+            'page_description' => __('admin.unidirectional_repair_desc'),
             'page_url' => route('admin.unidirectional-relationship-repair'),
         ]);
     }

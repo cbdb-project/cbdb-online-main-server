@@ -26,6 +26,7 @@ return [
     'reign_year'                => 'Reign Year',
     'tribe'                     => 'Tribe',
     'basic_info'                => 'Basic Information',
+    'person_records'            => 'Person Records',
     'edit_basic_info'           => 'Edit Basic Information',
     'delete_person'             => 'Delete Person',
     'create_or_modify'          => 'Create / Modify Information',

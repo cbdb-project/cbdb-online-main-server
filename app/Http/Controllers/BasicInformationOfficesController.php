@@ -65,11 +65,11 @@ class BasicInformationOfficesController extends Controller {
 
         //        dd($serialAddr);
         return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr,
-            'page_title' => '官名', 'page_description' => '基本信息表 官名', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.tab_postings'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '官名', 'url' => '#'],
+                ['label' => __('person.tab_postings'), 'url' => '#'],
             ],
         ]);
     }
@@ -105,12 +105,12 @@ class BasicInformationOfficesController extends Controller {
         return view('biogmains.offices.create', [
             'id' => $id,
             'biog_dy' => $biogDy,
-            'page_title' => '官名', 'page_description' => '基本信息表 官名', 'page_url' => '/basicinformation/'.$id.'/offices', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.tab_postings'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'), 'page_url' => '/basicinformation/'.$id.'/offices', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.tab_postings'), 'url' => route('basicinformation.offices.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -225,15 +225,15 @@ class BasicInformationOfficesController extends Controller {
         }
 
         return view('biogmains.offices.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res, 'biog_dy' => $biogDy,
-            'page_title' => '官名', 'page_description' => '基本信息表 官名',
+            'page_title' => __('person.tab_postings'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'),
             'page_url' => '/basicinformation/'.$id.'/offices',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_postings'), 'url' => route('basicinformation.offices.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -491,16 +491,16 @@ class BasicInformationOfficesController extends Controller {
             'res' => $res,
             'pk' => $pk,
             'biog_dy' => $biogDy,
-            'page_title' => '官名',
-            'page_description' => '基本信息表 官名',
+            'page_title' => __('person.tab_postings'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'),
             'page_url' => '/basicinformation/'.$id.'/offices',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '官名', 'url' => route('basicinformation.offices.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_postings'), 'url' => route('basicinformation.offices.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

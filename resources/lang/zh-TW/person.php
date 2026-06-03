@@ -26,6 +26,7 @@ return [
     'reign_year'                => '年號',
     'tribe'                     => '部、族',
     'basic_info'                => '基本資料',
+    'person_records'            => '人物基本資料',
     'edit_basic_info'           => '編輯基本資料',
     'delete_person'             => '刪除人物',
     'create_or_modify'          => '建立 / 修改資訊',

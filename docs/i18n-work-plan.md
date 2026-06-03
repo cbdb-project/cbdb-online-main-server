@@ -1,11 +1,11 @@
 # CBDB Online 中英文切換介面 — 實施計劃
 
-**狀態：** 🔄 Phase 8 計劃中（分支：`feature/i18n-phase8-react-components-operations`）  
+**狀態：** ✅ Phase 8 完成（分支：`feature/i18n-phase8-react-components-operations`）  
 **計劃日期：** 2026-06-01  
 **Phase 0–5 完成：** 2026-06-02  
 **Phase 6 完成：** 2026-06-02  
 **Phase 7 完成：** 2026-06-03  
-**Phase 8 計劃：** 2026-06-03  
+**Phase 8 完成：** 2026-06-03  
 **作者：** AI 協作草稿（王宏甦審閱）
 
 ---

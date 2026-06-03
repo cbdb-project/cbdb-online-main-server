@@ -50,11 +50,11 @@ class BasicInformationKinshipController extends Controller {
         }
 
         return view('biogmains.kinship.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '親屬', 'page_description' => '基本信息表 親屬', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.tab_kinship'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_kinship'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '親屬', 'url' => '#'],
+                ['label' => __('person.tab_kinship'), 'url' => '#'],
             ],
         ]);
     }
@@ -86,12 +86,12 @@ class BasicInformationKinshipController extends Controller {
 
         return view('biogmains.kinship.create', [
             'id' => $id,
-            'page_title' => '親屬', 'page_description' => '基本信息表 親屬', 'page_url' => '/basicinformation/'.$id.'/kinship', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.tab_kinship'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_kinship'), 'page_url' => '/basicinformation/'.$id.'/kinship', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '親屬', 'url' => route('basicinformation.kinship.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.tab_kinship'), 'url' => route('basicinformation.kinship.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -194,15 +194,15 @@ class BasicInformationKinshipController extends Controller {
         }
 
         return view('biogmains.kinship.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '親屬', 'page_description' => '基本信息表 親屬',
+            'page_title' => __('person.tab_kinship'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_kinship'),
             'page_url' => '/basicinformation/'.$id.'/kinship',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '親屬', 'url' => route('basicinformation.kinship.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_kinship'), 'url' => route('basicinformation.kinship.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -324,16 +324,16 @@ class BasicInformationKinshipController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '親屬',
-            'page_description' => '基本信息表 親屬',
+            'page_title' => __('person.tab_kinship'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_kinship'),
             'page_url' => '/basicinformation/'.$id.'/kinship',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '親屬', 'url' => route('basicinformation.kinship.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_kinship'), 'url' => route('basicinformation.kinship.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

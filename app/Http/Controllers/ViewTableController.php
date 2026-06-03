@@ -22,12 +22,19 @@ class ViewTableController extends Controller {
         $items = collect($definitions)->map(function ($definition, $key) {
             $aliases = Arr::get($definition, 'aliases', []);
             $primaryAlias = $aliases[0] ?? ('View_' . Str::studly(str_replace('-', '_', $key)));
+            $langKey = 'view_' . str_replace('-', '_', str_replace('posessions', 'possessions', $key));
+            $rawTitle = Arr::get($definition, 'title', $key);
+            $t = __('views.' . $langKey);
+            $title = ($t !== 'views.' . $langKey) ? $t : $rawTitle;
+            $rawDesc = Arr::get($definition, 'description', '');
+            $d = __('views.' . $langKey . '_desc');
+            $description = (!empty($d) && $d !== 'views.' . $langKey . '_desc') ? $d : $rawDesc;
 
             return [
                 'key' => $key,
                 'primary_alias' => $primaryAlias,
-                'title' => Arr::get($definition, 'title', $key),
-                'description' => Arr::get($definition, 'description', ''),
+                'title' => $title,
+                'description' => $description,
                 'aliases' => $aliases,
                 'builder' => Arr::get($definition, 'builder'),
             ];
@@ -37,7 +44,8 @@ class ViewTableController extends Controller {
 
         return view('view.list', [
             'views' => $items,
-            'page_title' => '檢視表總覽',
+            'page_title' => __('nav.views_overview'),
+            'page_title_key' => '檢視表總覽',
         ]);
     }
 
@@ -95,16 +103,27 @@ class ViewTableController extends Controller {
 
         $rows = $builder->paginate($perPage)->appends($request->except('page'));
 
+        $viewLangKey = 'view_' . str_replace('-', '_', str_replace('posessions', 'possessions', $effectiveKey));
+        $translatedTitle = __('views.' . $viewLangKey);
+        $resolvedTitle = ($translatedTitle !== 'views.' . $viewLangKey)
+            ? $translatedTitle
+            : ($definition['title'] ?? $effectiveKey);
+        $translatedDesc = __('views.' . $viewLangKey . '_desc');
+        $resolvedDesc = (!empty($translatedDesc) && $translatedDesc !== 'views.' . $viewLangKey . '_desc')
+            ? $translatedDesc
+            : ($definition['description'] ?? '');
+
         return view('view.index', [
-            'title' => $definition['title'] ?? $effectiveKey,
-            'description' => $definition['description'] ?? null,
+            'title' => $resolvedTitle,
+            'description' => $resolvedDesc,
             'columns' => $definition['columns'] ?? [],
             'rows' => $rows,
             'key' => $effectiveKey,
-            'page_title' => $definition['title'] ?? $effectiveKey,
-            'page_description' => $definition['description'] ?? '',
+            'page_title' => $resolvedTitle,
+            'page_title_key' => $definition['title'] ?? $effectiveKey,
+            'page_description' => $resolvedDesc,
             'page_url' => route('view.show', $effectiveKey),
-            'archer' => "<li class='breadcrumb-item'><a href='/view'>檢視表總覽</a></li>",
+            'archer' => "<li class='breadcrumb-item'><a href='/view'>" . __('nav.views_overview') . "</a></li>",
             'debug_sql' => $debugSql,
             'debug_sql_formatted' => $debugRenderedSql,
             'debug_bindings' => $debugBindings,

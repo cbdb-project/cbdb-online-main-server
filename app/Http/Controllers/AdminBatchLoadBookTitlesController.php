@@ -36,8 +36,9 @@ class AdminBatchLoadBookTitlesController extends Controller {
         $this->ensureAdmin();
 
         return view('admin.batch_load_book_titles', [
-            'page_title' => '批次匯入書稿資料',
-            'page_description' => '貼上以 tab 分隔的作者 ID、書名與來源 TEXT_ID，新增至 TEXT_CODES',
+            'page_title' => __('admin.batch_load_books'),
+            'page_title_key' => '批次匯入書稿資料',
+            'page_description' => __('admin.batch_load_books_desc'),
             'page_url' => route('admin.batch-load-book-titles'),
             'input' => old('entries', ''),
             'results' => session('batch_results', []),

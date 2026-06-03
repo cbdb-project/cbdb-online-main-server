@@ -58,13 +58,13 @@ class BasicInformationSourcesController extends Controller {
 
         return view('biogmains.sources.index', [
             'basicinformation' => $basicinformation,
-            'page_title' => '出處',
-            'page_description' => '基本信息表 出處',
-            'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.tab_sources'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_sources'),
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '出处', 'url' => '#'],
+                ['label' => __('person.tab_sources'), 'url' => '#'],
             ],
         ]);
     }
@@ -96,16 +96,16 @@ class BasicInformationSourcesController extends Controller {
 
         return view('biogmains.sources.create', [
             'id' => $id,
-            'page_title' => '出處',
-            'page_description' => '基本信息表 出處',
+            'page_title' => __('person.tab_sources'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_sources'),
             'page_url' => '/basicinformation/'.$id.'/sources',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '出处', 'url' => route('basicinformation.sources.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.tab_sources'), 'url' => route('basicinformation.sources.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -199,16 +199,16 @@ class BasicInformationSourcesController extends Controller {
             'id' => $id,
             'row' => $res['row'],
             'res' => $res,
-            'page_title' => '出處',
-            'page_description' => '基本信息表 出處',
+            'page_title' => __('person.tab_sources'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_sources'),
             'page_url' => '/basicinformation/'.$id.'/sources',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '出处', 'url' => route('basicinformation.sources.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_sources'), 'url' => route('basicinformation.sources.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -313,16 +313,16 @@ class BasicInformationSourcesController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '出處',
-            'page_description' => '基本信息表 出處',
+            'page_title' => __('person.tab_sources'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_sources'),
             'page_url' => '/basicinformation/'.$id.'/sources',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '出处', 'url' => route('basicinformation.sources.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_sources'), 'url' => route('basicinformation.sources.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

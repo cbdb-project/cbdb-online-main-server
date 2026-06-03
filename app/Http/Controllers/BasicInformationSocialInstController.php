@@ -58,11 +58,11 @@ class BasicInformationSocialInstController extends Controller {
         }
 
         return view('biogmains.socialinst.index', ['basicinformation' => $biogbasicinformation,
-            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構', 'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.tab_social_institutions'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_social_institutions'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社交機構', 'url' => '#'],
+                ['label' => __('person.tab_social_institutions'), 'url' => '#'],
             ],
         ]);
     }
@@ -94,12 +94,12 @@ class BasicInformationSocialInstController extends Controller {
 
         return view('biogmains.socialinst.create', [
             'id' => $id,
-            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構', 'page_url' => '/basicinformation/'.$id.'/socialinst', 'breadcrumb_home' => '人物基本資料', 'archer' => '<li>新增</li>',
+            'page_title' => __('person.tab_social_institutions'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_social_institutions'), 'page_url' => '/basicinformation/'.$id.'/socialinst', 'breadcrumb_home' => __('person.person_records'), 'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社交機構', 'url' => route('basicinformation.socialinst.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.tab_social_institutions'), 'url' => route('basicinformation.socialinst.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -207,15 +207,15 @@ class BasicInformationSocialInstController extends Controller {
         }
 
         return view('biogmains.socialinst.edit', ['id' => $id, 'row' => $res['row'], 'res' => $res,
-            'page_title' => '社交機構', 'page_description' => '基本信息表 社交機構',
+            'page_title' => __('person.tab_social_institutions'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_social_institutions'),
             'page_url' => '/basicinformation/'.$id.'/socialinst',
             'archer' => "<li>編輯</li>",
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社交機構', 'url' => route('basicinformation.socialinst.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_social_institutions'), 'url' => route('basicinformation.socialinst.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -368,16 +368,16 @@ class BasicInformationSocialInstController extends Controller {
             'row' => $res['row'],
             'res' => $res,
             'pk' => $pk,
-            'page_title' => '社交機構',
-            'page_description' => '基本信息表 社交機構',
+            'page_title' => __('person.tab_social_institutions'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.tab_social_institutions'),
             'page_url' => '/basicinformation/'.$id.'/socialinst',
             'archer' => '<li>編輯</li>',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '社交機構', 'url' => route('basicinformation.socialinst.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.tab_social_institutions'), 'url' => route('basicinformation.socialinst.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

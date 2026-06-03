@@ -74,7 +74,7 @@ class AiFillLogController extends Controller {
             ->get();
 
         return view('admin.ai_fill_logs.index', [
-            'page_title' => 'AI 填充日誌',
+            'page_title' => __('admin.ai_fill_logs'),
             'page_title_key' => 'AI 填充日誌',
             'page_url' => route('admin.ai-fill-logs'),
             'logs' => $logs,

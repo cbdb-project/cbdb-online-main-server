@@ -264,8 +264,9 @@ class CodesController extends Controller {
         $data = $this->codesrepostory->codes();
 
         return view('codes.index', [
-            'page_title' => '全部表格',
-            'page_description' => '全部表格',
+            'page_title' => __('nav.all_tables'),
+            'page_title_key' => '全部表格',
+            'page_description' => __('nav.all_tables_desc'),
             'page_url' => '/codes',
             'data' => $data,
         ]);
@@ -596,7 +597,7 @@ class CodesController extends Controller {
             'reviewComment' => $payload['__review_comment'] ?? null,
             'isCreateProposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
             'page_title' => 'Codes',
-            'page_description' => $table . ' 提案調整',
+            'page_description' => $table . ' ' . __('admin.proposal_adjustment'),
             'page_url' => route('codes.show', ['table_name' => $table]),
             'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li><li class='breadcrumb-item active'>提案調整</li>",
         ]);

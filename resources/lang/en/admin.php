@@ -12,6 +12,14 @@ return [
     'sql_explain'                 => 'SQL EXPLAIN',
     'unidirectional_repair'       => 'Unidirectional Relationship Repair',
     'merge_records'               => 'Merge Person Records',
+    'table_maintenance_desc'       => 'Manage CBDB internal tables (simplified/traditional mapping, name search index, etc.)',
+    'wiki_maintenance_desc'        => 'Manage Wiki cross-reference data in BIOG_SOURCE_DATA',
+    'batch_load_books_desc'        => 'Paste tab-separated Author ID, Book Title and source TEXT_ID to add to TEXT_CODES',
+    'batch_load_offices_desc'      => 'Paste tab-separated office data to create OFFICE_CODES and OFFICE_CODE_TYPE_REL entries',
+    'batch_load_social_institutes_desc' => 'Paste tab-separated social institution data to add NAME / CODE / ADDR records',
+    'unidirectional_repair_desc'   => 'Repair unidirectional kinship and association relations in the CBDB database',
+    'manage_edit_desc'             => 'Edit settings for user :name',
+    'proposal_adjustment'          => 'Proposal Adjustment',
 
     // manage/ — user list (index)
     'manage_inactive_users_title'  => 'Users Not Activated in the Past 7 Days (:count)',

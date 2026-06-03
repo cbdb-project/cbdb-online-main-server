@@ -55,22 +55,22 @@ class DashboardController extends Controller {
             ->get()
             ->reduce(function ($carry, $item) {
                 $typeNames = [
-                    \App\Models\Operation::TYPE_CREATE => '新增',
-                    \App\Models\Operation::TYPE_UPDATE_FULL => '修改', // full update
-                    \App\Models\Operation::TYPE_UPDATE => '修改', // partial update
-                    \App\Models\Operation::TYPE_DELETE => '刪除',
-                    \App\Models\Operation::TYPE_PROPOSAL_CREATE => '提案（新增）',
-                    \App\Models\Operation::TYPE_PROPOSAL_UPDATE => '提案（修改）',
+                    \App\Models\Operation::TYPE_CREATE => __('operations.op_create'),
+                    \App\Models\Operation::TYPE_UPDATE_FULL => __('operations.op_update'),
+                    \App\Models\Operation::TYPE_UPDATE => __('operations.op_update'),
+                    \App\Models\Operation::TYPE_DELETE => __('operations.op_delete'),
+                    \App\Models\Operation::TYPE_PROPOSAL_CREATE => __('operations.op_proposal_create'),
+                    \App\Models\Operation::TYPE_PROPOSAL_UPDATE => __('operations.op_proposal_update'),
                 ];
 
-                $typeName = $typeNames[$item->op_type] ?? '未知';
+                $typeName = $typeNames[$item->op_type] ?? __('common.unknown');
                 $carry[$typeName] = ($carry[$typeName] ?? 0) + $item->count;
 
                 return $carry;
             }, []);
 
         return view('dashboard.index', [
-            'page_title' => '系統總覽',
+            'page_title' => __('nav.dashboard'),
             'page_title_key' => '系統總覽',
             'totalPersons' => $totalPersons,
             'totalAltnames' => $totalAltnames,

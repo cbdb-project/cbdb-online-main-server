@@ -18,9 +18,9 @@
                     {{ csrf_field() }}
                     @if($table === 'TEXT_CODES')
                     <div class="form-group row">
-                        <label class="col-sm-2 col-form-label">作者</label>
+                        <label class="col-sm-2 col-form-label">{{ __('codes.author_label') }}</label>
                         <div class="col-sm-10" id="author_list_container">
-                            <span class="text-muted">載入作者中...</span>
+                            <span class="text-muted">{{ __('codes.loading_author') }}</span>
                         </div>
                     </div>
                     @endif
@@ -36,9 +36,9 @@
                             $helpText = null;
                             if ($isModifiedField && Auth::check() && Auth::user()->isActive()) {
                                 if ($key === 'c_modified_by' && $currentUserName !== null) {
-                                    $helpText = '欄位內容提交後會被替換為：' . $currentUserName;
+                                    $helpText = __('codes.field_will_be_replaced') . $currentUserName;
                                 } elseif ($key === 'c_modified_date') {
-                                    $helpText = '欄位內容提交後會被替換為：' . $currentTimestamp;
+                                    $helpText = __('codes.field_will_be_replaced') . $currentTimestamp;
                                 }
                             }
                         @endphp
@@ -53,7 +53,7 @@
                                 <button type="button" id="button_ajax_load_instance" class="btn btn-info">Load Data</button>
                             </div>
                             <div class="offset-sm-2 col-sm-10">
-                                <p class="help-block text-muted">請確保 <a href="/codes/TEXT_CODES" target="_blank">TEXT_CODES</a> 表中存在這本書的 c_textid，再複製 ID 填入</p>
+                                <p class="help-block text-muted">{!! __('codes.text_codes_copy_hint') !!}</p>
                             </div>
                             @elseif($table === 'ALTNAME_DATA' && $key === 'c_personid')
                             <div class="col-sm-10">
@@ -77,7 +77,7 @@
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
-                                <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                                <p class="help-block text-muted">{!! __('codes.addr_copy_hint') !!}</p>
                                 @if($helpText)
                                 <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
                                 @endif
@@ -86,7 +86,7 @@
                             <div class="col-sm-10">
                                 <input type="text" name="{{ $key }}" class="form-control"
                                        value="{{ old($key, $inputValue) }}" @if($shouldDisable) readonly @endif>
-                                <p class="help-block text-muted">請從 <a href="/codes/ADDR_CODES" target="_blank">ADDR_CODES</a> 表中複製 c_addr_id 填入</p>
+                                <p class="help-block text-muted">{!! __('codes.addr_copy_hint') !!}</p>
                                 @if($helpText)
                                 <p class="help-block text-info"><strong>{{ $helpText }}</strong></p>
                                 @endif
@@ -107,7 +107,7 @@
                         <label for="__proposal_comment" class="col-sm-2 col-form-label">{{ __('codes.proposal_desc') }}</label>
                         <div class="col-sm-10">
                             <textarea name="__proposal_comment" id="__proposal_comment" class="form-control" rows="3" placeholder="{{ __('codes.proposal_desc_hint') }}">{{ old('__proposal_comment') }}</textarea>
-                            <p class="help-block">如果直接儲存，此欄位會被忽略。</p>
+                            <p class="help-block">{{ __('codes.proposal_ignore_hint') }}</p>
                         </div>
                     </div>
                     <div class="form-group row">
@@ -127,6 +127,11 @@
 @endsection
 @section('js')
 @if($table === 'TEXT_CODES')
+<script>
+    var _msg_no_textid = {!! Js::from(__('codes.no_textid_msg')) !!};
+    var _msg_no_author = {!! Js::from(__('codes.no_author_data')) !!};
+    var _msg_load_failed = {!! Js::from(__('codes.load_failed')) !!};
+</script>
 <style>
     .author-list-scroll {
         border: 1px solid #ced4da;
@@ -156,7 +161,7 @@
         const loadAuthors = function() {
             const c_textid = $("input[name='c_textid']").val();
             if (!c_textid) {
-                $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">無 c_textid，無法載入作者</span>');
+                $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">' + _msg_no_textid + '</span>');
                 return;
             }
 
@@ -202,10 +207,10 @@
                     });
                     $authorList.append(list);
                 } else {
-                    $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">無作者資料</span>');
+                    $authorList.html('<span class="text-muted" style="padding-top: 7px; display: inline-block;">' + _msg_no_author + '</span>');
                 }
             }).fail(function() {
-                $authorList.html('<span class="text-danger" style="padding-top: 7px; display: inline-block;">載入失敗</span>');
+                $authorList.html('<span class="text-danger" style="padding-top: 7px; display: inline-block;">' + _msg_load_failed + '</span>');
             });
         };
 
@@ -214,6 +219,11 @@
 </script>
 @endif
 @if($table === 'TEXT_INSTANCE_DATA')
+<script>
+    var _msg_load_no_data = {!! Js::from(__('codes.load_no_data_alert')) !!};
+    var _msg_load_success = {!! Js::from(__('codes.load_success_alert')) !!};
+    var _msg_load_failed_alert = {!! Js::from(__('codes.load_failed_alert')) !!};
+</script>
 <script type="text/javascript">
 onViteReady(function (){
 
@@ -245,7 +255,7 @@ onViteReady(function (){
             DoAjax(url, {todo : "exSucceed"},
                 function(data, textStatus, jqXHR){
                     if(data.data == '') {
-                        alert('Load Data 沒有查詢到資料');
+                        alert(_msg_load_no_data);
                     }
                     else if(data.data != '') {
                         /* 在這裡添加錄入表單更新的欄位與資料 */
@@ -253,10 +263,10 @@ onViteReady(function (){
                         $("input[name='c_instance_title_chn']").css("background","#FFFFBB");
                         $("input[name='c_instance_title']").val(data.data[0].c_title);
                         $("input[name='c_instance_title']").css("background","#FFFFBB");
-                        alert('Load Data 更新[c_instance_title_chn]與[c_instance_title]成功');
+                        alert(_msg_load_success);
                     }
                     else {
-                        alert('Load Data 查詢失敗');
+                        alert(_msg_load_failed_alert);
                     }
                 });
 
@@ -273,6 +283,7 @@ onViteReady(function (){
 @endphp
 @if(in_array($table, ['ALTNAME_DATA', 'BIOG_ADDR_DATA']) || $hasPersonIdField)
 <script>
+    var _person_search_placeholder = {!! Js::from(__('codes.person_search_placeholder')) !!};
     onViteReady(function() {
         const $persons = $('.js-person-select');
 
@@ -281,7 +292,7 @@ onViteReady(function (){
             const initialId = $person.data('initial-id') || $person.data('initial-value') || $person.val();
 
             window.initPersonSelect($person, {
-                placeholder: '輸入姓名或 ID 搜尋人物',
+                placeholder: _person_search_placeholder,
             });
 
             if (initialId) {

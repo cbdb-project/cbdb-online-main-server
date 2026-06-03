@@ -56,13 +56,13 @@ class BasicInformationAddressesController extends Controller {
 
         return view('biogmains.addresses.index', [
             'basicinformation' => $biogbasicinformation,
-            'page_title' => '地址',
-            'page_description' => '基本信息表 地址',
-            'breadcrumb_home' => '人物基本資料',
+            'page_title' => __('person.addresses'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.addresses'),
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '地址', 'url' => '#'],
+                ['label' => __('person.addresses'), 'url' => '#'],
             ],
         ]);
     }
@@ -94,16 +94,16 @@ class BasicInformationAddressesController extends Controller {
 
         return view('biogmains.addresses.create', [
             'id' => $id,
-            'page_title' => '地址',
-            'page_description' => '基本信息表 地址',
+            'page_title' => __('person.addresses'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.addresses'),
             'page_url' => '/basicinformation/'.$id.'/addresses',
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'archer' => '<li>新增</li>',
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
-                ['label' => '新增', 'url' => '#'],
+                ['label' => __('person.addresses'), 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => __('common.add'), 'url' => '#'],
             ],
         ]);
     }
@@ -276,17 +276,17 @@ class BasicInformationAddressesController extends Controller {
             'row' => $row,
             'addr_str' => $addr_str,
             'text_str' => $text_str,
-            'page_title' => '地址',
-            'page_description' => '基本信息表 地址',
+            'page_title' => __('person.addresses'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.addresses'),
             'page_url' => '/basicinformation/'.$id.'/addresses',
             'archer' => "<li>編輯</li>",
             'other_belongs_str' => $other_belongs_str,
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.addresses'), 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }
@@ -484,17 +484,17 @@ class BasicInformationAddressesController extends Controller {
             'pk' => $pk,
             'addr_str' => $addr_str,
             'text_str' => $text_str,
-            'page_title' => '地址',
-            'page_description' => '基本信息表 地址',
+            'page_title' => __('person.addresses'),
+            'page_description' => __('person.person_records') . ' – ' . __('person.addresses'),
             'page_url' => '/basicinformation/'.$id.'/addresses',
             'archer' => '<li>編輯</li>',
             'other_belongs_str' => $other_belongs_str,
-            'breadcrumb_home' => '人物基本資料',
+            'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
-                ['label' => '人物基本資料', 'url' => route('basicinformation.index')],
+                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
                 ['label' => $personLabel, 'url' => route('basicinformation.edit', $id)],
-                ['label' => '地址', 'url' => route('basicinformation.addresses.index', $id)],
-                ['label' => '編輯', 'url' => '#'],
+                ['label' => __('person.addresses'), 'url' => route('basicinformation.addresses.index', $id)],
+                ['label' => __('common.edit'), 'url' => '#'],
             ],
         ]);
     }

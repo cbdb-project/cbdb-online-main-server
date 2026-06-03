@@ -63,8 +63,9 @@ class CbdbTableMaintenanceController extends Controller {
         }
 
         return view('admin.cbdb-table-maintenance', [
-            'page_title' => 'CBDB 內部表維護',
-            'page_description' => '管理 CBDB 內部資料表（繁簡映射表、姓名搜尋索引等）',
+            'page_title' => __('admin.table_maintenance'),
+            'page_title_key' => 'CBDB 內部表維護',
+            'page_description' => __('admin.table_maintenance_desc'),
             'page_url' => route('admin.cbdb-table-maintenance'),
             'tables' => $this->tables,
             'stats' => $stats,

@@ -23,8 +23,9 @@ class AdminBatchLoadOfficesController extends Controller {
         $this->ensureAdmin();
 
         return view('admin.batch_load_offices', [
-            'page_title' => '批次匯入官職',
-            'page_description' => '貼上以 tab 分隔的官職資料，依序建立 OFFICE_CODES 與 OFFICE_CODE_TYPE_REL',
+            'page_title' => __('admin.batch_load_offices'),
+            'page_title_key' => '批次匯入官職',
+            'page_description' => __('admin.batch_load_offices_desc'),
             'page_url' => route('admin.batch-load-offices'),
             'input' => old('entries', ''),
             'results' => session('batch_results', []),

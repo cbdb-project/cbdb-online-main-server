@@ -22,8 +22,9 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
         $this->ensureAdmin();
 
         return view('admin.batch_load_social_institutes', [
-            'page_title' => '批次匯入社會機構',
-            'page_description' => '貼上以 tab 分隔的社會機構資料，依序新增 NAME / CODE / ADDR 資料',
+            'page_title' => __('admin.batch_load_social_institutes'),
+            'page_title_key' => '批次匯入社會機構',
+            'page_description' => __('admin.batch_load_social_institutes_desc'),
             'page_url' => route('admin.batch-load-social-institutes'),
             'input' => old('entries', ''),
             'results' => session('batch_results', []),

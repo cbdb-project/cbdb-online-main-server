@@ -148,7 +148,7 @@ return [
     'no_paired_kinship'       => 'No corresponding kinship',
 
     // ─── Texts module ─────────────────────────────────────────────
-    'texts_list'              => 'Texts',
+    'texts_list'              => 'Writings',
     'text_code'               => 'Text Code',
     'text_role'               => 'Text Role',
     'book_title_field'        => 'Book Title',

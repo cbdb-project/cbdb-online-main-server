@@ -120,12 +120,19 @@ class PostingAutofillService {
             ];
         }
 
-        if (!$result['success'] && $this->hasFallback()) {
+        if (!$result['success'] && !($result['no_content'] ?? false) && $this->hasFallback()) {
             Log::warning('PostingAutofill 主要 LLM 失敗，嘗試 fallback', ['primary_error' => $result['error']]);
             $original = $this->switchToFallback();
 
             try {
                 $result = $this->doCallAI($sourceText);
+            } catch (\Exception $e) {
+                Log::error('PostingAutofill fallback LLM 連線異常', ['exception' => $e->getMessage()]);
+                $result = [
+                    'success' => false,
+                    'data' => null,
+                    'error' => 'AI API 連線失敗：' . $e->getMessage(),
+                ];
             } finally {
                 $this->restoreFromFallback($original);
             }
@@ -144,6 +151,7 @@ class PostingAutofillService {
                 'success' => false,
                 'data' => null,
                 'error' => 'Prompt 模板檔案不存在',
+                'no_content' => true,
             ];
         }
 
@@ -216,6 +224,7 @@ class PostingAutofillService {
                 'success' => false,
                 'data' => null,
                 'error' => '未能從文本中提取任官信息',
+                'no_content' => true,
             ];
         }
 

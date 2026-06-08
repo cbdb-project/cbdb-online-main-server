@@ -11,6 +11,17 @@
         $filters = $filters ?? [];
         $sortBy = $sortBy ?? '';
         $sortDir = $sortDir ?? 'asc';
+        $baseQuery = ['table_name' => $q];
+        if (($search ?? '') !== '') {
+            $baseQuery['search'] = $search;
+        }
+        if (!empty($filters)) {
+            $baseQuery['filters'] = $filters;
+        }
+        if ($sortBy !== '') {
+            $baseQuery['sort_by'] = $sortBy;
+            $baseQuery['sort_dir'] = $sortDir;
+        }
     @endphp
 
     <div class="card card-default">
@@ -116,7 +127,8 @@
                                        name="filters[{{ $item }}]"
                                        value="{{ $filters[$item] ?? '' }}"
                                        placeholder="{{ $item }}"
-                                       class="form-control form-control-sm">
+                                       class="form-control form-control-sm"
+                                       autocomplete="off">
                             </th>
                         @endforeach
                         @if($showActions)
@@ -211,7 +223,7 @@
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="btn-group" role="group">
                             @if($data['has_prev_pages'])
-                                <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['before' => $data['prev_cursor']])) }}"
+                                <a href="{{ route('codes.show', array_merge($baseQuery, ['before' => $data['prev_cursor']])) }}"
                                    class="btn btn-secondary btn-sm">
                                     <i class="fas fa-chevron-left"></i> {{ __('common.previous_page') }}
                                 </a>
@@ -222,11 +234,11 @@
                             @endif
 
                             <span class="btn btn-secondary btn-sm" disabled style="cursor: default;">
-                                ID: {{ number_format($data['first_id']) }} - {{ number_format($data['last_id']) }}
+                                ID: {{ ($data['first_id'] !== null && is_numeric($data['first_id'])) ? number_format($data['first_id']) : ($data['first_id'] ?? '-') }} - {{ ($data['last_id'] !== null && is_numeric($data['last_id'])) ? number_format($data['last_id']) : ($data['last_id'] ?? '-') }}
                             </span>
 
                             @if($data['has_more_pages'])
-                                <a href="{{ route('codes.show', array_merge(['table_name' => $q], $search ? ['search' => $search] : [], ['after' => $data['next_cursor']])) }}"
+                                <a href="{{ route('codes.show', array_merge($baseQuery, ['after' => $data['next_cursor']])) }}"
                                    class="btn btn-secondary btn-sm">
                                     {{ __('common.next_page') }} <i class="fas fa-chevron-right"></i>
                                 </a>
@@ -238,10 +250,19 @@
                         </div>
 
                         {{-- 跳转到 ID --}}
-                        <form method="GET" style="margin: 0;">
+                        <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="margin: 0;">
                             @if($search)
                                 <input type="hidden" name="search" value="{{ $search }}">
                             @endif
+                            @if(!empty($sortBy))
+                                <input type="hidden" name="sort_by" value="{{ $sortBy }}">
+                                <input type="hidden" name="sort_dir" value="{{ $sortDir }}">
+                            @endif
+                            @foreach($filters as $col => $val)
+                                @if($val !== '')
+                                    <input type="hidden" name="filters[{{ $col }}]" value="{{ $val }}">
+                                @endif
+                            @endforeach
                             <div class="input-group input-group-sm" style="width: 200px;">
                                 <input type="number" name="after" placeholder="{{ __('common.jump_to_id') }}"
                                        class="form-control" min="0">

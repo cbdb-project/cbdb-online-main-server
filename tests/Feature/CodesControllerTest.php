@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -38,12 +38,14 @@ class CodesControllerTest extends TestCase {
                 'TEST_CODES' => [],
                 'TEXT_CODES' => [],
                 'POSSESSION_DATA' => [],
+                'CBDB__NAME_FTS' => [],
                 'operations' => [],
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
                 'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
                 'POSSESSION_DATA' => ['c_personid', 'c_possession_record_id', 'c_sequence', 'c_possession_act_code', 'c_possession_desc'],
+                'CBDB__NAME_FTS' => ['id', 'person_name'],
                 'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
             ]
         );
@@ -52,7 +54,7 @@ class CodesControllerTest extends TestCase {
 
         $this->app->instance(CodesRepository::class, new class () extends CodesRepository {
             public function allowedTables(): array {
-                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA'];
+                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS'];
             }
 
             public function allowedTableMap(): array {
@@ -60,6 +62,7 @@ class CodesControllerTest extends TestCase {
                     'TEST_CODES' => 'TEST_CODES',
                     'TEXT_CODES' => 'TEXT_CODES',
                     'POSSESSION_DATA' => 'POSSESSION_DATA',
+                    'CBDB__NAME_FTS' => 'CBDB__NAME_FTS',
                 ];
             }
         });
@@ -324,6 +327,47 @@ class CodesControllerTest extends TestCase {
         $response->assertDontSee('Gamma entry');
         $response->assertSee('value="Beta"', false);
         $this->assertEmpty($this->operationSpy->calls);
+    }
+
+    #[Test]
+    public function testColumnFiltersAndSortAreAppliedSafely() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta second'],
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Beta first'],
+            ['code_id' => 'A3', 'code_sub' => 'X3', 'description' => 'Gamma third'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[description]=Beta&filters[bad_column%20or%201=1]=ignored&sort_by=code_id&sort_dir=desc%20union');
+
+        $response->assertStatus(200);
+        $response->assertSee('Beta second');
+        $response->assertSee('Beta first');
+        $response->assertDontSee('Gamma third');
+        $response->assertSee('name="filters[description]"', false);
+        $response->assertSee('value="Beta"', false);
+        $response->assertDontSee('bad_column or 1=1', false);
+
+        $content = $response->getContent();
+        $this->assertNotFalse($content);
+        $this->assertLessThan(strpos($content, 'Beta second'), strpos($content, 'Beta first'));
+        $this->assertEmpty($this->operationSpy->calls);
+    }
+
+    #[Test]
+    public function testCursorPaginationBranchRendersWithoutRuntimeError() {
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['id' => 1, 'person_name' => 'Alpha'],
+            ['id' => 2, 'person_name' => 'Beta'],
+            ['id' => 3, 'person_name' => 'Gamma'],
+        ]);
+
+        $response = $this->get('/codes/CBDB__NAME_FTS');
+
+        $response->assertStatus(200);
+        $response->assertSee('Alpha');
+        $response->assertSee('Beta');
+        $response->assertSee('Gamma');
+        $response->assertViewHas('useCursorPagination', true);
     }
 
     #[Test]
@@ -830,6 +874,134 @@ class CodesControllerTest extends TestCase {
         $this->fakeDb->clearFailures();
         $this->assertCount(1, $this->fakeDb->failuresCleared);
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // Phase 2: filter / sort tests
+    // ──────────────────────────────────────────────────────────────
+
+    #[Test]
+    public function testSortByValidColumnReturns200() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Banana'],
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Apple'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?sort_by=description&sort_dir=asc');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('sortBy', 'description');
+        $response->assertViewHas('sortDir', 'asc');
+        $response->assertSee('Apple');
+        $response->assertSee('Banana');
+    }
+
+    #[Test]
+    public function testSortByInvalidColumnIsIgnored() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?sort_by=non_existent_column&sort_dir=asc');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('sortBy', '');
+    }
+
+    #[Test]
+    public function testSortDirInvalidDefaultsToAsc() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?sort_by=description&sort_dir=INVALID');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('sortDir', 'asc');
+    }
+
+    #[Test]
+    public function testFilterByValidColumnReturnsMatchingRows() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Beta entry'],
+            ['code_id' => 'C1', 'code_sub' => 'Z1', 'description' => 'Gamma entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[description]=Beta');
+
+        $response->assertStatus(200);
+        $response->assertSee('Beta entry');
+        $response->assertDontSee('Alpha entry');
+        $response->assertDontSee('Gamma entry');
+        $response->assertViewHas('filters', ['description' => 'Beta']);
+    }
+
+    #[Test]
+    public function testFilterByInvalidColumnIsIgnored() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[non_existent]=value');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('filters', []);
+    }
+
+    #[Test]
+    public function testFilterArrayAttackIsDiscarded() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[description][]=array_attack');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('filters', []);
+    }
+
+    #[Test]
+    public function testFilterAndSortTogether() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'C1', 'code_sub' => 'Z1', 'description' => 'Cherry'],
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Apple'],
+            ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Banana'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[code_sub]=X1&sort_by=code_id&sort_dir=asc');
+
+        $response->assertStatus(200);
+        $response->assertSee('Apple');
+        $response->assertDontSee('Banana');
+        $response->assertDontSee('Cherry');
+        $response->assertViewHas('sortBy', 'code_id');
+        $response->assertViewHas('filters', ['code_sub' => 'X1']);
+    }
+
+    #[Test]
+    public function testFilterEmptyValueIsIgnored() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
+            ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Beta'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filters[description]=');
+
+        $response->assertStatus(200);
+        $response->assertSee('Alpha');
+        $response->assertSee('Beta');
+        $response->assertViewHas('filters', []);
+    }
+
+    #[Test]
+    public function testViewReceivesFilterSortDirVariables() {
+        $response = $this->get('/codes/TEST_CODES');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('filters', []);
+        $response->assertViewHas('sortBy', '');
+        $response->assertViewHas('sortDir', 'asc');
+    }
 }
 
 class FakeDatabaseManager {
@@ -844,13 +1016,14 @@ class FakeDatabaseManager {
     }
 
     public function table($name) {
-        if (!array_key_exists($name, $this->tables)) {
-            $this->tables[$name] = [];
+        $normalizedName = preg_split('/\s+as\s+/i', $name)[0] ?? $name;
+        if (!array_key_exists($normalizedName, $this->tables)) {
+            $this->tables[$normalizedName] = [];
         }
 
-        $rows = &$this->tables[$name];
+        $rows = &$this->tables[$normalizedName];
 
-        return new FakeQueryBuilder($rows, $this, $name);
+        return new FakeQueryBuilder($rows, $this, $normalizedName);
     }
 
     public function connection($name = null) {
@@ -926,6 +1099,9 @@ class FakeSchemaBuilder {
 class FakeQueryBuilder {
     private $rows;
     private $conditions = [];
+    private $orderBys = [];
+    private $selectedColumns = [];
+    private $limitValue = null;
     private $table;
     private $manager;
 
@@ -937,6 +1113,9 @@ class FakeQueryBuilder {
 
     public function __clone() {
         $this->conditions = [];
+        $this->orderBys = [];
+        $this->selectedColumns = [];
+        $this->limitValue = null;
     }
 
     public function where($column, $operator = null, $value = null, $boolean = 'and') {
@@ -1034,16 +1213,27 @@ class FakeQueryBuilder {
     }
 
     public function get() {
-        return array_map(function ($row) {
+        return collect(array_map(function ($row) {
             return (object) $row;
-        }, $this->applyConditions());
+        }, $this->applyConditions()));
     }
 
     public function orderBy($column, $direction = 'asc') {
+        $this->orderBys[] = [
+            'column' => $this->normalizeColumnName($column),
+            'direction' => strtolower((string) $direction) === 'desc' ? 'desc' : 'asc',
+        ];
+
         return $this;
     }
 
-    public function select($columns) {
+    public function select(...$columns) {
+        if (count($columns) === 1 && is_array($columns[0])) {
+            $columns = $columns[0];
+        }
+
+        $this->selectedColumns = $columns;
+
         return $this;
     }
 
@@ -1055,6 +1245,12 @@ class FakeQueryBuilder {
         return $this;
     }
 
+    public function limit($value) {
+        $this->limitValue = (int) $value;
+
+        return $this;
+    }
+
     public function max($column) {
         $filtered = $this->applyConditions();
         if (empty($filtered)) {
@@ -1062,7 +1258,7 @@ class FakeQueryBuilder {
         }
 
         $values = array_map(function ($row) use ($column) {
-            return $row[$column] ?? null;
+            return $row[$this->normalizeColumnName($column)] ?? null;
         }, $filtered);
 
         $values = array_filter($values, function ($value) {
@@ -1077,13 +1273,40 @@ class FakeQueryBuilder {
     }
 
     private function applyConditions(): array {
-        if (empty($this->conditions)) {
-            return $this->rows;
-        }
-
-        return array_values(array_filter($this->rows, function ($row) {
+        $rows = empty($this->conditions)
+            ? $this->rows
+            : array_values(array_filter($this->rows, function ($row) {
             return $this->rowMatches($row);
         }));
+
+        if (!empty($this->orderBys)) {
+            usort($rows, function (array $left, array $right) {
+                foreach ($this->orderBys as $orderBy) {
+                    $column = $orderBy['column'];
+                    $direction = $orderBy['direction'];
+                    $leftValue = $left[$column] ?? null;
+                    $rightValue = $right[$column] ?? null;
+
+                    if ($leftValue == $rightValue) {
+                        continue;
+                    }
+
+                    $comparison = $leftValue <=> $rightValue;
+
+                    return $direction === 'desc' ? -$comparison : $comparison;
+                }
+
+                return 0;
+            });
+        }
+
+        if ($this->limitValue !== null) {
+            $rows = array_slice($rows, 0, $this->limitValue);
+        }
+
+        return array_map(function (array $row) {
+            return $this->applySelectedColumns($row);
+        }, $rows);
     }
 
     private function rowMatches(array $row): bool {
@@ -1105,7 +1328,7 @@ class FakeQueryBuilder {
     }
 
     private function matchCondition(array $row, array $condition): bool {
-        $value = $row[$condition['column']] ?? null;
+        $value = $row[$this->normalizeColumnName($condition['column'])] ?? null;
         $expected = $condition['value'];
 
         if ($condition['operator'] === 'like') {
@@ -1114,6 +1337,52 @@ class FakeQueryBuilder {
             return stripos((string) $value, $needle) !== false;
         }
 
+        if ($condition['operator'] === '<') {
+            return $value < $expected;
+        }
+
+        if ($condition['operator'] === '>') {
+            return $value > $expected;
+        }
+
         return (string) $value === (string) $expected;
+    }
+
+    private function normalizeColumnName(string $column): string {
+        if (str_contains($column, '.')) {
+            $parts = explode('.', $column);
+
+            return end($parts);
+        }
+
+        return $column;
+    }
+
+    private function applySelectedColumns(array $row): array {
+        if (empty($this->selectedColumns)) {
+            return $row;
+        }
+
+        $selected = [];
+        foreach ($this->selectedColumns as $column) {
+            if (!is_string($column)) {
+                continue;
+            }
+
+            $trimmed = trim($column);
+            if (preg_match('/^\w+\.\*$/', $trimmed)) {
+                $selected = array_merge($selected, $row);
+                continue;
+            }
+
+            if (preg_match('/^(.+?)\s+as\s+(.+)$/i', $trimmed, $matches)) {
+                $selected[trim($matches[2])] = $row[$this->normalizeColumnName(trim($matches[1]))] ?? null;
+                continue;
+            }
+
+            $selected[$this->normalizeColumnName($trimmed)] = $row[$this->normalizeColumnName($trimmed)] ?? null;
+        }
+
+        return $selected;
     }
 }

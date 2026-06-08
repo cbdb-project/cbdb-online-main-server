@@ -1039,6 +1039,22 @@ class FakeQueryBuilder {
         }, $this->applyConditions());
     }
 
+    public function orderBy($column, $direction = 'asc') {
+        return $this;
+    }
+
+    public function select($columns) {
+        return $this;
+    }
+
+    public function leftJoin($table, $first, $operator = null, $second = null) {
+        return $this;
+    }
+
+    public function join($table, $first, $operator = null, $second = null) {
+        return $this;
+    }
+
     public function max($column) {
         $filtered = $this->applyConditions();
         if (empty($filtered)) {

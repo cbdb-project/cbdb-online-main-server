@@ -292,6 +292,15 @@ class CodesController extends Controller {
             $thead = $this->buildTableHead($table, $sampleRow, $joinConfig);
             $searchableColumns = $this->determineSearchableColumns($table, $thead);
 
+            // ★ 提前取得主鍵（tie-breaker 排序需要用到）
+            $keyColumns = $this->getKeyColumns($table);
+            $filters = $this->sanitizeColumnFilters($request->query('filters', []), $thead);
+            [$sortBy, $sortDir] = $this->sanitizeSortParameters(
+                $request->query('sort_by', ''),
+                $request->query('sort_dir', 'asc'),
+                $thead
+            );
+
             // 使用游标分页的大表列表
             $cursorPaginationTables = ['CBDB__NAME_FTS'];
             $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true);
@@ -299,34 +308,10 @@ class CodesController extends Controller {
             if ($search !== '' && !empty($searchableColumns)) {
                 $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
                     foreach ($searchableColumns as $column) {
-                        // 对于使用 JOIN 的表，需要将別名转换为原始表达式
-                        $searchColumn = $column;
-                        if ($joinConfig) {
-                            $baseAlias = $joinConfig['base_alias'];
-                            $selectList = $joinConfig['select'] ?? [];
-
-                            // 查找该列是否是別名，如果是，提取原始表达式
-                            $foundOriginalExpr = false;
-                            foreach ($selectList as $selectExpr) {
-                                if (strpos($selectExpr, ' as ' . $column) !== false) {
-                                    // 提取 "expression as alias" 中的 expression
-                                    $parts = explode(' as ', $selectExpr);
-                                    if (count($parts) === 2) {
-                                        $searchColumn = trim($parts[0]);
-                                        $foundOriginalExpr = true;
-
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // 如果不是別名且没有表前缀，添加基表別名
-                            if (!$foundOriginalExpr && !str_contains($column, '.')) {
-                                $searchColumn = $baseAlias . '.' . $column;
-                            }
+                        $searchColumn = $this->resolveColumnForQuery($column, $joinConfig);
+                        if ($searchColumn === null) {
+                            continue;
                         }
-
-                        // 对于游标分页的大表，使用前缀搜索以利用索引
                         if ($useCursorPagination) {
                             $subQuery->orWhere($searchColumn, 'like', $search . '%');
                         } else {
@@ -340,7 +325,55 @@ class CodesController extends Controller {
                 return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead);
             }
 
-            $data = $query->paginate($perPage)->appends(['search' => $search]);
+            // 讀取並驗證 filter 參數
+            $rawFilters = $request->query('filters', []);
+            if (!is_array($rawFilters)) {
+                $rawFilters = [];
+            }
+            $filters = [];
+            foreach ($rawFilters as $col => $val) {
+                if (in_array($col, $thead, true) && is_scalar($val)) {
+                    $filters[$col] = trim((string) $val);
+                }
+            }
+
+            // 讀取並驗證 sort 參數
+            $sortBy = $request->query('sort_by', '');
+            $sortDir = strtolower((string) $request->query('sort_dir', 'asc'));
+            if (!in_array($sortDir, ['asc', 'desc'], true)) {
+                $sortDir = 'asc';
+            }
+            if (!in_array($sortBy, $thead, true)) {
+                $sortBy = '';
+            }
+
+            // 欄位過濾（AND 邏輯）
+            foreach ($filters as $column => $value) {
+                if ($value === '') {
+                    continue;
+                }
+                $filterColumn = $this->resolveColumnForQuery($column, $joinConfig);
+                if ($filterColumn === null) {
+                    continue;
+                }
+                $query->where($filterColumn, 'like', '%' . $value . '%');
+            }
+
+            // 排序 + 主鍵 tie-breaker
+            if ($sortBy !== '') {
+                $sortColumn = $this->resolveColumnForQuery($sortBy, $joinConfig);
+                if ($sortColumn !== null) {
+                    $query->orderBy($sortColumn, $sortDir);
+                }
+            }
+            foreach ($keyColumns as $pkCol) {
+                $pkSortExpr = $this->resolveColumnForQuery($pkCol, $joinConfig);
+                if ($pkSortExpr !== null) {
+                    $query->orderBy($pkSortExpr, 'asc');
+                }
+            }
+
+            $data = $query->paginate($perPage)->appends($request->except('page'));
 
             $dynastyMap = [];
             if (in_array('c_dy', $thead, true)) {
@@ -348,10 +381,8 @@ class CodesController extends Controller {
             }
 
             $isReadOnly = $this->isReadOnlyTable($table);
-            $keyColumns = $this->getKeyColumns($table);
             $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
-            // 标记哪些列是通过 JOIN 获得的別名列
             $joinedColumns = [];
             if ($joinConfig) {
                 $joinedColumns = $this->getJoinedColumnNames($joinConfig);
@@ -371,6 +402,9 @@ class CodesController extends Controller {
                 'keyColumns' => $keyColumns,
                 'copyrightNote' => $copyrightNote,
                 'joinedColumns' => $joinedColumns,
+                'filters' => $filters,
+                'sortBy' => $sortBy,
+                'sortDir' => $sortDir,
             ]);
         } catch (\PDOException $e) {
             flash('找不到該資料表', 'warning');
@@ -1593,6 +1627,42 @@ class CodesController extends Controller {
             'copyrightNote' => $copyrightNote,
             'joinedColumns' => $joinedColumns,
             'useCursorPagination' => true,  // 标记使用游标分页
+            'filters' => [],
+            'sortBy' => '',
+            'sortDir' => 'asc',
         ]);
+    }
+
+    protected function resolveColumnForQuery(string $column, ?array $joinConfig): ?string {
+        if ($joinConfig === null) {
+            return $column;
+        }
+
+        $baseAlias = $joinConfig['base_alias'];
+        $baseTable = $joinConfig['base_table'];
+        $selectList = $joinConfig['select'] ?? [];
+
+        // 情境 B：欄位名是 JOIN alias（錨定結尾的 regex，防止 appt_name 匹配到 appt_name_chn）
+        foreach ($selectList as $selectExpr) {
+            if (preg_match('/\s+as\s+' . preg_quote($column, '/') . '\s*$/i', $selectExpr)) {
+                $parts = preg_split('/\s+as\s+/i', $selectExpr, 2);
+                if (count($parts) === 2) {
+                    return trim($parts[0]);
+                }
+            }
+        }
+
+        // 情境 C：欄位名是 base table 的真實欄位，確認存在後補前綴
+        if (!str_contains($column, '.')) {
+            $baseTableColumns = $this->getTableColumns($baseTable);
+            if (in_array($column, $baseTableColumns, true)) {
+                return $baseAlias . '.' . $column;
+            }
+
+            return null;
+        }
+
+        // 情境 D：已帶 prefix，來源不明，拒絕
+        return null;
     }
 }

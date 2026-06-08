@@ -43,4 +43,8 @@ return [
     'return_to_proposals'   => 'Back to Proposals',
     'update_proposal'       => 'Update Proposal',
     'resubmit_notice'       => 'After editing, this proposal will be re-submitted for review.',
+
+    'apply_filters'         => 'Apply Filters',
+    'clear_filters'         => 'Clear Filters',
+    'search_tables'         => 'Search tables…',
 ];

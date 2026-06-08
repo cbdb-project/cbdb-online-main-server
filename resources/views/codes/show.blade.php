@@ -8,6 +8,9 @@
         $showActions = Auth::check() && !$isReadOnly;
         $keyColumns = $keyColumns ?? [];
         $joinedColumns = $joinedColumns ?? [];
+        $filters = $filters ?? [];
+        $sortBy = $sortBy ?? '';
+        $sortDir = $sortDir ?? 'asc';
     @endphp
 
     <div class="card card-default">
@@ -18,7 +21,7 @@
                     <i class="fas fa-info-circle"></i> {!! $copyrightNote !!}
                 </div>
             @endif
-            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <form method="GET" action="{{ route('codes.show', ['table_name' => $q]) }}" style="flex: 0 0 auto; margin: 0;">
                     <div class="input-group input-group-sm" style="width: 420px;">
                         <input type="text"
@@ -33,22 +36,69 @@
                             @endif
                         </div>
                     </div>
+                    @if(!empty($sortBy))
+                        <input type="hidden" name="sort_by"  value="{{ $sortBy }}">
+                        <input type="hidden" name="sort_dir" value="{{ $sortDir ?? 'asc' }}">
+                    @endif
+                    @foreach(($filters ?? []) as $col => $val)
+                        @if($val !== '')
+                            <input type="hidden" name="filters[{{ $col }}]" value="{{ $val }}">
+                        @endif
+                    @endforeach
                 </form>
+                <button type="submit" form="filter-form" class="btn btn-sm btn-primary">
+                    {{ __('codes.apply_filters') }}
+                </button>
+                @if(!empty($filters) || !empty($sortBy))
+                    <a class="btn btn-sm btn-secondary"
+                       href="{{ route('codes.show', array_filter(['table_name' => $q, 'search' => $search])) }}">
+                        {{ __('codes.clear_filters') }}
+                    </a>
+                @endif
                 @if($showActions)
                     <a class="btn btn-sm btn-secondary" href="/codes/{{ $q }}/create">{{ __('common.add') }}</a>
                 @endif
             </div>
+            {{-- filter-form：放在 table 外部，input 欄位透過 form="filter-form" 關聯 --}}
+            <form method="GET"
+                  action="{{ route('codes.show', ['table_name' => $q]) }}"
+                  id="filter-form">
+                <input type="hidden" name="search"   value="{{ $search ?? '' }}">
+                <input type="hidden" name="sort_by"  value="{{ $sortBy ?? '' }}">
+                <input type="hidden" name="sort_dir" value="{{ $sortDir ?? 'asc' }}">
+            </form>
             <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                 <table class="table table-bordered table-striped table-sm">
                     <thead>
                     <tr>
                         @foreach ($thead as $item)
+                            @php
+                                if ($sortBy !== $item) {
+                                    $nextSortParams = ['sort_by' => $item, 'sort_dir' => 'asc'];
+                                    $sortIcon = '⇅';
+                                } elseif ($sortDir === 'asc') {
+                                    $nextSortParams = ['sort_by' => $item, 'sort_dir' => 'desc'];
+                                    $sortIcon = '▲';
+                                } else {
+                                    $nextSortParams = ['sort_by' => '', 'sort_dir' => ''];
+                                    $sortIcon = '▼';
+                                }
+                                $sortUrl = route('codes.show', array_merge(
+                                    ['table_name' => $q],
+                                    array_filter(request()->only(['search']), fn($v) => $v !== ''),
+                                    !empty($filters) ? ['filters' => $filters] : [],
+                                    array_filter($nextSortParams, fn($v) => $v !== '')
+                                ));
+                            @endphp
                             <th>
-                                @if(in_array($item, $joinedColumns))
-                                    ({{ $item }})
-                                @else
-                                    {{ $item }}
-                                @endif
+                                <a href="{{ $sortUrl }}" style="color: inherit; text-decoration: none; white-space: nowrap;">
+                                    @if(in_array($item, $joinedColumns))
+                                        ({{ $item }})
+                                    @else
+                                        {{ $item }}
+                                    @endif
+                                    {{ $sortIcon }}
+                                </a>
                                 @if(in_array($item, $keyColumns, true))
                                     <span class="badge badge-info ml-1">PK</span>
                                 @endif
@@ -56,6 +106,21 @@
                         @endforeach
                         @if($showActions)
                             <th style="width: 120px">{{ __('codes.actions') }}</th>
+                        @endif
+                    </tr>
+                    <tr class="filter-row">
+                        @foreach ($thead as $item)
+                            <th style="padding: 4px;">
+                                <input type="text"
+                                       form="filter-form"
+                                       name="filters[{{ $item }}]"
+                                       value="{{ $filters[$item] ?? '' }}"
+                                       placeholder="{{ $item }}"
+                                       class="form-control form-control-sm">
+                            </th>
+                        @endforeach
+                        @if($showActions)
+                            <th></th>
                         @endif
                     </tr>
                     </thead>

@@ -40,7 +40,7 @@ use App\Support\CompositePrimaryKey;
                         <td>
                             {{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc_chn }}
                             @if(!empty($basicinformation->biog_addresses[$i]->addr_type->c_addr_desc))
-                                <br><span class="text-muted small">{{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc }}</span>
+                                <br><span class="text-muted">{{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc }}</span>
                             @endif
                         </td>
                         <td>{{ $basicinformation->biog_addresses[$i]->addr->c_name_chn }}</td>

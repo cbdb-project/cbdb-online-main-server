@@ -303,7 +303,9 @@ class CodesController extends Controller {
 
             // 使用游标分页的大表列表
             $cursorPaginationTables = ['CBDB__NAME_FTS'];
-            $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true);
+            $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true)
+                && empty($filters)
+                && $sortBy === '';
 
             if ($search !== '' && !empty($searchableColumns)) {
                 $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
@@ -322,29 +324,7 @@ class CodesController extends Controller {
             }
 
             if ($useCursorPagination) {
-                return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead);
-            }
-
-            // 讀取並驗證 filter 參數
-            $rawFilters = $request->query('filters', []);
-            if (!is_array($rawFilters)) {
-                $rawFilters = [];
-            }
-            $filters = [];
-            foreach ($rawFilters as $col => $val) {
-                if (in_array($col, $thead, true) && is_scalar($val)) {
-                    $filters[$col] = trim((string) $val);
-                }
-            }
-
-            // 讀取並驗證 sort 參數
-            $sortBy = $request->query('sort_by', '');
-            $sortDir = strtolower((string) $request->query('sort_dir', 'asc'));
-            if (!in_array($sortDir, ['asc', 'desc'], true)) {
-                $sortDir = 'asc';
-            }
-            if (!in_array($sortBy, $thead, true)) {
-                $sortBy = '';
+                return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead, $filters, $sortBy, $sortDir);
             }
 
             // 欄位過濾（AND 邏輯）
@@ -938,6 +918,49 @@ class CodesController extends Controller {
         }
 
         return $cache[$table] = array_values(array_unique(array_filter($keys)));
+    }
+
+    /**
+     * @param mixed $rawFilters
+     * @param array<int, string> $thead
+     * @return array<string, string>
+     */
+    protected function sanitizeColumnFilters($rawFilters, array $thead): array {
+        if (!is_array($rawFilters)) {
+            return [];
+        }
+
+        $filters = [];
+        foreach ($rawFilters as $column => $value) {
+            if (!in_array($column, $thead, true) || !is_scalar($value)) {
+                continue;
+            }
+
+            $filters[$column] = trim((string) $value);
+        }
+
+        return $filters;
+    }
+
+    /**
+     * @param mixed $sortBy
+     * @param mixed $sortDir
+     * @param array<int, string> $thead
+     * @return array{0: string, 1: string}
+     */
+    protected function sanitizeSortParameters($sortBy, $sortDir, array $thead): array {
+        $normalizedSortBy = is_scalar($sortBy) ? trim((string) $sortBy) : '';
+        $normalizedSortDir = strtolower(is_scalar($sortDir) ? trim((string) $sortDir) : 'asc');
+
+        if (!in_array($normalizedSortDir, ['asc', 'desc'], true)) {
+            $normalizedSortDir = 'asc';
+        }
+
+        if (!in_array($normalizedSortBy, $thead, true)) {
+            $normalizedSortBy = '';
+        }
+
+        return [$normalizedSortBy, $normalizedSortDir];
     }
 
     /**
@@ -1540,7 +1563,17 @@ class CodesController extends Controller {
      * @param array $thead
      * @return \Illuminate\View\View
      */
-    protected function showWithCursorPagination(Request $request, string $table, $query, string $search, int $perPage, array $thead) {
+    protected function showWithCursorPagination(
+        Request $request,
+        string $table,
+        $query,
+        string $search,
+        int $perPage,
+        array $thead,
+        array $filters = [],
+        string $sortBy = '',
+        string $sortDir = 'asc'
+    ) {
         $after = $request->query('after');   // 下一页游标 (id)
         $before = $request->query('before'); // 上一页游标 (id)
 
@@ -1606,6 +1639,7 @@ class CodesController extends Controller {
         $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
 
         // 标记哪些列是通过 JOIN 获得的別名列        $upperTable = strtoupper($table);
+        $upperTable = strtoupper($table);
         $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
         $joinedColumns = [];
         if ($joinConfig) {
@@ -1627,9 +1661,9 @@ class CodesController extends Controller {
             'copyrightNote' => $copyrightNote,
             'joinedColumns' => $joinedColumns,
             'useCursorPagination' => true,  // 标记使用游标分页
-            'filters' => [],
-            'sortBy' => '',
-            'sortDir' => 'asc',
+            'filters' => $filters,
+            'sortBy' => $sortBy,
+            'sortDir' => $sortDir,
         ]);
     }
 

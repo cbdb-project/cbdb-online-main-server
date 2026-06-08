@@ -107,7 +107,7 @@ return [
     // ─── Sources module ───────────────────────────────────────────
     'sources_list'            => 'Sources',
     'primary_source'          => 'Primary Source',
-    'self_biography'          => 'Self-Written Biography',
+    'self_biography'          => 'Biographical Text',
     'wiki_warning'            => 'Warning',
     'wiki_warning_text'       => 'This record is bulk-imported Wiki reference data. If modified, your changes will be lost on the next import. Please confirm if manual modification is needed.',
     'options'                 => 'Options',

@@ -38,7 +38,12 @@ use App\Support\CompositePrimaryKey;
                     <tr>
                         <td>{{ $key+1 }}</td>
                         <td>{{ $value->pivot->c_sequence }}</td>
-                        <td>{{ $value->c_entry_desc_chn }}</td>
+                        <td>
+                            {{ $value->c_entry_desc_chn }}
+                            @if(!empty($value->c_entry_desc))
+                                <br><span class="text-muted small">{{ $value->c_entry_desc }}</span>
+                            @endif
+                        </td>
                         <td>
                             @if($value->pivot->c_year && $value->pivot->c_year != 0)
                                 {{ $value->pivot->c_year }}

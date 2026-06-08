@@ -154,7 +154,7 @@ class ApiController extends Controller {
     }
 
     public function birole() {
-        return DB::table('BIOG_INST_CODES')->get();
+        return DB::table('BIOG_INST_CODES')->select(['c_bi_role_code', 'c_bi_role_chn', 'c_bi_role_desc'])->get();
     }
 
     public function topic() {
@@ -263,7 +263,8 @@ class ApiController extends Controller {
                 $item['id'] = -999;
             }
             $dy = Dynasty::where('c_dy', $item->c_dy)->first()->c_dynasty_chn;
-            $item['text'] = $item->c_office_id." ".$item->c_office_pinyin." ".$item->c_office_chn." ".$dy;
+            $trans = !empty($item->c_office_trans) ? " ".e($item->c_office_trans) : '';
+            $item['text'] = $item->c_office_id." ".$item->c_office_pinyin." ".$item->c_office_chn." ".$dy.$trans;
         }
 
         return $data;

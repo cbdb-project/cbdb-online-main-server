@@ -39,7 +39,12 @@ use App\Support\CompositePrimaryKey;
                     <tr>
                         <td>{{ $key+1 }}</td>
                         <td>{{ $basicinformation->inst_name[$key]->c_inst_name_hz }}</td>
-                        <td>{{ $value->c_bi_role_chn }}</td>
+                        <td>
+                            {{ $value->c_bi_role_chn }}
+                            @if(!empty($value->c_bi_role_desc))
+                                <br><span class="text-muted small">{{ $value->c_bi_role_desc }}</span>
+                            @endif
+                        </td>
                         <td>{{ $value->pivot->c_bi_begin_year }}</td>
                         <td>{{ $value->pivot->c_bi_end_year }}</td>
                         @auth

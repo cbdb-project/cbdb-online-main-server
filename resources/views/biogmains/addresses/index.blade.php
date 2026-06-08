@@ -37,7 +37,12 @@ use App\Support\CompositePrimaryKey;
                 @for ($i = 0; $i < $basicinformation->biog_addresses_count; $i++)
                     <tr>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_sequence }}</td>
-                        <td>{{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc_chn }}</td>
+                        <td>
+                            {{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc_chn }}
+                            @if(!empty($basicinformation->biog_addresses[$i]->addr_type->c_addr_desc))
+                                <br><span class="text-muted small">{{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc }}</span>
+                            @endif
+                        </td>
                         <td>{{ $basicinformation->biog_addresses[$i]->addr->c_name_chn }}</td>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_firstyear }}</td>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_lastyear }}</td>

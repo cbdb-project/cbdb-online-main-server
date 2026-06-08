@@ -44,7 +44,12 @@ use App\Support\CompositePrimaryKey;
                                 {{ $assoc_name[$key]['c_sequence'] }}
                             @endif
                         </td>
-                        <td>{{ $value->c_assoc_desc_chn }}</td>
+                        <td>
+                            {{ $value->c_assoc_desc_chn }}
+                            @if(!empty($value->c_assoc_desc))
+                                <br><span class="text-muted small">{{ $value->c_assoc_desc }}</span>
+                            @endif
+                        </td>
                         <td>
                             @if($assoc_name[$key])
                                 <a href="{{ route('basicinformation.edit', $assoc_name[$key]['c_personid']) }}" target="_blank">{{ $assoc_name[$key]['assoc_name'] }}</a></td>

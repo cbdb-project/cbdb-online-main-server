@@ -1119,6 +1119,9 @@ class BiogMainRepository {
             $text_ = OfficeCode::find($row->c_office_id);
             $dy = Dynasty::where('c_dy', $text_->c_dy)->first()->c_dynasty_chn;
             $office_str = $text_->c_office_id." ".$text_->c_office_pinyin." ".$text_->c_office_chn." ".$dy;
+            if (!empty($text_->c_office_trans)) {
+                $office_str .= " ".e($text_->c_office_trans);
+            }
         }
         $posting_str = null;
         //        dd($row->c_inst_name_code);

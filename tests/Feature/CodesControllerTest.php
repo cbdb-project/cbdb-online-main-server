@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -39,6 +39,8 @@ class CodesControllerTest extends TestCase {
                 'TEXT_CODES' => [],
                 'POSSESSION_DATA' => [],
                 'CBDB__NAME_FTS' => [],
+                'APPOINTMENT_CODE_TYPE_REL' => [],
+                'OFFICE_CODE_TYPE_REL' => [],
                 'operations' => [],
             ],
             [
@@ -46,6 +48,8 @@ class CodesControllerTest extends TestCase {
                 'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
                 'POSSESSION_DATA' => ['c_personid', 'c_possession_record_id', 'c_sequence', 'c_possession_act_code', 'c_possession_desc'],
                 'CBDB__NAME_FTS' => ['id', 'person_name'],
+                'APPOINTMENT_CODE_TYPE_REL' => ['c_appt_code', 'c_appt_type_code'],
+                'OFFICE_CODE_TYPE_REL' => ['c_office_id', 'c_office_tree_id'],
                 'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
             ]
         );
@@ -54,7 +58,7 @@ class CodesControllerTest extends TestCase {
 
         $this->app->instance(CodesRepository::class, new class () extends CodesRepository {
             public function allowedTables(): array {
-                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS'];
+                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL'];
             }
 
             public function allowedTableMap(): array {
@@ -63,6 +67,8 @@ class CodesControllerTest extends TestCase {
                     'TEXT_CODES' => 'TEXT_CODES',
                     'POSSESSION_DATA' => 'POSSESSION_DATA',
                     'CBDB__NAME_FTS' => 'CBDB__NAME_FTS',
+                    'APPOINTMENT_CODE_TYPE_REL' => 'APPOINTMENT_CODE_TYPE_REL',
+                    'OFFICE_CODE_TYPE_REL' => 'OFFICE_CODE_TYPE_REL',
                 ];
             }
         });
@@ -1002,6 +1008,127 @@ class CodesControllerTest extends TestCase {
         $response->assertViewHas('sortBy', '');
         $response->assertViewHas('sortDir', 'asc');
     }
+
+    // ── Phase 3：JOIN 表 resolveColumnForQuery 單元測試 ────────────────
+
+    #[Test]
+    public function testResolveColumnForQueryJoinAlias() {
+        $joinConfig = [
+            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'select' => [
+                'rel.c_appt_code',
+                'code.c_appt_desc_chn as appt_name',
+                'rel.c_appt_type_code',
+                'type.c_appt_type_desc_chn as appt_type_name',
+            ],
+        ];
+
+        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
+        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
+        $method->setAccessible(true);
+
+        // JOIN alias 應解析為 selectList 中的原始表達式
+        $this->assertEquals('code.c_appt_desc_chn', $method->invoke($controller, 'appt_name', $joinConfig));
+        $this->assertEquals('type.c_appt_type_desc_chn', $method->invoke($controller, 'appt_type_name', $joinConfig));
+    }
+
+    #[Test]
+    public function testResolveColumnForQueryBaseTableColumn() {
+        $joinConfig = [
+            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'select' => [
+                'rel.c_appt_code',
+                'code.c_appt_desc_chn as appt_name',
+                'rel.c_appt_type_code',
+                'type.c_appt_type_desc_chn as appt_type_name',
+            ],
+        ];
+
+        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
+        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
+        $method->setAccessible(true);
+
+        // base table 真實欄位（FakeSchemaBuilder 回傳 c_appt_code, c_appt_type_code）
+        $this->assertEquals('rel.c_appt_code', $method->invoke($controller, 'c_appt_code', $joinConfig));
+        $this->assertEquals('rel.c_appt_type_code', $method->invoke($controller, 'c_appt_type_code', $joinConfig));
+    }
+
+    #[Test]
+    public function testResolveColumnForQueryNonJoinTable() {
+        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
+        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
+        $method->setAccessible(true);
+
+        // 非 JOIN 表：直接回傳欄位名
+        $this->assertEquals('c_name', $method->invoke($controller, 'c_name', null));
+        $this->assertEquals('description', $method->invoke($controller, 'description', null));
+    }
+
+    #[Test]
+    public function testResolveColumnForQueryUnresolvableReturnsNull() {
+        $joinConfig = [
+            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
+            'base_alias' => 'rel',
+            'select' => [
+                'rel.c_appt_code',
+                'code.c_appt_desc_chn as appt_name',
+            ],
+        ];
+
+        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
+        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
+        $method->setAccessible(true);
+
+        // 不在 selectList 也不在 base table schema → null
+        $this->assertNull($method->invoke($controller, 'unknown_column', $joinConfig));
+        // 已有 dot prefix → null（防禦性）
+        $this->assertNull($method->invoke($controller, 'malicious.injection', $joinConfig));
+    }
+
+    // ── Phase 3：JOIN 表整合測試 ───────────────────────────────────────
+
+    #[Test]
+    public function testAppointmentCodeTypeRelSortAndFilterReturns200() {
+        DB::table('APPOINTMENT_CODE_TYPE_REL')->insert([
+            ['c_appt_code' => 'A1', 'c_appt_type_code' => 'T1'],
+            ['c_appt_code' => 'B2', 'c_appt_type_code' => 'T2'],
+        ]);
+
+        // sort on JOIN alias column（由 getJoinedColumnNames 加入 $thead）
+        $response = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=appt_name&sort_dir=asc');
+        $response->assertStatus(200);
+        $response->assertViewHas('sortBy', 'appt_name');
+
+        // filter on base table column
+        $response2 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?filters[c_appt_code]=A1');
+        $response2->assertStatus(200);
+        $response2->assertViewHas('filters', ['c_appt_code' => 'A1']);
+
+        // 不在 $thead 白名單的欄位 → sanitizeSortParameters 清空 sortBy → 200，無例外
+        $response3 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=non_existent_column');
+        $response3->assertStatus(200);
+        $response3->assertViewHas('sortBy', '');
+    }
+
+    #[Test]
+    public function testOfficeCodeTypeRelSortAndFilterReturns200() {
+        DB::table('OFFICE_CODE_TYPE_REL')->insert([
+            ['c_office_id' => 1, 'c_office_tree_id' => 10],
+            ['c_office_id' => 2, 'c_office_tree_id' => 20],
+        ]);
+
+        // sort on JOIN alias column
+        $response = $this->get('/codes/OFFICE_CODE_TYPE_REL?sort_by=office_name&sort_dir=desc');
+        $response->assertStatus(200);
+        $response->assertViewHas('sortBy', 'office_name');
+
+        // filter on base table column
+        $response2 = $this->get('/codes/OFFICE_CODE_TYPE_REL?filters[c_office_id]=1');
+        $response2->assertStatus(200);
+        $response2->assertViewHas('filters', ['c_office_id' => '1']);
+    }
 }
 
 class FakeDatabaseManager {
@@ -1276,8 +1403,8 @@ class FakeQueryBuilder {
         $rows = empty($this->conditions)
             ? $this->rows
             : array_values(array_filter($this->rows, function ($row) {
-            return $this->rowMatches($row);
-        }));
+                return $this->rowMatches($row);
+            }));
 
         if (!empty($this->orderBys)) {
             usort($rows, function (array $left, array $right) {
@@ -1372,11 +1499,13 @@ class FakeQueryBuilder {
             $trimmed = trim($column);
             if (preg_match('/^\w+\.\*$/', $trimmed)) {
                 $selected = array_merge($selected, $row);
+
                 continue;
             }
 
             if (preg_match('/^(.+?)\s+as\s+(.+)$/i', $trimmed, $matches)) {
                 $selected[trim($matches[2])] = $row[$this->normalizeColumnName(trim($matches[1]))] ?? null;
+
                 continue;
             }
 

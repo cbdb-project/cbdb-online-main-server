@@ -128,7 +128,9 @@
                 let str = '';
                 for (let key in item) {
                     if (hidden.includes(key)) continue;
-                    str += item[key]+' ';
+                    const val = item[key];
+                    if (val === null || val === undefined || val === '') continue;
+                    str += val + ' ';
                 }
                 return str.trim();
             },

@@ -42,7 +42,7 @@ use App\Support\CompositePrimaryKey;
                         <td>
                             {{ $value->c_bi_role_chn }}
                             @if(!empty($value->c_bi_role_desc))
-                                <br><span class="text-muted small">{{ $value->c_bi_role_desc }}</span>
+                                <br><span class="text-muted">{{ $value->c_bi_role_desc }}</span>
                             @endif
                         </td>
                         <td>{{ $value->pivot->c_bi_begin_year }}</td>

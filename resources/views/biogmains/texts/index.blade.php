@@ -40,7 +40,7 @@ use App\Support\CompositePrimaryKey;
                         <td>
                             {{ $basicinformation->texts_role[$i]->c_role_desc_chn }}
                             @if(!empty($basicinformation->texts_role[$i]->c_role_desc))
-                                <br><span class="text-muted small">{{ $basicinformation->texts_role[$i]->c_role_desc }}</span>
+                                <br><span class="text-muted">{{ $basicinformation->texts_role[$i]->c_role_desc }}</span>
                             @endif
                         </td>
                         @auth

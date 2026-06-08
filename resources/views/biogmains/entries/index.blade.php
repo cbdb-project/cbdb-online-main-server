@@ -41,7 +41,7 @@ use App\Support\CompositePrimaryKey;
                         <td>
                             {{ $value->c_entry_desc_chn }}
                             @if(!empty($value->c_entry_desc))
-                                <br><span class="text-muted small">{{ $value->c_entry_desc }}</span>
+                                <br><span class="text-muted">{{ $value->c_entry_desc }}</span>
                             @endif
                         </td>
                         <td>

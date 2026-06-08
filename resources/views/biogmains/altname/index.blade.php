@@ -106,7 +106,7 @@ $altTypeDesc = trim((string) ($value->c_name_type_desc ?? ''));
                         <td>
                             {{ $altTypeLabel }}
                             @if($altTypeDesc !== '' && $altTypeDesc !== $altTypeLabel)
-                                <br><span class="text-muted small">{{ $altTypeDesc }}</span>
+                                <br><span class="text-muted">{{ $altTypeDesc }}</span>
                             @endif
                         </td>
                         @auth

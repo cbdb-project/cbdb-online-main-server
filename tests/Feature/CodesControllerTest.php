@@ -1097,9 +1097,12 @@ class CodesControllerTest extends TestCase {
         ]);
 
         // sort on JOIN alias column（由 getJoinedColumnNames 加入 $thead）
+        $this->fakeDb->recordedOrderBys = [];
         $response = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=appt_name&sort_dir=asc');
         $response->assertStatus(200);
         $response->assertViewHas('sortBy', 'appt_name');
+        // resolveColumnForQuery must resolve JOIN alias → fully-qualified expression
+        $this->assertContains(['code.c_appt_desc_chn', 'asc'], $this->fakeDb->recordedOrderBys);
 
         // filter on base table column
         $response2 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?filters[c_appt_code]=A1');
@@ -1107,9 +1110,12 @@ class CodesControllerTest extends TestCase {
         $response2->assertViewHas('filters', ['c_appt_code' => 'A1']);
 
         // 不在 $thead 白名單的欄位 → sanitizeSortParameters 清空 sortBy → 200，無例外
+        $this->fakeDb->recordedOrderBys = [];
         $response3 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=non_existent_column');
         $response3->assertStatus(200);
         $response3->assertViewHas('sortBy', '');
+        // no user-requested column should appear; PK tie-breakers are still recorded
+        $this->assertNotContains('non_existent_column', array_column($this->fakeDb->recordedOrderBys, 0));
     }
 
     #[Test]
@@ -1120,9 +1126,12 @@ class CodesControllerTest extends TestCase {
         ]);
 
         // sort on JOIN alias column
+        $this->fakeDb->recordedOrderBys = [];
         $response = $this->get('/codes/OFFICE_CODE_TYPE_REL?sort_by=office_name&sort_dir=desc');
         $response->assertStatus(200);
         $response->assertViewHas('sortBy', 'office_name');
+        // resolveColumnForQuery must resolve JOIN alias → fully-qualified expression
+        $this->assertContains(['code.c_office_chn', 'desc'], $this->fakeDb->recordedOrderBys);
 
         // filter on base table column
         $response2 = $this->get('/codes/OFFICE_CODE_TYPE_REL?filters[c_office_id]=1');
@@ -1136,6 +1145,7 @@ class FakeDatabaseManager {
     public $failures = [];
     public $failuresCleared = [];
     public $schemaColumns = [];
+    public array $recordedOrderBys = [];
 
     public function __construct(array $tables = [], array $schemaColumns = []) {
         $this->tables = $tables;
@@ -1346,9 +1356,11 @@ class FakeQueryBuilder {
     }
 
     public function orderBy($column, $direction = 'asc') {
+        $normalizedDir = strtolower((string) $direction) === 'desc' ? 'desc' : 'asc';
+        $this->manager->recordedOrderBys[] = [(string) $column, $normalizedDir];
         $this->orderBys[] = [
             'column' => $this->normalizeColumnName($column),
-            'direction' => strtolower((string) $direction) === 'desc' ? 'desc' : 'asc',
+            'direction' => $normalizedDir,
         ];
 
         return $this;

@@ -64,7 +64,7 @@ if ($altTypeLabel === '') {
 if ($altTypeLabel === '') {
     $altTypeLabel = $value->pivot->c_alt_name_type_code;
 }
-$altTypeCode = trim((string) ($value->c_name_type_code ?? $value->pivot->c_alt_name_type_code ?? ''));
+$altTypeDesc = trim((string) ($value->c_name_type_desc ?? ''));
 
 @endphp
                     <tr>
@@ -105,8 +105,8 @@ $altTypeCode = trim((string) ($value->c_name_type_code ?? $value->pivot->c_alt_n
                         <td>{{ $c_alt_name_chn_view }}</td>
                         <td>
                             {{ $altTypeLabel }}
-                            @if($altTypeCode !== '' && $altTypeCode !== $altTypeLabel)
-                                <br><span class="text-muted small">{{ $altTypeCode }}</span>
+                            @if($altTypeDesc !== '' && $altTypeDesc !== $altTypeLabel)
+                                <br><span class="text-muted small">{{ $altTypeDesc }}</span>
                             @endif
                         </td>
                         @auth

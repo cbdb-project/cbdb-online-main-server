@@ -43,4 +43,8 @@ return [
     'return_to_proposals'   => '返回提案列表',
     'update_proposal'       => '更新提案',
     'resubmit_notice'       => '修改後將重新送審，審核狀態會回到「待審核」。',
+
+    'apply_filters'         => '套用篩選',
+    'clear_filters'         => '清除篩選',
+    'search_tables'         => '搜尋表格…',
 ];

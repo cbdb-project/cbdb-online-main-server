@@ -54,4 +54,8 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# 5. 確認 CHGIS 底圖（缺檔則自 HuggingFace 下載；失敗不中斷部署）
+echo "检查 CHGIS 底图..."
+php artisan cbdb:fetch-chgis-map || echo "警告: CHGIS 底图下载失败，地图功能将于首次访问时重试"
+
 echo "部署完成！"

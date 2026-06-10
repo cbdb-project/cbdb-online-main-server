@@ -47,5 +47,7 @@ return [
         'path' => env('CHGIS_MAP_PATH', storage_path('app/chgis/chgis_map.mbtiles')),
         // 體積下限（位元組），低於此值視為半截/失敗檔。
         'expected_min_bytes' => (int) env('CHGIS_MAP_MIN_BYTES', 5_000_000),
+        // 整體下載逾時（秒）；數百 MB + 慢速連線需放寬。
+        'timeout' => (int) env('CHGIS_MAP_TIMEOUT', 1800),
     ],
 ];

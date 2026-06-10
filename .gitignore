@@ -23,3 +23,8 @@ version.txt
 # SQLite DB for development with Docker
 db-data/database.sqlite3
 database/database.sqlite3
+
+# CHGIS 底圖（自 HuggingFace 下載，不入版控）
+/storage/app/chgis/*.mbtiles
+/storage/app/chgis/*.part.*
+/storage/app/chgis/*.bak.*

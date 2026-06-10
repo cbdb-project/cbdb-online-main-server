@@ -21,6 +21,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\GenerateSchemaDocs::class,
         \App\Console\Commands\RebuildIndexYear::class,
         \App\Console\Commands\RebuildIndexAddress::class,
+        \App\Console\Commands\FetchChgisMap::class,
     ];
 
     /**

@@ -43,7 +43,21 @@ use App\Support\CompositePrimaryKey;
                         <td>{{ $value->pivot->c_sequence }}</td>
                         <td>{{ $value->pivot->c_posting_id }}</td>
                         <td>{!! $value->c_office_pinyin. '<br>'. $value->c_office_chn . (!empty($value->c_office_trans) ? '<br><span class="text-muted">'. e($value->c_office_trans) .'</span>' : '') !!}</td>
-                        <td>{{ $post2addr[$value->pivot->c_posting_id] ?? '' }}</td>
+                        <td>
+                            @php
+                                $chgisOfficeKey = $value->pivot->c_office_id . ':' . $value->pivot->c_posting_id;
+                                $chgisPlaces = ($officePlaces ?? [])[$chgisOfficeKey] ?? [];
+                                $fallbackPlaces = collect($post2addr[$chgisOfficeKey] ?? []);
+                            @endphp
+                            {{-- 無地點的官職任命維持空白（沿用原行為），不顯示「地名不詳」 --}}
+                            @if(!empty($chgisPlaces))
+                                @foreach($chgisPlaces as $chgisPlace)
+                                    @include('biogmains._place_link', ['entry' => $chgisPlace, 'personId' => $basicinformation->c_personid])@if(!$loop->last){{ __('chgis_map.place_separator') }}@endif
+                                @endforeach
+                            @elseif($fallbackPlaces->isNotEmpty())
+                                {{ $fallbackPlaces->implode(__('chgis_map.place_separator')) }}
+                            @endif
+                        </td>
                         <td>{{ $value->pivot->c_firstyear }}</td>
                         <td>{{ $value->pivot->c_lastyear }}</td>
                         @auth

@@ -43,7 +43,28 @@ use App\Support\CompositePrimaryKey;
                                 <br><span class="text-muted">{{ $basicinformation->biog_addresses[$i]->addr_type->c_addr_desc }}</span>
                             @endif
                         </td>
-                        <td>{{ $basicinformation->biog_addresses[$i]->addr->c_name_chn }}</td>
+                        <td>
+                            @php
+                                $addressRecord = $basicinformation->biog_addresses[$i];
+                                $chgisAddrKey = 'addr:' . $basicinformation->biog_addresses[$i]->c_addr_id . ':' . $basicinformation->biog_addresses[$i]->c_addr_type . ':' . $basicinformation->biog_addresses[$i]->c_sequence;
+                                $chgisAddrEntry = ($addressPointMap ?? collect())->get($chgisAddrKey);
+                                $fallbackAddr = $addressRecord->addr;
+                                $fallbackAddrName = $fallbackAddr?->c_name_chn;
+                                if ($fallbackAddrName === null || $fallbackAddrName === '') {
+                                    $fallbackAddrName = $fallbackAddr?->c_name;
+                                }
+                                if ($fallbackAddrName === null || $fallbackAddrName === '') {
+                                    $fallbackAddrName = $addressRecord->c_addr_id === null || $addressRecord->c_addr_id === ''
+                                        ? __('chgis_map.unknown_place')
+                                        : '#' . $addressRecord->c_addr_id;
+                                }
+                            @endphp
+                            @if($chgisAddrEntry)
+                                @include('biogmains._place_link', ['entry' => $chgisAddrEntry, 'personId' => $basicinformation->c_personid])
+                            @else
+                                {{ $fallbackAddrName }}
+                            @endif
+                        </td>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_firstyear }}</td>
                         <td>{{ $basicinformation->biog_addresses[$i]->c_lastyear }}</td>
                         @auth

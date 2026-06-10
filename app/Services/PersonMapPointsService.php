@@ -74,7 +74,7 @@ class PersonMapPointsService {
                 'linkable' => $linkable,
                 'first_year' => $row->c_firstyear,
                 'last_year' => $row->c_lastyear,
-                'label' => $nameChn ?? ($nameEn ?? ''),
+                'label' => $this->displayName($nameChn, $nameEn, ''),
             ];
         }
 

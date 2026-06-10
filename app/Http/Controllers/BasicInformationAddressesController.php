@@ -7,6 +7,7 @@ use App\Models\AddrCode;
 use App\Models\AddressCode;
 use App\Models\TextCode;
 use App\Repositories\BiogMainRepository;
+use App\Services\PersonMapPointsService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -33,8 +34,11 @@ class BasicInformationAddressesController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id) {
+    public function index(PersonMapPointsService $mapPoints, $id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithAddr($id);
+
+        // CHGIS 地圖：以 key 對應每列地址的座標與可連結狀態
+        $addressPointMap = collect($mapPoints->addressEntries($id))->keyBy('key');
 
         // 處理 basicinformation 可能為 null 或缺少字段的情況
         $personLabel = $id;
@@ -56,6 +60,7 @@ class BasicInformationAddressesController extends Controller {
 
         return view('biogmains.addresses.index', [
             'basicinformation' => $biogbasicinformation,
+            'addressPointMap' => $addressPointMap,
             'page_title' => __('person.addresses'),
             'page_description' => __('person.person_records') . ' – ' . __('person.addresses'),
             'breadcrumb_home' => __('person.person_records'),

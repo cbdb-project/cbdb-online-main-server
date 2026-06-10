@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\FetchChgisMapJob;
 use App\Services\ChgisMapManager;
 use App\Services\MbtilesReader;
+use App\Services\PersonMapPointsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -110,6 +111,13 @@ class ChgisMapController extends Controller {
             'state' => 'downloading',
             'started_at' => $startedAt,
         ]);
+    }
+
+    /**
+     * 某人物所有「有效座標」的地點（addresses + offices），供地圖 modal 繪製。
+     */
+    public function personPoints(PersonMapPointsService $service, int $id): JsonResponse {
+        return response()->json(['points' => $service->points($id)]);
     }
 
     /**

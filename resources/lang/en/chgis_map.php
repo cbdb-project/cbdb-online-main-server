@@ -14,6 +14,8 @@ return [
     'office_locations' => 'Office locations',
     'fit_all' => 'Show all',
     'close' => 'Close',
+    'count_unit' => 'entries',
+    'legend_count_hint' => 'Number: entries at this place',
 
     // Status & hints
     'loading' => 'Loading…',

@@ -810,7 +810,8 @@ class BasicInformationPagesLoadTest extends TestCase {
      */
     #[Test]
     public function test_basicinformation_offices_index_loads() {
-        $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
+        $response = $this->withSession(['locale' => 'zh-TW'])
+            ->get("/basicinformation/{$this->testPersonId}/offices");
         $response->assertStatus(200);
 
         // CHGIS：有效座標的官职地点 Place Name 渲染為可點擊連結，key 含 office_id
@@ -822,6 +823,9 @@ class BasicInformationPagesLoadTest extends TestCase {
         $this->assertStringContainsString('window.chgisMapConfig', $html);
         $this->assertStringContainsString('tileUrlTemplate', $html);
         $this->assertStringContainsString('\\/chgis-map\\/tiles\\/{z}\\/{x}\\/{y}', $html);
+        $this->assertStringContainsString('count_unit', $html);
+        $this->assertStringContainsString('legend_count_hint', $html);
+        $this->assertStringContainsString('unknown_place', $html);
     }
 
     /**
@@ -889,6 +893,12 @@ class BasicInformationPagesLoadTest extends TestCase {
         $html = $response->getContent();
         $this->assertStringContainsString('; ', $html);
         $this->assertStringContainsString('View on map', $html);
+        $this->assertStringContainsString('count_unit', $html);
+        $this->assertStringContainsString('entries', $html);
+        $this->assertStringContainsString('legend_count_hint', $html);
+        $this->assertStringContainsString('Number: entries at this place', $html);
+        $this->assertStringContainsString('unknown_place', $html);
+        $this->assertStringContainsString('Unknown place', $html);
     }
 
     /**

@@ -34,9 +34,12 @@
                 'retry' => __('chgis_map.retry'),
                 'no_points' => __('chgis_map.no_points'),
                 'load_error' => __('chgis_map.load_error'),
+                'unknown_place' => __('chgis_map.unknown_place'),
                 'type_address' => __('chgis_map.type_address'),
                 'type_office' => __('chgis_map.type_office'),
                 'year_range' => __('chgis_map.year_range'),
+                'count_unit' => __('chgis_map.count_unit'),
+                'legend_count_hint' => __('chgis_map.legend_count_hint'),
             ]) !!},
         };
     </script>

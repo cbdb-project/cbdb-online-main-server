@@ -458,30 +458,35 @@ function loadPoints(personId) {
 }
 
 function renderPoints(points, currentKey, fallbackCenter) {
-    if (!points.length) {
+    const valid = points.filter((p) => isFinite(p.lon) && isFinite(p.lat));
+    if (!valid.length) {
         setStatus({ message: t('no_points'), spinner: false, retry: false });
         return;
     }
 
+    // 依座標（四捨五入到 5 位小數）合併同地點的多個 node
+    const groups = groupByCoord(valid);
     const animate = !reducedMotion();
     const markers = [];
     let currentLatLng = null;
 
-    points.forEach((p) => {
-        if (!isFinite(p.lon) || !isFinite(p.lat)) {
-            return;
-        }
-        const latlng = [p.lat, p.lon];
-        const isCurrent = currentKey && p.key === currentKey;
-        const marker = isCurrent ? currentMarker(latlng) : normalMarker(latlng, p.source);
-        marker.addTo(mapInstance).bindPopup(popupHtml(p));
+    groups.forEach((entries) => {
+        const first = entries[0];
+        const latlng = [first.lat, first.lon];
+        const hasCurrent = currentKey && entries.some((e) => e.key === currentKey);
+        const marker = makeMarker(latlng, entries, hasCurrent);
+        marker.addTo(mapInstance).bindPopup(buildPopup(entries, currentKey), {
+            maxWidth: 300,
+            maxHeight: 320,
+        });
         markers.push(marker);
-        if (isCurrent) {
+        if (hasCurrent) {
             currentLatLng = latlng;
         }
     });
 
-    addLegend();
+    const hasCluster = Array.from(groups.values()).some((entries) => entries.length > 1);
+    addLegend(hasCluster);
 
     if (currentLatLng) {
         mapInstance.setView(currentLatLng, 7, { animate });
@@ -492,6 +497,33 @@ function renderPoints(points, currentKey, fallbackCenter) {
     } else {
         mapInstance.setView(fallbackCenter, 6, { animate });
     }
+}
+
+/** 依座標分組（同像素合併）。回傳 Map<coordKey, entries[]>。 */
+function groupByCoord(points) {
+    const groups = new Map();
+    points.forEach((p) => {
+        const lon = Number(p.lon);
+        const lat = Number(p.lat);
+        const key = lon.toFixed(5) + ',' + lat.toFixed(5);
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key).push(p);
+    });
+    return groups;
+}
+
+/** 同組有地址→藍，純官職→綠。 */
+function groupColor(entries) {
+    return entries.some((e) => e.source === 'address') ? '#2563eb' : '#16a34a';
+}
+
+function makeMarker(latlng, entries, hasCurrent) {
+    if (entries.length === 1) {
+        return hasCurrent ? currentMarker(latlng) : normalMarker(latlng, entries[0].source);
+    }
+    return clusterMarker(latlng, entries.length, hasCurrent, groupColor(entries));
 }
 
 function normalMarker(latlng, source) {
@@ -516,28 +548,118 @@ function currentMarker(latlng) {
     return L.marker(latlng, { icon, zIndexOffset: 1000 });
 }
 
-function popupHtml(p) {
-    const typeLabel = p.source === 'office' ? t('type_office') : t('type_address');
-    const name = p.label || p.name_chn || p.name || '';
-    let html = `<strong>${escapeHtml(name)}</strong><br><span>${escapeHtml(typeLabel)}</span>`;
-    if (p.first_year || p.last_year) {
-        const years = `${p.first_year || '?'}–${p.last_year || '?'}`;
-        html += `<br><span>${escapeHtml(t('year_range'))}: ${escapeHtml(years)}</span>`;
+/** 多筆同座標：帶數字徽章的標記（含當前點脈動）。 */
+function clusterMarker(latlng, count, isCurrent, color) {
+    const n = Number(count) || 0;
+    const cls = 'chgis-cluster-marker' + (isCurrent ? ' chgis-cluster-marker--current' : '');
+    // n 為整數、color 為固定字面色，無使用者輸入，無 XSS
+    const style = isCurrent ? '' : ` style="background:${color}"`;
+    const html = `<div class="${cls}"${style}><span class="chgis-cluster-badge">${n}</span></div>`;
+    const icon = L.divIcon({
+        className: '',
+        html,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
+    });
+    return L.marker(latlng, { icon, zIndexOffset: isCurrent ? 1000 : 0 });
+}
+
+function entryName(e) {
+    const label = firstNonEmpty(e.label, e.name_chn, e.name);
+    if (label !== '') {
+        return label;
     }
+    if (e.addr_id != null && e.addr_id !== '') {
+        return '#' + e.addr_id;
+    }
+
+    return t('unknown_place');
+}
+
+function firstNonEmpty(...values) {
+    for (const value of values) {
+        const text = value == null ? '' : String(value).trim();
+        if (text !== '') {
+            return text;
+        }
+    }
+
+    return '';
+}
+
+function formatYears(e) {
+    if (!e.first_year && !e.last_year) {
+        return '';
+    }
+
+    return String(e.first_year || '?') + '-' + String(e.last_year || '?');
+}
+
+function formatEntryLine(e, currentKey, showAddrId) {
+    const isCurrent = currentKey && e.key === currentKey;
+    let line = `<span class="chgis-pop__name">${escapeHtml(entryName(e))}</span>`;
+
+    if (showAddrId && e.addr_id != null && e.addr_id !== '') {
+        line += ` <span class="chgis-pop__meta">#${escapeHtml(e.addr_id)}</span>`;
+    }
+
+    const years = formatYears(e);
+    if (years) {
+        line += ` <span class="chgis-pop__yr">(${escapeHtml(years)})</span>`;
+    }
+
+    return `<div class="chgis-pop__item${isCurrent ? ' chgis-pop__item--current' : ''}">${line}</div>`;
+}
+
+/** 一組（同座標）的 popup：標頭 + 依類型分組的捲動清單，當前 node 標示。 */
+function buildPopup(entries, currentKey) {
+    const placeName = entryName(entries[0]);
+    const addresses = entries.filter((e) => e.source === 'address');
+    const offices = entries.filter((e) => e.source === 'office');
+
+    let head = `<strong>${escapeHtml(placeName)}</strong>`;
+    if (entries.length > 1) {
+        head += ` &middot; ${entries.length} ${escapeHtml(t('count_unit'))}`;
+    }
+
+    let html = `<div class="chgis-pop"><div class="chgis-pop__head">${head}</div>`;
+    html += popupSection(t('type_address'), addresses, currentKey);
+    html += popupSection(t('type_office'), offices, currentKey);
+    html += '</div>';
     return html;
 }
 
-function addLegend() {
+function popupSection(label, list, currentKey) {
+    if (!list.length) {
+        return '';
+    }
+
+    const showAddrId = new Set(list.map((e) => entryName(e))).size < list.length;
+    let html = `<div class="chgis-pop__section"><div class="chgis-pop__sectit">${escapeHtml(label)}</div>`;
+    list.forEach((e) => {
+        html += formatEntryLine(e, currentKey, showAddrId);
+    });
+    html += '</div>';
+    return html;
+}
+
+function addLegend(hasCluster) {
     if (legendControl) {
         legendControl.remove();
     }
     const legend = L.control({ position: 'bottomleft' });
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'chgis-legend');
-        div.innerHTML = `
+        let html = `
             <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#ef4444"></span>${escapeHtml(t('current_location'))}</div>
             <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#2563eb"></span>${escapeHtml(t('other_addresses'))}</div>
             <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#16a34a"></span>${escapeHtml(t('office_locations'))}</div>`;
+        // 只有真的出現合併標記時才顯示徽章說明
+        if (hasCluster) {
+            html += `<div class="chgis-legend__row"><span class="chgis-legend__badge">N</span>${escapeHtml(t('legend_count_hint'))}</div>`;
+        }
+        div.innerHTML = html;
         return div;
     };
     legend.addTo(mapInstance);

@@ -156,11 +156,107 @@
 }
 .chgis-legend__dot {
     display: inline-block;
+    flex: 0 0 auto; /* 避免被 flex 壓扁成橢圓 */
     width: 12px;
     height: 12px;
     border-radius: 50%;
     border: 2px solid #fff;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.chgis-legend__badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    font-size: 10px;
+    border: 1.5px solid #fff;
+}
+
+/* 多筆同座標：合併標記與數字徽章 */
+.chgis-cluster-marker {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+    overflow: visible; /* 確保外溢的數字徽章不被裁切 */
+}
+.chgis-cluster-marker--current {
+    background: #ef4444;
+    box-shadow: 0 0 0 2px #ef4444;
+}
+.chgis-cluster-marker--current::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.45);
+    transform: translate(-50%, -50%);
+    animation: chgis-pulse 1.6s ease-out infinite;
+}
+.chgis-cluster-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+    border: 1.5px solid #fff;
+    white-space: nowrap;
+}
+
+/* 合併 popup 內容 */
+.chgis-pop {
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.chgis-pop__head {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+.chgis-pop__section {
+    margin-top: 6px;
+}
+.chgis-pop__sectit {
+    font-size: 11px;
+    color: #6b7280;
+    margin-bottom: 2px;
+}
+.chgis-pop__item {
+    font-size: 13px;
+    line-height: 1.6;
+    word-break: break-word;
+}
+.chgis-pop__item--current {
+    font-weight: 700;
+}
+.chgis-pop__name {
+    color: #111827;
+}
+.chgis-pop__meta,
+.chgis-pop__yr {
+    color: #6b7280;
 }
 
 /* 突出顯示「目前地點」的脈動標記 */
@@ -234,7 +330,8 @@
     .leaflet-zoom-anim .leaflet-zoom-animated {
         transition: none !important;
     }
-    .chgis-current-marker::after {
+    .chgis-current-marker::after,
+    .chgis-cluster-marker--current::after {
         animation: none;
     }
     /* spinner 改用較慢的不透明度脈動而非旋轉，仍傳達「進行中」 */

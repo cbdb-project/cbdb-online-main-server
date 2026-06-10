@@ -14,6 +14,8 @@ return [
     'office_locations' => '官職地點',
     'fit_all' => '顯示全部',
     'close' => '關閉',
+    'count_unit' => '筆',
+    'legend_count_hint' => '數字：該地點筆數',
 
     // 狀態與提示
     'loading' => '載入中…',

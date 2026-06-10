@@ -265,6 +265,9 @@ function closeModal() {
     if (!overlayEl) {
         return;
     }
+    if (!overlayEl.classList.contains('is-open')) {
+        return;
+    }
     openToken++; // 使所有 pending 非同步 callback 失效
     stopPolling();
     abortPendingRequests();

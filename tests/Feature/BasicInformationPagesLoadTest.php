@@ -817,6 +817,11 @@ class BasicInformationPagesLoadTest extends TestCase {
         $html = $response->getContent();
         $this->assertStringContainsString('class="chgis-place-link"', $html);
         $this->assertStringContainsString('data-key="office:1:1:2"', $html);
+
+        // CHGIS：前端設定與資源已注入，且 tile URL 為相對路徑（JSON 中 / 轉義為 \/）
+        $this->assertStringContainsString('window.chgisMapConfig', $html);
+        $this->assertStringContainsString('tileUrlTemplate', $html);
+        $this->assertStringContainsString('\\/chgis-map\\/tiles\\/{z}\\/{x}\\/{y}', $html);
     }
 
     /**

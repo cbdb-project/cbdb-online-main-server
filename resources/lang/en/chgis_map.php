@@ -16,6 +16,7 @@ return [
     'close' => 'Close',
     'count_unit' => 'entries',
     'legend_count_hint' => 'Number: entries at this place',
+    'open_record' => 'Open this record in a new tab',
 
     // Status & hints
     'loading' => 'Loading…',

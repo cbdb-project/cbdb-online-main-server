@@ -565,18 +565,6 @@ function clusterMarker(latlng, count, isCurrent, color) {
     return L.marker(latlng, { icon, zIndexOffset: isCurrent ? 1000 : 0 });
 }
 
-function entryName(e) {
-    const label = firstNonEmpty(e.label, e.name_chn, e.name);
-    if (label !== '') {
-        return label;
-    }
-    if (e.addr_id != null && e.addr_id !== '') {
-        return '#' + e.addr_id;
-    }
-
-    return t('unknown_place');
-}
-
 function firstNonEmpty(...values) {
     for (const value of values) {
         const text = value == null ? '' : String(value).trim();
@@ -586,6 +574,57 @@ function firstNonEmpty(...values) {
     }
 
     return '';
+}
+
+/** 地點名稱（地名）：name_chn → name → #addr_id → 未知。 */
+function placeNameOf(e) {
+    const place = firstNonEmpty(e.name_chn, e.name);
+    if (place !== '') {
+        return place;
+    }
+    if (e.addr_id != null && e.addr_id !== '') {
+        return '#' + e.addr_id;
+    }
+
+    return t('unknown_place');
+}
+
+/** 官名中／英並列的 HTML（英文以較淡較小字呈現，避免擁擠）。 */
+function officeNameHtml(e) {
+    const chn = firstNonEmpty(e.office_name);
+    const en = firstNonEmpty(e.office_name_en);
+    if (chn && en) {
+        return escapeHtml(chn) + ` <span class="chgis-pop__en">${escapeHtml(en)}</span>`;
+    }
+    if (chn) {
+        return escapeHtml(chn);
+    }
+    if (en) {
+        return escapeHtml(en);
+    }
+
+    return '';
+}
+
+/** 一筆 entry 顯示的 HTML：官職為「官名(中 英) · 地名」，地址為「地名」。 */
+function entryDisplayHtml(e) {
+    const place = escapeHtml(placeNameOf(e));
+    if (e.source === 'office') {
+        const office = officeNameHtml(e);
+        return office ? `${office} &middot; ${place}` : place;
+    }
+
+    return place;
+}
+
+/** 純文字版（供同名碰撞偵測，不含標籤）。 */
+function entryDisplayText(e) {
+    if (e.source === 'office') {
+        const parts = [firstNonEmpty(e.office_name, e.office_name_en), placeNameOf(e)].filter(Boolean);
+        return parts.join(' · ');
+    }
+
+    return placeNameOf(e);
 }
 
 function formatYears(e) {
@@ -598,7 +637,12 @@ function formatYears(e) {
 
 function formatEntryLine(e, currentKey, showAddrId) {
     const isCurrent = currentKey && e.key === currentKey;
-    let line = `<span class="chgis-pop__name">${escapeHtml(entryName(e))}</span>`;
+    const inner = entryDisplayHtml(e);
+    // 有 url 時包成連結，於新分頁開啟該筆記錄頁；url 為相對路徑、經 escapeHtml
+    const nameHtml = e.url
+        ? `<a class="chgis-pop__link" href="${escapeHtml(e.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('open_record'))}">${inner}</a>`
+        : inner;
+    let line = `<span class="chgis-pop__name">${nameHtml}</span>`;
 
     if (showAddrId && e.addr_id != null && e.addr_id !== '') {
         line += ` <span class="chgis-pop__meta">#${escapeHtml(e.addr_id)}</span>`;
@@ -614,7 +658,7 @@ function formatEntryLine(e, currentKey, showAddrId) {
 
 /** 一組（同座標）的 popup：標頭 + 依類型分組的捲動清單，當前 node 標示。 */
 function buildPopup(entries, currentKey) {
-    const placeName = entryName(entries[0]);
+    const placeName = placeNameOf(entries[0]);
     const addresses = entries.filter((e) => e.source === 'address');
     const offices = entries.filter((e) => e.source === 'office');
 
@@ -635,7 +679,7 @@ function popupSection(label, list, currentKey) {
         return '';
     }
 
-    const showAddrId = new Set(list.map((e) => entryName(e))).size < list.length;
+    const showAddrId = new Set(list.map((e) => entryDisplayText(e))).size < list.length;
     let html = `<div class="chgis-pop__section"><div class="chgis-pop__sectit">${escapeHtml(label)}</div>`;
     list.forEach((e) => {
         html += formatEntryLine(e, currentKey, showAddrId);

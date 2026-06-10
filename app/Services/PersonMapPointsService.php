@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BiogAddr;
 use App\Models\BiogMain;
+use App\Support\CompositePrimaryKey;
 use App\Support\CoordinateValidator;
 use Illuminate\Support\Facades\DB;
 
@@ -74,7 +75,18 @@ class PersonMapPointsService {
                 'linkable' => $linkable,
                 'first_year' => $row->c_firstyear,
                 'last_year' => $row->c_lastyear,
-                'label' => $this->displayName($nameChn, $nameEn, ''),
+                'label' => $this->displayName($nameChn, $nameEn, 'addr_id:' . $row->c_addr_id),
+                // 該地址記錄頁（編輯查詢頁，相對 URL，供地圖 popup 開新分頁）
+                'url' => CompositePrimaryKey::buildUrl(
+                    'basicinformation.addresses.edit.query',
+                    ['id' => $personId],
+                    [
+                        'c_personid' => $personId,
+                        'c_addr_id' => (int) $row->c_addr_id,
+                        'c_addr_type' => (int) $row->c_addr_type,
+                        'c_sequence' => (int) $row->c_sequence,
+                    ]
+                ),
             ];
         }
 
@@ -119,12 +131,24 @@ class PersonMapPointsService {
                 'addr_id' => (int) $row->c_addr_id,
                 'name_chn' => $row->c_name_chn,
                 'name' => $row->c_name,
+                // 官名中／英（供 popup 並列顯示；可能為 null）
+                'office_name' => $info['office_chn'] ?? null,
+                'office_name_en' => $info['office_name'] ?? null,
                 'lon' => $linkable ? (float) $lon : null,
                 'lat' => $linkable ? (float) $lat : null,
                 'linkable' => $linkable,
                 'first_year' => $info['first_year'] ?? null,
                 'last_year' => $info['last_year'] ?? null,
                 'label' => $officeName ? ($officeName . ' · ' . $placeName) : $placeName,
+                // 該官職任命記錄頁（編輯查詢頁，相對 URL，供地圖 popup 開新分頁）
+                'url' => CompositePrimaryKey::buildUrl(
+                    'basicinformation.offices.edit.query',
+                    ['id' => $personId],
+                    [
+                        'c_office_id' => (int) $officeId,
+                        'c_posting_id' => (int) $postingId,
+                    ]
+                ),
             ];
         }
 

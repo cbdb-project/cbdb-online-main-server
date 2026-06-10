@@ -10,13 +10,14 @@ return [
     // Modal title & legend
     'modal_title' => 'Geographic location',
     'current_location' => 'Current location',
-    'other_addresses' => 'Other biographical addresses',
+    'biographical_addresses' => 'Biographical addresses',
     'office_locations' => 'Office locations',
     'fit_all' => 'Show all',
     'close' => 'Close',
     'count_unit' => 'entries',
     'legend_count_hint' => 'Number: entries at this place',
     'open_record' => 'Open this record in a new tab',
+    'both_types' => 'Both address and office',
 
     // Status & hints
     'loading' => 'Loading…',

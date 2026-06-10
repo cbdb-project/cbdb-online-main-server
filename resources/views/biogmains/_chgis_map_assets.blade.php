@@ -25,7 +25,7 @@
             i18n: {!! Js::from([
                 'modal_title' => __('chgis_map.modal_title'),
                 'current_location' => __('chgis_map.current_location'),
-                'other_addresses' => __('chgis_map.other_addresses'),
+                'biographical_addresses' => __('chgis_map.biographical_addresses'),
                 'office_locations' => __('chgis_map.office_locations'),
                 'close' => __('chgis_map.close'),
                 'loading' => __('chgis_map.loading'),
@@ -41,6 +41,7 @@
                 'count_unit' => __('chgis_map.count_unit'),
                 'legend_count_hint' => __('chgis_map.legend_count_hint'),
                 'open_record' => __('chgis_map.open_record'),
+                'both_types' => __('chgis_map.both_types'),
             ]) !!},
         };
     </script>

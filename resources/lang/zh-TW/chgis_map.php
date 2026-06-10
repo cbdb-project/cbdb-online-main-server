@@ -10,13 +10,14 @@ return [
     // Modal 標題與圖例
     'modal_title' => '地理位置',
     'current_location' => '目前地點',
-    'other_addresses' => '其他傳記地址',
+    'biographical_addresses' => '傳記地址',
     'office_locations' => '官職地點',
     'fit_all' => '顯示全部',
     'close' => '關閉',
     'count_unit' => '筆',
     'legend_count_hint' => '數字：該地點筆數',
     'open_record' => '開新分頁檢視此記錄',
+    'both_types' => '同時為地址與官職',
 
     // 狀態與提示
     'loading' => '載入中…',

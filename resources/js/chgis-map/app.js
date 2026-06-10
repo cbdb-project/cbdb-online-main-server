@@ -72,6 +72,27 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function sanitizePopupUrl(url) {
+    const raw = url == null ? '' : String(url).trim();
+    if (raw === '') {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(raw, window.location.origin);
+        const isSafeProtocol = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        if (!isSafeProtocol) {
+            return '';
+        }
+
+        return parsed.origin === window.location.origin
+            ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+            : parsed.toString();
+    } catch (_error) {
+        return '';
+    }
+}
+
 function focusableEls() {
     if (!overlayEl) {
         return [];
@@ -485,8 +506,13 @@ function renderPoints(points, currentKey, fallbackCenter) {
         }
     });
 
-    const hasCluster = Array.from(groups.values()).some((entries) => entries.length > 1);
-    addLegend(hasCluster);
+    const groupList = Array.from(groups.values());
+    const hasCluster = groupList.some((entries) => entries.length > 1);
+    // 僅當地圖上真的出現「分割色」marker（mixed 且非 current，current 會被紅色覆蓋）才在圖例說明
+    const hasMixed = groupList.some(
+        (entries) => groupIsMixed(entries) && !(currentKey && entries.some((e) => e.key === currentKey))
+    );
+    addLegend(hasCluster, hasMixed);
 
     if (currentLatLng) {
         mapInstance.setView(currentLatLng, 7, { animate });
@@ -514,16 +540,28 @@ function groupByCoord(points) {
     return groups;
 }
 
-/** 同組有地址→藍，純官職→綠。 */
-function groupColor(entries) {
-    return entries.some((e) => e.source === 'address') ? '#2563eb' : '#16a34a';
+const COLOR_ADDRESS = '#2563eb';
+const COLOR_OFFICE = '#16a34a';
+const FILL_MIXED = `linear-gradient(90deg, ${COLOR_ADDRESS} 0 50%, ${COLOR_OFFICE} 50% 100%)`;
+
+/** 該組是否同時含地址與官職（同一地點既是傳記地址又是任官地）。 */
+function groupIsMixed(entries) {
+    return entries.some((e) => e.source === 'address') && entries.some((e) => e.source === 'office');
+}
+
+/** 標記填色：兼具兩類→左藍右綠分割；純地址→藍；純官職→綠。 */
+function groupFill(entries) {
+    if (groupIsMixed(entries)) {
+        return FILL_MIXED;
+    }
+    return entries.some((e) => e.source === 'address') ? COLOR_ADDRESS : COLOR_OFFICE;
 }
 
 function makeMarker(latlng, entries, hasCurrent) {
     if (entries.length === 1) {
         return hasCurrent ? currentMarker(latlng) : normalMarker(latlng, entries[0].source);
     }
-    return clusterMarker(latlng, entries.length, hasCurrent, groupColor(entries));
+    return clusterMarker(latlng, entries.length, hasCurrent, groupFill(entries));
 }
 
 function normalMarker(latlng, source) {
@@ -549,11 +587,11 @@ function currentMarker(latlng) {
 }
 
 /** 多筆同座標：帶數字徽章的標記（含當前點脈動）。 */
-function clusterMarker(latlng, count, isCurrent, color) {
+function clusterMarker(latlng, count, isCurrent, fill) {
     const n = Number(count) || 0;
     const cls = 'chgis-cluster-marker' + (isCurrent ? ' chgis-cluster-marker--current' : '');
-    // n 為整數、color 為固定字面色，無使用者輸入，無 XSS
-    const style = isCurrent ? '' : ` style="background:${color}"`;
+    // n 為整數、fill 為固定字面色／漸層，無使用者輸入，無 XSS
+    const style = isCurrent ? '' : ` style="background:${fill}"`;
     const html = `<div class="${cls}"${style}><span class="chgis-cluster-badge">${n}</span></div>`;
     const icon = L.divIcon({
         className: '',
@@ -637,23 +675,26 @@ function formatYears(e) {
 
 function formatEntryLine(e, currentKey, showAddrId) {
     const isCurrent = currentKey && e.key === currentKey;
-    const inner = entryDisplayHtml(e);
-    // 有 url 時包成連結，於新分頁開啟該筆記錄頁；url 為相對路徑、經 escapeHtml
-    const nameHtml = e.url
-        ? `<a class="chgis-pop__link" href="${escapeHtml(e.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('open_record'))}">${inner}</a>`
-        : inner;
-    let line = `<span class="chgis-pop__name">${nameHtml}</span>`;
+    const safeUrl = sanitizePopupUrl(e.url);
 
+    // 整列內容：地名/官名 + #id + 年代
+    let content = `<span class="chgis-pop__name">${entryDisplayHtml(e)}</span>`;
     if (showAddrId && e.addr_id != null && e.addr_id !== '') {
-        line += ` <span class="chgis-pop__meta">#${escapeHtml(e.addr_id)}</span>`;
+        content += ` <span class="chgis-pop__meta">#${escapeHtml(e.addr_id)}</span>`;
     }
-
     const years = formatYears(e);
     if (years) {
-        line += ` <span class="chgis-pop__yr">(${escapeHtml(years)})</span>`;
+        content += ` <span class="chgis-pop__yr">(${escapeHtml(years)})</span>`;
     }
 
-    return `<div class="chgis-pop__item${isCurrent ? ' chgis-pop__item--current' : ''}">${line}</div>`;
+    const currentCls = isCurrent ? ' chgis-pop__item--current' : '';
+
+    // 有 url 時「整列」即為連結（block，整列可點），於新分頁開啟該筆記錄頁
+    if (safeUrl) {
+        return `<a class="chgis-pop__item chgis-pop__item--link${currentCls}" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('open_record'))}">${content}</a>`;
+    }
+
+    return `<div class="chgis-pop__item${currentCls}">${content}</div>`;
 }
 
 /** 一組（同座標）的 popup：標頭 + 依類型分組的捲動清單，當前 node 標示。 */
@@ -688,7 +729,7 @@ function popupSection(label, list, currentKey) {
     return html;
 }
 
-function addLegend(hasCluster) {
+function addLegend(hasCluster, hasMixed) {
     if (legendControl) {
         legendControl.remove();
     }
@@ -696,12 +737,16 @@ function addLegend(hasCluster) {
     legend.onAdd = function () {
         const div = L.DomUtil.create('div', 'chgis-legend');
         let html = `
-            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#ef4444"></span>${escapeHtml(t('current_location'))}</div>
-            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#2563eb"></span>${escapeHtml(t('other_addresses'))}</div>
-            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#16a34a"></span>${escapeHtml(t('office_locations'))}</div>`;
+            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:#ef4444"></span><span class="chgis-legend__label">${escapeHtml(t('current_location'))}</span></div>
+            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:${COLOR_ADDRESS}"></span><span class="chgis-legend__label">${escapeHtml(t('biographical_addresses'))}</span></div>
+            <div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:${COLOR_OFFICE}"></span><span class="chgis-legend__label">${escapeHtml(t('office_locations'))}</span></div>`;
+        // 同一點兼具地址與官職時的分割標記說明
+        if (hasMixed) {
+            html += `<div class="chgis-legend__row"><span class="chgis-legend__dot" style="background:${FILL_MIXED}"></span><span class="chgis-legend__label">${escapeHtml(t('both_types'))}</span></div>`;
+        }
         // 只有真的出現合併標記時才顯示徽章說明
         if (hasCluster) {
-            html += `<div class="chgis-legend__row"><span class="chgis-legend__badge">N</span>${escapeHtml(t('legend_count_hint'))}</div>`;
+            html += `<div class="chgis-legend__row"><span class="chgis-legend__badge">N</span><span class="chgis-legend__label">${escapeHtml(t('legend_count_hint'))}</span></div>`;
         }
         div.innerHTML = html;
         return div;

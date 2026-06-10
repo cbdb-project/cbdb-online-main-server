@@ -1,0 +1,250 @@
+/* CHGIS 地圖 modal 樣式（設計見 docs/CHGIS_MAP_PLACE_LINK.md §6.3-§6.6） */
+
+/* Place Name 連結 */
+.chgis-place-link {
+    cursor: pointer;
+    color: #2563eb;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+.chgis-place-link:hover {
+    color: #1d4ed8;
+    text-decoration-style: solid;
+}
+.chgis-place-link:focus-visible {
+    color: #1d4ed8;
+    text-decoration-style: solid;
+    outline: 2px solid #1d4ed8;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* 遮罩：背景變暗 + 模糊 */
+.chgis-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    padding: 16px;
+    overscroll-behavior: contain;
+    touch-action: none;
+}
+.chgis-modal-overlay.is-open {
+    opacity: 1;
+}
+
+/* 容器：無邊框、圓角、陰影 */
+.chgis-modal {
+    position: relative;
+    width: min(92vw, 1100px);
+    height: min(88vh, 760px);
+    max-height: min(88vh, 760px);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.18s ease;
+}
+.chgis-modal-overlay.is-open .chgis-modal {
+    transform: translateY(0) scale(1);
+}
+
+.chgis-modal__map {
+    position: absolute;
+    inset: 0;
+    background: #e8eef2;
+    overscroll-behavior: contain;
+}
+
+/* 關閉鈕：右上角浮動半透明圓形，命中區 >= 44px */
+.chgis-modal__close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    color: #111;
+    font-size: 22px;
+    line-height: 44px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.chgis-modal__close:hover {
+    background: #fff;
+}
+.chgis-modal__close:focus-visible,
+.chgis-status__retry:focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 2px;
+}
+
+/* 狀態提示（下載中／失敗） */
+.chgis-modal__status {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.92);
+    color: #333;
+}
+.chgis-modal__status[hidden] {
+    display: none;
+}
+.chgis-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #cbd5e1;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: chgis-spin 0.9s linear infinite;
+}
+.chgis-status__message {
+    max-width: 28em;
+    font-size: 15px;
+    line-height: 1.6;
+}
+.chgis-status__retry {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* 圖例 */
+.chgis-legend {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.7;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.chgis-legend__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.chgis-legend__dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+/* 突出顯示「目前地點」的脈動標記 */
+.chgis-current-marker {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #ef4444;
+}
+.chgis-current-marker::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.45);
+    transform: translate(-50%, -50%);
+    animation: chgis-pulse 1.6s ease-out infinite;
+}
+
+@keyframes chgis-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes chgis-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.7;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(3);
+        opacity: 0;
+    }
+}
+
+/* 手機：近全螢幕、無圓角 */
+@media (max-width: 640px) {
+    .chgis-modal-overlay {
+        padding: 0;
+    }
+    .chgis-modal {
+        width: 100vw;
+        height: 100vh; /* 舊瀏覽器 fallback */
+        height: 100dvh; /* 支援者覆蓋，處理瀏覽器列高度 */
+        max-height: 100vh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+    /* 圖例縮小避免擋住地圖 */
+    .chgis-legend {
+        font-size: 11px;
+        line-height: 1.5;
+        padding: 6px 9px;
+        max-width: 45vw;
+    }
+}
+
+/* 尊重減少動態偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .chgis-modal-overlay,
+    .chgis-modal {
+        transition: none;
+    }
+    .leaflet-pan-anim .leaflet-tile,
+    .leaflet-zoom-anim .leaflet-zoom-animated {
+        transition: none !important;
+    }
+    .chgis-current-marker::after {
+        animation: none;
+    }
+    /* spinner 改用較慢的不透明度脈動而非旋轉，仍傳達「進行中」 */
+    .chgis-spinner {
+        animation: chgis-fade 1.4s ease-in-out infinite;
+    }
+}
+
+@keyframes chgis-fade {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}

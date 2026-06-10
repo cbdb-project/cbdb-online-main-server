@@ -11,6 +11,8 @@ export default defineConfig({
                 'resources/js/app.js',          // Main entry: AdminLTE v3 + base setup
                 'resources/js/datatables.js',   // DataTables plugin
                 'resources/js/historical-maps/app.js',
+                // CHGIS 地圖 modal（addresses/offices Place Name 連結）
+                'resources/js/chgis-map/app.js',
                 // Inertia + React entry (PoC)
                 'resources/js/inertia/app.tsx',
             ],

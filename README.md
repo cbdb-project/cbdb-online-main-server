@@ -38,6 +38,7 @@
 * [稽核日誌提案](./docs/AUDIT_LOG_PROPOSAL.md)
 * [人物提案流程計畫](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
 * [BiogMain Repository 重構計畫](./docs/BIOGMAIN_REPOSITORY_REFACTOR_PLAN.md)
+* [CHGIS 地圖 Place Name 連結與浮出地圖](./docs/CHGIS_MAP_PLACE_LINK.md)
 * [複合主鍵 URL 設計](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)
 * [資料庫 Schema（MySQL/SQLite）](./docs/DATABASE_SCHEMA.md)
 * [Laravel Query 審查](./docs/LARAVEL_QUERY_REVIEW.md)
@@ -101,6 +102,7 @@ npm install
 ./vendor/bin/php-cs-fixer fix
 ./vendor/bin/phpunit
 npm run build
+php artisan cbdb:fetch-chgis-map
 ```
 
 ### 前端

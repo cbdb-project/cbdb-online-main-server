@@ -43,6 +43,9 @@ Route::get('chgis-map/tiles/{z}/{x}/{y}', 'ChgisMapController@tile')
     ->where(['z' => '[0-9]+', 'x' => '[0-9]+', 'y' => '[0-9]+'])
     ->name('chgis-map.tile');
 Route::get('chgis-map/status', 'ChgisMapController@status')->name('chgis-map.status');
+Route::get('basicinformation/{id}/map-points', 'ChgisMapController@personPoints')
+    ->where('id', '[0-9]+')
+    ->name('basicinformation.map-points');
 
 Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'show' => 'basicinformation.show',

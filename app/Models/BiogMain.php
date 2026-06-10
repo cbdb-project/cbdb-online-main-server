@@ -96,11 +96,11 @@ class BiogMain extends Model {
     }
 
     public function offices() {
-        return $this->belongsToMany('App\Models\OfficeCode', 'POSTED_TO_OFFICE_DATA', 'c_personid', 'c_office_id')->withPivot('c_sequence', 'c_posting_id', 'c_firstyear', 'c_lastyear')->orderBy('c_sequence');
+        return $this->belongsToMany('App\Models\OfficeCode', 'POSTED_TO_OFFICE_DATA', 'c_personid', 'c_office_id')->withPivot('c_office_id', 'c_sequence', 'c_posting_id', 'c_firstyear', 'c_lastyear')->orderBy('c_sequence');
     }
 
     public function offices_addr() {
-        return $this->belongsToMany('App\Models\AddrCode', 'POSTED_TO_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_posting_id')->where('c_office_id', '!=', -1);
+        return $this->belongsToMany('App\Models\AddrCode', 'POSTED_TO_ADDR_DATA', 'c_personid', 'c_addr_id')->withPivot('c_posting_id', 'c_office_id')->wherePivot('c_office_id', '!=', -1);
     }
 
     public function entries() {

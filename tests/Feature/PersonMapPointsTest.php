@@ -110,8 +110,8 @@ class PersonMapPointsTest extends TestCase {
         ]);
 
         DB::table('OFFICE_CODES')->insert([
-            ['c_office_id' => 9001, 'c_office_chn' => '知州'],
-            ['c_office_id' => 9002, 'c_office_chn' => '通判'],
+            ['c_office_id' => 9001, 'c_office_chn' => '知州', 'c_office_trans' => 'Prefect'],
+            ['c_office_id' => 9002, 'c_office_chn' => '通判', 'c_office_trans' => 'Vice Prefect'],
         ]);
 
         DB::table('POSTED_TO_OFFICE_DATA')->insert([
@@ -150,6 +150,18 @@ class PersonMapPointsTest extends TestCase {
         $office = $byKey['office:9001:5001:200'];
         $this->assertSame('office', $office['source']);
         $this->assertSame('知州 · 密州', $office['label']);
+
+        // 每筆帶記錄頁相對 URL（供 popup 開新分頁）與官名中英
+        $this->assertStringStartsWith('/basicinformation/1001/addresses/edit', $addr['url']);
+        $this->assertStringContainsString('c_personid=1001', $addr['url']);
+        $this->assertStringContainsString('c_addr_id=100', $addr['url']);
+        $this->assertStringContainsString('c_addr_type=1', $addr['url']);
+        $this->assertStringContainsString('c_sequence=1', $addr['url']);
+        $this->assertStringStartsWith('/basicinformation/1001/offices/edit', $office['url']);
+        $this->assertStringContainsString('c_office_id=9001', $office['url']);
+        $this->assertStringContainsString('c_posting_id=5001', $office['url']);
+        $this->assertSame('知州', $office['office_name']);
+        $this->assertSame('Prefect', $office['office_name_en']);
     }
 
     public function testEndpointExcludesInvalidCoordinates(): void {
@@ -210,7 +222,7 @@ class PersonMapPointsTest extends TestCase {
         $this->assertNotNull($orphan);
         $this->assertFalse($orphan['linkable']);
         $this->assertNull($orphan['name_chn']);
-        $this->assertSame('', $orphan['label']);
+        $this->assertSame('addr_id:88888', $orphan['label']);
         // 不應出現在地圖點位中
         $points = app(PersonMapPointsService::class)->points(1001);
         $this->assertNotContains(88888, collect($points)->pluck('addr_id')->all());

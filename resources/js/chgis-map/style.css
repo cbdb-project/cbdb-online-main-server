@@ -258,6 +258,28 @@
 .chgis-pop__yr {
     color: #6b7280;
 }
+/* popup 內連結（開新分頁檢視該筆記錄） */
+.chgis-pop__link {
+    color: #2563eb;
+    text-decoration: underline;
+}
+.chgis-pop__link:hover {
+    color: #1d4ed8;
+}
+.chgis-pop__link:focus-visible {
+    color: #1d4ed8;
+    outline: 2px solid #1d4ed8;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+/* 官名英文：較淡較小，避免與中文官名擁擠 */
+.chgis-pop__en {
+    color: #6b7280;
+    font-size: 0.85em;
+    margin-left: 3px;
+    font-weight: 400;
+    white-space: normal;
+}
 
 /* 突出顯示「目前地點」的脈動標記 */
 .chgis-current-marker {

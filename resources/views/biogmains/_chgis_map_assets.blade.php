@@ -40,6 +40,7 @@
                 'year_range' => __('chgis_map.year_range'),
                 'count_unit' => __('chgis_map.count_unit'),
                 'legend_count_hint' => __('chgis_map.legend_count_hint'),
+                'open_record' => __('chgis_map.open_record'),
             ]) !!},
         };
     </script>

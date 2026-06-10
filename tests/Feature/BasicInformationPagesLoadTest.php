@@ -826,6 +826,7 @@ class BasicInformationPagesLoadTest extends TestCase {
         $this->assertStringContainsString('count_unit', $html);
         $this->assertStringContainsString('legend_count_hint', $html);
         $this->assertStringContainsString('unknown_place', $html);
+        $this->assertStringContainsString('open_record', $html);
     }
 
     /**
@@ -899,6 +900,8 @@ class BasicInformationPagesLoadTest extends TestCase {
         $this->assertStringContainsString('Number: entries at this place', $html);
         $this->assertStringContainsString('unknown_place', $html);
         $this->assertStringContainsString('Unknown place', $html);
+        $this->assertStringContainsString('open_record', $html);
+        $this->assertStringContainsString('Open this record in a new tab', $html);
     }
 
     /**

@@ -38,6 +38,12 @@ Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 
+// CHGIS 地圖：底圖圖磚與下載狀態（與地址/官職列表頁同等公開）
+Route::get('chgis-map/tiles/{z}/{x}/{y}', 'ChgisMapController@tile')
+    ->where(['z' => '[0-9]+', 'x' => '[0-9]+', 'y' => '[0-9]+'])
+    ->name('chgis-map.tile');
+Route::get('chgis-map/status', 'ChgisMapController@status')->name('chgis-map.status');
+
 Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'show' => 'basicinformation.show',
     'create' => 'basicinformation.create',

@@ -69,6 +69,11 @@
 - Operations / Restore：
   - [app/Http/Controllers/OperationsController.php](./app/Http/Controllers/OperationsController.php)
   - [app/Repositories/OperationRepository.php](./app/Repositories/OperationRepository.php)
+- CHGIS 地圖（Place Name 連結與浮出地圖）：
+  - [app/Http/Controllers/ChgisMapController.php](./app/Http/Controllers/ChgisMapController.php)（tile/status/personPoints）
+  - [app/Services/PersonMapPointsService.php](./app/Services/PersonMapPointsService.php)、[app/Services/ChgisMapManager.php](./app/Services/ChgisMapManager.php)、[app/Support/CoordinateValidator.php](./app/Support/CoordinateValidator.php)
+  - [resources/js/chgis-map](./resources/js/chgis-map)、[config/chgis_map.php](./config/chgis_map.php)
+  - 底圖 `storage/app/chgis/chgis_map.mbtiles`（不入版控，`php artisan cbdb:fetch-chgis-map` 下載）；設計見 [docs/CHGIS_MAP_PLACE_LINK.md](./docs/CHGIS_MAP_PLACE_LINK.md)
 
 ## 常用命令
 
@@ -81,6 +86,7 @@ npm install
 npm run build
 php artisan cbdb:manage-user
 php artisan cbdb:import-trad-simp-map --truncate
+php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載）
 ```
 
 ## 提交前最低檢查

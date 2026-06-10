@@ -1,10 +1,15 @@
 # CHGIS 地圖：Place Name 可點擊連結與浮出地圖（可行性設計）
 
-> 狀態：設計草案（尚未實作）
+> 狀態：**已實作**（分支 `feature/chgis-map-place-link`，分階段 P1–P7）。本文件為設計與實作對照說明。
 > 範圍：`/basicinformation/{id}/addresses` 與 `/basicinformation/{id}/offices` 兩個列表頁的 **Place Name** 欄位
 > 目標：為「有有效經緯度」的地點加上可點擊連結，點擊後浮出以 `chgis_map.mbtiles` 為底圖的地圖，標出該人物所有有效地點，並突顯當前點。
->
-> **開發方式：本功能請另開新分支進行（例如 `feature/chgis-map-place-link`），不要直接在 `develop` 上開發。**
+
+> **部署注意（lazy 下載）**：`/chgis-map/status` 缺檔時以 `FetchChgisMapJob::dispatchAfterResponse()` 在回應後背景下載。當 `QUEUE_CONNECTION=sync`（預設）時，下載在 web 程序內執行，受 PHP `max_execution_time` 限制——大型底圖可能在下載完成前被中止。**正式環境應以 `php artisan cbdb:fetch-chgis-map`（部署步驟，見 §4.5）預先抓好底圖**，lazy 下載僅為後備；若要倚賴 lazy 下載，請改用常駐 queue worker（database/redis）或確保該路徑的 `max_execution_time` ≥ `chgis_map.source.timeout`。
+
+> **實作備忘（與初版設計的差異）**：
+> - 官職分組鍵改用 `(c_office_id, c_posting_id)` 複合鍵（`c_posting_id` 在 `POSTED_TO_OFFICE_DATA` 非全域唯一），點位 key 為 `office:{office_id}:{posting_id}:{addr_id}`；避免官名張冠李戴與 key 碰撞。
+> - `ChgisMapManager` 下載額外驗證 SQLite 魔術位元組、原子替換含備份還原；lock TTL 嚴格大於下載逾時，狀態含 `started_at` 以 stale 自癒避免永久 `downloading`。
+> - 前端 Leaflet 改為 npm 依賴（非 CDN），當前點用 `divIcon` 脈動、一般點用 `circleMarker`，避開 Vite 下預設 marker 圖檔路徑問題。
 
 ---
 
@@ -131,6 +136,7 @@ return [
     'url' => env('CHGIS_MAP_URL', 'https://huggingface.co/datasets/cbdb/chgis-map/resolve/main/chgis_map.mbtiles'),
     'path' => storage_path('app/chgis/chgis_map.mbtiles'),
     'expected_min_bytes' => 5_000_000, // 體積下限，防半截檔
+    'timeout' => 1800,                  // 下載逾時（秒）；lock TTL = timeout + 600
 ],
 ```
 
@@ -144,7 +150,7 @@ return [
 ### 4.5 取得方式二：接到 `deploy.sh`
 在 `deploy.sh` 快取重建後追加（**非致命**）：
 ```bash
-# 6. 確認 CHGIS 底圖（缺檔則自 HuggingFace 下載；失敗不中斷部署）
+# 5. 確認 CHGIS 底圖（缺檔則自 HuggingFace 下載；失敗不中斷部署）
 echo "檢查 CHGIS 底圖..."
 php artisan cbdb:fetch-chgis-map || echo "警告: CHGIS 底圖下載失敗，地圖功能將於首次存取時重試"
 ```
@@ -213,7 +219,7 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
 ```
 - 重用 `CoordinateValidator`：只回有效點。
 - address 與 office 都查（office 經 `offices_addr`）；同一頁觸發只需該頁資料，但為「顯示此人所有 addresses+offices」需**同時撈兩類**（不論從哪頁點進來）。
-- `key` 設計：addresses 用 `addr:{c_addr_id}:{c_addr_type}:{c_sequence}`；offices 用 `office:{c_posting_id}:{c_addr_id}`。供前端標記「當前點」。
+- `key` 設計：addresses 用 `addr:{c_addr_id}:{c_addr_type}:{c_sequence}`；offices **實作改為三鍵** `office:{c_office_id}:{c_posting_id}:{c_addr_id}`（因 `c_posting_id` 非全域唯一，見頂部「實作備忘」），供前端標記「當前點」。
 - 授權：與列表頁一致（公開可讀則公開；若有登入限制沿用）。
 
 ### 5.3 `serialAddr()` 調整（offices）

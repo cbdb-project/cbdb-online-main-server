@@ -54,6 +54,8 @@
     border-radius: 12px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
     overflow: hidden;
+    /* modal 本身隔離成單一 stacking context，避免 transform 動畫期間與 Leaflet 內層 z-index 互相干擾。 */
+    isolation: isolate;
     transform: translateY(12px) scale(0.98);
     transition: transform 0.18s ease;
 }
@@ -64,6 +66,9 @@
 .chgis-modal__map {
     position: absolute;
     inset: 0;
+    /* 地圖固定在 modal 內最底層，Leaflet 的 marker/popup/control z-index 只能在這一層內排序，
+       不能跨出來蓋住 modal 其他兄弟層。 */
+    z-index: 0;
     background: #e8eef2;
     overscroll-behavior: contain;
 }
@@ -73,7 +78,8 @@
     position: absolute;
     top: 12px;
     right: 12px;
-    z-index: 10;
+    /* 永遠高於 status、legend 與 Leaflet controls，確保任何狀態下都能關閉。 */
+    z-index: 30;
     width: 44px;
     height: 44px;
     border: none;
@@ -99,7 +105,8 @@
 .chgis-modal__status {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    /* 蓋住地圖內容，但保留右上角 close 可操作。 */
+    z-index: 20;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -142,30 +149,39 @@
     left: 12px;
     bottom: 12px;
     z-index: 10;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.92);
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 12px;
-    line-height: 1.7;
+    line-height: 1.45;
+    max-width: min(340px, 80vw); /* 容納最長標籤（Other biographical addresses）單行不溢出 */
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 .chgis-legend__row {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-start; /* 多行文字時與第一行對齊 */
+    gap: 7px;
+    white-space: nowrap; /* 桌機每列單行，圖例隨內容加寬 */
+}
+.chgis-legend__row + .chgis-legend__row {
+    margin-top: 4px;
+}
+.chgis-legend__label {
+    flex: 1 1 auto;
 }
 .chgis-legend__dot {
     display: inline-block;
     flex: 0 0 auto; /* 避免被 flex 壓扁成橢圓 */
-    width: 12px;
-    height: 12px;
+    margin-top: 2px; /* 與文字第一行對齊 */
+    width: 13px;
+    height: 13px;
     border-radius: 50%;
-    border: 2px solid #fff;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28); /* 細深內框，分割色不被白環吃掉 */
 }
 .chgis-legend__badge {
     display: inline-flex;
     flex: 0 0 auto;
+    margin-top: 1px;
     align-items: center;
     justify-content: center;
     min-width: 16px;
@@ -243,13 +259,40 @@
     color: #6b7280;
     margin-bottom: 2px;
 }
+/* 清單項：地址與官職統一樣式，給足行距 + 細分隔線 + hover */
 .chgis-pop__item {
+    display: block;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.5;
+    padding: 5px 6px;
+    border-radius: 4px;
     word-break: break-word;
+}
+.chgis-pop__item + .chgis-pop__item {
+    border-top: 1px solid #eef1f4;
+}
+.chgis-pop__item:hover {
+    background: #f8fafc;
 }
 .chgis-pop__item--current {
     font-weight: 700;
+}
+/* 整列即連結（開新分頁檢視該筆記錄）：整列可點，名稱為連結色 */
+.chgis-pop__item--link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.chgis-pop__item--link .chgis-pop__name {
+    color: #2563eb;
+    text-decoration: underline;
+}
+.chgis-pop__item--link:hover .chgis-pop__name {
+    color: #1d4ed8;
+}
+.chgis-pop__item--link:focus-visible {
+    outline: 2px solid #1d4ed8;
+    outline-offset: -2px;
 }
 .chgis-pop__name {
     color: #111827;
@@ -257,20 +300,6 @@
 .chgis-pop__meta,
 .chgis-pop__yr {
     color: #6b7280;
-}
-/* popup 內連結（開新分頁檢視該筆記錄） */
-.chgis-pop__link {
-    color: #2563eb;
-    text-decoration: underline;
-}
-.chgis-pop__link:hover {
-    color: #1d4ed8;
-}
-.chgis-pop__link:focus-visible {
-    color: #1d4ed8;
-    outline: 2px solid #1d4ed8;
-    outline-offset: 2px;
-    border-radius: 2px;
 }
 /* 官名英文：較淡較小，避免與中文官名擁擠 */
 .chgis-pop__en {
@@ -333,12 +362,15 @@
         max-height: 100dvh;
         border-radius: 0;
     }
-    /* 圖例縮小避免擋住地圖 */
+    /* 圖例：手機放寬上限並允許換行，避免長標籤被擠壓 */
     .chgis-legend {
         font-size: 11px;
-        line-height: 1.5;
+        line-height: 1.4;
         padding: 6px 9px;
-        max-width: 45vw;
+        max-width: 62vw;
+    }
+    .chgis-legend__row {
+        white-space: normal; /* 手機允許標籤換行，縮排對齊由 align-items 處理 */
     }
 }
 

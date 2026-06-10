@@ -34,10 +34,14 @@
     transition: opacity 0.18s ease;
     padding: 16px;
     overscroll-behavior: contain;
-    touch-action: none;
+    /* 關閉時（無 .is-open）不攔截頁面操作；否則透明遮罩會蓋住整頁，需重整才能恢復 */
+    pointer-events: none;
+    touch-action: auto;
 }
 .chgis-modal-overlay.is-open {
     opacity: 1;
+    pointer-events: auto;
+    touch-action: none;
 }
 
 /* 容器：無邊框、圓角、陰影 */

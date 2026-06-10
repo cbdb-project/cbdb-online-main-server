@@ -10,7 +10,7 @@ return [
     // Modal title & legend
     'modal_title' => 'Geographic location',
     'current_location' => 'Current location',
-    'other_addresses' => 'Other addresses',
+    'other_addresses' => 'Other biographical addresses',
     'office_locations' => 'Office locations',
     'fit_all' => 'Show all',
     'close' => 'Close',

@@ -10,7 +10,7 @@ return [
     // Modal 標題與圖例
     'modal_title' => '地理位置',
     'current_location' => '目前地點',
-    'other_addresses' => '其他地址',
+    'other_addresses' => '其他傳記地址',
     'office_locations' => '官職地點',
     'fit_all' => '顯示全部',
     'close' => '關閉',

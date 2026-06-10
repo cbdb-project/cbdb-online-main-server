@@ -27,6 +27,16 @@
               dynastyEnd: null,
           }
         },
+        watch: {
+            // 選項以非同步方式（axios）載入，而 select2 是在 Blade 的 onViteReady
+            // 中先行初始化，此時原生 <select> 通常只有 placeholder。select2 只會在
+            // 每次按鍵時重新查詢目前的 <option>，因此使用者若在資料載入完成前展開並
+            // 輸入關鍵字，會看到「No results / 沒有結果」且不會自動恢復。
+            // 資料載入後重新整理 select2，確保選項與已選值同步。
+            data() {
+                this.$nextTick(() => this.syncSelect2());
+            },
+        },
         computed: {
             displayData() {
                 if (this.model !== 'nianhao' || !Array.isArray(this.data) || this.data.length === 0) {
@@ -69,6 +79,26 @@
             this.readDynastyYears();
         },
         methods: {
+            // 資料載入完成後重新整理 select2，使其反映最新的 <option> 與已選值。
+            // 若 Blade 尚未初始化 select2（無 select2-hidden-accessible），則略過，
+            // 由 Blade 之後初始化時即可帶入完整選項。
+            syncSelect2() {
+                const jq = window.jQuery || window.$;
+                if (!jq || !jq.fn || !jq.fn.select2) return;
+                const $el = jq(this.$el);
+                if (!$el.hasClass('select2-hidden-accessible')) return;
+
+                const wasOpen = $el.select2('isOpen');
+                const val = this.selectedid;
+                $el.select2('destroy').select2();
+                if (val !== undefined && val !== null && val !== '') {
+                    // change.select2 命名空間只通知 select2，避免誤觸表單 dirty 偵測
+                    $el.val(String(val)).trigger('change.select2');
+                }
+                if (wasOpen) {
+                    $el.select2('open');
+                }
+            },
             readDynastyYears() {
                 if (this.model !== 'nianhao') return;
                 const startEl = document.querySelector('.dynasty_start');

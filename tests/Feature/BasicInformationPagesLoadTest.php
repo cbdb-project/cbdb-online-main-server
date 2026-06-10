@@ -284,7 +284,10 @@ class BasicInformationPagesLoadTest extends TestCase {
         // 创建 ADDR_CODES 表（地址代码表）
         Schema::create('ADDR_CODES', function (Blueprint $table) {
             $table->integer('c_addr_id')->primary();
+            $table->string('c_name', 100)->nullable();
             $table->string('c_name_chn', 100)->nullable();
+            $table->double('x_coord')->nullable();
+            $table->double('y_coord')->nullable();
         });
 
         // 创建 BIOG_ADDR_CODES 表（地址类型代码表）
@@ -315,6 +318,8 @@ class BasicInformationPagesLoadTest extends TestCase {
         Schema::create('OFFICE_CODES', function (Blueprint $table) {
             $table->integer('c_office_id')->primary();
             $table->string('c_office_chn', 200)->nullable();
+            $table->string('c_office_pinyin', 200)->nullable();
+            $table->string('c_office_trans', 200)->nullable();
         });
 
         // 创建 ASSOC_CODES 表（社会关系代码表）
@@ -406,8 +411,10 @@ class BasicInformationPagesLoadTest extends TestCase {
         ]);
 
         \DB::table('ADDR_CODES')->insert([
-            'c_addr_id' => 1,
-            'c_name_chn' => '测试地址',
+            // addr 1：有效座標（落在 CHGIS sane_bounds 內）→ 應渲染為地圖連結
+            ['c_addr_id' => 1, 'c_name_chn' => '测试地址', 'c_name' => 'Test Addr', 'x_coord' => 114.3, 'y_coord' => 34.8],
+            // addr 2：官职地点，有效座標
+            ['c_addr_id' => 2, 'c_name_chn' => '官职地点', 'c_name' => 'Office Place', 'x_coord' => 119.4, 'y_coord' => 36.7],
         ]);
 
         \DB::table('BIOG_ADDR_CODES')->insert([
@@ -525,6 +532,14 @@ class BasicInformationPagesLoadTest extends TestCase {
             'c_sequence' => 1,
             'c_firstyear' => 1000,
             'c_lastyear' => 1010,
+        ]);
+
+        // 4b. 官职地点关联（CHGIS 地图：posting 1 → addr 2，有效座標）
+        \DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_posting_id' => 1,
+            'c_office_id' => 1,
+            'c_addr_id' => 2,
         ]);
 
         // 5. 社会关系数据 (assoc)
@@ -715,6 +730,46 @@ class BasicInformationPagesLoadTest extends TestCase {
     public function test_basicinformation_addresses_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/addresses");
         $response->assertStatus(200);
+
+        // CHGIS：有效座標的地址 Place Name 渲染為可點擊連結
+        $html = $response->getContent();
+        $this->assertStringContainsString('class="chgis-place-link"', $html);
+        $this->assertStringContainsString('data-key="addr:1:1:1"', $html);
+        $this->assertStringContainsString('data-lon="114.3"', $html);
+    }
+
+    /**
+     * 測試地址子頁面：孤兒地址與危險字元名稱不應導致 500 或 XSS
+     */
+    #[Test]
+    public function test_basicinformation_addresses_index_handles_orphan_and_escapes_place_name() {
+        \DB::table('ADDR_CODES')->insert([
+            'c_addr_id' => 3,
+            'c_name_chn' => '<script>alert("xss")</script>',
+            'c_name' => 'Escaped Addr',
+            'x_coord' => 116.3,
+            'y_coord' => 39.9,
+        ]);
+        \DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_addr_id' => 3,
+            'c_addr_type' => 1,
+            'c_sequence' => 2,
+        ]);
+        \DB::table('BIOG_ADDR_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_addr_id' => 999,
+            'c_addr_type' => 1,
+            'c_sequence' => 3,
+        ]);
+
+        $response = $this->get("/basicinformation/{$this->testPersonId}/addresses");
+        $response->assertStatus(200);
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;', $html);
+        $this->assertStringNotContainsString('<script>alert("xss")</script>', $html);
+        $this->assertStringContainsString('#999', $html);
     }
 
     /**
@@ -757,6 +812,78 @@ class BasicInformationPagesLoadTest extends TestCase {
     public function test_basicinformation_offices_index_loads() {
         $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
         $response->assertStatus(200);
+
+        // CHGIS：有效座標的官职地点 Place Name 渲染為可點擊連結，key 含 office_id
+        $html = $response->getContent();
+        $this->assertStringContainsString('class="chgis-place-link"', $html);
+        $this->assertStringContainsString('data-key="office:1:1:2"', $html);
+    }
+
+    /**
+     * 測試官職子頁面：多地點應使用 i18n 分隔符，且 Place Name 連結 key 含 office_id
+     */
+    #[Test]
+    public function test_basicinformation_offices_index_uses_localized_separator_for_multiple_places() {
+        \DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_posting_id' => 1,
+            'c_office_id' => 1,
+            'c_addr_id' => 1,
+        ]);
+
+        $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
+        $response->assertStatus(200);
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('data-key="office:1:1:1"', $html);
+        $this->assertStringContainsString('data-key="office:1:1:2"', $html);
+        $this->assertStringContainsString('；', $html);
+    }
+
+    /**
+     * 测试社会关系子页面：/basicinformation/{id}/assoc
+     */
+    /**
+     * 測試官職子頁面：Place Name 連結不應帶 href，且危險字元名稱需正確跳脫
+     */
+    #[Test]
+    public function test_basicinformation_offices_index_escapes_place_name_without_href_hash() {
+        \DB::table('ADDR_CODES')->where('c_addr_id', 2)->update([
+            'c_name_chn' => '<script>alert("office-xss")</script>',
+            'c_name' => 'Office Escaped Addr',
+        ]);
+
+        $response = $this->get("/basicinformation/{$this->testPersonId}/offices");
+        $response->assertStatus(200);
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('&lt;script&gt;alert(&quot;office-xss&quot;)&lt;/script&gt;', $html);
+        $this->assertStringNotContainsString('<script>alert("office-xss")</script>', $html);
+
+        preg_match('/<a class="chgis-place-link"[^>]*>/', $html, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertStringNotContainsString('href=', $matches[0]);
+    }
+
+    /**
+     * 測試官職子頁面：英文語系下多地點分隔符應為 "; "
+     */
+    #[Test]
+    public function test_basicinformation_offices_index_uses_english_separator_when_locale_is_en() {
+        \DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => $this->testPersonId,
+            'c_posting_id' => 1,
+            'c_office_id' => 1,
+            'c_addr_id' => 1,
+        ]);
+
+        $response = $this->withSession(['locale' => 'en'])
+            ->get("/basicinformation/{$this->testPersonId}/offices");
+        $response->assertStatus(200);
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('; ', $html);
+        $this->assertStringContainsString('View on map', $html);
     }
 
     /**

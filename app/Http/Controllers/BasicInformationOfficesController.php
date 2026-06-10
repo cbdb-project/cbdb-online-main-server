@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\PersonMapPointsService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -39,11 +40,14 @@ class BasicInformationOfficesController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index($id) {
+    public function index(PersonMapPointsService $mapPoints, $id) {
         $biogbasicinformation = $this->biogMainRepository->byIdWithOff($id);
         //        dd($biogbasicinformation->offices_addr->toArray());
 
-        $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray());
+        $serialAddr = $this->serialAddr($biogbasicinformation->offices_addr->toArray(), $mapPoints);
+
+        // CHGIS 地圖：依 (c_office_id, c_posting_id) 分組的官職地點，含可連結狀態
+        $officePlaces = $mapPoints->officePlacesByPosting($id);
 
         // 處理 basicinformation 可能為 null 或缺少字段的情況
         $personLabel = $id;
@@ -64,7 +68,7 @@ class BasicInformationOfficesController extends Controller {
         }
 
         //        dd($serialAddr);
-        return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr,
+        return view('biogmains.offices.index', ['basicinformation' => $biogbasicinformation, 'post2addr' => $serialAddr, 'officePlaces' => $officePlaces,
             'page_title' => __('person.tab_postings'), 'page_description' => __('person.person_records') . ' – ' . __('person.tab_postings'), 'breadcrumb_home' => __('person.person_records'),
             'breadcrumbs' => [
                 ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
@@ -422,15 +426,28 @@ class BasicInformationOfficesController extends Controller {
      * @param array $array
      * @return null
      */
-    protected function serialAddr(array $array) {
+    protected function serialAddr(array $array, PersonMapPointsService $mapPoints) {
         $res = [];
         //        dd($array);
         foreach ($array as $item) {
-            $postingId = $item['pivot']['c_posting_id'];
-            if (Arr::has($res, $postingId)) {
-                $res[$postingId] = $res[$postingId].';'.$item['c_name_chn'];
+            $groupKey = $mapPoints->postingKey(
+                $item['pivot']['c_office_id'] ?? null,
+                $item['pivot']['c_posting_id'] ?? null
+            );
+            $placeName = $item['c_name_chn'] ?? null;
+
+            if ($placeName === null || $placeName === '') {
+                $placeName = $item['c_name'] ?? null;
+            }
+
+            if ($placeName === null || $placeName === '') {
+                continue;
+            }
+
+            if (Arr::has($res, $groupKey)) {
+                $res[$groupKey][] = $placeName;
             } else {
-                $res[$postingId] = $item['c_name_chn'];
+                $res[$groupKey] = [$placeName];
             }
         }
 

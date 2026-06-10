@@ -216,6 +216,19 @@ class PersonMapPointsTest extends TestCase {
         $this->assertNotContains(88888, collect($points)->pluck('addr_id')->all());
     }
 
+    public function testAddressLabelFallsBackFromEmptyChineseToEnglish(): void {
+        DB::table('ADDR_CODES')->where('c_addr_id', 100)->update([
+            'c_name_chn' => '',
+            'c_name' => 'Kaifeng',
+        ]);
+
+        $entry = collect(app(PersonMapPointsService::class)->addressEntries(1001))
+            ->firstWhere('addr_id', 100);
+
+        $this->assertNotNull($entry);
+        $this->assertSame('Kaifeng', $entry['label']);
+    }
+
     public function testOfficeIdMinusOnePlaceholderIsExcluded(): void {
         // c_office_id = -1 為「無地點」佔位，應被 offices_addr 關聯排除
         DB::table('POSTED_TO_ADDR_DATA')->insert([

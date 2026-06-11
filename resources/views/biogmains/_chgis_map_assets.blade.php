@@ -12,6 +12,13 @@
         ['{z}', '{x}', '{y}'],
         route('chgis-map.tile', ['z' => '__Z__', 'x' => '__X__', 'y' => '__Y__'], false)
     );
+
+    // 加底圖版本號做 cache-busting：以 mbtiles mtime 當版本（與 tile ETag 同源）。
+    // 底圖更新後版本號改變 → tile URL 改變（全新快取鍵），繞過瀏覽器既有的舊磚快取，
+    // 立即取得新磚；no-cache 僅能擋未來快取，無法淘汰使用者已存的舊磚，故另以 URL 版本根治。
+    $chgisManager = app(\App\Services\ChgisMapManager::class);
+    $chgisTileVersion = $chgisManager->isReady() ? (@filemtime($chgisManager->path()) ?: 0) : 0;
+    $chgisTileTemplate .= '?v=' . $chgisTileVersion;
 @endphp
 @push('scripts')
     <script>

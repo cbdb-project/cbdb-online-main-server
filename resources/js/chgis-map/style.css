@@ -73,6 +73,12 @@
     overscroll-behavior: contain;
 }
 
+/* Attribution bar：避免被 modal border-radius 裁切 */
+.chgis-modal__map .leaflet-control-attribution {
+    margin-bottom: 4px;
+    margin-right: 4px;
+}
+
 /* 關閉鈕：右上角浮動半透明圓形，命中區 >= 44px */
 .chgis-modal__close {
     position: absolute;

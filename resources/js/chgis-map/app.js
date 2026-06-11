@@ -387,7 +387,7 @@ function startMap(token, personId, currentKey, lon, lat) {
     cleanupMap();
     mapInstance = L.map(mapEl, {
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
         minZoom: c.minZoom || 3,
         maxZoom: 10,
     });
@@ -398,6 +398,10 @@ function startMap(token, personId, currentKey, lon, lat) {
         maxNativeZoom: c.maxZoom || 8,
         noWrap: true,
         bounds: boundsToLatLng(bounds),
+        attribution:
+            '<a href="https://chgis.fas.harvard.edu/data/chgis/v6/" target="_blank" rel="noopener noreferrer">CHGIS v6</a>' +
+            ' © Harvard &amp; Fudan | Rivers &amp; coastlines: 1820 data |' +
+            ' <a href="https://huggingface.co/datasets/cbdb/chgis-map" target="_blank" rel="noopener noreferrer">Map data</a>',
     }).addTo(mapInstance);
 
     const fallbackCenter = isFinite(lon) && isFinite(lat) ? [lat, lon] : [35, 110];

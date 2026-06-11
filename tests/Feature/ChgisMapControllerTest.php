@@ -92,6 +92,21 @@ class ChgisMapControllerTest extends TestCase {
         ]);
     }
 
+    /**
+     * 於既有 mbtiles 追加一塊圖磚（tile_row 直接以 TMS 列號寫入）。
+     */
+    private function insertTile(int $z, int $col, int $row, string $data): void {
+        $pdo = new PDO('sqlite:' . $this->path);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $stmt = $pdo->prepare('INSERT INTO tiles(zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?)');
+        $stmt->bindValue(1, $z, PDO::PARAM_INT);
+        $stmt->bindValue(2, $col, PDO::PARAM_INT);
+        $stmt->bindValue(3, $row, PDO::PARAM_INT);
+        $stmt->bindValue(4, $data, PDO::PARAM_LOB);
+        $stmt->execute();
+        $pdo = null;
+    }
+
     // ---- tile ----
 
     public function testTileHitUsesCorrectTmsFlip(): void {
@@ -136,6 +151,90 @@ class ChgisMapControllerTest extends TestCase {
         $second->assertOk();
 
         $this->assertNotSame($firstEtag, $second->headers->get('ETag'));
+    }
+
+    public function testTileSendsRevalidatingCacheControl(): void {
+        $this->makeDirectionalFixture();
+
+        $response = $this->get('/chgis-map/tiles/3/6/1');
+
+        $response->assertOk();
+        // 必須每次帶 ETag 重新驗證（no-cache）；不可有長 fresh 期，
+        // 否則底圖更新後瀏覽器於 fresh 期內不驗證，會繼續顯示舊磚（舊河流色）。
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $this->assertStringContainsString('no-cache', $cacheControl);
+        $this->assertStringNotContainsString('max-age', $cacheControl);
+    }
+
+    public function testTransparentTileSendsRevalidatingCacheControl(): void {
+        $this->makeDirectionalFixture();
+
+        // miss → 透明磚
+        $response = $this->get('/chgis-map/tiles/3/0/0');
+
+        $response->assertOk();
+        $this->assertLessThan(200, strlen($response->getContent()));
+        // 透明磚同樣需 no-cache：避免該格由「透明」轉為「底圖已覆蓋」後仍顯示快取空白磚。
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $this->assertStringContainsString('no-cache', $cacheControl);
+        $this->assertStringNotContainsString('max-age', $cacheControl);
+    }
+
+    public function testTransparentTileSupportsNotModified(): void {
+        $this->makeDirectionalFixture();
+
+        $first = $this->get('/chgis-map/tiles/3/0/0');
+        $first->assertOk();
+        $etag = $first->headers->get('ETag');
+
+        $this->assertNotNull($etag);
+
+        $this->withHeader('If-None-Match', $etag)
+            ->get('/chgis-map/tiles/3/0/0')
+            ->assertStatus(304);
+    }
+
+    public function testTransparentTileEtagChangesWhenMbtilesFileMtimeChanges(): void {
+        $this->makeDirectionalFixture();
+
+        $first = $this->get('/chgis-map/tiles/3/0/0');
+        $first->assertOk();
+        $firstEtag = $first->headers->get('ETag');
+
+        clearstatcache(true, $this->path);
+        touch($this->path, filemtime($this->path) + 2);
+        clearstatcache(true, $this->path);
+
+        $second = $this->get('/chgis-map/tiles/3/0/0');
+        $second->assertOk();
+
+        $this->assertNotSame($firstEtag, $second->headers->get('ETag'));
+    }
+
+    public function testTransparentTileBecomingRealReturns200NotStale304(): void {
+        // 本次修復的核心情境：某格先是 miss（透明磚），底圖更新後該格已有實磚，
+        // 帶舊透明磚 ETag 重抓時必須回 200＋實磚內容，而非沿用快取的 304 空白磚。
+        $this->makeDirectionalFixture();
+
+        // 先 miss → 透明磚，取得其 ETag（XYZ 3/0/0 未在 fixture 中）
+        $first = $this->get('/chgis-map/tiles/3/0/0');
+        $first->assertOk();
+        $this->assertLessThan(200, strlen($first->getContent()));
+        $transparentEtag = $first->headers->get('ETag');
+        $this->assertNotNull($transparentEtag);
+
+        // 底圖更新：於該 z/x/y 寫入實磚（XYZ 3/0/0 → TMS row = 2^3-1-0 = 7）並推進 mtime
+        $realTile = "\x89PNG\r\n\x1a\nREAL-TILE-AT-3-0-0";
+        $this->insertTile(3, 0, 7, $realTile);
+        clearstatcache(true, $this->path);
+        touch($this->path, filemtime($this->path) + 2);
+        clearstatcache(true, $this->path);
+
+        // 帶舊透明磚 ETag 重抓 → 必須 200＋實磚內容，不可回 304
+        $second = $this->withHeader('If-None-Match', $transparentEtag)
+            ->get('/chgis-map/tiles/3/0/0');
+        $second->assertOk();
+        $this->assertSame($realTile, $second->getContent());
     }
 
     public function testTileFlipDirectionIsConsistent(): void {

@@ -37,7 +37,7 @@ class ChgisMapController extends Controller {
 
         // 超出原生 zoom 或座標範圍 → 回透明磚（前端 overzoom 時亦安全）
         if ($z < $minZoom || $z > $maxZoom || !$this->withinTileRange($z, $x, $y)) {
-            return $this->transparentTile();
+            return $this->transparentTile($request, $z, $x, $y);
         }
 
         try {
@@ -46,19 +46,22 @@ class ChgisMapController extends Controller {
             // 底圖暫時不可用（如下載 rename 競態）時降級為透明磚，避免 Leaflet 整面報錯
             Log::warning('CHGIS 圖磚讀取失敗：' . $e->getMessage());
 
-            return $this->transparentTile();
+            return $this->transparentTile($request, $z, $x, $y);
         }
 
         if ($data === null) {
-            return $this->transparentTile();
+            return $this->transparentTile($request, $z, $x, $y);
         }
 
         // ETag 納入底圖檔 mtime，底圖更新後同 z/x/y 也會失效，避免回舊磚
         $version = @filemtime($this->manager->path()) ?: 0;
 
+        // no-cache：瀏覽器仍快取磚體，但每次都帶 ETag 回來驗證；
+        // 底圖未變回 304（省頻寬），底圖更新（mtime 變→ETag 變）即拉新磚。
+        // 不可用長 max-age，否則 fresh 期內瀏覽器不驗證，會繼續用舊磚（造成換底圖後仍見舊河流色）。
         $response = response($data, 200)
             ->header('Content-Type', 'image/png')
-            ->header('Cache-Control', 'public, max-age=2592000')
+            ->header('Cache-Control', 'public, no-cache')
             ->setEtag(md5($z . '/' . $x . '/' . $y . '/' . $version))
             ->setLastModified((new \DateTimeImmutable())->setTimestamp($version));
 
@@ -132,10 +135,22 @@ class ChgisMapController extends Controller {
     /**
      * 回傳 1×1 透明 PNG。
      */
-    private function transparentTile(): Response {
-        return response(base64_decode(self::TRANSPARENT_PNG), 200)
+    private function transparentTile(Request $request, int $z, int $x, int $y): Response {
+        // tile() 已於未就緒時 abort(503)，故此處 isReady() 目前恆為真；
+        // 三元僅為防禦性，讓本方法在未來被其他入口重用時仍安全（不對缺檔 filemtime）。
+        $version = $this->manager->isReady() ? (@filemtime($this->manager->path()) ?: 0) : 0;
+
+        // 同樣用 no-cache：避免某 z/x/y 由「超出範圍→透明磚」轉為「底圖已覆蓋」後，
+        // 瀏覽器仍沿用快取的空白磚。透明磚也提供 ETag/304，避免每次都重送 200。
+        $response = response(base64_decode(self::TRANSPARENT_PNG), 200)
             ->header('Content-Type', 'image/png')
-            ->header('Cache-Control', 'public, max-age=86400');
+            ->header('Cache-Control', 'public, no-cache')
+            ->setEtag(md5('transparent/' . $z . '/' . $x . '/' . $y . '/' . $version))
+            ->setLastModified((new \DateTimeImmutable())->setTimestamp($version));
+
+        $response->isNotModified($request);
+
+        return $response;
     }
 
     /**

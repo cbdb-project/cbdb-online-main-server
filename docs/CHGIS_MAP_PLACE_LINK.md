@@ -194,10 +194,21 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
 - 開啟 `storage/app/chgis/chgis_map.mbtiles`（唯讀 SQLite，PDO/`new \PDO('sqlite:...')`，獨立連線，**不**走預設 DB 連線）。
 - MBTiles 為 TMS：`tms_y = (2 ** $z) - 1 - $y`。
 - `SELECT tile_data FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?`。
-- 命中 → `Response(png, 200)`，帶 `Content-Type: image/png`、`Cache-Control: public, max-age=...`、`ETag`。
-- 未命中 → 回 1×1 透明 PNG（`204` 會讓 Leaflet 報錯，回透明 PNG 較穩）。
+- 命中 → `Response(png, 200)`，帶 `Content-Type: image/png`、`Cache-Control: public, no-cache`、`ETag`（含底圖 mtime）；隨即 `isNotModified()` 支援 `304`。
+- 未命中／超出範圍／讀取例外 → 回 1×1 透明 PNG（`204` 會讓 Leaflet 報錯，回透明 PNG 較穩）。透明磚同樣帶 `no-cache` + ETag（ETag 以 `transparent/` 前綴，避免與實磚在同 z/x/y、同 mtime 下誤撞 `304`），確保某格由「透明」轉為「底圖已覆蓋」後不會續用快取空白磚。
 - 檔案不存在 → `503`（前端已先查 status，理論上不會走到）。
 - 連線快取：以 singleton/靜態持有 PDO，避免每磚重開檔。
+
+#### 5.2.1 底圖更新後的快取失效策略（兩段式）
+
+底圖（`chgis_map.mbtiles`）更換後，必須讓使用者立即看到新磚而非舊磚。採**兩段式互補**設計，缺一不可：
+
+| 機制 | 位置 | 解決情境 |
+|------|------|----------|
+| **URL 版本號 `?v=<mbtiles mtime>`** | `_chgis_map_assets.blade.php`（注入 `tileUrlTemplate`） | **新開頁面／重新整理**：底圖更新→mtime 變→tile URL 變→全新快取鍵，瀏覽器既有舊磚快取自動失效。這是淘汰「已用舊 `max-age` 快取之舊磚」的主力。 |
+| **`Cache-Control: public, no-cache` + ETag** | `ChgisMapController::tile()` / `transparentTile()` | **已開著未關的分頁**：Leaflet 已用舊 `?v` 初始化，使用者不重整、僅平移/縮放時，no-cache 令這些請求帶 ETag 回源驗證→ETag 因 mtime 改變而失效→自動換新磚，免重整。 |
+
+> ⚠️ **不可改回長 `max-age`**：歷史上 tile 曾用 `max-age=2592000`（30 天），導致換底圖後瀏覽器於 fresh 期內不驗證、持續顯示舊磚（且因各 zoom 的磚被快取時間不同，呈現「只有某些 zoom 是舊色」的詭異現象）。`?v=` 雖能讓**新頁面**繞過，但長 `max-age` 會讓**已開分頁**把舊 `?v` 的磚硬快取到過期，故仍保留 `no-cache` 負責分頁自癒。兩者同源（皆用 mbtiles mtime），正常「換檔覆蓋」更新即同時生效。
 
 **`status()`** — 見 §4.6。
 
@@ -264,7 +275,7 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
 - 開啟時鎖 `body` 捲動（`overflow:hidden`）。
 
 ### 6.4 地圖內容
-- 底圖：`L.tileLayer('/chgis-map/tiles/{z}/{x}/{y}', { minZoom:3, maxZoom:10, maxNativeZoom:8, bounds: <mbtiles bounds>, noWrap:true })`（允許 overzoom 到 10，原生最大 8）。
+- 底圖：`L.tileLayer('/chgis-map/tiles/{z}/{x}/{y}?v=<mbtiles mtime>', { minZoom:3, maxZoom:10, maxNativeZoom:8, bounds: <mbtiles bounds>, noWrap:true })`（允許 overzoom 到 10，原生最大 8）。URL 末端的 `?v=` 版本號由 blade 注入做 cache-busting，見 §5.2.1。
 - 開啟後 `fetch(/basicinformation/{id}/map-points)` 取全部有效點。
 - **一般點**：標準 marker / circleMarker。
 - **當前點**（`data-key` 對應者）：特殊標記（較大、主題色、可加脈動光暈），`map.setView([lat,lon], zoom)` 置中。

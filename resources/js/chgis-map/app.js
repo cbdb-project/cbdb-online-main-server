@@ -392,6 +392,10 @@ function startMap(token, personId, currentKey, lon, lat) {
         maxZoom: 10,
     });
 
+    mapInstance.attributionControl.setPrefix(
+        '<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>'
+    );
+
     L.tileLayer(c.tileUrlTemplate, {
         minZoom: c.minZoom || 3,
         maxZoom: 10,

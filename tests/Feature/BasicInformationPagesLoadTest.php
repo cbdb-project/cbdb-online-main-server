@@ -822,7 +822,13 @@ class BasicInformationPagesLoadTest extends TestCase {
         // CHGIS：前端設定與資源已注入，且 tile URL 為相對路徑（JSON 中 / 轉義為 \/）
         $this->assertStringContainsString('window.chgisMapConfig', $html);
         $this->assertStringContainsString('tileUrlTemplate', $html);
-        $this->assertStringContainsString('\\/chgis-map\\/tiles\\/{z}\\/{x}\\/{y}', $html);
+        // tile 模板須帶 ?v= 底圖版本號做 cache-busting，版本來源需與 Blade 相同。
+        $chgisManager = app(\App\Services\ChgisMapManager::class);
+        $chgisTileVersion = $chgisManager->isReady() ? (@filemtime($chgisManager->path()) ?: 0) : 0;
+        $this->assertStringContainsString(
+            '\\/chgis-map\\/tiles\\/{z}\\/{x}\\/{y}?v=' . $chgisTileVersion,
+            $html
+        );
         $this->assertStringContainsString('count_unit', $html);
         $this->assertStringContainsString('legend_count_hint', $html);
         $this->assertStringContainsString('unknown_place', $html);

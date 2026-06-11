@@ -93,13 +93,36 @@ class FetchChgisMapTest extends TestCase {
         @mkdir($this->dir, 0775, true);
         file_put_contents($this->path, $this->fakeMbtiles());
 
-        Http::fake();
+        $etag = '"test-etag-v1"';
+        file_put_contents($this->dir . '/chgis_map.version', $etag);
+
+        Http::fake(['*' => Http::response('', 200, ['ETag' => $etag])]);
 
         $this->artisan('cbdb:fetch-chgis-map')
-            ->expectsOutputToContain('已存在')
+            ->expectsOutputToContain('已是最新')
             ->assertExitCode(0);
 
-        Http::assertNothingSent();
+        // 只有一次 HEAD（版本比對），沒有 GET 下載
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($req) => $req->method() === 'HEAD');
+    }
+
+    public function testDetectsUpdateAndRedownloads(): void {
+        @mkdir($this->dir, 0775, true);
+        file_put_contents($this->path, $this->fakeMbtiles(64));
+        file_put_contents($this->dir . '/chgis_map.version', '"old-etag"');
+
+        $newBody = $this->fakeMbtiles(128);
+        $newEtag = '"new-etag-v2"';
+
+        Http::fake(['*' => Http::response($newBody, 200, ['ETag' => $newEtag])]);
+
+        $this->artisan('cbdb:fetch-chgis-map')
+            ->expectsOutputToContain('新版本')
+            ->assertExitCode(0);
+
+        $this->assertSame($newBody, file_get_contents($this->path));
+        $this->assertSame($newEtag, file_get_contents($this->dir . '/chgis_map.version'));
     }
 
     public function testRedownloadsWhenExistingFileIsCorrupt(): void {

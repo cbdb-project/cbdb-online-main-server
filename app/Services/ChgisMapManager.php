@@ -21,6 +21,11 @@ class ChgisMapManager {
         return (string) config('chgis_map.source.path');
     }
 
+    /** 本地版本標記檔絕對路徑（存放上次下載時的遠端 ETag）。 */
+    public function versionPath(): string {
+        return dirname($this->path()) . '/chgis_map.version';
+    }
+
     /** 下載來源 URL（HuggingFace resolve raw）。 */
     public function sourceUrl(): string {
         return (string) config('chgis_map.source.url');
@@ -29,6 +34,61 @@ class ChgisMapManager {
     /** 視為有效檔案的體積下限（位元組）。 */
     public function expectedMinBytes(): int {
         return (int) config('chgis_map.source.expected_min_bytes', 5_000_000);
+    }
+
+    /**
+     * 取得遠端檔案的 ETag（透過 HTTP HEAD，自動追蹤 redirect）。
+     *
+     * 無法取得（網路錯誤、非 2xx）時回 null，呼叫端視為「無法判斷版本」。
+     */
+    public function getRemoteEtag(): ?string {
+        try {
+            $response = Http::timeout(30)
+                ->connectTimeout(10)
+                ->withOptions([
+                    'allow_redirects' => [
+                        'max' => 10,
+                        'strict' => false,
+                        'referer' => false,
+                        'protocols' => ['http', 'https'],
+                    ],
+                ])
+                ->head($this->sourceUrl());
+
+            if ($response->successful()) {
+                $etag = $response->header('ETag');
+
+                return ($etag !== '' && $etag !== null) ? $etag : null;
+            }
+        } catch (\Throwable) {
+            // 網路錯誤：無法判斷版本，回 null
+        }
+
+        return null;
+    }
+
+    /**
+     * 讀取本地版本標記（上次下載時儲存的 ETag），無記錄時回 null。
+     */
+    public function getLocalEtag(): ?string {
+        $path = $this->versionPath();
+        if (!is_file($path)) {
+            return null;
+        }
+        $content = trim((string) file_get_contents($path));
+
+        return $content !== '' ? $content : null;
+    }
+
+    /**
+     * 將 ETag 寫入版本標記檔，供下次啟動比對。
+     */
+    public function saveEtag(string $etag): void {
+        $dir = dirname($this->versionPath());
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+        file_put_contents($this->versionPath(), $etag);
     }
 
     /**
@@ -55,9 +115,11 @@ class ChgisMapManager {
      * 注意：本方法非並發安全——唯一 .part 命名可避免並發互相寫壞同一暫存檔，
      * 但仍可能重複下載。需要互斥時請由呼叫端加鎖（見 docs §4.6 P3）。
      *
+     * @return ?string 下載成功後回傳 ETag（若伺服器有回傳），否則 null
+     *
      * @throws RuntimeException 下載失敗或檔案不完整／格式不符時
      */
-    public function download(): void {
+    public function download(): ?string {
         $path = $this->path();
         $dir = dirname($path);
 
@@ -67,6 +129,8 @@ class ChgisMapManager {
 
         // 唯一暫存檔名，避免並發下載互相覆寫造成交錯壞檔。
         $partPath = $path . '.part.' . getmypid() . '.' . bin2hex(random_bytes(4));
+
+        $capturedEtag = null;
 
         try {
             try {
@@ -81,6 +145,10 @@ class ChgisMapManager {
             if (!$response->successful()) {
                 throw new RuntimeException('CHGIS 底圖下載失敗，HTTP 狀態碼：' . $response->status());
             }
+
+            // 從下載回應直接取 ETag，避免事後補一次 HEAD 造成版本不一致。
+            $etagHeader = $response->header('ETag');
+            $capturedEtag = ($etagHeader !== '' && $etagHeader !== null) ? $etagHeader : null;
 
             clearstatcache(true, $partPath);
             $size = is_file($partPath) ? filesize($partPath) : 0;
@@ -130,6 +198,8 @@ class ChgisMapManager {
                 @unlink($partPath);
             }
         }
+
+        return $capturedEtag;
     }
 
     /**

@@ -368,15 +368,41 @@
         max-height: 100dvh;
         border-radius: 0;
     }
-    /* 圖例：手機放寬上限並允許換行，避免長標籤被擠壓 */
+
+    /* 關閉鈕避開瀏海／圓角螢幕的安全區 */
+    .chgis-modal__close {
+        top: calc(12px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
+    }
+
+    /* Attribution（資訊欄）：縮小字級、貼齊底部安全區，固定為畫面最底一條，
+       讓圖例可疊放在它「之上」而非與它層疊。 */
+    .chgis-modal__map .leaflet-control-attribution {
+        margin: 0;
+        max-width: 100%;
+        font-size: 10px;
+        line-height: 1.3;
+        padding: 2px 6px;
+        padding-right: calc(6px + env(safe-area-inset-right));
+        padding-bottom: calc(2px + env(safe-area-inset-bottom));
+        padding-left: calc(6px + env(safe-area-inset-left));
+    }
+
+    /* 圖例：
+       - width:max-content 定寬，杜絕被 Leaflet 0 寬容器壓成「一字一行」直排；
+       - 避開左／下安全區；
+       - 抬到 attribution 之上（多讓 ~34px ≈ 兩行 attribution 高），避免與資訊欄層疊。 */
     .chgis-legend {
         font-size: 11px;
         line-height: 1.4;
         padding: 6px 9px;
-        max-width: 62vw;
+        width: max-content;
+        max-width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+        left: calc(12px + env(safe-area-inset-left));
+        bottom: calc(12px + env(safe-area-inset-bottom) + 34px);
     }
     .chgis-legend__row {
-        white-space: normal; /* 手機允許標籤換行，縮排對齊由 align-items 處理 */
+        white-space: normal; /* 標籤過長時仍可換行；有 max-content 兜底不會被壓成直排 */
     }
 }
 

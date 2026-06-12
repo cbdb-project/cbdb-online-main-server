@@ -383,6 +383,8 @@ function startMap(token, personId, currentKey, lon, lat) {
     const mapEl = overlayEl.querySelector('.chgis-modal__map');
     const c = cfg();
     const bounds = c.bounds || {};
+    // 顯示範圍（限制平移／縮放，不露出底圖內容外的純黑／純白）；缺設定時退回 tile bounds。
+    const displayLatLng = boundsToLatLng(c.displayBounds || bounds);
 
     cleanupMap();
     mapInstance = L.map(mapEl, {
@@ -390,6 +392,9 @@ function startMap(token, personId, currentKey, lon, lat) {
         attributionControl: true,
         minZoom: c.minZoom || 3,
         maxZoom: 10,
+        // 硬邊界：平移到界即回彈（maxBounds 延到 invalidateSize 後再設，
+        // 避免在 modal 進場、容器尺寸仍為 0 時夾擠出壞狀態導致底圖不顯示）。
+        maxBoundsViscosity: 1.0,
     });
 
     mapInstance.attributionControl.setPrefix(
@@ -401,7 +406,7 @@ function startMap(token, personId, currentKey, lon, lat) {
         maxZoom: 10,
         maxNativeZoom: c.maxZoom || 8,
         noWrap: true,
-        bounds: boundsToLatLng(bounds),
+        bounds: displayLatLng || boundsToLatLng(bounds),
         attribution:
             '<a href="https://chgis.fas.harvard.edu/data/chgis/v6/" target="_blank" rel="noopener noreferrer">CHGIS v6</a>' +
             ' © Harvard &amp; Fudan | Rivers &amp; coastlines: 1820 data |' +
@@ -445,6 +450,20 @@ function invalidateAfterTransition() {
         }
         done = true;
         mapInstance.invalidateSize({ animate: false });
+        // 容器有真實尺寸後才設 maxBounds 與最小 zoom（在 0×0 時設會夾擠出壞狀態、底圖不顯示）。
+        const disp = boundsToLatLng(cfg().displayBounds);
+        if (disp) {
+            const dispBounds = L.latLngBounds(disp);
+            // 最小 zoom = 「內容框剛好蓋滿視窗」的 zoom（inside=true：視窗需完全落在 bounds 內），
+            // 杜絕縮太遠露出內容外的純黑／純白。
+            const fitZoom = mapInstance.getBoundsZoom(dispBounds, true);
+            if (isFinite(fitZoom)) {
+                // 夾在 [設定 minZoom, maxZoom]：避免極小的 display_bounds 把 minZoom 推到超過 maxZoom 而鎖死地圖。
+                const floor = Math.max(cfg().minZoom || 3, fitZoom);
+                mapInstance.setMinZoom(Math.min(mapInstance.getMaxZoom(), floor));
+            }
+            mapInstance.setMaxBounds(dispBounds);
+        }
         modal.removeEventListener('transitionend', onEnd);
     };
     const onEnd = (e) => {
@@ -458,7 +477,7 @@ function invalidateAfterTransition() {
 }
 
 function boundsToLatLng(b) {
-    if (b.south == null) {
+    if (!b || b.south == null) {
         return undefined;
     }
     return [

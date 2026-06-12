@@ -30,6 +30,16 @@ return [
         'north' => (float) env('CHGIS_MAP_SANE_NORTH', 55.0),
     ],
 
+    // 地圖顯示範圍（maxBounds）：限制使用者平移／縮放不要露出底圖內容以外的純黑／純白區。
+    // 取自實際彩色內容的外接框（分析 mbtiles 磚像素得 W60.8 S3.1 E150.0 N59.2），
+    // 略加邊距後使用。與點有效性無關（那由 bounds / sane_bounds 把關），僅控制可視範圍。
+    'display_bounds' => [
+        'west' => (float) env('CHGIS_MAP_DISPLAY_WEST', 60.5),
+        'south' => (float) env('CHGIS_MAP_DISPLAY_SOUTH', 3.0),
+        'east' => (float) env('CHGIS_MAP_DISPLAY_EAST', 150.5),
+        'north' => (float) env('CHGIS_MAP_DISPLAY_NORTH', 59.5),
+    ],
+
     // 視為「等於 0」的容差，用於排除 0,0 與單軸為 0 的座標。
     'epsilon' => (float) env('CHGIS_MAP_EPSILON', 1e-7),
 

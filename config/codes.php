@@ -5,6 +5,14 @@ return [
     'database' => env('CBDB_DATABASE'),
     'per_page' => env('CODES_PER_PAGE', 20),
 
+    // 僅從 /codes 首頁清單隱藏（不影響直連 /codes/{table}，也不影響 Query Playground / NL / MCP 白名單）。
+    // 大小寫不敏感比對。設計見 docs/CODES_BOOLEAN_FILTER_DESIGN.md §9.1。
+    'ui_hidden' => [
+        'pinyin',
+        'CBDB__TRAD_SIMP_MAP',
+        'CBDB__NAME_FTS',
+    ],
+
     // 代碼表配置：鍵為表名，值為說明
     'tables' => [
         'ADDR_BELONGS_DATA' => '地址隸屬關係資料表',

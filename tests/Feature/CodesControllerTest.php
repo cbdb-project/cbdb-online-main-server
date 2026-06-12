@@ -377,6 +377,266 @@ class CodesControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testUiHiddenExcludedFromCodesListAssociativeConfig() {
+        // 生產 config/codes.php 的 tables 是關聯陣列（表名 => 說明），走 codes() 第一分支。
+        // 同時用全小寫 'pinyin' vs 大寫 'PINYIN' 鎖住 §9.1 C5 大小寫不敏感比對。
+        config(['codes.tables' => ['pinyin' => '拼音表', 'TEST_CODES' => '測試表']]);
+        config(['codes.ui_hidden' => ['PINYIN']]);
+
+        $names = array_column((new CodesRepository())->codes(), 'name');
+
+        // 從 /codes 首頁清單隱藏（大小寫不敏感）
+        $this->assertNotContains('pinyin', $names);
+        // 其他表不受影響
+        $this->assertContains('TEST_CODES', $names);
+        // 共用白名單（codes.tables）維持完整，不受 ui_hidden 影響
+        $this->assertArrayHasKey('pinyin', config('codes.tables'));
+    }
+
+    #[Test]
+    public function testUiHiddenAlsoFiltersLegacyIndexedConfig() {
+        // 向後相容：索引陣列（舊格式）走 codes() 第二分支，過濾同樣生效。
+        config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);
+
+        $names = array_column((new CodesRepository())->codes(), 'name');
+
+        $this->assertNotContains('CBDB__NAME_FTS', $names);
+        $this->assertContains('TEST_CODES', $names);
+        $this->assertContains('CBDB__NAME_FTS', config('codes.tables'));
+    }
+
+    #[Test]
+    public function testUiHiddenTableAbsentFromCodesIndexRoute() {
+        // 路由層級：GET /codes 首頁不應列出被隱藏的表。
+        config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);
+
+        $response = $this->get('/codes');
+
+        $response->assertStatus(200);
+        $response->assertDontSee('CBDB__NAME_FTS');
+        $response->assertSee('TEST_CODES');
+    }
+
+    #[Test]
+    public function testUiHiddenTableStillReachableViaDirectUrl() {
+        // ui_hidden 只從清單隱藏，直連 /codes/{table} 仍可達（不 404）。
+        config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['id' => 1, 'person_name' => 'Alpha'],
+        ]);
+
+        $response = $this->get('/codes/CBDB__NAME_FTS');
+
+        $response->assertStatus(200);
+        $response->assertSee('Alpha');
+    }
+
+    #[Test]
+    public function testBooleanModeOffByDefault() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('booleanEnabled', false);
+    }
+
+    #[Test]
+    public function testBooleanModeEnabledViaQueryParam() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('booleanEnabled', true);
+    }
+
+    #[Test]
+    public function testBooleanModeAppliesSimplePositiveTerm() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('booleanEnabled', true);
+        $response->assertSee('Beta entry');
+        $response->assertDontSee('Alpha entry');
+        $response->assertViewHas('appliedFilters', ['description' => 'Beta']);
+        $response->assertViewHas('filterErrors', []);
+    }
+
+    #[Test]
+    public function testBooleanModeMixedValidAndInvalidColumns() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
+        ]);
+
+        // 好欄位 description=Beta 照常套用；壞欄位 code_sub='X1 AND' 解析失敗 → 記錯誤並略過。
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1'
+            . '&filters[description]=Beta'
+            . '&filters[code_sub]=' . urlencode('X1 AND'));
+
+        $response->assertStatus(200);
+        // 好欄位生效：只剩 Beta entry
+        $response->assertSee('Beta entry');
+        $response->assertDontSee('Alpha entry');
+        // 分流正確：appliedFilters 只含好欄位、filterErrors 只含壞欄位
+        $response->assertViewHas('appliedFilters', ['description' => 'Beta']);
+        $errors = $response->viewData('filterErrors');
+        $this->assertSame(['code_sub' => 'dangling_operator'], $errors);
+
+        // 端到端護欄（決策 #19）：分頁連結帶好欄位、不帶被略過的壞欄位
+        $paginator = $response->viewData('data');
+        $url = $paginator->url(1);
+        $this->assertStringContainsString('description', $url);
+        $this->assertStringNotContainsString('code_sub', $url);
+        $this->assertStringContainsString('filter_bool', $url);
+
+        // blade 狀態攜帶（C6）：filter_bool 帶在 form/連結，互動不會洗掉布林模式
+        $response->assertSee('name="filter_bool" value="1"', false);
+        // blade 連結/隱藏狀態只帶好欄位（#19）：好欄位進 hidden 狀態，壞欄位不進
+        // （壞欄位仍會出現在 filter-row 文字輸入框做回填，故此處精準比對 hidden 狀態）
+        $response->assertSee('type="hidden" name="filters[description]"', false);
+        $response->assertDontSee('type="hidden" name="filters[code_sub]"', false);
+    }
+
+    #[Test]
+    public function testBooleanParseErrorRecordedAndColumnSkipped() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
+        ]);
+
+        // 'Beta AND' 懸空運算子 → 解析失敗 → 該欄記錯誤並略過（不轉字面、不套用），故兩列都顯示
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Alpha entry');
+        $response->assertSee('Beta entry');
+        $response->assertViewHas('appliedFilters', []);
+        $errors = $response->viewData('filterErrors');
+        $this->assertArrayHasKey('description', $errors);
+        $this->assertSame('dangling_operator', $errors['description']);
+    }
+
+    #[Test]
+    public function testKillSwitchForcesBooleanOff() {
+        config(['codes.boolean_filter_enabled' => false]);
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('booleanEnabled', false);
+    }
+
+    #[Test]
+    public function testKillSwitchHidesAdvancedFilterToggle() {
+        config(['codes.boolean_filter_enabled' => false]);
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES');
+
+        $response->assertStatus(200);
+        // kill-switch 關閉時整個停用：連開關都不顯示（§2.2）
+        $response->assertViewHas('booleanFilterAvailable', false);
+        $response->assertDontSee(__('codes.advanced_filter'), false);
+    }
+
+    #[Test]
+    public function testToggleOffLinkPreservesRawErrorColumn() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        // 布林模式 + 壞欄位 code_sub（解析失敗）。「關閉進階篩選」連結必須保留原始輸入，
+        // 讓使用者一鍵把錯誤布林字串降級為字面搜尋，而非讓輸入憑空消失（§9.2）。
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[code_sub]=' . urlencode('X1 AND'));
+
+        $response->assertStatus(200);
+        // toggle 連結是 href（方括號 URL-encoded 為 %5B/%5D）；filter-row input 用未編碼方括號，
+        // 故此斷言精準命中「連結帶有壞欄位原始值」，證明降級路徑保留它（pagination/sort 連結則排除，見上一測試）。
+        $response->assertSee('filters%5Bcode_sub%5D', false);
+    }
+
+    #[Test]
+    public function testFtsHardShortCircuitIgnoresFilterAndSort() {
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['id' => 1, 'person_name' => 'Alpha'],
+            ['id' => 2, 'person_name' => 'Beta'],
+        ]);
+
+        // 即使帶 filters/sort/filter_bool，游標大表也應硬短路：忽略它們、永遠走游標路徑
+        $response = $this->get('/codes/CBDB__NAME_FTS?filter_bool=1&filters[person_name]=' . urlencode('Alpha OR Beta') . '&sort_by=person_name&sort_dir=desc');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('useCursorPagination', true);
+        $response->assertViewHas('filters', []);
+        $response->assertViewHas('sortBy', '');
+        $response->assertViewHas('booleanEnabled', false);
+        // filter 被忽略，兩列都還在
+        $response->assertSee('Alpha');
+        $response->assertSee('Beta');
+    }
+
+    #[Test]
+    public function testAdvancedFilterToggleShownWhenOff() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES');
+
+        $response->assertStatus(200);
+        // 關閉狀態：顯示「進階篩選」開啟連結（帶 filter_bool=1）
+        $response->assertSee(__('codes.advanced_filter'), false);
+        $response->assertSee('filter_bool=1', false);
+    }
+
+    #[Test]
+    public function testSemanticDescriptionShownForAppliedBooleanFilter() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+            ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
+
+        $response->assertStatus(200);
+        // 後端權威回填的人話描述（zh-TW）
+        $response->assertViewHas('filterDescriptions', ['description' => '含「Beta」']);
+        $response->assertSee('含「Beta」', false);
+        $response->assertSee(__('codes.filter_applied_label'), false);
+    }
+
+    #[Test]
+    public function testParseErrorShownInUi() {
+        DB::table('TEST_CODES')->insert([
+            ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
+        ]);
+
+        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
+
+        $response->assertStatus(200);
+        // 逐欄錯誤標記 + 本地化錯誤訊息 + 彙總警示
+        $response->assertSee('is-invalid', false);
+        $response->assertSee(__('codes.filter_err_dangling_operator'), false);
+        $response->assertSee(__('codes.filter_errors_heading', ['count' => 1]), false);
+    }
+
+    #[Test]
     public function testGuestViewDoesNotShowActions() {
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],

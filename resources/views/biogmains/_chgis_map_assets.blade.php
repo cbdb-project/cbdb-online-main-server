@@ -29,6 +29,7 @@
             minZoom: {{ (int) config('chgis_map.min_zoom', 3) }},
             maxZoom: {{ (int) config('chgis_map.max_zoom', 8) }},
             bounds: {!! Js::from(config('chgis_map.bounds')) !!},
+            displayBounds: {!! Js::from(config('chgis_map.display_bounds')) !!},
             i18n: {!! Js::from([
                 'modal_title' => __('chgis_map.modal_title'),
                 'current_location' => __('chgis_map.current_location'),

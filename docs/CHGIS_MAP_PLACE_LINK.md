@@ -282,6 +282,7 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
 - 各 marker `bindPopup` 顯示地名、類型（地址/官職）、年代區間。
 - 多點時提供「縮放至全部」控制（`fitBounds`），但初始以當前點置中（符合需求）。
 - 圖例：區分「當前地點 / 其他地址 / 官職地點」。
+- **顯示範圍限制（maxBounds）**：地圖設 `maxBounds = config('chgis_map.display_bounds')` 且 `maxBoundsViscosity:1.0`，並在 `invalidateSize` 後以 `getBoundsZoom(displayBounds, true)` 把最小 zoom 設成「內容框蓋滿視窗」的值，避免平移／縮太遠露出底圖內容外的純黑／純白。`display_bounds` 取自實際彩色內容外接框（分析磚像素得約 `W60.8 S3.1 E150 N59.2`，加邊距後預設 `W60.5 S3 E150.5 N59.5`），與點有效性無關（後者仍由 `bounds`/`sane_bounds` 把關）。
 
 ### 6.5 底圖未就緒的提示（§4.6）
 - 開 modal → 先查 status。
@@ -294,6 +295,7 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
 - 觸控手勢：Leaflet `tap`/pinch zoom；`dragging` 啟用；避免與頁面捲動衝突（modal 開啟時 body 鎖捲動）。
 - 關閉鈕加大命中區（≥44px）；支援下滑關閉（可選）。
 - marker / popup 字級與點擊區放大。
+- **安全區與排版**：關閉鈕、attribution（資訊欄）、圖例皆以 `env(safe-area-inset-*)` 內推，避開瀏海／圓角螢幕邊緣遮蓋。圖例設 `width:max-content`（避免被 Leaflet 0 寬容器壓成一字一行的直排），並抬到 attribution 之上（多讓約兩行高），避免資訊欄與圖例層疊。
 
 ---
 

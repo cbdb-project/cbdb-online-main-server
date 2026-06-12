@@ -4,6 +4,7 @@ return [
     'codes_home'               => 'Tables Home',
     'addr_belongs_data'        => 'Address Hierarchy Table',
     'addr_codes'               => 'Address Codes',
+    'addresses'                => 'Main Address Table',
     'altname_codes'            => 'Alternative Name Codes',
     'appointment_codes'        => 'Appointment Type Codes',
     'office_codes'             => 'Office Codes',

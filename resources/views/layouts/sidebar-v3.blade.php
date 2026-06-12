@@ -67,6 +67,7 @@
                     $codesPages = [
                         'Codes',
                         '全部表格',
+                        'ADDRESSES',
                         'ALTNAME_CODES',
                         'APPOINTMENT_CODES',
                         'TEXT_CODES',
@@ -103,6 +104,12 @@
                             <a href="/codes/ADDR_CODES" class="nav-link {{ in_array($activePage, ['ADDR_CODES'], true) ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-map-marker-alt"></i>
                                 <p>{{ __('codes.addr_codes') }} <small>(ADDR_CODES)</small></p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/codes/ADDRESSES" class="nav-link {{ in_array($activePage, ['ADDRESSES'], true) ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-map"></i>
+                                <p>{{ __('codes.addresses') }} <small>(ADDRESSES)</small></p>
                             </a>
                         </li>
                         <li class="nav-item">

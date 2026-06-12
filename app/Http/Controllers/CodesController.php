@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Operation;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
+use App\Support\ColumnFilterExpression;
+use App\Support\ColumnFilterParseException;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -239,9 +241,16 @@ class CodesController extends Controller {
      */
     protected $tableColumnsCache = [];
 
-    public function __construct(CodesRepository $codesRepository, OperationRepository $operationRepository) {
+    protected ColumnFilterExpression $columnFilterExpression;
+
+    public function __construct(
+        CodesRepository $codesRepository,
+        OperationRepository $operationRepository,
+        ?ColumnFilterExpression $columnFilterExpression = null
+    ) {
         $this->codesrepostory = $codesRepository;
         $this->operationRepository = $operationRepository;
+        $this->columnFilterExpression = $columnFilterExpression ?? new ColumnFilterExpression();
         $this->allowedTables = $this->codesrepostory->allowedTables();
 
         // 直接从配置构建大小写映射，避免 SHOW TABLES 查询
@@ -258,6 +267,20 @@ class CodesController extends Controller {
         }
 
         return $this->allowedTablesMap[$key];
+    }
+
+    /**
+     * Effective state of the per-page boolean filter switch.
+     *
+     * Precedence (see design §2.2 C3): global kill-switch forces off; otherwise the
+     * `filter_bool` query param. Default off (literal behaviour, fully backward compatible).
+     */
+    protected function resolveBooleanFilterEnabled(Request $request): bool {
+        if (!config('codes.boolean_filter_enabled', true)) {
+            return false;
+        }
+
+        return $request->boolean('filter_bool');
     }
 
     public function index() {
@@ -300,9 +323,18 @@ class CodesController extends Controller {
                 $request->query('sort_dir', 'asc'),
                 $thead
             );
+            $booleanEnabled = $this->resolveBooleanFilterEnabled($request);
 
-            // 使用游标分页的大表列表
+            // 游标分页大表（如 CBDB__NAME_FTS）硬短路：無條件拒絕逐欄/布林 filter 與 sort，
+            // 永遠走游標路徑，避免對百萬列大表跑 %term% 全表掃描。見設計 §2.3。
             $cursorPaginationTables = ['CBDB__NAME_FTS'];
+            if (in_array(strtoupper($table), $cursorPaginationTables, true)) {
+                $filters = [];
+                $sortBy = '';
+                $sortDir = 'asc';
+                $booleanEnabled = false;
+            }
+
             $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true)
                 && empty($filters)
                 && $sortBy === '';
@@ -327,7 +359,20 @@ class CodesController extends Controller {
                 return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead, $filters, $sortBy, $sortDir);
             }
 
-            // 欄位過濾（AND 邏輯）
+            // 欄位過濾（欄位之間 AND）。
+            // - 關閉布林模式（預設）：單一 `%value%` 字面比對（與現狀完全相同）。
+            // - 開啟布林模式：對每欄解析 AND/OR/NOT 布林；解析失敗的欄位記錄錯誤並略過（不轉字面）。
+            // $appliedFilters 只含實際套用的欄位，供分頁/排序連結使用，避免把語法錯誤的欄位回灌 URL。
+            // 見設計 §6 / §9.2（M4/M9）。
+            $appliedFilters = [];
+            $filterErrors = [];
+            $filterDescriptions = [];
+            $descLabels = $booleanEnabled ? [
+                'contains' => (string) __('codes.filter_desc_contains'),
+                'not' => (string) __('codes.filter_desc_not'),
+                'and' => (string) __('codes.filter_desc_and'),
+                'or' => (string) __('codes.filter_desc_or'),
+            ] : [];
             foreach ($filters as $column => $value) {
                 if ($value === '') {
                     continue;
@@ -336,7 +381,22 @@ class CodesController extends Controller {
                 if ($filterColumn === null) {
                     continue;
                 }
-                $query->where($filterColumn, 'like', '%' . $value . '%');
+
+                if ($booleanEnabled) {
+                    try {
+                        $ast = $this->columnFilterExpression->parse($value);
+                    } catch (ColumnFilterParseException $e) {
+                        $filterErrors[$column] = $e->errorCode;
+
+                        continue;
+                    }
+                    $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast);
+                    $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $descLabels);
+                } else {
+                    $query->where($filterColumn, 'like', '%' . $value . '%');
+                }
+
+                $appliedFilters[$column] = $value;
             }
 
             // 排序 + 主鍵 tie-breaker
@@ -353,7 +413,13 @@ class CodesController extends Controller {
                 }
             }
 
-            $data = $query->paginate($perPage)->appends($request->except('page'));
+            // 分頁連結只攜帶實際套用的 filters（排除語法錯誤被略過的欄位），其餘 query 參數
+            // （search、sort、filter_bool 等）原樣保留。
+            $appendQuery = $request->except(['page', 'filters']);
+            if (!empty($appliedFilters)) {
+                $appendQuery['filters'] = $appliedFilters;
+            }
+            $data = $query->paginate($perPage)->appends($appendQuery);
 
             $dynastyMap = [];
             if (in_array('c_dy', $thead, true)) {
@@ -385,6 +451,14 @@ class CodesController extends Controller {
                 'filters' => $filters,
                 'sortBy' => $sortBy,
                 'sortDir' => $sortDir,
+                'booleanEnabled' => $booleanEnabled,
+                'booleanFilterAvailable' => (bool) config('codes.boolean_filter_enabled', true),
+                'appliedFilters' => $appliedFilters,
+                // rawFilters 為 sanitize 後（已 trim、限 $thead/scalar）的集合，供輸入框回填，
+                // 與既有 blade 回填使用的 $filters 一致。Phase 4 若需「使用者完全原樣輸入」再調整。
+                'rawFilters' => $filters,
+                'filterErrors' => $filterErrors,
+                'filterDescriptions' => $filterDescriptions,
             ]);
         } catch (\PDOException $e) {
             flash('找不到該資料表', 'warning');
@@ -1664,6 +1738,13 @@ class CodesController extends Controller {
             'filters' => $filters,
             'sortBy' => $sortBy,
             'sortDir' => $sortDir,
+            // 游标分頁路徑硬短路 filter/sort/布林，傳齊空值與兩分支對齊（避免 Blade undefined）。
+            'booleanEnabled' => false,
+            'booleanFilterAvailable' => false,
+            'appliedFilters' => [],
+            'rawFilters' => $filters,
+            'filterErrors' => [],
+            'filterDescriptions' => [],
         ]);
     }
 

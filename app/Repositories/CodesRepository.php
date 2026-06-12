@@ -90,11 +90,15 @@ class CodesRepository {
 
     public function codes() {
         $configTables = config('codes.tables', []);
+        $hidden = $this->uiHiddenSet();
 
         // 如果配置是關聯數組（表名 => 說明）
         if (!empty($configTables) && array_keys($configTables) !== range(0, count($configTables) - 1)) {
             $result = [];
             foreach ($configTables as $name => $description) {
+                if (isset($hidden[strtoupper((string) $name)])) {
+                    continue;
+                }
                 $result[] = [
                     'name' => $name,
                     'description' => $description,
@@ -108,6 +112,9 @@ class CodesRepository {
         $tables = $this->allowedTables();
         $result = [];
         foreach ($tables as $table) {
+            if (isset($hidden[strtoupper((string) $table)])) {
+                continue;
+            }
             $result[] = [
                 'name' => $table,
                 'description' => '',
@@ -115,5 +122,25 @@ class CodesRepository {
         }
 
         return $result;
+    }
+
+    /**
+     * Tables hidden from the /codes index list only (not from direct access or shared whitelists).
+     *
+     * Keys are uppercased table names for case-insensitive matching. See
+     * docs/CODES_BOOLEAN_FILTER_DESIGN.md §9.1.
+     *
+     * @return array<string,true>
+     */
+    protected function uiHiddenSet(): array {
+        $set = [];
+        foreach ((array) config('codes.ui_hidden', []) as $name) {
+            $name = trim((string) $name);
+            if ($name !== '') {
+                $set[strtoupper($name)] = true;
+            }
+        }
+
+        return $set;
     }
 }

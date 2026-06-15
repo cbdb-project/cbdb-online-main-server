@@ -53,7 +53,11 @@
 
 @section('js')
 <script>
-(function () {
+// 必須等 Vue 掛載（app.mount('#app')）後再綁定事件：
+// Vue 會把 #app 內的伺服器渲染節點整批重新建立，掛載前用 addEventListener
+// 綁定的監聽器會隨舊節點被丟棄，導致搜尋／排序失效。onViteReady 的回呼在
+// app.mount('#app') 之後才執行，可確保監聽器綁在最終節點上。
+onViteReady(function () {
     const tbody       = document.getElementById('codes-index-body');
     const searchInput = document.getElementById('table-search');
     const noMatchMsg  = document.getElementById('no-match-msg');
@@ -125,6 +129,6 @@
     searchInput.addEventListener('input', applyFilter);
 
     applyFilter();
-})();
+});
 </script>
 @endsection

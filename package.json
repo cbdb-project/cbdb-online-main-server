@@ -38,6 +38,9 @@
     "react-dom": "^19.2.4",
     "sql-formatter": "^15.6.12"
   },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
   "engines": {
     "node": ">=22 <23",
     "npm": ">=10 <11"

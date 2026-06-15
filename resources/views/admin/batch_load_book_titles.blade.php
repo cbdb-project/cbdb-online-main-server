@@ -91,7 +91,8 @@
             @endpush
             @push('scripts')
                 <script>
-                    (function () {
+                    // 監聽器須在 Vue 掛載（app.mount('#app')）後再綁定，否則會隨 #app 內節點重建被清除。
+                    onViteReady(function () {
                         var ta = document.getElementById('entries');
                         var gutter = document.getElementById('entries-line-numbers');
                         if (!ta || !gutter) return;
@@ -110,7 +111,7 @@
                         ta.addEventListener('input', render);
                         ta.addEventListener('scroll', function () { gutter.scrollTop = ta.scrollTop; });
                         render();
-                    })();
+                    });
                 </script>
             @endpush
 

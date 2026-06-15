@@ -130,6 +130,8 @@
 </div>
 
 <script>
+// 監聽器須在 Vue 掛載（app.mount('#app')）後再綁定，否則會隨 #app 內節點重建被清除。
+onViteReady(function () {
 var _confirmDelete1 = {!! Js::from(__('admin.manage_confirm_delete_1')) !!};
 var _confirmDelete2 = {!! Js::from(__('admin.manage_confirm_delete_2')) !!};
 
@@ -141,7 +143,9 @@ document.getElementById('delete_user').addEventListener('change', function() {
     }
 });
 
-document.querySelector('form').addEventListener('submit', function(e) {
+// 限定為刪除核取方塊所在的編輯表單；document.querySelector('form') 會誤選到
+// 導覽列較前面的 #__locale-form，導致刪除二次確認綁錯表單而失效。
+document.getElementById('delete_user').closest('form').addEventListener('submit', function(e) {
     const deleteCheckbox = document.getElementById('delete_user');
     if (deleteCheckbox.checked) {
         if (!confirm(_confirmDelete2)) {
@@ -149,6 +153,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
             return false;
         }
     }
+});
 });
 </script>
 @endsection

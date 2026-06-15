@@ -37,6 +37,7 @@
 - 不要重新引入外部 CDN 的 jQuery、Bootstrap、DataTables。
 - 修改 `resources/js/**` 後，提交前需重新編譯前端。
 - React 列表不要使用 index 當 key；若資料有複合主鍵，請使用穩定 `pk`。
+- 頁面級內聯腳本若要對 `#app` 內的伺服器渲染節點綁定事件（`addEventListener`），必須包在 `onViteReady(function(){ ... })` 內。`app.js` 會在 DOM ready 時 `createApp(...).mount('#app')`，把整個 `#app`（layout 的 `<div class="wrapper" id="app">`）重新編譯並重建所有節點，掛載前直接綁定的監聽器會隨舊節點被丟棄而失效。`onViteReady` 的回呼在 mount 之後才執行，可確保綁在最終節點上。委託到 `document`/`window` 的監聽器與內聯 `onclick` 屬性不受影響。
 
 ### 6. i18n（繁體中文 / 英文切換）
 - 系統預設語言為繁體中文（`zh-TW`），使用者可透過 navbar 切換至英文（`en`）。

@@ -270,6 +270,16 @@ class CodesController extends Controller {
     }
 
     /**
+     * 該表是否開放全量匯出。判斷單一來源：config('codes.export_columns') 中配置了**非空**有序欄位清單。
+     * export()（gate）與 show()（下載連結顯示）共用此條件，避免兩處漂移。
+     */
+    protected function isExportable(string $table): bool {
+        $columns = config('codes.export_columns.' . strtoupper($table));
+
+        return is_array($columns) && $columns !== [];
+    }
+
+    /**
      * Effective state of the per-page boolean filter switch.
      *
      * Precedence (see design §2.2 C3): global kill-switch forces off; otherwise the
@@ -445,6 +455,7 @@ class CodesController extends Controller {
                 'search' => $search,
                 'dynastyMap' => $dynastyMap,
                 'isReadOnly' => $isReadOnly,
+                'exportable' => $this->isExportable($table),
                 'keyColumns' => $keyColumns,
                 'copyrightNote' => $copyrightNote,
                 'joinedColumns' => $joinedColumns,
@@ -465,6 +476,62 @@ class CodesController extends Controller {
 
             return redirect()->back();
         }
+    }
+
+    /**
+     * 全量導出代碼表為下游同步用檔：tab 分隔、quote-aware CSV、無表頭、UTF-8、LF、串流。
+     *
+     * 範圍由 config('codes.export_columns') 白名單收斂：只有在該設定中明確配置有序欄位的表
+     * 才可匯出（本輪僅 OFFICE_CODES），其餘表（即使通過 guardTable，如 ADDR_CODES）一律 404。
+     * 輸出欄序 = config 指定順序（與 live schema 物理欄序無關）。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
+     *
+     * 公開唯讀（對齊已公開的 show 頁；OFFICE_CODES 為 CC BY-NC-SA 公開參考資料）、route 端 throttle:6,1。
+     * 此為 AGENTS.md §5 授權規則的有意識正當例外（維護者拍板）：僅唯讀、公開資料、且 update.py 需無憑證自助拉取。
+     */
+    public function export(Request $request, $table_name) {
+        $table = $this->guardTable($table_name);
+
+        if (!$this->isExportable($table)) {
+            abort(404);
+        }
+        $exportColumns = config('codes.export_columns.' . strtoupper($table));
+
+        // fail-fast：config 欄位必須全部存在於 live schema；缺欄/改名寧可 500 也不輸出錯位資料。
+        $missing = array_values(array_diff($exportColumns, Schema::getColumnListing($table)));
+        if (!empty($missing)) {
+            abort(500, sprintf('export_columns 與 %s 實際欄位不符，缺少：%s', $table, implode(', ', $missing)));
+        }
+
+        $keyColumns = $this->getKeyColumns($table);
+        $filename = $table . '.txt';
+
+        return response()->streamDownload(function () use ($table, $exportColumns, $keyColumns) {
+            $out = fopen('php://output', 'w');
+
+            $query = DB::table($table)->select($exportColumns);
+            // chunk() 需穩定排序；以主鍵排序（OFFICE_CODES = 單一主鍵 c_office_id）。
+            // c_office_id 升冪同時滿足下游 update.py 的「c_office_id 嚴格遞增」檢查。
+            foreach ($keyColumns as $keyColumn) {
+                $query->orderBy($keyColumn);
+            }
+
+            $query->chunk(2000, function ($rows) use ($out, $exportColumns) {
+                foreach ($rows as $row) {
+                    $values = [];
+                    foreach ($exportColumns as $column) {
+                        $value = $row->{$column} ?? null;
+                        $values[] = $value === null ? '' : (string) $value;
+                    }
+                    // escape 設為空字串：停用 PHP 專屬反斜線轉義，產生 RFC4180 標準引號加倍，
+                    // 與下游 Python csv.reader(delimiter="\t") 相容。
+                    fputcsv($out, $values, "\t", '"', '');
+                }
+            });
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+        ]);
     }
 
     public function edit($table_name, $id) {

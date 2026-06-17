@@ -47,6 +47,7 @@ return [
 
     'apply_filters' => '套用篩選',
     'clear_filters' => '清除篩選',
+    'download_full_table' => '下載完整表（.txt）',
     'search_tables' => '搜尋表格…',
 
     // 布林進階篩選（docs/CODES_BOOLEAN_FILTER_DESIGN.md Phase 4）

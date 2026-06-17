@@ -183,6 +183,9 @@ Route::post('basicinformation/{personid}/{resource}/{id}/proposal', 'BasicInform
     ->name('basicinformation.proposal.update');
 
 Route::get('codes', 'CodesController@index')->name('codes.index');
+// 全量導出：route 泛用，但範圍由 config('codes.export_columns') 白名單收斂（本輪僅 OFFICE_CODES）。
+// 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
+Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');

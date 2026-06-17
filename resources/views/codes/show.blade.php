@@ -102,6 +102,11 @@
                 @if($showActions)
                     <a class="btn btn-sm btn-secondary" href="/codes/{{ $q }}/create">{{ __('common.add') }}</a>
                 @endif
+                @if($exportable ?? false)
+                    <a class="btn btn-sm btn-outline-secondary" href="/codes/{{ $q }}/export" download>
+                        <i class="fas fa-download"></i> {{ __('codes.download_full_table') }}
+                    </a>
+                @endif
                 {{-- 進階布林篩選開關（桌面限定；游標大表不適用故隱藏；kill-switch 關閉時整個不顯示，見 §2.2 / 2.3 / B12） --}}
                 @if($booleanFilterAvailable && !($useCursorPagination ?? false))
                     <div class="d-none d-md-flex align-items-center" style="gap: 6px; margin-left: auto;">

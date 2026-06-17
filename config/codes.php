@@ -13,6 +13,26 @@ return [
         'CBDB__NAME_FTS',
     ],
 
+    // 可匯出為下游同步檔的表與其「有序欄位契約」。
+    // 只有列在此處的表才開放 GET /codes/{table}/export；陣列順序即下游 .txt 的欄位順序。
+    // endpoint 以 select(此順序) 輸出，與 live schema 物理欄序無關；並以 getColumnListing 驗證欄位存在性（fail-fast）。
+    // 設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
+    'export_columns' => [
+        'OFFICE_CODES' => [
+            'c_office_id',
+            'c_dy',
+            'c_office_pinyin',
+            'c_office_chn',
+            'c_office_pinyin_alt',
+            'c_office_chn_alt',
+            'c_office_trans',
+            'c_office_trans_alt',
+            'c_source',
+            'c_pages',
+            'c_notes',
+        ],
+    ],
+
     // 代碼表配置：鍵為表名，值為說明
     'tables' => [
         'ADDR_BELONGS_DATA' => '地址隸屬關係資料表',

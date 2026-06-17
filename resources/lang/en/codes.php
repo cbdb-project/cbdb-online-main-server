@@ -47,6 +47,7 @@ return [
 
     'apply_filters' => 'Apply Filters',
     'clear_filters' => 'Clear Filters',
+    'download_full_table' => 'Download full table (.txt)',
     'search_tables' => 'Search tables…',
 
     // Boolean advanced filter (docs/CODES_BOOLEAN_FILTER_DESIGN.md Phase 4)

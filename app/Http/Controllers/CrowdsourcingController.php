@@ -31,7 +31,10 @@ class CrowdsourcingController extends Controller {
         //        Operation::all();
     }
 
-    public function index() {
+    /**
+     * 建立眾包記錄列表（含每列 resource_diff），供 Blade index() 與 Inertia appIndex() 共用。
+     */
+    protected function buildCrowdsourcingLists() {
         $lists = Operation::where('crowdsourcing_status', '!=', 0)->orderBy('created_at', 'desc')->limit(100)->paginate(20);
         //將物件轉為陣列進行陣列比對
         $listsArr = $this->operationRepository->objectToArray($lists);
@@ -96,12 +99,95 @@ class CrowdsourcingController extends Controller {
             }
         }
 
+        return $lists;
+    }
+
+    public function index() {
+        $lists = $this->buildCrowdsourcingLists();
+
         return view('crowdsourcing.index', [
             'lists' => $lists,
             'page_title' => __('nav.crowdsourcing_records'),
             'page_title_key' => 'Crowdsourcing',
             'page_description' => __('nav.crowdsourcing_records_desc'),
             'page_url' => '/crowdsourcing',
+        ]);
+    }
+
+    public function appIndex() {
+        $lists = $this->buildCrowdsourcingLists();
+        $canReviewer = Auth::check() && !Auth::user()->isCrowdsourcingUser();
+
+        $rows = collect($lists->items())->map(function ($item) use ($canReviewer) {
+            $resourceData = json_decode($item->resource_data, true);
+            if (!is_array($resourceData)) {
+                $resourceData = is_string($item->resource_data) ? trim($item->resource_data) : null;
+            }
+
+            // 對齊 Blade：diffSource 與 hasDiff 採用與 index.blade.php 相同的回退與判斷邏輯，
+            // 確保 compare 按鈕的可用狀態與舊頁逐位一致（含 resource_diff 為 null 時回退 resource_original）。
+            $diffSource = $item->resource_diff ?? $item->resource_original;
+            $hasDiff = false;
+            if (is_array($diffSource)) {
+                if (($diffSource['type'] ?? null) === 'POSTED_TO_ADDR_DATA') {
+                    $hasDiff = !empty($diffSource['addresses'] ?? []);
+                } else {
+                    $hasDiff = !empty($diffSource['rows'] ?? []);
+                }
+            } elseif (is_string($diffSource) && trim($diffSource) !== '') {
+                $hasDiff = true;
+            }
+
+            $createdAt = $item->created_at;
+            $createdUtc = '';
+            $createdDisplay = '';
+            if ($createdAt instanceof Carbon) {
+                $createdDisplay = (string) $createdAt;
+                $createdUtc = $createdAt->copy()->setTimezone('UTC')->toIso8601String();
+            } elseif (is_string($createdAt) && trim($createdAt) !== '') {
+                $createdDisplay = trim($createdAt);
+
+                try {
+                    $createdUtc = Carbon::parse($createdAt, config('app.timezone', 'Asia/Shanghai'))
+                        ->setTimezone('UTC')->toIso8601String();
+                } catch (\Exception $e) {
+                    $createdUtc = $createdDisplay;
+                }
+            }
+
+            return [
+                'id' => $item->id,
+                'resource' => $item->resource,
+                'resource_id' => $item->resource_id,
+                'op_type' => $item->op_type,
+                'user_name' => $item->user->name ?? null,
+                'rate' => $item->rate,
+                'created_utc' => $createdUtc,
+                'created_display' => $createdDisplay,
+                'crowdsourcing_status' => $item->crowdsourcing_status,
+                'resource_data' => $resourceData,
+                'resource_diff' => $diffSource,
+                'has_diff' => $hasDiff,
+                'can_review' => $canReviewer && (int) $item->crowdsourcing_status === 2,
+                'confirm_url' => url('crowdsourcing/' . $item->id . '/confirm'),
+                'reject_url' => url('crowdsourcing/' . $item->id . '/reject'),
+            ];
+        })->all();
+
+        return \Inertia\Inertia::render('Admin/Crowdsourcing/Index', [
+            'lists' => $rows,
+            'pagination' => [
+                'current_page' => $lists->currentPage(),
+                'last_page' => $lists->lastPage(),
+                'per_page' => $lists->perPage(),
+                'total' => $lists->total(),
+                'from' => $lists->firstItem(),
+                'to' => $lists->lastItem(),
+            ],
+            'page_translations' => [
+                'operations' => __('operations'),
+                'codes' => __('codes'),
+            ],
         ]);
     }
 

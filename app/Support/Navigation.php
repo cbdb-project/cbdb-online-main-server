@@ -114,7 +114,7 @@ class Navigation {
                     'crowdsourcing',
                     'nav.crowdsourcing_records',
                     'fas fa-users-cog',
-                    self::routeUrl('crowdsourcing.index'),
+                    self::url('crowdsourcing', 'crowdsourcing.index', 'app.crowdsourcing.index'),
                     ['pages' => ['Crowdsourcing'], 'patterns' => ['crowdsourcing.*']]
                 ),
                 self::item(

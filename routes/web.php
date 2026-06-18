@@ -296,6 +296,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('superadmin')->group(function () {
         // 最近眾包錄入記錄
         Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
+        Route::get('app/crowdsourcing', ['as' => 'app.crowdsourcing.index', 'uses' => 'CrowdsourcingController@appIndex'])->middleware('inertia');
         Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
             'show' => 'crowdsourcing.show',
             'create' => 'crowdsourcing.create',

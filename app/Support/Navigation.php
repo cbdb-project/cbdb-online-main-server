@@ -77,7 +77,7 @@ class Navigation {
                 'operations',
                 'nav.recent_operations',
                 'fas fa-clipboard-list',
-                self::routeUrl('operations.index'),
+                self::url('operations', 'operations.index', 'app.operations.index'),
                 ['pages' => ['NewUpdate'], 'patterns' => []]
             ),
 
@@ -85,7 +85,7 @@ class Navigation {
                 'proposals',
                 'nav.recent_proposals',
                 'fas fa-clipboard-check',
-                self::routeUrl('operations.index', ['proposals_only' => 1]),
+                self::url('operations', 'operations.index', 'app.operations.index', ['proposals_only' => 1]),
                 ['pages' => ['OperationsProposals'], 'patterns' => []],
                 self::pendingProposalsBadge($user)
             ),
@@ -385,12 +385,12 @@ class Navigation {
      * 依 feature flag 解析連結：flag='new' 且新路由存在時指向新頁，否則舊頁。
      * 目前所有 flag 預設 'old'；新頁路由就緒後僅需翻 flag。
      */
-    protected static function url(string $flagKey, string $oldRoute, ?string $newRoute = null): ?string {
+    protected static function url(string $flagKey, string $oldRoute, ?string $newRoute = null, array $params = []): ?string {
         if (migration_flag_is_new($flagKey) && $newRoute !== null && Route::has($newRoute)) {
-            return self::routeUrl($newRoute);
+            return self::routeUrl($newRoute, $params);
         }
 
-        return self::routeUrl($oldRoute);
+        return self::routeUrl($oldRoute, $params);
     }
 
     /**

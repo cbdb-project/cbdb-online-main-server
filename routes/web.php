@@ -20,6 +20,7 @@ Auth::routes();
 
 Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
+Route::get('app/operations', ['as' => 'app.operations.index', 'uses' => 'OperationsController@appIndex'])->middleware('inertia');
 Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');
 
 Route::get('home', 'HomeController@index')->name('home');

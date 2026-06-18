@@ -72,3 +72,71 @@ if (!function_exists('migration_flag_is_new')) {
         return migration_flag($page) === 'new';
     }
 }
+
+// 聯合主鍵保留字弱點防禦函式。
+// 原僅定義於 resources/views/biogmains/defense.blade.php（@include 時載入），
+// 移至此處統一自動載入，供控制器（如 OperationsController::serializeOperationRow）共用；
+// defense.blade.php 仍以 function_exists 守衛，重複載入時自動略過，行為一致。
+if (!function_exists('unionPKDef')) {
+    function unionPKDef($key) {
+        $key = str_replace("/", "(slash)", $key);
+        //因為反斜線在php有用途, 兩個反斜線代表一個反斜線.
+        $key = str_replace("\\", "(backslash)", $key);
+        $key = str_replace("{", "(brackets)", $key);
+        $key = str_replace("}", "(brackets_r)", $key);
+        // URL 特殊字符處理：? 會被解析為查詢字符串開始，# 會被解析為錨點，& 會被解析為參數分隔符
+        $key = str_replace("?", "(question)", $key);
+        $key = str_replace("#", "(hash)", $key);
+        $key = str_replace("&", "(amp)", $key);
+        // 複合主鍵分隔符處理：- 是複合主鍵的分隔符，必須編碼以避免解析錯誤
+        $key = str_replace("-", "(minus)", $key);
+
+        return $key;
+    }
+}
+
+if (!function_exists('unionPKDef_decode')) {
+    function unionPKDef_decode($key) {
+        $key = str_replace("(slash)", "/", $key);
+        $key = str_replace("(backslash)", "\\", $key);
+        $key = str_replace("(brackets)", "{", $key);
+        $key = str_replace("(brackets_r)", "}", $key);
+        $key = str_replace("(question)", "?", $key);
+        $key = str_replace("(hash)", "#", $key);
+        $key = str_replace("(amp)", "&", $key);
+        $key = str_replace("(minus)", "-", $key);
+
+        return $key;
+    }
+}
+
+if (!function_exists('unionPKDef_decode_for_convert')) {
+    function unionPKDef_decode_for_convert($key) {
+        $key = str_replace("(slash)", "/", $key);
+        $key = str_replace("(backslash)", "\\", $key);
+        $key = str_replace("(brackets)(brackets)", "{ { ", $key);
+        $key = str_replace("(brackets)", "{", $key);
+        $key = str_replace("(brackets_r)(brackets_r)", "} } ", $key);
+        $key = str_replace("(brackets_r)", "}", $key);
+        $key = str_replace("(question)", "?", $key);
+        $key = str_replace("(hash)", "#", $key);
+        $key = str_replace("(amp)", "&", $key);
+        $key = str_replace("(minus)", "-", $key);
+
+        return $key;
+    }
+}
+
+if (!function_exists('unionPKDef_for_url')) {
+    function unionPKDef_for_url($compositePK) {
+        if (empty($compositePK)) {
+            return $compositePK;
+        }
+        $parts = explode("-", $compositePK);
+        foreach ($parts as $key => $value) {
+            $parts[$key] = unionPKDef($value);
+        }
+
+        return implode("-", $parts);
+    }
+}

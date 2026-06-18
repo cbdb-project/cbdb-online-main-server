@@ -246,6 +246,10 @@ Route::resource('manage', 'ManagementController', ['name' => [
     'edit' => 'manage.edit',
     'update' => 'manage.update',
 ]]);
+// Inertia + React 版（使用者管理列表）
+Route::get('app/manage', 'ManagementController@appIndex')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.manage.index');
 
 Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
 

@@ -146,8 +146,8 @@ class Navigation {
                     'manage',
                     'nav.user_management',
                     'fas fa-user-cog',
-                    self::routeUrl('manage.index'),
-                    ['pages' => ['用戶管理'], 'patterns' => ['manage.index']]
+                    self::url('manage', 'manage.index', 'app.manage.index'),
+                    ['pages' => ['用戶管理'], 'patterns' => ['manage.index', 'app.manage.index']]
                 ),
                 self::item(
                     'nl-query-logs',

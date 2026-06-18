@@ -73,7 +73,7 @@
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
 | P5-1 | operations/index（+restore/提案核可） | `operations.index`/`operations.restore` | todo | 列表 + 動作；OperationsProposalController |
-| P5-2 | manage/index | `manage.index` | todo | 使用者管理列表 |
+| P5-2 | manage/index | `manage.index` | done | 新路由 `app.manage.index`；buildUserListing 共用（byte-equiv）；spec `docs/migration-specs/manage-index.md`；flag old |
 | P5-3 | manage/edit | `manage.edit`/`manage.update` | todo | |
 | P5-4 | manage/merge-preview | `merge-preview.index` | todo | 合併工具 |
 | P5-5 | crowdsourcing/index | `crowdsourcing.index` | todo | 列表 + confirm/reject |

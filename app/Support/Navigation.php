@@ -160,8 +160,8 @@ class Navigation {
                     'ai-fill-logs',
                     'admin.ai_fill_logs',
                     'fas fa-robot',
-                    self::routeUrl('admin.ai-fill-logs'),
-                    ['pages' => ['AI 填充日誌'], 'patterns' => []]
+                    self::url('admin.ai-fill-logs', 'admin.ai-fill-logs', 'app.admin.ai-fill-logs'),
+                    ['pages' => ['AI 填充日誌'], 'patterns' => ['app.admin.ai-fill-logs']]
                 ),
                 self::item(
                     'audit-logs',

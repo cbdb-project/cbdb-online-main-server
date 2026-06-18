@@ -13,7 +13,8 @@
     <a href="{{ $node['href'] ?? '#' }}" class="nav-link {{ ($isActive || $isOpen) ? 'active' : '' }}">
         <i class="nav-icon {{ $node['icon'] }}"></i>
         <p>
-            {{ __($node['label']) }}
+            {{-- label/badge 已由 App\Support\Navigation 解析為當前語系字串，直接輸出。 --}}
+            {{ $node['label'] }}
             @if(!empty($node['suffix']))
                 <small>{{ $node['suffix'] }}</small>
             @endif
@@ -21,7 +22,7 @@
                 <i class="right fas fa-angle-left"></i>
             @endif
             @if($badge && ($badge['show'] ?? false))
-                <span class="badge badge-{{ $badge['variant'] }} float-right">{{ __($badge['label']) }}</span>
+                <span class="badge badge-{{ $badge['variant'] }} float-right">{{ $badge['label'] }}</span>
             @endif
         </p>
     </a>

@@ -316,6 +316,9 @@
 | （示例）2026-06-18 | UI 元件庫鎖定 Tailwind+shadcn | 保真度原則：需可完全掌控視覺 | 使用者 |
 | 2026-06-18 | Phase 0 執行順序調整為 F1→F4→F5→F2→F3→F6（非表序 F1..F6） | 依賴：F2(AppShell 側邊欄) 消費 F4(roles) 與 F5(nav schema)，故後端基礎先行 | 使用者（/goal 授權自走） |
 | 2026-06-18 | F5「導覽單一來源」採「真正單一來源」：Blade sidebar 與 React 共用 App\Support\Navigation；Blade 改以遞迴 partial 渲染 schema | 降低雙殼期側邊欄漂移（§五緩解）；active-state 仍沿用既有 $page_title 字串以相容未遷移頁面，僅 React 端改用 route pattern | 使用者（/goal 授權自走） |
+| 2026-06-18 | F2：正式殼建為**新元件 DashboardLayout**，不改既有精簡 AppShell（5 個已上線頁續用） | 避免對線上工具造成非預期版面變動；新遷移頁改用 DashboardLayout，舊頁日後折入 | 使用者（/goal 授權自走） |
+| 2026-06-18 | nav 的 label 由 Navigation 於後端以 __() 解析為顯示字串（Blade 與 React 直接輸出，不再前端翻譯） | codes/views/admin 翻譯群組未在 shared translations；伺服器解析最簡且 locale 正確（切換為伺服器往返） | 使用者（/goal 授權自走） |
+| 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 仍供 Blade routeIs 使用 | 使用者（/goal 授權自走） |
 
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）
 | 日期 | 頁面/範圍 | 坑 / 心得 | 後續頁如何套用 |

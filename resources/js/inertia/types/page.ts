@@ -24,8 +24,18 @@ export interface AuthUserCan {
 export interface AuthUser {
     id: number;
     name: string;
+    avatar: string | null;
+    institution: string | null;
     roles: AuthUserRoles;
     can: AuthUserCan;
+}
+
+export interface ShellRoutes {
+    home_url: string;
+    profile_url: string | null;
+    logout_url: string;
+    login_url: string;
+    register_url: string;
 }
 
 export interface FlashMessage {
@@ -41,12 +51,37 @@ export interface FlashMessage {
 export type TranslationValue = string | { [key: string]: TranslationValue };
 export type TranslationGroup = Record<string, TranslationValue>;
 
+/** 導覽節點（對應 App\Support\Navigation 輸出）。 */
+export interface NavBadge {
+    label: string;
+    variant: string;
+    show: boolean;
+}
+
+export interface NavActive {
+    pages: string[];
+    patterns: string[];
+}
+
+export interface NavNode {
+    key: string;
+    label: string;
+    icon: string;
+    href: string | null;
+    suffix: string | null;
+    badge: NavBadge | null;
+    active: NavActive;
+    children: NavNode[];
+}
+
 export interface SharedProps {
     app: { version: string };
     auth: { user: AuthUser | null };
     locale: string;
     locale_url: string;
     flash: FlashMessage[];
+    nav: NavNode[];
+    shell: ShellRoutes;
     translations: Record<string, TranslationGroup>;
     page_translations?: Record<string, TranslationGroup>;
     [key: string]: unknown;

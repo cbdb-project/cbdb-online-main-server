@@ -28,6 +28,8 @@ class HandleInertiaRequests extends Middleware {
                 'user' => $user ? [
                     'id' => $user->id,
                     'name' => $user->name,
+                    'avatar' => $user->avatar,
+                    'institution' => $user->institution,
                     // 角色旗標（對齊 User::is* 方法）；前端側邊欄/頁面閘門用。
                     // ⚠️ 僅供 UX，後端每條 mutation 路由仍須獨立授權（AGENTS.md §5）。
                     'roles' => [
@@ -55,6 +57,16 @@ class HandleInertiaRequests extends Middleware {
             // 已套用角色閘門、已依 feature flag 解析連結。React AppShell 側邊欄
             // 依目前路由（active.patterns）自行判定 active，不靠中文字串比對。
             'nav' => Navigation::tree($user),
+            // 殼所需的固定連結（導覽列首頁/個人資料/登入登出等），由後端解析路由
+            // 為相對 URL，React DashboardLayout 直接使用，避免前端硬編碼路徑。
+            'shell' => [
+                'home_url' => route('basicinformation.index', [], false),
+                'profile_url' => \Illuminate\Support\Facades\Route::has('profile.edit')
+                    ? route('profile.edit', [], false) : null,
+                'logout_url' => route('logout', [], false),
+                'login_url' => route('login', [], false),
+                'register_url' => route('register', [], false),
+            ],
             // flash 訊息橋接：把 laracasts/flash 的 session 訊息轉成陣列，
             // 由 React AppShell 統一渲染 toast/alert（取代 Blade flash::message partial）。
             'flash' => $this->flashMessages(),

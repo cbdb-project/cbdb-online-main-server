@@ -315,7 +315,9 @@ class Navigation {
     ): array {
         return [
             'key' => $key,
-            'label' => $label,
+            // label 在此即解析為當前語系的顯示字串（單一來源、Blade 與 React 共用，
+            // locale 切換是伺服器往返、share() 會重算，故不需前端再翻譯）。
+            'label' => __($label),
             'icon' => $icon,
             'href' => $href,
             'suffix' => null,
@@ -335,7 +337,7 @@ class Navigation {
     protected static function tree_(string $key, string $label, string $icon, array $children, ?string $href = null, ?\Closure $gate = null, array $activePages = []): array {
         return [
             'key' => $key,
-            'label' => $label,
+            'label' => __($label),
             'icon' => $icon,
             'href' => $href,
             'suffix' => null,
@@ -425,7 +427,7 @@ class Navigation {
         }
 
         return [
-            'label' => 'nav.pending_review',
+            'label' => __('nav.pending_review'),
             'variant' => 'warning',
             'show' => $hasPending,
         ];

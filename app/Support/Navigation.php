@@ -181,8 +181,8 @@ class Navigation {
                     'batch-books',
                     'admin.batch_load_books',
                     'fa fa-upload',
-                    self::routeUrl('admin.batch-load-book-titles'),
-                    ['pages' => ['批次匯入書稿資料'], 'patterns' => []]
+                    self::url('admin.batch-load-book-titles', 'admin.batch-load-book-titles', 'app.admin.batch-load-book-titles'),
+                    ['pages' => ['批次匯入書稿資料'], 'patterns' => ['app.admin.batch-load-book-titles']]
                 ),
                 self::item(
                     'batch-offices',

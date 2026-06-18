@@ -77,7 +77,7 @@
 | P5-3 | manage/edit | `manage.edit`/`manage.update` | done | 新路由 `app.manage.edit/update`；performUserUpdate 共用（byte-equiv，含軟刪除）；spec `docs/migration-specs/manage-edit.md`；flag old |
 | P5-4 | manage/merge-preview | `merge-preview.index` | todo | 合併工具 |
 | P5-5 | crowdsourcing/index | `crowdsourcing.index` | todo | 列表 + confirm/reject |
-| P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | todo | 檔案上傳（forceFormData）+ undo |
+| P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | done | 新路由（store/undo 重用，listRouteName 依路徑重導）；spec `docs/migration-specs/batch-load-book-titles.md`；flag old |
 | P5-7 | admin/batch_load_offices | `admin.batch-load-offices` | todo | 檔案上傳 |
 | P5-8 | admin/batch_load_social_institutes | `admin.batch-load-social-institutes` | todo | 檔案上傳 |
 | P5-9 | admin/wiki-maintenance | `admin.wiki-maintenance` | todo | **輪詢/非同步**（progress/cancel） |

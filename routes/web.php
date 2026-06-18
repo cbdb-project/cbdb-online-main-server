@@ -352,6 +352,13 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')->name('admin.batch-load-book-titles.store');
     Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')->name('admin.batch-load-book-titles.undo');
     Route::post('admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')->name('admin.batch-load-book-titles.update-pinyin');
+    // Inertia + React 版（store/undo 重用既有方法，依請求路徑決定重導）
+    Route::get('app/admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@appShowForm')
+        ->middleware('inertia')->name('app.admin.batch-load-book-titles');
+    Route::post('app/admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')
+        ->middleware('inertia')->name('app.admin.batch-load-book-titles.store');
+    Route::post('app/admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')
+        ->middleware('inertia')->name('app.admin.batch-load-book-titles.undo');
     Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')->name('admin.batch-load-social-institutes');
     Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
     Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')->name('admin.batch-load-offices');

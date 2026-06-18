@@ -39,7 +39,7 @@
 | P2-1 | codes/index | `codes.index` | done | 新路由 `app.codes.index`；客戶端搜尋/排序；spec `docs/migration-specs/codes-index.md`；flag old |
 | P2-2 | codes/show | `codes.show` | done | 新路由 `app.codes.show`；buildShowPayload/buildCursorPayload 共用（Blade byte-equiv）；spec `docs/migration-specs/codes-show.md`；flag old |
 | P2-3 | codes/create | `codes.create`/`codes.store` | done | 新路由 `app.codes.create/store/propose.store`；write-path 共用 performStore/performProposalStore（byte-equiv）；spec `docs/migration-specs/codes-create.md`；flag old |
-| P2-4 | codes/edit | `codes.edit`/`codes.update`/`codes.destroy` | todo | |
+| P2-4 | codes/edit | `codes.edit`/`codes.update`/`codes.destroy` | done | 新路由 `app.codes.edit/update/destroy/propose.update`；write-path 共用 perform*（byte-equiv）；spec `docs/migration-specs/codes-edit.md`；flag old |
 | P2-5 | codes/proposal-edit | `codes.propose.*`/`codes.proposals.*` | todo | 群眾提案流程 |
 
 ## Phase 3 — 人物列表與檢視（高流量；依賴：F*）

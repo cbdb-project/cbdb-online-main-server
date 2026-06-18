@@ -204,6 +204,14 @@ Route::post('app/codes/{table_name}/proposal', 'CodesController@appProposeStore'
 Route::post('app/codes/{table_name}', 'CodesController@appStore')
     ->middleware('inertia')
     ->name('app.codes.store');
+Route::get('app/codes/{table_name}/{id}/edit', 'CodesController@appEdit')
+    ->middleware('inertia')->name('app.codes.edit')->where('id', '.*');
+Route::match(['post', 'patch'], 'app/codes/{table_name}/{id}/proposal', 'CodesController@appProposalUpdate')
+    ->middleware('inertia')->name('app.codes.propose.update')->where('id', '.*');
+Route::match(['put', 'patch'], 'app/codes/{table_name}/{id}', 'CodesController@appUpdate')
+    ->middleware('inertia')->name('app.codes.update')->where('id', '.*');
+Route::delete('app/codes/{table_name}/{id}', 'CodesController@appDestroy')
+    ->middleware('inertia')->name('app.codes.destroy')->where('id', '.*');
 Route::get('app/codes/{table_name}', 'CodesController@appShow')
     ->middleware('inertia')
     ->name('app.codes.show');

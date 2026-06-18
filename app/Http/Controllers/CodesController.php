@@ -434,14 +434,26 @@ class CodesController extends Controller {
                 'index' => $this->codesIndexUrl(),
                 'create' => $this->codesActionUrl('create', $table),
                 'export' => '/codes/' . $table . '/export',
-                // edit/destroy 為舊 Blade 路徑模板（含 __ID__ 佔位），新版就緒前沿用。
-                'edit_template' => '/codes/' . $table . '/__ID__/edit',
-                'destroy_template' => '/codes/' . $table . '/__ID__',
+                // edit/destroy 模板（含 __ID__ 佔位）依 codes flag 解析。
+                'edit_template' => $this->codesIdTemplate('app.codes.edit', 'edit', $table),
+                'destroy_template' => $this->codesIdTemplate('app.codes.destroy', null, $table),
             ],
             'page_translations' => [
                 'codes' => is_array($t = trans('codes')) ? $t : [],
             ],
         ]);
+    }
+
+    /**
+     * 帶 __ID__ 佔位的 edit/destroy 連結模板（flag-aware）。
+     * 新版路由存在且 flag=new 時用 app 路由，否則回退舊 Blade 路徑。
+     */
+    protected function codesIdTemplate(string $appRoute, ?string $suffix, string $table): string {
+        if (migration_flag_is_new('codes') && Route::has($appRoute)) {
+            return route($appRoute, ['table_name' => $table, 'id' => '__ID__'], false);
+        }
+
+        return '/codes/' . $table . '/__ID__' . ($suffix ? '/' . $suffix : '');
     }
 
     /** 代碼表總覽 URL（flag-aware）。 */
@@ -745,8 +757,90 @@ class CodesController extends Controller {
         return redirect()->route('codes.index');
     }
 
+    /**
+     * Inertia + React 版：編輯表單頁。
+     */
+    public function appEdit($table_name, $id) {
+        $table = $this->guardTable($table_name);
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止編輯。', 'warning');
+
+            return redirect()->route('app.codes.show', ['table_name' => $table]);
+        }
+
+        try {
+            $keyColumns = $this->getKeyColumns($table);
+            $conditions = $this->buildConditionsFromId($keyColumns, $id);
+            $query = DB::table($table);
+            foreach ($conditions as $column => $value) {
+                $query->where($column, $value);
+            }
+            $data = $query->first();
+
+            // 舊版以 '-' 分隔複合鍵的相容回退（與 Blade edit 一致）。
+            if (!$data && count($keyColumns) > 1 && !str_contains($id, '_._') && str_contains($id, '-')) {
+                $fallbackConditions = $this->buildConditionsFromId($keyColumns, str_replace('-', '_._', $id));
+                if (count($fallbackConditions) > count($conditions)) {
+                    $fallbackQuery = DB::table($table);
+                    foreach ($fallbackConditions as $col => $val) {
+                        $fallbackQuery->where($col, $val);
+                    }
+                    $data = $fallbackQuery->first();
+                }
+            }
+
+            if (!$data) {
+                flash('找不到該筆資料', 'warning');
+
+                return redirect()->route('app.codes.show', ['table_name' => $table]);
+            }
+
+            $rowArray = $this->orderAuditFieldsForDisplay($this->convertRowToArray($data));
+            $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
+        } catch (\PDOException $e) {
+            flash('找不到該資料表', 'warning');
+
+            return redirect()->route('app.codes.index');
+        }
+
+        return Inertia::render('Codes/Edit', [
+            'table' => $table,
+            'id' => $compositeId,
+            'columns' => array_keys($rowArray),
+            'values' => $rowArray,
+            'key_columns' => array_values($keyColumns),
+            'can_propose' => Auth::check() && Auth::user()->isActive(),
+            'urls' => [
+                'update' => route('app.codes.update', ['table_name' => $table, 'id' => $compositeId], false),
+                'propose' => route('app.codes.propose.update', ['table_name' => $table, 'id' => $compositeId], false),
+                'destroy' => route('app.codes.destroy', ['table_name' => $table, 'id' => $compositeId], false),
+                'show' => route('app.codes.show', ['table_name' => $table], false),
+            ],
+            'page_translations' => [
+                'codes' => is_array($t = trans('codes')) ? $t : [],
+            ],
+        ]);
+    }
+
     public function update(Request $request, $table_name, $id) {
         $table = $this->guardTable($table_name);
+
+        return $this->performUpdate($request, $table, $id, 'codes.show', 'codes.edit');
+    }
+
+    /**
+     * Inertia + React 版：直接更新（與 Blade update 共用 performUpdate）。
+     */
+    public function appUpdate(Request $request, $table_name, $id) {
+        $table = $this->guardTable($table_name);
+
+        return $this->performUpdate($request, $table, $id, 'app.codes.show', 'app.codes.edit');
+    }
+
+    /**
+     * 直接更新代碼表的共用實作；$showRoute/$editRoute 控制唯讀/成功重導目標。
+     */
+    protected function performUpdate(Request $request, string $table, $id, string $showRoute, string $editRoute) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
@@ -759,7 +853,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route($showRoute, ['table_name' => $table]);
         }
         $keyColumns = $this->getKeyColumns($table);
         $conditions = $this->buildConditionsFromId($keyColumns, $id);
@@ -794,7 +888,7 @@ class CodesController extends Controller {
 
         $id = $this->buildCompositeId($keyColumns, $updatedRow);
 
-        return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
+        return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設遮除的第1個欄位呈現。
@@ -1150,6 +1244,23 @@ class CodesController extends Controller {
 
     public function proposalUpdate(Request $request, $table_name, $id) {
         $table = $this->guardTable($table_name);
+
+        return $this->performProposalUpdate($request, $table, $id, 'codes.edit');
+    }
+
+    /**
+     * Inertia + React 版：提交修改提案（與 Blade proposalUpdate 共用）。
+     */
+    public function appProposalUpdate(Request $request, $table_name, $id) {
+        $table = $this->guardTable($table_name);
+
+        return $this->performProposalUpdate($request, $table, $id, 'app.codes.edit');
+    }
+
+    /**
+     * 修改提案的共用實作；$editRoute 控制成功重導目標。
+     */
+    protected function performProposalUpdate(Request $request, string $table, $id, string $editRoute) {
         if ($redirect = $this->ensureEditableAccess($table)) {
             return $redirect;
         }
@@ -1189,11 +1300,28 @@ class CodesController extends Controller {
             flash('已提交修改提案，等待管理員審核 @ '.Carbon::now(), 'info');
         }
 
-        return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
+        return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
 
     public function destroy($table_name, $id) {
         $table = $this->guardTable($table_name);
+
+        return $this->performDestroy($table, $id, 'codes.show');
+    }
+
+    /**
+     * Inertia + React 版：刪除（與 Blade destroy 共用 performDestroy）。
+     */
+    public function appDestroy($table_name, $id) {
+        $table = $this->guardTable($table_name);
+
+        return $this->performDestroy($table, $id, 'app.codes.show');
+    }
+
+    /**
+     * 刪除代碼表列的共用實作；$showRoute 控制唯讀/成功重導目標。
+     */
+    protected function performDestroy(string $table, $id, string $showRoute) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
@@ -1206,7 +1334,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止刪除。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route($showRoute, ['table_name' => $table]);
         }
         $keyColumns = $this->getKeyColumns($table);
         $conditions = $this->buildConditionsFromId($keyColumns, $id);
@@ -1222,7 +1350,7 @@ class CodesController extends Controller {
 
         flash('Delete success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('codes.show', ['table_name' => $table]);
+        return redirect()->route($showRoute, ['table_name' => $table]);
     }
 
     protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {

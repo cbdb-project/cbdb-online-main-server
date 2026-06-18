@@ -1,4 +1,6 @@
-# API v2（現行版本）
+# API v2
+
+v1 與 v2 並行提供：v1 為舊版端口，v2 為較新端口；兩者目前同時可用。本文件描述 v2。
 
 v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagination` 結構。基底 URL：`https://input.cbdb.fas.harvard.edu/api/v2/...`
 
@@ -8,7 +10,11 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 
 ### `GET /api/v2/persons`
 
-輸出 BIOG_MAIN 所有人物的 `c_personid`，按主鍵升序，分頁輸出。**不需要登入。**
+輸出 BIOG_MAIN 所有人物的 `c_personid` 與時間資訊，按主鍵升序，分頁輸出。**不需要登入。**
+
+每筆人物附帶兩個時間欄位：
+- `c_created_date`：該人物的建檔時間（取自 BIOG_MAIN）。
+- `c_modified_date`：該人物**任何**資訊（本體 BIOG_MAIN 或其子資源：地址、別名、官職、親屬、事件、社會地位、入仕、著作、財產、社會機構、關係等）最後一次被修改的時間。此為人物聚合層級的水位線，與 BIOG_MAIN 本表的 `c_modified_date`（僅反映本列修改）語意不同。日常由系統即時維護，並可由 `php artisan cbdb:rebuild-person-change-index` 全量校正。
 
 ### 輸入參數
 
@@ -28,8 +34,8 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 {
   "ok": true,
   "data": [
-    {"c_personid": 1},
-    {"c_personid": 2}
+    {"c_personid": 1, "c_created_date": "2007-05-01 00:00:00", "c_modified_date": "2026-03-12 09:21:00"},
+    {"c_personid": 2, "c_created_date": "2008-01-01 00:00:00", "c_modified_date": null}
   ],
   "pagination": {
     "total": 680000,
@@ -45,8 +51,10 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | 屬性名 | 屬性類型 | 說明 |
 | ------ | ------ | ------ |
 | ok | 布林 | 請求是否成功 |
-| data | 陣列 | 人物 ID 列表 |
+| data | 陣列 | 人物列表 |
 | data[i].c_personid | 數字 | 人物 ID |
+| data[i].c_created_date | 字串/null | 人物建檔時間（`YYYY-MM-DD HH:MM:SS`），無則為 null |
+| data[i].c_modified_date | 字串/null | 人物（含所有子資源）最後修改時間；尚未回填時為 null |
 | pagination.total | 數字 | 資料總筆數 |
 | pagination.per_page | 數字 | 每頁筆數 |
 | pagination.current_page | 數字 | 當前頁碼 |

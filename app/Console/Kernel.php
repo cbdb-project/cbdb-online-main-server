@@ -22,6 +22,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\RebuildIndexYear::class,
         \App\Console\Commands\RebuildIndexAddress::class,
         \App\Console\Commands\FetchChgisMap::class,
+        \App\Console\Commands\RebuildPersonChangeIndex::class,
     ];
 
     /**

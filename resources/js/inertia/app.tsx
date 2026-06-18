@@ -1,5 +1,7 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+// Tailwind v4 + 設計 token（僅此 inertia bundle 載入，不影響 Blade/AdminLTE）
+import '../../css/inertia.css';
 import { installNumberInputWheelGuard } from '../utils/disableNumberInputWheel';
 
 installNumberInputWheelGuard();

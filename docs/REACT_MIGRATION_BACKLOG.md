@@ -1,0 +1,121 @@
+# React + Inertia 遷移待辦帳本（backlog ledger）
+
+> 本檔是遷移執行的**單一真實來源**：列舉全部待遷移頁面與狀態。策略與規則見 [REACT_INERTIA_MIGRATION_PLAN.md](./REACT_INERTIA_MIGRATION_PLAN.md)（recipe、保真度原則、自主執行協定）。
+> **本檔可頻繁更新**（每完成一頁就改狀態）；設計文件保持穩定。
+
+## 狀態圖例
+- `todo` 未開始　·　`in-progress` 進行中　·　`in-review` 已實作、走 gate 中　·　`done` 已合併（flag 仍指舊頁，待人切換）　·　`live` 已切換上線　·　`blocked` 卡住待人決定　·　`retired` 舊頁已退役刪除
+
+**認領慣例（並發安全）**：標 `in-progress` 時寫成 `in-progress (iter-id, 起 ISO8601)`。同一時間只有一個 executor、序列執行。開機先 **`git fetch --prune origin`**（失敗即 infra 故障停機）再對帳（見設計文件附錄 C 步驟 0）：孤兒 `in-progress`（無對應 PR 且逾時）標回 `todo`/`blocked`；**帳本與（已刷新的）git/PR 不一致時以 git 為準**。
+**挑選順序**：依賴就緒 → phase 編號 → **同 phase 內由上而下嚴格表序**。無可挑（全 `blocked`/`done`）→ 停機回報。
+**心得/決策**：踩坑與計畫變更記錄在設計文件附錄 D（活頁），不寫在本表。
+
+## 全域前置（gate 0，必須先完成）
+| # | 項目 | 狀態 | 備註 |
+|---|---|---|---|
+| F1 | Phase 0 工具鏈：Tailwind + shadcn/ui + AdminLTE 視覺 token | todo | 附錄 A.1 |
+| F2 | `AppShell` 正式化（側邊欄/角色閘門/active-state/深色模式/flash/breadcrumbs） | todo | 附錄 A.2；依賴 F1 |
+| F3 | 共用基元：`DataTable`(TanStack)/表單/`Modal`/`ConfirmDialog`/分頁 | todo | 附錄 A.3；依賴 F1 |
+| F4 | 後端 `share()` 增補 `auth.user.roles`/`can` + `flash` 橋接 | todo | 附錄 A.4 |
+| F5 | feature-flag 機制（§五之二）+ 導覽單一來源 | todo | 附錄 A.5 |
+| F6 | 測試範式 `assertInertia`；評估 E2E（Playwright） | todo | 附錄 A.6 |
+| F7 | **複合主鍵 write-path 收斂** + query-path store/update/destroy Feature 測試齊備 | todo | **Phase 4 硬前置**；見 COMPOSITE_PRIMARY_KEY_URL_DESIGN.md；此 gate 只由人翻 `done` |
+
+> **Phase 1+ 任一頁開工前，F1–F5 必須 `done`。Phase 4 任一頁開工前，F7 必須 `done`（否則整個 Phase 4 `blocked`）。**
+
+## Phase 1 — 唯讀葉節點（依賴：F1–F5 必須 `done`；F6 建議）
+| # | 頁面 | 路由（舊） | 控制器 | 狀態 | 備註 |
+|---|---|---|---|---|---|
+| P1-1 | admin/audit_logs/index | `admin.audit-logs` | AdminAuditLogController | todo | **試點/參考頁**，附錄 B；授權 `canViewAuditLogs` |
+| P1-2 | admin/ai_fill_logs/index | `admin.ai-fill-logs` | AiFillLogController | todo | 唯讀日誌表 |
+| P1-3 | admin/explain_sql | `admin.explainsql` | AdminExplainSqlController | todo | SQL EXPLAIN 表單（唯讀輸出） |
+| P1-4 | dashboard/index | `dashboard` | DashboardController | todo | 統計卡片 |
+| P1-5 | profile/edit | `profile.edit`/`profile.update` | UserProfileController | todo | 簡單表單（含 api-tokens.* 檢查） |
+| P1-6 | query_playground/nl_query_logs | `query-playground.nl-query-logs` | QueryPlaygroundController@nlQueryLogs | todo | 唯讀日誌；Playground UI 本身已是 React |
+
+## Phase 2 — Codes 代碼表 CRUD（依賴：F*，建議 P1 完成後）
+| # | 頁面 | 路由（舊） | 狀態 | 備註 |
+|---|---|---|---|---|
+| P2-1 | codes/index | `codes.index` | todo | 代碼表列表 |
+| P2-2 | codes/show | `codes.show` | todo | 單表列數據 |
+| P2-3 | codes/create | `codes.create`/`codes.store` | todo | 首個 CRUD 表單（建立 useForm/422/flash 樣板） |
+| P2-4 | codes/edit | `codes.edit`/`codes.update`/`codes.destroy` | todo | |
+| P2-5 | codes/proposal-edit | `codes.propose.*`/`codes.proposals.*` | todo | 群眾提案流程 |
+
+## Phase 3 — 人物列表與檢視（高流量；依賴：F*）
+| # | 頁面 | 路由（舊） | 狀態 | 備註 |
+|---|---|---|---|---|
+| P3-1 | biogmains/basicinformation/index | `basicinformation.index` | todo | 實質首頁；可複用 PersonBrowser **唯讀**元件 |
+| P3-2 | biogmains/basicinformation/show | （legacy `layouts.app`） | todo | 唯讀；淘汰最後一個 Bootstrap-3 layout；與編輯器解耦 |
+
+## Phase 4 — 人物編輯器 + 12 複合主鍵子資源（XL；最高風險）
+> **硬前置 = 全域 gate `F7` 必須 `done`**（複合主鍵 write-path 收斂 + query-path store/update/destroy Feature 測試齊備；見 COMPOSITE_PRIMARY_KEY_URL_DESIGN.md）。F7 未 `done` 則整個 Phase 4 `blocked`。
+> ⚠️ 提醒：PersonBrowser tab 為**唯讀**，編輯表單為**全新開發**。每個子資源 4 視圖（index/create/edit/_form）。
+
+| # | 子資源（view dir） | 控制器 | DB 表 / 複合鍵 | 狀態 |
+|---|---|---|---|---|
+| P4-0 | basicinformation/{create,edit} | BasicInformationController | BIOG_MAIN (c_personid) | todo |
+| P4-1 | altname | BasicInformationAltnamesController | ALTNAME_DATA（3-key，無 c_sequence） | todo |
+| P4-2 | addresses | BasicInformationAddressesController | BIOG_ADDR_DATA | todo |
+| P4-3 | texts | BasicInformationTextsController | BIOG_TEXT_DATA/TEXT_DATA | todo |
+| P4-4 | sources | BasicInformationSourcesController | BIOG_SOURCE_DATA | todo |
+| P4-5 | offices | BasicInformationOfficesController | POSTED_TO_OFFICE_DATA(+ADDR) | todo |
+| P4-6 | assoc | BasicInformationAssocController | ASSOC_DATA（9-col key） | todo |
+| P4-7 | kinship | BasicInformationKinshipController | KIN_DATA | todo |
+| P4-8 | events | BasicInformationEventsController | EVENTS_DATA | todo |
+| P4-9 | statuses | BasicInformationStatusesController | STATUS_DATA | todo |
+| P4-10 | entries | BasicInformationEntriesController | ENTRY_DATA（9-col key） | todo |
+| P4-11 | possession | BasicInformationPossessionController | POSSESSION_DATA | todo |
+| P4-12 | socialinst | BasicInformationSocialInstController | BIOG_INST_DATA | todo |
+| P4-P | basicinformation 提案流程 | BasicInformationProposalController | — | todo |
+
+## Phase 5 — 管理與營運工具（依賴：F*，部分依賴 P4 樣板）
+| # | 頁面 | 路由（舊） | 狀態 | 備註 |
+|---|---|---|---|---|
+| P5-1 | operations/index（+restore/提案核可） | `operations.index`/`operations.restore` | todo | 列表 + 動作；OperationsProposalController |
+| P5-2 | manage/index | `manage.index` | todo | 使用者管理列表 |
+| P5-3 | manage/edit | `manage.edit`/`manage.update` | todo | |
+| P5-4 | manage/merge-preview | `merge-preview.index` | todo | 合併工具 |
+| P5-5 | crowdsourcing/index | `crowdsourcing.index` | todo | 列表 + confirm/reject |
+| P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | todo | 檔案上傳（forceFormData）+ undo |
+| P5-7 | admin/batch_load_offices | `admin.batch-load-offices` | todo | 檔案上傳 |
+| P5-8 | admin/batch_load_social_institutes | `admin.batch-load-social-institutes` | todo | 檔案上傳 |
+| P5-9 | admin/wiki-maintenance | `admin.wiki-maintenance` | todo | **輪詢/非同步**（progress/cancel） |
+| P5-10 | admin/cbdb-table-maintenance | `admin.cbdb-table-maintenance` | todo | **輪詢/非同步**（rebuild/progress） |
+| P5-11 | admin/unidirectional-relationship-repair | `admin.unidirectional-relationship-repair` | todo | 修復工具 |
+| P5-12 | maps/index | `app.maps.index` | todo | superadmin；已在 /app/* |
+
+## Phase 6 — 認證頁與入口（建議最後；依賴：F*）
+| # | 頁面 | 路由（舊） | 狀態 | 備註 |
+|---|---|---|---|---|
+| P6-1 | auth/login | `Auth::routes()` | todo | laravel/ui 後端不變 |
+| P6-2 | auth/register | `Auth::routes()` | todo | |
+| P6-3 | auth/passwords/email | `Auth::routes()` | todo | 忘記密碼 |
+| P6-4 | auth/passwords/reset | `Auth::routes()` | todo | 重設密碼 |
+| P6-5 | welcome | `/`（WelcomeController） | todo | landing |
+| P6-C1 | 刪除死碼 home.blade.php | — | todo | **僅刪 view**；`/home` route/redirect 仍活躍，不可動 |
+| P6-C2 | 刪除死碼 auth/register2.blade.php | — | todo | 已確認無引用 |
+
+## Phase 7 — 下架 AdminLTE（全部頁 `live`/`retired` 後）
+| # | 項目 | 狀態 |
+|---|---|---|
+| P7-1 | 移除 admin-lte/jquery/bootstrap/datatables.net-bs4/Select2 主題 | todo |
+| P7-2 | 移除 layouts/dashboard-v3 全套 + resources/js/app.js 的 Vue 掛載 | todo |
+| P7-3 | 更新 AGENTS.md / ADMINLTE.md / README.md / CHANGELOG.md；標註 ADMINLTE4_UPGRADE_FEASIBILITY.md 已被取代 | todo |
+
+## 已具 React 版、僅待切換 + 退役（非重寫）
+| 頁面 | React 路由 | 狀態 | 備註 |
+|---|---|---|---|
+| view/index、view/list | `app.view.index`/`app.view.show` | todo | React 版已上線；待 flip flag + 退役 Blade `view.index`/`view.show` |
+| Query Playground UI | `/app/query-playground` | live | 已是 React（僅 nl_query_logs 日誌頁待遷，見 P1-6） |
+| Person Browser | `/app/*` | live | 已是 React（唯讀） |
+| Search-by-Entry | `/app/*` | live | 已是 React |
+
+## 明確排除（不在「頁面重寫」範圍）
+| 項目 | 原因 |
+|---|---|
+| cbdbapi/person.blade.php | XML/資料回應樣板（`response()->view()`），非互動頁 |
+
+---
+
+**統計**：待遷移互動頁面組約 30+（展開到視圖 ~105）；Phase 4 為工作量主體。狀態以本表為準，每次迭代更新。

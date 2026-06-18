@@ -167,8 +167,8 @@ class Navigation {
                     'audit-logs',
                     'admin.audit_logs',
                     'fas fa-clipboard-check',
-                    self::routeUrl('admin.audit-logs'),
-                    ['pages' => ['審計日誌'], 'patterns' => []]
+                    self::url('admin.audit-logs', 'admin.audit-logs', 'app.admin.audit-logs'),
+                    ['pages' => ['審計日誌'], 'patterns' => ['app.admin.audit-logs']]
                 ),
                 self::item(
                     'explain-sql',

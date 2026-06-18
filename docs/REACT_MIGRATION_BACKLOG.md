@@ -72,10 +72,10 @@
 ## Phase 5 — 管理與營運工具（依賴：F*，部分依賴 P4 樣板）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
-| P5-1 | operations/index（+restore/提案核可） | `operations.index`/`operations.restore` | todo | 列表 + 動作；OperationsProposalController |
+| P5-1 | operations/index（+restore/提案核可） | `operations.index`/`operations.restore` | done | 新路由 `app.operations.index`（inertia）；buildOperationsListing+serializeOperationRow 共用；寫入端點未改（router.post/delete）；unionPKDef* 移至 app/helpers.php；spec `docs/migration-specs/operations.md`；flag old |
 | P5-2 | manage/index | `manage.index` | done | 新路由 `app.manage.index`；buildUserListing 共用（byte-equiv）；spec `docs/migration-specs/manage-index.md`；flag old |
 | P5-3 | manage/edit | `manage.edit`/`manage.update` | done | 新路由 `app.manage.edit/update`；performUserUpdate 共用（byte-equiv，含軟刪除）；spec `docs/migration-specs/manage-edit.md`；flag old |
-| P5-4 | manage/merge-preview | `merge-preview.index` | todo | 合併工具 |
+| P5-4 | manage/merge-preview | `merge-preview.index` | done | 新路由 `app.merge-preview.index`（inertia）；buildMergePreview 共用；純唯讀預覽（無寫入）；isAdmin 權限保留；spec `docs/migration-specs/merge-preview.md`；flag old |
 | P5-5 | crowdsourcing/index | `crowdsourcing.index` | done | 新路由 `app.crowdsourcing.index`（superadmin+inertia）；buildCrowdsourcingLists 共用；confirm/reject 寫入未改（整頁導覽連 Blade GET）；has_diff 對齊 Blade；spec `docs/migration-specs/crowdsourcing.md`；flag old |
 | P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | done | 新路由（store/undo 重用，listRouteName 依路徑重導）；spec `docs/migration-specs/batch-load-book-titles.md`；flag old |
 | P5-7 | admin/batch_load_offices | `admin.batch-load-offices` | done | 新路由（store 重用，listRouteName 重導；backWithErrors 收 Request）；spec `docs/migration-specs/batch-load-offices.md`；flag old |

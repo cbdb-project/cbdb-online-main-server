@@ -259,6 +259,7 @@ Route::match(['put', 'patch'], 'app/manage/{manage}', 'ManagementController@appU
     ->name('app.manage.update');
 
 Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
+Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.merge-preview.index')->middleware('inertia');
 
 Route::resource('operations', 'OperationsController', ['name' => [
     'show' => 'operations.show',

@@ -223,7 +223,7 @@ class Navigation {
                     'merge-preview',
                     'admin.merge_records',
                     'ion ion-shuffle',
-                    self::routeUrl('merge-preview.index'),
+                    self::url('merge-preview', 'merge-preview.index', 'app.merge-preview.index'),
                     ['pages' => ['MergePreview'], 'patterns' => []]
                 ),
             ], self::routeUrl('manage.index'), fn () => $isSuperAdmin),

@@ -209,7 +209,7 @@ class Navigation {
                     'table-maintenance',
                     'admin.table_maintenance',
                     'fa fa-database',
-                    self::routeUrl('admin.cbdb-table-maintenance'),
+                    self::url('admin.cbdb-table-maintenance', 'admin.cbdb-table-maintenance', 'app.admin.cbdb-table-maintenance'),
                     ['pages' => ['CBDB 內部表維護'], 'patterns' => []]
                 ),
                 self::item(

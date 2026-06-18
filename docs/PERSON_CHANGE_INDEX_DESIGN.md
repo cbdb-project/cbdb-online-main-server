@@ -78,6 +78,15 @@ c_last_modified_date = 取下列各值中「非 NULL 的最大者」:
 
 ### 4. 維護機制:單一寫者(audit_log 收斂點)+ 可重建命令
 
+> **初次回填與自動更新的關係(精確說明)**
+>
+> 常見一句話「初次回填完成後,凡記入 audit_log 的新變更都會自動更新 person_change_index」**方向正確,但因果描述要精確**:
+>
+> - **不是** audit_log 表「驅動」person_change_index(沒有任何程序監看 audit_log 再回寫,也沒有 DB trigger)。而是**同一個方法 `AuditLogService::logChange()` 在同一次操作裡同時做兩件事**:寫一筆 audit_log,並(透過 `DB::afterCommit`)更新 person_change_index。兩者由同一條程式路徑產生。
+> - 因此「自動更新」**只涵蓋走 `logChange()` 的變更**——即應用程式的審計寫入路徑(mutation 與提案核准套用),且為人物相關的 14 張表(scope 守衛)。任何**繞過**此路徑的寫入(直接 SQL、匯入腳本、或直接往 audit_log 塞列)**既不會寫 audit_log、也不會更新 person_change_index**,須待下次 `rebuild` 才反映。
+> - 更新為 **best-effort 且在交易提交後**:mutation 回滾則不更新(正確);水位線 upsert 萬一失敗只記 log、跳過,缺口由 `cbdb:rebuild-person-change-index` 補回。
+> - 建議文案(供 README / 下游):「初次回填後,凡經應用程式正常編輯流程(會寫入 audit_log)的變更,都會在同一次操作中自動更新 person_change_index;繞過該流程的變更則需重跑 rebuild 才會反映。」
+
 - **日常即時更新**:掛在 **`AuditLogService::logChange()`**(`app/Services/AuditLogService.php:38`),由 `table_name` + `row_pk` / `new_data` / `old_data` 解析 `c_personid`,對 `person_change_index` 做 **NULL-safe GREATEST upsert**(語意同「水位線定義」的 NULL 警告)。
   - **掛載點務必是 `logChange()`,不是 `write()`、也不是任一 handler**(已驗證):`write()` 一律轉呼 `logChange()`;子資源 create/update/delete、BIOG_MAIN 本體 update、**提案核准套用**(direct-workflow 表經 `BiogMainRepository` 各 store/update;其餘表經 `OperationsProposalController::writeAuditLogForApproval()`)最終全部進到 `logChange()`。掛這裡即一網打盡,新增 handler 也不會漏。
   - ⚠ **即時路徑也必須用 NULL-safe GREATEST,不能用 Laravel `upsert()` 的預設覆寫語意**(review 嚴重修正):否則一筆 `occurred_at` 早於現值的即時 mutation(時鐘漂移、或 occurred_at 取事務開始時間)會把水位線**回退**,「單調不回退」宣稱即破功。重建側與即時側共用**同一份** NULL-safe GREATEST 邏輯(集中於 `app/Services/PersonChangeIndexService.php`,命令與 logChange 皆委派之,避免兩處分歧)。

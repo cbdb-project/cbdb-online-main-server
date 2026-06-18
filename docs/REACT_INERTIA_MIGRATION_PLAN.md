@@ -4,8 +4,9 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：Phase 0 地基 **F1–F6 完成**；**Phase 1（P1-1…P1-6）全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate；flag 一律預設 old，待人切換）。F7（複合主鍵 write-path）仍 `todo`，只由人翻，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：Phase 2 — Codes 代碼表 CRUD（P2-1 codes/index 起）。這是第一個真正的 CRUD 表單群組，沉澱 useForm/422/flash 可複用樣板。
+> - **目前進度**：Phase 0（F1–F6）、**Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate；flag 一律預設 old，待人切換）。write-path（store/update/destroy/proposal）採 perform* 單一來源抽取，舊 Blade byte-equivalent。F7（複合主鍵 write-path）仍 `todo`，**只由人翻**，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
+> - **下一步**：Phase 3 — 人物列表與檢視（P3-1 basicinformation/index、P3-2 show）。
+> - **重要**：Phase 4 硬前置 F7 為人類關卡；agent 完成 Phase 3、Phase 5 後，Phase 4 須等人翻 F7 才可開工（否則標 blocked 升級）。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。

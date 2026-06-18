@@ -194,6 +194,10 @@ Route::get('app/codes', 'CodesController@appIndex')
 // 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
 Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
+// Inertia + React 版（單表資料檢視）
+Route::get('app/codes/{table_name}', 'CodesController@appShow')
+    ->middleware('inertia')
+    ->name('app.codes.show');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');

@@ -356,7 +356,11 @@ class Navigation {
      * @return array<string, mixed>
      */
     protected static function codeItem(string $key, string $label, string $icon, string $table): array {
-        $node = self::item($key, $label, $icon, '/codes/' . $table, ['pages' => [$table], 'patterns' => []]);
+        // href 依 codes flag 解析：flag=new 且 app.codes.show 存在時指向 React 單表頁。
+        $href = (migration_flag_is_new('codes') && Route::has('app.codes.show'))
+            ? self::routeUrl('app.codes.show', ['table_name' => $table])
+            : '/codes/' . $table;
+        $node = self::item($key, $label, $icon, $href, ['pages' => [$table], 'patterns' => []]);
         $node['suffix'] = '(' . $table . ')';
 
         return $node;

@@ -38,9 +38,9 @@ class CodesIndexInertiaTest extends TestCase {
         config(['codes.ui_hidden' => []]);
         config(['migration_flags.pages.codes' => 'new']);
 
-        // app.codes.show 尚未建立（P2-2），故即使 flag=new 仍安全回退舊路徑。
+        // app.codes.show 已建立（P2-2），flag=new 時連結指向 React 單表頁。
         $this->get(route('app.codes.index'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('tables.0.url', '/codes/OFFICE_CODES'));
+                ->where('tables.0.url', '/app/codes/OFFICE_CODES'));
     }
 }

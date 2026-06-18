@@ -348,172 +348,280 @@ class CodesController extends Controller {
         $search = trim((string) $request->query('search', ''));
 
         try {
-            $perPage = config('codes.per_page', 20);
-            $upperTable = strtoupper($table);
-
-            // Check if this table needs JOIN
-            $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
-            if ($joinConfig) {
-                $query = $this->buildJoinQuery($joinConfig);
-            } else {
-                $query = DB::table($table);
-            }
-
-            $sampleRow = (clone $query)->first();
-            $thead = $this->buildTableHead($table, $sampleRow, $joinConfig);
-            $searchableColumns = $this->determineSearchableColumns($table, $thead);
-
-            // ★ 提前取得主鍵（tie-breaker 排序需要用到）
-            $keyColumns = $this->getKeyColumns($table);
-            $filters = $this->sanitizeColumnFilters($request->query('filters', []), $thead);
-            [$sortBy, $sortDir] = $this->sanitizeSortParameters(
-                $request->query('sort_by', ''),
-                $request->query('sort_dir', 'asc'),
-                $thead
-            );
-            $booleanEnabled = $this->resolveBooleanFilterEnabled($request);
-
-            // 游标分页大表（如 CBDB__NAME_FTS）硬短路：無條件拒絕逐欄/布林 filter 與 sort，
-            // 永遠走游標路徑，避免對百萬列大表跑 %term% 全表掃描。見設計 §2.3。
-            $cursorPaginationTables = ['CBDB__NAME_FTS'];
-            if (in_array(strtoupper($table), $cursorPaginationTables, true)) {
-                $filters = [];
-                $sortBy = '';
-                $sortDir = 'asc';
-                $booleanEnabled = false;
-            }
-
-            $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true)
-                && empty($filters)
-                && $sortBy === '';
-
-            if ($search !== '' && !empty($searchableColumns)) {
-                $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
-                    foreach ($searchableColumns as $column) {
-                        $searchColumn = $this->resolveColumnForQuery($column, $joinConfig);
-                        if ($searchColumn === null) {
-                            continue;
-                        }
-                        if ($useCursorPagination) {
-                            $subQuery->orWhere($searchColumn, 'like', $search . '%');
-                        } else {
-                            $subQuery->orWhere($searchColumn, 'like', '%' . $search . '%');
-                        }
-                    }
-                });
-            }
-
-            if ($useCursorPagination) {
-                return $this->showWithCursorPagination($request, $table, $query, $search, $perPage, $thead, $filters, $sortBy, $sortDir);
-            }
-
-            // 欄位過濾（欄位之間 AND）。
-            // - 關閉布林模式（預設）：單一 `%value%` 字面比對（與現狀完全相同）。
-            // - 開啟布林模式：對每欄解析 AND/OR/NOT 布林；解析失敗的欄位記錄錯誤並略過（不轉字面）。
-            // $appliedFilters 只含實際套用的欄位，供分頁/排序連結使用，避免把語法錯誤的欄位回灌 URL。
-            // 見設計 §6 / §9.2（M4/M9）。
-            $appliedFilters = [];
-            $filterErrors = [];
-            $filterDescriptions = [];
-            $descLabels = $booleanEnabled ? [
-                'contains' => (string) __('codes.filter_desc_contains'),
-                'not' => (string) __('codes.filter_desc_not'),
-                'and' => (string) __('codes.filter_desc_and'),
-                'or' => (string) __('codes.filter_desc_or'),
-            ] : [];
-            foreach ($filters as $column => $value) {
-                if ($value === '') {
-                    continue;
-                }
-                $filterColumn = $this->resolveColumnForQuery($column, $joinConfig);
-                if ($filterColumn === null) {
-                    continue;
-                }
-
-                if ($booleanEnabled) {
-                    try {
-                        $ast = $this->columnFilterExpression->parse($value);
-                    } catch (ColumnFilterParseException $e) {
-                        $filterErrors[$column] = $e->errorCode;
-
-                        continue;
-                    }
-                    $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast);
-                    $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $descLabels);
-                } else {
-                    $query->where($filterColumn, 'like', '%' . $value . '%');
-                }
-
-                $appliedFilters[$column] = $value;
-            }
-
-            // 排序 + 主鍵 tie-breaker
-            if ($sortBy !== '') {
-                $sortColumn = $this->resolveColumnForQuery($sortBy, $joinConfig);
-                if ($sortColumn !== null) {
-                    $query->orderBy($sortColumn, $sortDir);
-                }
-            }
-            foreach ($keyColumns as $pkCol) {
-                $pkSortExpr = $this->resolveColumnForQuery($pkCol, $joinConfig);
-                if ($pkSortExpr !== null) {
-                    $query->orderBy($pkSortExpr, 'asc');
-                }
-            }
-
-            // 分頁連結只攜帶實際套用的 filters（排除語法錯誤被略過的欄位），其餘 query 參數
-            // （search、sort、filter_bool 等）原樣保留。
-            $appendQuery = $request->except(['page', 'filters']);
-            if (!empty($appliedFilters)) {
-                $appendQuery['filters'] = $appliedFilters;
-            }
-            $data = $query->paginate($perPage)->appends($appendQuery);
-
-            $dynastyMap = [];
-            if (in_array('c_dy', $thead, true)) {
-                $dynastyMap = $this->getDynastyNameMap();
-            }
-
-            $isReadOnly = $this->isReadOnlyTable($table);
-            $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
-
-            $joinedColumns = [];
-            if ($joinConfig) {
-                $joinedColumns = $this->getJoinedColumnNames($joinConfig);
-            }
-
-            return view('codes.show', [
-                'page_title' => $table,
-                'page_description' => '',
-                'page_url' => '/codes',
-                'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
-                'q' => $table,
-                'thead' => $thead,
-                'data' => $data,
-                'search' => $search,
-                'dynastyMap' => $dynastyMap,
-                'isReadOnly' => $isReadOnly,
-                'exportable' => $this->isExportable($table),
-                'keyColumns' => $keyColumns,
-                'copyrightNote' => $copyrightNote,
-                'joinedColumns' => $joinedColumns,
-                'filters' => $filters,
-                'sortBy' => $sortBy,
-                'sortDir' => $sortDir,
-                'booleanEnabled' => $booleanEnabled,
-                'booleanFilterAvailable' => (bool) config('codes.boolean_filter_enabled', true),
-                'appliedFilters' => $appliedFilters,
-                // rawFilters 為 sanitize 後（已 trim、限 $thead/scalar）的集合，供輸入框回填，
-                // 與既有 blade 回填使用的 $filters 一致。Phase 4 若需「使用者完全原樣輸入」再調整。
-                'rawFilters' => $filters,
-                'filterErrors' => $filterErrors,
-                'filterDescriptions' => $filterDescriptions,
-            ]);
+            $payload = $this->buildShowPayload($request, $table, $search);
         } catch (\PDOException $e) {
             flash('找不到該資料表', 'warning');
 
             return redirect()->back();
         }
+
+        return view('codes.show', array_merge([
+            'page_title' => $table,
+            'page_description' => '',
+            'page_url' => '/codes',
+            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
+        ], $payload));
+    }
+
+    /**
+     * Inertia + React 版：代碼表單表資料（與 Blade show() 共用 buildShowPayload）。
+     */
+    public function appShow(Request $request, $table_name) {
+        $table = $this->guardTable($table_name);
+        $search = trim((string) $request->query('search', ''));
+
+        try {
+            $payload = $this->buildShowPayload($request, $table, $search);
+        } catch (\PDOException $e) {
+            flash('找不到該資料表', 'warning');
+
+            return redirect()->route('app.codes.index');
+        }
+
+        $useCursor = $payload['useCursorPagination'] ?? false;
+
+        // 序列化分頁資料為前端可消費結構（標準 = Laravel paginator；游標 = cursorMeta）。
+        if ($useCursor) {
+            $cursor = $payload['data'];
+            $rows = collect($cursor['data'])->map(fn ($r) => (array) $r)->all();
+            $dataProp = [
+                'rows' => $rows,
+                'first_id' => $cursor['first_id'],
+                'last_id' => $cursor['last_id'],
+                'has_more_pages' => $cursor['has_more_pages'],
+                'has_prev_pages' => $cursor['has_prev_pages'],
+                'next_cursor' => $cursor['next_cursor'],
+                'prev_cursor' => $cursor['prev_cursor'],
+            ];
+            $meta = null;
+        } else {
+            $paginator = $payload['data'];
+            $dataProp = ['rows' => array_map(fn ($r) => (array) $r, $paginator->items())];
+            $meta = [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ];
+        }
+
+        return Inertia::render('Codes/Show', [
+            'table' => $table,
+            'thead' => $payload['thead'],
+            'rows' => $dataProp['rows'],
+            'cursor' => $useCursor ? $dataProp : null,
+            'meta' => $meta,
+            'use_cursor' => $useCursor,
+            'search' => $payload['search'],
+            'dynasty_map' => (object) ($payload['dynastyMap'] ?? []),
+            'is_read_only' => $payload['isReadOnly'] ?? false,
+            'exportable' => $payload['exportable'] ?? false,
+            'key_columns' => array_values($payload['keyColumns'] ?? []),
+            'joined_columns' => array_values($payload['joinedColumns'] ?? []),
+            'copyright_note' => $payload['copyrightNote'] ?? null,
+            'filters' => (object) ($payload['filters'] ?? []),
+            'sort_by' => $payload['sortBy'] ?? '',
+            'sort_dir' => $payload['sortDir'] ?? 'asc',
+            'boolean_enabled' => $payload['booleanEnabled'] ?? false,
+            'boolean_filter_available' => $payload['booleanFilterAvailable'] ?? false,
+            'filter_errors' => (object) ($payload['filterErrors'] ?? []),
+            'filter_descriptions' => (object) ($payload['filterDescriptions'] ?? []),
+            // 操作連結（建立/編輯/刪除）依 codes flag 解析（新版就緒前回退 Blade）。
+            'can_edit' => \Illuminate\Support\Facades\Auth::check() && !($payload['isReadOnly'] ?? false),
+            'urls' => [
+                'index' => $this->codesIndexUrl(),
+                'create' => $this->codesActionUrl('create', $table),
+                'export' => '/codes/' . $table . '/export',
+                // edit/destroy 為舊 Blade 路徑模板（含 __ID__ 佔位），新版就緒前沿用。
+                'edit_template' => '/codes/' . $table . '/__ID__/edit',
+                'destroy_template' => '/codes/' . $table . '/__ID__',
+            ],
+            'page_translations' => [
+                'codes' => is_array($t = trans('codes')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /** 代碼表總覽 URL（flag-aware）。 */
+    protected function codesIndexUrl(): string {
+        if (migration_flag_is_new('codes') && Route::has('app.codes.index')) {
+            return route('app.codes.index', [], false);
+        }
+
+        return '/codes';
+    }
+
+    /** 代碼表 create 連結 base（flag-aware；edit/destroy 由前端帶 id 組合）。 */
+    protected function codesActionUrl(string $action, string $table): string {
+        // 新版 create/edit/destroy（P2-3/P2-4）就緒前一律回退舊 Blade 路徑。
+        return '/codes/' . $table . '/' . $action;
+    }
+
+    /**
+     * 建立 codes show 的 props payload（標準 offset 或游標分頁）。Blade 與 Inertia 共用。
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildShowPayload(Request $request, string $table, string $search): array {
+        $perPage = config('codes.per_page', 20);
+        $upperTable = strtoupper($table);
+
+        // Check if this table needs JOIN
+        $joinConfig = $this->tableJoinConfigurations[$upperTable] ?? null;
+        if ($joinConfig) {
+            $query = $this->buildJoinQuery($joinConfig);
+        } else {
+            $query = DB::table($table);
+        }
+
+        $sampleRow = (clone $query)->first();
+        $thead = $this->buildTableHead($table, $sampleRow, $joinConfig);
+        $searchableColumns = $this->determineSearchableColumns($table, $thead);
+
+        // ★ 提前取得主鍵（tie-breaker 排序需要用到）
+        $keyColumns = $this->getKeyColumns($table);
+        $filters = $this->sanitizeColumnFilters($request->query('filters', []), $thead);
+        [$sortBy, $sortDir] = $this->sanitizeSortParameters(
+            $request->query('sort_by', ''),
+            $request->query('sort_dir', 'asc'),
+            $thead
+        );
+        $booleanEnabled = $this->resolveBooleanFilterEnabled($request);
+
+        // 游标分页大表（如 CBDB__NAME_FTS）硬短路：無條件拒絕逐欄/布林 filter 與 sort，
+        // 永遠走游標路徑，避免對百萬列大表跑 %term% 全表掃描。見設計 §2.3。
+        $cursorPaginationTables = ['CBDB__NAME_FTS'];
+        if (in_array(strtoupper($table), $cursorPaginationTables, true)) {
+            $filters = [];
+            $sortBy = '';
+            $sortDir = 'asc';
+            $booleanEnabled = false;
+        }
+
+        $useCursorPagination = in_array(strtoupper($table), $cursorPaginationTables, true)
+            && empty($filters)
+            && $sortBy === '';
+
+        if ($search !== '' && !empty($searchableColumns)) {
+            $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
+                foreach ($searchableColumns as $column) {
+                    $searchColumn = $this->resolveColumnForQuery($column, $joinConfig);
+                    if ($searchColumn === null) {
+                        continue;
+                    }
+                    if ($useCursorPagination) {
+                        $subQuery->orWhere($searchColumn, 'like', $search . '%');
+                    } else {
+                        $subQuery->orWhere($searchColumn, 'like', '%' . $search . '%');
+                    }
+                }
+            });
+        }
+
+        if ($useCursorPagination) {
+            return $this->buildCursorPayload($request, $table, $query, $search, $perPage, $thead, $filters, $sortBy, $sortDir);
+        }
+
+        // 欄位過濾（欄位之間 AND）。
+        // - 關閉布林模式（預設）：單一 `%value%` 字面比對（與現狀完全相同）。
+        // - 開啟布林模式：對每欄解析 AND/OR/NOT 布林；解析失敗的欄位記錄錯誤並略過（不轉字面）。
+        // $appliedFilters 只含實際套用的欄位，供分頁/排序連結使用，避免把語法錯誤的欄位回灌 URL。
+        // 見設計 §6 / §9.2（M4/M9）。
+        $appliedFilters = [];
+        $filterErrors = [];
+        $filterDescriptions = [];
+        $descLabels = $booleanEnabled ? [
+            'contains' => (string) __('codes.filter_desc_contains'),
+            'not' => (string) __('codes.filter_desc_not'),
+            'and' => (string) __('codes.filter_desc_and'),
+            'or' => (string) __('codes.filter_desc_or'),
+        ] : [];
+        foreach ($filters as $column => $value) {
+            if ($value === '') {
+                continue;
+            }
+            $filterColumn = $this->resolveColumnForQuery($column, $joinConfig);
+            if ($filterColumn === null) {
+                continue;
+            }
+
+            if ($booleanEnabled) {
+                try {
+                    $ast = $this->columnFilterExpression->parse($value);
+                } catch (ColumnFilterParseException $e) {
+                    $filterErrors[$column] = $e->errorCode;
+
+                    continue;
+                }
+                $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast);
+                $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $descLabels);
+            } else {
+                $query->where($filterColumn, 'like', '%' . $value . '%');
+            }
+
+            $appliedFilters[$column] = $value;
+        }
+
+        // 排序 + 主鍵 tie-breaker
+        if ($sortBy !== '') {
+            $sortColumn = $this->resolveColumnForQuery($sortBy, $joinConfig);
+            if ($sortColumn !== null) {
+                $query->orderBy($sortColumn, $sortDir);
+            }
+        }
+        foreach ($keyColumns as $pkCol) {
+            $pkSortExpr = $this->resolveColumnForQuery($pkCol, $joinConfig);
+            if ($pkSortExpr !== null) {
+                $query->orderBy($pkSortExpr, 'asc');
+            }
+        }
+
+        // 分頁連結只攜帶實際套用的 filters（排除語法錯誤被略過的欄位），其餘 query 參數
+        // （search、sort、filter_bool 等）原樣保留。
+        $appendQuery = $request->except(['page', 'filters']);
+        if (!empty($appliedFilters)) {
+            $appendQuery['filters'] = $appliedFilters;
+        }
+        $data = $query->paginate($perPage)->appends($appendQuery);
+
+        $dynastyMap = [];
+        if (in_array('c_dy', $thead, true)) {
+            $dynastyMap = $this->getDynastyNameMap();
+        }
+
+        $isReadOnly = $this->isReadOnlyTable($table);
+        $copyrightNote = $this->tableCopyrightNotes[$table] ?? null;
+
+        $joinedColumns = [];
+        if ($joinConfig) {
+            $joinedColumns = $this->getJoinedColumnNames($joinConfig);
+        }
+
+        return [
+            'q' => $table,
+            'thead' => $thead,
+            'data' => $data,
+            'search' => $search,
+            'dynastyMap' => $dynastyMap,
+            'isReadOnly' => $isReadOnly,
+            'exportable' => $this->isExportable($table),
+            'keyColumns' => $keyColumns,
+            'copyrightNote' => $copyrightNote,
+            'joinedColumns' => $joinedColumns,
+            'filters' => $filters,
+            'sortBy' => $sortBy,
+            'sortDir' => $sortDir,
+            'booleanEnabled' => $booleanEnabled,
+            'booleanFilterAvailable' => (bool) config('codes.boolean_filter_enabled', true),
+            'appliedFilters' => $appliedFilters,
+            // rawFilters 為 sanitize 後（已 trim、限 $thead/scalar）的集合，供輸入框回填，
+            // 與既有 blade 回填使用的 $filters 一致。Phase 4 若需「使用者完全原樣輸入」再調整。
+            'rawFilters' => $filters,
+            'filterErrors' => $filterErrors,
+            'filterDescriptions' => $filterDescriptions,
+        ];
     }
 
     /**
@@ -1742,7 +1850,7 @@ class CodesController extends Controller {
      * @param array $thead
      * @return \Illuminate\View\View
      */
-    protected function showWithCursorPagination(
+    protected function buildCursorPayload(
         Request $request,
         string $table,
         $query,
@@ -1752,7 +1860,7 @@ class CodesController extends Controller {
         array $filters = [],
         string $sortBy = '',
         string $sortDir = 'asc'
-    ) {
+    ): array {
         $after = $request->query('after');   // 下一页游标 (id)
         $before = $request->query('before'); // 上一页游标 (id)
 
@@ -1825,17 +1933,14 @@ class CodesController extends Controller {
             $joinedColumns = $this->getJoinedColumnNames($joinConfig);
         }
 
-        return view('codes.show', [
-            'page_title' => $table,
-            'page_description' => '',
-            'page_url' => '/codes',
-            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
+        return [
             'q' => $table,
             'thead' => $thead,
             'data' => $cursorMeta,  // 传递游标元数据而非标准分页对象
             'search' => $search,
             'dynastyMap' => $dynastyMap,
             'isReadOnly' => $isReadOnly,
+            'exportable' => $this->isExportable($table),
             'keyColumns' => $keyColumns,
             'copyrightNote' => $copyrightNote,
             'joinedColumns' => $joinedColumns,
@@ -1850,7 +1955,7 @@ class CodesController extends Controller {
             'rawFilters' => $filters,
             'filterErrors' => [],
             'filterDescriptions' => [],
-        ]);
+        ];
     }
 
     protected function resolveColumnForQuery(string $column, ?array $joinConfig): ?string {

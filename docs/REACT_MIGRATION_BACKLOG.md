@@ -36,8 +36,8 @@
 ## Phase 2 — Codes 代碼表 CRUD（依賴：F*，建議 P1 完成後）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
-| P2-1 | codes/index | `codes.index` | todo | 代碼表列表 |
-| P2-2 | codes/show | `codes.show` | todo | 單表列數據 |
+| P2-1 | codes/index | `codes.index` | done | 新路由 `app.codes.index`；客戶端搜尋/排序；spec `docs/migration-specs/codes-index.md`；flag old |
+| P2-2 | codes/show | `codes.show` | done | 新路由 `app.codes.show`；buildShowPayload/buildCursorPayload 共用（Blade byte-equiv）；spec `docs/migration-specs/codes-show.md`；flag old |
 | P2-3 | codes/create | `codes.create`/`codes.store` | todo | 首個 CRUD 表單（建立 useForm/422/flash 樣板） |
 | P2-4 | codes/edit | `codes.edit`/`codes.update`/`codes.destroy` | todo | |
 | P2-5 | codes/proposal-edit | `codes.propose.*`/`codes.proposals.*` | todo | 群眾提案流程 |

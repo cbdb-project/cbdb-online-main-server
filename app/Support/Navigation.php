@@ -91,7 +91,7 @@ class Navigation {
             ),
 
             // 全部表格（Codes）
-            self::tree_('codes', 'nav.all_tables', 'fa fa-database', self::codesChildren(), '/codes'),
+            self::tree_('codes', 'nav.all_tables', 'fa fa-database', self::codesChildren(), self::url('codes', 'codes.index', 'app.codes.index')),
 
             // 檢視表（Views）。'地址層級檢視' 為舊 $viewPages 殘留（無對應子連結，
             // 目前無頁面設定此 $page_title），保留以維持選單展開的完全一致。
@@ -241,8 +241,8 @@ class Navigation {
                 'codes-home',
                 'nav.all_tables_home',
                 'fas fa-th-list',
-                '/codes',
-                ['pages' => ['Codes', '全部表格'], 'patterns' => []]
+                self::url('codes', 'codes.index', 'app.codes.index'),
+                ['pages' => ['Codes', '全部表格'], 'patterns' => ['app.codes.index']]
             ),
             self::codeItem('addr-belongs', 'codes.addr_belongs_data', 'fas fa-sitemap', 'ADDR_BELONGS_DATA'),
             self::codeItem('addr-codes', 'codes.addr_codes', 'fas fa-map-marker-alt', 'ADDR_CODES'),

@@ -13,7 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class CodesController extends Controller {
     protected $codesrepostory;
@@ -303,6 +305,42 @@ class CodesController extends Controller {
             'page_url' => '/codes',
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Inertia + React 版：代碼表總覽。
+     */
+    public function appIndex() {
+        $data = $this->codesrepostory->codes();
+
+        // 每個代碼表的「檢視」連結受 codes flag 控制（新版 show 就緒後指向 React）。
+        $rows = array_map(function ($item) {
+            $name = $item['name'];
+
+            return [
+                'name' => $name,
+                'description' => $item['description'] ?? '',
+                'url' => $this->codesShowUrl($name),
+            ];
+        }, $data);
+
+        return Inertia::render('Codes/Index', [
+            'tables' => $rows,
+            'page_translations' => [
+                'codes' => is_array($t = trans('codes')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /**
+     * 代碼表 show 連結：依 codes flag 指向新 React 或舊 Blade（相對 URL）。
+     */
+    protected function codesShowUrl(string $tableName): string {
+        if (migration_flag_is_new('codes') && Route::has('app.codes.show')) {
+            return route('app.codes.show', ['table_name' => $tableName], false);
+        }
+
+        return '/codes/' . $tableName;
     }
 
     public function show(Request $request, $table_name) {

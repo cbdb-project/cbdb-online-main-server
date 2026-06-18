@@ -333,6 +333,9 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/answer-from-nl', 'QueryPlaygroundController@answerFromNL')->name('query-playground.answer-from-nl');
     Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')->name('query-playground.answer-from-nl-stream');
     Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')->name('query-playground.nl-query-logs');
+    Route::get('app/query-playground/nl-query-logs', 'QueryPlaygroundController@appNlQueryLogs')
+        ->middleware('inertia')
+        ->name('app.query-playground.nl-query-logs');
 
     // Query Playground（Inertia + React）
     Route::get('app/query-playground', 'QueryPlaygroundController@appIndex')

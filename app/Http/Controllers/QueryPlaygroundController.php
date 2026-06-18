@@ -457,15 +457,65 @@ class QueryPlaygroundController extends Controller {
             abort(403, 'Unauthorized. Super admin access required.');
         }
 
+        $logs = $this->buildNlQueryLogsQuery($request)->paginate(20)->withQueryString();
+
+        return view('query_playground.nl_query_logs', [
+            'page_title' => '自然語言查詢日誌',
+            'page_title_key' => 'NL Query Logs',
+            'page_url' => route('query-playground.nl-query-logs'),
+            'logs' => $logs,
+            'users' => $this->nlQueryLogUsers(),
+            'filters' => [
+                'search' => $request->input('search'),
+                'success' => $request->input('success'),
+                'user_id' => $request->input('user_id'),
+            ],
+        ]);
+    }
+
+    /**
+     * NL 查詢日誌列表（Inertia + React 版，僅 Super Admin）。
+     */
+    public function appNlQueryLogs(Request $request) {
+        if (!Auth::user()->isSuperAdmin()) {
+            abort(403, 'Unauthorized. Super admin access required.');
+        }
+
+        $paginator = $this->buildNlQueryLogsQuery($request)->paginate(20)->withQueryString();
+        $rows = array_map(fn ($log) => $this->prepareNlLog($log), $paginator->items());
+
+        return Inertia::render('Admin/NlQueryLogs/Index', [
+            'logs' => [
+                'data' => $rows,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                ],
+            ],
+            'users' => $this->nlQueryLogUsers()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]),
+            'filters' => [
+                'search' => $request->input('search'),
+                'success' => $request->input('success'),
+                'user_id' => $request->input('user_id'),
+            ],
+            'playground_url' => route('app.query-playground.index', [], false),
+            'page_translations' => [
+                'query' => is_array($t = trans('query')) ? $t : [],
+                'operations' => is_array($t = trans('operations')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /** 建立 NL 查詢日誌查詢（join users + 套用 search/success/user_id 篩選 + 排序）。 */
+    protected function buildNlQueryLogsQuery(Request $request) {
         $query = DB::table('nl_query_logs')
             ->leftJoin('users', 'nl_query_logs.user_id', '=', 'users.id')
-            ->select(
-                'nl_query_logs.*',
-                'users.name as user_name',
-                'users.email as user_email'
-            );
+            ->select('nl_query_logs.*', 'users.name as user_name', 'users.email as user_email');
 
-        // 搜尋過濾
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
@@ -476,44 +526,95 @@ class QueryPlaygroundController extends Controller {
             });
         }
 
-        // 成功/失敗過濾
         if ($request->filled('success')) {
             $query->where('nl_query_logs.success', $request->input('success'));
         }
 
-        // 用戶過濾
         if ($request->filled('user_id')) {
             $query->where('nl_query_logs.user_id', $request->input('user_id'));
         }
 
-        // 排序
-        $query->orderBy('nl_query_logs.created_at', 'desc');
+        return $query->orderBy('nl_query_logs.created_at', 'desc');
+    }
 
-        // 分頁
-        $logs = $query->paginate(20)->withQueryString();
-
-        // 獲取所有用戶列表用於篩選
-        $users = DB::table('users')
+    /** 有日誌記錄的使用者清單（篩選用）。 */
+    protected function nlQueryLogUsers() {
+        return DB::table('users')
             ->whereIn('id', function ($query) {
-                $query->select('user_id')
-                    ->from('nl_query_logs')
-                    ->whereNotNull('user_id')
-                    ->distinct();
+                $query->select('user_id')->from('nl_query_logs')->whereNotNull('user_id')->distinct();
             })
             ->orderBy('name')
             ->get();
+    }
 
-        return view('query_playground.nl_query_logs', [
-            'page_title' => '自然語言查詢日誌',
-            'page_title_key' => 'NL Query Logs',
-            'page_url' => route('query-playground.nl-query-logs'),
-            'logs' => $logs,
-            'users' => $users,
-            'filters' => [
-                'search' => $request->input('search'),
-                'success' => $request->input('success'),
-                'user_id' => $request->input('user_id'),
-            ],
-        ]);
+    /**
+     * 備妥一筆 NL 日誌供前端渲染。LLM 回應原文（llm_response）完整保留於 collapsible，
+     * 另計算 llm_summary（model / token 用量 / 回合數）便於快速檢視。
+     *
+     * @param object $log
+     * @return array<string, mixed>
+     */
+    protected function prepareNlLog($log): array {
+        return [
+            'id' => $log->id,
+            'user_name' => $log->user_name,
+            'user_email' => $log->user_email,
+            'created_at' => (string) $log->created_at,
+            'execution_time_ms' => $log->execution_time_ms,
+            'success' => (bool) $log->success,
+            'question' => $log->question,
+            'generated_sql' => $log->generated_sql,
+            'explanation' => $log->explanation,
+            'error_message' => $log->error_message,
+            'llm_prompt' => $log->llm_prompt,
+            'llm_response' => $log->llm_response,
+            'llm_summary' => $this->parseLlmSummary($log->llm_response),
+        ];
+    }
+
+    /**
+     * 從 llm_response JSON 萃取摘要（相容 rounds / OpenAI / Gemini 格式）。
+     * 詳細逐回合/工具結果不在此重建（成本取捨）——原文 JSON 已完整提供。
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function parseLlmSummary(?string $llmResponse): ?array {
+        if ($llmResponse === null || $llmResponse === '') {
+            return null;
+        }
+        $data = json_decode($llmResponse, true);
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $rounds = $data['rounds'] ?? null;
+        $model = $data['model'] ?? $data['modelVersion'] ?? null;
+        $prompt = 0;
+        $completion = 0;
+        $total = 0;
+
+        if (is_array($rounds)) {
+            foreach ($rounds as $round) {
+                $usage = $round['llm_response']['usage'] ?? [];
+                $prompt += (int) ($usage['prompt_tokens'] ?? 0);
+                $completion += (int) ($usage['completion_tokens'] ?? 0);
+                $total += (int) ($usage['total_tokens'] ?? 0);
+                $model = $model ?? ($round['llm_response']['model'] ?? null);
+            }
+        } else {
+            $usage = $data['usage'] ?? [];
+            $meta = $data['usageMetadata'] ?? [];
+            $prompt = (int) ($usage['prompt_tokens'] ?? $meta['promptTokenCount'] ?? 0);
+            $completion = (int) ($usage['completion_tokens'] ?? $meta['candidatesTokenCount'] ?? 0);
+            $total = (int) ($usage['total_tokens'] ?? $meta['totalTokenCount'] ?? 0);
+        }
+
+        return [
+            'model' => $model,
+            'rounds_count' => is_array($rounds) ? count($rounds) : null,
+            'prompt_tokens' => $prompt,
+            'completion_tokens' => $completion,
+            'total_tokens' => $total,
+        ];
     }
 }

@@ -4,8 +4,8 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：Phase 0 地基 **F1–F6 全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate）。F7（複合主鍵 write-path）仍 `todo`，只由人翻，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：Phase 1 試點/參考頁 `admin/audit-logs`（P1-1，附錄 B）：把 AdminAuditLogController 增設 Inertia 變體（meta + sort/direction）、前端 Pages/Admin/AuditLogs/Index.tsx 套 DashboardLayout + DataTable。
+> - **目前進度**：Phase 0 地基 **F1–F6 完成**；**Phase 1（P1-1…P1-6）全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate；flag 一律預設 old，待人切換）。F7（複合主鍵 write-path）仍 `todo`，只由人翻，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
+> - **下一步**：Phase 2 — Codes 代碼表 CRUD（P2-1 codes/index 起）。這是第一個真正的 CRUD 表單群組，沉澱 useForm/422/flash 可複用樣板。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。

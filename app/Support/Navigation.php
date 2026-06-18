@@ -153,8 +153,8 @@ class Navigation {
                     'nl-query-logs',
                     'admin.nl_query_logs',
                     'fas fa-comments',
-                    self::routeUrl('query-playground.nl-query-logs'),
-                    ['pages' => ['NL Query Logs'], 'patterns' => []]
+                    self::url('query-playground.nl-query-logs', 'query-playground.nl-query-logs', 'app.query-playground.nl-query-logs'),
+                    ['pages' => ['NL Query Logs'], 'patterns' => ['app.query-playground.nl-query-logs']]
                 ),
                 self::item(
                     'ai-fill-logs',

@@ -103,7 +103,10 @@ npm install
 ./vendor/bin/phpunit
 npm run build
 php artisan cbdb:fetch-chgis-map
+php artisan cbdb:rebuild-person-change-index   # 部署後須跑一次：回填人物層級修改水位線（否則 /api/v2/persons 的 c_modified_date 全為 null）
 ```
+
+> 部署提醒：`person_change_index`（供 `/api/v2/persons` 的 `c_created_date` / `c_modified_date`）的 migration 只建表不回填。部署到任何環境後須**手動執行一次** `php artisan cbdb:rebuild-person-change-index` 做初始全量回填；之後日常由系統即時維護，並可定期以 `--since` 增量校正。詳見 [docs/PERSON_CHANGE_INDEX_DESIGN.md](docs/PERSON_CHANGE_INDEX_DESIGN.md)。
 
 ### 前端
 - React/Inertia 版 Query Playground 是現行主路徑：`/app/query-playground`

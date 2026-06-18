@@ -21,10 +21,22 @@ class ApiV2PersonListTest extends TestCase {
             $table->integer('c_personid')->primary();
             $table->string('c_name_chn')->nullable();
             $table->string('c_name')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            // BIOG_MAIN 本表也有 c_modified_date（本列語意）；用來驗證 API 不會誤輸出它，
+            // 而是輸出 person_change_index 的人物層級水位線。
+            $table->dateTime('c_modified_date')->nullable();
+        });
+
+        Schema::create('person_change_index', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->dateTime('c_last_modified_date')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->dateTime('updated_at')->nullable();
         });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('person_change_index');
         Schema::dropIfExists('BIOG_MAIN');
         parent::tearDown();
     }
@@ -133,5 +145,55 @@ class ApiV2PersonListTest extends TestCase {
         $response = $this->getJson('/api/v2/persons');
 
         $response->assertOk()->assertJson(['ok' => true]);
+    }
+
+    public function test_outputs_created_date_and_modified_date_from_sidecar(): void {
+        DB::table('BIOG_MAIN')->insert([
+            [
+                'c_personid' => 10,
+                'c_name_chn' => '甲',
+                'c_name' => 'A',
+                'c_created_date' => '2007-01-01 00:00:00',
+                'c_modified_date' => '2010-01-01 00:00:00', // BIOG_MAIN 本表語意，不應被輸出
+            ],
+        ]);
+        DB::table('person_change_index')->insert([
+            [
+                'c_personid' => 10,
+                'c_last_modified_date' => '2026-03-12 09:21:00',
+                'c_created_date' => '2007-01-01 00:00:00',
+                'updated_at' => '2026-03-12 09:21:00',
+            ],
+        ]);
+
+        $response = $this->getJson('/api/v2/persons');
+        $response->assertOk();
+
+        $row = $response->json('data.0');
+        $this->assertSame(10, $row['c_personid']);
+        // c_created_date 來自 BIOG_MAIN
+        $this->assertSame('2007-01-01 00:00:00', $row['c_created_date']);
+        // c_modified_date 來自 person_change_index 水位線，而非 BIOG_MAIN.c_modified_date(2010)
+        $this->assertSame('2026-03-12 09:21:00', $row['c_modified_date']);
+    }
+
+    public function test_modified_date_is_null_when_no_sidecar_row(): void {
+        DB::table('BIOG_MAIN')->insert([
+            [
+                'c_personid' => 5,
+                'c_name_chn' => '甲',
+                'c_name' => 'A',
+                'c_created_date' => '2007-01-01 00:00:00',
+                'c_modified_date' => '2010-01-01 00:00:00',
+            ],
+        ]);
+
+        $response = $this->getJson('/api/v2/persons');
+        $response->assertOk();
+
+        $row = $response->json('data.0');
+        $this->assertSame('2007-01-01 00:00:00', $row['c_created_date']);
+        $this->assertArrayHasKey('c_modified_date', $row);
+        $this->assertNull($row['c_modified_date']);
     }
 }

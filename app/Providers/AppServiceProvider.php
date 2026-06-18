@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\BiogMain;
 use App\Observers\BiogMainObserver;
+use App\Services\PersonChangeIndexService;
 use App\Services\QueryProfile;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Pagination\Paginator;
@@ -20,6 +21,12 @@ class AppServiceProvider extends ServiceProvider {
     public function register() {
         $this->app->singleton(QueryProfile::class, function () {
             return new QueryProfile();
+        });
+
+        // person_change_index 水位線寫入服務：singleton 讓 tableExists() 的 schema 檢查
+        // 在單一 request/command 內只做一次（避免每筆 audit 寫入都查 information_schema）。
+        $this->app->singleton(PersonChangeIndexService::class, function () {
+            return new PersonChangeIndexService();
         });
     }
 

@@ -6,6 +6,7 @@ use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AuditLogService {
@@ -66,6 +67,27 @@ class AuditLogService {
             'old_data' => $this->encodeJson($oldData),
             'new_data' => $this->encodeJson($newData),
         ]);
+
+        // 單一寫者：每筆人物相關變更更新 person_change_index 水位線。
+        // 此處是所有 direct mutation 與提案核准套用的收斂點，掛這裡即一網打盡。
+        // recordChange 內含 scope 與 person_change_index 存在性守衛，非人物表或表未建時為 no-op。
+        //
+        // 用 afterCommit 把水位線更新延到外層 mutation 交易「提交後」才執行（交易外、獨立語句）：
+        //  - 若 mutation 回滾，callback 不執行（不為未持久化的變更跳水位線，語意正確）；
+        //  - 若水位線 upsert 自身失敗（含死鎖），只影響它自己，**絕不回滾已提交的使用者資料**；
+        //    失敗僅記 Log::warning，缺口由 rebuild 命令（權威來源）補回；
+        //  - 不在交易內時，afterCommit 會立即執行該 callback。
+        $occurredAtString = $occurredAt->format('Y-m-d H:i:s');
+        DB::afterCommit(function () use ($table, $rowPk, $newData, $oldData, $occurredAtString) {
+            try {
+                app(PersonChangeIndexService::class)->recordChange($table, $rowPk, $newData, $oldData, $occurredAtString);
+            } catch (\Throwable $e) {
+                Log::warning('person_change_index 即時更新失敗，將由 rebuild 補回', [
+                    'table' => $table,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
     }
 
     public function buildRowPkFromData(string $table, array $data): array {

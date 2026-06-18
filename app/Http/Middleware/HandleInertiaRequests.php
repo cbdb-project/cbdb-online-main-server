@@ -61,8 +61,8 @@ class HandleInertiaRequests extends Middleware {
             // 為相對 URL，React DashboardLayout 直接使用，避免前端硬編碼路徑。
             'shell' => [
                 'home_url' => route('basicinformation.index', [], false),
-                'profile_url' => \Illuminate\Support\Facades\Route::has('profile.edit')
-                    ? route('profile.edit', [], false) : null,
+                // profile 連結受 migration flag 控制：flag=new 且新路由存在時指向 React 版。
+                'profile_url' => $this->profileUrl(),
                 'logout_url' => route('logout', [], false),
                 'login_url' => route('login', [], false),
                 'register_url' => route('register', [], false),
@@ -86,6 +86,21 @@ class HandleInertiaRequests extends Middleware {
     }
 
     /**
+     * 個人資料連結（依 migration flag 指向 Blade 或 React 版；皆不存在時 null）。
+     */
+    protected function profileUrl(): ?string {
+        $route = \Illuminate\Support\Facades\Route::class;
+        if (migration_flag_is_new('profile') && $route::has('app.profile.edit')) {
+            return route('app.profile.edit', [], false);
+        }
+        if ($route::has('profile.edit')) {
+            return route('profile.edit', [], false);
+        }
+
+        return null;
+    }
+
+    /**
      * 將 laracasts/flash 的 session 訊息（session key `flash_notification`）
      * 正規化成前端可消費的陣列。flash 訊息屬一次性 session flash data，
      * 在本次請求被讀取後即隨 Laravel flash 生命週期清除，不需手動 forget。
@@ -99,7 +114,7 @@ class HandleInertiaRequests extends Middleware {
             $messages = collect($messages);
         }
 
-        return $messages->map(function ($message) {
+        $result = $messages->map(function ($message) {
             // Message 物件或已是陣列皆可能出現，統一取欄位。
             $get = fn ($key, $default = null) => is_array($message)
                 ? ($message[$key] ?? $default)
@@ -113,5 +128,28 @@ class HandleInertiaRequests extends Middleware {
                 'overlay' => (bool) $get('overlay', false),
             ];
         })->values()->all();
+
+        // 一併橋接 Laravel 慣用的一次性 session 訊息（控制器常用 ->with('success', ...)）。
+        $generic = [
+            'success' => 'success',
+            'error' => 'danger',
+            'warning' => 'warning',
+            'info' => 'info',
+            'status' => 'info',
+        ];
+        foreach ($generic as $key => $level) {
+            $value = session($key);
+            if (is_string($value) && $value !== '') {
+                $result[] = [
+                    'level' => $level,
+                    'message' => $value,
+                    'title' => null,
+                    'important' => false,
+                    'overlay' => false,
+                ];
+            }
+        }
+
+        return $result;
     }
 }

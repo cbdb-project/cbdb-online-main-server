@@ -30,7 +30,7 @@
 | P1-2 | admin/ai_fill_logs/index | `admin.ai-fill-logs` | AiFillLogController | done | 唯讀日誌（卡片列表）；新路由 `app.admin.ai-fill-logs`；spec `docs/migration-specs/admin-ai-fill-logs.md`；flag old |
 | P1-3 | admin/explain_sql | `admin.explainsql` | AdminExplainSqlController | done | 新路由 `app.admin.explainsql(.explain)`；唯讀白名單共用 runExplain()；spec `docs/migration-specs/admin-explain-sql.md`；flag old |
 | P1-4 | dashboard/index | `dashboard` | DashboardController | done | 新路由 `app.dashboard`；buildStats() 共用；spec `docs/migration-specs/dashboard.md`；flag old |
-| P1-5 | profile/edit | `profile.edit`/`profile.update` | UserProfileController | todo | 簡單表單（含 api-tokens.* 檢查） |
+| P1-5 | profile/edit | `profile.edit`/`profile.update` | UserProfileController | done | 新路由 `app.profile.edit(.update)`；含 TokenManager（api-tokens.*）；share() flash 擴充 session success/error；spec `docs/migration-specs/profile-edit.md`；flag old |
 | P1-6 | query_playground/nl_query_logs | `query-playground.nl-query-logs` | QueryPlaygroundController@nlQueryLogs | todo | 唯讀日誌；Playground UI 本身已是 React |
 
 ## Phase 2 — Codes 代碼表 CRUD（依賴：F*，建議 P1 完成後）

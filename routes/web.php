@@ -224,6 +224,13 @@ Route::post('operations/{operation}/restore', 'OperationsController@restore')->n
 Route::middleware('auth')->group(function () {
     Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
     Route::patch('profile', 'UserProfileController@update')->name('profile.update');
+    // Inertia + React 版
+    Route::get('app/profile', 'UserProfileController@appEdit')
+        ->middleware('inertia')
+        ->name('app.profile.edit');
+    Route::patch('app/profile', 'UserProfileController@appUpdate')
+        ->middleware('inertia')
+        ->name('app.profile.update');
 
     // API Token 管理
     Route::get('api-tokens', 'ApiTokenController@index')->name('api-tokens.index');

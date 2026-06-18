@@ -4,9 +4,9 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；Phase 5 **P5-2、P5-3 完成、P5-12 排除**（獨立地圖應用）。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate；flag 一律預設 old，待人切換。write-path（codes/manage 的 store/update/destroy/proposal）採 perform* 單一來源抽取，舊 Blade byte-equivalent。
+> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate；flag 一律預設 old，待人切換。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
 > - **人類關卡（agent 不可跨越）**：① **F7**（複合主鍵 write-path）只由人翻 `done` → 整個 **Phase 4（P4-0…P4-P，人物編輯器 13 子表）blocked**；② **P3-2**：`basicinformation/show` 實為 editor readonly，需人拍板設計方向（見 D.1）。
-> - **下一步（agent 可續）**：Phase 5 剩餘互動工具——P5-1 operations、P5-4 merge-preview、P5-5 crowdsourcing、P5-6/7/8 batch loaders（檔案上傳）、P5-9/10 wiki/table maintenance（輪詢非同步）、P5-11 unidirectional-repair。皆為較重的互動/diff/上傳/輪詢頁，逐頁照 recipe 推進。
+> - **下一步（agent 可續）**：Phase 0–5（含）範圍內 agent 可做的頁面已全數完成。剩餘僅人類關卡（F7 → Phase 4、P3-2 設計決策）與 Phase 6（認證頁/入口，依賴 F*）。各頁 flag 仍為 old，待人逐一驗收後切換。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。
@@ -327,7 +327,12 @@
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）
 | 日期 | 頁面/範圍 | 坑 / 心得 | 後續頁如何套用 |
 |---|---|---|---|
-| （尚無，待第一頁實作後填入） | | | |
+| 2026-06-18 | Phase 5 共用 | **重列表頁配方**：把 index() 的每列資料建構抽成 `buildXxxListing()`，Blade index() 與新 appIndex() 共用，appIndex 再以 `serializeXxxRow()` 攤平。Blade 保持 byte-equivalent，靠既有 Blade 回歸測試把關。 | 任何含複雜每列 @php 計算的列表頁皆套此模式 |
+| 2026-06-18 | operations (P5-1) | Blade 視圖內 `@include('biogmains.defense')` 才定義的全域 helper（`unionPKDef*`）控制器用不到 → 移到自動載入的 `app/helpers.php`（function_exists 守衛，函式體逐字相同），defense.blade 重複定義自動略過。 | 控制器需用 Blade-only 全域函式時，集中到 app/helpers.php 而非重寫 |
+| 2026-06-18 | 寫入/敏感端點 | restore/approve/reject/confirm/reject/rebuild/import 等寫入端點**完全不改**：React 以 `router.post`/`router.delete`（Inertia 重導）或 `fetch`+`X-XSRF-TOKEN`（回 JSON 的端點）呼叫既有路由。`redirect()->back()` 會回到 app 頁 referer → 同 shell 不跳出。 | 所有含寫入動作的頁沿用；JSON 端點用 fetch + XSRF cookie 範式（同 Profile/TokenManager） |
+| 2026-06-18 | wiki/table maintenance (P5-9/10) | **非同步輪詢**：fetch POST → task_id → `setInterval` 每 2–5 秒 poll progress 端點 → 進度條；completed/error/cancelled 時 `clearInterval` 並 alert，完成用 `router.reload()` 更新統計。務必在所有終止/錯誤分支清理 interval（用 `stopPoll()`/`reset()`）。 | 其餘輪詢頁沿用；interval 清理是必檢項 |
+| 2026-06-18 | 序列化保真 | 連結/URL 組裝（如 wiki 條目 link 的 CJK `rawurlencode`、resource 編輯連結）一律在 PHP appIndex 端算好再傳，避免 JS 端重算與 Blade 不一致；測試斷言編碼後字串。 | 任何含伺服器端 URL 組裝的頁，序列化時就算好 |
+| 2026-06-18 | Navigation flag-aware | `self::url(flag, oldRoute, newRoute)` 需帶 query 參數時（如 operations proposals_only=1）擴充第 4 參數 `$params`；兩個指向同路由不同參數的節點共用同一 flag。 | nav 帶參數的 flag-aware 節點沿用 |
 
 ---
 

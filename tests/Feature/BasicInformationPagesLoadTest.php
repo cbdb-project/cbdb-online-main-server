@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -634,6 +635,19 @@ class BasicInformationPagesLoadTest extends TestCase {
     /**
      * 回歸測試：翻頁時 q 為空字串（ConvertEmptyStringsToNull 會轉為 null）不應 500
      */
+    #[Test]
+    public function test_app_basicinformation_index_renders_inertia() {
+        $response = $this->get(route('app.basicinformation.index'));
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('BasicInformation/Index')
+            ->has('names.data')
+            ->has('names.meta')
+            ->has('dynasty_facets')
+            ->has('edit_template')
+            ->has('create_url'));
+    }
+
     #[Test]
     public function test_basicinformation_index_with_empty_query_and_pagination() {
         $response = $this->get('/basicinformation?q=&page=2');

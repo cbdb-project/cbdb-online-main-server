@@ -57,6 +57,10 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'update' => 'basicinformation.update',
     'index' => 'basicinformation.index',
 ]]);
+// Inertia + React 版（人物列表，public，與舊 index 同）
+Route::get('app/basicinformation', 'BasicInformationController@appIndex')
+    ->middleware('inertia')
+    ->name('app.basicinformation.index');
 Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
 Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOfficesController@saveas');

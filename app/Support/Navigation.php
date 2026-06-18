@@ -69,8 +69,8 @@ class Navigation {
                 'person',
                 'nav.person_editing',
                 'fas fa-landmark',
-                self::url('basicinformation.index', 'basicinformation.index'),
-                ['pages' => ['Basicinformation'], 'patterns' => ['basicinformation.index']]
+                self::url('basicinformation.index', 'basicinformation.index', 'app.basicinformation.index'),
+                ['pages' => ['Basicinformation'], 'patterns' => ['basicinformation.index', 'app.basicinformation.index']]
             ),
 
             self::item(

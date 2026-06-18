@@ -22,7 +22,9 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 /**
  * Class BiogBasicInformationController
@@ -57,7 +59,7 @@ class BasicInformationController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
-        $this->middleware('auth')->except(['index', 'show', 'edit']);
+        $this->middleware('auth')->except(['index', 'show', 'edit', 'appIndex', 'appShow']);
     }
 
     private function normalizePersonId($id): int {
@@ -114,6 +116,74 @@ class BasicInformationController extends Controller {
             'q' => $q,
             'c_dy' => $cDy,
             'dynastyFacets' => $dynastyFacets,
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：人物列表（實質首頁）。授權/查詢邏輯與 Blade index 一致。
+     */
+    public function appIndex(Request $request) {
+        $q = trim((string) ($request->input('q') ?? ''));
+        $num = $request->input('num', 20);
+        $cDyInput = $request->input('c_dy');
+        $cDy = $cDyInput === null ? '' : trim((string) $cDyInput);
+
+        $dynastyFacets = $q !== '' ? BiogMainRepository::dynastyFacetsByQuery($q) : [];
+
+        // c_dy 不在當前查詢的朝代分佈中 → 重導乾淨 URL（與 Blade 同邏輯，導向 app 路由）。
+        if ($cDy !== '' && !empty($dynastyFacets)) {
+            $validDynasties = collect($dynastyFacets)->pluck('c_dy')->map(fn ($v) => (string) $v)->toArray();
+            if (!in_array((string) $cDy, $validDynasties, true)) {
+                $params = $request->only(['q', 'num']);
+
+                return redirect()->route('app.basicinformation.index', array_filter($params, fn ($v) => $v !== null && $v !== ''));
+            }
+        }
+
+        $names = $this->biogMainRepository->namesByQuery($request, $num);
+
+        $rows = array_map(fn ($item) => [
+            'c_personid' => $item->c_personid,
+            'c_name_chn' => $item->c_name_chn,
+            'c_name' => $item->c_name,
+            'c_dynasty_chn' => $item->c_dynasty_chn ?? '',
+            'c_index_year' => $item->c_index_year,
+            'addr_name_chn' => $item->ADDR_c_name_chn ?? '',
+            'zi' => $item->c_alt_name_chn_zi ?? '',
+            'hao' => $item->c_alt_name_chn_hao ?? '',
+        ], $names->items());
+
+        $editIsNew = migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit');
+
+        return Inertia::render('BasicInformation/Index', [
+            'names' => [
+                'data' => $rows,
+                'meta' => [
+                    'current_page' => $names->currentPage(),
+                    'last_page' => $names->lastPage(),
+                    'per_page' => $names->perPage(),
+                    'total' => $names->total(),
+                    'from' => $names->firstItem(),
+                    'to' => $names->lastItem(),
+                ],
+            ],
+            'q' => $q,
+            'c_dy' => $cDy,
+            'dynasty_facets' => array_map(fn ($f) => [
+                'c_dy' => $f->c_dy,
+                'c_dynasty_chn' => $f->c_dynasty_chn,
+                'count' => $f->count,
+            ], is_array($dynastyFacets) ? $dynastyFacets : $dynastyFacets->all()),
+            'can_add' => Auth::check() && Auth::user()->isActive(),
+            // 人物編輯器仍為 Blade（Phase 4，受 F7 硬前置）；連結模板 flag-aware。
+            'edit_template' => $editIsNew
+                ? route('app.basicinformation.edit', ['basicinformation' => '__ID__'], false)
+                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
+            'create_url' => route('basicinformation.create', [], false),
+            'page_translations' => [
+                'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
         ]);
     }
 

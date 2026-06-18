@@ -45,7 +45,7 @@
 ## Phase 3 — 人物列表與檢視（高流量；依賴：F*）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
-| P3-1 | biogmains/basicinformation/index | `basicinformation.index` | todo | 實質首頁；可複用 PersonBrowser **唯讀**元件 |
+| P3-1 | biogmains/basicinformation/index | `basicinformation.index` | done | 新路由 `app.basicinformation.index`（public）；搜尋+朝代facets+分頁；spec `docs/migration-specs/basicinformation-index.md`；flag old |
 | P3-2 | biogmains/basicinformation/show | （legacy `layouts.app`） | todo | 唯讀；淘汰最後一個 Bootstrap-3 layout；與編輯器解耦 |
 
 ## Phase 4 — 人物編輯器 + 12 複合主鍵子資源（XL；最高風險）

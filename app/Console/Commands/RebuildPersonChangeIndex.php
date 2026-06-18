@@ -204,7 +204,10 @@ class RebuildPersonChangeIndex extends Command {
             foreach ($rows as $row) {
                 $buffer[] = [
                     'c_personid' => (int) $row->c_personid,
-                    'last' => $row->m,
+                    // 水位線 = max(該表 c_modified_date, c_created_date)：建檔本身也是一次「異動」，
+                    // 否則「只有建檔時間、從未被改」的人物水位線會是 NULL，被 modified_since 漏掉（under-fetch）。
+                    // 符合設計 GREATEST(MAX(modified), MAX(created), audit) 公式。
+                    'last' => $this->maxDate($row->m, $row->cr),
                     'created' => $writeCreated ? $row->cr : null,
                 ];
                 $processed++;
@@ -439,19 +442,35 @@ class RebuildPersonChangeIndex extends Command {
         return number_format(memory_get_usage(true) / 1024 / 1024, 2);
     }
 
+    /**
+     * 兩個可為 NULL 的 datetime 字串取較大者（'Y-m-d H:i:s' 字典序＝時間序）。
+     * 任一為 NULL 取另一；皆 NULL 回 NULL。
+     */
+    protected function maxDate(?string $a, ?string $b): ?string {
+        if ($a === null) {
+            return $b;
+        }
+        if ($b === null) {
+            return $a;
+        }
+
+        return $a >= $b ? $a : $b;
+    }
+
     protected function normalizeSince(?string $since): ?string {
-        $since = $since ? trim($since) : '';
-        if ($since === '') {
+        if ($since === null || trim($since) === '') {
             return null;
         }
 
-        try {
-            return \Illuminate\Support\Carbon::parse($since)->format('Y-m-d H:i:s');
-        } catch (Throwable $e) {
-            $this->warn(sprintf('--since 無法解析（%s），忽略此參數。', $since));
-
-            return null;
+        // 與 API 的 modified_since 共用同一套嚴格解析（PersonChangeIndexService::parseThreshold）：
+        // 完整鎖定形狀 + checkdate/時間範圍 + 時區正規化。無法安全辨識則忽略 --since
+        // （退回全量重建＝over-fetch，安全方向），避免相對/曆法非法輸入把門檻推晚而漏掉區間變更。
+        $normalized = PersonChangeIndexService::parseThreshold($since);
+        if ($normalized === null) {
+            $this->warn(sprintf('--since 無法辨識（%s），已忽略（改為全量重建）。', trim($since)));
         }
+
+        return $normalized;
     }
 
     /**

@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 /**
  * person_change_index（人物層級修改水位線）的共用寫入邏輯。
@@ -41,6 +43,57 @@ class PersonChangeIndexService {
 
     public function isPersonScopedTable(string $table): bool {
         return in_array($table, self::PERSON_SCOPED_TABLES, true);
+    }
+
+    /**
+     * 將使用者輸入的時間門檻（API `modified_since`、命令 `--since`）嚴格解析為 app 時區的
+     * 'Y-m-d H:i:s'；無法安全辨識時回 null（呼叫端據此「不過濾」＝over-fetch 安全方向，絕不漏資料）。
+     *
+     * 兩處共用同一份邏輯，避免分歧。防線：
+     *  1. 完整鎖定字串形狀（日期 + 可選時間 + 可選時區後綴），擋掉相對/關鍵字輸入（now / `+1 day` 等）。
+     *  2. checkdate() 驗曆法、時分秒範圍驗證——擋掉「形狀合法但曆法非法」（如 2026-02-31、24:00:00），
+     *     否則 Carbon::parse 會把它們進位成更晚時間，造成 under-fetch 並違反「無法辨識則忽略」。
+     *  3. 時區正規化：帶時區後綴者換算到 app 時區再比較；無後綴者以 app 時區解讀（與 DB 牆鐘一致）。
+     */
+    public static function parseThreshold($value): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/', $value, $m)) {
+            return null;
+        }
+
+        if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            return null;
+        }
+
+        if (isset($m[4]) && $m[4] !== '') {
+            $hour = (int) $m[4];
+            $minute = (int) $m[5];
+            $second = (isset($m[6]) && $m[6] !== '') ? (int) $m[6] : 0;
+            if ($hour > 23 || $minute > 59 || $second > 59) {
+                return null;
+            }
+        }
+
+        try {
+            $appTimezone = (string) config('app.timezone');
+            $hasExplicitTimezone = preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/', $value) === 1;
+
+            $threshold = $hasExplicitTimezone
+                ? Carbon::parse($value)
+                : Carbon::parse($value, $appTimezone);
+
+            return $threshold->setTimezone($appTimezone)->format('Y-m-d H:i:s');
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /**

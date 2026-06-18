@@ -13,12 +13,12 @@
 ## 全域前置（gate 0，必須先完成）
 | # | 項目 | 狀態 | 備註 |
 |---|---|---|---|
-| F1 | Phase 0 工具鏈：Tailwind + shadcn/ui + AdminLTE 視覺 token | todo | 附錄 A.1 |
-| F2 | `AppShell` 正式化（側邊欄/角色閘門/active-state/深色模式/flash/breadcrumbs） | todo | 附錄 A.2；依賴 F1 |
-| F3 | 共用基元：`DataTable`(TanStack)/表單/`Modal`/`ConfirmDialog`/分頁 | todo | 附錄 A.3；依賴 F1 |
-| F4 | 後端 `share()` 增補 `auth.user.roles`/`can` + `flash` 橋接 | todo | 附錄 A.4 |
-| F5 | feature-flag 機制（§五之二）+ 導覽單一來源 | todo | 附錄 A.5 |
-| F6 | 測試範式 `assertInertia`；評估 E2E（Playwright） | todo | 附錄 A.6 |
+| F1 | Phase 0 工具鏈：Tailwind + shadcn/ui + AdminLTE 視覺 token | done | 附錄 A.1；commit cb51518 |
+| F2 | `AppShell` 正式化（新建 DashboardLayout，不動既有精簡 AppShell） | done | 附錄 A.2；commit 710c4f6 |
+| F3 | 共用基元：`DataTable`(TanStack)/表單/`Modal`/`ConfirmDialog`/分頁 | done | 附錄 A.3；commit f70ec08 |
+| F4 | 後端 `share()` 增補 `auth.user.roles`/`can` + `flash` 橋接 | done | 附錄 A.4；commit 8bc5194 |
+| F5 | feature-flag 機制（§五之二）+ 導覽單一來源 | done | 附錄 A.5；commit ddfed0c |
+| F6 | 測試範式 `assertInertia`（沿用既有 + share() 契約測試）；E2E 延後至 Phase 3/4 | done | 附錄 A.6 |
 | F7 | **複合主鍵 write-path 收斂** + query-path store/update/destroy Feature 測試齊備 | todo | **Phase 4 硬前置**；見 COMPOSITE_PRIMARY_KEY_URL_DESIGN.md；此 gate 只由人翻 `done` |
 
 > **Phase 1+ 任一頁開工前，F1–F5 必須 `done`。Phase 4 任一頁開工前，F7 必須 `done`（否則整個 Phase 4 `blocked`）。**

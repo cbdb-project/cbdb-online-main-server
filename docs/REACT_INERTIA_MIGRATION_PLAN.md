@@ -4,8 +4,8 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：Phase 0 進行中。F1（Tailwind+token）、F4（share roles/can+flash）已合併至 `feat/phase0-f1-tailwind-tokens` 分支；F5（migration flags + 導覽單一來源）走 gate 中。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：F5 過 gate 後 → F2（AppShell 正式化，消費 nav schema + roles + flash）→ F3（共用基元）→ F6（測試範式）→ Phase 1 試點頁 `admin/audit-logs`。
+> - **目前進度**：Phase 0 地基 **F1–F6 全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate）。F7（複合主鍵 write-path）仍 `todo`，只由人翻，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
+> - **下一步**：Phase 1 試點/參考頁 `admin/audit-logs`（P1-1，附錄 B）：把 AdminAuditLogController 增設 Inertia 變體（meta + sort/direction）、前端 Pages/Admin/AuditLogs/Index.tsx 套 DashboardLayout + DataTable。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。
@@ -319,6 +319,7 @@
 | 2026-06-18 | F2：正式殼建為**新元件 DashboardLayout**，不改既有精簡 AppShell（5 個已上線頁續用） | 避免對線上工具造成非預期版面變動；新遷移頁改用 DashboardLayout，舊頁日後折入 | 使用者（/goal 授權自走） |
 | 2026-06-18 | nav 的 label 由 Navigation 於後端以 __() 解析為顯示字串（Blade 與 React 直接輸出，不再前端翻譯） | codes/views/admin 翻譯群組未在 shared translations；伺服器解析最簡且 locale 正確（切換為伺服器往返） | 使用者（/goal 授權自走） |
 | 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 仍供 Blade routeIs 使用 | 使用者（/goal 授權自走） |
+| 2026-06-18 | F6：assertInertia 範式沿用既有（已 5 檔使用）；新增 share() 契約測試守護 roles/can/flash/nav/shell。**Playwright E2E 延後**至 Phase 3/4（首個複雜互動流＝人物編輯器）再導入 | Phase 0–2 為唯讀/簡單 CRUD，後端 assertInertia + parity review 已足；先不增 E2E 基礎設施負擔 | 使用者（/goal 授權自走） |
 
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）
 | 日期 | 頁面/範圍 | 坑 / 心得 | 後續頁如何套用 |

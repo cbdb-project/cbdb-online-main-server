@@ -195,8 +195,8 @@ class Navigation {
                     'batch-social',
                     'admin.batch_load_social_institutes',
                     'fa fa-university',
-                    self::routeUrl('admin.batch-load-social-institutes'),
-                    ['pages' => ['批次匯入社會機構'], 'patterns' => []]
+                    self::url('admin.batch-load-social-institutes', 'admin.batch-load-social-institutes', 'app.admin.batch-load-social-institutes'),
+                    ['pages' => ['批次匯入社會機構'], 'patterns' => ['app.admin.batch-load-social-institutes']]
                 ),
                 self::item(
                     'wiki-maintenance',

@@ -79,7 +79,7 @@
 | P5-5 | crowdsourcing/index | `crowdsourcing.index` | todo | 列表 + confirm/reject |
 | P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | done | 新路由（store/undo 重用，listRouteName 依路徑重導）；spec `docs/migration-specs/batch-load-book-titles.md`；flag old |
 | P5-7 | admin/batch_load_offices | `admin.batch-load-offices` | done | 新路由（store 重用，listRouteName 重導；backWithErrors 收 Request）；spec `docs/migration-specs/batch-load-offices.md`；flag old |
-| P5-8 | admin/batch_load_social_institutes | `admin.batch-load-social-institutes` | todo | 檔案上傳 |
+| P5-8 | admin/batch_load_social_institutes | `admin.batch-load-social-institutes` | done | 新路由（store 重用，listRouteName 重導；backWithErrors 收 Request×3）；spec `docs/migration-specs/batch-load-social-institutes.md`；flag old |
 | P5-9 | admin/wiki-maintenance | `admin.wiki-maintenance` | todo | **輪詢/非同步**（progress/cancel） |
 | P5-10 | admin/cbdb-table-maintenance | `admin.cbdb-table-maintenance` | todo | **輪詢/非同步**（rebuild/progress） |
 | P5-11 | admin/unidirectional-relationship-repair | `admin.unidirectional-relationship-repair` | todo | 修復工具 |

@@ -361,6 +361,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')->name('app.admin.batch-load-book-titles.undo');
     Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')->name('admin.batch-load-social-institutes');
     Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
+    // Inertia + React 版（store 重用，依請求路徑重導）
+    Route::get('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@appShowForm')
+        ->middleware('inertia')->name('app.admin.batch-load-social-institutes');
+    Route::post('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')
+        ->middleware('inertia')->name('app.admin.batch-load-social-institutes.store');
     Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')->name('admin.batch-load-offices');
     Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')->name('admin.batch-load-offices.store');
     // Inertia + React 版（store 重用，依請求路徑重導）

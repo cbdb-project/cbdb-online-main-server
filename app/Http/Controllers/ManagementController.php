@@ -200,6 +200,43 @@ class ManagementController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Inertia + React 版：使用者編輯表單頁。
+     */
+    public function appEdit($id) {
+        if (!Auth::user()->canManageUsers()) {
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        $user = User::find($id);
+        if (!$user) {
+            flash('用戶不存在 @ '.Carbon::now(), 'error');
+
+            return redirect()->route('app.manage.index');
+        }
+
+        return Inertia::render('Admin/Manage/Edit', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'institution' => $user->institution,
+                'is_active' => (int) $user->is_active,
+                'is_admin' => (int) $user->is_admin,
+                'role_name' => $user->getRoleName(),
+            ],
+            'urls' => [
+                'update' => route('app.manage.update', ['manage' => $user->id], false),
+                'index' => route('app.manage.index', [], false),
+            ],
+            'page_translations' => [
+                'admin' => is_array($t = trans('admin')) ? $t : [],
+            ],
+        ]);
+    }
+
     public function update(Request $request, $id) {
         if (!Auth::user()->canManageUsers()) {
             flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
@@ -215,6 +252,33 @@ class ManagementController extends Controller {
             return redirect()->route('manage.index');
         }
 
+        return $this->performUserUpdate($request, $user, 'manage.index');
+    }
+
+    /**
+     * Inertia + React 版：更新使用者（與 Blade update 共用 performUserUpdate）。
+     */
+    public function appUpdate(Request $request, $id) {
+        if (!Auth::user()->canManageUsers()) {
+            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        $user = User::find($id);
+        if (!$user) {
+            flash('用戶不存在 @ '.Carbon::now(), 'error');
+
+            return redirect()->route('app.manage.index');
+        }
+
+        return $this->performUserUpdate($request, $user, 'app.manage.index');
+    }
+
+    /**
+     * 更新/軟刪除使用者的共用實作；$indexRoute 控制完成後重導目標。
+     */
+    protected function performUserUpdate(Request $request, User $user, string $indexRoute) {
         // 检查是否要删除用戶
         if ($request->has('delete_user') && $request->delete_user == 1) {
             $email = $user->email;
@@ -226,7 +290,7 @@ class ManagementController extends Controller {
             $user->save();
             flash('用戶已刪除 @ '.Carbon::now(), 'danger');
 
-            return redirect()->route('manage.index');
+            return redirect()->route($indexRoute);
         }
 
         // 验证输入
@@ -242,7 +306,7 @@ class ManagementController extends Controller {
 
         flash('用戶設定已更新 @ '.Carbon::now(), 'success');
 
-        return redirect()->route('manage.index');
+        return redirect()->route($indexRoute);
     }
 
     /**

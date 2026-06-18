@@ -74,7 +74,7 @@
 |---|---|---|---|---|
 | P5-1 | operations/index（+restore/提案核可） | `operations.index`/`operations.restore` | todo | 列表 + 動作；OperationsProposalController |
 | P5-2 | manage/index | `manage.index` | done | 新路由 `app.manage.index`；buildUserListing 共用（byte-equiv）；spec `docs/migration-specs/manage-index.md`；flag old |
-| P5-3 | manage/edit | `manage.edit`/`manage.update` | todo | |
+| P5-3 | manage/edit | `manage.edit`/`manage.update` | done | 新路由 `app.manage.edit/update`；performUserUpdate 共用（byte-equiv，含軟刪除）；spec `docs/migration-specs/manage-edit.md`；flag old |
 | P5-4 | manage/merge-preview | `merge-preview.index` | todo | 合併工具 |
 | P5-5 | crowdsourcing/index | `crowdsourcing.index` | todo | 列表 + confirm/reject |
 | P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | todo | 檔案上傳（forceFormData）+ undo |

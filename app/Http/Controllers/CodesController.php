@@ -455,7 +455,11 @@ class CodesController extends Controller {
 
     /** 代碼表 create 連結 base（flag-aware；edit/destroy 由前端帶 id 組合）。 */
     protected function codesActionUrl(string $action, string $table): string {
-        // 新版 create/edit/destroy（P2-3/P2-4）就緒前一律回退舊 Blade 路徑。
+        if ($action === 'create' && migration_flag_is_new('codes') && Route::has('app.codes.create')) {
+            return route('app.codes.create', ['table_name' => $table], false);
+        }
+
+        // 其餘（edit/destroy，P2-4）就緒前一律回退舊 Blade 路徑。
         return '/codes/' . $table . '/' . $action;
     }
 
@@ -830,8 +834,65 @@ class CodesController extends Controller {
         ]);
     }
 
+    /**
+     * Inertia + React 版：新增表單頁。
+     */
+    public function appCreate($table_name) {
+        $table = $this->guardTable($table_name);
+        if ($this->isReadOnlyTable($table)) {
+            flash('該代碼表為只讀，禁止新增。', 'warning');
+
+            return redirect()->route('app.codes.show', ['table_name' => $table]);
+        }
+
+        $columns = $this->getTableColumns($table);
+        $keyColumns = $this->getKeyColumns($table);
+        $columns = $this->orderColumnsForCreate($columns, $keyColumns);
+
+        $defaults = [];
+        $firstKey = $keyColumns[0] ?? null;
+        if ($firstKey && in_array($firstKey, $columns, true)) {
+            $nextValue = $this->guessNextKeyValue($table, $firstKey);
+            if ($nextValue !== null) {
+                $defaults[$firstKey] = $nextValue;
+            }
+        }
+
+        return Inertia::render('Codes/Create', [
+            'table' => $table,
+            'columns' => array_values($columns),
+            'defaults' => (object) $defaults,
+            'can_propose' => Auth::check() && Auth::user()->isActive(),
+            'urls' => [
+                'store' => route('app.codes.store', ['table_name' => $table], false),
+                'propose' => route('app.codes.propose.store', ['table_name' => $table], false),
+                'show' => route('app.codes.show', ['table_name' => $table], false),
+            ],
+            'page_translations' => [
+                'codes' => is_array($t = trans('codes')) ? $t : [],
+            ],
+        ]);
+    }
+
     public function proposalStore(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
+
+        return $this->performProposalStore($request, $table, 'codes.show');
+    }
+
+    /**
+     * Inertia + React 版：提交新增提案（與 Blade proposalStore 共用 performProposalStore）。
+     */
+    public function appProposeStore(Request $request, $table_name) {
+        $table = $this->guardTable($table_name);
+
+        return $this->performProposalStore($request, $table, 'app.codes.show');
+    }
+
+    /**
+     * 新增提案的共用實作。$showRoute 控制成功後重導目標；授權/驗證/提案記錄邏輯共用。
+     */
+    protected function performProposalStore(Request $request, string $table, string $showRoute) {
         if ($redirect = $this->ensureEditableAccess($table)) {
             return $redirect;
         }
@@ -873,7 +934,7 @@ class CodesController extends Controller {
             flash('已提交新增提案，等待管理員審核 @ '.Carbon::now(), 'info');
         }
 
-        return redirect()->route('codes.show', ['table_name' => $table]);
+        return redirect()->route($showRoute, ['table_name' => $table]);
     }
 
     public function proposalEdit($table_name, $operationId) {
@@ -1008,6 +1069,25 @@ class CodesController extends Controller {
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
     public function store(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
+
+        return $this->performStore($request, $table, 'codes.show', 'codes.edit');
+    }
+
+    /**
+     * Inertia + React 版：直接儲存（與 Blade store 共用 performStore）。
+     */
+    public function appStore(Request $request, $table_name) {
+        $table = $this->guardTable($table_name);
+
+        // 編輯頁尚未遷移（P2-4），成功後暫導向 app.codes.show。
+        return $this->performStore($request, $table, 'app.codes.show', 'app.codes.show');
+    }
+
+    /**
+     * 直接寫入代碼表的共用實作。$showRoute/$editRoute 控制唯讀/成功的重導目標，
+     * 其餘授權/驗證/寫入/稽核邏輯 Blade 與 Inertia 完全共用（write-path 單一來源）。
+     */
+    protected function performStore(Request $request, string $table, string $showRoute, string $editRoute) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
 
@@ -1020,7 +1100,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止新增。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route($showRoute, ['table_name' => $table]);
         }
         $data = Arr::except($request->all(), ['_token', '__proposal_comment']);
         $keyColumns = $this->getKeyColumns($table);
@@ -1065,7 +1145,7 @@ class CodesController extends Controller {
 
         flash('Store success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('codes.edit', ['table_name' => $table, 'id' => $id]);
+        return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
 
     public function proposalUpdate(Request $request, $table_name, $id) {

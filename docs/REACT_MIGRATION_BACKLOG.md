@@ -46,7 +46,7 @@
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
 | P3-1 | biogmains/basicinformation/index | `basicinformation.index` | done | 新路由 `app.basicinformation.index`（public）；搜尋+朝代facets+分頁；spec `docs/migration-specs/basicinformation-index.md`；flag old |
-| P3-2 | biogmains/basicinformation/show | （legacy `layouts.app`） | todo | 唯讀；淘汰最後一個 Bootstrap-3 layout；與編輯器解耦 |
+| P3-2 | biogmains/basicinformation/show | （legacy `layouts.app`） | blocked | **需人類決策**：show() 實際 render 的是 editor 視圖（edit.blade.php，533 行）的 readonly 模式，非獨立 show 視圖；show.blade.php（唯一用 layouts.app 者）實為孤兒（無人 render）。忠實復刻 = Phase 4 編輯器唯讀版（F7-blocked）。是否改以 PersonBrowser 風格的解耦唯讀視圖取代＝⚠️ 設計決策。見附錄 D.1。 |
 
 ## Phase 4 — 人物編輯器 + 12 複合主鍵子資源（XL；最高風險）
 > **硬前置 = 全域 gate `F7` 必須 `done`**（複合主鍵 write-path 收斂 + query-path store/update/destroy Feature 測試齊備；見 COMPOSITE_PRIMARY_KEY_URL_DESIGN.md）。F7 未 `done` 則整個 Phase 4 `blocked`。

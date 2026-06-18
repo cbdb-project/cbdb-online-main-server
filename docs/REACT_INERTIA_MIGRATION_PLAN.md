@@ -4,9 +4,9 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：Phase 0（F1–F6）、**Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**（commit 於 `feat/phase0-f1-tailwind-tokens` 分支，逐項過 review agent + codex gate；flag 一律預設 old，待人切換）。write-path（store/update/destroy/proposal）採 perform* 單一來源抽取，舊 Blade byte-equivalent。F7（複合主鍵 write-path）仍 `todo`，**只由人翻**，為 Phase 4 硬前置。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：Phase 3 — 人物列表與檢視（P3-1 basicinformation/index、P3-2 show）。
-> - **重要**：Phase 4 硬前置 F7 為人類關卡；agent 完成 Phase 3、Phase 5 後，Phase 4 須等人翻 F7 才可開工（否則標 blocked 升級）。
+> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；Phase 5 **P5-2、P5-3 完成、P5-12 排除**（獨立地圖應用）。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate；flag 一律預設 old，待人切換。write-path（codes/manage 的 store/update/destroy/proposal）採 perform* 單一來源抽取，舊 Blade byte-equivalent。
+> - **人類關卡（agent 不可跨越）**：① **F7**（複合主鍵 write-path）只由人翻 `done` → 整個 **Phase 4（P4-0…P4-P，人物編輯器 13 子表）blocked**；② **P3-2**：`basicinformation/show` 實為 editor readonly，需人拍板設計方向（見 D.1）。
+> - **下一步（agent 可續）**：Phase 5 剩餘互動工具——P5-1 operations、P5-4 merge-preview、P5-5 crowdsourcing、P5-6/7/8 batch loaders（檔案上傳）、P5-9/10 wiki/table maintenance（輪詢非同步）、P5-11 unidirectional-repair。皆為較重的互動/diff/上傳/輪詢頁，逐頁照 recipe 推進。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。

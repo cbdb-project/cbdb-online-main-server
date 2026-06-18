@@ -363,6 +363,11 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
     Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')->name('admin.batch-load-offices');
     Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')->name('admin.batch-load-offices.store');
+    // Inertia + React 版（store 重用，依請求路徑重導）
+    Route::get('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@appShowForm')
+        ->middleware('inertia')->name('app.admin.batch-load-offices');
+    Route::post('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')
+        ->middleware('inertia')->name('app.admin.batch-load-offices.store');
     Route::get('admin/wiki-maintenance', 'WikiMaintenanceController@index')->name('admin.wiki-maintenance');
     Route::post('admin/wiki-maintenance/delete-all', 'WikiMaintenanceController@deleteAll')->name('admin.wiki-maintenance.delete-all');
     Route::post('admin/wiki-maintenance/reimport', 'WikiMaintenanceController@reimport')->name('admin.wiki-maintenance.reimport');

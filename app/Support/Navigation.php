@@ -188,8 +188,8 @@ class Navigation {
                     'batch-offices',
                     'admin.batch_load_offices',
                     'fa fa-briefcase',
-                    self::routeUrl('admin.batch-load-offices'),
-                    ['pages' => ['批次匯入官職'], 'patterns' => []]
+                    self::url('admin.batch-load-offices', 'admin.batch-load-offices', 'app.admin.batch-load-offices'),
+                    ['pages' => ['批次匯入官職'], 'patterns' => ['app.admin.batch-load-offices']]
                 ),
                 self::item(
                     'batch-social',

@@ -8,6 +8,7 @@ use App\Support\CompositePrimaryKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class AdminBatchLoadOfficesController extends Controller {
     /**
@@ -33,6 +34,31 @@ class AdminBatchLoadOfficesController extends Controller {
         ]);
     }
 
+    /**
+     * Inertia + React 版：批次匯入官職表單頁。
+     */
+    public function appShowForm(Request $request) {
+        $this->ensureAdmin();
+
+        return Inertia::render('Admin/BatchLoadOffices/Index', [
+            'input' => (string) old('entries', ''),
+            'results' => session('batch_results', []),
+            'batch_errors' => array_values(session('batch_errors', [])),
+            'urls' => [
+                'store' => route('app.admin.batch-load-offices.store', [], false),
+                'reset' => route('app.admin.batch-load-offices', [], false),
+            ],
+            'page_translations' => [
+                'admin' => is_array($t = trans('admin')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /** store 完成後的列表路由（依請求路徑，Blade 與 Inertia 共用 store）。 */
+    protected function listRouteName(Request $request): string {
+        return $request->is('app/*') ? 'app.admin.batch-load-offices' : 'admin.batch-load-offices';
+    }
+
     public function store(Request $request) {
         $this->ensureAdmin();
 
@@ -43,7 +69,7 @@ class AdminBatchLoadOfficesController extends Controller {
         [$rows, $errors] = $this->parseEntries($data['entries']);
 
         if (!empty($errors)) {
-            return $this->backWithErrors($errors);
+            return $this->backWithErrors($request, $errors);
         }
 
         $dynastyMap = $this->getDynastyMap();
@@ -54,7 +80,7 @@ class AdminBatchLoadOfficesController extends Controller {
 
         $allErrors = array_merge($additionalErrors, $typeErrors, $sourceErrors);
         if (!empty($allErrors)) {
-            return $this->backWithErrors($allErrors);
+            return $this->backWithErrors($request, $allErrors);
         }
 
         $results = [];
@@ -113,7 +139,7 @@ class AdminBatchLoadOfficesController extends Controller {
         });
 
         return redirect()
-            ->route('admin.batch-load-offices')
+            ->route($this->listRouteName($request))
             ->with('batch_results', $results)
             ->with('batch_errors', []);
     }
@@ -321,9 +347,9 @@ class AdminBatchLoadOfficesController extends Controller {
      *
      * @param array<int,string> $errors
      */
-    protected function backWithErrors(array $errors) {
+    protected function backWithErrors(Request $request, array $errors) {
         return redirect()
-            ->route('admin.batch-load-offices')
+            ->route($this->listRouteName($request))
             ->withInput()
             ->with('batch_errors', $errors);
     }

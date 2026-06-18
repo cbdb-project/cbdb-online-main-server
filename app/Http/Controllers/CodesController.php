@@ -1059,6 +1059,40 @@ class CodesController extends Controller {
         ]);
     }
 
+    /**
+     * Inertia + React 版：提案調整表單頁（與 Blade proposalEdit 同資料來源）。
+     */
+    public function appProposalEdit($table_name, $operationId) {
+        $table = $this->guardTable($table_name);
+        $operation = $this->findOperationOrAbort((int) $operationId);
+        $payload = $this->ensureProposalEditable($operation, $table);
+
+        $columns = Schema::getColumnListing($table);
+        $values = [];
+        foreach ($columns as $column) {
+            $values[$column] = $payload[$column] ?? '';
+        }
+
+        return Inertia::render('Codes/ProposalEdit', [
+            'table' => $table,
+            'columns' => array_values($columns),
+            'values' => $values,
+            'operation_id' => $operation['id'],
+            'key_columns' => array_values($payload['__key_columns'] ?? $this->getKeyColumns($table)),
+            'proposal_meta' => (object) ($payload['__proposal_meta'] ?? []),
+            'review_status' => $payload['__review_status'] ?? 'pending',
+            'review_comment' => $payload['__review_comment'] ?? null,
+            'is_create_proposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
+            'urls' => [
+                'update' => route('app.codes.proposals.update', ['table_name' => $table, 'operation' => $operation['id']], false),
+                'return' => route('operations.index', ['proposals_only' => 1], false),
+            ],
+            'page_translations' => [
+                'codes' => is_array($t = trans('codes')) ? $t : [],
+            ],
+        ]);
+    }
+
     public function proposalUpdateExisting(Request $request, $table_name, $operationId) {
         $table = $this->guardTable($table_name);
         $operation = $this->findOperationOrAbort((int) $operationId);

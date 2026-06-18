@@ -204,6 +204,13 @@ Route::post('app/codes/{table_name}/proposal', 'CodesController@appProposeStore'
 Route::post('app/codes/{table_name}', 'CodesController@appStore')
     ->middleware('inertia')
     ->name('app.codes.store');
+// 提案調整（須排在 {id} 泛用路由之前，否則 id='.*' 會吞掉 proposals/{operation}）
+Route::get('app/codes/{table_name}/proposals/{operation}/edit', 'CodesController@appProposalEdit')
+    ->middleware('inertia')->name('app.codes.proposals.edit');
+Route::patch('app/codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')
+    ->middleware('inertia')->name('app.codes.proposals.update');
+Route::delete('app/codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')
+    ->middleware('inertia')->name('app.codes.proposals.cancel');
 Route::get('app/codes/{table_name}/{id}/edit', 'CodesController@appEdit')
     ->middleware('inertia')->name('app.codes.edit')->where('id', '.*');
 Route::match(['post', 'patch'], 'app/codes/{table_name}/{id}/proposal', 'CodesController@appProposalUpdate')

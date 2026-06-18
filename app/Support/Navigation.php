@@ -216,7 +216,7 @@ class Navigation {
                     'unidirectional-repair',
                     'admin.unidirectional_repair',
                     'fas fa-exchange-alt',
-                    self::routeUrl('admin.unidirectional-relationship-repair'),
+                    self::url('admin.unidirectional-relationship-repair', 'admin.unidirectional-relationship-repair', 'app.admin.unidirectional-relationship-repair'),
                     ['pages' => ['單向關係修復'], 'patterns' => []]
                 ),
                 self::item(

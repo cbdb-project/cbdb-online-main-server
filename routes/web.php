@@ -389,6 +389,7 @@ Route::middleware('auth')->group(function () {
         ->where('taskId', '[a-zA-Z0-9_]+')
         ->name('admin.cbdb-table-maintenance.progress');
     Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')->name('admin.unidirectional-relationship-repair');
+    Route::get('app/admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@appIndex')->name('app.admin.unidirectional-relationship-repair')->middleware('inertia');
     Route::post('admin/unidirectional-relationship-repair/kinship', 'UnidirectionalRelationshipRepairController@repairKinship')->name('admin.unidirectional-relationship-repair.kinship');
     // Query Playground
     Route::get('query-playground', 'QueryPlaygroundController@index')->name('query-playground.index');

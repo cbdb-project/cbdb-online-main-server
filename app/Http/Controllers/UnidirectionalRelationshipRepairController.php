@@ -42,6 +42,19 @@ class UnidirectionalRelationshipRepairController extends Controller {
         ]);
     }
 
+    public function appIndex(Request $request) {
+        return \Inertia\Inertia::render('Admin/UnidirectionalRelationshipRepair/Index', [
+            'urls' => [
+                'kinship' => route('admin.unidirectional-relationship-repair.kinship', [], false),
+                'assoc' => route('admin.unidirectional-relationship-repair.assoc', [], false),
+            ],
+            'page_translations' => [
+                'admin' => __('admin'),
+                'common' => __('common'),
+            ],
+        ]);
+    }
+
     /**
      * 修復親屬關係
      */

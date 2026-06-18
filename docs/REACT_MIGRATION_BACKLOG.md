@@ -80,7 +80,7 @@
 | P5-6 | admin/batch_load_book_titles | `admin.batch-load-book-titles` | done | 新路由（store/undo 重用，listRouteName 依路徑重導）；spec `docs/migration-specs/batch-load-book-titles.md`；flag old |
 | P5-7 | admin/batch_load_offices | `admin.batch-load-offices` | done | 新路由（store 重用，listRouteName 重導；backWithErrors 收 Request）；spec `docs/migration-specs/batch-load-offices.md`；flag old |
 | P5-8 | admin/batch_load_social_institutes | `admin.batch-load-social-institutes` | done | 新路由（store 重用，listRouteName 重導；backWithErrors 收 Request×3）；spec `docs/migration-specs/batch-load-social-institutes.md`；flag old |
-| P5-9 | admin/wiki-maintenance | `admin.wiki-maintenance` | todo | **輪詢/非同步**（progress/cancel） |
+| P5-9 | admin/wiki-maintenance | `admin.wiki-maintenance` | done | 新路由 `app.admin.wiki-maintenance`（inertia）；buildWikiListing 共用；非同步導入 fetch+2s 輪詢+取消；寫入/async 端點未改；spec `docs/migration-specs/wiki-maintenance.md`；flag old |
 | P5-10 | admin/cbdb-table-maintenance | `admin.cbdb-table-maintenance` | todo | **輪詢/非同步**（rebuild/progress） |
 | P5-11 | admin/unidirectional-relationship-repair | `admin.unidirectional-relationship-repair` | done | 新路由 `app.admin.unidirectional-relationship-repair`（inertia）；純表單頁；repairKinship/Assoc 寫入端點未改（fetch + X-XSRF-TOKEN）；spec `docs/migration-specs/unidirectional-relationship-repair.md`；flag old |
 | P5-12 | maps/index | `app.maps.index` | retired/排除 | 獨立全螢幕 Leaflet 地圖應用（自有 historical-maps/app.js），非 AdminLTE dashboard 頁；已在 /app/maps、superadmin。包進 DashboardLayout 反而破壞全幅 UX → 列為 shell 遷移範圍外（例外，見附錄 D.1）。 |

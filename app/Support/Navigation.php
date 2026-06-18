@@ -202,7 +202,7 @@ class Navigation {
                     'wiki-maintenance',
                     'admin.wiki_maintenance',
                     'fab fa-wikipedia-w',
-                    self::routeUrl('admin.wiki-maintenance'),
+                    self::url('admin.wiki-maintenance', 'admin.wiki-maintenance', 'app.admin.wiki-maintenance'),
                     ['pages' => ['Wiki 對照資料維護'], 'patterns' => []]
                 ),
                 self::item(

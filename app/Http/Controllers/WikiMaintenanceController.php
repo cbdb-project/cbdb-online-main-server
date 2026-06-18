@@ -28,7 +28,7 @@ class WikiMaintenanceController extends Controller {
         });
     }
 
-    public function index(Request $request) {
+    protected function buildWikiListing(Request $request): array {
         $sourceId = $request->input('source_id', $this->targetSourceIds[0]);
 
         // 验证 source_id 是否在允许的范围内
@@ -60,11 +60,7 @@ class WikiMaintenanceController extends Controller {
                 ->count();
         }
 
-        return view('admin.wiki-maintenance', [
-            'page_title' => __('admin.wiki_maintenance'),
-            'page_title_key' => 'Wiki 對照資料維護',
-            'page_description' => __('admin.wiki_maintenance_desc'),
-            'page_url' => route('admin.wiki-maintenance'),
+        return [
             'records' => $records,
             'currentSourceId' => $sourceId,
             'targetSourceIds' => $this->targetSourceIds,
@@ -75,6 +71,71 @@ class WikiMaintenanceController extends Controller {
             'perPage' => $perPage,
             'hasNext' => $total > $page * $perPage,
             'hasPrev' => $page > 1,
+        ];
+    }
+
+    public function index(Request $request) {
+        $data = $this->buildWikiListing($request);
+
+        return view('admin.wiki-maintenance', array_merge($data, [
+            'page_title' => __('admin.wiki_maintenance'),
+            'page_title_key' => 'Wiki 對照資料維護',
+            'page_description' => __('admin.wiki_maintenance_desc'),
+            'page_url' => route('admin.wiki-maintenance'),
+        ]));
+    }
+
+    public function appIndex(Request $request) {
+        $data = $this->buildWikiListing($request);
+
+        $records = collect($data['records'])->map(function ($r) {
+            // 與 Blade 相同的條目連結組裝：c_url_api + (含中日韓字元則 rawurlencode) c_pages + c_url_api_coda。
+            $link = null;
+            if ($r->c_url_api && $r->c_textid && $r->c_pages) {
+                $urlPart = $r->c_pages;
+                if (preg_match('/[\x{4e00}-\x{9fff}]/u', $urlPart)) {
+                    $urlPart = rawurlencode($urlPart);
+                }
+                $link = $r->c_url_api . $urlPart . ($r->c_url_api_coda ?? '');
+            }
+
+            return [
+                'c_personid' => $r->c_personid,
+                'c_name_chn' => $r->c_name_chn,
+                'c_textid' => $r->c_textid,
+                'c_pages' => $r->c_pages,
+                'link' => $link,
+            ];
+        })->all();
+
+        $sources = array_map(fn ($id) => [
+            'id' => $id,
+            'name' => $this->sourceNames[$id],
+            'count' => $data['stats'][$id],
+        ], $data['targetSourceIds']);
+
+        return \Inertia\Inertia::render('Admin/WikiMaintenance/Index', [
+            'records' => $records,
+            'current_source_id' => (int) $data['currentSourceId'],
+            'sources' => $sources,
+            'pagination' => [
+                'page' => $data['page'],
+                'per_page' => $data['perPage'],
+                'total' => $data['total'],
+                'has_next' => $data['hasNext'],
+                'has_prev' => $data['hasPrev'],
+            ],
+            'urls' => [
+                'index' => route('app.admin.wiki-maintenance', [], false),
+                'import' => route('admin.wiki-maintenance.import-url', [], false),
+                'delete_all' => route('admin.wiki-maintenance.delete-all', [], false),
+                'progress_base' => '/admin/wiki-maintenance/progress/',
+                'cancel_base' => '/admin/wiki-maintenance/cancel/',
+            ],
+            'page_translations' => [
+                'admin' => __('admin'),
+                'common' => __('common'),
+            ],
         ]);
     }
 

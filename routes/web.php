@@ -377,6 +377,7 @@ Route::middleware('auth')->group(function () {
     Route::post('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')
         ->middleware('inertia')->name('app.admin.batch-load-offices.store');
     Route::get('admin/wiki-maintenance', 'WikiMaintenanceController@index')->name('admin.wiki-maintenance');
+    Route::get('app/admin/wiki-maintenance', 'WikiMaintenanceController@appIndex')->name('app.admin.wiki-maintenance')->middleware('inertia');
     Route::post('admin/wiki-maintenance/delete-all', 'WikiMaintenanceController@deleteAll')->name('admin.wiki-maintenance.delete-all');
     Route::post('admin/wiki-maintenance/reimport', 'WikiMaintenanceController@reimport')->name('admin.wiki-maintenance.reimport');
     Route::post('admin/wiki-maintenance/import-url', 'WikiMaintenanceController@importFromUrl')->name('admin.wiki-maintenance.import-url');

@@ -149,7 +149,7 @@ php artisan cbdb:rebuild-person-change-index
   - 用 query builder 明確 join,表名大小寫照寫:`->leftJoin('person_change_index', 'BIOG_MAIN.c_personid', '=', 'person_change_index.c_personid')`(避免 SQLite/MySQL 表名大小寫差異)。
   - 對沒有 sidecar 列的人物,`c_modified_date` 會是 NULL(部署後須先跑一次 rebuild,見「文件變更/部署」)。
   - 單次 indexed left join,效能可控;讀取端零跨表彙整。
-- (可選,建議一併評估)新增 `?modified_since=` 增量同步參數,利用 `c_last_modified_date` 索引。
+- **已實作** `?modified_since=` 增量同步參數,利用 `c_last_modified_date` 索引(`where c_last_modified_date >= ?`,含邊界、NULL 水位線排除)。解析經嚴格格式守衛(完整鎖定 `^\d{4}-\d{2}-\d{2}...$`,擋掉相對/關鍵字輸入)+ 時區正規化到 app 時區(`setTimezone`);無法辨識則忽略過濾(over-fetch 安全方向)。命令的 `--since` 與此共用同一套守衛/時區規則。為避免「只有建檔時間、從未被改」的人物水位線為 NULL 而被漏掉,重建水位線取 `max(MAX(c_modified_date), MAX(c_created_date))`(符合 GREATEST 公式)。
 - 輸出範例:
   ```json
   { "c_personid": 10, "c_created_date": "2007-05-01 00:00:00", "c_modified_date": "2026-03-12 09:21:00" }

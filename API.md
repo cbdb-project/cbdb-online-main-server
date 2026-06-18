@@ -1,6 +1,6 @@
 # API v2
 
-v1 與 v2 並行提供：v1 為舊版端口，v2 為較新端口；兩者目前同時可用。本文件描述 v2。
+v1 與 v2 並行提供，兩者目前同時可用。本文件分兩部分：**上半部**為 v2（`/api/v2/...`，回傳 `ok` + `data` + `pagination` 結構）；**下半部**「舊版 API 文檔」為 v1 舊版端口（`/api/...`，如 `post_list`）。以下先介紹 v2。
 
 v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagination` 結構。基底 URL：`https://input.cbdb.fas.harvard.edu/api/v2/...`
 
@@ -22,11 +22,22 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | ------ | ------ | ------ | ------ |
 | per_page | 數字 | 100 | 每頁筆數，上限 1000 |
 | page | 數字 | 1 | 頁碼 |
+| modified_since | 日期時間字串 | 無 | 增量同步：只回傳 `c_modified_date` **大於等於**(含邊界)此時間的人物 |
+
+`modified_since` 說明：
+
+- 用於下游增量同步：先做一次完整抓取，之後帶上次取得的最大 `c_modified_date` 再次請求，即可只取「之後有變更」的人物。
+- 接受格式：`YYYY-MM-DD`、`YYYY-MM-DD HH:MM:SS`、或帶時區的 ISO8601（如 `2026-06-15T00:00:00Z`、`2026-06-15T08:00:00+08:00`）。**不接受**相對／關鍵字（如 `now`、`+1 day`）。
+- 時區：未帶時區後綴者以伺服器時區（`+08:00`）解讀；帶時區者會換算為伺服器時區後比較。
+- 容錯：格式或日期無效時（含曆法非法如 `2026-02-31`、時間越界如 `24:00:00`）**忽略此參數並回傳全部**（寧可多回，不漏資料）。
+- 尚未回填水位線（`c_modified_date` 為 null）的人物**不會**被 `modified_since` 命中。
 
 ### 輸入示例
 
 `/api/v2/persons` 取第一頁（預設每頁 100 筆）  
-`/api/v2/persons?per_page=500&page=2` 取第二頁，每頁 500 筆
+`/api/v2/persons?per_page=500&page=2` 取第二頁，每頁 500 筆  
+`/api/v2/persons?modified_since=2026-06-15%2008:00:00` 取 2026-06-15 08:00 以後有變更的人物  
+`/api/v2/persons?modified_since=2026-06-15T00:00:00Z&per_page=500` 以 UTC 時間增量同步，每頁 500 筆
 
 ### 輸出格式
 

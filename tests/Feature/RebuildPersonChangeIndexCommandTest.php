@@ -103,6 +103,25 @@ class RebuildPersonChangeIndexCommandTest extends TestCase {
         );
     }
 
+    public function test_rebuild_sets_watermark_from_created_date_when_never_modified(): void {
+        // 只有建檔時間、c_modified_date 為 NULL（從未被改）的人物：
+        // 水位線應 = 建檔時間（建檔本身是一次異動），而非 NULL，否則會被 modified_since 漏掉。
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 50, 'c_created_date' => '2026-02-02 00:00:00', 'c_modified_date' => null],
+        ]);
+
+        $this->artisan('cbdb:rebuild-person-change-index')->assertExitCode(0);
+
+        $this->assertSame(
+            '2026-02-02 00:00:00',
+            DB::table('person_change_index')->where('c_personid', 50)->value('c_last_modified_date')
+        );
+        $this->assertSame(
+            '2026-02-02 00:00:00',
+            DB::table('person_change_index')->where('c_personid', 50)->value('c_created_date')
+        );
+    }
+
     public function test_rebuild_since_and_prune_respect_audit_window_and_delete_orphans(): void {
         DB::table('BIOG_MAIN')->insert([
             [
@@ -174,5 +193,61 @@ class RebuildPersonChangeIndexCommandTest extends TestCase {
             '2020-02-01 00:00:00',
             DB::table('person_change_index')->where('c_personid', 20)->value('c_created_date')
         );
+    }
+
+    public function test_invalid_since_is_ignored_to_avoid_under_fetch(): void {
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 10, 'c_created_date' => '2020-01-01 00:00:00', 'c_modified_date' => '2020-01-02 00:00:00'],
+            ['c_personid' => 20, 'c_created_date' => '2020-02-01 00:00:00', 'c_modified_date' => '2020-02-02 00:00:00'],
+        ]);
+
+        DB::table('audit_log')->insert([
+            [
+                'occurred_at' => '2026-06-09 09:00:00',
+                'created_at' => '2026-06-09 09:00:00',
+                'table_name' => 'POSTED_TO_OFFICE_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'system',
+                'actor_id' => 'system',
+                'operation_id' => '00000000000000000000000010',
+                'row_pk' => json_encode(['c_office_id' => 1, 'c_posting_id' => 1], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'row_pk_text' => 'c_office_id=1&c_posting_id=1',
+                'old_data' => null,
+                'new_data' => json_encode(['c_personid' => 10], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ],
+            [
+                'occurred_at' => '2026-06-17 12:00:00',
+                'created_at' => '2026-06-17 12:00:00',
+                'table_name' => 'POSTED_TO_OFFICE_DATA',
+                'operation' => 'DELETE',
+                'actor_type' => 'system',
+                'actor_id' => 'system',
+                'operation_id' => '00000000000000000000000020',
+                'row_pk' => json_encode(['c_office_id' => 2, 'c_posting_id' => 2], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'row_pk_text' => 'c_office_id=2&c_posting_id=2',
+                'old_data' => json_encode(['c_personid' => 20], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'new_data' => null,
+            ],
+        ]);
+
+        foreach (['2026-02-31', '2026-06-15 24:00:00', '2026-13-01', '2026-06-15 12:60:00'] as $bad) {
+            DB::table('person_change_index')->delete();
+
+            $this->artisan('cbdb:rebuild-person-change-index', [
+                '--since' => $bad,
+            ])->expectsOutputToContain('--since 無法辨識')
+                ->assertExitCode(0);
+
+            $this->assertSame(
+                '2026-06-09 09:00:00',
+                DB::table('person_change_index')->where('c_personid', 10)->value('c_last_modified_date'),
+                "invalid --since {$bad} 應退回全量重建，不能漏掉較早的 person 10"
+            );
+            $this->assertSame(
+                '2026-06-17 12:00:00',
+                DB::table('person_change_index')->where('c_personid', 20)->value('c_last_modified_date'),
+                "invalid --since {$bad} 應退回全量重建，不能漏掉較晚的 person 20"
+            );
+        }
     }
 }

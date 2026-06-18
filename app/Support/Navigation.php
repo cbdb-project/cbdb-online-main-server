@@ -174,8 +174,8 @@ class Navigation {
                     'explain-sql',
                     'admin.sql_explain',
                     'fa fa-search',
-                    self::routeUrl('admin.explainsql'),
-                    ['pages' => ['SQL 執行計畫'], 'patterns' => []]
+                    self::url('admin.explain-sql', 'admin.explainsql', 'app.admin.explainsql'),
+                    ['pages' => ['SQL 執行計畫'], 'patterns' => ['app.admin.explainsql']]
                 ),
                 self::item(
                     'batch-books',

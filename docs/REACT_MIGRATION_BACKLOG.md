@@ -28,7 +28,7 @@
 |---|---|---|---|---|---|
 | P1-1 | admin/audit_logs/index | `admin.audit-logs` | AdminAuditLogController | done | **試點/參考頁**，附錄 B；新路由 `app.admin.audit-logs`；fidelity spec `docs/migration-specs/admin-audit-logs.md`；flag 預設 old |
 | P1-2 | admin/ai_fill_logs/index | `admin.ai-fill-logs` | AiFillLogController | done | 唯讀日誌（卡片列表）；新路由 `app.admin.ai-fill-logs`；spec `docs/migration-specs/admin-ai-fill-logs.md`；flag old |
-| P1-3 | admin/explain_sql | `admin.explainsql` | AdminExplainSqlController | todo | SQL EXPLAIN 表單（唯讀輸出） |
+| P1-3 | admin/explain_sql | `admin.explainsql` | AdminExplainSqlController | done | 新路由 `app.admin.explainsql(.explain)`；唯讀白名單共用 runExplain()；spec `docs/migration-specs/admin-explain-sql.md`；flag old |
 | P1-4 | dashboard/index | `dashboard` | DashboardController | todo | 統計卡片 |
 | P1-5 | profile/edit | `profile.edit`/`profile.update` | UserProfileController | todo | 簡單表單（含 api-tokens.* 檢查） |
 | P1-6 | query_playground/nl_query_logs | `query-playground.nl-query-logs` | QueryPlaygroundController@nlQueryLogs | todo | 唯讀日誌；Playground UI 本身已是 React |

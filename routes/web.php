@@ -285,6 +285,13 @@ Route::middleware('auth')->group(function () {
 
     Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
     Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
+    // Inertia + React 版（表單頁；GET 顯示、POST 跑 EXPLAIN 後重新 render）
+    Route::get('app/admin/explainsql', 'AdminExplainSqlController@appShow')
+        ->middleware('inertia')
+        ->name('app.admin.explainsql');
+    Route::post('app/admin/explainsql', 'AdminExplainSqlController@appExplain')
+        ->middleware('inertia')
+        ->name('app.admin.explainsql.explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');
     Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')->name('admin.batch-load-book-titles.store');
     Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')->name('admin.batch-load-book-titles.undo');

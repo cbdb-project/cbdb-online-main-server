@@ -4,8 +4,9 @@
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：尚未開工（文件規劃中）。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：完成全域前置 F1–F6（Phase 0 地基）→ 實作參考頁 `admin/audit-logs` → 才可交接 24/7 自走。
+> - **目前進度**：Phase 0 進行中。F1（Tailwind+token）、F4（share roles/can+flash）已合併至 `feat/phase0-f1-tailwind-tokens` 分支；F5（migration flags + 導覽單一來源）走 gate 中。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
+> - **下一步**：F5 過 gate 後 → F2（AppShell 正式化，消費 nav schema + roles + flash）→ F3（共用基元）→ F6（測試範式）→ Phase 1 試點頁 `admin/audit-logs`。
+> - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。
 
@@ -313,6 +314,8 @@
 | 日期 | 變更 | 原因 | 核可人 |
 |---|---|---|---|
 | （示例）2026-06-18 | UI 元件庫鎖定 Tailwind+shadcn | 保真度原則：需可完全掌控視覺 | 使用者 |
+| 2026-06-18 | Phase 0 執行順序調整為 F1→F4→F5→F2→F3→F6（非表序 F1..F6） | 依賴：F2(AppShell 側邊欄) 消費 F4(roles) 與 F5(nav schema)，故後端基礎先行 | 使用者（/goal 授權自走） |
+| 2026-06-18 | F5「導覽單一來源」採「真正單一來源」：Blade sidebar 與 React 共用 App\Support\Navigation；Blade 改以遞迴 partial 渲染 schema | 降低雙殼期側邊欄漂移（§五緩解）；active-state 仍沿用既有 $page_title 字串以相容未遷移頁面，僅 React 端改用 route pattern | 使用者（/goal 授權自走） |
 
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）
 | 日期 | 頁面/範圍 | 坑 / 心得 | 後續頁如何套用 |

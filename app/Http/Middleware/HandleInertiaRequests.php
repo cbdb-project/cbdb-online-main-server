@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Navigation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -50,6 +51,10 @@ class HandleInertiaRequests extends Middleware {
             ],
             'locale' => app()->getLocale(),
             'locale_url' => route('locale.switch', [], false),
+            // 導覽單一來源（與 Blade sidebar 共用 App\Support\Navigation）：
+            // 已套用角色閘門、已依 feature flag 解析連結。React AppShell 側邊欄
+            // 依目前路由（active.patterns）自行判定 active，不靠中文字串比對。
+            'nav' => Navigation::tree($user),
             // flash 訊息橋接：把 laracasts/flash 的 session 訊息轉成陣列，
             // 由 React AppShell 統一渲染 toast/alert（取代 Blade flash::message partial）。
             'flash' => $this->flashMessages(),

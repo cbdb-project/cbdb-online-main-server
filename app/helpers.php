@@ -41,3 +41,34 @@ if (!function_exists('get_app_version')) {
         }
     }
 }
+
+if (!function_exists('migration_flag')) {
+    /**
+     * 取得遷移頁面 feature flag 值（'old' | 'new'）。
+     * 見 config/migration_flags.php 與 docs/REACT_INERTIA_MIGRATION_PLAN.md §五之二。
+     *
+     * @param string $page 頁面 key（如 'dashboard'、'admin.audit-logs'）
+     * @return string 'old' 或 'new'
+     */
+    function migration_flag(string $page): string {
+        $value = config("migration_flags.pages.$page");
+
+        if ($value === null) {
+            $value = config('migration_flags.default', 'old');
+        }
+
+        return $value === 'new' ? 'new' : 'old';
+    }
+}
+
+if (!function_exists('migration_flag_is_new')) {
+    /**
+     * 該遷移頁面是否已切換到新 React/Inertia 版本。
+     *
+     * @param string $page 頁面 key
+     * @return bool
+     */
+    function migration_flag_is_new(string $page): bool {
+        return migration_flag($page) === 'new';
+    }
+}

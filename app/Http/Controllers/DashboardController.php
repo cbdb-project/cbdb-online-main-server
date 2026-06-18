@@ -4,9 +4,29 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class DashboardController extends Controller {
     public function index() {
+        return view('dashboard.index', array_merge([
+            'page_title' => __('nav.dashboard'),
+            'page_title_key' => '系統總覽',
+        ], $this->buildStats()));
+    }
+
+    /**
+     * Inertia + React 版（統計卡片）。
+     */
+    public function appIndex() {
+        return Inertia::render('Dashboard/Index', $this->buildStats());
+    }
+
+    /**
+     * 計算儀表板統計（基礎計數 + 近期修改 + 操作類型）。Blade 與 Inertia 共用。
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildStats(): array {
         // 基础统计
         $totalPersons = DB::table('BIOG_MAIN')->count();
         $totalAltnames = DB::table('ALTNAME_DATA')->count();
@@ -69,9 +89,7 @@ class DashboardController extends Controller {
                 return $carry;
             }, []);
 
-        return view('dashboard.index', [
-            'page_title' => __('nav.dashboard'),
-            'page_title_key' => '系統總覽',
+        return [
             'totalPersons' => $totalPersons,
             'totalAltnames' => $totalAltnames,
             'totalOffices' => $totalOffices,
@@ -82,6 +100,6 @@ class DashboardController extends Controller {
             'weeklyStats' => $weeklyStats,
             'monthlyStats' => $monthlyStats,
             'operationTypeStats' => $operationTypeStats,
-        ]);
+        ];
     }
 }

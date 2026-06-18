@@ -24,6 +24,9 @@ Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middlew
 
 Route::get('home', 'HomeController@index')->name('home');
 Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('dashboard');
+Route::get('app/dashboard', 'DashboardController@appIndex')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.dashboard');
 Route::get('cbdbapi/person.php', 'CbdbApiController@person')->name('cbdbapi.v1.person');
 Route::get('cbdbapi/person', 'CbdbApiController@person');
 Route::get('openapi.yaml', function () {

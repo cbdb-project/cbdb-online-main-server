@@ -61,8 +61,8 @@ class Navigation {
                 'dashboard',
                 'nav.dashboard',
                 'fas fa-tachometer-alt',
-                self::url('dashboard', 'dashboard'),
-                ['pages' => ['系統總覽'], 'patterns' => ['dashboard']]
+                self::url('dashboard', 'dashboard', 'app.dashboard'),
+                ['pages' => ['系統總覽'], 'patterns' => ['dashboard', 'app.dashboard']]
             ),
 
             self::item(

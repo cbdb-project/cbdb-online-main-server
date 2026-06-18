@@ -321,6 +321,7 @@
 | 2026-06-18 | nav 的 label 由 Navigation 於後端以 __() 解析為顯示字串（Blade 與 React 直接輸出，不再前端翻譯） | codes/views/admin 翻譯群組未在 shared translations；伺服器解析最簡且 locale 正確（切換為伺服器往返） | 使用者（/goal 授權自走） |
 | 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 仍供 Blade routeIs 使用 | 使用者（/goal 授權自走） |
 | 2026-06-18 | F6：assertInertia 範式沿用既有（已 5 檔使用）；新增 share() 契約測試守護 roles/can/flash/nav/shell。**Playwright E2E 延後**至 Phase 3/4（首個複雜互動流＝人物編輯器）再導入 | Phase 0–2 為唯讀/簡單 CRUD，後端 assertInertia + parity review 已足；先不增 E2E 基礎設施負擔 | 使用者（/goal 授權自走） |
+| 2026-06-18 | P5-12 maps/index 列為 shell 遷移範圍外 | 獨立全螢幕 Leaflet 地圖應用（自有 entry），非 AdminLTE dashboard 頁；包進 DashboardLayout 破壞 UX。已在 /app/maps、superadmin。 | 使用者（/goal 授權自走） |
 | 2026-06-18 | **P3-2 標 blocked，待人決策**：`basicinformation/show` 路由實際 render `edit.blade.php`（533 行編輯器）的 readonly 模式；`show.blade.php`（唯一 layouts.app 使用者）為孤兒死碼（無 controller render）。忠實復刻 P3-2 = 建 Phase 4 編輯器的唯讀 React 版（受 F7 硬前置）。**需人類拍板**：(A) 等 F7／Phase 4 一併做編輯器唯讀版；或 (B) 核可以 PersonBrowser 風格的解耦唯讀視圖「合理化」取代（plan §四 Phase 3 建議方向），並確認 show.blade.php 可刪。 | 待人類 | — |
 
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）

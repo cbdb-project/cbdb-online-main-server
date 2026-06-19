@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useTranslation } from '../../hooks/useTranslation';
-import AppShell from '../../Layouts/AppShell';
+import DashboardLayout from '../../Layouts/DashboardLayout';
 import EntryCodeList, { EntryCode } from '../../components/EntryCodeList';
 import EntryPeopleTable, { EntryPersonRow } from '../../components/EntryPeopleTable';
 import EntryTypeTree, { EntryType } from '../../components/EntryTypeTree';
@@ -395,7 +395,7 @@ export default function Index() {
     const selectedDynastyPreview = formatDynastyPreview(filters.dynasty_codes, dynasties, t);
 
     return (
-        <AppShell>
+        <DashboardLayout disableContentPadding>
             <div style={workspaceStyle}>
                 <div>
                     <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>{t('search_by_entry_title')}</h2>
@@ -805,7 +805,7 @@ export default function Index() {
                     </div>
                 </div>
             </SelectionDialog>
-        </AppShell>
+        </DashboardLayout>
     );
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
-import AppShell from '../../Layouts/AppShell';
+import DashboardLayout from '../../Layouts/DashboardLayout';
 import ModeTabs, { type PlaygroundMode } from '../../components/QueryPlayground/ModeTabs';
 import SqlEditorPanel from '../../components/QueryPlayground/SqlEditorPanel';
 import QueryResultTable from '../../components/QueryPlayground/QueryResultTable';
@@ -197,7 +197,7 @@ export default function Index() {
     }, []);
 
     return (
-        <AppShell>
+        <DashboardLayout disableContentPadding>
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
                 {/* Header */}
                 <div style={{ marginBottom: 20 }}>
@@ -334,6 +334,6 @@ export default function Index() {
                     )}
                 </div>
             </div>
-        </AppShell>
+        </DashboardLayout>
     );
 }

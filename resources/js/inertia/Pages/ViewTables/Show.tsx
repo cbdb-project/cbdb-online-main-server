@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import AppShell from '../../Layouts/AppShell';
+import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import DataTable from '../../components/DataTable';
 import SearchToolbar from '../../components/SearchToolbar';
@@ -127,7 +127,7 @@ export default function Show({
     };
 
     return (
-        <AppShell>
+        <DashboardLayout disableContentPadding>
             <div style={{ padding: '24px 24px 48px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
                     <Link href={listUrl} style={{ color: '#007bff', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500 }}>
@@ -222,7 +222,7 @@ export default function Show({
                     </div>
                 </div>
             </div>
-        </AppShell>
+        </DashboardLayout>
     );
 }
 

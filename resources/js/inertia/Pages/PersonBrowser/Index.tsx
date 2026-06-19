@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
-import AppShell from '../../Layouts/AppShell';
+import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import { registerDirtyChecker } from '../../hooks/useDirtyGuard';
 import PeopleSearchPanel from '../../components/PersonBrowser/PeopleSearchPanel';
@@ -450,7 +450,7 @@ export default function PersonBrowserIndex() {
     }, [handleSelect, runOrWarnUnsaved]);
 
     return (
-        <AppShell>
+        <DashboardLayout disableContentPadding>
             {isMobile && sidebarOpen ? (
                 <div
                     style={mobileBackdropStyle}
@@ -567,7 +567,7 @@ export default function PersonBrowserIndex() {
                     {tPerson('unsaved_changes_warning')}
                 </div>
             </SelectionDialog>
-        </AppShell>
+        </DashboardLayout>
     );
 }
 

@@ -12,6 +12,12 @@ interface DashboardLayoutProps {
     title?: string;
     description?: string;
     breadcrumbs?: Crumb[];
+    /**
+     * 關閉內容區預設內距（p-4 md:p-6）。供既有自帶內距/全幅的 React 工具
+     * （PersonBrowser / QueryPlayground / SearchByEntry / ViewTables）沿用其原版面，
+     * 避免改套 DashboardLayout 後與自身 padding 疊加。新遷移頁不傳此 prop，行為不變。
+     */
+    disableContentPadding?: boolean;
 }
 
 /**
@@ -24,7 +30,7 @@ interface DashboardLayoutProps {
  * 組成：深色側邊欄（單一來源 nav）＋ 導覽列（pushmenu/深色模式/語言/使用者）＋
  * 內容標頭（標題/描述/麵包屑）＋ flash 訊息 ＋ 內容 ＋ 頁尾。
  */
-export default function DashboardLayout({ children, title, description, breadcrumbs }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, title, description, breadcrumbs, disableContentPadding }: DashboardLayoutProps) {
     const { app } = usePage<SharedProps>().props;
     const { isDark, toggle } = useDarkMode();
     const [collapsed, setCollapsed] = useState(false);
@@ -41,7 +47,7 @@ export default function DashboardLayout({ children, title, description, breadcru
                     onToggleDark={toggle}
                 />
 
-                <main className="flex-1 p-4 md:p-6">
+                <main className={`flex-1${disableContentPadding ? '' : ' p-4 md:p-6'}`}>
                     {(title || breadcrumbs) && (
                         <div className="mb-4 flex flex-col gap-1 border-b border-border pb-3">
                             <Breadcrumbs crumbs={breadcrumbs} />

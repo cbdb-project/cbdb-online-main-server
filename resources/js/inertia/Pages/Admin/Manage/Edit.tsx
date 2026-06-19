@@ -102,7 +102,7 @@ export default function ManageEdit() {
                         </Select>
                     </FormField>
 
-                    <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                    <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
                         <div className="mb-1 font-medium">{t('manage_role_desc_title')}</div>
                         <ul className="list-disc space-y-1 pl-4">
                             {ROLE_DESCRIPTIONS.map((role) => (

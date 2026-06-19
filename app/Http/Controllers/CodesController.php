@@ -1428,13 +1428,29 @@ class CodesController extends Controller {
         $keys = [];
 
         try {
-            $connection = DB::connection();
-            $details = $connection->getDoctrineSchemaManager()->listTableDetails($table);
-            if ($details->hasPrimaryKey()) {
-                $keys = $details->getPrimaryKey()->getColumns();
+            $indexes = Schema::getIndexes($table);
+            foreach ($indexes as $index) {
+                if (!empty($index['primary']) && !empty($index['columns']) && is_array($index['columns'])) {
+                    $keys = $index['columns'];
+                    break;
+                }
             }
         } catch (\Throwable $e) {
             $keys = [];
+        }
+
+        try {
+            if (empty($keys)) {
+                $connection = DB::connection();
+                $details = $connection->getDoctrineSchemaManager()->listTableDetails($table);
+                if ($details->hasPrimaryKey()) {
+                    $keys = $details->getPrimaryKey()->getColumns();
+                }
+            }
+        } catch (\Throwable $e) {
+            if (empty($keys)) {
+                $keys = [];
+            }
         }
 
         // 只有在需要时才查询列（作为 fallback）

@@ -18,7 +18,7 @@ class NavigationSchemaTest extends TestCase {
         $keys = [];
         foreach ($nodes as $node) {
             $keys[] = $node['key'];
-            if (! empty($node['children'])) {
+            if (!empty($node['children'])) {
                 $keys = array_merge($keys, $this->collectKeys($node['children']));
             }
         }
@@ -75,6 +75,48 @@ class NavigationSchemaTest extends TestCase {
         $this->assertSame(route('dashboard'), $dashboard['href']);
     }
 
+    public function test_view_subtree_is_flag_aware(): void {
+        // 檢視表（views）父節點與每個子檢視 href 應隨 view flag 在舊 Blade / 新 React 間切換，
+        // 與 codes 子樹對齊（show 與 appShow 共用同一 key 解析）。
+        config(['migration_flags.pages.view' => 'old']);
+        $old = Navigation::tree(null);
+        $this->assertSame(route('view.index'), $this->findHref($old, 'views'));
+        $this->assertSame(route('view.show', 'altname-data'), $this->findHref($old, 'altname-data'));
+
+        config(['migration_flags.pages.view' => 'new']);
+        $new = Navigation::tree(null);
+        $this->assertSame(route('app.view.index'), $this->findHref($new, 'views'));
+        $this->assertSame(route('app.view.show', 'altname-data'), $this->findHref($new, 'altname-data'));
+    }
+
+    public function test_admin_tree_parent_is_flag_aware(): void {
+        // 管理工具樹的父節點（header 連結）應隨 manage flag 切換，與其子項 manage 一致。
+        $admin = User::factory()->create(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_SUPER_ADMIN]);
+
+        config(['migration_flags.pages.manage' => 'old']);
+        $this->assertSame(route('manage.index'), $this->findHref(Navigation::tree($admin), 'admin'));
+
+        config(['migration_flags.pages.manage' => 'new']);
+        $this->assertSame(route('app.manage.index'), $this->findHref(Navigation::tree($admin), 'admin'));
+    }
+
+    /** 遞迴尋找指定 key 節點的 href。 */
+    private function findHref(array $nodes, string $key): ?string {
+        foreach ($nodes as $node) {
+            if (($node['key'] ?? null) === $key) {
+                return $node['href'] ?? null;
+            }
+            if (!empty($node['children'])) {
+                $h = $this->findHref($node['children'], $key);
+                if ($h !== null) {
+                    return $h;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function test_node_active_matches_page_title_and_route_pattern(): void {
         $node = [
             'active' => ['pages' => ['系統總覽'], 'patterns' => []],
@@ -90,7 +132,7 @@ class NavigationSchemaTest extends TestCase {
         $pages = [];
         foreach ($nodes as $node) {
             $pages = array_merge($pages, $node['active']['pages'] ?? []);
-            if (! empty($node['children'])) {
+            if (!empty($node['children'])) {
                 $pages = array_merge($pages, $this->collectActivePages($node['children']));
             }
         }

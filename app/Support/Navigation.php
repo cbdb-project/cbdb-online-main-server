@@ -95,7 +95,7 @@ class Navigation {
 
             // 檢視表（Views）。'地址層級檢視' 為舊 $viewPages 殘留（無對應子連結，
             // 目前無頁面設定此 $page_title），保留以維持選單展開的完全一致。
-            self::tree_('views', 'nav.views', 'fa fa-th-list', self::viewsChildren(), self::routeUrl('view.index'), null, ['地址層級檢視']),
+            self::tree_('views', 'nav.views', 'fa fa-th-list', self::viewsChildren(), self::url('view', 'view.index', 'app.view.index'), null, ['地址層級檢視']),
 
             // 專家工具（需活躍）
             self::tree_('expert', 'nav.expert_tools', 'fas fa-flask', [
@@ -226,7 +226,7 @@ class Navigation {
                     self::url('merge-preview', 'merge-preview.index', 'app.merge-preview.index'),
                     ['pages' => ['MergePreview'], 'patterns' => []]
                 ),
-            ], self::routeUrl('manage.index'), fn () => $isSuperAdmin),
+            ], self::url('manage', 'manage.index', 'app.manage.index'), fn () => $isSuperAdmin),
         ];
     }
 
@@ -372,11 +372,17 @@ class Navigation {
      * @return array<string, mixed>
      */
     protected static function viewItem(string $slug, string $label, string $icon, string $pageTitle): array {
+        // href 依 view flag 解析：flag=new 且 app.view.show 存在時指向 React 單檢視頁
+        // （與 codeItem 對齊；show 與 appShow 共用同一 key 解析 buildViewData）。
+        $href = (migration_flag_is_new('view') && Route::has('app.view.show'))
+            ? self::routeUrl('app.view.show', $slug)
+            : self::routeUrl('view.show', $slug);
+
         return self::item(
             $slug,
             $label,
             $icon,
-            self::routeUrl('view.show', $slug),
+            $href,
             ['pages' => [$pageTitle], 'patterns' => []]
         );
     }

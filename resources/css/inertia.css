@@ -134,6 +134,17 @@
     /* 字體：沿用主站 Source Sans Pro / Noto Sans TC（見近期 commit） */
     --font-sans: 'Source Sans Pro', 'Noto Sans TC', -apple-system, BlinkMacSystemFont,
         'Segoe UI', Roboto, sans-serif;
+
+    /*
+     * 正文字級對齊 AdminLTE 16px 基準。
+     * React 元件普遍以 `text-sm` 當正文/表格字級，預設 0.875rem(14px) 較舊 Blade 頁偏小；
+     * 此處把 text-sm 提到 1rem(16px)、text-xs 提到 0.8125rem(13px)，使整體閱讀字級與舊頁齊平。
+     * 僅調「字級 token」，不動 Tailwind 間距/圓角等 rem token，故不會造成版面重排。
+     */
+    --text-sm: 1rem;
+    --text-sm--line-height: 1.5rem;
+    --text-xs: 0.8125rem;
+    --text-xs--line-height: 1.25rem;
 }
 
 @layer base {

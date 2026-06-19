@@ -23,9 +23,8 @@ interface DashboardLayoutProps {
 /**
  * Phase 0 F2：正式版 React 殼（AdminLTE 風格），供遷移後的後台/CRUD 頁面使用。
  *
- * 注意：既有 5 個已上線 React 頁（PersonBrowser/QueryPlayground/SearchByEntry/
- * ViewTables）仍沿用精簡版 AppShell，本元件不強加於它們，避免對線上工具造成
- * 非預期的版面變動（見遷移計畫附錄 D 決策記錄）。新遷移頁一律改用 DashboardLayout。
+ * 既有 React 工具（PersonBrowser / QueryPlayground / SearchByEntry / ViewTables）亦已改套
+ * 本元件（以 disableContentPadding 保留自身內距），與遷移頁版面一致（見附錄 D.1，2026-06-19）。
  *
  * 組成：深色側邊欄（單一來源 nav）＋ 導覽列（pushmenu/深色模式/語言/使用者）＋
  * 內容標頭（標題/描述/麵包屑）＋ flash 訊息 ＋ 內容 ＋ 頁尾。

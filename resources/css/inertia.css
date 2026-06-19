@@ -25,7 +25,7 @@
 /* shadcn/ui 動畫工具（accordion、dialog 進出場等） */
 @plugin 'tailwindcss-animate';
 
-/* 深色模式：沿用既有 localStorage['darkMode'] 機制，由 AppShell 在
+/* 深色模式：沿用既有 localStorage['darkMode'] 機制，由殼層（useDarkMode）在
    <html> 掛上 .dark class（與 AdminLTE 的 body.dark-mode 概念對齊）。 */
 @custom-variant dark (&:is(.dark *));
 

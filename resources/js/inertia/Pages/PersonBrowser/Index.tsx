@@ -577,7 +577,8 @@ const MOBILE_BREAKPOINT = 960;
 
 const wrapperStyle: React.CSSProperties = {
     display: 'flex',
-    height: 'calc(100vh - 100px)',
+    // 填滿 DashboardLayout 內容區：扣掉導覽列（h-14 ≈ 57px）與頁尾（py-3 + text-sm ≈ 49px）≈ 106px。
+    height: 'calc(100vh - 106px)',
     overflow: 'hidden',
 };
 

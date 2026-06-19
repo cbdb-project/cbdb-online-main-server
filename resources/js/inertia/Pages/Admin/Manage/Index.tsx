@@ -24,14 +24,21 @@ interface ManageIndexPageProps extends SharedProps {
     edit_template: string;
 }
 
-const SORTABLE: { key: string; label: string }[] = [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Name' },
-    { key: 'email', label: 'Email' },
-    { key: 'institution', label: 'Institution' },
-    { key: 'is_active', label: 'manage_approved_col' },
-    { key: 'is_admin', label: 'manage_role_col' },
+const SORTABLE: { key: string; label: string; group: 'admin' | 'common' }[] = [
+    { key: 'id', label: 'manage_user_id', group: 'admin' },
+    { key: 'name', label: 'name', group: 'common' },
+    { key: 'email', label: 'email', group: 'common' },
+    { key: 'institution', label: 'institution', group: 'common' },
+    { key: 'is_active', label: 'manage_approved_col', group: 'admin' },
+    { key: 'is_admin', label: 'manage_role_col', group: 'admin' },
 ];
+
+const ROLE_DESCRIPTIONS = [
+    { key: 'general', title: 'manage_role_desc_general_title', body: 'manage_role_desc_general_body' },
+    { key: 'expert', title: 'manage_role_desc_expert_title', body: 'manage_role_desc_expert_body' },
+    { key: 'crowdsource', title: 'manage_role_desc_crowdsource_title', body: 'manage_role_desc_crowdsource_body' },
+    { key: 'sysadmin', title: 'manage_role_desc_sysadmin_title', body: 'manage_role_desc_sysadmin_body' },
+] as const;
 
 export default function ManageIndex() {
     const props = usePage<ManageIndexPageProps>().props;
@@ -58,12 +65,13 @@ export default function ManageIndex() {
         e.preventDefault();
         reload(base({ page: undefined }));
     };
+
     const toggleSort = (col: string) => {
         const nextOrder = filters.sort_by === col && filters.sort_order === 'asc' ? 'desc' : 'asc';
         reload(base({ sort_by: col, sort_order: nextOrder, page: 1 }));
     };
-    const sortIcon = (col: string) => (filters.sort_by === col ? (filters.sort_order === 'asc' ? '▲' : '▼') : '');
 
+    const sortIcon = (col: string) => (filters.sort_by === col ? (filters.sort_order === 'asc' ? '▲' : '▼') : '');
     const editUrl = (id: number) => edit_template.replace('__ID__', String(id));
 
     const statusBadge = (active: boolean) =>
@@ -103,10 +111,10 @@ export default function ManageIndex() {
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50">
                                 <tr>
-                                    <th className="px-3 py-2 text-left font-medium">ID</th>
-                                    <th className="px-3 py-2 text-left font-medium">Name</th>
-                                    <th className="px-3 py-2 text-left font-medium">Email</th>
-                                    <th className="px-3 py-2 text-left font-medium">Institution</th>
+                                    <th className="px-3 py-2 text-left font-medium">{t('manage_user_id')}</th>
+                                    <th className="px-3 py-2 text-left font-medium">{tc('name')}</th>
+                                    <th className="px-3 py-2 text-left font-medium">{tc('email')}</th>
+                                    <th className="px-3 py-2 text-left font-medium">{tc('institution')}</th>
                                     <th className="px-3 py-2 text-left font-medium">{t('manage_approved_col')}</th>
                                     <th className="px-3 py-2 text-left font-medium">{t('manage_role_col')}</th>
                                     <th className="px-3 py-2 text-left font-medium">{t('manage_actions_col')}</th>
@@ -133,6 +141,20 @@ export default function ManageIndex() {
                         )}
                     </form>
                 </div>
+
+                <div className="border-b border-border px-4 py-3 text-xs text-muted-foreground">
+                    <div className="mb-1 font-medium">{t('manage_role_desc_title')}</div>
+                    <ul className="list-disc space-y-1 pl-4">
+                        {ROLE_DESCRIPTIONS.map((role) => (
+                            <li key={role.key}>
+                                <span className="font-medium">{t(role.title)}</span>
+                                {' - '}
+                                <span>{t(role.body)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
                 <div className="overflow-x-auto p-2">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50">
@@ -140,7 +162,7 @@ export default function ManageIndex() {
                                 {SORTABLE.map((c) => (
                                     <th key={c.key} className="px-3 py-2 text-left font-medium">
                                         <button type="button" className="hover:underline" onClick={() => toggleSort(c.key)}>
-                                            {c.label.startsWith('manage_') ? t(c.label) : c.label} {sortIcon(c.key)}
+                                            {c.group === 'admin' ? t(c.label) : tc(c.label)} {sortIcon(c.key)}
                                         </button>
                                     </th>
                                 ))}
@@ -160,6 +182,7 @@ export default function ManageIndex() {
                         </tbody>
                     </table>
                 </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
                     <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         {t('manage_per_page')}
@@ -174,7 +197,7 @@ export default function ManageIndex() {
                     <Pagination
                         meta={data.meta}
                         onPageChange={(page) => reload(base({ page }))}
-                        summaryTemplate="{from}–{to} / {total}"
+                        summaryTemplate="{from}-{to} / {total}"
                         labels={{ previous: tc('previous'), next: tc('next') }}
                     />
                 </div>

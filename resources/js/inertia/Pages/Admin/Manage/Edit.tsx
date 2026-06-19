@@ -32,6 +32,13 @@ const ROLE_OPTIONS = [
     { value: 3, label: 'manage_role_sysadmin' },
 ];
 
+const ROLE_DESCRIPTIONS = [
+    { key: 'general', title: 'manage_role_desc_general_title', body: 'manage_role_desc_general_body' },
+    { key: 'expert', title: 'manage_role_desc_expert_title', body: 'manage_role_desc_expert_body' },
+    { key: 'crowdsource', title: 'manage_role_desc_crowdsource_title', body: 'manage_role_desc_crowdsource_body' },
+    { key: 'sysadmin', title: 'manage_role_desc_sysadmin_title', body: 'manage_role_desc_sysadmin_body' },
+] as const;
+
 export default function ManageEdit() {
     const props = usePage<ManageEditPageProps>().props;
     const { user, urls } = props;
@@ -52,7 +59,6 @@ export default function ManageEdit() {
     };
 
     const submitDelete = () => {
-        // 軟刪除：只送 delete_user=1（後端 PATCH 依此走刪除分支）。
         form.transform(() => ({ delete_user: 1 }));
         form.patch(urls.update, { preserveScroll: true });
     };
@@ -65,17 +71,17 @@ export default function ManageEdit() {
     return (
         <DashboardLayout
             title={t('manage_edit_desc', { name: user.name })}
-            breadcrumbs={[{ label: 'User management', url: urls.index }, { label: user.name }]}
+            breadcrumbs={[{ label: t('manage_breadcrumb_index'), url: urls.index }, { label: user.name }]}
         >
             <div className="max-w-2xl space-y-4">
                 <div className="rounded-lg border border-border bg-card p-4 text-sm">
                     <div className="grid grid-cols-2 gap-2">
-                        <div><span className="text-muted-foreground">ID:</span> {user.id}</div>
-                        <div><span className="text-muted-foreground">Name:</span> {user.name}</div>
-                        <div><span className="text-muted-foreground">Email:</span> {user.email}</div>
-                        <div><span className="text-muted-foreground">Institution:</span> {user.institution}</div>
-                        <div><span className="text-muted-foreground">Created:</span> {user.created_at ?? '-'}</div>
-                        <div><span className="text-muted-foreground">Updated:</span> {user.updated_at ?? '-'}</div>
+                        <div><span className="text-muted-foreground">{t('manage_user_id')}:</span> {user.id}</div>
+                        <div><span className="text-muted-foreground">{tc('name')}:</span> {user.name}</div>
+                        <div><span className="text-muted-foreground">{tc('email')}:</span> {user.email}</div>
+                        <div><span className="text-muted-foreground">{tc('institution')}:</span> {user.institution}</div>
+                        <div><span className="text-muted-foreground">{t('manage_registered_at')}:</span> {user.created_at ?? '-'}</div>
+                        <div><span className="text-muted-foreground">{t('manage_updated_at')}:</span> {user.updated_at ?? '-'}</div>
                     </div>
                 </div>
 
@@ -86,6 +92,8 @@ export default function ManageEdit() {
                             <option value="0">{t('manage_not_activated_opt')}</option>
                         </Select>
                     </FormField>
+                    <p className="-mt-1 text-xs text-muted-foreground">{t('manage_inactive_login_hint')}</p>
+
                     <FormField label={t('manage_role_col')} htmlFor="is_admin" error={form.errors.is_admin}>
                         <Select id="is_admin" value={String(form.data.is_admin)} onChange={(e) => form.setData('is_admin', Number(e.target.value))}>
                             {ROLE_OPTIONS.map((r) => (
@@ -94,11 +102,29 @@ export default function ManageEdit() {
                         </Select>
                     </FormField>
 
+                    <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                        <div className="mb-1 font-medium">{t('manage_role_desc_title')}</div>
+                        <ul className="list-disc space-y-1 pl-4">
+                            {ROLE_DESCRIPTIONS.map((role) => (
+                                <li key={role.key}>
+                                    <span className="font-medium">{t(role.title)}</span>
+                                    {' - '}
+                                    <span>{t(role.body)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
                         <Button type="submit" disabled={form.processing}>{tc('save_changes')}</Button>
                         <a href={urls.index} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
                             {tc('cancel')}
                         </a>
+                    </div>
+
+                    <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                        <div className="mb-1 text-sm font-medium text-destructive">{t('manage_dangerous_ops')}</div>
+                        <p className="mb-2 text-xs text-muted-foreground">{t('manage_delete_warning')}</p>
                         <Button type="button" variant="destructive" disabled={form.processing} onClick={() => setConfirmDelete(true)}>
                             {t('manage_delete_user')}
                         </Button>

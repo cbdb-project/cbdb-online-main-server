@@ -19,6 +19,7 @@ return [
     'batch_load_social_institutes_desc' => 'Paste tab-separated social institution data to add NAME / CODE / ADDR records',
     'unidirectional_repair_desc'   => 'Repair unidirectional kinship and association relations in the CBDB database',
     'manage_edit_desc'             => 'Edit settings for user :name',
+    'manage_breadcrumb_index'      => 'User management',
     'proposal_adjustment'          => 'Proposal Adjustment',
 
     // manage/ — user list (index)
@@ -57,10 +58,14 @@ return [
     'manage_confirm_delete_2'      => 'Final confirmation: Do you really want to delete this user?',
 
     // manage/ — role descriptions partial
-    'manage_role_desc_general'     => '<strong>General User</strong> — A CBDB data-entry contributor who has completed one to four weeks of entry training and possesses the necessary domain knowledge. May directly edit records, submit and review proposals, and use expert tools.',
-    'manage_role_desc_expert'      => '<strong>Expert</strong> — Head of the CBDB editorial team. Has administrative rights including user management, batch import, and operation restoration.',
-    'manage_role_desc_crowdsource' => '<strong>Crowdsourcing</strong> — A CBDB collaborator (research assistant, visiting scholar, data partner, etc.). May submit proposals and use expert tools, but may not directly edit records.',
-    'manage_role_desc_sysadmin'    => '<strong>System Administrator</strong> — CBDB committee members, platform developers and maintainers, and colleagues who require full administrative access. Has access to all features.',
+    'manage_role_desc_general_title'     => 'General User',
+    'manage_role_desc_general_body'      => 'A CBDB data-entry contributor who has completed one to four weeks of entry training and possesses the necessary domain knowledge. May directly edit records, submit and review proposals, and use expert tools.',
+    'manage_role_desc_expert_title'      => 'Expert',
+    'manage_role_desc_expert_body'       => 'Head of the CBDB editorial team. Has administrative rights including user management, batch import, and operation restoration.',
+    'manage_role_desc_crowdsource_title' => 'Crowdsourcing',
+    'manage_role_desc_crowdsource_body'  => 'A CBDB collaborator (research assistant, visiting scholar, data partner, etc.). May submit proposals and use expert tools, but may not directly edit records.',
+    'manage_role_desc_sysadmin_title'    => 'System Administrator',
+    'manage_role_desc_sysadmin_body'     => 'CBDB committee members, platform developers and maintainers, and colleagues who require full administrative access. Has access to all features.',
 
     // manage/ — merge preview
     'manage_merge_title'              => 'Merge Person Records',

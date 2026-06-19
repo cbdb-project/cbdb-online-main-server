@@ -19,6 +19,7 @@ return [
     'batch_load_social_institutes_desc' => '貼上以 tab 分隔的社會機構資料，依序新增 NAME / CODE / ADDR 資料',
     'unidirectional_repair_desc'   => '修復 CBDB 資料庫中的單向親屬關係和社會關係',
     'manage_edit_desc'             => '編輯用戶 :name 的設置',
+    'manage_breadcrumb_index'      => '用戶管理',
     'proposal_adjustment'          => '提案調整',
 
     // manage/ — 用戶列表
@@ -57,10 +58,14 @@ return [
     'manage_confirm_delete_2'      => '最後確認：您真的要刪除此用戶嗎？',
 
     // manage/ — 角色說明 partial
-    'manage_role_desc_general'     => '<strong>一般用戶</strong> — 通過了兩週至一個月錄入訓練、具備專業知識的 CBDB 錄入者。可直接編輯資料、提交與審核提案，並使用專家工具。',
-    'manage_role_desc_expert'      => '<strong>專家</strong> — CBDB 編輯小組負責人，擁有用戶管理、批次匯入、操作復原等管理權限。',
-    'manage_role_desc_crowdsource' => '<strong>眾包</strong> — CBDB 的合作者（研究助理、訪問學者、數據合作者等），可提交提案與使用專家工具，但不可直接編輯資料。',
-    'manage_role_desc_sysadmin'    => '<strong>系統管理員</strong> — CBDB 委員會成員、平台開發與維護者，以及需要完整管理權限的同事，擁有所有功能的存取權限。',
+    'manage_role_desc_general_title'     => '一般用戶',
+    'manage_role_desc_general_body'      => '通過了兩週至一個月錄入訓練、具備專業知識的 CBDB 錄入者。可直接編輯資料、提交與審核提案，並使用專家工具。',
+    'manage_role_desc_expert_title'      => '專家',
+    'manage_role_desc_expert_body'       => 'CBDB 編輯小組負責人，擁有用戶管理、批次匯入、操作復原等管理權限。',
+    'manage_role_desc_crowdsource_title' => '眾包',
+    'manage_role_desc_crowdsource_body'  => 'CBDB 的合作者（研究助理、訪問學者、數據合作者等），可提交提案與使用專家工具，但不可直接編輯資料。',
+    'manage_role_desc_sysadmin_title'    => '系統管理員',
+    'manage_role_desc_sysadmin_body'     => 'CBDB 委員會成員、平台開發與維護者，以及需要完整管理權限的同事，擁有所有功能的存取權限。',
 
     // manage/ — 合併預覽
     'manage_merge_title'              => '人物記錄合併',

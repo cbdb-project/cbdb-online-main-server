@@ -109,7 +109,7 @@
                                     {{ __('admin.manage_delete_user') }}
                                 </label>
                                 <small class="form-text text-danger">
-                                    {!! __('admin.manage_delete_warning') !!}
+                                    {{ __('admin.manage_delete_warning') }}
                                 </small>
                             </div>
                         </div>

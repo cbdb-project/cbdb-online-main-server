@@ -75,7 +75,7 @@ export interface NavNode {
 }
 
 export interface SharedProps {
-    app: { version: string };
+    app: { name: string | null; version: string };
     auth: { user: AuthUser | null };
     locale: string;
     locale_url: string;

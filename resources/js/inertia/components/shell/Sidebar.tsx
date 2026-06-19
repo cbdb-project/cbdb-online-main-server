@@ -14,7 +14,8 @@ interface SidebarProps {
 export default function Sidebar({ collapsed }: SidebarProps) {
     const page = usePage<SharedProps>();
     const nav: NavNode[] = page.props.nav ?? [];
-    const appName = 'CBDB';
+    // 與舊 Blade 側邊欄（sidebar-v3）一致：讀 config('app.name')，未設定時回退 'CBDB'。
+    const appName = page.props.app?.name ?? 'CBDB';
     const currentPath = (page.url.split('?')[0] || '/').replace(/\/$/, '') || '/';
 
     return (

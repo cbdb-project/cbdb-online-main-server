@@ -40,6 +40,17 @@ class InertiaSharedPropsTest extends TestCase {
         }
     }
 
+    public function test_share_exposes_app_name_and_version(): void {
+        config(['app.name' => 'CBDB Online']);
+
+        $props = $this->shareFor(null);
+
+        // 側邊欄品牌名改由 share() 的 app.name 提供（取代前端硬編碼），與舊 Blade 側邊欄
+        // config('app.name') 同源；version 仍保留。
+        $this->assertSame('CBDB Online', $props['app']['name']);
+        $this->assertArrayHasKey('version', $props['app']);
+    }
+
     public function test_authenticated_share_exposes_roles_and_can(): void {
         $user = User::factory()->create(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_SUPER_ADMIN]);
         $props = $this->shareFor($user);

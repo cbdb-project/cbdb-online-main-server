@@ -60,6 +60,8 @@ class ManageEditInertiaTest extends TestCase {
                 ->component('Admin/Manage/Edit')
                 ->where('user.id', $target->id)
                 ->where('user.is_admin', 0)
+                ->where('user.created_at', $target->created_at?->format('Y-m-d H:i:s'))
+                ->where('user.updated_at', $target->updated_at?->format('Y-m-d H:i:s'))
                 ->has('urls.update'));
     }
 

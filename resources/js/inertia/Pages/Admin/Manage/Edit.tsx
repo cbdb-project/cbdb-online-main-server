@@ -16,6 +16,8 @@ interface ManagedUser {
     is_active: number;
     is_admin: number;
     role_name: string;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 interface ManageEditPageProps extends SharedProps {
@@ -72,6 +74,8 @@ export default function ManageEdit() {
                         <div><span className="text-muted-foreground">Name:</span> {user.name}</div>
                         <div><span className="text-muted-foreground">Email:</span> {user.email}</div>
                         <div><span className="text-muted-foreground">Institution:</span> {user.institution}</div>
+                        <div><span className="text-muted-foreground">Created:</span> {user.created_at ?? '-'}</div>
+                        <div><span className="text-muted-foreground">Updated:</span> {user.updated_at ?? '-'}</div>
                     </div>
                 </div>
 

@@ -226,6 +226,8 @@ class ManagementController extends Controller {
                 'is_active' => (int) $user->is_active,
                 'is_admin' => (int) $user->is_admin,
                 'role_name' => $user->getRoleName(),
+                'created_at' => optional($user->created_at)->format('Y-m-d H:i:s'),
+                'updated_at' => optional($user->updated_at)->format('Y-m-d H:i:s'),
             ],
             'urls' => [
                 'update' => route('app.manage.update', ['manage' => $user->id], false),

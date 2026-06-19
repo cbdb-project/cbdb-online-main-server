@@ -14,6 +14,14 @@
  */
 @import 'tailwindcss';
 
+/*
+ * Font Awesome 6 free（自托管，由 Vite 打包 webfonts，不走 CDN）。
+ * Inertia 根模板 inertia.blade.php 為獨立 HTML，不繼承 AdminLTE layout，故 React 頁面
+ * 的 `fa*` 圖示需在此 bundle 內自備字型。沿用後端 Navigation 與各頁既有的 FA class 字串
+ * （fas/far/fab/v4 兩段式 `fa fa-*`）；FA6 保留 v5 別名，舊名稱多數可直接渲染。
+ */
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+
 /* shadcn/ui 動畫工具（accordion、dialog 進出場等） */
 @plugin 'tailwindcss-animate';
 

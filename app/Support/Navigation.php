@@ -222,7 +222,7 @@ class Navigation {
                 self::item(
                     'merge-preview',
                     'admin.merge_records',
-                    'ion ion-shuffle',
+                    'fas fa-shuffle',
                     self::url('merge-preview', 'merge-preview.index', 'app.merge-preview.index'),
                     ['pages' => ['MergePreview'], 'patterns' => []]
                 ),

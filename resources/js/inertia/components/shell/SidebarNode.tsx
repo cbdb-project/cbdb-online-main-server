@@ -81,28 +81,43 @@ export default function SidebarNode({ node, currentPath, depth = 0 }: SidebarNod
             'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary'
     );
 
+    const hasLink = !!node.href && node.href !== '#';
+
     if (hasChildren) {
         return (
             <li>
-                <a
-                    href={node.href ?? '#'}
-                    className={linkClass}
-                    style={indentStyle}
-                    onClick={(e) => {
-                        // 父節點：點擊切換展開（若無實際連結）；有連結則同時導覽。
-                        if (!node.href || node.href === '#') {
-                            e.preventDefault();
-                        }
-                        setOpen((v) => !v);
-                    }}
-                >
-                    <i className={cn('w-4 text-center', node.icon)} aria-hidden />
-                    <span className="flex-1">{label}</span>
-                    <i
-                        className={cn('fas fa-angle-left transition-transform', open && '-rotate-90')}
-                        aria-hidden
-                    />
-                </a>
+                {/* 導覽（標籤連結）與展開切換（角形鈕）分離：父節點若有實際連結，點標籤導覽、
+                    點角形鈕只切換展開且不導覽（preventDefault），否則「點父項導覽會重渲染、
+                    active 分支被 useEffect 重新展開」導致使用者永遠無法收起該選單。 */}
+                <div className={linkClass} style={indentStyle}>
+                    {hasLink ? (
+                        <a href={node.href!} className="flex flex-1 items-center gap-2 min-w-0">
+                            <i className={cn('w-4 text-center', node.icon)} aria-hidden />
+                            <span className="flex-1 truncate">{label}</span>
+                        </a>
+                    ) : (
+                        <button
+                            type="button"
+                            className="flex flex-1 items-center gap-2 min-w-0 text-left"
+                            onClick={() => setOpen((v) => !v)}
+                        >
+                            <i className={cn('w-4 text-center', node.icon)} aria-hidden />
+                            <span className="flex-1 truncate">{label}</span>
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        aria-label="toggle submenu"
+                        aria-expanded={open}
+                        className="ml-1 shrink-0 px-1"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
+                    >
+                        <i
+                            className={cn('fas fa-angle-left transition-transform', open && '-rotate-90')}
+                            aria-hidden
+                        />
+                    </button>
+                </div>
                 {open && (
                     <ul className="space-y-1">
                         {node.children.map((child) => (

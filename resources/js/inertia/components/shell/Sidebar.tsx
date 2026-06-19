@@ -21,14 +21,17 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     return (
         <aside
             className={
-                'flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ' +
+                // sticky top-0：頁面內容比視窗高時（如 manage 50 列）側邊欄仍釘在視窗左側撐滿全高，
+                // 否則 h-screen 靜態流式會只覆蓋頁面上半（見 2026-06-19 修正）。
+                'sticky top-0 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ' +
                 (collapsed ? 'w-0 overflow-hidden md:w-0' : 'w-64')
             }
         >
             <div className="flex h-14 items-center justify-center border-b border-sidebar-border px-4 text-lg font-light text-sidebar-primary-foreground">
                 {appName}
             </div>
-            <nav className="flex-1 overflow-y-auto px-2 py-3">
+            {/* sidebar-scroll：深色細捲軸，取代深色側邊欄上突兀的預設白色捲軸 */}
+            <nav className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3">
                 <ul className="space-y-1">
                     {nav.map((node) => (
                         <SidebarNode key={node.key} node={node} currentPath={currentPath} />

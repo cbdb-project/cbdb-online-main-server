@@ -33,6 +33,15 @@
 - 預設 context 攔截所有非 GET/HEAD 請求（abort + 記錄），`serviceWorkers:'block'` 防繞過。
 - **刻意寫入的單元**才在該操作前後暫時放行對應的寫入端點（白名單到具體 method+URL），操作完立即收回；其餘請求仍攔截。任何非預期寫入 → 該單元 FAIL。
 
+### 1.5 對抗性紀律與「資料以外」的維度（本版新增，補先前盲點）
+> 教訓：先前只比「我選擇抽取的 DOM 文字資料」，且**用寫死 `/app` URL 直接開頁**，導致**呈現層**（字體/CSS/實際載入資源）與**進入路徑**（側邊欄連結、登入落地）完全在斷言之外——使用者一眼能看到的真問題（如 `/app` 宣告 `Source Sans Pro`/`Noto Sans TC` 卻沒實際載入字體）卻測不到。修正三原則：
+
+1. **對抗式而非確認式**：每個單元都要先自問「**什麼差異是我目前的斷言看不到的？**」，再補一條檢查。全綠不是成功，是該起疑的信號。
+2. **走使用者真正的路徑**：能用點側邊欄/連結抵達就**不要寫死 URL**；驗證「怎麼到這頁」與「這頁長怎樣」，不只是「這頁的資料」。
+3. **呈現層也是 parity 的一部分**：字體、實際載入的 @font-face、關鍵 computed style、視覺，都要納入斷言。「宣告了字體名」≠「載入了字體」。
+
+對應新增三個維度流程（I/J/K，見矩陣）。
+
 ## 二、可雙邊對比的流程矩陣
 
 | # | 流程 | 操作類型 | 舊路由 | 新路由 | 對比點 |
@@ -45,7 +54,13 @@
 | F | **manage 使用者 改啟用/角色** | 修改（寫，**可逆**） | `GET /manage/{id}/edit`→**PUT** | `appEdit`→`appUpdate`(**PATCH**) | 列表該列狀態/角色 badge 變化 + flash；測畢改回原值 |
 | G | **manage 使用者 軟刪除** | 刪除（寫，**不可逆**） | 勾 `delete_user=1`→**PUT** | destructive→ConfirmDialog→**PATCH**`{delete_user:1}` | 軟刪後該列消失 + flash；**僅對拋棄帳號、不可復原** |
 | H | **ExplainSQL 送出** | 查詢（讀寫表單） | `GET/POST /admin/explainsql` | `app.admin.explainsql(.explain)` | 同一 SQL 的 EXPLAIN 結果列語義一致 |
+| **I** | **資源載入 / 字體 parity** | 呈現（讀） | 任一舊頁 | 對應 `/app` 頁 | **鎖定目標家族** Source Sans Pro + Noto Sans TC（不把 Font Awesome 算進比對，避免噪音）。**雙重判準**：(1) 等 `document.fonts.ready` 後比對實際註冊的 @font-face families；(2) **網路層佐證**——`page.on('response')` 過濾 `resourceType==='font'`（或 URL 命中 `.woff2`/fontsource chunk），斷言新頁實際**下載**了目標字體檔。新頁須實際載入舊頁所載入的字體，不可只在 CSS 宣告字體名。**`document.fonts.check` 受測試機系統字體影響會假 PASS，不可單用；`document.fonts` 列舉的 FontFace 可能 `status:'unloaded'`，故須 fonts.ready + 網路層雙重佐證。** |
+| **J** | **導航完整性（flag 連結目標）** | 進入路徑 | 側邊欄 | 側邊欄 | **以點側邊欄連結抵達**（不寫死 URL）：斷言只對**經 `Navigation::url(flag, old, new)` 解析的節點**生效——對 `migration_flag_is_new()=true` 者 href→`/app/*` 且點擊落 React 頁、`=false` 者→舊 Blade。**必須排除「不經 `url()`、直接 `routeUrl('app.*')` 的恆新項目」**：`query-playground`、`person-browser`、`search-by-entry`、`maps`、`views-overview-new`（這些永遠指 /app，與 flag 無關，與 §三「新獨有」一致），對它們套 flag 斷言會假 FAIL。另：(a) 須在**正確登入身分**下擷取側邊欄（superadmin-only 子樹對他人不渲染）；(b) `routeUrl()` 對未註冊路由回 `null`，須區分「路由未註冊」與「flag 指向錯」，不可把 null 當失敗。涵蓋**登入後落地頁**是否符合 flag。 |
+| **L** | **表單/詳情頁欄位集合完整性 parity** | 內容（讀） | 任一舊編輯/詳情頁 | 對應 `/app` 頁 | **掃描**每個已遷移的編輯/詳情頁，收集舊頁顯示的**欄位/值集合**（label 文字、readonly 欄位值、顯示的資料值如 created_at/updated_at 時間戳），斷言新頁**未缺少**舊頁呈現的任一資訊。**重點抓「新頁少了舊頁有的欄位」**（如 manage 編輯頁新版缺 `註冊時間 created_at`/`最後更新時間 updated_at`——連 `appEdit` 的 props.user 都沒帶這兩欄）。比對以「值集合包含關係」為主（label 文字新舊可能不同，故以**舊頁顯示的資料值是否出現在新頁**為準），既抓缺漏也報多出。**流程 D（codes 編輯）亦須升級為比對完整欄位集合，而非只比所改的單一值。** **實作要點**：(a) 新頁「呈現值」須含 `<main>` innerText **加上表單欄位值**（input/select/textarea），否則以 input 渲染的欄位值不在 innerText 內會假 FAIL；(b) 取文限縮 `<main>`（排除側邊欄）避免短值在側欄假命中；(c) `select` 至少同時採集**當前 option text 與 option value**，新頁若以原始 value 呈現、舊頁以 select2 標籤文字呈現，應優先視為**格式差異**而非硬 FAIL；(d) 若仍有字串格式不一致（例如時間戳格式化、人物 select2 標籤更豐富）而落入 DIFF，須人工複核分辨「真缺漏」與「格式差異」；(e) codes 用含稽核欄的 `_DATA` 表、rowId 由 show 頁動態解析。 |
+| **K** | **視覺 parity（關鍵 computed style）** | 呈現（讀） | 任一舊頁 | 對應 `/app` 頁 | 比對主要容器關鍵 computed style + 截圖留存供人工目視。**警告：computed `font-family` 字串新舊幾乎相等（皆解析出 'Source Sans Pro','Noto Sans TC',…），但字串相等≠字體已載入——對本案字體 bug，K 的 font-family 字串比對會假 PASS。** 故 K 僅輔助，字體載入的紅燈一律以 **I（載入清單 + 網路層）** 為準，視覺差異以截圖/像素為準。 |
 
+> **I/J/K 是「資料以外」維度**，補先前盲點（見 §1.5）。I 直接驗證字體實際載入；J 強制走側邊欄而非寫死 URL，抓出「flag 未翻/側邊欄仍指舊頁/登入落地錯」這類進入路徑問題。
+> **flag 生效快取陷阱**：Laravel 12 的 `php artisan serve`（`ServeCommand`）會**監看 `.env`，變更時自動重啟** server（除非加 `--no-reload`），故 `.env` 的 flag 改動**會即時生效，不需手動重啟**。真正的陷阱只有一個：若曾跑過 `php artisan config:cache`，`config()` 改讀 `bootstrap/cache/config.php` 而**完全忽略 `.env`**，此時改 `.env`（含重啟 serve）都無效，必須先 `php artisan config:clear`。流程 J 實作時仍以**瀏覽器實際看到的側邊欄連結**為準（而非 CLI `migration_flag_is_new`），若兩者不一致，優先懷疑殘留的 config cache。
 > A–E 在同一張可寫 codes 目標表上串成一條完整 CRUD 生命週期（建→查→改→刪），合成列即用即刪。
 > **直接存 vs 提案是兩個獨立按鈕/端點，不是角色分支**：`performStore/Update/Destroy` 只檢查 `Auth::check() && isActive()`，**任何 active 使用者點「直接儲存」(save_direct) 都直接寫目標表**；「提案」(submit_proposal) 是另一條路由（`app.codes.propose.*`），寫的是 `operations` 表**而非目標表**。本計畫 C–E 一律**點 save_direct**，**絕不可點 submit_proposal**（否則沒寫到目標表、卻污染 operations，是假測）。`can_propose`/`can_edit` 只決定按鈕是否出現，與 superadmin 身分無關。
 > manage 需 `canManageUsers()`。

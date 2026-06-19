@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
@@ -27,6 +28,8 @@ class AdminExplainSqlInertiaTest extends TestCase {
             'database' => ':memory:',
             'prefix' => '',
         ]);
+        config()->set('mcp.cbdb.allowed_tables', ['sample']);
+        config()->set('mcp.cbdb.max_limit', 100);
 
         Schema::create('users', function ($table) {
             $table->increments('id');
@@ -94,5 +97,21 @@ class AdminExplainSqlInertiaTest extends TestCase {
                 ->component('Admin/ExplainSql/Index')
                 ->where('results', null)
                 ->whereNot('error', null));
+    }
+
+    #[Test]
+    public function explain_returns_results_props_for_valid_sql(): void {
+        $admin = $this->makeAdmin();
+        DB::statement('CREATE TABLE sample (id INTEGER)');
+
+        $this->actingAs($admin)
+            ->post(route('app.admin.explainsql.explain'), ['sql' => 'SELECT * FROM sample'])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/ExplainSql/Index')
+                ->where('sql', 'SELECT * FROM sample')
+                ->where('error', null)
+                ->has('columns')
+                ->has('results.0'));
     }
 }

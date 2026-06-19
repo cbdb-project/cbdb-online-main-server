@@ -37,7 +37,10 @@ class AdminExplainSqlController extends Controller {
 
         if (!$error) {
             try {
-                $results = DB::select(DB::raw('EXPLAIN ' . $sql));
+                // DB::select 需要字串；傳 DB::raw() Expression 會觸發
+                // 「PDO::prepare(): Argument #1 must be of type string, Expression given」，
+                // 使 EXPLAIN 永遠丟例外（新舊頁共用此方法，故兩邊都壞）。
+                $results = DB::select('EXPLAIN ' . $sql);
                 $columns = !empty($results) ? array_keys((array) $results[0]) : [];
             } catch (\Throwable $e) {
                 $error = $e->getMessage();

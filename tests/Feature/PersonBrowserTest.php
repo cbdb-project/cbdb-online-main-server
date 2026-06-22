@@ -155,7 +155,10 @@ class PersonBrowserTest extends TestCase {
                 c_firstyear SMALLINT,
                 c_lastyear SMALLINT,
                 c_sequence INT,
-                c_notes TEXT
+                c_source INT,
+                c_pages TEXT,
+                c_notes TEXT,
+                c_natal INT
             )
         ');
 
@@ -172,7 +175,10 @@ class PersonBrowserTest extends TestCase {
             CREATE TABLE IF NOT EXISTS BIOG_TEXT_DATA (
                 c_personid INT,
                 c_textid INT,
-                c_role_id INT
+                c_role_id INT,
+                c_source INT,
+                c_pages VARCHAR(255),
+                c_notes TEXT
             )
         ');
 
@@ -216,7 +222,16 @@ class PersonBrowserTest extends TestCase {
                 c_assoc_code INT,
                 c_assoc_id INT,
                 c_inst_code INT,
-                c_inst_name_code INT
+                c_inst_name_code INT,
+                c_source INT,
+                c_pages VARCHAR(255),
+                c_notes TEXT,
+                c_exam_rank VARCHAR(255),
+                c_attempt_count INT,
+                c_exam_field VARCHAR(255),
+                c_parental_status_code INT,
+                c_age INT,
+                c_posting_notes VARCHAR(255)
             )
         ');
 
@@ -238,7 +253,9 @@ class PersonBrowserTest extends TestCase {
                 c_day INT,
                 c_source INT,
                 c_pages VARCHAR(255),
-                c_notes TEXT
+                c_notes TEXT,
+                c_event LONGTEXT,
+                c_role VARCHAR(255)
             )
         ');
 
@@ -259,7 +276,8 @@ class PersonBrowserTest extends TestCase {
                 c_lastyear SMALLINT,
                 c_source INT,
                 c_pages VARCHAR(255),
-                c_notes TEXT
+                c_notes TEXT,
+                c_supplement VARCHAR(255)
             )
         ');
 
@@ -286,7 +304,15 @@ class PersonBrowserTest extends TestCase {
                 c_assoc_last_year INT,
                 c_source INT,
                 c_pages VARCHAR(255),
-                c_notes TEXT
+                c_notes TEXT,
+                c_topic_code INT,
+                c_occasion_code INT,
+                c_tertiary_personid INT,
+                c_tertiary_type_notes TEXT,
+                c_assoc_claimer_id INT,
+                c_addr_id INT,
+                c_inst_code INT,
+                c_inst_name_code INT
             )
         ');
 
@@ -305,7 +331,8 @@ class PersonBrowserTest extends TestCase {
                 c_kin_code INT,
                 c_source INT,
                 c_pages VARCHAR(255),
-                c_notes TEXT
+                c_notes TEXT,
+                c_autogen_notes TEXT
             )
         ');
 
@@ -326,7 +353,11 @@ class PersonBrowserTest extends TestCase {
                 c_possession_desc VARCHAR(255),
                 c_possession_desc_chn VARCHAR(255),
                 c_quantity VARCHAR(255),
+                c_measure_code SMALLINT,
                 c_possession_yr SMALLINT,
+                c_possession_nh_code INT,
+                c_possession_nh_yr SMALLINT,
+                c_possession_yr_range INT,
                 c_source INT,
                 c_pages VARCHAR(255),
                 c_notes TEXT
@@ -347,6 +378,14 @@ class PersonBrowserTest extends TestCase {
                 c_inst_name_code INT,
                 c_bi_role_code INT,
                 c_inst_code INT,
+                c_bi_begin_year INT,
+                c_bi_by_nh_code INT,
+                c_bi_by_nh_year INT,
+                c_bi_by_range INT,
+                c_bi_end_year INT,
+                c_bi_ey_nh_code INT,
+                c_bi_ey_nh_year INT,
+                c_bi_ey_range INT,
                 c_source INT,
                 c_pages VARCHAR(255),
                 c_notes TEXT
@@ -379,7 +418,13 @@ class PersonBrowserTest extends TestCase {
                 c_lastyear SMALLINT,
                 c_source INT,
                 c_pages VARCHAR(255),
-                c_notes TEXT
+                c_notes TEXT,
+                c_appt_code INT,
+                c_assume_office_code INT,
+                c_dy INT,
+                c_inst_code INT,
+                c_inst_name_code INT,
+                c_office_category_id INT
             )
         ');
 
@@ -388,6 +433,14 @@ class PersonBrowserTest extends TestCase {
                 c_office_id INTEGER PRIMARY KEY,
                 c_office_chn VARCHAR(255),
                 c_office_trans VARCHAR(255)
+            )
+        ');
+
+        DB::statement('
+            CREATE TABLE IF NOT EXISTS APPOINTMENT_CODES (
+                c_appt_code INTEGER PRIMARY KEY,
+                c_appt_desc_chn VARCHAR(255),
+                c_appt_desc VARCHAR(255)
             )
         ');
 
@@ -633,6 +686,11 @@ class PersonBrowserTest extends TestCase {
                 'c_source' => null,
                 'c_pages' => '12a',
                 'c_notes' => 'served briefly',
+                'c_assume_office_code' => 1,
+                'c_dy' => 15,
+                'c_inst_code' => 12,
+                'c_inst_name_code' => 34,
+                'c_office_category_id' => 2,
             ],
         ]);
 
@@ -702,6 +760,7 @@ class PersonBrowserTest extends TestCase {
                 'c_possession_desc' => 'Books',
                 'c_possession_desc_chn' => '書籍',
                 'c_quantity' => '20',
+                'c_measure_code' => 5,
                 'c_possession_yr' => 744,
                 'c_source' => 1,
                 'c_pages' => '31a',
@@ -730,7 +789,7 @@ class PersonBrowserTest extends TestCase {
         ]);
 
         DB::table('KIN_DATA')->insert([
-            ['c_personid' => 1, 'c_kin_id' => 2, 'c_kin_code' => 1, 'c_source' => null, 'c_pages' => null, 'c_notes' => 'friend'],
+            ['c_personid' => 1, 'c_kin_id' => 2, 'c_kin_code' => 1, 'c_source' => null, 'c_pages' => null, 'c_notes' => 'friend', 'c_autogen_notes' => 'autogen-x'],
         ]);
 
         DB::table('KINSHIP_CODES')->insert([
@@ -1013,6 +1072,12 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('items.0.office_chn', '翰林學士');
         $response->assertJsonPath('items.0.office', 'Hanlin Academician');
         $response->assertJsonPath('items.0.address_summary', '洛陽 / Luoyang');
+        // Task 27 回歸：tab 必須返回補回欄位（守住「tab 漏返回→編輯保存清空」資料流失向量）。
+        $response->assertJsonPath('items.0.assume_office_code', 1);
+        $response->assertJsonPath('items.0.dy', 15);
+        $response->assertJsonPath('items.0.inst_code', 12);
+        $response->assertJsonPath('items.0.inst_name_code', 34);
+        $response->assertJsonPath('items.0.office_category_id', 2);
     }
 
     #[Test]
@@ -1065,6 +1130,7 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('items.0.act_chn', '擁有');
         $response->assertJsonPath('items.0.desc_chn', '書籍');
         $response->assertJsonPath('items.0.quantity', '20');
+        $response->assertJsonPath('items.0.measure_code', 5);
         $response->assertJsonPath('items.0.year', 744);
     }
 
@@ -1089,7 +1155,10 @@ class PersonBrowserTest extends TestCase {
         $response->assertOk();
         $response->assertJsonPath('tab', 'sources');
         $this->assertCount(1, $response->json('items'));
+        // tab-return 守護（防「tab 漏返回→編輯態預填空→保存清空」資料流失向量）：
+        // 兩個出處旗標都須由 tab 查詢返回，編輯器才能正確預填。
         $response->assertJsonPath('items.0.is_main_source', true);
+        $response->assertJsonPath('items.0.is_self_bio', false);
     }
 
     #[Test]
@@ -1117,6 +1186,8 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('items.0.relation', 'Friend');
         $response->assertJsonPath('items.0.kin_person_id', 2);
         $response->assertJsonPath('items.0.kin_person_name_chn', '杜甫');
+        // Task 27 tab-return 斷言：守住 c_autogen_notes 的「tab 漏返回→保存清空」資料流失向量。
+        $response->assertJsonPath('items.0.autogen_notes', 'autogen-x');
     }
 
     #[Test]
@@ -1147,6 +1218,7 @@ class PersonBrowserTest extends TestCase {
             'c_lastyear' => 762,
             'c_sequence' => 1,
             'c_notes' => '居住地',
+            'c_natal' => 1,
         ]);
         DB::table('BIOG_ADDR_CODES')->insert([
             'c_addr_type' => 1,
@@ -1167,6 +1239,8 @@ class PersonBrowserTest extends TestCase {
         $response->assertJsonPath('items.0.pk.c_addr_id', 100);
         $response->assertJsonPath('items.0.pk.c_addr_type', 1);
         $response->assertJsonPath('items.0.pk.c_sequence', 1);
+        // Task 27：tab 須返回 c_natal（守「tab 漏返回→編輯預填空→保存清空」資料流失向量）。
+        $response->assertJsonPath('items.0.natal', 1);
         $response->assertJsonPath('items.0.addr_chn', '長安');
         $response->assertJsonPath('items.0.type_label_chn', '居住地');
         $response->assertJsonPath('items.0.first_year', 730);
@@ -1525,5 +1599,139 @@ class PersonBrowserTest extends TestCase {
             count(array_unique($keys)),
             'sources: JSON-encoded pk must be unique; pipe chars and null/empty must not collide'
         );
+    }
+
+    // ───────────────────────────────────
+    // P4-0-B：人物主檔獨立 React Edit/Show/Create 頁
+    // ───────────────────────────────────
+
+    #[Test]
+    public function test_app_basicinformation_show_renders_inertia_for_guest(): void {
+        // show 頁公開（與 legacy show 一致）：未登入可載入 PersonEditor 編輯中樞，唯讀（canEditBasicInfo=false）。
+        $response = $this->get(route('app.basicinformation.show', ['id' => 1]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('BasicInformation/PersonEditor')
+                ->where('personId', 1)
+                ->where('canEditBasicInfo', false)
+                ->where('canProposeEdits', false)
+                ->where('mutateEndpoint', route('api.v2.mutate.web', [], false))
+                ->where('pinyinEndpoint', '/api/select/search/pinyin')
+                ->where('summaryEndpoint', route('app.basicinformation.summary', ['id' => '__PERSON_ID__'], false))
+                ->where('tabEndpoint', route('app.basicinformation.tab', ['id' => '__PERSON_ID__', 'tabKey' => '__TAB_KEY__'], false))
+                ->where('initialTab', 'basic_info')
+                ->has('tabKeys')
+                ->has('person_label')
+        );
+    }
+
+    #[Test]
+    public function test_app_basicinformation_show_404_for_missing_person(): void {
+        $response = $this->get(route('app.basicinformation.show', ['id' => 999999]));
+        $response->assertNotFound();
+    }
+
+    #[Test]
+    public function test_app_basicinformation_edit_renders_inertia_for_guest_readonly(): void {
+        // edit 頁本身公開可載入 PersonEditor；未登入 canEditBasicInfo=false（實際寫入由 /api/v2 把關）。
+        $response = $this->get(route('app.basicinformation.edit', ['id' => 1]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('BasicInformation/PersonEditor')
+                ->where('personId', 1)
+                ->where('canEditBasicInfo', false)
+                ->where('canProposeEdits', false)
+                ->where('deleteEndpoint', route('api.v2.delete.web', [], false))
+                ->where('createEndpoint', route('api.v2.create.web', [], false))
+                ->has('tabEndpoint')
+        );
+    }
+
+    #[Test]
+    public function test_app_basicinformation_edit_can_edit_true_for_super_admin(): void {
+        $response = $this->actingAs($this->user)
+            ->get(route('app.basicinformation.edit', ['id' => 1]));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('BasicInformation/PersonEditor')
+                ->where('canEditBasicInfo', true)
+                ->where('canProposeEdits', true)
+        );
+    }
+
+    #[Test]
+    public function test_app_basicinformation_summary_returns_json(): void {
+        // PersonEditor 摘要端點（編輯者/訪客可用，非 superadmin-only）。
+        $response = $this->get(route('app.basicinformation.summary', ['id' => 1]));
+
+        $response->assertOk();
+        $response->assertJson(['c_personid' => 1]);
+        $response->assertJsonStructure(['tab_counts']);
+    }
+
+    #[Test]
+    public function test_app_basicinformation_summary_404_for_missing_person(): void {
+        $response = $this->get(route('app.basicinformation.summary', ['id' => 999999]));
+        $response->assertNotFound();
+    }
+
+    #[Test]
+    public function test_app_basicinformation_tab_returns_json(): void {
+        $response = $this->get(route('app.basicinformation.tab', ['id' => 1, 'tabKey' => 'basic_info']));
+
+        $response->assertOk();
+        $response->assertJsonStructure(['sections']);
+    }
+
+    #[Test]
+    public function test_app_basicinformation_tab_404_for_invalid_tab_key(): void {
+        $response = $this->get(route('app.basicinformation.tab', ['id' => 1, 'tabKey' => 'bogus_tab']));
+        $response->assertNotFound();
+    }
+
+    #[Test]
+    public function test_app_basicinformation_edit_404_for_missing_person(): void {
+        $response = $this->get(route('app.basicinformation.edit', ['id' => 999999]));
+        $response->assertNotFound();
+    }
+
+    #[Test]
+    public function test_app_basicinformation_create_requires_authentication(): void {
+        $response = $this->get(route('app.basicinformation.create'));
+        $response->assertRedirect(route('login'));
+    }
+
+    #[Test]
+    public function test_app_basicinformation_create_renders_inertia_for_writer(): void {
+        $response = $this->actingAs($this->user)
+            ->get(route('app.basicinformation.create'));
+
+        $response->assertOk();
+        $response->assertInertia(
+            fn (Assert $page) => $page
+                ->component('BasicInformation/Create')
+                ->where('can_create', true)
+                ->where('create_endpoint', route('api.v2.create.web', [], false))
+                ->has('temp_id')
+                ->has('edit_template')
+                ->has('index_url')
+        );
+    }
+
+    #[Test]
+    public function test_app_basicinformation_create_redirects_proposal_only_user_to_legacy(): void {
+        // 可提案但不可直接寫入（眾包）用戶：BIOG_MAIN create proposal v2 回 501，導回舊版。
+        $crowdUser = User::factory()->create(['is_active' => 1, 'is_admin' => User::ROLE_CROWDSOURCING]);
+
+        $response = $this->actingAs($crowdUser)
+            ->get(route('app.basicinformation.create'));
+
+        $response->assertRedirect(route('basicinformation.create'));
     }
 }

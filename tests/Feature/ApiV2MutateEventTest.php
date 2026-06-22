@@ -109,16 +109,16 @@ class ApiV2MutateEventTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
             $table->integer('c_year')->nullable();
             $table->integer('c_month')->nullable();
             $table->integer('c_day')->nullable();
             $table->integer('c_nh_code')->nullable();
             $table->integer('c_nh_year')->nullable();
-            $table->integer('c_range')->nullable();
+            $table->integer('c_yr_range')->nullable();
             $table->integer('c_intercalary')->default(0);
-            $table->integer('c_event_type')->nullable();
-            $table->integer('c_event_addr')->nullable();
+            $table->integer('c_addr_id')->nullable();
+            $table->longText('c_event')->nullable();
+            $table->string('c_role', 255)->nullable();
             $table->primary(['c_personid', 'c_sequence', 'c_event_code']);
         });
     }
@@ -200,6 +200,33 @@ class ApiV2MutateEventTest extends TestCase {
             'c_personid' => 1000,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEventUpdatePersistsRoleAndDoesNotNullOtherFields(): void {
+        // 回歸（Task 27）：補欄 c_role 必須能寫入；且只改單一欄位時，未送出的欄位
+        // （c_role / c_year）不可被清成 null —— 防護先前發現的「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'event-role@example.com');
+        $this->actingAs($user);
+        $this->seedEvent(['c_role' => '原始角色', 'c_year' => 1060]);
+
+        // (a) 直接更新 c_role 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_role' => '新角色'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50,
+            'c_role' => '新角色', 'c_year' => 1060,
+        ]);
+
+        // (b) 只改 c_notes（payload 不含 c_role/c_year）後，c_role/c_year 仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50,
+            'c_notes' => '只改備註', 'c_role' => '新角色', 'c_year' => 1060,
         ]);
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class LoginController extends Controller {
     /*
@@ -35,10 +36,20 @@ class LoginController extends Controller {
      */
     public function __construct() {
         $this->middleware('guest')->except('logout');
+        // Phase 6：認證頁 React/Inertia 變體需 HandleInertiaRequests（共用 props/根模板）。
+        // 僅作用於顯示表單的 GET 動作；POST 處理（login）不掛，授權仍由 guest middleware 控制。
+        $this->middleware('inertia')->only('showLoginForm');
     }
 
     public function showLoginForm(Request $request) {
         $this->storeIntendedRedirect($request);
+
+        if (migration_flag_is_new('auth.login')) {
+            return Inertia::render('Auth/Login', [
+                'status' => session('status'),
+                'intended' => $request->input('redirect', session('url.intended')),
+            ]);
+        }
 
         return view('auth.login');
     }
@@ -68,6 +79,37 @@ class LoginController extends Controller {
         $this->incrementLoginAttempts($request);
 
         return $this->sendFailedLoginResponse($request);
+    }
+
+    /**
+     * 登入成功回應。
+     *
+     * Inertia（React 登入頁）以 XHR 送出 POST /login；成功後的目的地（dashboard）
+     * 目前仍是 Blade（非 Inertia）頁。若回傳一般 302，Inertia client 會跟隨重導後
+     * 收到「非 Inertia 的 HTML 回應」而無法處理（dev 下以 iframe 顯示錯誤、AdminLTE
+     * 在該 iframe 內 auto-init 拋 autoIframeMode null，頁面卡在 /login）。
+     * 因此對 Inertia 請求改用 Inertia::location → 409 + X-Inertia-Location，
+     * 讓瀏覽器硬導向到 Blade 目的地。非 Inertia（舊 Blade 登入）行為不變。
+     */
+    protected function sendLoginResponse(Request $request) {
+        $request->session()->regenerate();
+        $this->clearLoginAttempts($request);
+
+        if ($response = $this->authenticated($request, $this->guard()->user())) {
+            return $response;
+        }
+
+        $target = $this->redirectPath();
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($target);
+        }
+
+        if ($request->wantsJson()) {
+            return new \Illuminate\Http\JsonResponse([], 204);
+        }
+
+        return redirect()->intended($target);
     }
 
     /**

@@ -155,6 +155,15 @@ class User extends Authenticatable {
     }
 
     /**
+     * 检查用户是否可以提交提案（活跃用户即可，與後端 authorizeProposal 一致）
+     *
+     * @return bool
+     */
+    public function canPropose(): bool {
+        return $this->isActive();
+    }
+
+    /**
      * 检查用户是否可以运行批量导入操作（活跃的专家或系统管理员）
      *
      * @return bool

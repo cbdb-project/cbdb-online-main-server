@@ -1734,21 +1734,29 @@ class BiogMainRepository {
 
     public function possessionStoreById(Request $request, $id) {
         $data = $request->all();
-        $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
         $addr = $data['c_addr_id'];
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
 
-        DB::transaction(function () use ($id, $data, $addr) {
+        $newId = null;
+        DB::transaction(function () use ($id, $data, $addr, &$newId) {
+            // surrogate id 必須在交易內以 lockForUpdate 配發，避免併發 create 取得相同 id（與 officeStoreById 一致）
+            $lastId = DB::table('POSSESSION_DATA')
+                ->lockForUpdate()
+                ->orderByDesc('c_possession_record_id')
+                ->value('c_possession_record_id');
+            $newId = ((int) $lastId) + 1;
+            $data['c_possession_record_id'] = $newId;
+
             DB::table('POSSESSION_DATA')->insert($data);
-            $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
-            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+            $this->insertAddrPo($addr, $newId, $data['c_personid']);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $newId, $data);
             (new AuditLogService())->write(
                 'POSSESSION_DATA',
                 'INSERT',
-                ['c_possession_record_id' => $data['c_possession_record_id']],
+                ['c_possession_record_id' => $newId],
                 null,
                 $data,
                 'user',
@@ -1757,7 +1765,7 @@ class BiogMainRepository {
             );
         });
 
-        return $data['c_possession_record_id'];
+        return $newId;
     }
 
     public function possessionDeleteById($id, $c_personid) {

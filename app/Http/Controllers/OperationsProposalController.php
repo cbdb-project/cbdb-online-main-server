@@ -135,7 +135,7 @@ class OperationsProposalController extends Controller {
         }
 
         $opType = (int) $operation->op_type;
-        if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true)) {
+        if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE, Operation::TYPE_PROPOSAL_DELETE], true)) {
             abort(404);
         }
     }
@@ -213,6 +213,10 @@ class OperationsProposalController extends Controller {
         array $original,
         array $auxiliaryPayload
     ): array {
+        if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_DELETE) {
+            return [$this->applyDeleteProposal($table, $keyColumns, $original), false];
+        }
+
         if ($table === 'KIN_DATA') {
             return [$this->applyKinshipProposal($operation, $data, $original, $auxiliaryPayload), true];
         }
@@ -223,6 +227,10 @@ class OperationsProposalController extends Controller {
 
         if ($table === 'POSTED_TO_OFFICE_DATA') {
             return [$this->applyOfficeProposal($operation, $data, $original, $auxiliaryPayload), true];
+        }
+
+        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
+            return [$this->applyPossessionCreateProposal($operation, $data, $auxiliaryPayload), true];
         }
 
         if ($table === 'EVENTS_DATA') {
@@ -377,6 +385,36 @@ class OperationsProposalController extends Controller {
         $row = $this->fetchAppliedRow('POSTED_TO_OFFICE_DATA', $pk);
         if ($row === null) {
             throw new \RuntimeException('官名提案套用後讀取資料失敗。');
+        }
+
+        return $row;
+    }
+
+    /**
+     * 財產新增提案核准：委派 possessionStoreById 配發 c_possession_record_id（交易內 max+1），
+     * 連帶寫主表 POSSESSION_DATA + 副表 POSSESSION_ADDR + operation + audit_log。
+     * 地址陣列存於 __proposal_aux['c_addr_id']；usedDirectWorkflow=true 由委派端自行寫 operation/audit，
+     * approve() 不再重複寫，避免 operation/audit 重複（比照 applyOfficeProposal）。
+     */
+    protected function applyPossessionCreateProposal(
+        Operation $operation,
+        array $data,
+        array $auxiliaryPayload
+    ): array {
+        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? 0);
+
+        $addr = $auxiliaryPayload['c_addr_id'] ?? [];
+        if (!is_array($addr)) {
+            $addr = [$addr];
+        }
+
+        $request = Request::create('/', 'POST', array_merge($data, ['c_addr_id' => array_values($addr)]));
+
+        $newId = $this->biogMainRepository->possessionStoreById($request, $personId);
+
+        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $newId]);
+        if ($row === null) {
+            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
         }
 
         return $row;
@@ -584,6 +622,107 @@ class OperationsProposalController extends Controller {
         return $this->convertRowToArray($row);
     }
 
+    /**
+     * 套用刪除提案：以 __key_columns + original 的 PK 值定位目標列並刪除。
+     * offices(POSTED_TO_OFFICE_DATA)/possession(POSSESSION_DATA) 連帶刪除副表。
+     * 回傳被刪除前的原始列（供 logFinalOperation/audit 使用）；目標列不存在則回傳空陣列。
+     */
+    protected function applyDeleteProposal(string $table, array $keyColumns, array $original): array {
+        if (empty($original)) {
+            throw new \RuntimeException('缺少原始資料，無法刪除。');
+        }
+        if (empty($keyColumns)) {
+            throw new \RuntimeException('提案缺少主鍵資訊，無法刪除。');
+        }
+
+        $conditions = $this->buildKeyConditions($keyColumns, $original);
+
+        $row = DB::table($table)->where($conditions)->first();
+        if (!$row) {
+            // 目標列已不存在：視為冪等成功，回傳原始資料以利稽核紀錄
+            return $original;
+        }
+
+        $deletedRow = $this->convertRowToArray($row);
+
+        // 連帶刪除副表
+        if ($table === 'POSTED_TO_OFFICE_DATA') {
+            $this->deleteOfficeAuxiliaryTables($deletedRow);
+        } elseif ($table === 'POSSESSION_DATA') {
+            $this->deletePossessionAuxiliaryTables($deletedRow);
+        }
+
+        DB::table($table)->where($conditions)->delete();
+
+        if ($table === 'ALTNAME_DATA') {
+            $this->indexAltnameAfterDelete($deletedRow);
+        }
+
+        return $deletedRow;
+    }
+
+    /**
+     * POSTED_TO_OFFICE_DATA 核准刪除時連帶刪除 POSTED_TO_ADDR_DATA 與 POSTING_DATA。
+     */
+    protected function deleteOfficeAuxiliaryTables(array $row): void {
+        $officeId = $row['c_office_id'] ?? null;
+        $postingId = $row['c_posting_id'] ?? null;
+        $personId = $row['c_personid'] ?? null;
+
+        if ($officeId === null || $postingId === null) {
+            return;
+        }
+
+        if (Schema::hasTable('POSTED_TO_ADDR_DATA')) {
+            $addrQuery = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_office_id', $officeId)
+                ->where('c_posting_id', $postingId);
+            if ($personId !== null) {
+                $addrQuery->where('c_personid', $personId);
+            }
+            $addrQuery->delete();
+        }
+
+        if (Schema::hasTable('POSTING_DATA')) {
+            DB::table('POSTING_DATA')->where('c_posting_id', $postingId)->delete();
+        }
+    }
+
+    /**
+     * POSSESSION_DATA 核准刪除時連帶刪除 POSSESSION_ADDR。
+     */
+    protected function deletePossessionAuxiliaryTables(array $row): void {
+        $recordId = $row['c_possession_record_id'] ?? null;
+        if ($recordId === null) {
+            return;
+        }
+
+        if (Schema::hasTable('POSSESSION_ADDR')) {
+            DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $recordId)->delete();
+        }
+    }
+
+    /**
+     * ALTNAME_DATA 核准刪除後移除全文索引。
+     */
+    protected function indexAltnameAfterDelete(array $row): void {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
+            return;
+        }
+
+        $name = $row['c_alt_name_chn'] ?? null;
+        $personId = $row['c_personid'] ?? null;
+        if (empty($name) || $personId === null) {
+            return;
+        }
+
+        $this->nameSearchIndexService->removeAltname(
+            $personId,
+            $row['c_alt_name_type_code'] ?? null,
+            $name
+        );
+    }
+
     protected function buildUpdatePayload(array $data, array $keyColumns, array $original): array {
         $updatePayload = array_diff_key($data, array_flip($keyColumns));
 
@@ -748,12 +887,26 @@ class OperationsProposalController extends Controller {
             return;
         }
 
+        if ($proposalType === Operation::TYPE_PROPOSAL_DELETE) {
+            $operation = 'DELETE';
+            $oldData = $original ?: $appliedRow;
+            $newData = null;
+        } elseif ($proposalType === Operation::TYPE_PROPOSAL_CREATE) {
+            $operation = 'INSERT';
+            $oldData = null;
+            $newData = $appliedRow;
+        } else {
+            $operation = 'UPDATE';
+            $oldData = $original;
+            $newData = $appliedRow;
+        }
+
         (new AuditLogService())->write(
             $proposal->resource,
-            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? 'INSERT' : 'UPDATE',
+            $operation,
             $rowPk,
-            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? null : $original,
-            $appliedRow,
+            $oldData,
+            $newData,
             'user',
             (string) Auth::id(),
             (string) $proposal->id
@@ -763,13 +916,35 @@ class OperationsProposalController extends Controller {
     protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {
         $proposalData = json_decode($proposal->resource_data, true) ?? [];
         $keyColumns = $proposalData['__key_columns'] ?? [];
-        $resourceId = $this->buildCompositeId($keyColumns, $appliedRow);
-        $type = $proposalType === Operation::TYPE_PROPOSAL_CREATE
-            ? Operation::TYPE_CREATE
-            : Operation::TYPE_UPDATE;
+
+        if ($proposalType === Operation::TYPE_PROPOSAL_DELETE) {
+            $type = Operation::TYPE_DELETE;
+        } elseif ($proposalType === Operation::TYPE_PROPOSAL_CREATE) {
+            $type = Operation::TYPE_CREATE;
+        } else {
+            $type = Operation::TYPE_UPDATE;
+        }
+
+        // delete 後 appliedRow 為被刪列（= original），以原始 PK 建立 resource_id
+        $resourceIdRow = $type === Operation::TYPE_DELETE ? $original : $appliedRow;
+        $resourceId = $this->buildCompositeId($keyColumns, $resourceIdRow);
 
         // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
         $personId = $proposal->c_personid ?? 0;
+
+        if ($type === Operation::TYPE_DELETE) {
+            $this->operationRepository->store(
+                Auth::id(),
+                $personId,
+                Operation::TYPE_DELETE,
+                $proposal->resource,
+                $resourceId,
+                $original,
+                $original
+            );
+
+            return;
+        }
 
         $this->operationRepository->store(
             Auth::id(),

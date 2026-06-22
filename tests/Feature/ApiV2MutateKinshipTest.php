@@ -109,7 +109,7 @@ class ApiV2MutateKinshipTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
+            $table->text('c_autogen_notes')->nullable();
             $table->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
         });
     }
@@ -190,6 +190,33 @@ class ApiV2MutateKinshipTest extends TestCase {
             'c_personid' => 1000,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdatePersistsAutogenNotesAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補欄 c_autogen_notes（KIN_DATA 真實欄）須能寫入；只改一個欄位時，
+        // 未送出的 c_autogen_notes / c_pages 不可被清成 null —— 防「保存即清空」資料流失。
+        $user = $this->makeUser(email: 'kin-autogen@example.com');
+        $this->actingAs($user);
+        $this->seedKinship(['c_autogen_notes' => '原始自動備註', 'c_pages' => '7-9']);
+
+        // (a) 直接更新 c_autogen_notes 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_autogen_notes' => '新自動備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72,
+            'c_autogen_notes' => '新自動備註', 'c_pages' => '7-9',
+        ]);
+
+        // (b) 只改 c_notes（不送 c_autogen_notes/c_pages）後，兩者仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72,
+            'c_notes' => '只改備註', 'c_autogen_notes' => '新自動備註', 'c_pages' => '7-9',
         ]);
     }
 

@@ -49,17 +49,22 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
     }
 
     protected function allowedFields(): array {
+        // 僅列 POSSESSION_DATA 真實欄位（對照 schema migration）。
+        // 早期版本含 c_supplement / c_measure_value / c_firstyear / c_lastyear 等不存在欄位（假欄），已移除。
         return [
             'c_sequence',
+            'c_possession_act_code',
+            'c_possession_desc',
+            'c_possession_desc_chn',
+            'c_quantity',
+            'c_measure_code',
+            'c_possession_yr',
+            'c_possession_nh_code',
+            'c_possession_nh_yr',
+            'c_possession_yr_range',
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
-            'c_possession_act_code',
-            'c_measure_code',
-            'c_measure_value',
-            'c_firstyear',
-            'c_lastyear',
         ];
     }
 

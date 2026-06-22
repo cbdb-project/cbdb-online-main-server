@@ -172,14 +172,6 @@ class MutationController extends Controller {
         $targetPk = $payload['target']['pk'] ?? null;
         $meta = $payload['meta'] ?? [];
 
-        // proposal delete 尚未實作
-        if ($mode === 'proposal') {
-            return $this->errorResponse('proposal delete 尚未實作', 501, [
-                'mode' => 'proposal',
-                'operation' => 'delete',
-            ]);
-        }
-
         if (!is_array($targetPk)) {
             return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
         }

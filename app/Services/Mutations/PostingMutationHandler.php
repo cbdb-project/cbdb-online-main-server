@@ -55,7 +55,6 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
             'c_firstyear',
             'c_fy_nh_code',
             'c_fy_nh_year',
@@ -68,6 +67,11 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_ly_intercalary',
             'c_appt_code',
             'c_assume_office_code',
+            // Task 27 補回（皆 POSTED_TO_OFFICE_DATA 真實欄）
+            'c_dy',
+            'c_inst_code',
+            'c_inst_name_code',
+            'c_office_category_id',
         ];
     }
 

@@ -44,6 +44,7 @@ class AddressCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_notes',
             'c_source',
             'c_pages',
+            'c_natal',
             'c_fy_nh_code',
             'c_fy_nh_year',
             'c_fy_range',

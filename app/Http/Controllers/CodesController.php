@@ -1432,6 +1432,7 @@ class CodesController extends Controller {
             foreach ($indexes as $index) {
                 if (!empty($index['primary']) && !empty($index['columns']) && is_array($index['columns'])) {
                     $keys = $index['columns'];
+
                     break;
                 }
             }

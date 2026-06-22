@@ -110,13 +110,14 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_bi_firstyear')->nullable();
-            $table->integer('c_bi_lastyear')->nullable();
-            $table->integer('c_bi_fy_nh_code')->nullable();
-            $table->integer('c_bi_fy_nh_year')->nullable();
-            $table->integer('c_bi_ly_nh_code')->nullable();
-            $table->integer('c_bi_ly_nh_year')->nullable();
+            $table->integer('c_bi_begin_year')->nullable();
+            $table->integer('c_bi_by_nh_code')->nullable();
+            $table->integer('c_bi_by_nh_year')->nullable();
+            $table->integer('c_bi_by_range')->nullable();
+            $table->integer('c_bi_end_year')->nullable();
+            $table->integer('c_bi_ey_nh_code')->nullable();
+            $table->integer('c_bi_ey_nh_year')->nullable();
+            $table->integer('c_bi_ey_range')->nullable();
             $table->primary(['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code']);
         });
     }

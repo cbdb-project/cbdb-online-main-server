@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -12,8 +12,12 @@ import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
+import { getCsrfToken } from '../shared/csrf';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { Button } from '../../ui/Button';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import PostingEditorModal, { PostingEditorRow } from '../PostingEditorModal';
 
 interface PostingItem {
     pk: {
@@ -41,22 +45,123 @@ interface PostingItem {
     source_id: number | null;
     pages: string | null;
     notes: string | null;
+    appt_code?: number | null;
+    appt_chn?: string | null;
+    appt?: string | null;
 }
 
 interface Props {
     data: { tab: string; person_index_year?: number | null; items: PostingItem[] };
     canEdit: boolean;
+    /** 可提案但不可直接寫入（眾包用戶）。 */
+    canPropose?: boolean;
     postCE?: boolean;
+    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.offices）。 */
+    officesEditorIsNew?: boolean;
+    personId?: number | null;
+    createEndpoint?: string;
+    mutateEndpoint?: string;
+    deleteEndpoint?: string;
+    /** 編輯/刪除成功後刷新該分頁。 */
+    onRefresh?: () => void;
 }
 
-export default function PostingsTab({ data, canEdit, postCE }: Props) {
+export default function PostingsTab({
+    data,
+    canEdit,
+    canPropose = false,
+    postCE,
+    officesEditorIsNew = false,
+    personId = null,
+    createEndpoint = '',
+    mutateEndpoint = '',
+    deleteEndpoint = '',
+    onRefresh,
+}: Props) {
     const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
+    const [editorOpen, setEditorOpen] = useState(false);
+    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
+    const [editorRow, setEditorRow] = useState<PostingEditorRow | null>(null);
+    const [editorOfficeLabel, setEditorOfficeLabel] = useState<string | null>(null);
+    const [editorSourceLabel, setEditorSourceLabel] = useState<string | null>(null);
+
+    const [deleteTarget, setDeleteTarget] = useState<PostingItem | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
+    const useReactEditor = officesEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+    // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
+    const proposalMode = !canEdit && canPropose;
+
+    const openCreate = () => {
+        setEditorMode('create');
+        setEditorRow(null);
+        setEditorOfficeLabel(null);
+        setEditorSourceLabel(null);
+        setEditorOpen(true);
+    };
+
+    const openEdit = (item: PostingItem) => {
+        setEditorMode('edit');
+        setEditorRow(item as PostingEditorRow);
+        setEditorOfficeLabel(formatBilingualLabel(item.office_chn, item.office) || (item.office_id != null ? String(item.office_id) : null));
+        setEditorSourceLabel(item.source_id != null ? formatTextTitle(textRecords[item.source_id], item.source_id) : null);
+        setEditorOpen(true);
+    };
+
+    const handleDelete = async () => {
+        if (!deleteTarget || !personId) {
+            return;
+        }
+        setDeleting(true);
+        setDeleteError(null);
+        try {
+            const response = await fetch(deleteEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    resource: 'postings',
+                    person_id: personId,
+                    mode: proposalMode ? 'proposal' : 'direct',
+                    target: { pk: deleteTarget.pk },
+                }),
+            });
+            const json = await response.json().catch(() => ({}));
+            if (!response.ok || !json?.ok) {
+                setDeleteError(json?.message || `${t('delete_failed')}（HTTP ${response.status}）`);
+                return;
+            }
+            setDeleteTarget(null);
+            onRefresh?.();
+        } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : t('delete_failed'));
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
         <div style={containerStyle}>
-            <LegacyCreateButton tabKey="postings" canEdit={canEdit} />
+            {useReactEditor ? (
+                <div style={createBarStyle}>
+                    <Button size="sm" onClick={openCreate}>
+                        {t('add_btn')}
+                    </Button>
+                </div>
+            ) : (
+                <LegacyCreateButton tabKey="postings" canEdit={canEdit} />
+            )}
+
             {data.items.length === 0 ? <EmptyState /> : null}
             {pageItems.map((item) => (
                 <TabCard key={stableKey(item.pk)}>
@@ -86,16 +191,59 @@ export default function PostingsTab({ data, canEdit, postCE }: Props) {
                             </span>
                         ) : item.address_summary}
                     />
+                    <MetaRow label={t('appt_type_label')} value={formatBilingualLabel(item.appt_chn ?? null, item.appt ?? null)} />
                     <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
                     <MetaRow label={t('pages_label')} value={item.pages} />
                     <MetaRow label={t('remarks')} value={item.notes} />
                     <CardActions>
-                        <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
-                        <LegacyDeleteButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
+                        {useReactEditor ? (
+                            <>
+                                <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                                    {t('edit_btn')}
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>
+                                    {t('delete_btn')}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
+                                <LegacyDeleteButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
+                            </>
+                        )}
                     </CardActions>
                 </TabCard>
             ))}
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
+
+            {useReactEditor ? (
+                <>
+                    <PostingEditorModal
+                        open={editorOpen}
+                        mode={editorMode}
+                        proposalMode={proposalMode}
+                        personId={personId!}
+                        createEndpoint={createEndpoint}
+                        mutateEndpoint={mutateEndpoint}
+                        row={editorRow}
+                        officeInitialLabel={editorOfficeLabel}
+                        sourceInitialLabel={editorSourceLabel}
+                        onClose={() => setEditorOpen(false)}
+                        onSaved={() => onRefresh?.()}
+                    />
+                    <ConfirmDialog
+                        open={deleteTarget != null}
+                        onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}
+                        title={proposalMode ? t('proposal_delete_btn') : t('posting_delete_title')}
+                        description={deleteError ?? (proposalMode ? `${t('proposal_delete_prefix')}\n${t('posting_delete_confirm')}` : t('posting_delete_confirm'))}
+                        confirmLabel={deleting ? (proposalMode ? t('submitting_proposal') : t('saving')) : (proposalMode ? t('proposal_delete_btn') : t('delete_btn'))}
+                        cancelLabel={t('cancel_btn')}
+                        destructive
+                        loading={deleting}
+                        onConfirm={() => void handleDelete()}
+                    />
+                </>
+            ) : null}
         </div>
     );
 }
@@ -104,6 +252,12 @@ const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
+};
+
+const createBarStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
 };
 
 const addressListStyle: React.CSSProperties = {

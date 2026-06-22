@@ -18,8 +18,25 @@ interface Props {
     activeTab: string;
     tabEndpoint: string;
     mutateEndpoint: string;
+    createEndpoint?: string;
+    deleteEndpoint?: string;
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
+    canProposeEdits?: boolean;
+    /** basic_info 分頁進場即進入編輯狀態（編輯主界面用；PersonBrowser 不傳 → 維持原行為）。 */
+    basicInfoStartEditing?: boolean;
+    altnameEditorIsNew?: boolean;
+    addressesEditorIsNew?: boolean;
+    textsEditorIsNew?: boolean;
+    sourcesEditorIsNew?: boolean;
+    officesEditorIsNew?: boolean;
+    assocEditorIsNew?: boolean;
+    kinshipEditorIsNew?: boolean;
+    eventsEditorIsNew?: boolean;
+    entriesEditorIsNew?: boolean;
+    statusesEditorIsNew?: boolean;
+    possessionEditorIsNew?: boolean;
+    socialInstEditorIsNew?: boolean;
     postCE?: boolean;
     onSelectPerson?: (personId: number) => void;
     onBasicInfoSaved?: () => void;
@@ -39,16 +56,6 @@ type TypedTabComponent = React.ComponentType<{ data: any; canEdit: boolean; post
 const TAB_COMPONENTS: Record<string, TypedTabComponent> = {
     alt_names: AltNamesTab,
     addresses: AddressesTab,
-    entries: EntriesTab,
-    statuses: StatusesTab,
-    events: EventsTab,
-    associations: AssociationsTab,
-    possessions: PossessionsTab,
-    sources: SourcesTab,
-    texts: TextsTab,
-    postings: PostingsTab,
-    social_institutions: InstitutionsTab,
-    kinship: KinshipTab,
 };
 
 /**
@@ -60,8 +67,24 @@ export default function TabContentLoader({
     activeTab,
     tabEndpoint,
     mutateEndpoint,
+    createEndpoint = '',
+    deleteEndpoint = '',
     pinyinEndpoint,
     canEditBasicInfo,
+    canProposeEdits = false,
+    basicInfoStartEditing = false,
+    altnameEditorIsNew = false,
+    addressesEditorIsNew = false,
+    textsEditorIsNew = false,
+    sourcesEditorIsNew = false,
+    officesEditorIsNew = false,
+    assocEditorIsNew = false,
+    kinshipEditorIsNew = false,
+    eventsEditorIsNew = false,
+    entriesEditorIsNew = false,
+    statusesEditorIsNew = false,
+    possessionEditorIsNew = false,
+    socialInstEditorIsNew = false,
     postCE = false,
     onSelectPerson,
     onBasicInfoSaved,
@@ -178,12 +201,225 @@ export default function TabContentLoader({
                 mutateEndpoint={mutateEndpoint}
                 pinyinEndpoint={pinyinEndpoint}
                 canEdit={canEditBasicInfo}
+                startEditing={basicInfoStartEditing}
                 onEditorStateChange={onBasicInfoEditorStateChange}
                 onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
                 onSaved={() => {
                     retryActiveTab();
                     onBasicInfoSaved?.();
                 }}
+            />
+        );
+    }
+
+    // 別名分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'alt_names') {
+        return (
+            <AltNamesTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                altnameEditorIsNew={altnameEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 地址分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'addresses') {
+        return (
+            <AddressesTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                postCE={postCE}
+                canPropose={canProposeEdits}
+                addressesEditorIsNew={addressesEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 著述分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'texts') {
+        return (
+            <TextsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                textsEditorIsNew={textsEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 出處分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'sources') {
+        return (
+            <SourcesTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                sourcesEditorIsNew={sourcesEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 任官/官名分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'postings') {
+        return (
+            <PostingsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                postCE={postCE}
+                canPropose={canProposeEdits}
+                officesEditorIsNew={officesEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 社會關係分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'associations') {
+        return (
+            <AssociationsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                postCE={postCE}
+                canPropose={canProposeEdits}
+                assocEditorIsNew={assocEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+                onSelectPerson={onSelectPerson}
+            />
+        );
+    }
+
+    // 親屬關係分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'kinship') {
+        return (
+            <KinshipTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                kinshipEditorIsNew={kinshipEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+                onSelectPerson={onSelectPerson}
+            />
+        );
+    }
+
+    // 事件分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'events') {
+        return (
+            <EventsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                eventsEditorIsNew={eventsEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 入仕分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'entries') {
+        return (
+            <EntriesTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                entriesEditorIsNew={entriesEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+                onSelectPerson={onSelectPerson}
+            />
+        );
+    }
+
+    // 社會區分分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'statuses') {
+        return (
+            <StatusesTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                postCE={postCE}
+                canPropose={canProposeEdits}
+                statusesEditorIsNew={statusesEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 財產分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'possessions') {
+        return (
+            <PossessionsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                canPropose={canProposeEdits}
+                possessionEditorIsNew={possessionEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
+            />
+        );
+    }
+
+    // 社交機構分頁：注入 React 編輯器所需端點與遷移開關
+    if (activeTab === 'social_institutions') {
+        return (
+            <InstitutionsTab
+                data={state.data}
+                canEdit={canEditBasicInfo}
+                postCE={postCE}
+                canPropose={canProposeEdits}
+                socialInstEditorIsNew={socialInstEditorIsNew}
+                personId={personId}
+                createEndpoint={createEndpoint}
+                mutateEndpoint={mutateEndpoint}
+                deleteEndpoint={deleteEndpoint}
+                onRefresh={retryActiveTab}
             />
         );
     }

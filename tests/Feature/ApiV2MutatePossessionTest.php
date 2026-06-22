@@ -109,12 +109,15 @@ class ApiV2MutatePossessionTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
             $table->integer('c_possession_act_code')->default(0);
+            $table->string('c_possession_desc', 255)->nullable();
+            $table->string('c_possession_desc_chn', 255)->nullable();
+            $table->string('c_quantity', 255)->nullable();
             $table->integer('c_measure_code')->default(0);
-            $table->string('c_measure_value', 255)->nullable();
-            $table->integer('c_firstyear')->nullable();
-            $table->integer('c_lastyear')->nullable();
+            $table->integer('c_possession_yr')->nullable();
+            $table->integer('c_possession_nh_code')->nullable();
+            $table->integer('c_possession_nh_yr')->nullable();
+            $table->integer('c_possession_yr_range')->nullable();
             $table->primary('c_possession_record_id');
         });
     }
@@ -232,6 +235,26 @@ class ApiV2MutatePossessionTest extends TestCase {
         $audit = DB::table('audit_log')->where('table_name', 'POSSESSION_DATA')->first();
         $this->assertNotNull($audit);
         $this->assertSame('UPDATE', $audit->operation);
+    }
+
+    #[Test]
+    public function testDirectPossessionUpdateOnlyNotesPreservesMeasureCode(): void {
+        // 回歸：編輯只改備註時，c_measure_code（單位）不得被清空。
+        $user = $this->makeUser(email: 'poss-measure@example.com');
+        $this->actingAs($user);
+        $this->seedPossession(['c_measure_code' => 7, 'c_notes' => '舊備註']);
+
+        $response = $this->postJson('/api/v2/mutate', $this->possessionPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]));
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('POSSESSION_DATA', [
+            'c_possession_record_id' => 500,
+            'c_notes' => '只改備註',
+            'c_measure_code' => 7,
+        ]);
     }
 
     // ── Proposal Update Tests ───────────────────────────────

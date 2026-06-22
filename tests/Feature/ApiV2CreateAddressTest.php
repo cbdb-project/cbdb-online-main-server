@@ -112,6 +112,7 @@ class ApiV2CreateAddressTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
+            $table->integer('c_natal')->nullable();
             $table->integer('c_fy_nh_code')->nullable();
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
@@ -203,6 +204,25 @@ class ApiV2CreateAddressTest extends TestCase {
             'c_sequence' => 1,
             'c_firstyear' => 1060,
             'c_source' => 20,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressCreatePersistsNatal(): void {
+        // 回歸（Task 27）：補欄 c_natal（是否本貫）在 create 路徑須真的寫入 BIOG_ADDR_DATA。
+        $user = $this->makeUser(email: 'create-addr-natal@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_firstyear' => 1060, 'c_source' => 20, 'c_natal' => 1],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000,
+            'c_addr_id' => 200,
+            'c_addr_type' => 2,
+            'c_sequence' => 1,
+            'c_natal' => 1,
         ]);
     }
 

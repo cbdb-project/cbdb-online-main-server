@@ -29,8 +29,36 @@ class PersonBrowserController extends Controller {
             'summaryEndpoint' => route('app.person-browser.summary', ['personId' => '__PERSON_ID__'], false),
             'tabEndpoint' => route('app.person-browser.tab', ['personId' => '__PERSON_ID__', 'tabKey' => '__TAB_KEY__'], false),
             'mutateEndpoint' => route('api.v2.mutate.web', [], false),
+            'createEndpoint' => route('api.v2.create.web', [], false),
+            'deleteEndpoint' => route('api.v2.delete.web', [], false),
             'pinyinEndpoint' => '/api/select/search/pinyin',
             'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            // 可提案但不可直接寫入的眾包用戶亦可送提案（與後端 authorizeProposal 一致）。
+            'canProposeEdits' => $user ? $user->canPropose() : false,
+            // PersonBrowser 別名分頁編輯器遷移開關（預設 old）。
+            'altnameEditorIsNew' => migration_flag_is_new('basicinformation.altname'),
+            // PersonBrowser 地址分頁編輯器遷移開關（預設 old）。
+            'addressesEditorIsNew' => migration_flag_is_new('basicinformation.addresses'),
+            // PersonBrowser 著述分頁編輯器遷移開關（預設 old）。
+            'textsEditorIsNew' => migration_flag_is_new('basicinformation.texts'),
+            // PersonBrowser 出處分頁編輯器遷移開關（預設 old）。
+            'sourcesEditorIsNew' => migration_flag_is_new('basicinformation.sources'),
+            // PersonBrowser 任官/官名分頁編輯器遷移開關（預設 old）。
+            'officesEditorIsNew' => migration_flag_is_new('basicinformation.offices'),
+            // PersonBrowser 社會關係分頁編輯器遷移開關（預設 old）。
+            'assocEditorIsNew' => migration_flag_is_new('basicinformation.assoc'),
+            // PersonBrowser 親屬分頁編輯器遷移開關（預設 old）。
+            'kinshipEditorIsNew' => migration_flag_is_new('basicinformation.kinship'),
+            // PersonBrowser 事件分頁編輯器遷移開關（預設 old）。
+            'eventsEditorIsNew' => migration_flag_is_new('basicinformation.events'),
+            // PersonBrowser 入仕分頁編輯器遷移開關（預設 old）。
+            'entriesEditorIsNew' => migration_flag_is_new('basicinformation.entries'),
+            // PersonBrowser 社會區分分頁編輯器遷移開關（預設 old）。
+            'statusesEditorIsNew' => migration_flag_is_new('basicinformation.statuses'),
+            // PersonBrowser 財產分頁編輯器遷移開關（預設 old）。
+            'possessionEditorIsNew' => migration_flag_is_new('basicinformation.possession'),
+            // PersonBrowser 社交機構分頁編輯器遷移開關（預設 old）。
+            'socialInstEditorIsNew' => migration_flag_is_new('basicinformation.socialinst'),
             'initialPersonId' => $request->has('person_id')
                 ? (int) $request->input('person_id')
                 : ($hasQueryParameters ? null : 1),

@@ -117,11 +117,9 @@ class ApiV2DeleteEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_entry_nh_code')->nullable();
+            $table->integer('c_nianhao_id')->nullable();
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
-            $table->string('c_secondary_source_title', 255)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -264,7 +262,7 @@ class ApiV2DeleteEntryTest extends TestCase {
     // ── Proposal Delete Tests ───────────────────────────────
 
     #[Test]
-    public function testProposalEntryDeleteReturns501(): void {
+    public function testProposalEntryDeleteWritesPendingProposal(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-entry-proposal@example.com');
         $this->actingAs($user);
         $this->seedEntry();
@@ -273,22 +271,31 @@ class ApiV2DeleteEntryTest extends TestCase {
             'mode' => 'proposal',
         ]));
 
-        $response->assertStatus(501)
+        $response->assertOk()
             ->assertJson([
-                'ok' => false,
-                'errors' => [
-                    'mode' => 'proposal',
-                    'operation' => 'delete',
-                ],
+                'ok' => true,
+                'mode' => 'proposal',
+                'operation' => 'delete',
+                'result' => ['status' => 'proposal_deleted'],
             ]);
 
-        // 原始資料未被刪除
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'ENTRY_DATA',
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+        ]);
+        $op = DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_DELETE)->first();
+        $payload = json_decode($op->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+
+        // 目標列未被實際刪除
         $this->assertDatabaseHas('ENTRY_DATA', [
             'c_personid' => 1000,
             'c_entry_code' => 36,
             'c_sequence' => 1,
             'c_year' => 1057,
         ]);
+
+        $this->assertSame(0, DB::table('audit_log')->where('table_name', 'ENTRY_DATA')->where('operation', 'DELETE')->count());
     }
 
     // ── Error Cases ─────────────────────────────────────────

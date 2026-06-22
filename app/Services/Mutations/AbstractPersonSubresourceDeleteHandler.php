@@ -57,11 +57,28 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
         return 'c_personid';
     }
 
+    /**
+     * 允許為 null 的主鍵欄位（如 BIOG_SOURCE_DATA.c_pages 為 varchar、可空）。
+     * 預設無；子類可覆寫。findOriginalRow/performDelete 以 where($col, null) 自動轉 whereNull。
+     */
+    protected function optionalKeyFields(): array {
+        return [];
+    }
+
+    /**
+     * 正規化傳入的 target.pk（預設不變）。
+     * 子類可覆寫，使 delete 的 PK 與 create/update 寫入時的 canonical 形式一致，
+     * 確保 round-trip（如 BIOG_SOURCE_DATA.c_pages create 時 canonical 為 ''，delete 也須對齊）。
+     */
+    protected function normalizeTargetPk(array $pk): array {
+        return $pk;
+    }
+
     // ── supports ─────────────────────────────────────────────
 
     public function supports(string $resource, string $mode, string $operation): bool {
         return in_array($resource, $this->resourceAliases(), true)
-            && $mode === 'direct'
+            && in_array($mode, ['direct', 'proposal'], true)
             && $operation === 'delete';
     }
 
@@ -74,9 +91,12 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
             return $authorizationError;
         }
 
+        // 1.5 正規化 PK（與 create/update canonical 形式對齊，確保 round-trip）
+        $targetPk = $this->normalizeTargetPk($targetPk);
+
         // 2. 驗證 PK 格式
         try {
-            CompositePrimaryKey::validateOrFail($targetPk, $this->tableName());
+            CompositePrimaryKey::validateOrFail($targetPk, $this->tableName(), $this->optionalKeyFields());
         } catch (\Throwable $e) {
             return $this->errorResponse('主鍵格式不正確', 422, ['pk' => [$e->getMessage()]]);
         }

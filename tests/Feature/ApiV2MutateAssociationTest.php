@@ -119,6 +119,15 @@ class ApiV2MutateAssociationTest extends TestCase {
             $table->text('c_supplement')->nullable();
             $table->integer('c_sequence')->default(0);
             $table->integer('c_assoc_count')->default(0);
+            // Task 27：補回欄位（皆 ASSOC_DATA 真實欄）。
+            $table->integer('c_topic_code')->nullable();
+            $table->integer('c_occasion_code')->nullable();
+            $table->integer('c_tertiary_personid')->nullable();
+            $table->text('c_tertiary_type_notes')->nullable();
+            $table->integer('c_assoc_claimer_id')->nullable();
+            $table->integer('c_addr_id')->nullable();
+            $table->integer('c_inst_code')->default(0);
+            $table->integer('c_inst_name_code')->default(0);
             $table->primary([
                 'c_personid', 'c_assoc_code', 'c_assoc_id',
                 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code',
@@ -185,6 +194,38 @@ class ApiV2MutateAssociationTest extends TestCase {
     // ── Direct Update Tests ─────────────────────────────────
 
     #[Test]
+    public function testUpdatePreservesSentinelPkFields(): void {
+        // 回歸：編輯「未知出處/未知年份」記錄（c_text_title='[n/a]'、c_assoc_first_year=-9999），
+        // 前端把哨仔顯示為空、changes 帶空值（middleware 轉 null）；preprocessUpdateData 須轉回哨兵，
+        // 否則 PK 會漂移成 '' / 0。
+        $user = $this->makeUser(email: 'assoc-sentinel@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation([
+            'c_text_title' => '[n/a]',
+            'c_assoc_first_year' => -9999,
+            'c_notes' => '原備註',
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'target' => ['pk' => ['c_text_title' => '[n/a]', 'c_assoc_first_year' => -9999]],
+            'changes' => ['c_notes' => '改後備註', 'c_text_title' => null, 'c_assoc_first_year' => null],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+
+        // PK 哨兵保持，不漂移為 0 / ''
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000,
+            'c_assoc_code' => 1,
+            'c_assoc_id' => 2000,
+            'c_text_title' => '[n/a]',
+            'c_assoc_first_year' => -9999,
+            'c_notes' => '改後備註',
+        ]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_assoc_first_year' => 0]);
+    }
+
+    #[Test]
     public function testDirectAssociationUpdateSucceeds(): void {
         $user = $this->makeUser(email: 'assoc-direct@example.com');
         $this->actingAs($user);
@@ -220,6 +261,41 @@ class ApiV2MutateAssociationTest extends TestCase {
             'c_personid' => 1000,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdatePersistsRestoredFieldsAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補回欄位（c_topic_code / c_addr_id / c_tertiary_personid / c_inst_code…）
+        // 須能寫入；且只改單一欄位時，未送出的補回欄位不可被清成 null —— 防護「保存即清空」資料流失。
+        $user = $this->makeUser(email: 'assoc-restored@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation([
+            'c_topic_code' => 5,
+            'c_addr_id' => 100,
+            'c_tertiary_personid' => 777,
+            'c_inst_code' => 12,
+            'c_inst_name_code' => 3,
+        ]);
+
+        // (a) 直接更新補回欄位應成功寫入（含 inst 兩欄）。
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_topic_code' => 9, 'c_inst_code' => 20, 'c_inst_name_code' => 4],
+        ]))->assertOk();
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_id' => 2000,
+            'c_topic_code' => 9, 'c_inst_code' => 20, 'c_inst_name_code' => 4,
+            'c_addr_id' => 100, 'c_tertiary_personid' => 777,
+        ]);
+
+        // (b) 只改 c_notes（payload 不含補回欄位）後，補回欄位仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_id' => 2000,
+            'c_notes' => '只改備註', 'c_topic_code' => 9,
+            'c_inst_code' => 20, 'c_addr_id' => 100, 'c_tertiary_personid' => 777,
         ]);
     }
 

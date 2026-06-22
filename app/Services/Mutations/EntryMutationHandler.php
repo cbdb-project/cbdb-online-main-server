@@ -59,11 +59,17 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
-            'c_entry_nh_code',
+            'c_nianhao_id',
             'c_entry_nh_year',
             'c_entry_range',
-            'c_secondary_source_title',
+            // Task 27 補回舊表單可錄入欄（皆 ENTRY_DATA 真實欄；c_parental_status_code 為真實欄名，
+            // 舊表單 field 名 c_parental_status_code 實為 parentstatus 代碼，存入 c_parental_status_code）。
+            'c_exam_rank',
+            'c_attempt_count',
+            'c_exam_field',
+            'c_parental_status_code',
+            'c_age',
+            'c_posting_notes',
         ];
     }
 

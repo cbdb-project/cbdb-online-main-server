@@ -117,11 +117,15 @@ class ApiV2CreateEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_entry_nh_code')->nullable();
+            $table->integer('c_nianhao_id')->nullable();
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
-            $table->string('c_secondary_source_title', 255)->nullable();
+            $table->string('c_exam_rank', 255)->nullable();
+            $table->integer('c_attempt_count')->nullable();
+            $table->string('c_exam_field', 255)->nullable();
+            $table->integer('c_parental_status_code')->nullable();
+            $table->integer('c_age')->nullable();
+            $table->string('c_posting_notes', 255)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -241,6 +245,37 @@ class ApiV2CreateEntryTest extends TestCase {
             'c_inst_name_code' => 0,
             'c_source' => 20,
             'c_pages' => '10-15',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEntryCreatePersistsRestoredFields(): void {
+        // 回歸（Task 27）：補回的入仕欄位在 create 路徑須真的寫入 ENTRY_DATA。
+        $user = $this->makeUser(email: 'create-entry-restored@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_source' => 20,
+                'c_exam_rank' => '進士',
+                'c_attempt_count' => 3,
+                'c_exam_field' => '詩賦',
+                'c_parental_status_code' => 2,
+                'c_age' => 25,
+                'c_posting_notes' => '初任',
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000,
+            'c_entry_code' => 72,
+            'c_sequence' => 1,
+            'c_exam_rank' => '進士',
+            'c_attempt_count' => 3,
+            'c_exam_field' => '詩賦',
+            'c_parental_status_code' => 2,
+            'c_age' => 25,
+            'c_posting_notes' => '初任',
         ]);
     }
 

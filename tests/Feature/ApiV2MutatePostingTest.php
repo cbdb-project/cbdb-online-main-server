@@ -123,6 +123,10 @@ class ApiV2MutatePostingTest extends TestCase {
             $table->integer('c_ly_intercalary')->default(0);
             $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
+            $table->integer('c_dy')->nullable();
+            $table->integer('c_inst_code')->default(0);
+            $table->integer('c_inst_name_code')->default(0);
+            $table->integer('c_office_category_id')->nullable();
             $table->primary(['c_office_id', 'c_posting_id']);
         });
     }
@@ -202,6 +206,38 @@ class ApiV2MutatePostingTest extends TestCase {
             'c_posting_id' => 400,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectPostingUpdatePersistsRestoredFieldsAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補回的 c_assume_office_code/c_dy/c_inst_code/c_inst_name_code/c_office_category_id
+        // 須能寫入；且只改一個欄位時，未送出的補回欄不可被清空（防「保存即清空」資料流失）。
+        $user = $this->makeUser(email: 'posting-restored@example.com');
+        $this->actingAs($user);
+        $this->seedPosting([
+            'c_assume_office_code' => 1, 'c_dy' => 15, 'c_inst_code' => 12,
+            'c_inst_name_code' => 34, 'c_office_category_id' => 2,
+        ]);
+
+        // (a) 直接更新補回欄位應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_dy' => 16, 'c_office_category_id' => 3],
+        ]))->assertOk();
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400,
+            'c_dy' => 16, 'c_office_category_id' => 3,
+            'c_assume_office_code' => 1, 'c_inst_code' => 12, 'c_inst_name_code' => 34,
+        ]);
+
+        // (b) 只改 c_notes（不送補回欄）後，補回欄仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400, 'c_notes' => '只改備註',
+            'c_assume_office_code' => 1, 'c_dy' => 16, 'c_inst_code' => 12,
+            'c_inst_name_code' => 34, 'c_office_category_id' => 3,
         ]);
     }
 

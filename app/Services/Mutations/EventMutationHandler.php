@@ -40,16 +40,16 @@ class EventMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
             'c_year',
             'c_month',
             'c_day',
             'c_nh_code',
             'c_nh_year',
-            'c_range',
+            'c_yr_range',
             'c_intercalary',
-            'c_event_type',
-            'c_event_addr',
+            'c_role',
+            'c_event',
+            'c_addr_id',
         ];
     }
 

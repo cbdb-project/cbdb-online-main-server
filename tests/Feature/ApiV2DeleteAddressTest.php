@@ -240,7 +240,7 @@ class ApiV2DeleteAddressTest extends TestCase {
     // ── Proposal Delete Tests ───────────────────────────────
 
     #[Test]
-    public function testProposalAddressDeleteReturns501(): void {
+    public function testProposalAddressDeleteWritesPendingProposal(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-addr-proposal@example.com');
         $this->actingAs($user);
         $this->seedAddress();
@@ -249,22 +249,33 @@ class ApiV2DeleteAddressTest extends TestCase {
             'mode' => 'proposal',
         ]));
 
-        $response->assertStatus(501)
+        $response->assertOk()
             ->assertJson([
-                'ok' => false,
-                'errors' => [
-                    'mode' => 'proposal',
-                    'operation' => 'delete',
-                ],
+                'ok' => true,
+                'mode' => 'proposal',
+                'operation' => 'delete',
+                'result' => ['status' => 'proposal_deleted'],
             ]);
 
-        // 原始資料未被刪除
+        // 寫入 TYPE_PROPOSAL_DELETE operation，狀態 pending
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'BIOG_ADDR_DATA',
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+        ]);
+        $op = DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_DELETE)->first();
+        $payload = json_decode($op->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+
+        // 目標列未被實際刪除
         $this->assertDatabaseHas('BIOG_ADDR_DATA', [
             'c_personid' => 1000,
             'c_addr_id' => 100,
             'c_addr_type' => 1,
             'c_sequence' => 1,
         ]);
+
+        // 無 audit DELETE
+        $this->assertSame(0, DB::table('audit_log')->where('table_name', 'BIOG_ADDR_DATA')->where('operation', 'DELETE')->count());
     }
 
     // ── Error Cases ─────────────────────────────────────────

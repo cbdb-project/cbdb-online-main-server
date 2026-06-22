@@ -62,6 +62,27 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
 Route::get('app/basicinformation', 'BasicInformationController@appIndex')
     ->middleware('inertia')
     ->name('app.basicinformation.index');
+// Inertia + React 版（人物主檔 create/edit/show）。
+// create 須排在 {id}/edit、{id} 之前，避免被泛用路由攔截。
+Route::get('app/basicinformation/create', 'BasicInformationController@appCreate')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.create');
+Route::get('app/basicinformation/{id}/edit', 'BasicInformationController@appEdit')
+    ->where('id', '[0-9]+')
+    ->middleware('inertia')
+    ->name('app.basicinformation.edit');
+// PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
+// 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
+Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')
+    ->where('id', '[0-9]+')
+    ->name('app.basicinformation.summary');
+Route::get('app/basicinformation/{id}/tabs/{tabKey}', 'BasicInformationController@tab')
+    ->where('id', '[0-9]+')
+    ->name('app.basicinformation.tab');
+Route::get('app/basicinformation/{id}', 'BasicInformationController@appShow')
+    ->where('id', '[0-9]+')
+    ->middleware('inertia')
+    ->name('app.basicinformation.show');
 Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
 Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOfficesController@saveas');

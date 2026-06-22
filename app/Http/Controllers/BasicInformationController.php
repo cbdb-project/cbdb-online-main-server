@@ -15,6 +15,7 @@ use App\Repositories\YearRangeRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
+use App\Services\PersonBrowserService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -43,13 +44,14 @@ class BasicInformationController extends Controller {
     protected $operationRepository;
     protected $toolRepository;
     protected $nameSearchIndexService;
+    protected $personBrowserService;
 
     /**
      * Create a new controller instance.
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService) {
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService, PersonBrowserService $personBrowserService) {
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
         $this->dynastyRepository = $dynastyRepository;
@@ -59,7 +61,11 @@ class BasicInformationController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
-        $this->middleware('auth')->except(['index', 'show', 'edit', 'appIndex', 'appShow']);
+        $this->personBrowserService = $personBrowserService;
+        // 檢視類路由（含 React appShow/appEdit 與其 summary/tab JSON 端點）可公開；
+        // 實際寫入由 /api/v2 handler 授權把關。summary/tab 與舊唯讀人物頁同樣公開，
+        // 確保訪客也能檢視（編輯能力由 canEditBasicInfo + 後端 v2 授權決定）。
+        $this->middleware('auth')->except(['index', 'show', 'edit', 'appIndex', 'appShow', 'appEdit', 'summary', 'tab']);
     }
 
     private function normalizePersonId($id): int {
@@ -177,11 +183,220 @@ class BasicInformationController extends Controller {
             'can_add' => Auth::check() && Auth::user()->isActive(),
             // 人物編輯器仍為 Blade（Phase 4，受 F7 硬前置）；連結模板 flag-aware。
             'edit_template' => $editIsNew
-                ? route('app.basicinformation.edit', ['basicinformation' => '__ID__'], false)
+                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
                 : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
             'create_url' => route('basicinformation.create', [], false),
             'page_translations' => [
                 'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /**
+     * 共用：組出 React 編輯/檢視頁所需的 person props（sections + form + 摘要標籤）。
+     * sections/form 與 PersonBrowser basic_info 分頁同源（PersonBrowserService::tabData），
+     * BasicInfoView 可直接消費；不存在則 404。
+     *
+     * @return array{0: array, 1: string}  [props, personLabel]
+     */
+    protected function buildPersonViewProps(int $personId): array {
+        $basic = $this->personBrowserService->tabData($personId, 'basic_info');
+
+        if ($basic === null || empty($basic['sections'])) {
+            abort(404);
+        }
+
+        // 名稱標籤直接從 BIOG_MAIN 取，避免耦合 summary() 的完整欄位需求。
+        $nameRow = DB::table('BIOG_MAIN')
+            ->where('c_personid', $personId)
+            ->first(['c_name_chn', 'c_name']);
+        $nameChn = $nameRow->c_name_chn ?? '';
+        $name = $nameRow->c_name ?? '';
+
+        $personLabel = (string) $personId;
+        if ($nameChn || $name) {
+            $personLabel .= ' - ' . $nameChn;
+            if ($name) {
+                $personLabel .= ' (' . $name . ')';
+            }
+        }
+
+        return [
+            [
+                'person_id' => $personId,
+                'sections' => $basic['sections'] ?? [],
+                'form' => $basic['form'] ?? null,
+                'name_chn' => $nameChn,
+                'name' => $name,
+            ],
+            $personLabel,
+        ];
+    }
+
+    /**
+     * 端點與授權旗標（Edit/Show 共用）。實際寫入授權由 /api/v2 handler 把關，
+     * 前端 can_* 僅控制 UI 顯示。
+     *
+     * @return array<string, mixed>
+     */
+    protected function personEditorMeta(): array {
+        $user = Auth::user();
+
+        return [
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            // 可提案但不可直接寫入者（眾包用戶）亦可送 update 提案；BIOG_MAIN create/delete 提案
+            // v2 尚未支援（回 501），故前端對 proposal-only 用戶隱藏新增/刪除入口。
+            'can_propose' => $user ? $user->canPropose() : false,
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'pinyin_endpoint' => '/api/select/search/pinyin',
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+        ];
+    }
+
+    /**
+     * Inertia + React 版：人物編輯主界面（PersonEditor，對齊舊 /basicinformation/{id} 的
+     * 13 分頁高效錄入界面）。複用 PersonBrowser 的 BrowserTabs + TabContentLoader，但聚焦
+     * 單一人物（無搜尋 sidebar）、basic_info 分頁進場即可錄入、12 子資源分頁各帶 React 編輯器。
+     * 頁面本身可公開載入（檢視/可編輯由 can_edit 與 /api/v2 handler 把關）。
+     */
+    public function appEdit($id) {
+        return $this->renderPersonEditor($id);
+    }
+
+    /**
+     * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
+     * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
+     */
+    public function appShow($id) {
+        return $this->renderPersonEditor($id);
+    }
+
+    /**
+     * 渲染 PersonEditor 編輯中樞。先以 buildPersonViewProps 確認人物存在（404）並取標籤。
+     */
+    protected function renderPersonEditor($id) {
+        $personId = $this->normalizePersonId($id);
+        // 確認人物存在並取得顯示標籤（不存在則 404）。
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 支援 ?tab= 深連結（對齊舊頁各子資源獨立 URL 的可深連結性）；非法值回退 basic_info。
+        $validTabs = array_merge(['basic_info'], \App\Services\PersonBrowserService::validTabKeys());
+        $requestedTab = (string) request('tab', '');
+        $initialTab = in_array($requestedTab, $validTabs, true) ? $requestedTab : 'basic_info';
+
+        return Inertia::render('BasicInformation/PersonEditor', array_merge([
+            'personId' => $personId,
+            'person_label' => $personLabel,
+            'initialTab' => $initialTab,
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+            'page_translations' => [
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
+        ], $this->personEditorTabProps()));
+    }
+
+    /**
+     * PersonEditor 所需的端點 + 旗標（與 PersonBrowserController@index 對齊），
+     * 但 summary/tab 端點改指向「編輯者/訪客可用」的 app.basicinformation.summary/.tab
+     * （非 superadmin-only）。__PERSON_ID__ / __TAB_KEY__ 由前端替換。
+     *
+     * @return array<string, mixed>
+     */
+    protected function personEditorTabProps(): array {
+        $user = Auth::user();
+
+        return [
+            'tabKeys' => PersonBrowserService::validTabKeys(),
+            'summaryEndpoint' => route('app.basicinformation.summary', ['id' => '__PERSON_ID__'], false),
+            'tabEndpoint' => route('app.basicinformation.tab', ['id' => '__PERSON_ID__', 'tabKey' => '__TAB_KEY__'], false),
+            'mutateEndpoint' => route('api.v2.mutate.web', [], false),
+            'createEndpoint' => route('api.v2.create.web', [], false),
+            'deleteEndpoint' => route('api.v2.delete.web', [], false),
+            'pinyinEndpoint' => '/api/select/search/pinyin',
+            'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'canProposeEdits' => $user ? $user->canPropose() : false,
+            'altnameEditorIsNew' => migration_flag_is_new('basicinformation.altname'),
+            'addressesEditorIsNew' => migration_flag_is_new('basicinformation.addresses'),
+            'textsEditorIsNew' => migration_flag_is_new('basicinformation.texts'),
+            'sourcesEditorIsNew' => migration_flag_is_new('basicinformation.sources'),
+            'officesEditorIsNew' => migration_flag_is_new('basicinformation.offices'),
+            'assocEditorIsNew' => migration_flag_is_new('basicinformation.assoc'),
+            'kinshipEditorIsNew' => migration_flag_is_new('basicinformation.kinship'),
+            'eventsEditorIsNew' => migration_flag_is_new('basicinformation.events'),
+            'entriesEditorIsNew' => migration_flag_is_new('basicinformation.entries'),
+            'statusesEditorIsNew' => migration_flag_is_new('basicinformation.statuses'),
+            'possessionEditorIsNew' => migration_flag_is_new('basicinformation.possession'),
+            'socialInstEditorIsNew' => migration_flag_is_new('basicinformation.socialinst'),
+        ];
+    }
+
+    /**
+     * PersonEditor 用：人物摘要（JSON，header + tab_counts）。委託 PersonBrowserService::summary。
+     * 與 person-browser summary 同資料，但路由不在 superadmin 組，供編輯主界面取用。
+     */
+    public function summary($id) {
+        $personId = $this->normalizePersonId($id);
+        $data = $this->personBrowserService->summary($personId);
+
+        if ($data === null) {
+            return response()->json(['error' => 'Person not found'], 404);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * PersonEditor 用：分頁資料（JSON）。先校驗 tabKey 合法，委託 PersonBrowserService::tabData。
+     */
+    public function tab($id, $tabKey) {
+        $personId = $this->normalizePersonId($id);
+
+        if (!in_array($tabKey, PersonBrowserService::validTabKeys(), true)) {
+            return response()->json(['error' => 'Invalid tab key'], 404);
+        }
+
+        $data = $this->personBrowserService->tabData($personId, $tabKey);
+
+        if ($data === null) {
+            return response()->json(['error' => 'Tab data not available'], 404);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * Inertia + React 版：新增人物表單頁（c_personid + 核心姓名欄位）→ /api/v2/create。
+     * 須登入（middleware auth 已涵蓋本方法）；實際寫入授權由 v2 handler 把關。
+     */
+    public function appCreate() {
+        $user = Auth::user();
+
+        // BIOG_MAIN create 提案 v2 尚未支援（回 501）：可提案但不可直接寫入者導回舊版新增流程。
+        if ($user && !$user->canWriteDirectly() && $user->canPropose()) {
+            flash('人物新增提案請使用舊版眾包流程 @ '.Carbon::now(), 'info');
+
+            return redirect()->route('basicinformation.create');
+        }
+
+        $tempId = (int) BiogMain::max('c_personid') + 1;
+
+        return Inertia::render('BasicInformation/Create', [
+            'temp_id' => $tempId,
+            'can_create' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'edit_template' => migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit')
+                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
+                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+            'page_translations' => [
                 'person' => is_array($t = trans('person')) ? $t : [],
             ],
         ]);

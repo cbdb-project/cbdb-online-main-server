@@ -49,6 +49,22 @@ class OperationsProposalControllerTest extends TestCase {
             $table->timestamps();
         });
 
+        Schema::dropIfExists('audit_log');
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 64);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512)->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+
         Schema::dropIfExists('TEST_CODES');
         Schema::create('TEST_CODES', function (Blueprint $table) {
             $table->string('code_id');
@@ -76,6 +92,28 @@ class OperationsProposalControllerTest extends TestCase {
             $table->dateTime('c_modified_date')->nullable();
         });
 
+        Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
+        Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_office_id');
+            $table->integer('c_posting_id');
+            $table->text('c_notes')->nullable();
+        });
+
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
+        Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_posting_id');
+            $table->integer('c_office_id');
+            $table->integer('c_addr_id')->default(0);
+        });
+
+        Schema::dropIfExists('POSTING_DATA');
+        Schema::create('POSTING_DATA', function (Blueprint $table) {
+            $table->integer('c_posting_id')->primary();
+            $table->integer('c_personid')->default(0);
+        });
+
         Schema::dropIfExists('ENTRY_DATA');
         Schema::create('ENTRY_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
@@ -96,10 +134,14 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('POSTING_DATA');
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
+        Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::dropIfExists('ENTRY_DATA');
         Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('TEST_SINGLE');
         Schema::dropIfExists('TEST_CODES');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
         parent::tearDown();
@@ -503,5 +545,168 @@ class OperationsProposalControllerTest extends TestCase {
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('rejected', $payload['__review_status']);
         $this->assertSame('Not acceptable', $payload['__review_comment']);
+    }
+
+    #[Test]
+    public function testApproveDeleteProposalRemovesRow(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'DL',
+            'code_sub' => '01',
+            'description' => 'Delete me',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'code_id' => 'DL',
+            'code_sub' => '01',
+            'description' => 'Delete me',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource_id' => 'DL_._01',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '同意刪除',
+        ]);
+        $response->assertRedirect();
+
+        // 目標列確實被刪
+        $this->assertDatabaseMissing('TEST_CODES', ['code_id' => 'DL', 'code_sub' => '01']);
+
+        // __review_status=approved
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame('同意刪除', $payload['__review_comment']);
+
+        // 寫入 TYPE_DELETE final operation
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'TEST_CODES',
+            'op_type' => Operation::TYPE_DELETE,
+        ]);
+
+        // audit DELETE 寫入：old=original, new=null
+        $audit = DB::table('audit_log')->where('table_name', 'TEST_CODES')->where('operation', 'DELETE')->first();
+        $this->assertNotNull($audit);
+        $this->assertNotNull($audit->old_data);
+        $this->assertNull($audit->new_data);
+    }
+
+    #[Test]
+    public function testApproveDeleteProposalRemovesOfficeAndAuxiliaryTables(): void {
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'office',
+        ]);
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            ['c_personid' => 1000, 'c_posting_id' => 7, 'c_office_id' => 50, 'c_addr_id' => 130],
+            ['c_personid' => 1000, 'c_posting_id' => 7, 'c_office_id' => 50, 'c_addr_id' => 200],
+        ]);
+        DB::table('POSTING_DATA')->insert(['c_posting_id' => 7, 'c_personid' => 1000]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'office',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'resource_id' => '50_._7',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        // 主表與副表一併刪除
+        $this->assertDatabaseMissing('POSTED_TO_OFFICE_DATA', ['c_office_id' => 50, 'c_posting_id' => 7]);
+        $this->assertSame(0, DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', 7)->count());
+        $this->assertSame(0, DB::table('POSTING_DATA')->where('c_posting_id', 7)->count());
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'op_type' => Operation::TYPE_DELETE,
+        ]);
+    }
+
+    #[Test]
+    public function testRejectDeleteProposalKeepsRow(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'RK',
+            'code_sub' => '02',
+            'description' => 'Keep me',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'code_id' => 'RK',
+            'code_sub' => '02',
+            'description' => 'Keep me',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource_id' => 'RK_._02',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+
+        $response = $this->post(route('operations.proposals.reject', $operation), [
+            'review_comment' => '不同意刪除',
+        ]);
+        $response->assertRedirect();
+
+        // 目標列保留
+        $this->assertDatabaseHas('TEST_CODES', ['code_id' => 'RK', 'code_sub' => '02', 'description' => 'Keep me']);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('rejected', $payload['__review_status']);
+        $this->assertSame('不同意刪除', $payload['__review_comment']);
+
+        // 無 final DELETE operation、無 audit DELETE
+        $this->assertDatabaseMissing('operations', ['resource' => 'TEST_CODES', 'op_type' => Operation::TYPE_DELETE]);
+        $this->assertSame(0, DB::table('audit_log')->where('operation', 'DELETE')->count());
     }
 }

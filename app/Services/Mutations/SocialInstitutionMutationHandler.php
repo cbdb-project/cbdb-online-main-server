@@ -41,13 +41,14 @@ class SocialInstitutionMutationHandler extends AbstractPersonSubresourceMutation
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
-            'c_bi_firstyear',
-            'c_bi_lastyear',
-            'c_bi_fy_nh_code',
-            'c_bi_fy_nh_year',
-            'c_bi_ly_nh_code',
-            'c_bi_ly_nh_year',
+            'c_bi_begin_year',
+            'c_bi_by_nh_code',
+            'c_bi_by_nh_year',
+            'c_bi_by_range',
+            'c_bi_end_year',
+            'c_bi_ey_nh_code',
+            'c_bi_ey_nh_year',
+            'c_bi_ey_range',
         ];
     }
 

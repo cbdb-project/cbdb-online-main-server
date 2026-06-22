@@ -208,6 +208,33 @@ class ApiV2MutateStatusTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectStatusUpdatePersistsSupplementAndDoesNotNullOtherFields(): void {
+        // 回歸（Task 27）：補欄 c_supplement 必須能寫入；且只改單一欄位時，未送出的欄位
+        // （c_supplement / c_firstyear）不可被清成 null —— 防護「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'status-supplement@example.com');
+        $this->actingAs($user);
+        $this->seedStatus(['c_supplement' => '原始補充', 'c_firstyear' => 1050]);
+
+        // (a) 直接更新 c_supplement 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => ['c_supplement' => '新補充'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_supplement' => '新補充', 'c_firstyear' => 1050,
+        ]);
+
+        // (b) 只改 c_notes（payload 不含 c_supplement/c_firstyear）後，兩者仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_notes' => '只改備註', 'c_supplement' => '新補充', 'c_firstyear' => 1050,
+        ]);
+    }
+
+    #[Test]
     public function testDirectStatusUpdateReturnsOperationIdAndRow(): void {
         $user = $this->makeUser(email: 'status-result@example.com');
         $this->actingAs($user);

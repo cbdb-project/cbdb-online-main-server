@@ -112,6 +112,7 @@ class ApiV2MutateAddressTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
+            $table->integer('c_natal')->nullable();
             $table->integer('c_fy_nh_code')->nullable();
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
@@ -208,6 +209,35 @@ class ApiV2MutateAddressTest extends TestCase {
             'c_personid' => 1000,
             'c_firstyear' => 1060,
             'c_notes' => '測試備註',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdatePersistsNatalAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補欄 c_natal（是否本貫）須能寫入；且只改單一欄位時，未送出的
+        // c_natal / c_firstyear 不可被清成 null —— 防護「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'addr-natal@example.com');
+        $this->actingAs($user);
+        // 注意：addressPayload 預設 changes 含 c_firstyear=1060（會被 array_replace_recursive 併入），
+        // 故 seed 與斷言一律用 1060；本測試重點是 c_natal 的寫入與「不送即不被清空」。
+        $this->seedAddress(['c_natal' => 1, 'c_firstyear' => 1060]);
+
+        // (a) 直接更新 c_natal 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_natal' => 0],
+        ]))->assertOk();
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_natal' => 0, 'c_firstyear' => 1060,
+        ]);
+
+        // (b) changes 不含 c_natal（僅改 c_notes）後，c_natal 仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_notes' => '只改備註', 'c_natal' => 0, 'c_firstyear' => 1060,
         ]);
     }
 

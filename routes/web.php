@@ -106,6 +106,10 @@ Route::get('app/basicinformation/{id}/events/edit-v2', 'BasicInformationControll
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.events.editv2');
+Route::get('app/basicinformation/{id}/entries/edit-v2', 'BasicInformationController@appEntriesEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.entries.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

@@ -117,7 +117,7 @@ class ApiV2DeleteEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->integer('c_nianhao_id')->nullable();
+            $table->integer('c_entry_nh_id')->nullable(); // 對齊真實欄名（2026_01_22 rename c_nianhao_id->c_entry_nh_id）
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
             $table->string('c_created_by', 255)->nullable();

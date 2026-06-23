@@ -117,7 +117,7 @@ class ApiV2MutateEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->integer('c_nianhao_id')->nullable();
+            $table->integer('c_entry_nh_id')->nullable(); // 對齊真實欄名（2026_01_22 rename c_nianhao_id->c_entry_nh_id）
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
             $table->string('c_exam_rank', 255)->nullable();
@@ -517,5 +517,23 @@ class ApiV2MutateEntryTest extends TestCase {
 
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'entries']);
+    }
+
+    #[Test]
+    public function testDirectEntryUpdatePersistsEraNianhaoField(): void {
+        // 回歸：入仕年的年號代碼欄真實欄名為 c_entry_nh_id（2026_01_22 rename，舊名 c_nianhao_id）。
+        // allowlist 若殘留舊名，更新年號將寫不進真實欄。
+        $user = $this->makeUser(email: 'entry-era@example.com');
+        $this->actingAs($user);
+        $this->seedEntry(['c_entry_nh_id' => 1, 'c_entry_nh_year' => 2]);
+
+        $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'changes' => ['c_entry_nh_id' => 9, 'c_entry_nh_year' => 4],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000, 'c_entry_code' => 36, 'c_sequence' => 1,
+            'c_entry_nh_id' => 9, 'c_entry_nh_year' => 4,
+        ]);
     }
 }

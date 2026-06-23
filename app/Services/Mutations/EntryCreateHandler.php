@@ -60,7 +60,8 @@ class EntryCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            'c_nianhao_id',
+            // 年號代碼欄：ENTRY_DATA 真實欄為 c_entry_nh_id（2026_01_22 rename 將 c_nianhao_id 改為此名）。
+            'c_entry_nh_id',
             'c_entry_nh_year',
             'c_entry_range',
             // Task 27 補回舊表單可錄入欄（皆 ENTRY_DATA 真實欄；c_parental_status_code 為真實欄名）。

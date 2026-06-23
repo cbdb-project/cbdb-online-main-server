@@ -713,6 +713,113 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：入仕（entries）編輯器（對齊 legacy biogmains/entries/_form）。獨立測試路由，
+     * flag 仍 old、不上線。10 段複合主鍵；有 c_entry_code+c_sequence+c_kin_code+c_assoc_code+
+     * c_kin_id+c_year+c_assoc_id+c_inst_code+c_inst_name_code 即編輯，否則新增。
+     */
+    public function appEntriesEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        // 10 段主鍵齊備才視為編輯。
+        $pkKeys = ['c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code'];
+        $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $where = ['c_personid' => $personId];
+            foreach ($pkKeys as $k) {
+                $where[$k] = (int) $request->input($k);
+            }
+            $row = DB::table('ENTRY_DATA')->where($where)->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 各非同步搜尋欄位補回顯示標籤（補水失敗不影響編輯主流程，僅顯示空白）。
+            try {
+                $entryCode = (int) $row->c_entry_code;
+                if ($entryCode) {
+                    $c = DB::table('ENTRY_CODES')->where('c_entry_code', $entryCode)->first();
+                    if ($c) {
+                        $initialLabels['c_entry_code'] = trim($entryCode.' '.($c->c_entry_desc_chn ?? '').' '.($c->c_entry_desc ?? ''));
+                    }
+                }
+                $kinCode = (int) $row->c_kin_code;
+                if ($kinCode) {
+                    $c = DB::table('KINSHIP_CODES')->where('c_kincode', $kinCode)->first();
+                    if ($c) {
+                        $initialLabels['c_kin_code'] = trim($kinCode.' '.($c->c_kinrel_chn ?? '').' '.($c->c_kinrel ?? ''));
+                    }
+                }
+                $assocCode = (int) $row->c_assoc_code;
+                if ($assocCode) {
+                    $c = DB::table('ASSOC_CODES')->where('c_assoc_code', $assocCode)->first();
+                    if ($c) {
+                        $initialLabels['c_assoc_code'] = trim($assocCode.' '.($c->c_assoc_desc_chn ?? '').' '.($c->c_assoc_desc ?? ''));
+                    }
+                }
+                foreach (['c_kin_id' => (int) $row->c_kin_id, 'c_assoc_id' => (int) $row->c_assoc_id] as $field => $pid) {
+                    if ($pid) {
+                        $b = DB::table('BIOG_MAIN')->where('c_personid', $pid)->first();
+                        if ($b) {
+                            $initialLabels[$field] = trim($pid.' '.($b->c_name_chn ?? '').' '.($b->c_name ?? ''));
+                        }
+                    }
+                }
+                $instCode = (int) $row->c_inst_code;
+                $instNameCode = (int) $row->c_inst_name_code;
+                if ($instCode || $instNameCode) {
+                    $n = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $instNameCode)->first();
+                    $initialLabels['c_inst_code'] = trim($instCode.'-'.$instNameCode.' '.($n->c_inst_name_hz ?? ''));
+                }
+                if ((int) ($row->c_entry_addr_id ?? 0)) {
+                    $a = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_entry_addr_id)->first();
+                    if ($a) {
+                        $initialLabels['c_entry_addr_id'] = trim($a->c_addr_id.' '.($a->c_name ?? '').' '.($a->c_name_chn ?? '').' '.($a->c_firstyear ?? '').'~'.($a->c_lastyear ?? ''));
+                    }
+                }
+                if ((int) ($row->c_source ?? 0)) {
+                    $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($tx) {
+                        $initialLabels['c_source'] = trim($tx->c_textid.' '.($tx->c_title ?? '').' '.($tx->c_title_chn ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EntriesEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.entries.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

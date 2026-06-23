@@ -117,7 +117,7 @@ class ApiV2CreateEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->integer('c_nianhao_id')->nullable();
+            $table->integer('c_entry_nh_id')->nullable(); // 對齊真實欄名（2026_01_22 rename c_nianhao_id->c_entry_nh_id）
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
             $table->string('c_exam_rank', 255)->nullable();
@@ -276,6 +276,31 @@ class ApiV2CreateEntryTest extends TestCase {
             'c_parental_status_code' => 2,
             'c_age' => 25,
             'c_posting_notes' => '初任',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEntryCreatePersistsEraNianhaoFields(): void {
+        // 回歸：入仕年的年號代碼欄真實欄名為 c_entry_nh_id（2026_01_22 rename，舊名 c_nianhao_id）。
+        // allowlist 若殘留舊名 c_nianhao_id，year 號將寫不進真實欄，此測試守住該欄與 nh_year/range。
+        $user = $this->makeUser(email: 'create-entry-era@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_entry_nh_id' => 7,
+                'c_entry_nh_year' => 3,
+                'c_entry_range' => 0,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000,
+            'c_entry_code' => 72,
+            'c_sequence' => 1,
+            'c_entry_nh_id' => 7,
+            'c_entry_nh_year' => 3,
+            'c_entry_range' => 0,
         ]);
     }
 

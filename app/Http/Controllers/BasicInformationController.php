@@ -988,6 +988,102 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：官名／任官（offices/postings）編輯器（對齊 legacy offices/_form，非 person-browser）。
+     * 編輯模式以 ?c_office_id=&c_posting_id= 深連結；地址副表（POSTED_TO_ADDR_DATA）多筆載入。
+     */
+    public function appOfficeEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 人物朝代（供官名/地名搜尋過濾，對齊 legacy $biog_dy）。
+        $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
+        $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+
+        // 編輯模式：c_office_id 與 c_posting_id 皆存在（0 為合法 office id，故以 has() 判斷）。
+        $hasPk = $request->has('c_office_id') && $request->has('c_posting_id')
+            && $request->input('c_posting_id') !== '';
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $officeId = (int) $request->input('c_office_id');
+            $postingId = (int) $request->input('c_posting_id');
+            $row = DB::table('POSTED_TO_OFFICE_DATA')
+                ->where('c_office_id', $officeId)
+                ->where('c_posting_id', $postingId)
+                ->where('c_personid', $personId)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            // 整列補水（含農曆等隱藏欄），避免回存時把未載入欄位清成 NULL（四步法則）。
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（search 欄位）：官名 / 出處 / 社會機構。list 欄位（朝代/任命/方式/分類）自行載入。
+            try {
+                $office = DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->first();
+                if ($office) {
+                    $initialLabels['c_office_id'] = trim($office->c_office_id . ' ' . ($office->c_office_chn ?? '') . ' ' . ($office->c_office_pinyin ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                if ((int) $row->c_inst_code) {
+                    $name = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $row->c_inst_name_code)->value('c_inst_name_hz');
+                    $initialLabels['c_inst_code'] = trim($row->c_inst_code . '-' . $row->c_inst_name_code . ' ' . ($name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            // 地址副表（多筆）→ initial_addr [{id,label}]。
+            try {
+                $addrRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $personId)
+                    ->where('c_posting_id', $postingId)
+                    ->get();
+                foreach ($addrRows as $ar) {
+                    $addrCode = DB::table('ADDR_CODES')->where('c_addr_id', $ar->c_addr_id)->first();
+                    $label = $addrCode ? trim(($addrCode->c_name_chn ?? '') . ' ' . ($addrCode->c_name ?? '')) : '';
+
+                    $initialAddr[] = ['id' => (string) $ar->c_addr_id, 'label' => $label !== '' ? $label : ('ADDR ' . $ar->c_addr_id)];
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/OfficeEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $dynastyCode,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.offices.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

@@ -121,6 +121,11 @@ Route::get('app/basicinformation/{id}/sources/edit-v2', 'BasicInformationControl
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.sources.editv2');
+// 官名／任官編輯器 V2（對齊 legacy offices/_form，含多地址＋雙 era＋社會機構）。獨立測試路由，offices flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/offices/edit-v2', 'BasicInformationController@appOfficeEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.offices.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

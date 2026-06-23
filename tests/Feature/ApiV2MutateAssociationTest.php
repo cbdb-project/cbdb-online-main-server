@@ -29,9 +29,13 @@ class ApiV2MutateAssociationTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createAssociationTable();
+        $this->createAssocCodesTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -128,12 +132,60 @@ class ApiV2MutateAssociationTest extends TestCase {
             $table->integer('c_addr_id')->nullable();
             $table->integer('c_inst_code')->default(0);
             $table->integer('c_inst_name_code')->default(0);
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary([
                 'c_personid', 'c_assoc_code', 'c_assoc_id',
                 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code',
                 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
             ]);
         });
+    }
+
+    /** 關係碼配對表：afterDirectUpdate 以舊關係碼查其配對碼定位反向鏡像列。code 1↔2 互為配對。 */
+    protected function createAssocCodesTable(): void {
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 1, 'c_assoc_pair' => 2, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 2, 'c_assoc_pair' => 1, 'c_assoc_pair2' => null],
+        ]);
+    }
+
+    /** 親屬碼配對表：未送 kin 配對碼時 afterDirectUpdate 以 c_kin_pair1 查權威反向碼。75↔76 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 0, 'c_kin_pair1' => null, 'c_kin_pair2' => null],
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+        ]);
+    }
+
+    /** 反向鏡像列（對方 2000 擁有、指回原人 1000、反向關係碼 2）。 */
+    protected function seedMirror(array $overrides = []): void {
+        DB::table('ASSOC_DATA')->insert(array_replace([
+            'c_personid' => 2000,
+            'c_assoc_code' => 2,
+            'c_assoc_id' => 1000,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '書名',
+            'c_assoc_first_year' => 1060,
+            'c_source' => 10,
+            'c_notes' => null,
+        ], $overrides));
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -223,6 +275,106 @@ class ApiV2MutateAssociationTest extends TestCase {
             'c_notes' => '改後備註',
         ]);
         $this->assertDatabaseMissing('ASSOC_DATA', ['c_assoc_first_year' => 0]);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdateSyncsExistingMirror(): void {
+        // 後台自動雙向同步（32a-update）：更新正向關係時，反向鏡像列同步更新（重用 syncAssocMirrorOnUpdate）。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror-upd@example.com'));
+        $this->seedAssociation();
+        $this->seedMirror();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後備註', 'c_assocship_pair' => 2],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        // 正向更新。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '改後備註']);
+        // 反向鏡像同步更新。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後備註']);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdateBackfillsMissingMirror(): void {
+        // 「永遠同步」改進：反向鏡像缺失（舊資料單邊）時，更新正向會補建反向，修正 legacy 選擇性跳過。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror-bf@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '補建備註', 'c_assocship_pair' => 2],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        // 反向鏡像被補建（對方 2000 擁有、指回 1000、反向碼 2、同出處/年份）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000,
+            'c_text_title' => '書名', 'c_assoc_first_year' => 1060, 'c_notes' => '補建備註',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectUpdateWithoutSentPairsPreservesMirrorKinCode(): void {
+        // 回歸（codex MAJOR）：只改內容、未送 kin 配對碼時，不可把既有鏡像的親屬配對碼洗成 0；
+        // 以 KINSHIP_CODES 權威反向碼（75→76）保持。
+        $this->actingAs($this->makeUser(email: 'assoc-kinpair@example.com'));
+        $this->seedAssociation(['c_kin_code' => 75]);                                  // 正向 kin code 75
+        $this->seedMirror(['c_kin_code' => 76, 'c_kin_id' => 1000, 'c_assoc_kin_id' => 1000]); // 反向 kin code 76
+
+        // 只改 c_notes，完全不送任何配對碼。
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'target' => ['pk' => ['c_kin_code' => 75]],
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+
+        // 鏡像親屬碼仍為 76（權威反向碼），未被洗成 0。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_kin_code' => 76]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_kin_code' => 0]);
+    }
+
+    #[Test]
+    public function testProposalUpdateStoresAuthoritativePairsInAux(): void {
+        // 回歸（codex MAJOR）：proposal 只改內容、未送配對碼時，aux 須存「權威反向碼」（非 0），
+        // 否則核准時 legacy 無條件讀三鍵會用 0 洗掉既有鏡像的關係碼。
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'assoc-prop-aux@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案改備註'],
+            'meta' => ['comment' => '請審'],
+        ]))->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        $op = DB::table('operations')->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)->latest('id')->first();
+        $this->assertNotNull($op);
+        $data = json_decode($op->resource_data, true);
+        // 未送 → 以 ASSOC_CODES[1].c_assoc_pair=2 權威值補齊，而非 0。
+        $this->assertSame(2, (int) ($data['__proposal_aux']['c_assocship_pair'] ?? null));
+    }
+
+    #[Test]
+    public function testPairOnlyDirectUpdateBackfillsMirror(): void {
+        // pair-only：只送 c_assocship_pair、不改任何 ASSOC_DATA 欄（顯式修復缺失反向鏡像）。
+        $this->actingAs($this->makeUser(email: 'assoc-paironly@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_assocship_pair' => 2],
+        ])->assertOk()->assertJson(['ok' => true, 'operation' => 'update']);
+
+        // 反向鏡像被補建。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000,
+            'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+        ]);
     }
 
     #[Test]

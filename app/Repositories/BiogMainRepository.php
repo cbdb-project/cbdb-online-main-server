@@ -2461,44 +2461,113 @@ class BiogMainRepository {
             $data_mirror['c_assoc_kin_id'] = $c_personid;
             $data_mirror['c_assoc_code'] = $assoc_pair;
             $data_mirror['c_personid'] = $assoc_id;
-            $data_mirror = Arr::except($data_mirror, ['c_assoc_id']);
+            // 反向列指回原人；補建鏡像時需要此 PK 段（update 為同值無害）。
+            $data_mirror['c_assoc_id'] = $c_personid;
 
-            $mirrorQuery = DB::table('ASSOC_DATA')->where([
-                ['c_assoc_id', '=', $c_personid],
-                ['c_personid', '=', $old_assoc_id],
-                ['c_text_title', '=', $old_c_text_title],
-                ['c_assoc_first_year', '=', $old_c_assoc_first_year],
-            ])
-            ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
-                if ($old_c_assocship_pair1 !== null) {
-                    $query->where('c_assoc_code', '=', $old_c_assocship_pair1);
-                }
-                if ($old_c_assocship_pair2 !== null) {
-                    $query->orWhere('c_assoc_code', '=', $old_c_assocship_pair2);
-                }
-            });
-
-            $mirroredRows = (clone $mirrorQuery)->get();
-            $mirrorQuery->update($data_mirror);
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
-                $newMirroredData = array_merge($oldMirroredData, $data_mirror);
-
-                $auditLog->write(
-                    'ASSOC_DATA',
-                    'UPDATE',
-                    $auditLog->buildRowPkFromData('ASSOC_DATA', $newMirroredData),
-                    $oldMirroredData,
-                    $newMirroredData,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 定位並同步反向鏡像列（共用方法；找不到反向列則補建＝永遠雙向同步）。
+            $this->syncAssocMirrorOnUpdate(
+                $data_mirror,
+                (int) $c_personid,
+                $old_assoc_id,
+                $old_c_text_title,
+                $old_c_assoc_first_year,
+                $old_c_assocship_pair1,
+                $old_c_assocship_pair2,
+                $operation,
+                $auditLog
+            );
         });
 
         return $ori_data;
+    }
+
+    /**
+     * 定位並同步 ASSOC_DATA 反向（互逆）鏡像列。供 legacy assocPerformUpdate 與 v2 AssociationMutationHandler 共用。
+     *
+     * 行為對齊 legacy assocPerformUpdate 的鏡像區塊：用「對方擁有(c_personid=oldAssocId)、指回原人(c_assoc_id=cPersonid)、
+     * 同舊 c_text_title / c_assoc_first_year、且 c_assoc_code 屬舊關係碼的配對碼(pair1/pair2)」定位反向列，找到則更新成 $dataMirror。
+     *
+     * 「永遠雙向同步」改進（修正 legacy 選擇性跳過）：若定位不到反向列（舊資料缺鏡像、或舊關係碼無配對碼而漏更新），
+     * 則直接補建 $dataMirror，確保關係恆為雙向。更新既有列時不覆蓋其建檔資訊（c_created_by/date）。
+     *
+     * @param array      $dataMirror 反向鏡像列的完整資料（已反向變換：含 c_personid=對方、c_assoc_id=原人、反向關係/親屬碼、其餘欄位）
+     * @param int        $cPersonid  原人 c_personid（反向列的 c_assoc_id）
+     * @param mixed      $oldAssocId 更新前的對方 c_assoc_id（反向列擁有者）
+     * @param mixed      $oldTextTitle 更新前的 c_text_title
+     * @param mixed      $oldFirstYear 更新前的 c_assoc_first_year
+     * @param mixed      $oldPair1   舊關係碼的 ASSOC_CODES.c_assoc_pair
+     * @param mixed      $oldPair2   舊關係碼的 ASSOC_CODES.c_assoc_pair2
+     * @param mixed      $operation  本次操作的 Operation（鏡像 audit 沿用其 id）；可為 null
+     */
+    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        $query = DB::table('ASSOC_DATA')->where([
+            ['c_assoc_id', '=', $cPersonid],
+            ['c_personid', '=', $oldAssocId],
+            ['c_text_title', '=', $oldTextTitle],
+            ['c_assoc_first_year', '=', $oldFirstYear],
+        ])
+        ->where(function ($q) use ($oldPair1, $oldPair2) {
+            if ($oldPair1 !== null) {
+                $q->where('c_assoc_code', '=', $oldPair1);
+            }
+            if ($oldPair2 !== null) {
+                $q->orWhere('c_assoc_code', '=', $oldPair2);
+            }
+        });
+
+        $mirroredRows = (clone $query)->get();
+
+        if ($mirroredRows->isEmpty()) {
+            // legacy 預設行為：找不到反向列即跳過（不補建），保持原選擇性行為不變。
+            // v2 在「調用方明確送了配對碼」時才補建（$allowBackfill=true）＝永遠雙向同步，
+            // 修正 legacy 單邊缺鏡像；且不臆造無效反向碼（c_assoc_code=0）的垃圾列。
+            $mirrorCode = $dataMirror['c_assoc_code'] ?? null;
+            if (!$allowBackfill || $mirrorCode === null || (string) $mirrorCode === '0' || (int) $mirrorCode === 0) {
+                return;
+            }
+
+            $insert = $dataMirror;
+            if (empty($insert['c_created_by'])) {
+                $insert['c_created_by'] = Auth::user()->name ?? '';
+                $insert['c_created_date'] = Carbon::now();
+            }
+            DB::table('ASSOC_DATA')->insert($insert);
+            $auditLog->write(
+                'ASSOC_DATA',
+                'INSERT',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $insert),
+                null,
+                $insert,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+
+            return;
+        }
+
+        // 更新既有反向鏡像列；不覆蓋其建檔資訊（c_created_by/date）。
+        $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+        $query->update($updateSet);
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+            $newMirroredData = array_merge($oldMirroredData, $updateSet);
+
+            $auditLog->write(
+                'ASSOC_DATA',
+                'UPDATE',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $newMirroredData),
+                $oldMirroredData,
+                $newMirroredData,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        }
     }
 
     public function assocStoreById(Request $request, $id) {

@@ -29,9 +29,11 @@ class ApiV2DeleteKinshipTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createKinTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -107,8 +109,26 @@ class ApiV2DeleteKinshipTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
+            $table->text('c_autogen_notes')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
             $table->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
         });
+    }
+
+    /** 親屬碼配對表：反向碼一律以 c_kin_pair1 權威推導。72↔73、75↔76 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 72, 'c_kin_pair1' => 73, 'c_kin_pair2' => null],
+            ['c_kincode' => 73, 'c_kin_pair1' => 72, 'c_kin_pair2' => null],
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+        ]);
     }
 
     protected function seedKin(array $overrides = []): void {
@@ -143,6 +163,52 @@ class ApiV2DeleteKinshipTest extends TestCase {
                 ],
             ],
         ], $overrides);
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteRemovesReciprocalMirror(): void {
+        // 正向 (1000,200,75) 與反向鏡像 (200,1000,76)（75↔76 配對）同備註；刪正向應連帶刪反向。
+        $user = $this->makeUser(email: 'delete-kin-mirror@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        // 正向已刪
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75,
+        ]);
+        // 反向鏡像連帶刪除
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+        ]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteFailsClosedWhenCodeMissingFromCodeTable(): void {
+        // 正向碼缺於 KINSHIP_CODES（資料完整性破壞）：刪除須 fail-closed 回滾整筆，
+        // 不可正向已刪而反向鏡像孤兒（codex MAJOR 修正）。
+        $user = $this->makeUser(email: 'delete-kin-failclosed@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 99, 'c_autogen_notes' => 'auto-x']); // 99 不在 KINSHIP_CODES
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 98,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload([
+            'target' => ['pk' => ['c_kin_code' => 99]],
+        ]));
+
+        // 交易回滾：正向與反向皆原樣保留（無孤兒、無半刪）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 99]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 98]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count());
     }
 
     #[Test]

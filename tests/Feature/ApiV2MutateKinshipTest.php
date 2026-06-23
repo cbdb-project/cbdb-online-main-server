@@ -29,9 +29,11 @@ class ApiV2MutateKinshipTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createKinshipTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -110,8 +112,27 @@ class ApiV2MutateKinshipTest extends TestCase {
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
             $table->text('c_autogen_notes')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
             $table->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
         });
+    }
+
+    /** 親屬碼配對表：反向碼一律以 c_kin_pair1 權威推導。72↔73、75↔76 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 72, 'c_kin_pair1' => 73, 'c_kin_pair2' => null],
+            ['c_kincode' => 73, 'c_kin_pair1' => 72, 'c_kin_pair2' => null],
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+        ]);
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -156,6 +177,54 @@ class ApiV2MutateKinshipTest extends TestCase {
         ];
 
         return array_replace_recursive($payload, $overrides);
+    }
+
+    // ── 反向鏡像同步（update）─────────────────────────────────
+
+    #[Test]
+    public function testDirectKinshipUpdateSyncsReciprocalMirror(): void {
+        // 正向 (1000,2000,72) 與反向鏡像 (2000,1000,73)（72↔73 配對）同備註以利定位；
+        // 更新正向 c_notes 後，反向鏡像應同步且配對碼維持 73、不被洗成 0。
+        $user = $this->makeUser(email: 'kin-mirror-upd@example.com');
+        $this->actingAs($user);
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後備註'],
+        ]))->assertOk();
+
+        // 正向更新
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '改後備註',
+        ]);
+        // 反向鏡像同步（備註同步、配對碼維持 73）
+        $this->assertDatabaseHas('KIN_DATA', [
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後備註',
+        ]);
+        // 反向鏡像配對碼未被洗成 0
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 0,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateWithoutReciprocalMirrorDoesNotFabricate(): void {
+        // allowBackfill=false（對齊 legacy）：找不到反向列時不臆造鏡像；非關係編輯（改備註）不應產生新列。
+        $user = $this->makeUser(email: 'kin-mirror-none@example.com');
+        $this->actingAs($user);
+        $this->seedKinship(['c_kin_code' => 72, 'c_autogen_notes' => 'auto-y']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+
+        // 仍只有 1 筆（正向），未補建反向。
+        $this->assertSame(1, DB::table('KIN_DATA')->count());
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000]);
     }
 
     // ── Direct Update Tests ─────────────────────────────────

@@ -1424,65 +1424,18 @@ class BiogMainRepository {
             $data_mirror = Arr::except($data_mirror, ['c_kin_id']);
 
             #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-            $kin_code_pair = KinshipCode::find($old_kin_code);
-            $sumQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                $query->where('c_kin_id', $id)
-                    ->where('c_personid', $old_kin_id)
-                    ->where('c_autogen_notes', $c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $sumQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                    $query->where('c_kin_id', $id)
-                        ->where('c_personid', $old_kin_id)
-                        ->where('c_autogen_notes', $c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                });
-            }
-
-            $sum = $sumQuery->get();
-            $sumCount = count($sum);
-            if ($sumCount == 1) {
-                $updateQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                    $query->where('c_kin_id', $id)
-                        ->where('c_personid', $old_kin_id)
-                        ->where('c_autogen_notes', $c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $updateQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                        $query->where('c_kin_id', $id)
-                            ->where('c_personid', $old_kin_id)
-                            ->where('c_autogen_notes', $c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                    });
-                }
-
-                $mirroredRows = (clone $updateQuery)->get();
-                $updateQuery->update($data_mirror);
-            } else {
-                $updateQuery = DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]]);
-                $mirroredRows = (clone $updateQuery)->get();
-                $updateQuery->update($data_mirror);
-            }
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
-                $newMirroredData = array_merge($oldMirroredData, $data_mirror);
-
-                $auditLog->write(
-                    'KIN_DATA',
-                    'UPDATE',
-                    $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData),
-                    $oldMirroredData,
-                    $newMirroredData,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 反向鏡像同步抽出為共用方法（legacy 與 v2 KinshipMutationHandler 共用）；
+            // 舊碼配對查找與缺碼 fail-closed 一併移入該方法（保留 legacy 原子失敗語意）。
+            $sumCount = $this->syncKinMirrorOnUpdate(
+                $data_mirror,
+                (int) $id,
+                $old_kin_id,
+                $c_autogen_notes,
+                $old_kin_code,
+                $operation,
+                $auditLog,
+                false
+            );
         });
 
         $ori_data['err'] = $sumCount;
@@ -1569,10 +1522,6 @@ class BiogMainRepository {
         }
 
         DB::transaction(function () use ($id, $temp_l, $row, $auditLog) {
-            #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-            $old_kin_code = $row->c_kin_code;
-            $kin_code_pair = KinshipCode::find($old_kin_code);
-
             $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $temp_l[0],
                 'c_kin_id' => $temp_l[1],
@@ -1594,92 +1543,14 @@ class BiogMainRepository {
                 $operationId
             );
 
-            $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
-                $query->where('c_kin_id', $row->c_personid)
-                    ->where('c_personid', $row->c_kin_id)
-                    ->where('c_autogen_notes', $row->c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $row2Query->orWhere(function ($query) use ($row, $kin_code_pair) {
-                    $query->where('c_kin_id', $row->c_personid)
-                        ->where('c_personid', $row->c_kin_id)
-                        ->where('c_autogen_notes', $row->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                });
-            }
-
-            $row2 = $row2Query->first();
-
             DB::table('KIN_DATA')->where([
                 ['c_personid', '=', $temp_l[0]],
                 ['c_kin_id', '=', $temp_l[1]],
                 ['c_kin_code', '=', $temp_l[2]],
             ])->delete();
 
-            //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
-            if ($row2 !== null && is_null($row2->c_modified_date)) {
-                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                        $query->where('c_kin_id', $row2->c_kin_id)
-                            ->where('c_personid', $row2->c_personid)
-                            ->where('c_source', $row2->c_source)
-                            ->where('c_autogen_notes', $row2->c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                    });
-                }
-
-                $mirroredRows = (clone $deleteQuery)->get();
-                $deleteQuery->delete();
-            } elseif ($row2 !== null) {
-                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1)
-                        ->where('c_modified_date', $row2->c_modified_date);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                        $query->where('c_kin_id', $row2->c_kin_id)
-                            ->where('c_personid', $row2->c_personid)
-                            ->where('c_source', $row2->c_source)
-                            ->where('c_autogen_notes', $row2->c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2)
-                            ->where('c_modified_date', $row2->c_modified_date);
-                    });
-                }
-
-                $mirroredRows = (clone $deleteQuery)->get();
-                $deleteQuery->delete();
-            } else {
-                $mirroredRows = collect();
-            }
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
-                $auditLog->write(
-                    'KIN_DATA',
-                    'DELETE',
-                    $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData),
-                    $mirroredRowData,
-                    null,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 反向鏡像刪除抽出為共用方法（legacy 與 v2 KinshipDeleteHandler 共用）。
+            $this->syncKinMirrorOnDelete((array) $row, $operation, $auditLog);
         });
     }
 
@@ -2567,6 +2438,166 @@ class BiogMainRepository {
                 (string) Auth::id(),
                 $operationId
             );
+        }
+    }
+
+    /**
+     * 同步親屬（KIN_DATA）反向鏡像列（update 場景）。legacy kinshipUpdateById 與 v2 KinshipMutationHandler 共用。
+     *
+     * 反向列定位（對齊 legacy）：對方為客體指向本人（c_kin_id=本人、c_personid=舊對方），舊備註相符，
+     * 親屬碼 ∈ 舊正向碼的權威配對（KINSHIP_CODES.c_kin_pair1/pair2）。精確命中 1 筆＝以配對定位更新；
+     * 否則退回寬鬆定位（僅 c_kin_id/c_personid/c_autogen_notes）＝完全保留 legacy 行為。
+     *
+     * $dataMirror 須已備妥：c_kin_code=反向碼、c_personid=新對方、且「不含 c_kin_id」（反向列 c_kin_id 維持本人）。
+     * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
+     * legacy 呼叫一律傳 false＝行為不變。回傳精確配對命中數（legacy 以此填 err）。
+     */
+    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false): int {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        // 反向列以「舊正向碼」的權威配對定位。舊碼缺於 KINSHIP_CODES＝資料完整性已破壞：
+        // fail-closed 中止（拋例外回滾整筆交易），與 legacy（解參考 null 致命錯誤）同為原子失敗，
+        // 避免 fall-through 到寬鬆定位誤改他組關係或留下單邊鏡像孤兒（codex MAJOR 修正）。
+        $kinCodePair = KinshipCode::find($oldKinCode);
+        if (!$kinCodePair) {
+            throw new \RuntimeException('找不到原親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像失準已中止本次同步。');
+        }
+        $oldPair1 = $kinCodePair->c_kin_pair1;
+        $oldPair2 = $kinCodePair->c_kin_pair2 ?? null;
+
+        $pairWhere = function ($query) use ($cPersonid, $oldKinId, $oldAutogenNotes, $oldPair1, $oldPair2) {
+            $query->where(function ($q) use ($cPersonid, $oldKinId, $oldAutogenNotes, $oldPair1) {
+                $q->where('c_kin_id', $cPersonid)
+                    ->where('c_personid', $oldKinId)
+                    ->where('c_autogen_notes', $oldAutogenNotes)
+                    ->where('c_kin_code', $oldPair1);
+            });
+            if (!empty($oldPair2)) {
+                $query->orWhere(function ($q) use ($cPersonid, $oldKinId, $oldAutogenNotes, $oldPair2) {
+                    $q->where('c_kin_id', $cPersonid)
+                        ->where('c_personid', $oldKinId)
+                        ->where('c_autogen_notes', $oldAutogenNotes)
+                        ->where('c_kin_code', $oldPair2);
+                });
+            }
+        };
+
+        $sumCount = DB::table('KIN_DATA')->where($pairWhere)->count();
+
+        if ($sumCount === 1) {
+            $updateQuery = DB::table('KIN_DATA')->where($pairWhere);
+        } else {
+            $updateQuery = DB::table('KIN_DATA')->where([
+                ['c_kin_id', '=', $cPersonid],
+                ['c_personid', '=', $oldKinId],
+                ['c_autogen_notes', '=', $oldAutogenNotes],
+            ]);
+        }
+
+        $mirroredRows = (clone $updateQuery)->get();
+
+        if ($mirroredRows->isEmpty()) {
+            // 找不到反向列。legacy（false）＝原樣跳過；v2 永遠同步（true）＝鏡像碼有效時補建。
+            $mirrorCode = $dataMirror['c_kin_code'] ?? null;
+            if ($allowBackfill && $mirrorCode !== null && (string) $mirrorCode !== '0' && (int) $mirrorCode !== 0) {
+                $insert = $dataMirror;
+                $insert['c_kin_id'] = $cPersonid; // 反向列客體＝本人（dataMirror 不含 c_kin_id，補回）
+                if (empty($insert['c_created_by'])) {
+                    $insert['c_created_by'] = Auth::user()->name ?? '';
+                    $insert['c_created_date'] = Carbon::now();
+                }
+                DB::table('KIN_DATA')->insert($insert);
+                $auditLog->write('KIN_DATA', 'INSERT', $auditLog->buildRowPkFromData('KIN_DATA', $insert), null, $insert, 'user', (string) Auth::id(), $operationId);
+            }
+
+            return $sumCount;
+        }
+
+        $updateQuery->update($dataMirror);
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+            $newMirroredData = array_merge($oldMirroredData, $dataMirror);
+            $auditLog->write('KIN_DATA', 'UPDATE', $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData), $oldMirroredData, $newMirroredData, 'user', (string) Auth::id(), $operationId);
+        }
+
+        return $sumCount;
+    }
+
+    /**
+     * 同步親屬（KIN_DATA）反向鏡像列（delete 場景）。legacy kinshipDeleteById 與 v2 KinshipDeleteHandler 共用。
+     * $row 為被刪除的「正向列」（陣列）。依 legacy：先以配對碼定位反向列 row2（c_kin_id=正向 c_personid、
+     * c_personid=正向 c_kin_id、備註相符、c_kin_code ∈ 正向碼配對），再依 row2 的 c_source/c_autogen_notes
+     * （及 c_modified_date 有值時加入）刪除並補 audit。正向列本身由呼叫端（base handler / legacy）負責刪除。
+     */
+    public function syncKinMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        // 正向碼缺於 KINSHIP_CODES＝資料完整性已破壞：fail-closed 中止（拋例外回滾整筆交易，
+        // 與 legacy 解參考 null 致命錯誤同為原子失敗），避免正向已刪而反向鏡像孤兒（codex MAJOR 修正）。
+        // 注意：這與「反向列 row2 不存在」（合法的單邊資料）不同——後者下方仍正常 return 不刪。
+        $kinCodePair = KinshipCode::find($row['c_kin_code'] ?? null);
+        if (!$kinCodePair) {
+            throw new \RuntimeException('找不到親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像孤兒已中止刪除。');
+        }
+        $pair1 = $kinCodePair->c_kin_pair1;
+        $pair2 = $kinCodePair->c_kin_pair2 ?? null;
+        $autogen = $row['c_autogen_notes'] ?? null;
+
+        $row2Query = DB::table('KIN_DATA')->where(function ($q) use ($row, $autogen, $pair1) {
+            $q->where('c_kin_id', $row['c_personid'])
+                ->where('c_personid', $row['c_kin_id'])
+                ->where('c_autogen_notes', $autogen)
+                ->where('c_kin_code', $pair1);
+        });
+        if (!empty($pair2)) {
+            $row2Query->orWhere(function ($q) use ($row, $autogen, $pair2) {
+                $q->where('c_kin_id', $row['c_personid'])
+                    ->where('c_personid', $row['c_kin_id'])
+                    ->where('c_autogen_notes', $autogen)
+                    ->where('c_kin_code', $pair2);
+            });
+        }
+        $row2 = $row2Query->first();
+        if ($row2 === null) {
+            return;
+        }
+
+        $hasModDate = !is_null($row2->c_modified_date);
+        $deleteWhere = function ($query) use ($row2, $pair1, $pair2, $hasModDate) {
+            $query->where(function ($q) use ($row2, $pair1, $hasModDate) {
+                $q->where('c_kin_id', $row2->c_kin_id)
+                    ->where('c_personid', $row2->c_personid)
+                    ->where('c_source', $row2->c_source)
+                    ->where('c_autogen_notes', $row2->c_autogen_notes)
+                    ->where('c_kin_code', $pair1);
+                if ($hasModDate) {
+                    $q->where('c_modified_date', $row2->c_modified_date);
+                }
+            });
+            if (!empty($pair2)) {
+                $query->orWhere(function ($q) use ($row2, $pair2, $hasModDate) {
+                    $q->where('c_kin_id', $row2->c_kin_id)
+                        ->where('c_personid', $row2->c_personid)
+                        ->where('c_source', $row2->c_source)
+                        ->where('c_autogen_notes', $row2->c_autogen_notes)
+                        ->where('c_kin_code', $pair2);
+                    if ($hasModDate) {
+                        $q->where('c_modified_date', $row2->c_modified_date);
+                    }
+                });
+            }
+        };
+
+        $deleteQuery = DB::table('KIN_DATA')->where($deleteWhere);
+        $mirroredRows = (clone $deleteQuery)->get();
+        $deleteQuery->delete();
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            $auditLog->write('KIN_DATA', 'DELETE', $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData), $mirroredRowData, null, 'user', (string) Auth::id(), $operationId);
         }
     }
 

@@ -80,10 +80,13 @@ class OperationsProposalController extends Controller {
                     $finalOperation = $this->logFinalOperation($operation, $appliedRow, $original, $opType);
                     $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
 
-                    // 社會關係刪除核准：在 final delete operation 建立後同步刪除反向鏡像列，
+                    // 社會關係／親屬刪除核准：在 final delete operation 建立後同步刪除反向鏡像列，
                     // 使鏡像 audit 掛同一 operation id（與 direct delete 一致，避免單向孤兒且審計鏈完整）。
                     if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'ASSOC_DATA') {
                         app(\App\Repositories\BiogMainRepository::class)->syncAssocMirrorOnDelete($appliedRow, $finalOperation);
+                    }
+                    if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'KIN_DATA') {
+                        app(\App\Repositories\BiogMainRepository::class)->syncKinMirrorOnDelete($appliedRow, $finalOperation);
                     }
                 }
                 $this->updateProposalStatus(

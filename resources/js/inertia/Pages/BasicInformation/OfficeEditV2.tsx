@@ -42,7 +42,7 @@ export default function OfficeEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label}>
+        <DashboardLayout title={p.person_label} headerAlign="center">
             <PersonBanner data={p.person_banner} />
             <OfficeEditor
                 personId={p.person_id}

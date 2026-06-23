@@ -194,6 +194,7 @@ export default function PersonEditor() {
     return (
         <DashboardLayout
             title={person_label}
+            headerAlign="center"
             breadcrumbs={[
                 { label: tPerson('person_records'), url: index_url },
                 // 末段隨當前分頁切換（人物記錄 / 著述 …），使頂部反映正在檢視的子資源，

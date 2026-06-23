@@ -32,7 +32,7 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
                         {columns.map((c, ci) => (
                             <th key={ci} style={{ ...thStyle, ...(c.width ? { width: c.width } : {}) }}>{c.header}</th>
                         ))}
-                        {actions ? <th style={{ ...thStyle, width: 140 }}>{actionsHeader}</th> : null}
+                        {actions ? <th style={{ ...thStyle, width: 120 }}>{actionsHeader}</th> : null}
                     </tr>
                 </thead>
                 <tbody>
@@ -59,8 +59,9 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
 const wrapStyle: React.CSSProperties = { overflowX: 'auto', marginBottom: 8 };
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', background: '#fff' };
 const thStyle: React.CSSProperties = {
-    textAlign: 'left', padding: '8px 10px', borderBottom: '2px solid #dee2e6', borderTop: '1px solid #dee2e6',
+    textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #dee2e6', borderTop: '1px solid #dee2e6',
     background: '#f8f9fa', color: '#495057', fontWeight: 700, whiteSpace: 'nowrap',
 };
-const tdStyle: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid #dee2e6', color: '#212529', verticalAlign: 'top' };
+// padding 對齊 legacy table-sm（≈0.3rem）較緊湊密度。
+const tdStyle: React.CSSProperties = { padding: '6px 10px', borderBottom: '1px solid #dee2e6', color: '#212529', verticalAlign: 'top' };
 const emptyTdStyle: React.CSSProperties = { padding: '16px 10px', textAlign: 'center', color: '#94a3b8', borderBottom: '1px solid #dee2e6' };

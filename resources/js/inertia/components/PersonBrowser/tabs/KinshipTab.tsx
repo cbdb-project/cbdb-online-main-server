@@ -203,19 +203,21 @@ function renderKinshipPerson(item: KinshipItem, onSelectPerson?: (personId: numb
     }
 
     const label = formatBilingualLabel(item.kin_person_name_chn, item.kin_person_name);
+    const pid = item.kin_person_id as number;
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => {
-                    const pid = item.kin_person_id as number;
-                    if (onSelectPerson) { onSelectPerson(pid); } else { router.visit(`/app/basicinformation/${pid}`); }
-                }}
-                style={linkButtonStyle}
-            >
-                [{item.kin_person_id}]
-            </button>
+            {onSelectPerson ? (
+                // person-browser 主從檢視：原地切換選取的人物。
+                <button type="button" onClick={() => onSelectPerson(pid)} style={linkButtonStyle}>
+                    [{item.kin_person_id}]
+                </button>
+            ) : (
+                // 編輯器情境：另開新分頁（對齊 legacy target="_blank"），避免離開當前人物編輯頁。
+                <a href={`/app/basicinformation/${pid}`} target="_blank" rel="noopener noreferrer" style={linkButtonStyle}>
+                    [{item.kin_person_id}]
+                </a>
+            )}
             {label ? ` ${label}` : null}
         </>
     );

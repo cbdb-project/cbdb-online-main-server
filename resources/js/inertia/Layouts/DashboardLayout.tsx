@@ -18,6 +18,12 @@ interface DashboardLayoutProps {
      * 避免改套 DashboardLayout 後與自身 padding 疊加。新遷移頁不傳此 prop，行為不變。
      */
     disableContentPadding?: boolean;
+    /**
+     * 標頭（麵包屑/標題/描述）對齊方式。預設 'left'（其餘頁面不受影響）；
+     * 'center' 供人物詳情中樞/編輯器頁，使身份標頭「人物記錄 / 分頁」+「id - 名 · 朝代」置中。
+     * 注意：僅置中此標頭區塊，子資源分頁導航（PersonBanner）仍維持靠左（tab 慣例）。
+     */
+    headerAlign?: 'left' | 'center';
 }
 
 /**
@@ -29,7 +35,7 @@ interface DashboardLayoutProps {
  * 組成：深色側邊欄（單一來源 nav）＋ 導覽列（pushmenu/深色模式/語言/使用者）＋
  * 內容標頭（標題/描述/麵包屑）＋ flash 訊息 ＋ 內容 ＋ 頁尾。
  */
-export default function DashboardLayout({ children, title, description, breadcrumbs, disableContentPadding }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, title, description, breadcrumbs, disableContentPadding, headerAlign = 'left' }: DashboardLayoutProps) {
     const { app } = usePage<SharedProps>().props;
     const { isDark, toggle } = useDarkMode();
     const [collapsed, setCollapsed] = useState(false);
@@ -48,7 +54,7 @@ export default function DashboardLayout({ children, title, description, breadcru
 
                 <main className={`flex-1${disableContentPadding ? '' : ' p-4 md:p-6'}`}>
                     {(title || breadcrumbs) && (
-                        <div className="mb-4 flex flex-col gap-1 border-b border-border pb-3">
+                        <div className={`mb-4 flex flex-col gap-1 border-b border-border pb-3${headerAlign === 'center' ? ' items-center text-center' : ''}`}>
                             <Breadcrumbs crumbs={breadcrumbs} />
                             {title && <h1 className="text-xl font-semibold">{title}</h1>}
                             {description && <p className="text-sm text-muted-foreground">{description}</p>}

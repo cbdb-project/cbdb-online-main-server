@@ -38,7 +38,7 @@ export default function EventEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label}>
+        <DashboardLayout title={p.person_label} headerAlign="center">
             <PersonBanner data={p.person_banner} />
             <EventEditor
                 personId={p.person_id}

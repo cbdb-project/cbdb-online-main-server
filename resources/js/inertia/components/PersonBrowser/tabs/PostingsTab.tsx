@@ -169,11 +169,10 @@ export default function PostingsTab({
                                         <AddressDisplayWithMap
                                             labelChn={address.addr_chn}
                                             labelEng={address.addr}
-                                            adminCatCode={address.admin_cat_code}
-                                            adminCatLabel={address.admin_cat_label}
                                             latitude={address.latitude}
                                             longitude={address.longitude}
-                                            year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}
+                                            personId={personId}
+                                            mapKey={`office:${item.pk.c_office_id}:${item.pk.c_posting_id}:${address.addr_id}`}
                                         />
                                     </React.Fragment>
                                 ))}

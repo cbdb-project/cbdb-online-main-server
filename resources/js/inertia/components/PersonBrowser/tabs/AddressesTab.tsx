@@ -153,11 +153,10 @@ export default function AddressesTab({
                             <AddressDisplayWithMap
                                 labelChn={item.addr_chn}
                                 labelEng={item.addr}
-                                adminCatCode={item.admin_cat_code}
-                                adminCatLabel={item.admin_cat_label}
                                 latitude={item.latitude}
                                 longitude={item.longitude}
-                                year={inferDisplayYear(item.first_year, item.last_year, data.person_index_year ?? null)}
+                                personId={personId ?? item.pk.c_personid}
+                                mapKey={`addr:${item.pk.c_addr_id}:${item.pk.c_addr_type}:${item.pk.c_sequence}`}
                             />
                         )}
                     />

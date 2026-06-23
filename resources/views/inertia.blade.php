@@ -19,5 +19,9 @@
 </head>
 <body>
     @inertia
+    {{-- CHGIS 地圖前端資源：使 .chgis-place-link 點擊在 React 頁亦能浮出以 chgis_map.mbtiles
+         為底圖的無邊框地圖（取代 /app/maps iframe）。partial 以 @push('scripts') 注入 config + @vite。 --}}
+    @include('biogmains._chgis_map_assets')
+    @stack('scripts')
 </body>
 </html>

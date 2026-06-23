@@ -21,6 +21,25 @@
 
 可重用基礎設施（已建並驗證）：`afterDirectUpdate`/`afterDirectInsert`/`proposalAuxiliaryPayload` 鉤子（在 Abstract*Handler，空預設、對其他子資源 no-op）、legacy 邏輯抽取共用法（offices `syncPostingAddresses` 已示範，assoc/kinship 鏡像沿用）、`PostingAiAutofill` 面板、`CompositePrimaryKey::emptyToSentinel`。詳見 memory `v2-childtable-mirror-reuse-pattern`。
 
+## 進度補充：#40 模擬測試結果（2026-06-23）
+
+方法（依 docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md §6.0）：`compare-pages.mjs` 全量擷取 13 個編輯器頁的新舊證據
+（基本資料 edit、12 子資源 create-mode：legacy `/basicinformation/1762/{sub}/create` vs 新 `/app/.../{sub}/edit-v2`），
+再由 review agent 逐對判讀差異清單，分「真實缺口／可接受 delta／格式差異」三類。
+
+**總結論：React 編輯器為忠實的欄位級移植**——各 spec 欄位皆存在、可直接編輯性與 legacy 一致；無欄位遺漏、無 editable→readonly 退化（下列邊界除外）。
+大量 count 落差（mainText、option、labels−1）皆由**可接受 delta** 解釋：select2/select-vue→CodeAutocomplete（option 不再內嵌）、`人物基本資訊` in-form 塊→PersonBanner、
+成對碼 select（assocship/kinship/assoc_kinship pair）改由後端權威同步而移除、農曆 1-12/1-30 提示→EraTimeField tooltip、0 計數徽章隱藏。AI 工具（offices 任官自動填、assoc/statuses code-lookup）、saveas、c_autogen_notes、Wiki 警告、checkbox 皆確認存在。
+
+**已修並過閘（commit 9156451 + 本批）**：(a) 共享「查看本頁歷史記錄」連結（PersonBanner，依分頁，13 編輯器+中樞）；(b) 修改說明 textarea+提示對所有可提案者顯示；
+(c) basic-info 3 個指數欄補 auto_calc 提示；(d) entries `arabic_numerals_hint`、assoc `assoc_count_hint`、offices `sequence_same_note` 補回可見提示文字。
+
+**翻 flag 前待處理（gate-before-flip）**：
+- ⛔ **副表編輯阻擋特定子資源上線**：events `c_addr_id`（EVENTS_ADDR）在新編輯器**唯讀（create+edit 皆是）**，legacy 可編輯；possession `c_addr_id[]` 多地址在 **edit 模式唯讀**（create 可）。→ 須先支援副表 mutation，否則 events/possession 維持 old。
+- ⚠️ **edit 模式待覆核**（create 證據未涵蓋）：altnames `c_alt_name_chn/c_alt_name/c_notes` 的 unionPKDef 特殊字元 round-trip（須確認 v2 後端編解碼）；sources edit 模式 `c_textid/c_pages` 唯讀（PK 不可變、delete-and-recreate 設計）須人簽核為可接受。
+- 可接受/cosmetic：label 的 `(c_*)` 後綴改名、possession 度量單位以 inline placeholder 取代獨立 label、offices AI 摘要少一行 empty_count。
+- 尚未執行維度：I 字體載入、J 側欄/flag 導流、K 視覺 computed style、A–H 互動寫入（子資源 mutation 走 API，依 §三不做 UI 雙邊對比，必要時另以 API 測試）。
+
 ## A. 全局共享機制（先在 React 建一次，各頁複用——最易漏）
 
 1. **`EraTimeField`（年號/時間複合控件）** ← legacy `components/inline-time-fields.blade.php`（已起 Phase 1，需完整覆蓋）：年份 input + **西元↔年號雙向轉換鈕**（`.era-convert-btn`/`.era-reverse-convert-btn`，邏輯見 `app.js` initEraConversion：cn-era、朝代過濾、多結果 dialog、按 c_str 年份範圍精確匹配 nianhao id、反向算西元、特殊映射）+ 年號 select + 年號年 + range select（可選）+ **農曆區塊（閏月 checkbox hidden0/checkbox1、月 1-12、日 1-30、日干支 select）**+ notes（可選）+ `initLunarValidation` 月日範圍校驗。各使用處子字段集不同（見各頁）。

@@ -190,10 +190,11 @@ export default function EntryEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, highlight = false) => (
+    const textRow = (key: string, label: string, highlight = false, hint?: string) => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
             <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} />
+            {hint ? <span style={fieldHintStyle}>{hint}</span> : null}</div></div>
     );
 
     return (
@@ -215,7 +216,7 @@ export default function EntryEditor({
                 <EraTimeField values={buildEra(EY)} onChange={(p) => applyEra(EY, p)} dynastyCode={dynastyCode} showRange disabled={!editable} /></div></div>
 
             {textRow('c_exam_rank', tr('exam_ranking', '等第') + ' (c_exam_rank)')}
-            {textRow('c_attempt_count', tr('entry_attempt_count', '應試次數') + ' (c_attempt_count)')}
+            {textRow('c_attempt_count', tr('entry_attempt_count', '應試次數') + ' (c_attempt_count)', false, tr('arabic_numerals_hint', '請填阿拉伯數字(半形/半角)'))}
             {textRow('c_exam_field', tr('entry_exam_field', '應試領域') + ' (c_exam_field)')}
 
             <div style={rowStyle}><label style={labelStyle}>{tr('entry_parental_status', '父祖狀態')} (c_parental_status_code)</label><div style={fieldStyle}>
@@ -305,6 +306,7 @@ const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, m
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
 const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '0.875rem', color: '#374151', paddingTop: 6 };
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };

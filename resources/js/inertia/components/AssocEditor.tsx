@@ -254,10 +254,11 @@ export default function AssocEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, highlight = false) => (
+    const textRow = (key: string, label: string, highlight = false, hint?: string) => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
             <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} />
+            {hint ? <span style={fieldHintStyle}>{hint}</span> : null}</div></div>
     );
     const searchRow = (key: string, label: string, endpoint: string, highlight = false, sentinel = '0') => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
@@ -323,7 +324,7 @@ export default function AssocEditor({
             {listRow('c_occasion_code', `${tr('occasion_field', '場合')} (c_occasion_code)`, 'occasion', 'c_occasion_code', ['c_occasion_desc_chn', 'c_occasion_desc'])}
 
             {textRow('c_text_title', `${tr('text_title_field', '作品/出處標題')} (c_text_title)`)}
-            {textRow('c_assoc_count', `${tr('assoc_count_field', '數量')} (c_assoc_count)`)}
+            {textRow('c_assoc_count', `${tr('assoc_count_field', '數量')} (c_assoc_count)`, false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
 
             {searchRow('c_tertiary_personid', `${tr('tertiary_person', '中介人物')} (c_tertiary_personid)`, '/api/select/search/biog')}
             {textRow('c_tertiary_type_notes', `${tr('tertiary_notes', '中介說明')} (c_tertiary_type_notes)`)}
@@ -376,6 +377,7 @@ const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, m
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
 const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '0.875rem', color: '#374151', paddingTop: 6 };
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
 const aiCard: React.CSSProperties = { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 12, marginBottom: 14 };

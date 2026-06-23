@@ -263,10 +263,11 @@ export default function OfficeEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, highlight = false) => (
+    const textRow = (key: string, label: string, highlight = false, hint?: string) => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
             <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} />
+            {hint ? <span style={fieldHintStyle}>{hint}</span> : null}</div></div>
     );
     const listRow = (key: string, label: string, model: string, idKey: string, labelKeys: string[]) => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
@@ -291,7 +292,7 @@ export default function OfficeEditor({
                     <input type="text" value={fields.c_posting_id ?? ''} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
             ) : null}
 
-            {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`)}
+            {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`, false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
 
             <div style={rowStyle}><label style={labelStyle}>{tr('office_name_field', '官名')} (c_office_id)</label><div style={fieldStyle}>
                 <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
@@ -384,6 +385,7 @@ const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, m
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
 const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '0.875rem', color: '#374151', paddingTop: 6 };
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
 const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef4fb', border: '1px solid #c7d7ea', borderRadius: 14, padding: '2px 6px 2px 10px', fontSize: '0.8rem', color: '#1f3a5f' };

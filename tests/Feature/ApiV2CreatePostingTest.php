@@ -123,11 +123,17 @@ class ApiV2CreatePostingTest extends TestCase {
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_lastyear')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
             $table->integer('c_dy')->nullable();
@@ -206,6 +212,30 @@ class ApiV2CreatePostingTest extends TestCase {
             'c_firstyear' => 1050,
         ]);
         $this->assertDatabaseHas('POSTING_DATA', ['c_posting_id' => 6, 'c_personid' => 1000]);
+    }
+
+    #[Test]
+    public function testDirectPostingCreatePersistsLunarFields(): void {
+        // 回歸：legacy 表單（showLunar=true）送出農曆 month/day/day_gz，officeStoreById 會寫入；
+        // v2 create 白名單原本漏掉這些欄 → 新編輯器填了卻存不進＝內容流失。
+        $user = $this->makeUser(email: 'create-post-lunar@example.com');
+        $this->actingAs($user);
+        DB::table('POSTING_DATA')->insert(['c_personid' => 999, 'c_posting_id' => 5]);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_office_id' => 87473,
+                'c_addr' => [],
+                'c_fy_month' => 3, 'c_fy_day' => 8, 'c_fy_day_gz' => 11,
+                'c_ly_month' => 11, 'c_ly_day' => 28, 'c_ly_day_gz' => 47,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 87473, 'c_posting_id' => 6,
+            'c_fy_month' => 3, 'c_fy_day' => 8, 'c_fy_day_gz' => 11,
+            'c_ly_month' => 11, 'c_ly_day' => 28, 'c_ly_day_gz' => 47,
+        ]);
     }
 
     #[Test]

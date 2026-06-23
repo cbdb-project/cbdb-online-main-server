@@ -116,11 +116,17 @@ class ApiV2MutatePostingTest extends TestCase {
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_lastyear')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
             $table->integer('c_dy')->nullable();
@@ -206,6 +212,28 @@ class ApiV2MutatePostingTest extends TestCase {
             'c_posting_id' => 400,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectPostingUpdatePersistsLunarFields(): void {
+        // 回歸：legacy 表單（showLunar=true）會送出 c_fy_month/day/day_gz、c_ly_month/day/day_gz，
+        // officeStoreById/$request->all() 會寫入；v2 白名單原本漏掉這些農曆欄 → 靜默流失。
+        $user = $this->makeUser(email: 'posting-lunar@example.com');
+        $this->actingAs($user);
+        $this->seedPosting();
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => [
+                'c_fy_month' => 5, 'c_fy_day' => 12, 'c_fy_day_gz' => 7,
+                'c_ly_month' => 9, 'c_ly_day' => 30, 'c_ly_day_gz' => 21,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400,
+            'c_fy_month' => 5, 'c_fy_day' => 12, 'c_fy_day_gz' => 7,
+            'c_ly_month' => 9, 'c_ly_day' => 30, 'c_ly_day_gz' => 21,
         ]);
     }
 

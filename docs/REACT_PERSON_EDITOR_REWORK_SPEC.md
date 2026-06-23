@@ -34,11 +34,17 @@
 **已修並過閘（commit 9156451 + 本批）**：(a) 共享「查看本頁歷史記錄」連結（PersonBanner，依分頁，13 編輯器+中樞）；(b) 修改說明 textarea+提示對所有可提案者顯示；
 (c) basic-info 3 個指數欄補 auto_calc 提示；(d) entries `arabic_numerals_hint`、assoc `assoc_count_hint`、offices `sequence_same_note` 補回可見提示文字。
 
-**翻 flag 前待處理（gate-before-flip）**：
-- ⛔ **副表編輯阻擋特定子資源上線**：events `c_addr_id`（EVENTS_ADDR）在新編輯器**唯讀（create+edit 皆是）**，legacy 可編輯；possession `c_addr_id[]` 多地址在 **edit 模式唯讀**（create 可）。→ 須先支援副表 mutation，否則 events/possession 維持 old。
-- ⚠️ **edit 模式待覆核**（create 證據未涵蓋）：altnames `c_alt_name_chn/c_alt_name/c_notes` 的 unionPKDef 特殊字元 round-trip（須確認 v2 後端編解碼）；sources edit 模式 `c_textid/c_pages` 唯讀（PK 不可變、delete-and-recreate 設計）須人簽核為可接受。
-- 可接受/cosmetic：label 的 `(c_*)` 後綴改名、possession 度量單位以 inline placeholder 取代獨立 label、offices AI 摘要少一行 empty_count。
-- 尚未執行維度：I 字體載入、J 側欄/flag 導流、K 視覺 computed style、A–H 互動寫入（子資源 mutation 走 API，依 §三不做 UI 雙邊對比，必要時另以 API 測試）。
+**邊界項覆核結果（2026-06-23 已解）**：
+- ✅ altnames unionPKDef：**無需**。v2 mutate 以結構化 JSON `target.pk` 傳遞主鍵（非 URL path segment），特殊字元原生 round-trip；legacy 的 unionPKDef 僅為 URL path 轉義之用。非缺口。
+- ✅ sources edit 模式 `c_textid/c_pages` 唯讀：**可接受 delta**。為 v2 PK 不可變模型（delete-and-recreate）之一致設計，且 SourceEditor 明確以 hint 告知使用者（`source_pk_immutable_hint`「出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增」）。已記入 memory person-editor-accepted-design-deltas。
+- 可接受/cosmetic：label `(c_*)` 後綴改名、possession 度量單位 inline placeholder、offices AI 摘要少一行 empty_count。
+
+**全頁 A–K 矩陣（已翻 new 上線頁面，2026-06-23 全綠）**：A/B codes 搜尋/過濾、C/D/E codes CRUD、F/G manage、H ExplainSQL、I 字體實際載入、J 側欄 flag 導流 皆 PASS（證據在 storage/app/test-artifacts/）。K 視覺以 compare 截圖留證。
+
+**gate-before-flip 決定（2026-06-23）**：
+- ⛔ **events / possession 維持 `old`**：地址副表（EVENTS_ADDR / POSSESSION_ADDR 多列）編輯在新編輯器唯讀、legacy 可編輯＝真實 parity 缺口。補副表 mutation 屬獨立功能開發，**決定延後**（非本測試環節範圍）；在補齊前此二者不翻 new。
+- ✅ **其餘 11 個編輯器（basic-info/altname/texts/sources/addresses/kinship/assoc/offices/statuses/entries/socialinst）內容/L parity 確認忠實**、v2 mutation API 測試全綠（見 BACKLOG W1–W4 + P4-1…P4-12）、可接受 delta 已記錄 → **內容面達到 flip-ready**。
+- 實際翻 flag **暫緩**：使用者本階段仍在逐頁目視微調編輯器版面（標題/麵包屑/分隔符等），且翻 new 為「重大頁面變更，須於翻時一併告知使用者」（§0.1）。建議使用者目視覆核收尾後，再由 AI agent 翻這 11 個 flag。
 
 ## A. 全局共享機制（先在 React 建一次，各頁複用——最易漏）
 

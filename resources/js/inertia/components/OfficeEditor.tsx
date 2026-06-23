@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
+import PostingAiAutofill, { AiAutofillData, AiFieldEntry } from './PersonEditorShared/PostingAiAutofill';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 
 /**
@@ -37,6 +38,8 @@ interface Props {
     mutateEndpoint: string;
     deleteEndpoint?: string;
     indexUrl: string;
+    aiEnabled?: boolean;
+    aiExtractEndpoint?: string;
     t?: (k: string) => string;
 }
 
@@ -54,7 +57,7 @@ const NON_PK = [
 
 export default function OfficeEditor({
     personId, personLabel, dynastyCode = null, mode, initialFields, initialLabels = {}, initialAddr = [],
-    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
+    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiExtractEndpoint, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 新增預設對齊 legacy：c_office_id 預設 option 0、c_source 預設 0、旗標 0；編輯由 initialFields 覆蓋。
@@ -129,6 +132,54 @@ export default function OfficeEditor({
         setAddrKey((k) => k + 1); // 重置新增框
     };
     const removeAddr = (id: string) => setAddr((prev) => prev.filter((a) => a.id !== id));
+
+    // AI 自動填套用前的快照（供「清除 AI 填入」還原）。
+    const preAi = useRef<{ f: Fields; l: Fields; a: AddrItem[] } | null>(null);
+    const applyAiData = (data: AiAutofillData) => {
+        if (!preAi.current) preAi.current = { f: { ...fields }, l: { ...labels }, a: [...addr] };
+        const entries: Record<string, AiFieldEntry> = { ...(data.matched_fields ?? {}), ...(data.suggested_fields ?? {}) };
+        setFields((prev) => {
+            const next = { ...prev };
+            for (const [name, entry] of Object.entries(entries)) {
+                if (name === 'c_addr' || name === 'c_inst_name_code') continue; // 另行處理
+                if (name === 'c_inst_code') {
+                    const raw = entry.value;
+                    const s = Array.isArray(raw) ? String(raw[0] ?? '') : String(raw ?? '');
+                    const dash = s.indexOf('-');
+                    if (dash >= 0) { next.c_inst_code = s.slice(0, dash) || '0'; next.c_inst_name_code = s.slice(dash + 1) || '0'; } else if (s && s !== '0') {
+                        next.c_inst_code = s;
+                        const nm = entries.c_inst_name_code?.value;
+                        if (nm != null) next.c_inst_name_code = String(nm);
+                    }
+                    continue;
+                }
+                const v = entry.value;
+                if (v === null || v === undefined) continue;
+                next[name] = String(v);
+            }
+            return next;
+        });
+        setLabels((prev) => {
+            const next = { ...prev };
+            for (const [name, entry] of Object.entries(entries)) {
+                if (entry.text != null && !Array.isArray(entry.text)) next[name] = String(entry.text);
+            }
+            return next;
+        });
+        const addrEntry = entries.c_addr;
+        if (addrEntry && Array.isArray(addrEntry.value)) {
+            const texts = Array.isArray(addrEntry.text) ? addrEntry.text : [];
+            setAddr(addrEntry.value.map((v, i) => ({ id: String(v), label: texts[i] != null ? String(texts[i]) : `ADDR ${v}` })));
+        }
+        setMessage(tr('ai_fill_done_status', 'AI 已填入，請人工核對後再儲存'));
+    };
+    const clearAi = () => {
+        if (!preAi.current) return;
+        setFields(preAi.current.f);
+        setLabels(preAi.current.l);
+        setAddr(preAi.current.a);
+        preAi.current = null;
+    };
 
     const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
         setFields((prev) => ({ ...prev, c_source: p.source, c_pages: p.pages }));
@@ -229,6 +280,11 @@ export default function OfficeEditor({
             <h3 style={titleStyle}>{mode === 'create' ? tr('office_create', '新增任官') : tr('office_edit', '編輯任官')} — {personLabel}</h3>
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
+
+            {mode === 'create' && aiEnabled && aiExtractEndpoint && editable ? (
+                <PostingAiAutofill personId={personId} extractEndpoint={aiExtractEndpoint} disabled={!editable}
+                    t={t} onApply={applyAiData} onClear={clearAi} />
+            ) : null}
 
             {mode === 'edit' ? (
                 <div style={rowStyle}><label style={labelStyle}>posting_id</label><div style={fieldStyle}>

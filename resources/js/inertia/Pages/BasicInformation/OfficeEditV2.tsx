@@ -21,6 +21,8 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    ai_enabled: boolean;
+    ai_extract_endpoint: string;
 }
 
 export default function OfficeEditV2() {
@@ -53,6 +55,8 @@ export default function OfficeEditV2() {
                 mutateEndpoint={p.mutate_endpoint}
                 deleteEndpoint={p.delete_endpoint}
                 indexUrl={p.index_url}
+                aiEnabled={p.ai_enabled}
+                aiExtractEndpoint={p.ai_extract_endpoint}
                 t={t}
             />
         </DashboardLayout>

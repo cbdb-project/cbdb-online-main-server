@@ -1347,6 +1347,9 @@ class BasicInformationController extends Controller {
             'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
                 ? route('app.basicinformation.index', [], false)
                 : route('basicinformation.index', [], false),
+            // #34 中樞改用 legacy 風格 PersonBanner（人物頭 + 子資源導航）取代 person-browser 的
+            // PersonSummaryPanel/BrowserTabs；active_tab/counts 於前端以即時狀態覆蓋。
+            'person_banner' => $this->personBannerProps($personId, $initialTab),
             'page_translations' => [
                 'person' => is_array($t = trans('person')) ? $t : [],
             ],

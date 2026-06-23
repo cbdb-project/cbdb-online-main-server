@@ -3,9 +3,9 @@ import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import { registerDirtyChecker } from '../../hooks/useDirtyGuard';
-import PersonSummaryPanel, { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
-import BrowserTabs, { TAB_DEFINITIONS } from '../../components/PersonBrowser/BrowserTabs';
+import type { PersonSummary } from '../../components/PersonBrowser/PersonSummaryPanel';
 import TabContentLoader from '../../components/PersonBrowser/TabContentLoader';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
 import SelectionDialog from '../../components/SelectionDialog';
 
 /**
@@ -23,6 +23,7 @@ interface PageProps {
     person_label: string;
     initialTab: string;
     index_url: string;
+    person_banner: PersonBannerData;
     summaryEndpoint: string;
     tabEndpoint: string;
     mutateEndpoint: string;
@@ -53,6 +54,7 @@ export default function PersonEditor() {
         initialTab,
         index_url,
         summaryEndpoint,
+        person_banner,
         tabEndpoint,
         mutateEndpoint,
         createEndpoint,
@@ -197,15 +199,12 @@ export default function PersonEditor() {
                 { label: person_label },
             ]}
         >
-            <PersonSummaryPanel summary={summary} loading={summaryLoading} error={summaryError} />
+            <PersonBanner
+                data={{ ...person_banner, active_tab: activeTab, counts: summary?.tab_counts ?? person_banner.counts }}
+                onTabSelect={handleTabChange}
+            />
 
             <div style={tabsWrapStyle}>
-                <BrowserTabs
-                    tabs={TAB_DEFINITIONS}
-                    activeTab={activeTab}
-                    counts={summary?.tab_counts || {}}
-                    onTabChange={handleTabChange}
-                />
                 <div style={tabContentStyle}>
                     <TabContentLoader
                         personId={personId}

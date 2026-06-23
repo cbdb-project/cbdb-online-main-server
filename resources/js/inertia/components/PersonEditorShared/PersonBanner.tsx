@@ -34,11 +34,19 @@ const TABS: Array<{ key: string; icon: string; labelKey: string }> = [
     { key: 'sources', icon: 'fas fa-file-alt', labelKey: 'tab_sources' },
 ];
 
-export default function PersonBanner({ data }: { data: PersonBannerData }) {
+/**
+ * @param onTabSelect 提供時（詳情中樞 SPA）：點分頁改為呼叫此回呼切換分頁，不整頁導航；
+ *                    未提供時（editv2 編輯器頁）：router.visit 導向中樞 ?tab=<key>。
+ */
+export default function PersonBanner({ data, onTabSelect }: { data: PersonBannerData; onTabSelect?: (key: string) => void }) {
     const t = useTranslation('person');
     const heading = `${data.name_chn || ''}${data.name ? '（' + data.name + '）' : ''} - ${data.person_id}`;
 
     const go = (key: string) => {
+        if (onTabSelect) {
+            onTabSelect(key);
+            return;
+        }
         router.visit(`/app/basicinformation/${data.person_id}?tab=${key}`);
     };
 

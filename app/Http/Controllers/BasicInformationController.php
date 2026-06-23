@@ -216,9 +216,11 @@ class BasicInformationController extends Controller {
         $name = $nameRow->c_name ?? '';
         $dynasty = $nameRow->c_dynasty_chn ?? '';
 
+        // 身份標題：id / 中文名(拼音) / 朝代 一律以中點「·」分隔（不混用 - 與 ·）。
+        // 中點表「同級並列」，較 dash 的「標題—副標」更貼合 id/名/朝代為並列詮釋資料。
         $personLabel = (string) $personId;
         if ($nameChn || $name) {
-            $personLabel .= ' - ' . $nameChn;
+            $personLabel .= ' · ' . $nameChn;
             if ($name) {
                 $personLabel .= ' (' . $name . ')';
             }

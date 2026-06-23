@@ -196,7 +196,6 @@ export default function PersonEditor() {
             title={person_label}
             breadcrumbs={[
                 { label: tPerson('person_records'), url: index_url },
-                { label: person_label },
             ]}
         >
             <PersonBanner

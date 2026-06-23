@@ -35,7 +35,7 @@ export default function AltnameEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+        <DashboardLayout title={p.person_label}>
             <PersonBanner data={p.person_banner} />
             <AltnameEditor
                 personId={p.person_id}

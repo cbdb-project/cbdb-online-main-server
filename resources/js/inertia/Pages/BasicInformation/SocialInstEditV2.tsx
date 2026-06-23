@@ -36,7 +36,7 @@ export default function SocialInstEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+        <DashboardLayout title={p.person_label}>
             <PersonBanner data={p.person_banner} />
             <SocialInstEditor
                 personId={p.person_id}

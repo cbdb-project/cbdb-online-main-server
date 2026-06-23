@@ -71,6 +71,12 @@ Route::get('app/basicinformation/{id}/edit', 'BasicInformationController@appEdit
     ->where('id', '[0-9]+')
     ->middleware('inertia')
     ->name('app.basicinformation.edit');
+// Task 27 重做：對齊 legacy /edit 的 React 基本資料編輯器（BasicInfoEditor）。
+// 獨立路由供逐步重做/驗證；不受 flag 影響、不上線（驗證通過並全面重做後再整合）。
+Route::get('app/basicinformation/{id}/edit-v2', 'BasicInformationController@appEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

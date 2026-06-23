@@ -268,6 +268,39 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Task 27 重做：對齊 legacy /basicinformation/{id}/edit 的 React 基本資料編輯器（BasicInfoEditor）。
+     * 把 form.fields（富物件）攤平成 BasicInfoEditor 需要的 initial_fields（c_* → 原始值字串）
+     * 與 initial_labels（c_* → 顯示標籤）。獨立路由供逐步重做/端到端驗證，不受 flag 影響、不上線。
+     */
+    public function appEditV2($id) {
+        $personId = $this->normalizePersonId($id);
+        [$person, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $formFields = $person['form']['fields'] ?? [];
+        $initialFields = [];
+        $initialLabels = [];
+        foreach ($formFields as $key => $f) {
+            $initialFields[$key] = (string) ($f['value'] ?? '');
+            if (isset($f['display_value']) && $f['display_value'] !== '') {
+                $initialLabels[$key] = (string) $f['display_value'];
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EditV2', [
+            'personId' => $personId,
+            'person_label' => $personLabel,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'pinyin_endpoint' => '/api/select/search/pinyin',
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

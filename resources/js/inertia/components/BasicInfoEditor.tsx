@@ -252,6 +252,26 @@ export default function BasicInfoEditor({
         </div>
     );
 
+    // 緊湊欄位格（label 靠左、窄 label）：供雙欄並排列使用（對齊 legacy col-sm-6 內的 col-sm-4/8）。
+    const cell = (key: string, label: string, readonly = false) => (
+        <div style={cellRowStyle}>
+            <label style={cellLabelStyle}>{label}</label>
+            <input type="text" value={fields[key] ?? ''} readOnly={readonly} disabled={readonly}
+                onChange={(e) => set(key, e.target.value)}
+                style={{ ...inputStyle, ...(readonly ? readonlyStyle : {}) }} />
+        </div>
+    );
+
+    // 唯讀派生格（label 置頂）：供 4-up grid 使用（對齊 legacy col-xl-3）。
+    const derivedCell = (key: string, label: string, hint?: string) => (
+        <div style={derivedCellStyle}>
+            <label style={derivedLabelStyle}>{label}</label>
+            <input type="text" value={labels[key] || fields[key] || ''} readOnly disabled
+                style={{ ...inputStyle, ...readonlyStyle }} />
+            {hint ? <small style={hintStyle} className="text-muted">{hint}</small> : null}
+        </div>
+    );
+
     const birth: DateGroup = { year: 'c_birthyear', nhCode: 'c_by_nh_code', nhYear: 'c_by_nh_year', range: 'c_by_range', intercalary: 'c_by_intercalary', month: 'c_by_month', day: 'c_by_day', dayGz: 'c_by_day_gz' };
     const death: DateGroup = { year: 'c_deathyear', nhCode: 'c_dy_nh_code', nhYear: 'c_dy_nh_year', range: 'c_dy_range', intercalary: 'c_dy_intercalary', month: 'c_dy_month', day: 'c_dy_day', dayGz: 'c_dy_day_gz' };
     const flEarly: DateGroup = { year: 'c_fl_earliest_year', nhCode: 'c_fl_ey_nh_code', nhYear: 'c_fl_ey_nh_year', notes: 'c_fl_ey_notes' };
@@ -265,20 +285,34 @@ export default function BasicInfoEditor({
             {pinyinDone ? <div style={okStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
             {nameWarning ? <div style={warnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
-            {textRow('c_surname_chn', tr('surname_chn', '姓（中）'))}
-            {textRow('c_mingzi_chn', tr('mingzi_chn', '名（中）'))}
-            {textRow('c_surname', 'Xing')}
-            {textRow('c_mingzi', 'Ming')}
-            {canEdit ? <button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button> : null}
-            {textRow('c_surname_proper', tr('foreign_surname', '外文姓'))}
-            {textRow('c_mingzi_proper', tr('foreign_mingzi', '外文名'))}
-            {textRow('c_surname_rm', tr('foreign_rm_surname', '羅馬字姓'))}
-            {textRow('c_mingzi_rm', tr('foreign_rm_mingzi', '羅馬字名'))}
-            {/* 4 唯讀自動派生 */}
-            {textRow('c_name_chn', '姓名（中） (c_name_chn)', true, tr('name_auto_hint', '由姓和名自動合併，無需手動填寫'))}
-            {textRow('c_name', '拼音 (c_name)', true, tr('pinyin_auto_hint', '由 Xing/Ming 自動合併，無需手動填寫'))}
-            {textRow('c_name_proper', '外文全名 (c_name_proper)', true, tr('foreign_full_auto_hint', '自動合併，無需手動填寫'))}
-            {textRow('c_name_rm', '羅馬字全名 (c_name_rm)', true, tr('rm_auto_hint', '自動合併，無需手動填寫'))}
+            {/* 姓名：中文 / 羅馬化雙欄並排（對齊 legacy col-sm-6 × col-sm-6）。 */}
+            <div style={twoColStyle}>
+                <div style={colStyle}>
+                    {cell('c_surname_chn', tr('surname_chn', '姓（中）'))}
+                    {cell('c_mingzi_chn', tr('mingzi_chn', '名（中）'))}
+                </div>
+                <div style={colStyle}>
+                    {cell('c_surname', 'Xing')}
+                    {cell('c_mingzi', 'Ming')}
+                </div>
+            </div>
+            {canEdit ? <div style={pinyinBtnRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button></div> : null}
+            {/* 外文 / 羅馬字姓名：每列兩欄並排（對齊 legacy 一行兩 pair）。 */}
+            <div style={twoColStyle}>
+                <div style={colStyle}>{cell('c_surname_proper', tr('foreign_surname', '外文姓'))}</div>
+                <div style={colStyle}>{cell('c_mingzi_proper', tr('foreign_mingzi', '外文名'))}</div>
+            </div>
+            <div style={twoColStyle}>
+                <div style={colStyle}>{cell('c_surname_rm', tr('foreign_rm_surname', '羅馬字姓'))}</div>
+                <div style={colStyle}>{cell('c_mingzi_rm', tr('foreign_rm_mingzi', '羅馬字名'))}</div>
+            </div>
+            {/* 4 唯讀自動派生：4-up grid、label 置頂（對齊 legacy col-xl-3）。 */}
+            <div style={derivedGridStyle}>
+                {derivedCell('c_name_chn', '姓名（中） (c_name_chn)', tr('name_auto_hint', '由姓和名自動合併，無需手動填寫'))}
+                {derivedCell('c_name', '拼音 (c_name)', tr('pinyin_auto_hint', '由 Xing/Ming 自動合併，無需手動填寫'))}
+                {derivedCell('c_name_proper', '外文全名 (c_name_proper)', tr('foreign_full_auto_hint', '自動合併，無需手動填寫'))}
+                {derivedCell('c_name_rm', '羅馬字全名 (c_name_rm)', tr('rm_auto_hint', '自動合併，無需手動填寫'))}
+            </div>
 
             {/* 性別（NULL/0/1）以 select */}
             <div style={rowStyle}>
@@ -361,6 +395,16 @@ export default function BasicInfoEditor({
 const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 20 };
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 10 };
+// 雙欄並排（對齊 legacy col-sm-6 × col-sm-6）：窄屏自動換行。
+const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 0 };
+const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
+const cellRowStyle: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 };
+const cellLabelStyle: React.CSSProperties = { width: 96, flexShrink: 0, fontSize: '0.875rem', color: '#374151' };
+// 唯讀派生 4-up grid（對齊 legacy col-xl-3）：label 置頂。
+const derivedGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 10 };
+const derivedCellStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 };
+const derivedLabelStyle: React.CSSProperties = { fontSize: '0.8rem', color: '#374151' };
+const pinyinBtnRowStyle: React.CSSProperties = { marginBottom: 10, paddingLeft: 96 };
 const labelStyle: React.CSSProperties = { width: 220, flexShrink: 0, fontSize: '0.875rem', paddingTop: 8, color: '#374151' };
 const fieldStyle: React.CSSProperties = { flex: 1 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };

@@ -307,6 +307,89 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：地址編輯器（對齊 legacy biogmains/addresses/_form）。獨立測試路由，
+     * flag 仍 old、不上線。有 c_addr_id+c_addr_type+c_sequence 即編輯，否則新增。
+     */
+    public function appAddressEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        $hasPk = $request->filled('c_addr_id') && $request->filled('c_addr_type') && $request->filled('c_sequence');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $otherBelongs = '';
+        if ($mode === 'edit') {
+            $row = DB::table('BIOG_ADDR_DATA')->where([
+                'c_personid' => $personId,
+                'c_addr_id' => (int) $request->input('c_addr_id'),
+                'c_addr_type' => (int) $request->input('c_addr_type'),
+                'c_sequence' => (int) $request->input('c_sequence'),
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 對齊 legacy：c_addr_id（地名）與 c_source（出處）為非同步搜尋欄位，
+            // 無 label 將顯示空白，故於編輯模式補回 addr_str / text_str；並補回 other_belongs 顯示。
+            try {
+                $addrCode = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_addr_id)->first();
+                if ($addrCode) {
+                    $belongs = DB::table('ADDR_BELONGS_DATA')->where('c_addr_id', (int) $row->c_addr_id)->get();
+                    $belongLabels = [];
+                    foreach ($belongs as $b) {
+                        $parent = DB::table('ADDR_CODES')->where('c_addr_id', (int) $b->c_belongs_to)->first();
+                        if ($parent) {
+                            $belongLabels[] = '[['.$parent->c_addr_id.' '.$parent->c_name_chn.' '.$parent->c_firstyear.'~'.$parent->c_lastyear.']]';
+                        }
+                    }
+                    $base = trim($addrCode->c_addr_id.' '.$addrCode->c_name.' '.$addrCode->c_name_chn.' '.$addrCode->c_firstyear.'~'.$addrCode->c_lastyear);
+                    $initialLabels['c_addr_id'] = trim($base.' '.($belongLabels[0] ?? ''));
+                    if (count($belongLabels) > 1) {
+                        $otherBelongs = implode('、', array_slice($belongLabels, 1));
+                    }
+                }
+                if ($row->c_source !== null && $row->c_source !== '') {
+                    $textCode = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($textCode) {
+                        $initialLabels['c_source'] = trim($textCode->c_textid.' '.$textCode->c_title.' '.$textCode->c_title_chn);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // 標籤補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AddressEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'other_belongs' => $otherBelongs,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.addresses.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

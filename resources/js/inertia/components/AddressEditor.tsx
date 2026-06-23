@@ -1,0 +1,252 @@
+import React, { useMemo, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
+import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
+import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
+import TextpersonPair from './PersonEditorShared/TextpersonPair';
+import { getCsrfToken } from './PersonBrowser/shared/csrf';
+
+/**
+ * 地址編輯器（對齊 legacy biogmains/addresses/_form.blade.php，非 person-browser）。
+ * 欄位：序號 / 地址類型 / 地名(addr 搜尋, 朝代範圍過濾) / 起年·末年(EraTimeField 含農曆) /
+ * 出處 / 頁碼 / 備註 / 祖籍 / textperson_pair；三態授權提交；create→/api/v2/create、update→/api/v2/mutate。
+ * 複合主鍵 (c_personid, c_addr_id, c_addr_type, c_sequence)；對齊 legacy，序號／類型／地名於新增與編輯皆可改，
+ * 後端 performUpdate 支援主鍵改鍵（含衝突檢查）。
+ */
+type Fields = Record<string, string>;
+
+interface Props {
+    personId: number;
+    personLabel: string;
+    dynastyCode?: number | null;  // 人物朝代代碼（EraTimeField 年號轉換用）
+    dynastyStart?: string;   // 人物朝代起年（addr 搜尋過濾 dy_start）
+    dynastyEnd?: string;     // 人物朝代末年（dy_end）
+    mode: 'create' | 'edit';
+    initialFields: Fields;
+    initialLabels?: Fields;
+    otherBelongs?: string;
+    canEdit: boolean;
+    canPropose: boolean;
+    createEndpoint: string;
+    mutateEndpoint: string;
+    deleteEndpoint?: string;
+    indexUrl: string;
+    t?: (k: string) => string;
+}
+
+const PK = ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence'];
+const FY = { year: 'c_firstyear', nhCode: 'c_fy_nh_code', nhYear: 'c_fy_nh_year', range: 'c_fy_range', intercalary: 'c_fy_intercalary', month: 'c_fy_month', day: 'c_fy_day', dayGz: 'c_fy_day_gz' };
+const LY = { year: 'c_lastyear', nhCode: 'c_ly_nh_code', nhYear: 'c_ly_nh_year', range: 'c_ly_range', intercalary: 'c_ly_intercalary', month: 'c_ly_month', day: 'c_ly_day', dayGz: 'c_ly_day_gz' };
+// 非主鍵可寫欄位（提交 changes 用）。
+const NON_PK = [
+    'c_firstyear', ...['c_fy_nh_code', 'c_fy_nh_year', 'c_fy_range', 'c_fy_intercalary', 'c_fy_month', 'c_fy_day', 'c_fy_day_gz'],
+    'c_lastyear', ...['c_ly_nh_code', 'c_ly_nh_year', 'c_ly_range', 'c_ly_intercalary', 'c_ly_month', 'c_ly_day', 'c_ly_day_gz'],
+    'c_source', 'c_pages', 'c_notes', 'c_natal',
+];
+
+export default function AddressEditor({
+    personId, personLabel, dynastyCode = null, dynastyStart, dynastyEnd, mode, initialFields, initialLabels = {}, otherBelongs = '',
+    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
+}: Props) {
+    const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
+    const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields });
+    const [labels, setLabels] = useState<Fields>(initialLabels);
+    const snapshot = useRef(JSON.stringify({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields }));
+    const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [sourceHighlight, setSourceHighlight] = useState(false);
+    const [comment, setComment] = useState('');
+
+    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
+    const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
+    const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
+    const editable = canEdit || canPropose;
+
+    const buildEra = (g: typeof FY): EraTimeFieldValues => ({
+        year: fields[g.year] ?? '', nhCode: fields[g.nhCode] ?? '', nhCodeLabel: labels[g.nhCode] ?? '',
+        nhYear: fields[g.nhYear] ?? '', range: fields[g.range] ?? '', rangeLabel: labels[g.range] ?? '',
+        intercalary: fields[g.intercalary] ?? '0', month: fields[g.month] ?? '', day: fields[g.day] ?? '',
+        dayGz: fields[g.dayGz] ?? '', dayGzLabel: labels[g.dayGz] ?? '',
+    });
+    const applyEra = (g: typeof FY, patch: Partial<EraTimeFieldValues>) => {
+        setFields((prev) => {
+            const next = { ...prev };
+            (['year', 'nhCode', 'nhYear', 'range', 'intercalary', 'month', 'day', 'dayGz'] as const).forEach((kk) => {
+                if (patch[kk] !== undefined) next[g[kk]] = patch[kk] as string;
+            });
+            return next;
+        });
+        if (patch.nhCodeLabel !== undefined) setLabel(g.nhCode, patch.nhCodeLabel);
+        if (patch.rangeLabel !== undefined) setLabel(g.range, patch.rangeLabel);
+        if (patch.dayGzLabel !== undefined) setLabel(g.dayGz, patch.dayGzLabel);
+    };
+
+    const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
+        setFields((prev) => ({ ...prev, c_source: p.source, c_pages: p.pages }));
+        setLabel('c_source', p.sourceLabel);
+        setSourceHighlight(true);
+        window.setTimeout(() => setSourceHighlight(false), 4000);
+        setMessage(tr('update_source_success', '已自動回填出處與頁碼'));
+    };
+
+    const save = async (sm: 'direct' | 'proposal') => {
+        setSaving(true); setError(null); setMessage(null);
+        const pk = Object.fromEntries(PK.map((k) => [k, Number(fields[k] ?? 0)]));
+        let changes: Record<string, string | null>;
+        let target: Record<string, number>;
+        let endpoint: string;
+        let operation: string;
+        if (mode === 'create') {
+            endpoint = createEndpoint; operation = 'create'; target = pk;
+            changes = {};
+            for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+        } else {
+            endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
+            const initial: Fields = JSON.parse(snapshot.current);
+            changes = {};
+            for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
+            // 主鍵欄位（序號／類型／地名）可改：對齊 legacy，後端據此改鍵。PK 不可為空，故只送非空值。
+            for (const k of ['c_addr_id', 'c_addr_type', 'c_sequence']) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v && v !== '') changes[k] = v; }
+            if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
+        }
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ resource: 'addresses', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            snapshot.current = JSON.stringify(fields);
+            if (mode === 'create') { window.location.assign(indexUrl); }
+            // 直接儲存若改了主鍵（序號／類型／地名），列已改鍵；同步 originalPk，後續儲存／提案／刪除才會指向新列（避免對舊 PK 操作回 404）。
+            else if (sm === 'direct') { originalPk.current = Object.fromEntries(PK.map((k) => [k, Number(fields[k] ?? 0)])); }
+        } catch (e) {
+            setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
+        } finally { setSaving(false); }
+    };
+
+    const doDelete = async () => {
+        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此地址？'))) return;
+        setDeleting(true); setError(null);
+        try {
+            const res = await fetch(deleteEndpoint, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ resource: 'addresses', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            snapshot.current = JSON.stringify(fields);
+            window.location.assign(indexUrl);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
+        } finally { setDeleting(false); }
+    };
+
+    const numRow = (key: string, label: string, required = false, maxLength?: number) => (
+        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+            <input type="number" value={fields[key] ?? ''} disabled={!editable} required={required} maxLength={maxLength}
+                onChange={(e) => set(key, e.target.value)} style={{ ...inputStyle, ...(!editable ? roStyle : {}) }} />
+        </div></div>
+    );
+    const textRow = (key: string, label: string, highlight = false) => (
+        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+            <input type="text" value={fields[key] ?? ''} onChange={(e) => set(key, e.target.value)}
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}) }} /></div></div>
+    );
+
+    return (
+        <div style={cardStyle}>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('address_create', '新增地址') : tr('address_edit', '編輯地址')} — {personLabel}</h3>
+            {message ? <div style={okStyle}>{message}</div> : null}
+            {error ? <div style={errStyle}>{error}</div> : null}
+
+            {numRow('c_sequence', tr('migration_sequence', '遷移序號'), true, 4)}
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('address_type', '地址類型')} (c_addr_type)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="list" model="biogaddr" idKey="c_addr_type" labelKeys={['c_addr_desc_chn', 'c_addr_desc']}
+                    value={fields.c_addr_type ?? '0'} initialLabel={labels.c_addr_type ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_addr_type', v); setLabel('c_addr_type', l); }} /></div></div>
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('place_name', '地名')} (c_addr_id)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="search" endpoint="/api/select/search/addr"
+                    extraQuery={{ dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' }}
+                    value={fields.c_addr_id ?? '0'} initialLabel={labels.c_addr_id ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_addr_id', v); setLabel('c_addr_id', l); }} />
+                {otherBelongs ? <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>{tr('other_upper_info', '其他上層資訊')}: {otherBelongs}</div> : null}</div></div>
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('start_year', '起年')} (c_firstyear)</label><div style={fieldStyle}>
+                <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+            <div style={rowStyle}><label style={labelStyle}>{tr('end_year', '末年')} (c_lastyear)</label><div style={fieldStyle}>
+                <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                    value={fields.c_source ?? ''} initialLabel={labels.c_source ?? ''} disabled={!editable}
+                    aria-invalid={sourceHighlight}
+                    onChange={(v, l) => { set('c_source', v); setLabel('c_source', l); }} /></div></div>
+            {textRow('c_pages', tr('pages_entries', '頁碼'), sourceHighlight)}
+            <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
+                <textarea value={fields.c_notes ?? ''} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto' }} /></div></div>
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('maiden_addr', '祖籍')} (c_natal)</label><div style={fieldStyle}>
+                <select value={fields.c_natal ?? ''} onChange={(e) => set('c_natal', e.target.value)} disabled={!editable} style={selectStyle}>
+                    <option value="">{tr('please_select', '請選擇')}</option>
+                    <option value="0">0-{tr('no', '否')}</option>
+                    <option value="1">1-{tr('yes', '是')}</option>
+                </select></div></div>
+
+            <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
+
+            {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
+                <>
+                    {fields.c_created_by ? (
+                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_created', '建檔')}</label><div style={fieldStyle}>
+                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
+                    ) : null}
+                    {fields.c_modified_by ? (
+                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_updated', '更新')}</label><div style={fieldStyle}>
+                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
+                    ) : null}
+                </>
+            ) : null}
+
+            {(canEdit || canPropose) && (
+                <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }}
+                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
+            )}
+
+            <div style={{ ...rowStyle, gap: 8 }}>
+                <div style={{ width: 160, flexShrink: 0 }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, maxWidth: 880 };
+const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
+const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '0.875rem', color: '#374151', paddingTop: 6 };
+const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
+const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
+const selectStyle: React.CSSProperties = { ...inputStyle };
+const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
+const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
+const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
+const infoBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #0e7490', background: '#0891b2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
+const dangerBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #b91c1c', background: '#fff5f5', color: '#b91c1c', fontWeight: 700, cursor: 'pointer' };
+const cancelBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

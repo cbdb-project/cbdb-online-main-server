@@ -44,6 +44,8 @@ interface SearchProps extends CommonProps {
     mode: 'search';
     /** async 查詢 endpoint（例：/api/select/search/text）。 */
     endpoint: string;
+    /** 額外查詢參數（例：addr 的朝代範圍 dy_start/dy_end）。 */
+    extraQuery?: Record<string, string>;
 }
 
 type Props = ListProps | SearchProps;
@@ -83,8 +85,13 @@ async function fetchList(model: string, idKey: string, labelKeys: string[]): Pro
     return listCache.get(model)!;
 }
 
-async function fetchSearch(endpoint: string, q: string): Promise<CodeOption[]> {
-    const url = `${endpoint}?q=${encodeURIComponent(q)}`;
+async function fetchSearch(endpoint: string, q: string, extraQuery: Record<string, string> = {}): Promise<CodeOption[]> {
+    const params = new URLSearchParams({ q });
+    for (const [k, v] of Object.entries(extraQuery)) {
+        if (v !== undefined && v !== null && v !== '') params.set(k, v);
+    }
+    const sep = endpoint.includes('?') ? '&' : '?';
+    const url = `${endpoint}${sep}${params.toString()}`;
     const response = await fetch(url, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
@@ -167,7 +174,7 @@ export default function CodeAutocomplete(props: Props) {
         debounceRef.current = window.setTimeout(() => {
             setLoading(true);
             setError(null);
-            fetchSearch((props as SearchProps).endpoint, q)
+            fetchSearch((props as SearchProps).endpoint, q, (props as SearchProps).extraQuery)
                 .then(setOptions)
                 .catch((e) => setError(e instanceof Error ? e.message : '查詢失敗'))
                 .finally(() => setLoading(false));

@@ -117,10 +117,16 @@ class ApiV2CreateAddressTest extends TestCase {
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -204,6 +210,27 @@ class ApiV2CreateAddressTest extends TestCase {
             'c_sequence' => 1,
             'c_firstyear' => 1060,
             'c_source' => 20,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressCreatePersistsLunarFields(): void {
+        // 回歸（人物編輯重做）：新增地址時 EraTimeField showLunar 的農曆月/日/干支須在 create allowlist 內。
+        $user = $this->makeUser(email: 'create-addr-lunar@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_firstyear' => 1060, 'c_source' => 20,
+                'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+                'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 200, 'c_addr_type' => 2, 'c_sequence' => 1,
+            'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+            'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
         ]);
     }
 

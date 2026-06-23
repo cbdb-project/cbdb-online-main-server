@@ -49,16 +49,30 @@ class AddressMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_fy_nh_year',
             'c_fy_range',
             'c_fy_intercalary',
+            'c_fy_month',
+            'c_fy_day',
+            'c_fy_day_gz',
             'c_ly_nh_code',
             'c_ly_nh_year',
             'c_ly_range',
             'c_ly_intercalary',
+            'c_ly_month',
+            'c_ly_day',
+            'c_ly_day_gz',
         ];
     }
 
     protected function preprocessUpdateData(array $data): array {
         // -999 → 0 轉換
         $data = $this->normalizeSentinelValues($data, ['c_addr_id', 'c_source']);
+
+        // 對齊 legacy emptyToSentinel：地名／出處為碼表 FK（0=Unknown），清空時正規化為 '0'，
+        // 不可寫成 NULL（real schema 多為 NOT NULL default 0）。
+        foreach (['c_addr_id', 'c_source'] as $f) {
+            if (array_key_exists($f, $data) && ($data[$f] === null || $data[$f] === '')) {
+                $data[$f] = '0';
+            }
+        }
 
         // 布林欄位轉 int
         if (array_key_exists('c_fy_intercalary', $data)) {

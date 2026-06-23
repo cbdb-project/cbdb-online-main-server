@@ -117,10 +117,16 @@ class ApiV2MutateAddressTest extends TestCase {
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -238,6 +244,46 @@ class ApiV2MutateAddressTest extends TestCase {
         $this->assertDatabaseHas('BIOG_ADDR_DATA', [
             'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
             'c_notes' => '只改備註', 'c_natal' => 0, 'c_firstyear' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdatePersistsLunarFields(): void {
+        // 回歸（人物編輯重做）：地址編輯器 EraTimeField showLunar 會送出農曆月/日/干支
+        // （c_fy_month/c_fy_day/c_fy_day_gz、c_ly_*）；這些欄位須在 allowlist 內，否則整筆保存 422。
+        $user = $this->makeUser(email: 'addr-lunar@example.com');
+        $this->actingAs($user);
+        $this->seedAddress();
+
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => [
+                'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+                'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+            'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdateClearingSourceNormalizesToSentinelZero(): void {
+        // 回歸（人物編輯重做）：清空出處（c_source）時前端送 null，後端須對齊 legacy emptyToSentinel
+        // 正規化為 0（Unknown），不可寫成 NULL（real schema c_source NOT NULL default 0）。
+        $user = $this->makeUser(email: 'addr-clearsource@example.com');
+        $this->actingAs($user);
+        $this->seedAddress(['c_source' => 10]);
+
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_source' => null],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_source' => 0,
         ]);
     }
 

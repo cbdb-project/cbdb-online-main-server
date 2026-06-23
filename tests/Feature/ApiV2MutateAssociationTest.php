@@ -132,6 +132,20 @@ class ApiV2MutateAssociationTest extends TestCase {
             $table->integer('c_addr_id')->nullable();
             $table->integer('c_inst_code')->default(0);
             $table->integer('c_inst_name_code')->default(0);
+            $table->integer('c_assoc_fy_nh_code')->nullable();
+            $table->integer('c_assoc_fy_nh_year')->nullable();
+            $table->integer('c_assoc_fy_range')->nullable();
+            $table->integer('c_assoc_fy_intercalary')->nullable();
+            $table->integer('c_assoc_fy_month')->nullable();
+            $table->integer('c_assoc_fy_day')->nullable();
+            $table->integer('c_assoc_fy_day_gz')->nullable();
+            $table->integer('c_assoc_ly_nh_code')->nullable();
+            $table->integer('c_assoc_ly_nh_year')->nullable();
+            $table->integer('c_assoc_ly_range')->nullable();
+            $table->integer('c_assoc_ly_intercalary')->nullable();
+            $table->integer('c_assoc_ly_month')->nullable();
+            $table->integer('c_assoc_ly_day')->nullable();
+            $table->integer('c_assoc_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -275,6 +289,22 @@ class ApiV2MutateAssociationTest extends TestCase {
             'c_notes' => '改後備註',
         ]);
         $this->assertDatabaseMissing('ASSOC_DATA', ['c_assoc_first_year' => 0]);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdatePersistsEraLunarFields(): void {
+        // 回歸：legacy x-inline-time-fields 送出 era 農曆欄；v2 白名單原漏 → 編輯時靜默流失。
+        $this->actingAs($this->makeUser(email: 'assoc-era-upd@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_assoc_fy_nh_code' => 5, 'c_assoc_fy_month' => 6, 'c_assoc_ly_day_gz' => 21],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+            'c_assoc_fy_nh_code' => 5, 'c_assoc_fy_month' => 6, 'c_assoc_ly_day_gz' => 21,
+        ]);
     }
 
     #[Test]

@@ -142,6 +142,11 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_text_title',
             'c_assoc_first_year',
             'c_assoc_last_year',
+            // era 農曆欄（legacy x-inline-time-fields 送出；之前白名單漏掉＝靜默流失，同 offices 31a）。
+            'c_assoc_fy_nh_code', 'c_assoc_fy_nh_year', 'c_assoc_fy_range',
+            'c_assoc_fy_intercalary', 'c_assoc_fy_month', 'c_assoc_fy_day', 'c_assoc_fy_day_gz',
+            'c_assoc_ly_nh_code', 'c_assoc_ly_nh_year', 'c_assoc_ly_range',
+            'c_assoc_ly_intercalary', 'c_assoc_ly_month', 'c_assoc_ly_day', 'c_assoc_ly_day_gz',
             'c_source',
             'c_pages',
             'c_notes',

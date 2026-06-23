@@ -126,6 +126,20 @@ class ApiV2CreateAssociationTest extends TestCase {
             $table->integer('c_addr_id')->nullable();
             $table->integer('c_inst_code')->default(0);
             $table->integer('c_inst_name_code')->default(0);
+            $table->integer('c_assoc_fy_nh_code')->nullable();
+            $table->integer('c_assoc_fy_nh_year')->nullable();
+            $table->integer('c_assoc_fy_range')->nullable();
+            $table->integer('c_assoc_fy_intercalary')->nullable();
+            $table->integer('c_assoc_fy_month')->nullable();
+            $table->integer('c_assoc_fy_day')->nullable();
+            $table->integer('c_assoc_fy_day_gz')->nullable();
+            $table->integer('c_assoc_ly_nh_code')->nullable();
+            $table->integer('c_assoc_ly_nh_year')->nullable();
+            $table->integer('c_assoc_ly_range')->nullable();
+            $table->integer('c_assoc_ly_intercalary')->nullable();
+            $table->integer('c_assoc_ly_month')->nullable();
+            $table->integer('c_assoc_ly_day')->nullable();
+            $table->integer('c_assoc_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -179,6 +193,34 @@ class ApiV2CreateAssociationTest extends TestCase {
                 'c_notes' => '新增社會關係',
             ],
         ], $overrides);
+    }
+
+    #[Test]
+    public function testDirectAssociationCreatePersistsEraLunarFields(): void {
+        // 回歸：legacy x-inline-time-fields 送出 c_assoc_fy_*/c_assoc_ly_* era 農曆欄；v2 白名單原漏 → 靜默流失。
+        $this->actingAs($this->makeUser(email: 'assoc-era@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_source' => 20,
+                'c_assocship_pair' => 101,
+                'c_assoc_fy_nh_code' => 5, 'c_assoc_fy_nh_year' => 3, 'c_assoc_fy_range' => 2,
+                'c_assoc_fy_intercalary' => 1, 'c_assoc_fy_month' => 6, 'c_assoc_fy_day' => 12, 'c_assoc_fy_day_gz' => 7,
+                'c_assoc_ly_nh_code' => 8, 'c_assoc_ly_month' => 9, 'c_assoc_ly_day' => 30, 'c_assoc_ly_day_gz' => 21,
+            ],
+        ]))->assertOk();
+
+        // 正向落 era。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_assoc_fy_nh_code' => 5, 'c_assoc_fy_month' => 6, 'c_assoc_fy_day_gz' => 7,
+            'c_assoc_ly_nh_code' => 8, 'c_assoc_ly_day' => 30,
+        ]);
+        // 互逆鏡像也含 era（時間欄沿用正向）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_assoc_fy_nh_code' => 5, 'c_assoc_fy_month' => 6, 'c_assoc_ly_nh_code' => 8,
+        ]);
     }
 
     #[Test]

@@ -4,6 +4,23 @@
 >
 > 紀律：每頁重做須對照本 checklist 逐項補齊；過閘以「實機能真的編輯並保存、資料正確落庫」為準（DB 級實查），非「渲染出來」。慢、做對、不漏。人物編輯器目前全 `old`（legacy 完整在線），逐頁重做+過閘後才翻 `new`。
 
+## 進度（更新於 2026-06-23）
+
+過閘＝review agent 讀碼 → codex（`codex exec --dangerously-bypass-approvals-and-sandbox`）→ 無嚴重問題 → 提交。獨立測試路由 `…/edit-v2`，flag 全 `old`、未上線。
+
+| 編輯器 | 狀態 | 備註 |
+|---|---|---|
+| basic-info / altname / addresses / texts | ✅ 已重做過閘 | EraTimeField/CodeAutocomplete/TextpersonPair 等共享機制已建 |
+| socialinst / possession | ✅ 已重做過閘 | |
+| events / entries / statuses(含 AI code-lookup) | ✅ 已重做過閘 | |
+| sources | ✅ 已重做過閘 | 修正 c_textid=0 parity + delete round-trip |
+| **offices ★AI** | ✅ 已重做過閘 | 31a 農曆白名單 / 31b 地址同步(抽 syncPostingAddresses+afterDirectUpdate 鉤子) / 31c UI(多地址+雙era+inst拆碼+saveas) / 31d AI 任官自動填 |
+| **assoc ★AI + 雙向 mirror** | ⏳ 進行中 | **32a-create 已過閘提交**（新增方向互逆鏡像，afterDirectInsert 鉤子 + proposal aux 三鍵哨兵）。待：32a-update（抽取 assocPerformUpdate 2457-2498 鏡像區塊共用 + **「永遠同步」改進**，須謹慎設計）、32a-delete、32b 編輯器UI+AI code-lookup(ASSOC_CODES) |
+| **kinship + 雙向 mirror** | ⬜ 待做(#33) | 同 assoc 手法；legacy 鏡像 BiogMainRepository 1421-1670；c_autogen_notes 在 v2 可編會破壞配對，須一併處理 |
+| 統一版面對齊 + 人物詳情中樞 + 翻 flag | ⬜ 待做(#34) | 見 D0；功能全做完後一次性 layout pass，再組裝中樞、逐頁過 SIMULATION_TEST_PLAN 後翻 new |
+
+可重用基礎設施（已建並驗證）：`afterDirectUpdate`/`afterDirectInsert`/`proposalAuxiliaryPayload` 鉤子（在 Abstract*Handler，空預設、對其他子資源 no-op）、legacy 邏輯抽取共用法（offices `syncPostingAddresses` 已示範，assoc/kinship 鏡像沿用）、`PostingAiAutofill` 面板、`CompositePrimaryKey::emptyToSentinel`。詳見 memory `v2-childtable-mirror-reuse-pattern`。
+
 ## A. 全局共享機制（先在 React 建一次，各頁複用——最易漏）
 
 1. **`EraTimeField`（年號/時間複合控件）** ← legacy `components/inline-time-fields.blade.php`（已起 Phase 1，需完整覆蓋）：年份 input + **西元↔年號雙向轉換鈕**（`.era-convert-btn`/`.era-reverse-convert-btn`，邏輯見 `app.js` initEraConversion：cn-era、朝代過濾、多結果 dialog、按 c_str 年份範圍精確匹配 nianhao id、反向算西元、特殊映射）+ 年號 select + 年號年 + range select（可選）+ **農曆區塊（閏月 checkbox hidden0/checkbox1、月 1-12、日 1-30、日干支 select）**+ notes（可選）+ `initLunarValidation` 月日範圍校驗。各使用處子字段集不同（見各頁）。

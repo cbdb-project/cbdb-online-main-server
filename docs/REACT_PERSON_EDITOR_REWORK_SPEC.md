@@ -16,9 +16,8 @@
 | sources | ✅ 已重做過閘 | 修正 c_textid=0 parity + delete round-trip |
 | **offices ★AI** | ✅ 已重做過閘 | 31a 農曆白名單 / 31b 地址同步(抽 syncPostingAddresses+afterDirectUpdate 鉤子) / 31c UI(多地址+雙era+inst拆碼+saveas) / 31d AI 任官自動填 |
 | **assoc ★AI + 雙向 mirror** | ✅ 全部完成過閘 | 後端互逆鏡像(create/update/delete+核准路徑)+era 白名單+編輯器UI+AI code-lookup 全部過閘提交。codex 多輪揪出 legacy 數據模型歧義全修。9段PK 編輯器、pair 由後端權威補齊、AI 識別 create/edit 皆顯示 |
-| **kinship + 雙向 mirror** | ⏳ 進行中(#33) | 照搬 assoc 已建基礎設施(鉤子+抽取+代碼表權威+兩級定位+核准路徑)。待：後端鏡像(create/update/delete+applyDeleteProposal KIN_DATA+applyKinshipProposal)一次批量過閘 → 編輯器UI。注意 c_autogen_notes 在 v2 可編會破壞配對須處理 |
-| **kinship + 雙向 mirror** | ⬜ 待做(#33) | 同 assoc 手法；legacy 鏡像 BiogMainRepository 1421-1670；c_autogen_notes 在 v2 可編會破壞配對，須一併處理 |
-| 統一版面對齊 + 人物詳情中樞 + 翻 flag | ⬜ 待做(#34) | 見 D0；功能全做完後一次性 layout pass，再組裝中樞、逐頁過 SIMULATION_TEST_PLAN 後翻 new |
+| **kinship + 雙向 mirror** | ✅ 全部完成過閘(#33) | 後端互逆鏡像(create 33a6fb2 / update+delete+核准刪除 1811faf，抽 syncKinMirrorOnUpdate/OnDelete 共用法 legacy+v2 共享)+編輯器UI 6f38e88，皆 review→codex CLEAN。配對碼一律 KINSHIP_CODES.c_kin_pair1 權威推導不採信前端、c_autogen_notes 編輯不破壞配對；缺碼 fail-closed 回滾防孤兒(codex 揪出)。3段PK 編輯器、pair 後端補齊 |
+| 統一版面對齊 + 人物詳情中樞 + 翻 flag | ⏳ 進行中(#34) | 見 D0；功能全做完後一次性 layout pass，再組裝中樞、逐頁過 SIMULATION_TEST_PLAN 後翻 new |
 
 可重用基礎設施（已建並驗證）：`afterDirectUpdate`/`afterDirectInsert`/`proposalAuxiliaryPayload` 鉤子（在 Abstract*Handler，空預設、對其他子資源 no-op）、legacy 邏輯抽取共用法（offices `syncPostingAddresses` 已示範，assoc/kinship 鏡像沿用）、`PostingAiAutofill` 面板、`CompositePrimaryKey::emptyToSentinel`。詳見 memory `v2-childtable-mirror-reuse-pattern`。
 

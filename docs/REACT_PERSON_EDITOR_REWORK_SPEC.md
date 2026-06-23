@@ -15,7 +15,7 @@
 | events / entries / statuses(含 AI code-lookup) | ✅ 已重做過閘 | |
 | sources | ✅ 已重做過閘 | 修正 c_textid=0 parity + delete round-trip |
 | **offices ★AI** | ✅ 已重做過閘 | 31a 農曆白名單 / 31b 地址同步(抽 syncPostingAddresses+afterDirectUpdate 鉤子) / 31c UI(多地址+雙era+inst拆碼+saveas) / 31d AI 任官自動填 |
-| **assoc ★AI + 雙向 mirror** | ⏳ 進行中 | **32a-create 已過閘提交**（新增方向互逆鏡像，afterDirectInsert 鉤子 + proposal aux 三鍵哨兵）。待：32a-update（抽取 assocPerformUpdate 2457-2498 鏡像區塊共用 + **「永遠同步」改進**，須謹慎設計）、32a-delete、32b 編輯器UI+AI code-lookup(ASSOC_CODES) |
+| **assoc ★AI + 雙向 mirror** | ⏳ 後端完成，待 32b UI | **32a 後端互逆鏡像全部過閘提交**：create(afterDirectInsert 鉤子+proposal aux 三鍵權威碼)、update(抽取 syncAssocMirrorOnUpdate 共用+afterDirectUpdate 鉤子+永遠同步補建+未送 pair 以代碼表權威碼補齊)、delete(抽取 syncAssocMirrorOnDelete+afterDirectDelete 鉤子+兩級精確定位多筆+核准路徑挂 final op id)。codex 多輪揪出 legacy 數據模型歧義(first()誤刪/歧義退化單邊/proposal 核准缺鏡像/審計 op id)全修。待：32b React 編輯器UI(9段PK+pair 聯動+AI code-lookup ASSOC_CODES) |
 | **kinship + 雙向 mirror** | ⬜ 待做(#33) | 同 assoc 手法；legacy 鏡像 BiogMainRepository 1421-1670；c_autogen_notes 在 v2 可編會破壞配對，須一併處理 |
 | 統一版面對齊 + 人物詳情中樞 + 翻 flag | ⬜ 待做(#34) | 見 D0；功能全做完後一次性 layout pass，再組裝中樞、逐頁過 SIMULATION_TEST_PLAN 後翻 new |
 

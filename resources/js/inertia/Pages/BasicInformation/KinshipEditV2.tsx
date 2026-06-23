@@ -2,6 +2,7 @@ import React from 'react';
 import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import KinEditor from '../../components/KinEditor';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -19,6 +20,7 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    person_banner: PersonBannerData;
 }
 
 export default function KinshipEditV2() {
@@ -37,6 +39,7 @@ export default function KinshipEditV2() {
 
     return (
         <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+            <PersonBanner data={p.person_banner} />
             <KinEditor
                 personId={p.person_id}
                 personLabel={p.person_label}

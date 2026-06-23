@@ -31,6 +31,7 @@ interface PageProps {
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
     canProposeEdits: boolean;
+    basicInfoEditorIsNew: boolean;
     altnameEditorIsNew: boolean;
     addressesEditorIsNew: boolean;
     textsEditorIsNew: boolean;
@@ -59,6 +60,7 @@ export default function PersonEditor() {
         pinyinEndpoint,
         canEditBasicInfo,
         canProposeEdits,
+        basicInfoEditorIsNew,
         altnameEditorIsNew,
         addressesEditorIsNew,
         textsEditorIsNew,
@@ -215,7 +217,8 @@ export default function PersonEditor() {
                         pinyinEndpoint={pinyinEndpoint}
                         canEditBasicInfo={canEditBasicInfo}
                         canProposeEdits={canProposeEdits}
-                        basicInfoStartEditing
+                        basicInfoEditorIsNew={basicInfoEditorIsNew}
+                        basicInfoStartEditing={!basicInfoEditorIsNew}
                         altnameEditorIsNew={altnameEditorIsNew}
                         addressesEditorIsNew={addressesEditorIsNew}
                         textsEditorIsNew={textsEditorIsNew}

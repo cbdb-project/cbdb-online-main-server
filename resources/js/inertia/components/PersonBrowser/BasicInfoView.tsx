@@ -23,6 +23,11 @@ interface Props {
     onSaved?: () => void;
     onEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterSaveHandler?: ((handler: (() => Promise<boolean>) | null) => void) | undefined;
+    /**
+     * 覆寫「編輯基本資料」按鈕行為：提供時點擊不進入內聯編輯，改執行此回呼
+     * （#34 詳情中樞用於導向獨立 BasicInfoEditor edit-v2，含年號轉換）。
+     */
+    onEditClick?: () => void;
 }
 
 interface Section {
@@ -101,6 +106,7 @@ export default function BasicInfoView({
     onSaved,
     onEditorStateChange,
     onRegisterSaveHandler,
+    onEditClick,
 }: Props) {
     const t = useTranslation('person');
     const tCommon = useTranslation('common');
@@ -307,7 +313,7 @@ export default function BasicInfoView({
                     <div style={toolbarButtonGroupStyle}>
                         {!editing && canEdit ? (
                             <>
-                                <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
+                                <button type="button" style={primaryButtonStyle} onClick={onEditClick ?? beginEdit}>
                                     {t('edit_basic_info')}
                                 </button>
                                 <form ref={deleteFormRef} method="POST" action={`/basicinformation/${personId}`} style={{ display: 'none' }}>

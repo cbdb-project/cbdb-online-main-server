@@ -2,6 +2,7 @@ import React from 'react';
 import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import SourceEditor from '../../components/SourceEditor';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -19,6 +20,7 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    person_banner: PersonBannerData;
     is_wiki_source: boolean;
 }
 
@@ -38,6 +40,7 @@ export default function SourceEditV2() {
 
     return (
         <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+            <PersonBanner data={p.person_banner} />
             <SourceEditor
                 personId={p.person_id}
                 personLabel={p.person_label}

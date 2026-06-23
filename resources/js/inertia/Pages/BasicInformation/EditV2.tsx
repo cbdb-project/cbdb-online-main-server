@@ -2,6 +2,7 @@ import React from 'react';
 import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import BasicInfoEditor from '../../components/BasicInfoEditor';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -20,6 +21,7 @@ interface PageProps extends SharedProps {
     delete_endpoint: string;
     pinyin_endpoint: string;
     index_url: string;
+    person_banner: PersonBannerData;
     duplicate_collateral_url: string;
     saveas_url: string;
 }
@@ -35,6 +37,7 @@ export default function EditV2() {
 
     return (
         <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+            <PersonBanner data={p.person_banner} />
             <BasicInfoEditor
                 personId={p.personId}
                 personLabel={p.person_label}

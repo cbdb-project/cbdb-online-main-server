@@ -1,0 +1,89 @@
+import React from 'react';
+import { router } from '@inertiajs/react';
+import { useTranslation } from '../../hooks/useTranslation';
+
+/**
+ * 人物 banner（對齊 legacy biogmains/banner.blade.php）：人物名標題 + 13 子資源分頁導航
+ * （圖示 + 標籤 + 計數徽章 + 當前頁高亮）。供各 editv2 編輯器頁與詳情中樞共用，
+ * 修正先前 React 編輯器頁丟失「人物基本資訊頭 + 子資源導航」的退化。
+ *
+ * 分頁點擊導向 React 詳情中樞對應分頁（/app/basicinformation/{id}?tab=<key>）。
+ */
+export interface PersonBannerData {
+    person_id: number;
+    name_chn: string;
+    name: string;
+    active_tab: string;
+    counts: Record<string, number>;
+}
+
+// legacy banner 的分頁順序 / 圖示 / person.tab_* 翻譯鍵（hub tab key）。
+const TABS: Array<{ key: string; icon: string; labelKey: string }> = [
+    { key: 'basic_info', icon: 'fas fa-user', labelKey: 'tab_basic_info' },
+    { key: 'addresses', icon: 'fas fa-map-marker-alt', labelKey: 'tab_addresses' },
+    { key: 'alt_names', icon: 'fas fa-id-card', labelKey: 'tab_alt_names' },
+    { key: 'texts', icon: 'fas fa-book', labelKey: 'tab_texts' },
+    { key: 'postings', icon: 'fas fa-briefcase', labelKey: 'tab_postings' },
+    { key: 'entries', icon: 'fas fa-door-open', labelKey: 'tab_entries' },
+    { key: 'events', icon: 'fas fa-calendar-alt', labelKey: 'tab_events' },
+    { key: 'statuses', icon: 'fas fa-users', labelKey: 'tab_statuses' },
+    { key: 'kinship', icon: 'fas fa-user-friends', labelKey: 'tab_kinship' },
+    { key: 'associations', icon: 'fas fa-network-wired', labelKey: 'tab_associations' },
+    { key: 'possessions', icon: 'fas fa-coins', labelKey: 'tab_possessions' },
+    { key: 'social_institutions', icon: 'fas fa-building', labelKey: 'tab_social_institutions' },
+    { key: 'sources', icon: 'fas fa-file-alt', labelKey: 'tab_sources' },
+];
+
+export default function PersonBanner({ data }: { data: PersonBannerData }) {
+    const t = useTranslation('person');
+    const heading = `${data.name_chn || ''}${data.name ? '（' + data.name + '）' : ''} - ${data.person_id}`;
+
+    const go = (key: string) => {
+        router.visit(`/app/basicinformation/${data.person_id}?tab=${key}`);
+    };
+
+    return (
+        <div style={wrapStyle}>
+            <h3 style={headingStyle}>{heading.trim()}</h3>
+            <div style={navStyle} role="tablist">
+                {TABS.map((tab) => {
+                    const active = tab.key === data.active_tab;
+                    // 計數僅在 >0 時顯示 badge（basic_info 無計數）；無記錄不顯示 0（使用者指定，較 legacy 精簡）。
+                    const count = tab.key === 'basic_info' ? 0 : (data.counts?.[tab.key] ?? 0);
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={active}
+                            onClick={() => go(tab.key)}
+                            style={{ ...tabStyle, ...(active ? tabActiveStyle : {}) }}
+                        >
+                            <i className={tab.icon} aria-hidden="true" style={{ marginRight: 4 }} />
+                            {t(tab.labelKey)}
+                            {count > 0 ? <span style={badgeStyle}>{count}</span> : null}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+const wrapStyle: React.CSSProperties = { marginBottom: 16 };
+const headingStyle: React.CSSProperties = { textAlign: 'center', fontSize: '1.15rem', fontWeight: 700, margin: '0 0 12px' };
+const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid #dee2e6', paddingBottom: 0 };
+const tabStyle: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',
+    border: '1px solid transparent', borderTopLeftRadius: 6, borderTopRightRadius: 6,
+    background: 'none', color: '#255f93', fontSize: '0.85rem', cursor: 'pointer',
+    marginBottom: -1,
+};
+const tabActiveStyle: React.CSSProperties = {
+    color: '#495057', background: '#fff', borderColor: '#dee2e6 #dee2e6 #fff',
+    fontWeight: 700,
+};
+const badgeStyle: React.CSSProperties = {
+    marginLeft: 5, padding: '1px 7px', borderRadius: 10, background: '#e9ecef',
+    color: '#495057', fontSize: '0.72rem', fontWeight: 600,
+};

@@ -235,6 +235,23 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * 人物 banner 資料（對齊 legacy biogmains/banner.blade.php）：人物名 + 13 分頁計數，
+     * 供各 editv2 編輯器頁與詳情中樞顯示「人物頭 + 子資源導航（含計數）」，
+     * 修正 React 編輯器頁丟失人物基本資訊頭的問題。$activeTab 為當前頁對應的 hub 分頁鍵。
+     */
+    protected function personBannerProps(int $personId, string $activeTab): array {
+        $nameRow = DB::table('BIOG_MAIN')->where('c_personid', $personId)->first(['c_name_chn', 'c_name']);
+
+        return [
+            'person_id' => $personId,
+            'name_chn' => $nameRow->c_name_chn ?? '',
+            'name' => $nameRow->c_name ?? '',
+            'active_tab' => $activeTab,
+            'counts' => $this->personBrowserService->tabCounts($personId),
+        ];
+    }
+
+    /**
      * 端點與授權旗標（Edit/Show 共用）。實際寫入授權由 /api/v2 handler 把關，
      * 前端 can_* 僅控制 UI 顯示。
      *
@@ -298,9 +315,14 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'pinyin_endpoint' => '/api/select/search/pinyin',
-            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-                ? route('app.basicinformation.index', [], false)
-                : route('basicinformation.index', [], false),
+            // #34 詳情中樞接線：存檔/取消後返回 React 詳情中樞基本資料分頁（show=new 時）；
+            // 否則回退人物列表（standalone 測試或 show 仍 old）。
+            'index_url' => migration_flag_is_new('basicinformation.show') && Route::has('app.basicinformation.show')
+                ? route('app.basicinformation.show', ['id' => $personId, 'tab' => 'basic_info'], false)
+                : (migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                    ? route('app.basicinformation.index', [], false)
+                    : route('basicinformation.index', [], false)),
+            'person_banner' => $this->personBannerProps($personId, 'basic_info'),
             'duplicate_collateral_url' => "/basicinformation/{$personId}/Duplicate_Collateral_Info",
             'saveas_url' => "/basicinformation/{$personId}/saveas",
         ]);
@@ -386,6 +408,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'addresses'], false),
+            'person_banner' => $this->personBannerProps($personId, 'addresses'),
         ]);
     }
 
@@ -446,6 +469,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'texts'], false),
+            'person_banner' => $this->personBannerProps($personId, 'texts'),
         ]);
     }
 
@@ -505,6 +529,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'alt_names'], false),
+            'person_banner' => $this->personBannerProps($personId, 'alt_names'),
         ]);
     }
 
@@ -571,6 +596,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'social_institutions'], false),
+            'person_banner' => $this->personBannerProps($personId, 'social_institutions'),
         ]);
     }
 
@@ -639,6 +665,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'possessions'], false),
+            'person_banner' => $this->personBannerProps($personId, 'possessions'),
         ]);
     }
 
@@ -709,6 +736,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'events'], false),
+            'person_banner' => $this->personBannerProps($personId, 'events'),
         ]);
     }
 
@@ -816,6 +844,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'entries'], false),
+            'person_banner' => $this->personBannerProps($personId, 'entries'),
         ]);
     }
 
@@ -913,6 +942,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'statuses'], false),
+            'person_banner' => $this->personBannerProps($personId, 'statuses'),
             'route_name' => 'app.basicinformation.statuses.editv2',
         ]);
     }
@@ -983,6 +1013,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'sources'], false),
+            'person_banner' => $this->personBannerProps($personId, 'sources'),
             'is_wiki_source' => $isWikiSource,
         ]);
     }
@@ -1080,6 +1111,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'postings'], false),
+            'person_banner' => $this->personBannerProps($personId, 'postings'),
             // AI 任官自動填：僅在 Gemini 已設定且使用者啟用時提供（對齊 legacy offices/_form 條件，新增模式才顯示）。
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
             'ai_extract_endpoint' => Route::has('ai.posting.extract') ? route('ai.posting.extract', [], false) : '',
@@ -1201,6 +1233,7 @@ class BasicInformationController extends Controller {
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'associations'], false),
+            'person_banner' => $this->personBannerProps($personId, 'associations'),
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
             'ai_suggest_endpoint' => Route::has('ai.code-lookup.suggest') ? route('ai.code-lookup.suggest', [], false) : '',
         ]);
@@ -1282,6 +1315,7 @@ class BasicInformationController extends Controller {
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'kinship'], false),
+            'person_banner' => $this->personBannerProps($personId, 'kinship'),
         ]);
     }
 
@@ -1339,6 +1373,8 @@ class BasicInformationController extends Controller {
             'pinyinEndpoint' => '/api/select/search/pinyin',
             'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'canProposeEdits' => $user ? $user->canPropose() : false,
+            // basic_info 分頁編輯入口（flag=new 時導向獨立 BasicInfoEditor edit-v2，含年號轉換）。
+            'basicInfoEditorIsNew' => migration_flag_is_new('basicinformation.editor'),
             'altnameEditorIsNew' => migration_flag_is_new('basicinformation.altname'),
             'addressesEditorIsNew' => migration_flag_is_new('basicinformation.addresses'),
             'textsEditorIsNew' => migration_flag_is_new('basicinformation.texts'),

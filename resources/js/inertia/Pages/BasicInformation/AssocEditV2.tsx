@@ -2,6 +2,7 @@ import React from 'react';
 import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import AssocEditor from '../../components/AssocEditor';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -20,6 +21,7 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    person_banner: PersonBannerData;
     ai_enabled: boolean;
     ai_suggest_endpoint: string;
 }
@@ -40,6 +42,7 @@ export default function AssocEditV2() {
 
     return (
         <DashboardLayout title={p.person_label} breadcrumbs={[{ label: p.person_label }]}>
+            <PersonBanner data={p.person_banner} />
             <AssocEditor
                 personId={p.person_id}
                 personLabel={p.person_label}

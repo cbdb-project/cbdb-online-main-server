@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
 import BasicInfoView from './BasicInfoView';
 import AltNamesTab from './tabs/AltNamesTab';
 import AddressesTab from './tabs/AddressesTab';
@@ -25,6 +26,8 @@ interface Props {
     canProposeEdits?: boolean;
     /** basic_info 分頁進場即進入編輯狀態（編輯主界面用；PersonBrowser 不傳 → 維持原行為）。 */
     basicInfoStartEditing?: boolean;
+    /** flag=new 時 basic_info 改為「檢視 + 編輯按鈕導向獨立 BasicInfoEditor（含年號轉換）」。 */
+    basicInfoEditorIsNew?: boolean;
     altnameEditorIsNew?: boolean;
     addressesEditorIsNew?: boolean;
     textsEditorIsNew?: boolean;
@@ -73,6 +76,7 @@ export default function TabContentLoader({
     canEditBasicInfo,
     canProposeEdits = false,
     basicInfoStartEditing = false,
+    basicInfoEditorIsNew = false,
     altnameEditorIsNew = false,
     addressesEditorIsNew = false,
     textsEditorIsNew = false,
@@ -192,6 +196,23 @@ export default function TabContentLoader({
                 fields: Record<string, unknown>;
             };
         };
+
+        // flag=new：檢視 + 「編輯基本資料」按鈕導向獨立 BasicInfoEditor（含年號轉換），
+        // 不走內聯編輯（故不掛 startEditing / 脏数据守卫 / 保存钩子）。
+        if (basicInfoEditorIsNew && personId != null) {
+            return (
+                <BasicInfoView
+                    sections={basicData?.sections || []}
+                    form={basicData?.form || null}
+                    personId={personId}
+                    mutateEndpoint={mutateEndpoint}
+                    pinyinEndpoint={pinyinEndpoint}
+                    canEdit={canEditBasicInfo || canProposeEdits}
+                    startEditing={false}
+                    onEditClick={() => router.visit(`/app/basicinformation/${personId}/edit-v2`)}
+                />
+            );
+        }
 
         return (
             <BasicInfoView

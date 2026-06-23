@@ -820,6 +820,104 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：社會區分（statuses）編輯器 V2。
+     * 對齊 legacy biogmains/statuses/_form.blade.php（含 AI 智能識別社會區分類別代碼）。
+     * 獨立測試路由，statuses migration flag 維持 old、不上線。
+     *
+     * 主鍵 3 段（c_personid, c_sequence, c_status_code）。0 為合法主鍵段（c_status_code=0=未詳），
+     * 故以 has() && input!=='' 判斷編輯/新增（不可用 (int) 後是否為 0 判斷）。
+     */
+    public function appStatusEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        // 主鍵齊備（含 c_sequence、c_status_code，0 為合法值）才視為編輯。
+        $pkKeys = ['c_sequence', 'c_status_code'];
+        $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $where = ['c_personid' => $personId];
+            foreach ($pkKeys as $k) {
+                $where[$k] = (int) $request->input($k);
+            }
+            $row = DB::table('STATUS_DATA')->where($where)->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 非同步搜尋欄位補回顯示標籤（補水失敗不影響編輯主流程，僅顯示空白）。
+            try {
+                $statusCode = (int) $row->c_status_code;
+                if ($statusCode) {
+                    $c = DB::table('STATUS_CODES')->where('c_status_code', $statusCode)->first();
+                    if ($c) {
+                        $initialLabels['c_status_code'] = trim($statusCode . ' ' . ($c->c_status_desc_chn ?? '') . ' ' . ($c->c_status_desc ?? ''));
+                    }
+                }
+                if ((int) ($row->c_source ?? 0)) {
+                    $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($tx) {
+                        $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                    }
+                }
+                // 年號（起/終）標籤補水。
+                foreach (['c_fy_nh_code', 'c_ly_nh_code'] as $nhField) {
+                    $nhId = (int) ($row->{$nhField} ?? 0);
+                    if ($nhId) {
+                        $nh = DB::table('NIAN_HAO')->where('c_nianhao_id', $nhId)->first();
+                        if ($nh) {
+                            $initialLabels[$nhField] = trim((string) ($nh->c_nianhao_chn ?? ''));
+                        }
+                    }
+                }
+                // 時限（起/終）標籤補水。
+                foreach (['c_fy_range', 'c_ly_range'] as $rField) {
+                    $rCode = (int) ($row->{$rField} ?? 0);
+                    if ($rCode) {
+                        $rg = DB::table('YEAR_RANGE_CODES')->where('c_range_code', $rCode)->first();
+                        if ($rg) {
+                            $initialLabels[$rField] = trim((string) ($rg->c_range_chn ?? ''));
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+        $aiEnabled = (bool) config('services.gemini.api_key') && $user && $user->isActive();
+
+        return Inertia::render('BasicInformation/StatusEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'ai_enabled' => $aiEnabled,
+            'ai_model' => (string) config('services.gemini.model', ''),
+            'ai_suggest_endpoint' => route('ai.code-lookup.suggest', [], false),
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.statuses.index', ['basicinformation' => $personId], false),
+            'route_name' => 'app.basicinformation.statuses.editv2',
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

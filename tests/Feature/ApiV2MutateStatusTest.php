@@ -235,6 +235,72 @@ class ApiV2MutateStatusTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectStatusUpdateRekeyStatusCodePreservesUnchangedFields(): void {
+        // 回歸（StatusEditor V2）：改鍵 c_status_code（同時改一非主鍵欄 c_notes），
+        // 舊 PK row 必須消失、新 PK row 出現，且所有未變更欄位（c_source / c_pages /
+        // c_supplement / 起終年 / 年號）一個都不能漂移或被清成 null。
+        $user = $this->makeUser(email: 'status-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedStatus([
+            'c_status_code' => 50,
+            'c_source' => 10,
+            'c_pages' => '1-5',
+            'c_supplement' => '原始補充',
+            'c_firstyear' => 1050,
+            'c_fy_nh_code' => 7,
+            'c_fy_nh_year' => 3,
+            'c_fy_range' => 0,
+            'c_lastyear' => 1100,
+            'c_ly_nh_code' => 8,
+            'c_ly_nh_year' => 5,
+            'c_ly_range' => 0,
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => [
+                'c_status_code' => 60, // 改鍵
+                'c_notes' => '改鍵後備註',
+            ],
+        ]));
+        $response->assertOk();
+
+        // 舊 PK row 消失
+        $this->assertDatabaseMissing('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+        ]);
+        // 新 PK row 出現，未變更欄位全數保留
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 60,
+            'c_notes' => '改鍵後備註',
+            'c_source' => 10, 'c_pages' => '1-5', 'c_supplement' => '原始補充',
+            'c_firstyear' => 1050, 'c_fy_nh_code' => 7, 'c_fy_nh_year' => 3, 'c_fy_range' => 0,
+            'c_lastyear' => 1100, 'c_ly_nh_code' => 8, 'c_ly_nh_year' => 5, 'c_ly_range' => 0,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectStatusUpdateAcceptsAllEraColumns(): void {
+        // 回歸（trap #1 allowlist 全覆蓋）：起/終年的 8 個年號/時限欄位皆須在白名單內，
+        // 任一缺漏會在編輯起終年時造成 422 或靜默資料流失。
+        $user = $this->makeUser(email: 'status-era@example.com');
+        $this->actingAs($user);
+        $this->seedStatus();
+
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => [
+                'c_firstyear' => 1060, 'c_fy_nh_code' => 11, 'c_fy_nh_year' => 2, 'c_fy_range' => 1,
+                'c_lastyear' => 1090, 'c_ly_nh_code' => 12, 'c_ly_nh_year' => 4, 'c_ly_range' => 1,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_firstyear' => 1060, 'c_fy_nh_code' => 11, 'c_fy_nh_year' => 2, 'c_fy_range' => 1,
+            'c_lastyear' => 1090, 'c_ly_nh_code' => 12, 'c_ly_nh_year' => 4, 'c_ly_range' => 1,
+        ]);
+    }
+
+    #[Test]
     public function testDirectStatusUpdateReturnsOperationIdAndRow(): void {
         $user = $this->makeUser(email: 'status-result@example.com');
         $this->actingAs($user);

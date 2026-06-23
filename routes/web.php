@@ -110,6 +110,12 @@ Route::get('app/basicinformation/{id}/entries/edit-v2', 'BasicInformationControl
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.entries.editv2');
+// 社會區分編輯器 V2（對齊 legacy statuses/_form，含 AI 智能識別社會區分類別代碼）。
+// 獨立測試路由，statuses flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/statuses/edit-v2', 'BasicInformationController@appStatusEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.statuses.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

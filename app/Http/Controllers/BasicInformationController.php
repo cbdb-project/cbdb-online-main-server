@@ -1199,7 +1199,8 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.assoc.index', ['basicinformation' => $personId], false),
+            // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'associations'], false),
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
             'ai_suggest_endpoint' => Route::has('ai.code-lookup.suggest') ? route('ai.code-lookup.suggest', [], false) : '',
         ]);
@@ -1208,7 +1209,8 @@ class BasicInformationController extends Controller {
     /**
      * Inertia + React 版：親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy kinship/_form）。
      * 3 段複合主鍵（c_personid 由路由帶入、c_kin_id、c_kin_code）；互逆配對碼由後端權威推導，
-     * 故不需前端送 c_kinship_pair。assoc/kinship flag 仍 old、本路由僅供測試對比。
+     * 故不需前端送 c_kinship_pair。#34 詳情中樞已接線：flag=new 時 KinshipTab 新增/編輯導向此頁，
+     * 存檔後返回 React 中樞 ?tab=kinship。
      */
     public function appKinshipEditV2(Request $request, $id) {
         $personId = $this->normalizePersonId($id);
@@ -1278,7 +1280,8 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.kinship.index', ['basicinformation' => $personId], false),
+            // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'kinship'], false),
         ]);
     }
 

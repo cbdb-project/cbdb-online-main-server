@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -13,11 +14,11 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import { APP_THEME } from '../../../theme';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import KinshipEditorModal, { KinshipEditorRow } from '../KinshipEditorModal';
 
 interface KinshipItem {
     pk: {
@@ -72,30 +73,25 @@ export default function KinshipTab({
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<KinshipEditorRow | null>(null);
-
     const [deleteTarget, setDeleteTarget] = useState<KinshipItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
+    // #34：新增/編輯導向獨立 edit-v2 編輯器頁（非 person-browser 內聯 modal）；刪除仍於列表內聯確認。
     const useReactEditor =
         kinshipEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('kinship', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: KinshipItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as KinshipEditorRow);
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('kinship', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -186,23 +182,6 @@ export default function KinshipTab({
 
             {useReactEditor ? (
                 <>
-                    <KinshipEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        kinCodeInitialLabel={
-                            editorRow ? formatBilingualLabel(editorRow.relation_chn, editorRow.relation) : null
-                        }
-                        kinPersonInitialLabel={
-                            editorRow ? formatBilingualLabel(editorRow.kin_person_name_chn, editorRow.kin_person_name) : null
-                        }
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => {

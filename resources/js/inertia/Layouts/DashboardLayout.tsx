@@ -54,10 +54,11 @@ export default function DashboardLayout({ children, title, description, breadcru
 
                 <main className={`flex-1${disableContentPadding ? '' : ' p-4 md:p-6'}`}>
                     {(title || breadcrumbs) && (
-                        <div className={`mb-4 flex flex-col gap-1 border-b border-border pb-3${headerAlign === 'center' ? ' items-center text-center' : ''}`}>
+                        <div className="mb-4 flex flex-col gap-1 border-b border-border pb-3">
+                            {/* headerAlign='center'：僅標題（身份）置中，麵包屑維持靠左（使用者指定）。 */}
                             <Breadcrumbs crumbs={breadcrumbs} />
-                            {title && <h1 className="text-xl font-semibold">{title}</h1>}
-                            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+                            {title && <h1 className={`text-xl font-semibold${headerAlign === 'center' ? ' text-center' : ''}`}>{title}</h1>}
+                            {description && <p className={`text-sm text-muted-foreground${headerAlign === 'center' ? ' text-center' : ''}`}>{description}</p>}
                         </div>
                     )}
 

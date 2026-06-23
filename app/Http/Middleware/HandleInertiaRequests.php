@@ -82,6 +82,9 @@ class HandleInertiaRequests extends Middleware {
                 // 殼所需翻譯群組常駐（驗證錯誤訊息、共用按鈕等）
                 'auth' => is_array($t = trans('auth')) ? $t : [],
                 'validation' => is_array($t = trans('validation')) ? $t : [],
+                // 人物編輯器（13 個 *Editor / PersonEditor 中樞）皆用 biogmains group；
+                // 常駐共享後，中英切換才會即時重渲染各編輯器的 label/按鈕（否則只回退硬編碼 zh）。
+                'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
             ],
         ]);
     }

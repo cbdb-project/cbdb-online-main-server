@@ -918,6 +918,76 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：著述出處（sources）編輯器 V2。
+     * 對齊 legacy biogmains/sources/_form.blade.php（含維基資料來源警告）。
+     * 獨立測試路由，sources migration flag 維持 old、不上線。
+     *
+     * 主鍵 3 段（c_personid, c_textid, c_pages）。c_pages 為 varchar 主鍵，哨兵為 ''（空字串）；
+     * c_textid=0 為合法值。故以「c_textid 是否存在且非空」判斷編輯/新增（0 仍視為已選編輯目標），
+     * c_pages 省略時視為 ''（對齊 BiogSourceRepository::normalizePk canonical 形式）。
+     * 後端 SourceMutationHandler 在 update 模式視 PK 不可變（c_textid/c_pages 唯讀）。
+     */
+    public function appSourceEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // c_textid 存在且非空才視為編輯（0 為合法 textid，故不可用 (int) 是否為 0 判斷）。
+        $hasPk = $request->has('c_textid') && $request->input('c_textid') !== '';
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $isWikiSource = false;
+        if ($mode === 'edit') {
+            $textId = (int) $request->input('c_textid');
+            // c_pages 省略時視為 ''（canonical），對齊 normalizePk。
+            $pages = (string) $request->input('c_pages', '');
+            $row = DB::table('BIOG_SOURCE_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_textid', $textId)
+                ->where('c_pages', $pages)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 出處（c_textid，search 欄位）補回顯示標籤；補水失敗不影響編輯主流程。
+            // 注意：c_textid=0（未詳）為合法代碼，亦須補水（對齊 legacy；不可用 if ($textId) 略過 0）。
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', $textId)->first();
+                if ($tx) {
+                    $initialLabels['c_textid'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+
+            // 維基資料來源警告（對齊 legacy $wikiSourceIds）。
+            $isWikiSource = in_array($textId, [60795, 68942, 68943], true);
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/SourceEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.sources.index', ['basicinformation' => $personId], false),
+            'is_wiki_source' => $isWikiSource,
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

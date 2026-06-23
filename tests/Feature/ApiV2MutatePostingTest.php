@@ -29,9 +29,11 @@ class ApiV2MutatePostingTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createPostingTable();
+        $this->createPostingAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -137,6 +139,28 @@ class ApiV2MutatePostingTest extends TestCase {
         });
     }
 
+    protected function createPostingAddrTable(): void {
+        Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
+            $table->integer('c_personid')->default(0);
+            $table->integer('c_posting_id')->default(0);
+            $table->integer('c_office_id')->default(0);
+            $table->integer('c_addr_id')->default(0);
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
+        });
+    }
+
+    protected function seedAddr(int $addrId, array $overrides = []): void {
+        DB::table('POSTED_TO_ADDR_DATA')->insert(array_replace([
+            'c_personid' => 1000,
+            'c_posting_id' => 400,
+            'c_office_id' => 300,
+            'c_addr_id' => $addrId,
+        ], $overrides));
+    }
+
     // ── Helpers ──────────────────────────────────────────────
 
     protected function seedPosting(array $overrides = []): void {
@@ -235,6 +259,115 @@ class ApiV2MutatePostingTest extends TestCase {
             'c_fy_month' => 5, 'c_fy_day' => 12, 'c_fy_day_gz' => 7,
             'c_ly_month' => 9, 'c_ly_day' => 30, 'c_ly_day_gz' => 21,
         ]);
+    }
+
+    // ── 地址副表同步（31b：v2 update 重用 officeUpdateById 抽出的 syncPostingAddresses）──
+
+    #[Test]
+    public function testPostingUpdateWithOfficeFieldAlsoSyncsAddress(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr1@example.com'));
+        $this->seedPosting();
+
+        // 同時改官名欄與地址：afterDirectUpdate 於同一交易內同步地址。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_notes' => '改備註', 'c_addr' => [130, 131]],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 130]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 131]);
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', ['c_office_id' => 300, 'c_posting_id' => 400, 'c_notes' => '改備註']);
+    }
+
+    /** 純地址 payload（不經 postingPayload 的 array_replace_recursive，避免帶入預設 c_notes）。 */
+    protected function addressOnlyPayload(array $changes): array {
+        return [
+            'resource' => 'postings',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_office_id' => 300, 'c_posting_id' => 400]],
+            'changes' => $changes,
+        ];
+    }
+
+    #[Test]
+    public function testPostingAddressOnlyUpdateAddsAndRemoves(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr2@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+        $this->seedAddr(131);
+
+        // 僅送 c_addr（無官名欄變更）：走 handleAddressOnlyDirect。保留 130、移除 131、新增 140。
+        $this->postJson('/api/v2/mutate', $this->addressOnlyPayload(['c_addr' => [130, 140]]))
+            ->assertOk()->assertJson(['ok' => true, 'operation' => 'update']);
+
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 140]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 131]);
+    }
+
+    #[Test]
+    public function testPostingAddressOnlyUpdateNoChangeReturns422(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr3@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+
+        // 地址未變更 → 與父類 no_effective_changes 一致，回 422（不建立虛假 operation）。
+        $this->postJson('/api/v2/mutate', $this->addressOnlyPayload(['c_addr' => [130]]))
+            ->assertStatus(422)->assertJson(['ok' => false]);
+    }
+
+    #[Test]
+    public function testPostingUpdateClearsAddressesViaClearedFlag(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr4@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+        $this->seedAddr(131);
+
+        // c_addr_cleared='1' 且未送 c_addr → 清空全部地址（incomingAddr = []）。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_addr_cleared' => '1'],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 131]);
+    }
+
+    #[Test]
+    public function testPostingUpdateOfficeIdChangeMigratesAddresses(): void {
+        // 關鍵對齊：改 c_office_id 時地址須遷移到新官職，不可流失（OfficeIdChangeAddressLoss 的 v2 版）。
+        $this->actingAs($this->makeUser(email: 'posting-addr5@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_office_id' => 301, 'c_addr' => [130]],
+        ]))->assertOk();
+
+        // 官名列主鍵改到 301；地址 130 遷移到 office 301（未流失）。
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', ['c_office_id' => 301, 'c_posting_id' => 400]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 301, 'c_addr_id' => 130]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 130]);
+    }
+
+    #[Test]
+    public function testPostingProposalUpdateStoresAddressInAux(): void {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'posting-addr6@example.com'));
+        $this->seedPosting();
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案備註', 'c_addr' => [130]],
+            'meta' => ['comment' => '請審'],
+        ]))->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        $op = DB::table('operations')->where('resource', 'POSTED_TO_OFFICE_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)->latest('id')->first();
+        $this->assertNotNull($op);
+        $data = json_decode($op->resource_data, true);
+        $this->assertSame([130], $data['__proposal_aux']['c_addr'] ?? null);
+        // 提案不應實際寫入地址列。
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
     }
 
     #[Test]

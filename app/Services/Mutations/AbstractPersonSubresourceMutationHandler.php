@@ -230,6 +230,9 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                     (string) Auth::id(),
                     $operation ? (string) $operation->id : null
                 );
+
+                // 子類在同一交易內的後續處理（例如任官地址副表同步），保證原子性
+                $this->afterDirectUpdate($personId, $targetPk, $updateData, $newArray, $operation);
             });
         } catch (\InvalidArgumentException $e) {
             // performUpdate() 明確拋出的 PK 衝突（如 AltnameMutationHandler、AddressMutationHandler）
@@ -300,6 +303,12 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             '__key_columns' => $this->keyColumns(),
         ]);
 
+        // 子類可附加副表提案資料（例如任官地址 c_addr，核准時由 applyOfficeProposal 套用）
+        $auxiliaryPayload = $this->proposalAuxiliaryPayload();
+        if ($auxiliaryPayload !== []) {
+            $proposalData['__proposal_aux'] = $auxiliaryPayload;
+        }
+
         $operation = $this->operationRepository->store(
             Auth::id(),
             $personId,
@@ -364,6 +373,21 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         }
 
         return $newPk;
+    }
+
+    /**
+     * direct 更新成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
+     * 子類可覆寫以在原子交易內同步副表（例如任官 PostingMutationHandler 同步 POSTED_TO_ADDR_DATA）。
+     */
+    protected function afterDirectUpdate(int $personId, array $targetPk, array $updateData, array $newArray, ?Operation $operation): void {
+    }
+
+    /**
+     * proposal 更新時附加的副表提案資料（預設空）。
+     * 子類可覆寫以把副表（例如任官地址 c_addr）寫入 __proposal_aux，核准時套用。
+     */
+    protected function proposalAuxiliaryPayload(): array {
+        return [];
     }
 
     /** 欄位值驗證（預設無驗證，子類可覆寫） */

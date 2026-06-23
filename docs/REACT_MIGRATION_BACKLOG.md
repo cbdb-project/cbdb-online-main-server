@@ -149,6 +149,13 @@
 | P4-12 | socialinst | BasicInformationSocialInstController | BIOG_INST_DATA | **done**（2026-06-22，flag old；React 編輯器；**修既有 7 個假欄**(c_supplement/c_bi_firstyear/c_bi_lastyear/c_bi_fy_*/c_bi_ly_*→真實 c_bi_begin_year/c_bi_end_year/c_bi_by_*/c_bi_ey_*)；review+codex 過、build✓、SocialInstitution 34 綠） |
 | P4-P | basicinformation 提案流程 | BasicInformationProposalController | — | **done**（2026-06-22，flag old）：A=後端 proposal DELETE 提交+審核（OperationsProposalController 加 delete 分支、offices/possession 副表）；B=offices/possession proposal CREATE 提交+審核（applyOfficeProposal/新增 applyPossessionCreateProposal）；C=12 編輯器加提案模式 UI（User::canPropose()=isActive、canProposeEdits prop、proposalMode=!canEdit&&canPropose、comment）。皆過 review+codex。眾包用戶可於新編輯器送 create/update/delete 提案，後端 authorizeDirect/authorizeProposal 強制無權限升級。 |
 
+### Phase 4 後續：詳情中樞組裝 + 上線閘門（2026-06-23，#34）
+12 子資源編輯器（P4-1…P4-12）功能/欄位/資料正確性皆 `done`（flag old）後，組裝人物詳情中樞並對齊 legacy：
+- **詳情中樞**（`/app/basicinformation/{id}`，`PersonEditor.tsx`）改用 legacy 風格 `PersonBanner`（人物頭 + 13 子資源分頁導航），脫離 person-browser 的 `BrowserTabs/PersonSummaryPanel`；`basic_info` 分頁內嵌 `BasicInfoEditor`（含年號轉換）；其餘 12 分頁為 legacy 表格樣式（`SubresourceTable`），「新增/編輯」導向獨立 `…/edit-v2` 編輯器頁。
+- **版面 pass**（#39）：身份標題置中、麵包屑靠左且末段隨分頁切換、頁碼置中、表格密度對齊 `table-sm`、地圖點地名以該座標居中、親屬/社會關係人連結另開新分頁。
+- **已修 bug**：i18n 中英切換（biogmains 共享 translations）、AI SSL（環境）、`person_records` 誤譯、各列序號/雙語/i18n 欄頭 parity（review+codex gate）。
+- **上線閘門（gate-before-flip，見 REACT_MIGRATION_SIMULATION_TEST_PLAN.md §0.1）**：`basicinformation.*` 全 `old`；須先以模擬測試計畫做**全面新舊機器對比**（內容/結構 + 互動 + L 欄位/說明文字 + I 字體 + J 導流 + K 視覺），差異清單清空 + review + codex 無嚴重 issue 後，才由 AI agent 翻 `new`。
+
 ## Phase 5 — 管理與營運工具（依賴：F*，部分依賴 P4 樣板）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|

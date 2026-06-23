@@ -52,7 +52,6 @@ export default function PersonEditor() {
         personId,
         person_label,
         initialTab,
-        index_url,
         summaryEndpoint,
         person_banner,
         tabEndpoint,
@@ -196,9 +195,10 @@ export default function PersonEditor() {
             title={person_label}
             headerAlign="center"
             breadcrumbs={[
-                { label: tPerson('person_records'), url: index_url },
-                // 末段隨當前分頁切換（人物記錄 / 著述 …），使頂部反映正在檢視的子資源，
-                // 不再固定停留在「基本資料」造成誤解。
+                // 首段「人物記錄」連到「這個人的基本資料」（詳情中樞，預設 basic_info 分頁），
+                // 而非人物列表——從任一子資源分頁一鍵回到本人基本資料（使用者指定）。
+                { label: tPerson('person_records'), url: `/app/basicinformation/${personId}` },
+                // 末段隨當前分頁切換（人物記錄 / 著述 …），使頂部反映正在檢視的子資源。
                 { label: tPerson(`tab_${activeTab}`) },
             ]}
         >

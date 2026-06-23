@@ -182,6 +182,58 @@ class ApiV2CreateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectAssociationCreateWritesReciprocalMirror(): void {
+        // 後台自動雙向同步（32a）：新增正向關係時，於同交易內無條件寫入互逆鏡像列
+        // （對齊 legacy assocStoreById；對方為主體、原人為客體、用反向關係碼）。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_source' => 20,
+                'c_notes' => '甲對乙',
+                'c_assocship_pair' => 101,
+                'c_kinship_pair' => 0,
+                'c_assoc_kinship_pair' => 0,
+            ],
+        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
+
+        // 正向（主）列。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080, 'c_notes' => '甲對乙',
+        ]);
+        // 互逆鏡像列：對方(2000)為主體、原人(1000)為客體、反向關係碼 101。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080, 'c_notes' => '甲對乙',
+        ]);
+    }
+
+    #[Test]
+    public function testProposalAssociationCreateStoresPairsInAux(): void {
+        // proposal 模式不直接寫列（含鏡像），但須把互逆配對碼存入 __proposal_aux，核准時建鏡像。
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'assoc-prop@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_source' => 20, 'c_assocship_pair' => 101],
+            'meta' => ['comment' => '請審'],
+        ]))->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        $op = DB::table('operations')->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->latest('id')->first();
+        $this->assertNotNull($op);
+        $data = json_decode($op->resource_data, true);
+        $this->assertSame(101, (int) ($data['__proposal_aux']['c_assocship_pair'] ?? null));
+        // 缺送的配對碼必須以哨兵 0 補齊（核准時 assocStoreById 無條件讀三鍵，缺鍵會變 null）。
+        $this->assertSame(0, (int) ($data['__proposal_aux']['c_kinship_pair'] ?? null));
+        $this->assertSame(0, (int) ($data['__proposal_aux']['c_assoc_kinship_pair'] ?? null));
+        // 提案不應實際寫入正式列（含鏡像）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101]);
+    }
+
+    #[Test]
     public function testDirectAssociationCreateSucceeds(): void {
         $user = $this->makeUser(email: 'create-assoc-direct@example.com');
         $this->actingAs($user);

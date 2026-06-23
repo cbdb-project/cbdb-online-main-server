@@ -201,6 +201,9 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
                     (string) Auth::id(),
                     $operation ? (string) $operation->id : null
                 );
+
+                // 子類在同一交易內的後續處理（例如社會關係/親屬寫互逆鏡像列），保證原子性
+                $this->afterDirectInsert($personId, $actualPk, $rowData, $insertedArray, $operation);
             });
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isUniqueConstraintViolation($e)) {
@@ -250,6 +253,12 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             '__key_columns' => $this->keyColumns(),
         ]);
 
+        // 子類可附加副表/鏡像提案資料（例如社會關係的互逆配對碼），核准時據以建立鏡像列。
+        $auxiliaryPayload = $this->proposalAuxiliaryPayload();
+        if ($auxiliaryPayload !== []) {
+            $proposalData['__proposal_aux'] = $auxiliaryPayload;
+        }
+
         $operation = $this->operationRepository->store(
             Auth::id(),
             $personId,
@@ -298,6 +307,21 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     /** 執行資料表新增 */
     protected function performInsert(array $rowData): void {
         DB::table($this->tableName())->insert($rowData);
+    }
+
+    /**
+     * direct 新增成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
+     * 子類可覆寫以在原子交易內寫入互逆鏡像列（例如 AssociationCreateHandler 寫 ASSOC_DATA 反向關係）。
+     */
+    protected function afterDirectInsert(int $personId, array $actualPk, array $rowData, array $insertedArray, ?Operation $operation): void {
+    }
+
+    /**
+     * proposal 新增時附加的副表/鏡像提案資料（預設空）。
+     * 子類可覆寫以把互逆配對碼寫入 __proposal_aux，核准時據以建立鏡像列。
+     */
+    protected function proposalAuxiliaryPayload(): array {
+        return [];
     }
 
     /** 欄位值驗證（預設無驗證，子類可覆寫） */

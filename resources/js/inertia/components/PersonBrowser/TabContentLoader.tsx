@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { router } from '@inertiajs/react';
 import BasicInfoView from './BasicInfoView';
+import BasicInfoEditor from '../BasicInfoEditor';
+import { useTranslation } from '../../hooks/useTranslation';
 import AltNamesTab from './tabs/AltNamesTab';
 import AddressesTab from './tabs/AddressesTab';
 import EntriesTab from './tabs/EntriesTab';
@@ -95,6 +96,15 @@ export default function TabContentLoader({
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
 }: Props) {
+    // basic_info 內嵌 BasicInfoEditor 用的翻譯（biogmains→person→common 鏈，隨 locale 切換）。
+    const tBio = useTranslation('biogmains');
+    const tPerson = useTranslation('person');
+    const tCommon = useTranslation('common');
+    const tEditor = (k: string): string => {
+        const v = tBio(k); if (v && v !== k) return v;
+        const v2 = tPerson(k); if (v2 && v2 !== k) return v2;
+        const v3 = tCommon(k); return v3 && v3 !== k ? v3 : k;
+    };
     const [cache, setCache] = useState<Record<string, TabState>>({});
     const [fetchSeq, setFetchSeq] = useState(0);
     const cachePersonRef = useRef<number | null>(personId);
@@ -197,19 +207,36 @@ export default function TabContentLoader({
             };
         };
 
-        // flag=new：檢視 + 「編輯基本資料」按鈕導向獨立 BasicInfoEditor（含年號轉換），
-        // 不走內聯編輯（故不掛 startEditing / 脏数据守卫 / 保存钩子）。
+        // flag=new：直接內嵌獨立 BasicInfoEditor（落地即可編輯，含年號轉換），對齊 legacy
+        // /basicinformation/{id}/edit「打開即錄入」；不再「檢視＋編輯按鈕跳轉」。
         if (basicInfoEditorIsNew && personId != null) {
+            const ff = (basicData?.form?.fields ?? {}) as Record<string, unknown>;
+            const initialFields: Record<string, string> = {};
+            const initialLabels: Record<string, string> = {};
+            for (const [k, f] of Object.entries(ff)) {
+                if (f !== null && typeof f === 'object') {
+                    const obj = f as { value?: unknown; display_value?: unknown };
+                    initialFields[k] = obj.value == null ? '' : String(obj.value);
+                    if (obj.display_value != null && obj.display_value !== '') initialLabels[k] = String(obj.display_value);
+                } else {
+                    initialFields[k] = f == null ? '' : String(f);
+                }
+            }
             return (
-                <BasicInfoView
-                    sections={basicData?.sections || []}
-                    form={basicData?.form || null}
+                <BasicInfoEditor
                     personId={personId}
+                    personLabel=""
+                    initialFields={initialFields}
+                    initialLabels={initialLabels}
+                    canEdit={canEditBasicInfo}
+                    canPropose={canProposeEdits}
                     mutateEndpoint={mutateEndpoint}
+                    deleteEndpoint={deleteEndpoint}
                     pinyinEndpoint={pinyinEndpoint}
-                    canEdit={canEditBasicInfo || canProposeEdits}
-                    startEditing={false}
-                    onEditClick={() => router.visit(`/app/basicinformation/${personId}/edit-v2`)}
+                    indexUrl={`/app/basicinformation/${personId}?tab=basic_info`}
+                    duplicateCollateralUrl={`/basicinformation/${personId}/Duplicate_Collateral_Info`}
+                    saveasUrl={`/basicinformation/${personId}/saveas`}
+                    t={tEditor}
                 />
             );
         }

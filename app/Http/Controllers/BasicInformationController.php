@@ -240,12 +240,16 @@ class BasicInformationController extends Controller {
      * 修正 React 編輯器頁丟失人物基本資訊頭的問題。$activeTab 為當前頁對應的 hub 分頁鍵。
      */
     protected function personBannerProps(int $personId, string $activeTab): array {
-        $nameRow = DB::table('BIOG_MAIN')->where('c_personid', $personId)->first(['c_name_chn', 'c_name']);
+        $row = DB::table('BIOG_MAIN')
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->where('BIOG_MAIN.c_personid', $personId)
+            ->first(['BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn']);
 
         return [
             'person_id' => $personId,
-            'name_chn' => $nameRow->c_name_chn ?? '',
-            'name' => $nameRow->c_name ?? '',
+            'name_chn' => $row->c_name_chn ?? '',
+            'name' => $row->c_name ?? '',
+            'dynasty' => $row->c_dynasty_chn ?? '',
             'active_tab' => $activeTab,
             'counts' => $this->personBrowserService->tabCounts($personId),
         ];

@@ -13,6 +13,7 @@ export interface PersonBannerData {
     person_id: number;
     name_chn: string;
     name: string;
+    dynasty?: string;
     active_tab: string;
     counts: Record<string, number>;
 }
@@ -53,6 +54,12 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
     return (
         <div style={wrapStyle}>
             <h3 style={headingStyle}>{heading.trim()}</h3>
+            <div style={infoStyle}>
+                <span><b>{t('person_id')}:</b> {data.person_id}</span>
+                <span><b>{t('pinyin')}:</b> {data.name || '—'}</span>
+                <span><b>{t('dynasty')}:</b> {data.dynasty || '—'}</span>
+                <span><b>{t('name')}:</b> {data.name_chn || '—'}</span>
+            </div>
             <div style={navStyle} role="tablist">
                 {TABS.map((tab) => {
                     const active = tab.key === data.active_tab;
@@ -79,7 +86,11 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
 }
 
 const wrapStyle: React.CSSProperties = { marginBottom: 16 };
-const headingStyle: React.CSSProperties = { textAlign: 'center', fontSize: '1.15rem', fontWeight: 700, margin: '0 0 12px' };
+const headingStyle: React.CSSProperties = { textAlign: 'center', fontSize: '1.15rem', fontWeight: 700, margin: '0 0 8px' };
+const infoStyle: React.CSSProperties = {
+    display: 'flex', flexWrap: 'wrap', gap: '4px 20px', justifyContent: 'center',
+    fontSize: '0.85rem', color: '#475569', marginBottom: 12,
+};
 const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid #dee2e6', paddingBottom: 0 };
 const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',

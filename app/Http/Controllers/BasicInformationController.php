@@ -450,6 +450,65 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：別名（altname）編輯器（對齊 legacy biogmains/altname/_form）。
+     * 主鍵 (c_personid, c_alt_name_chn[字串], c_alt_name_type_code)；獨立測試路由、未上線。
+     */
+    public function appAltnameEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $hasPk = $request->filled('c_alt_name_chn') && $request->filled('c_alt_name_type_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $altNameChn = (string) $request->input('c_alt_name_chn');
+            $typeCode = (int) $request->input('c_alt_name_type_code');
+            $row = DB::table('ALTNAME_DATA')->where([
+                'c_personid' => $personId,
+                'c_alt_name_chn' => $altNameChn,
+                'c_alt_name_type_code' => $typeCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_source（出處）為非同步搜尋欄位，補回顯示標籤（失敗不影響編輯）。
+            try {
+                $sourceId = (int) ($initialFields['c_source'] ?? 0);
+                if ($sourceId > 0) {
+                    $text = DB::table('TEXT_CODES')->where('c_textid', $sourceId)->first();
+                    if ($text) {
+                        $initialLabels['c_source'] = trim((string) ($text->c_title_chn ?? $text->c_title ?? $sourceId));
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AltnameEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.altnames.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

@@ -1,0 +1,225 @@
+import React, { useRef, useState } from 'react';
+import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
+import TextpersonPair from './PersonEditorShared/TextpersonPair';
+import { getCsrfToken } from './PersonBrowser/shared/csrf';
+
+/**
+ * 別名（altname）編輯器（對齊 legacy biogmains/altname/_form，非 person-browser）。
+ * 欄位：序號(c_sequence) / 別名(中) c_alt_name_chn(PK,字串) / 別名 c_alt_name /
+ * 類型 c_alt_name_type_code(altcode 碼表) / 出處 c_source(text 搜尋) / 頁碼 / 備註 / textperson_pair。
+ * 複合主鍵 (c_personid, c_alt_name_chn, c_alt_name_type_code)；c_alt_name_chn 為字串主鍵——
+ * 構建 PK 時必須保留字串（不可 Number()）。對齊 legacy，別名(中)/類型於編輯時可改，後端 performUpdate 改鍵。
+ */
+type Fields = Record<string, string>;
+
+interface Props {
+    personId: number;
+    personLabel: string;
+    mode: 'create' | 'edit';
+    initialFields: Fields;
+    initialLabels?: Fields;
+    canEdit: boolean;
+    canPropose: boolean;
+    createEndpoint: string;
+    mutateEndpoint: string;
+    deleteEndpoint?: string;
+    indexUrl: string;
+    t?: (k: string) => string;
+}
+
+const PK = ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'];
+const EDITABLE_PK = ['c_alt_name_chn', 'c_alt_name_type_code'];
+const NON_PK = ['c_alt_name', 'c_source', 'c_pages', 'c_notes', 'c_sequence'];
+// 字串型主鍵欄（構建 PK 時保留字串，不可 Number()）。
+const STRING_PK = new Set(['c_alt_name_chn']);
+
+// 依欄位型別構建單一 PK 值（字串 PK 保留字串、其餘轉數字）。
+function pkVal(key: string, raw: string, personId: number): string | number {
+    if (key === 'c_personid') return Number(raw || personId);
+    if (STRING_PK.has(key)) return raw ?? '';
+    return Number(raw || 0);
+}
+
+export default function AltnameEditor({
+    personId, personLabel, mode, initialFields, initialLabels = {},
+    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
+}: Props) {
+    const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
+    // 對齊 legacy：c_sequence 不預設值（建立時必填、由使用者決定序號），避免捏造序號造成排序錯誤。
+    const base: Fields = { c_personid: String(personId), c_alt_name_chn: '', c_alt_name_type_code: '0', ...initialFields };
+    const [fields, setFields] = useState<Fields>(base);
+    const [labels, setLabels] = useState<Fields>(initialLabels);
+    const snapshot = useRef(JSON.stringify(base));
+    const originalPk = useRef<Record<string, string | number>>(
+        Object.fromEntries(PK.map((k) => [k, pkVal(k, initialFields[k] ?? (k === 'c_personid' ? String(personId) : ''), personId)])),
+    );
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [sourceHighlight, setSourceHighlight] = useState(false);
+    const [comment, setComment] = useState('');
+
+    const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
+    const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
+    const editable = canEdit || canPropose;
+
+    const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
+        setFields((prev) => ({ ...prev, c_source: p.source, c_pages: p.pages }));
+        setLabel('c_source', p.sourceLabel);
+        setSourceHighlight(true);
+        window.setTimeout(() => setSourceHighlight(false), 4000);
+        setMessage(tr('update_source_success', '已自動回填出處與頁碼'));
+    };
+
+    const save = async (sm: 'direct' | 'proposal') => {
+        setSaving(true); setError(null); setMessage(null);
+        let changes: Record<string, string | null>;
+        let target: Record<string, string | number>;
+        let endpoint: string;
+        let operation: string;
+        if (mode === 'create') {
+            // 別名(中) 為主鍵，必填；c_sequence 對齊 legacy create 為必填。
+            if ((fields.c_alt_name_chn ?? '') === '') { setSaving(false); setError(tr('altname_required', '請輸入別名（中文）')); return; }
+            if ((fields.c_sequence ?? '') === '') { setSaving(false); setError(tr('sequence_required', '請輸入序號')); return; }
+            endpoint = createEndpoint; operation = 'create';
+            target = Object.fromEntries(PK.map((k) => [k, pkVal(k, fields[k] ?? '', personId)]));
+            changes = {};
+            for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+        } else {
+            endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
+            // 主鍵欄（別名(中)/類型）不可清空：清空會讓送出的 changes 略過該欄，導致 DB 仍為舊鍵、
+            // 但 client snapshot/PK 已失準（後續 save/delete 命中錯誤記錄）。對齊 legacy 直接擋下。
+            for (const k of EDITABLE_PK) {
+                if ((fields[k] ?? '') === '') { setSaving(false); setError(tr('pk_required', '主鍵欄位不可為空')); return; }
+            }
+            const initial: Fields = JSON.parse(snapshot.current);
+            changes = {};
+            for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
+            // 可改主鍵（別名(中)/類型）：對齊 legacy，後端據此改鍵（上方已保證非空）。
+            for (const k of EDITABLE_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v; }
+            if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
+        }
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ resource: 'altnames', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            snapshot.current = JSON.stringify(fields);
+            if (mode === 'create') { window.location.assign(indexUrl); }
+            // 直接儲存若改了主鍵：以「實際送出的 PK 變更」覆寫 originalPk（字串 PK 保留字串）。
+            // 不可用 fields 重建（清空欄位會讓 client/DB PK 失準）。
+            else if (sm === 'direct') {
+                const nextPk = { ...originalPk.current };
+                for (const k of EDITABLE_PK) {
+                    if (Object.prototype.hasOwnProperty.call(changes, k)) {
+                        nextPk[k] = STRING_PK.has(k) ? String(changes[k]) : Number(changes[k]);
+                    }
+                }
+                originalPk.current = nextPk;
+            }
+        } catch (e) {
+            setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
+        } finally { setSaving(false); }
+    };
+
+    const doDelete = async () => {
+        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此別名？'))) return;
+        setDeleting(true); setError(null);
+        try {
+            const res = await fetch(deleteEndpoint, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ resource: 'altnames', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            snapshot.current = JSON.stringify(fields);
+            window.location.assign(indexUrl);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
+        } finally { setDeleting(false); }
+    };
+
+    const textRow = (key: string, label: string, type = 'text', highlight = false) => (
+        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+            <input type={type} value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
+    );
+
+    return (
+        <div style={cardStyle}>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('altname_create', '新增別名') : tr('altname_edit', '編輯別名')} — {personLabel}</h3>
+            {message ? <div style={okStyle}>{message}</div> : null}
+            {error ? <div style={errStyle}>{error}</div> : null}
+
+            {textRow('c_sequence', tr('sequence', '序號'), 'number')}
+            {textRow('c_alt_name_chn', tr('altname_chn', '別名（中）') + ' (c_alt_name_chn)')}
+            {textRow('c_alt_name', tr('altname_pinyin_label', '別名（拼音）') + ' (c_alt_name)')}
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('altname_type', '類型')} (c_alt_name_type_code)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="list" model="altcode" idKey="c_alt_name_type_code" labelKeys={['c_alt_name_type_code', 'c_alt_name_type_desc_chn', 'c_alt_name_type_desc']}
+                    value={fields.c_alt_name_type_code ?? '0'} initialLabel={labels.c_alt_name_type_code ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_alt_name_type_code', v); setLabel('c_alt_name_type_code', l); }} /></div></div>
+
+            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                    value={fields.c_source ?? ''} initialLabel={labels.c_source ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_source', v); setLabel('c_source', l); }} /></div></div>
+            {textRow('c_pages', tr('pages_entries', '頁碼'), 'text', sourceHighlight)}
+            <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
+                <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
+
+            <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
+
+            {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
+                <>
+                    {fields.c_created_by ? (
+                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_created', '建檔')}</label><div style={fieldStyle}>
+                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
+                    ) : null}
+                    {fields.c_modified_by ? (
+                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_updated', '更新')}</label><div style={fieldStyle}>
+                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
+                    ) : null}
+                </>
+            ) : null}
+
+            {(canEdit || canPropose) && (
+                <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }}
+                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
+            )}
+
+            <div style={{ ...rowStyle, gap: 8 }}>
+                <div style={{ width: 160, flexShrink: 0 }} />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, maxWidth: 880 };
+const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
+const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '0.875rem', color: '#374151', paddingTop: 6 };
+const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
+const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
+const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
+const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
+const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
+const infoBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #0e7490', background: '#0891b2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
+const dangerBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #b91c1c', background: '#fff5f5', color: '#b91c1c', fontWeight: 700, cursor: 'pointer' };
+const cancelBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

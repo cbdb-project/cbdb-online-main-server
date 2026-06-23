@@ -36,6 +36,11 @@
 ## C. 最易漏清單（每頁過閘前核對）
 1. textperson_pair（全子資源）2. 年號雙向轉換鈕 + 農曆校驗 3. person 上下文隱藏字段（驅動 addr 過濾/AI）4. AI 兩端點（offices=posting.extract；assoc/statuses=code-lookup.suggest，table 不同）5. multi-select 地址（offices/possession，offices 有清空標記）6. 複合主鍵 query 模式 + unionPKDef 7. 三態授權提交 + __proposal_comment 8. CHGIS 地圖（addresses/offices index）9. 各頁 required/默認值差異 10. 零散特有（拼音生成/indexYear/beforeunload/Duplicate×2/Wiki 警告/另存為/c_autogen_notes/補充文字）。
 
+## D0. 版面（layout）—— 使用者決定：功能全做完後再統一調版面（2026-06-22）
+- 目前各編輯器是「功能正確、版面未對齊 legacy」狀態（使用者已知、可接受）。
+- **不在每個編輯器逐頁調版面**；待 12 個編輯器功能/欄位/資料正確性全部做完並過閘後，做**一個統一的「版面對齊 legacy」pass**：建共享表單版面組件，一次性把所有頁的區塊劃分/欄位順序/分組/間距/label 位置/hints 呈現拉齊到 legacy 編輯頁。
+- 為此，各編輯器重建時**結構保持一致**（欄位分組、區塊命名比照 legacy `版面分區`），便於最後統一套版面、減少返工。
+
 ## D. 重做計畫
 1. **共享基礎組件**（A 節全部）建好並各自驗證。
 2. **逐頁重建**（B 節），每頁對照 checklist + C 節核對。

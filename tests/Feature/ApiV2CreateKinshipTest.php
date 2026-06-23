@@ -29,9 +29,11 @@ class ApiV2CreateKinshipTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createKinTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -116,6 +118,21 @@ class ApiV2CreateKinshipTest extends TestCase {
         });
     }
 
+    /** 親屬碼配對表：未送 c_kinship_pair 時以 c_kin_pair1 查權威反向碼。75↔76、80↔81 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+            ['c_kincode' => 80, 'c_kin_pair1' => 81, 'c_kin_pair2' => null],
+            ['c_kincode' => 81, 'c_kin_pair1' => 80, 'c_kin_pair2' => null],
+        ]);
+    }
+
     protected function seedKin(array $overrides = []): void {
         DB::table('KIN_DATA')->insert(array_replace([
             'c_personid' => 1000,
@@ -154,6 +171,22 @@ class ApiV2CreateKinshipTest extends TestCase {
                 'c_notes' => '新增親屬',
             ],
         ], $overrides);
+    }
+
+    #[Test]
+    public function testDirectKinshipCreateWritesReciprocalMirror(): void {
+        // 後台自動雙向同步：新增親屬關係時於同交易內無條件寫互逆鏡像列（對齊 legacy kinshipStoreById）。
+        // 未送 c_kinship_pair → 後端以 KINSHIP_CODES[80].c_kin_pair1=81 權威補齊。
+        $this->actingAs($this->makeUser(email: 'kin-mirror@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親'],
+        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
+
+        // 正向 (1000,300,80)。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80, 'c_notes' => '甲之親']);
+        // 互逆鏡像 (300,1000,81)：對方為主體、原人為客體、反向親屬碼 81。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_notes' => '甲之親']);
     }
 
     #[Test]

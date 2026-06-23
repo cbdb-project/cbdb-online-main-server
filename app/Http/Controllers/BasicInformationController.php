@@ -1206,6 +1206,83 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy kinship/_form）。
+     * 3 段複合主鍵（c_personid 由路由帶入、c_kin_id、c_kin_code）；互逆配對碼由後端權威推導，
+     * 故不需前端送 c_kinship_pair。assoc/kinship flag 仍 old、本路由僅供測試對比。
+     */
+    public function appKinshipEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 編輯模式：以 2 段非 c_personid 主鍵（c_kin_id、c_kin_code）皆存在判斷。
+        $hasPk = $request->has('c_kin_id') && $request->has('c_kin_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $row = DB::table('KIN_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_kin_id', (int) $request->input('c_kin_id'))
+                ->where('c_kin_code', (int) $request->input('c_kin_code'))
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（失敗不影響編輯主流程）。
+            try {
+                $kid = (int) ($row->c_kin_id ?? 0);
+                if ($kid) {
+                    $p = DB::table('BIOG_MAIN')->where('c_personid', $kid)->first();
+                    if ($p) {
+                        $initialLabels['c_kin_id'] = trim($p->c_personid . ' ' . ($p->c_name_chn ?? '') . ' ' . ($p->c_name ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $code = (int) ($row->c_kin_code ?? 0);
+                if ($code) {
+                    $k = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+                    if ($k) {
+                        $initialLabels['c_kin_code'] = trim($k->c_kincode . ' ' . ($k->c_kinrel_chn ?? '') . ' ' . ($k->c_kinrel ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/KinshipEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.kinship.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

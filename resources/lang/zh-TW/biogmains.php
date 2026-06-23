@@ -146,6 +146,9 @@ return [
     'relative_name'           => '親戚姓名',
     'paired_kinship'          => '成對親屬關係',
     'no_paired_kinship'       => '無對應親屬關係',
+    'kinship_create'          => '新增親屬關係',
+    'kinship_edit'            => '編輯親屬關係',
+    'kinship_pair_auto_hint'  => '互逆親屬關係（配對）由系統依關係碼自動雙向同步，無需手動填寫。',
 
     // ─── Texts module ─────────────────────────────────────────────
     'texts_list'              => '著述清單',

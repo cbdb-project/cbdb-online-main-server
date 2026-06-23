@@ -146,6 +146,9 @@ return [
     'relative_name'           => 'Relative Name',
     'paired_kinship'          => 'Paired Kinship',
     'no_paired_kinship'       => 'No corresponding kinship',
+    'kinship_create'          => 'Add Kinship',
+    'kinship_edit'            => 'Edit Kinship',
+    'kinship_pair_auto_hint'  => 'The reciprocal (paired) kinship is synced automatically by the system based on the relation code; no manual entry needed.',
 
     // ─── Texts module ─────────────────────────────────────────────
     'texts_list'              => 'Writings',

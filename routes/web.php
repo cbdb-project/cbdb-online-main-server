@@ -131,6 +131,11 @@ Route::get('app/basicinformation/{id}/assoc/edit-v2', 'BasicInformationControlle
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.assoc.editv2');
+// 親屬關係編輯器 V2（對齊 legacy kinship/_form，3 段 PK＋親屬碼/人物/出處搜尋；互逆配對碼後端權威補齊＋雙向 mirror）。獨立測試路由，kinship flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/kinship/edit-v2', 'BasicInformationController@appKinshipEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.kinship.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

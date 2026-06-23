@@ -296,7 +296,13 @@ class BasicInformationController extends Controller {
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
             'pinyin_endpoint' => '/api/select/search/pinyin',
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+            'duplicate_collateral_url' => "/basicinformation/{$personId}/Duplicate_Collateral_Info",
+            'saveas_url' => "/basicinformation/{$personId}/saveas",
         ]);
     }
 

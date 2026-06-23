@@ -17,7 +17,11 @@ interface PageProps extends SharedProps {
     can_edit: boolean;
     can_propose: boolean;
     mutate_endpoint: string;
+    delete_endpoint: string;
     pinyin_endpoint: string;
+    index_url: string;
+    duplicate_collateral_url: string;
+    saveas_url: string;
 }
 
 export default function EditV2() {
@@ -39,7 +43,11 @@ export default function EditV2() {
                 canEdit={p.can_edit}
                 canPropose={p.can_propose}
                 mutateEndpoint={p.mutate_endpoint}
+                deleteEndpoint={p.delete_endpoint}
                 pinyinEndpoint={p.pinyin_endpoint}
+                indexUrl={p.index_url}
+                duplicateCollateralUrl={p.duplicate_collateral_url}
+                saveasUrl={p.saveas_url}
                 t={(k) => t(k)}
             />
         </DashboardLayout>

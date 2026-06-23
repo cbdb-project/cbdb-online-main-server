@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -21,7 +22,11 @@ interface Props {
     canEdit: boolean;            // 可直接寫入
     canPropose: boolean;         // 可提案
     mutateEndpoint: string;      // /api/v2/mutate
+    deleteEndpoint?: string;     // /api/v2/delete
     pinyinEndpoint?: string;     // /api/select/search/pinyin
+    indexUrl?: string;           // 刪除後導回的人物列表
+    duplicateCollateralUrl?: string;
+    saveasUrl?: string;
     t?: (k: string) => string;   // person/biogmains 翻譯
 }
 
@@ -35,7 +40,8 @@ interface DateGroup {
 
 export default function BasicInfoEditor({
     personId, personLabel, initialFields, initialLabels = {},
-    canEdit, canPropose, mutateEndpoint, pinyinEndpoint = '/api/select/search/pinyin', t,
+    canEdit, canPropose, mutateEndpoint, deleteEndpoint, pinyinEndpoint = '/api/select/search/pinyin',
+    indexUrl = '/basicinformation', duplicateCollateralUrl, saveasUrl, t,
 }: Props) {
     // useTranslation 在缺 key 時回傳 key 本身；故須在 t(k)===k（未翻譯）時退回中文 fallback，
     // 否則按鈕/標籤會顯示原始 key（如 save_directly）而非中文。
@@ -51,6 +57,7 @@ export default function BasicInfoEditor({
     const [error, setError] = useState<string | null>(null);
     const [pinyinDone, setPinyinDone] = useState(false);
     const [comment, setComment] = useState('');
+    const [deleting, setDeleting] = useState(false);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== initialSnapshot.current, [fields]);
     const dynastyCode = useMemo(() => {
@@ -92,10 +99,12 @@ export default function BasicInfoEditor({
         nhCodeLabel: labels[g.nhCode] ?? '',
         nhYear: fields[g.nhYear] ?? '',
         range: g.range ? fields[g.range] ?? '' : '',
+        rangeLabel: g.range ? labels[g.range] ?? '' : '',
         intercalary: g.intercalary ? fields[g.intercalary] ?? '0' : '0',
         month: g.month ? fields[g.month] ?? '' : '',
         day: g.day ? fields[g.day] ?? '' : '',
         dayGz: g.dayGz ? fields[g.dayGz] ?? '' : '',
+        dayGzLabel: g.dayGz ? labels[g.dayGz] ?? '' : '',
         notes: g.notes ? fields[g.notes] ?? '' : '',
     });
 
@@ -118,6 +127,8 @@ export default function BasicInfoEditor({
             return next;
         });
         if (patch.nhCodeLabel !== undefined) setLabel(g.nhCode, patch.nhCodeLabel);
+        if (g.range && patch.rangeLabel !== undefined) setLabel(g.range, patch.rangeLabel);
+        if (g.dayGz && patch.dayGzLabel !== undefined) setLabel(g.dayGz, patch.dayGzLabel);
     };
 
     // 生成拼音：用中文姓名查 /api/select/search/pinyin，回填拼音姓/名。
@@ -176,6 +187,36 @@ export default function BasicInfoEditor({
         } finally { setSaving(false); }
     };
 
+    // 刪除（軟刪除）走 /api/v2/delete（對齊 legacy delete-form）。僅 canEdit 顯示。
+    const doDelete = async () => {
+        if (!deleteEndpoint) return;
+        if (!window.confirm(tr('delete_confirm', '確定要刪除此人物嗎？此操作無法復原。'))) return;
+        setDeleting(true); setError(null);
+        try {
+            const res = await fetch(deleteEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json', 'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    resource: 'basicinformation', person_id: personId, mode: 'direct',
+                    operation: 'delete', target: { pk: { c_personid: personId } },
+                }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            initialSnapshot.current = JSON.stringify(fields); // 避免離頁守衛攔截
+            router.visit(indexUrl);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
+        } finally { setDeleting(false); }
+    };
+
+    // 對齊 legacy #check_info：名（中）或拼音名任一空 → 提示。
+    const nameWarning = (fields.c_mingzi_chn ?? '') === '' || (fields.c_mingzi ?? '') === '';
+
     const textRow = (key: string, label: string, readonly = false, hint?: string) => (
         <div style={rowStyle}>
             <label style={labelStyle}>{label}</label>
@@ -199,6 +240,18 @@ export default function BasicInfoEditor({
         </div>
     );
 
+    // 唯讀展示列（index 自動欄等）：顯示 label（display_value）若有，否則原始值。
+    const displayRow = (key: string, label: string, hint?: string) => (
+        <div style={rowStyle}>
+            <label style={labelStyle}>{label}</label>
+            <div style={fieldStyle}>
+                <input type="text" value={labels[key] || fields[key] || ''} readOnly disabled
+                    style={{ ...inputStyle, ...readonlyStyle }} />
+                {hint ? <small style={hintStyle} className="text-muted">{hint}</small> : null}
+            </div>
+        </div>
+    );
+
     const birth: DateGroup = { year: 'c_birthyear', nhCode: 'c_by_nh_code', nhYear: 'c_by_nh_year', range: 'c_by_range', intercalary: 'c_by_intercalary', month: 'c_by_month', day: 'c_by_day', dayGz: 'c_by_day_gz' };
     const death: DateGroup = { year: 'c_deathyear', nhCode: 'c_dy_nh_code', nhYear: 'c_dy_nh_year', range: 'c_dy_range', intercalary: 'c_dy_intercalary', month: 'c_dy_month', day: 'c_dy_day', dayGz: 'c_dy_day_gz' };
     const flEarly: DateGroup = { year: 'c_fl_earliest_year', nhCode: 'c_fl_ey_nh_code', nhYear: 'c_fl_ey_nh_year', notes: 'c_fl_ey_notes' };
@@ -210,6 +263,7 @@ export default function BasicInfoEditor({
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
             {pinyinDone ? <div style={okStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
+            {nameWarning ? <div style={warnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
             {textRow('c_surname_chn', tr('surname_chn', '姓（中）'))}
             {textRow('c_mingzi_chn', tr('mingzi_chn', '名（中）'))}
@@ -230,9 +284,9 @@ export default function BasicInfoEditor({
             <div style={rowStyle}>
                 <label style={labelStyle}>{tr('gender', '性別')} (c_female)</label>
                 <div style={fieldStyle}>
-                    <select value={fields.c_female ?? 'NULL'} disabled={!canEdit && !canPropose}
+                    <select value={fields.c_female ?? ''} disabled={!canEdit && !canPropose}
                         onChange={(e) => set('c_female', e.target.value)} style={inputStyle}>
-                        <option value="NULL">NULL</option>
+                        <option value="">{tr('please_select', 'NULL')}</option>
                         <option value="0">0-{tr('male', '男')}</option>
                         <option value="1">1-{tr('female', '女')}</option>
                     </select>
@@ -247,7 +301,12 @@ export default function BasicInfoEditor({
             <EraTimeField values={buildEra(death)} onChange={(p) => applyEra(death, p)} dynastyCode={dynastyCode} showRange showLunar />
 
             {textRow('c_index_year', tr('index_year', '指數年') + ' (c_index_year)', true, tr('auto_calc_hint', '由算法自動計算'))}
+            {displayRow('c_index_year_type_code', tr('index_year_method', '指數年方法') + ' (c_index_year_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
+            {displayRow('c_index_year_source_id', tr('index_year_source', '指數年來源') + ' (c_index_year_source_id)')}
+            {displayRow('c_index_addr_id', tr('index_addr', '指數地址') + ' (c_index_addr_id)')}
+            {displayRow('c_index_addr_type_code', tr('index_addr_type', '指數地址類型') + ' (c_index_addr_type_code)')}
             {textRow('c_death_age', tr('age_at_death', '享年') + ' (c_death_age)')}
+            {codeRow('c_death_age_range', tr('range_label', '範圍') + ' (c_death_age_range)', 'range', 'c_range_code', ['c_range_code', 'c_approx', 'c_approx_chn'])}
 
             <div style={sectionLabel}>{tr('active_from', '在世始年')} (c_fl_earliest_year)</div>
             <EraTimeField values={buildEra(flEarly)} onChange={(p) => applyEra(flEarly, p)} dynastyCode={dynastyCode} showNotes />
@@ -275,9 +334,23 @@ export default function BasicInfoEditor({
                 </div>
             ) : null}
 
+            {/* audit-fields 唯讀區（建檔/更新者，僅有值時顯示，對齊 legacy x-forms.audit-fields） */}
+            {(fields.c_created_by || fields.c_created_date || fields.c_modified_by || fields.c_modified_date) ? (
+                <div style={auditWrapStyle}>
+                    <div style={sectionLabel}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
+                    {displayRow('c_created_by', tr('audit_created_by', '建檔者') + ' (c_created_by)')}
+                    {displayRow('c_created_date', tr('audit_created_date', '建檔日期') + ' (c_created_date)')}
+                    {displayRow('c_modified_by', tr('audit_modified_by', '更新者') + ' (c_modified_by)')}
+                    {displayRow('c_modified_date', tr('audit_modified_date', '更新日期') + ' (c_modified_date)')}
+                </div>
+            ) : null}
+
             <div style={submitRow}>
                 {canEdit ? <button type="button" disabled={saving || !dirty} style={primaryBtn} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
                 {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={infoBtn} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit && deleteEndpoint ? <button type="button" disabled={deleting} style={dangerBtn} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                {duplicateCollateralUrl ? <a href={duplicateCollateralUrl} style={successLink}>{tr('duplicate_collateral', 'Duplicate Collateral Info')}</a> : null}
+                {saveasUrl ? <a href={saveasUrl} style={successLink}>{tr('duplicate_basic', 'Duplicate Basic Info')}</a> : null}
             </div>
         </div>
     );
@@ -297,3 +370,7 @@ const primaryBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, 
 const infoBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #17a2b8', background: '#17a2b8', color: '#fff', fontWeight: 700, cursor: 'pointer', marginBottom: 10 };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
+const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
+const auditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' };
+const dangerBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #dc3545', background: '#dc3545', color: '#fff', fontWeight: 700, cursor: 'pointer' };
+const successLink: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #28a745', background: '#28a745', color: '#fff', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

@@ -65,6 +65,15 @@ export default function EraTimeField({
     const [eraOptions, setEraOptions] = useState<EraResult[] | null>(null);
     const [busy, setBusy] = useState(false);
 
+    // 農曆月(1-12)/日(1-30) 範圍校驗（對齊 legacy initLunarValidation）。
+    const inRange = (v: string | undefined, max: number) => {
+        if (v == null || v === '') return true;
+        const n = Number(v);
+        return Number.isInteger(n) && n >= 1 && n <= max;
+    };
+    const monthInvalid = !inRange(values.month, 12);
+    const dayInvalid = !inRange(values.day, 30);
+
     const fillFromEra = async (era: EraResult) => {
         const year = parseInt(values.year, 10);
         let id = await findNianhaoIdByNameAndYear(era.reign_title, year, Number(era.year));
@@ -101,13 +110,42 @@ export default function EraTimeField({
         }
         setBusy(true);
         try {
-            const candidates = gregorianToReignCandidates(year, dynastyCode ?? null);
-            if (!candidates.length) {
+            // 取「全部」候選（不過濾朝代），再自行依朝代過濾，以便偵測朝代不匹配並警告（對齊 app.js）。
+            const all = gregorianToReignCandidates(year, null);
+            if (!all.length) {
                 window.alert(`無法找到西元 ${year} 年對應的年號`);
                 return;
             }
+            const dc = dynastyCode ?? null;
+            // 對齊 legacy app.js：單一候選與多候選兩條分支分開處理，避免「朝代無對應 alert」與
+            // 「單一結果 confirm」同時觸發（雙重彈窗）。
+            if (all.length === 1) {
+                const only = all[0];
+                // 單一結果且與所選朝代不符 → 只 confirm（不另發朝代無對應 alert，對齊 app.js:529-549）。
+                if (dc && dc > 0 && only.dynasty !== dc) {
+                    const ok = window.confirm(
+                        `所選朝代與查詢結果不符。\n\n查詢結果：${only.dynasty_name} ${only.reign_title} ${only.year_num}\n\n是否使用此結果？`,
+                    );
+                    if (!ok) {
+                        return;
+                    }
+                }
+                await fillFromEra(only);
+                return;
+            }
+            // 多候選：依朝代過濾；過濾後為空 → 警告並用全部候選（對齊 legacy app.js:500-527）。
+            let candidates = all;
+            if (dc && dc > 0) {
+                const filtered = all.filter((r) => r.dynasty === dc);
+                if (filtered.length === 0) {
+                    window.alert(`所選朝代在西元 ${year} 年沒有對應的年號。\n請檢查朝代選擇是否正確，或從以下全部候選中選擇。`);
+                    candidates = all;
+                } else {
+                    candidates = filtered;
+                }
+            }
             if (candidates.length === 1) {
-                await fillFromEra(candidates[0]);
+                await fillFromEra(candidates[0]); // 過濾後剩 1（朝代相符）→ 直接填
             } else {
                 setEraOptions(candidates); // 多結果 → 彈出選擇
             }
@@ -209,10 +247,14 @@ export default function EraTimeField({
                         {intercalaryLabel}
                     </label>
                     <input type="number" min={1} max={12} value={values.month ?? ''} disabled={disabled}
-                        onChange={(e) => onChange({ month: e.target.value })} style={{ ...inputStyle, width: '7ch' }} aria-label="月" />
+                        onChange={(e) => onChange({ month: e.target.value })}
+                        style={{ ...inputStyle, width: '7ch', ...(monthInvalid ? invalidStyle : {}) }}
+                        aria-invalid={monthInvalid} title={monthInvalid ? '請輸入 1-12 或留空' : undefined} aria-label="月" />
                     <span style={unitStyle}>月</span>
                     <input type="number" min={1} max={30} value={values.day ?? ''} disabled={disabled}
-                        onChange={(e) => onChange({ day: e.target.value })} style={{ ...inputStyle, width: '7ch' }} aria-label="日" />
+                        onChange={(e) => onChange({ day: e.target.value })}
+                        style={{ ...inputStyle, width: '7ch', ...(dayInvalid ? invalidStyle : {}) }}
+                        aria-invalid={dayInvalid} title={dayInvalid ? '請輸入 1-30 或留空' : undefined} aria-label="日" />
                     <span style={unitStyle}>日</span>
                     <label style={labelStyle}>{dayGzLabel}</label>
                     <div style={{ minWidth: '12ch', flex: '1 1 12ch' }}>
@@ -261,6 +303,7 @@ export default function EraTimeField({
 
 const wrapStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, position: 'relative' };
 const inputStyle: React.CSSProperties = { height: 34, padding: '0 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
+const invalidStyle: React.CSSProperties = { borderColor: '#dc3545', boxShadow: '0 0 0 1px #dc3545' };
 const btnGroupStyle: React.CSSProperties = { display: 'flex', gap: 4 };
 const convBtnStyle: React.CSSProperties = { height: 34, minWidth: 32, borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '1rem' };
 const fieldGroupStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 };

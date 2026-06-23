@@ -162,6 +162,44 @@ class ApiV2MutateTextTest extends TestCase {
     // ── Direct Update Tests ─────────────────────────────────
 
     #[Test]
+    public function testDirectTextUpdateCanRekeyTextid(): void {
+        // 回歸（人物編輯重做）：著述編輯器允許在編輯模式改主鍵（c_textid／c_role_id），
+        // 後端據 changes 對舊列改鍵。驗證改 c_textid 後舊列消失、新列以新 PK 存在且非 PK 欄位保留。
+        $user = $this->makeUser(email: 'text-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedText(['c_textid' => 200, 'c_role_id' => 1, 'c_pages' => '1-5']);
+
+        $this->postJson('/api/v2/mutate', $this->textPayload([
+            'changes' => ['c_textid' => 300],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1,
+        ]);
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 300, 'c_role_id' => 1, 'c_pages' => '1-5',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectTextUpdateClearingSourceNormalizesToSentinelZero(): void {
+        // 回歸（人物編輯重做）：清空出處（c_source）時 React 編輯器送 null，後端須對齊 legacy
+        // emptyToSentinel 正規化為 0（Unknown），不可寫成 NULL（real schema c_source NOT NULL default 0）。
+        $user = $this->makeUser(email: 'text-clearsource@example.com');
+        $this->actingAs($user);
+        $this->seedText(['c_source' => 10]);
+
+        $this->postJson('/api/v2/mutate', $this->textPayload([
+            'changes' => ['c_source' => null],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1,
+            'c_source' => 0,
+        ]);
+    }
+
+    #[Test]
     public function testDirectTextUpdateSucceeds(): void {
         $user = $this->makeUser(email: 'text-direct@example.com');
         $this->actingAs($user);

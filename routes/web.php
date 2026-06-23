@@ -82,6 +82,11 @@ Route::get('app/basicinformation/{id}/addresses/edit-v2', 'BasicInformationContr
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.addresses.editv2');
+// 著述編輯器 V2（對齊 legacy texts/_form）。獨立測試路由、flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/texts/edit-v2', 'BasicInformationController@appTextEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.texts.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

@@ -47,6 +47,15 @@ class TextCreateHandler extends AbstractPersonSubresourceCreateHandler {
     }
 
     protected function preprocessCreateData(array $data): array {
-        return $this->normalizeSentinelValues($data, ['c_textid', 'c_source']);
+        $data = $this->normalizeSentinelValues($data, ['c_textid', 'c_source']);
+
+        // 對齊 legacy emptyToSentinel：著述／出處清空時正規化為 '0'（不可 NULL）。
+        foreach (['c_textid', 'c_source'] as $f) {
+            if (array_key_exists($f, $data) && ($data[$f] === null || $data[$f] === '')) {
+                $data[$f] = '0';
+            }
+        }
+
+        return $data;
     }
 }

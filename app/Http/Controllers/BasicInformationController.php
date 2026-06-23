@@ -390,6 +390,66 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：著述（texts）編輯器（對齊 legacy biogmains/texts/_form）。獨立測試路由，
+     * flag 仍 old、不上線。有 c_textid+c_role_id 即編輯，否則新增。
+     */
+    public function appTextEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $hasPk = $request->filled('c_textid') && $request->filled('c_role_id');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $textid = (int) $request->input('c_textid');
+            $roleId = (int) $request->input('c_role_id');
+            $row = DB::table('BIOG_TEXT_DATA')->where([
+                'c_personid' => $personId,
+                'c_textid' => $textid,
+                'c_role_id' => $roleId,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 對齊 legacy textById：c_textid（著述）與 c_source（出處）為非同步搜尋欄位，
+            // 無 label 會顯示空白，故補回 res['text'] / res['text_str']。
+            try {
+                $res = $this->biogMainRepository->textById($personId.'-'.$textid.'-'.$roleId);
+                if (!empty($res['text'])) {
+                    $initialLabels['c_textid'] = trim($res['text']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/TextEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.texts.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

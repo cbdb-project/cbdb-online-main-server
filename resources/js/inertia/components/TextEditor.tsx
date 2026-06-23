@@ -1,15 +1,13 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { router } from '@inertiajs/react';
-import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
+import React, { useRef, useState } from 'react';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 
 /**
- * 地址編輯器（對齊 legacy biogmains/addresses/_form.blade.php，非 person-browser）。
- * 欄位：序號 / 地址類型 / 地名(addr 搜尋, 朝代範圍過濾) / 起年·末年(EraTimeField 含農曆) /
- * 出處 / 頁碼 / 備註 / 祖籍 / textperson_pair；三態授權提交；create→/api/v2/create、update→/api/v2/mutate。
- * 複合主鍵 (c_personid, c_addr_id, c_addr_type, c_sequence)；對齊 legacy，序號／類型／地名於新增與編輯皆可改，
+ * 著述（texts）編輯器（對齊 legacy biogmains/texts/_form，非 person-browser）。
+ * 欄位：著述(c_textid, text 搜尋) / 角色(c_role_id, role 碼表) / 出處(c_source, text 搜尋) /
+ * 頁碼 / 備註 / textperson_pair；三態授權提交；create→/api/v2/create、update→/api/v2/mutate。
+ * 複合主鍵 (c_personid, c_textid, c_role_id)；對齊 legacy，著述／角色於新增與編輯皆可改，
  * 後端 performUpdate 支援主鍵改鍵（含衝突檢查）。
  */
 type Fields = Record<string, string>;
@@ -17,13 +15,9 @@ type Fields = Record<string, string>;
 interface Props {
     personId: number;
     personLabel: string;
-    dynastyCode?: number | null;  // 人物朝代代碼（EraTimeField 年號轉換用）
-    dynastyStart?: string;   // 人物朝代起年（addr 搜尋過濾 dy_start）
-    dynastyEnd?: string;     // 人物朝代末年（dy_end）
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
-    otherBelongs?: string;
     canEdit: boolean;
     canPropose: boolean;
     createEndpoint: string;
@@ -33,24 +27,19 @@ interface Props {
     t?: (k: string) => string;
 }
 
-const PK = ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence'];
-const FY = { year: 'c_firstyear', nhCode: 'c_fy_nh_code', nhYear: 'c_fy_nh_year', range: 'c_fy_range', intercalary: 'c_fy_intercalary', month: 'c_fy_month', day: 'c_fy_day', dayGz: 'c_fy_day_gz' };
-const LY = { year: 'c_lastyear', nhCode: 'c_ly_nh_code', nhYear: 'c_ly_nh_year', range: 'c_ly_range', intercalary: 'c_ly_intercalary', month: 'c_ly_month', day: 'c_ly_day', dayGz: 'c_ly_day_gz' };
+const PK = ['c_personid', 'c_textid', 'c_role_id'];
+const EDITABLE_PK = ['c_textid', 'c_role_id'];
 // 非主鍵可寫欄位（提交 changes 用）。
-const NON_PK = [
-    'c_firstyear', ...['c_fy_nh_code', 'c_fy_nh_year', 'c_fy_range', 'c_fy_intercalary', 'c_fy_month', 'c_fy_day', 'c_fy_day_gz'],
-    'c_lastyear', ...['c_ly_nh_code', 'c_ly_nh_year', 'c_ly_range', 'c_ly_intercalary', 'c_ly_month', 'c_ly_day', 'c_ly_day_gz'],
-    'c_source', 'c_pages', 'c_notes', 'c_natal',
-];
+const NON_PK = ['c_source', 'c_pages', 'c_notes'];
 
-export default function AddressEditor({
-    personId, personLabel, dynastyCode = null, dynastyStart, dynastyEnd, mode, initialFields, initialLabels = {}, otherBelongs = '',
+export default function TextEditor({
+    personId, personLabel, mode, initialFields, initialLabels = {},
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
-    const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields });
+    const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const snapshot = useRef(JSON.stringify({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields }));
+    const snapshot = useRef(JSON.stringify({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields }));
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -59,29 +48,9 @@ export default function AddressEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
-
-    const buildEra = (g: typeof FY): EraTimeFieldValues => ({
-        year: fields[g.year] ?? '', nhCode: fields[g.nhCode] ?? '', nhCodeLabel: labels[g.nhCode] ?? '',
-        nhYear: fields[g.nhYear] ?? '', range: fields[g.range] ?? '', rangeLabel: labels[g.range] ?? '',
-        intercalary: fields[g.intercalary] ?? '0', month: fields[g.month] ?? '', day: fields[g.day] ?? '',
-        dayGz: fields[g.dayGz] ?? '', dayGzLabel: labels[g.dayGz] ?? '',
-    });
-    const applyEra = (g: typeof FY, patch: Partial<EraTimeFieldValues>) => {
-        setFields((prev) => {
-            const next = { ...prev };
-            (['year', 'nhCode', 'nhYear', 'range', 'intercalary', 'month', 'day', 'dayGz'] as const).forEach((kk) => {
-                if (patch[kk] !== undefined) next[g[kk]] = patch[kk] as string;
-            });
-            return next;
-        });
-        if (patch.nhCodeLabel !== undefined) setLabel(g.nhCode, patch.nhCodeLabel);
-        if (patch.rangeLabel !== undefined) setLabel(g.range, patch.rangeLabel);
-        if (patch.dayGzLabel !== undefined) setLabel(g.dayGz, patch.dayGzLabel);
-    };
 
     const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
         setFields((prev) => ({ ...prev, c_source: p.source, c_pages: p.pages }));
@@ -107,8 +76,8 @@ export default function AddressEditor({
             const initial: Fields = JSON.parse(snapshot.current);
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
-            // 主鍵欄位（序號／類型／地名）可改：對齊 legacy，後端據此改鍵。PK 不可為空，故只送非空值。
-            for (const k of ['c_addr_id', 'c_addr_type', 'c_sequence']) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v && v !== '') changes[k] = v; }
+            // 主鍵欄位（著述／角色）可改：對齊 legacy，後端據此改鍵。PK 不可為空，故只送非空值。
+            for (const k of EDITABLE_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v && v !== '') changes[k] = v; }
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -116,19 +85,19 @@ export default function AddressEditor({
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'addresses', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
+                body: JSON.stringify({ resource: 'texts', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
             snapshot.current = JSON.stringify(fields);
             if (mode === 'create') { window.location.assign(indexUrl); }
-            // 直接儲存若改了主鍵（序號／類型／地名），列已改鍵；以「實際送出的 PK 變更」覆寫 originalPk，
-            // 後續操作才指向新列。不可用 fields 重建（清空欄位 Number('')=0 會讓 client 與 DB 失準），
+            // 直接儲存若改了主鍵（著述／角色），列已改鍵；以「實際送出的 PK 變更」覆寫 originalPk，
+            // 後續操作才指向新列。注意：不可用 fields 重建（清空欄位 Number('')=0 會讓 client 與 DB 失準），
             // 只套用 changes 內真正送出的 PK 欄位（清空未送出者保留原值）。
             else if (sm === 'direct') {
                 const nextPk = { ...originalPk.current };
-                for (const k of ['c_addr_id', 'c_addr_type', 'c_sequence']) { if (Object.prototype.hasOwnProperty.call(changes, k)) nextPk[k] = Number(changes[k]); }
+                for (const k of EDITABLE_PK) { if (Object.prototype.hasOwnProperty.call(changes, k)) nextPk[k] = Number(changes[k]); }
                 originalPk.current = nextPk;
             }
         } catch (e) {
@@ -137,14 +106,14 @@ export default function AddressEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此地址？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此著述？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'addresses', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } }),
+                body: JSON.stringify({ resource: 'texts', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
@@ -155,58 +124,35 @@ export default function AddressEditor({
         } finally { setDeleting(false); }
     };
 
-    const numRow = (key: string, label: string, required = false, maxLength?: number) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
-            <input type="number" value={fields[key] ?? ''} disabled={!editable} required={required} maxLength={maxLength}
-                onChange={(e) => set(key, e.target.value)} style={{ ...inputStyle, ...(!editable ? roStyle : {}) }} />
-        </div></div>
-    );
     const textRow = (key: string, label: string, highlight = false) => (
         <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
-            <input type="text" value={fields[key] ?? ''} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}) }} /></div></div>
+            <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
+                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
     );
 
     return (
         <div style={cardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('address_create', '新增地址') : tr('address_edit', '編輯地址')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('text_create', '新增著述') : tr('text_edit', '編輯著述')} — {personLabel}</h3>
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
 
-            {numRow('c_sequence', tr('migration_sequence', '遷移序號'), true, 4)}
+            <div style={rowStyle}><label style={labelStyle}>{tr('text_code', '著述')} (c_textid)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                    value={fields.c_textid ?? '0'} initialLabel={labels.c_textid ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} /></div></div>
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('address_type', '地址類型')} (c_addr_type)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="list" model="biogaddr" idKey="c_addr_type" labelKeys={['c_addr_desc_chn', 'c_addr_desc']}
-                    value={fields.c_addr_type ?? '0'} initialLabel={labels.c_addr_type ?? ''} disabled={!editable}
-                    onChange={(v, l) => { set('c_addr_type', v); setLabel('c_addr_type', l); }} /></div></div>
-
-            <div style={rowStyle}><label style={labelStyle}>{tr('place_name', '地名')} (c_addr_id)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/addr"
-                    extraQuery={{ dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' }}
-                    value={fields.c_addr_id ?? '0'} initialLabel={labels.c_addr_id ?? ''} disabled={!editable}
-                    onChange={(v, l) => { set('c_addr_id', v); setLabel('c_addr_id', l); }} />
-                {otherBelongs ? <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>{tr('other_upper_info', '其他上層資訊')}: {otherBelongs}</div> : null}</div></div>
-
-            <div style={rowStyle}><label style={labelStyle}>{tr('start_year', '起年')} (c_firstyear)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
-            <div style={rowStyle}><label style={labelStyle}>{tr('end_year', '末年')} (c_lastyear)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+            <div style={rowStyle}><label style={labelStyle}>{tr('text_role', '角色')} (c_role_id)</label><div style={fieldStyle}>
+                <CodeAutocomplete mode="list" model="role" idKey="c_role_id" labelKeys={['c_role_id', 'c_role_desc_chn', 'c_role_desc']}
+                    value={fields.c_role_id ?? '0'} initialLabel={labels.c_role_id ?? ''} disabled={!editable}
+                    onChange={(v, l) => { set('c_role_id', v); setLabel('c_role_id', l); }} /></div></div>
 
             <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
                 <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
                     value={fields.c_source ?? ''} initialLabel={labels.c_source ?? ''} disabled={!editable}
-                    aria-invalid={sourceHighlight}
                     onChange={(v, l) => { set('c_source', v); setLabel('c_source', l); }} /></div></div>
             {textRow('c_pages', tr('pages_entries', '頁碼'), sourceHighlight)}
             <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
-                <textarea value={fields.c_notes ?? ''} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto' }} /></div></div>
-
-            <div style={rowStyle}><label style={labelStyle}>{tr('maiden_addr', '祖籍')} (c_natal)</label><div style={fieldStyle}>
-                <select value={fields.c_natal ?? ''} onChange={(e) => set('c_natal', e.target.value)} disabled={!editable} style={selectStyle}>
-                    <option value="">{tr('please_select', '請選擇')}</option>
-                    <option value="0">0-{tr('no', '否')}</option>
-                    <option value="1">1-{tr('yes', '是')}</option>
-                </select></div></div>
+                <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
 
@@ -249,7 +195,6 @@ const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const selectStyle: React.CSSProperties = { ...inputStyle };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };

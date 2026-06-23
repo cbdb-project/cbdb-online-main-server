@@ -91,6 +91,16 @@ Route::get('app/basicinformation/{id}/altnames/edit-v2', 'BasicInformationContro
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.altnames.editv2');
+// 社會機構編輯器 V2（對齊 legacy socialinst/_form）。獨立測試路由、flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/socialinst/edit-v2', 'BasicInformationController@appSocialinstEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.socialinst.editv2');
+// 占有／財產編輯器 V2（對齊 legacy possession/_form）。獨立測試路由、flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/possession/edit-v2', 'BasicInformationController@appPossessionEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.possession.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

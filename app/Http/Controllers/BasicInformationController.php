@@ -509,6 +509,140 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：社會機構（socialinst）編輯器（對齊 legacy biogmains/socialinst/_form）。
+     * 主鍵 (c_personid, c_inst_code, c_inst_name_code, c_bi_role_code)；獨立測試路由、flag 仍 old、不上線。
+     */
+    public function appSocialinstEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        $hasPk = $request->filled('c_inst_code') && $request->filled('c_inst_name_code') && $request->filled('c_bi_role_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $instCode = (int) $request->input('c_inst_code');
+            $instNameCode = (int) $request->input('c_inst_name_code');
+            $roleCode = (int) $request->input('c_bi_role_code');
+            $row = DB::table('BIOG_INST_DATA')->where([
+                'c_personid' => $personId,
+                'c_inst_code' => $instCode,
+                'c_inst_name_code' => $instNameCode,
+                'c_bi_role_code' => $roleCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_inst_code（合併搜尋）與 c_source（出處）為非同步搜尋欄位，補回顯示標籤；
+            // c_bi_role_code 為 list 模式自行解析。補水失敗不影響編輯。
+            try {
+                $res = $this->biogMainRepository->socialInstById($personId.'-'.$instCode.'-'.$instNameCode.'-'.$roleCode);
+                if (!empty($res['inst_code'])) {
+                    $initialLabels['c_inst_code'] = trim($res['inst_code']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/SocialInstEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.socialinst.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：占有／財產（possession）編輯器（對齊 legacy biogmains/possession/_form）。
+     * 主鍵 c_possession_record_id 為伺服器配發 surrogate；新增由 PossessionCreateHandler 配發 + 寫 POSSESSION_ADDR。
+     * 地址副表（c_addr_id 多選）僅於新增可編輯；編輯模式為唯讀（v2 update 尚未支援副表，標 TODO）。
+     */
+    public function appPossessionEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        $hasPk = $request->filled('c_possession_record_id');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $recordId = (int) $request->input('c_possession_record_id');
+            $row = DB::table('POSSESSION_DATA')
+                ->where('c_possession_record_id', $recordId)
+                ->where('c_personid', $personId)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_source（出處）為非同步搜尋欄位，補回顯示標籤；地址副表補回供唯讀顯示。
+            // c_measure_code / c_possession_act_code 為 list 模式自行解析。補水失敗不影響編輯。
+            try {
+                $res = $this->biogMainRepository->possessionById($recordId);
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+                foreach (($res['addr_str'] ?? []) as $item) {
+                    $initialAddr[] = ['id' => (string) $item[0], 'label' => (string) $item[1]];
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/PossessionEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.possession.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

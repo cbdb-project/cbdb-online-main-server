@@ -204,6 +204,37 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectSocialInstitutionRekeyPreservesUnchangedFields(): void {
+        // React SocialInstEditor 編輯模式可改鍵（c_bi_role_code）；改鍵時未變更的非鍵欄位不得遺失。
+        $user = $this->makeUser(email: 'socinst-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedSocialInstitution(['c_pages' => 'p.99', 'c_notes' => '原備註']);
+
+        $response = $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload([
+            'changes' => ['c_bi_role_code' => 2, 'c_notes' => '新備註'],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+
+        // 新鍵列存在，且未變更的 c_pages 仍保留（無欄位遺失）。
+        $this->assertDatabaseHas('BIOG_INST_DATA', [
+            'c_personid' => 1000,
+            'c_inst_code' => 10,
+            'c_inst_name_code' => 20,
+            'c_bi_role_code' => 2,
+            'c_notes' => '新備註',
+            'c_pages' => 'p.99',
+        ]);
+        // 舊鍵列已移除（改鍵而非新增）。
+        $this->assertDatabaseMissing('BIOG_INST_DATA', [
+            'c_personid' => 1000,
+            'c_inst_code' => 10,
+            'c_inst_name_code' => 20,
+            'c_bi_role_code' => 1,
+        ]);
+    }
+
+    #[Test]
     public function testDirectSocialInstitutionUpdateReturnsOperationIdAndRow(): void {
         $user = $this->makeUser(email: 'socinst-result@example.com');
         $this->actingAs($user);

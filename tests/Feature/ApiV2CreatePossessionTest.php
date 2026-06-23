@@ -188,6 +188,26 @@ class ApiV2CreatePossessionTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectPossessionCreatePersistsPossessionActCodeZero(): void {
+        // React PossessionEditor 新增時對齊 legacy，未動的占有行為仍送 '0'（未詳碼）而非省略；
+        // 確認 '0' 經白名單往返後正確落庫為 0（而非 NULL）。
+        $user = $this->makeUser(email: 'create-poss-act0@example.com');
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_possession_act_code' => '0', 'c_source' => '0'],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+        $newId = $response->json('result.pk.c_possession_record_id');
+        $this->assertDatabaseHas('POSSESSION_DATA', [
+            'c_possession_record_id' => $newId,
+            'c_possession_act_code' => 0,
+            'c_source' => 0,
+        ]);
+    }
+
+    #[Test]
     public function testDirectPossessionCreateWritesAddressSideTable(): void {
         $user = $this->makeUser(email: 'create-poss-addr@example.com');
         $this->actingAs($user);

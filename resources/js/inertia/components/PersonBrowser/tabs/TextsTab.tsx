@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -10,13 +11,11 @@ import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import TextEditorModal, { TextEditorRow } from '../TextEditorModal';
 
 interface TextItem {
     pk: {
@@ -64,12 +63,6 @@ export default function TextsTab({
 }: Props) {
     const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id ?? null));
-
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<TextEditorRow | null>(null);
-    const [editorSourceLabel, setEditorSourceLabel] = useState<string | null>(null);
 
     const [deleteTarget, setDeleteTarget] = useState<TextItem | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -81,17 +74,13 @@ export default function TextsTab({
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorSourceLabel(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('texts', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: TextItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as TextEditorRow);
-        setEditorSourceLabel(item.source_id != null ? formatTextTitle(textRecords[item.source_id], item.source_id) : null);
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('texts', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -173,20 +162,6 @@ export default function TextsTab({
 
             {useReactEditor ? (
                 <>
-                    <TextEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        textInitialLabel={editorRow ? formatBilingualLabel(editorRow.title_chn, editorRow.title) : null}
-                        roleInitialLabel={editorRow ? formatBilingualLabel(editorRow.role_chn, editorRow.role) : null}
-                        sourceInitialLabel={editorSourceLabel}
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}

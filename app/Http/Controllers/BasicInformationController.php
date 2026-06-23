@@ -385,7 +385,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.addresses.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'addresses'], false),
         ]);
     }
 
@@ -445,7 +445,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.texts.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'texts'], false),
         ]);
     }
 
@@ -504,7 +504,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.altnames.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'alt_names'], false),
         ]);
     }
 
@@ -570,7 +570,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.socialinst.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'social_institutions'], false),
         ]);
     }
 
@@ -638,7 +638,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.possession.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'possessions'], false),
         ]);
     }
 
@@ -708,7 +708,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.events.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'events'], false),
         ]);
     }
 
@@ -815,7 +815,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.entries.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'entries'], false),
         ]);
     }
 
@@ -912,7 +912,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.statuses.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'statuses'], false),
             'route_name' => 'app.basicinformation.statuses.editv2',
         ]);
     }
@@ -982,7 +982,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.sources.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'sources'], false),
             'is_wiki_source' => $isWikiSource,
         ]);
     }
@@ -1079,7 +1079,7 @@ class BasicInformationController extends Controller {
             'create_endpoint' => route('api.v2.create.web', [], false),
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
-            'index_url' => route('basicinformation.offices.index', ['basicinformation' => $personId], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'postings'], false),
             // AI 任官自動填：僅在 Gemini 已設定且使用者啟用時提供（對齊 legacy offices/_form 條件，新增模式才顯示）。
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
             'ai_extract_endpoint' => Route::has('ai.posting.extract') ? route('ai.posting.extract', [], false) : '',

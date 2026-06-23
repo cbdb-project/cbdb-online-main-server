@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -10,14 +11,12 @@ import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import AddressEditorModal, { AddressEditorRow } from '../AddressEditorModal';
 
 interface AddressItem {
     pk: {
@@ -74,13 +73,6 @@ export default function AddressesTab({
 }: Props) {
     const t = useTranslation('person');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id ?? null));
-
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<AddressEditorRow | null>(null);
-    const [editorSourceLabel, setEditorSourceLabel] = useState<string | null>(null);
-    const [editorAddrLabel, setEditorAddrLabel] = useState<string | null>(null);
 
     const [deleteTarget, setDeleteTarget] = useState<AddressItem | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -92,19 +84,13 @@ export default function AddressesTab({
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorSourceLabel(null);
-        setEditorAddrLabel(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('addresses', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: AddressItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as AddressEditorRow);
-        setEditorSourceLabel(item.source_id != null ? formatTextTitle(textRecords[item.source_id], item.source_id) : null);
-        setEditorAddrLabel(formatBilingualLabel(item.addr_chn, item.addr) || (item.addr_id != null ? String(item.addr_id) : null));
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('addresses', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -205,19 +191,6 @@ export default function AddressesTab({
 
             {useReactEditor ? (
                 <>
-                    <AddressEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        sourceInitialLabel={editorSourceLabel}
-                        addrInitialLabel={editorAddrLabel}
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}

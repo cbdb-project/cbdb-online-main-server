@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -13,10 +14,10 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import PossessionEditorModal, { PossessionEditorRow } from '../PossessionEditorModal';
 
 interface PossessionItem {
     pk: {
@@ -64,12 +65,6 @@ export default function PossessionsTab({
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<PossessionEditorRow | null>(null);
-    const [editorActLabel, setEditorActLabel] = useState<string | null>(null);
-    const [editorSourceLabel, setEditorSourceLabel] = useState<string | null>(null);
-
     const [deleteTarget, setDeleteTarget] = useState<PossessionItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -80,19 +75,13 @@ export default function PossessionsTab({
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorActLabel(null);
-        setEditorSourceLabel(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('possessions', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: PossessionItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as PossessionEditorRow);
-        setEditorActLabel(formatBilingualLabel(item.act_chn, item.act) || (item.act_code != null ? String(item.act_code) : null));
-        setEditorSourceLabel(item.source_id != null ? formatTextTitle(textRecords[item.source_id], item.source_id) : null);
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('possessions', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -178,19 +167,6 @@ export default function PossessionsTab({
 
             {useReactEditor ? (
                 <>
-                    <PossessionEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        actInitialLabel={editorActLabel}
-                        sourceInitialLabel={editorSourceLabel}
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}

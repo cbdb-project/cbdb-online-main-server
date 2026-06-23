@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -13,10 +14,10 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import EntryEditorModal, { EntryEditorRow } from '../EntryEditorModal';
 
 interface EntryItem {
     pk: {
@@ -76,10 +77,6 @@ export default function EntriesTab({
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<EntryEditorRow | null>(null);
-
     const [deleteTarget, setDeleteTarget] = useState<EntryItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -91,15 +88,13 @@ export default function EntriesTab({
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('entries', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: EntryItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as EntryEditorRow);
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('entries', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -193,20 +188,6 @@ export default function EntriesTab({
 
             {useReactEditor ? (
                 <>
-                    <EntryEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        entryCodeInitialLabel={
-                            editorRow ? formatBilingualLabel(editorRow.entry_desc_chn, editorRow.entry_desc) : null
-                        }
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => {

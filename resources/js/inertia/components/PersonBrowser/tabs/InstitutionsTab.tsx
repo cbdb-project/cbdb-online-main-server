@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import TabCard from '../shared/TabCard';
 import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
@@ -13,10 +14,10 @@ import { stableKey } from '../shared/stableKey';
 import { formatTextTitle } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import SocialInstitutionEditorModal, { SocialInstitutionEditorRow } from '../SocialInstitutionEditorModal';
 
 interface InstitutionItem {
     pk: {
@@ -71,10 +72,6 @@ export default function InstitutionsTab({
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
-    const [editorOpen, setEditorOpen] = useState(false);
-    const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-    const [editorRow, setEditorRow] = useState<SocialInstitutionEditorRow | null>(null);
-
     const [deleteTarget, setDeleteTarget] = useState<InstitutionItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -86,15 +83,13 @@ export default function InstitutionsTab({
     const proposalMode = !canEdit && canPropose;
 
     const openCreate = () => {
-        setEditorMode('create');
-        setEditorRow(null);
-        setEditorOpen(true);
+        const url = buildEditV2CreateUrl('social_institutions', personId);
+        if (url) router.visit(url);
     };
 
     const openEdit = (item: InstitutionItem) => {
-        setEditorMode('edit');
-        setEditorRow(item as SocialInstitutionEditorRow);
-        setEditorOpen(true);
+        const url = buildEditV2EditUrl('social_institutions', item.pk, personId);
+        if (url) router.visit(url);
     };
 
     const handleDelete = async () => {
@@ -186,23 +181,6 @@ export default function InstitutionsTab({
 
             {useReactEditor ? (
                 <>
-                    <SocialInstitutionEditorModal
-                        open={editorOpen}
-                        mode={editorMode}
-                        proposalMode={proposalMode}
-                        personId={personId!}
-                        createEndpoint={createEndpoint}
-                        mutateEndpoint={mutateEndpoint}
-                        row={editorRow}
-                        instInitialLabel={
-                            editorRow ? formatBilingualLabel(editorRow.inst_name_chn, editorRow.inst_name) : null
-                        }
-                        roleInitialLabel={
-                            editorRow ? formatBilingualLabel(editorRow.role_chn, editorRow.role) : null
-                        }
-                        onClose={() => setEditorOpen(false)}
-                        onSaved={() => onRefresh?.()}
-                    />
                     <ConfirmDialog
                         open={deleteTarget != null}
                         onOpenChange={(o) => {

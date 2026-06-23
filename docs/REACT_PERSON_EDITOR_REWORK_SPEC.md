@@ -83,6 +83,8 @@
 - **不在每個編輯器逐頁調版面**；待 12 個編輯器功能/欄位/資料正確性全部做完並過閘後，做**一個統一的「版面對齊 legacy」pass**：建共享表單版面組件，一次性把所有頁的區塊劃分/欄位順序/分組/間距/label 位置/hints 呈現拉齊到 legacy 編輯頁。
 - 為此，各編輯器重建時**結構保持一致**（欄位分組、區塊命名比照 legacy `版面分區`），便於最後統一套版面、減少返工。
 
+**版面 pass 結果（2026-06-23，#39）**：先做統一外觀（標題置中/麵包屑/列表 table-sm/頁碼置中等），再以 agent 逐一比對 legacy `_form.blade` 的「並排（side-by-side）」欄位分佈。**結論：legacy 編輯表單絕大多數本就是單欄（一列一欄）**，React 已對齊；唯二真正的並排缺口：(a) **basic-info** 姓名區（姓中/名中 ｜ Xing/Ming、外文/羅馬字姓名成對、4 唯讀派生 4-up grid）；(b) **assoc** 三組「關係碼 ｜ 關係人」（c_kin_code/id、c_assoc_code/id、c_assoc_kin_code/id）。此二者已改為並排版面（cell/searchCell + 雙欄）並過 review+codex（commit e19ae94 + 本批）。其餘 10 編輯器 legacy 即單欄，不再強加並排（強加反而偏離 legacy）；EraTimeField/possession 數量+單位等複合控件兩版皆已 inline，無缺口。
+
 ## D. 重做計畫
 1. **共享基礎組件**（A 節全部）建好並各自驗證。
 2. **逐頁重建**（B 節），每頁對照 checklist + C 節核對。

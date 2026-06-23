@@ -11,6 +11,10 @@ interface Props {
     year?: number | null;
     mapId?: string | null;
     buttonLabel?: string;
+    /** 對齊 legacy _place_link：把地名本身渲染成虛線下劃連結（點擊開地圖），而非另置「地圖」按鈕。 */
+    asPlaceLink?: boolean;
+    /** asPlaceLink 時作為連結文字的地名（預設用 label）。 */
+    triggerText?: string;
 }
 
 export default function MapPreviewTrigger({
@@ -22,6 +26,8 @@ export default function MapPreviewTrigger({
     year = null,
     mapId = null,
     buttonLabel = '地圖',
+    asPlaceLink = false,
+    triggerText,
 }: Props) {
     const [open, setOpen] = useState(false);
     const mapUrl = useMemo(
@@ -32,16 +38,28 @@ export default function MapPreviewTrigger({
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setOpen(true)}
-                style={buttonStyle}
-                title="點這裡看地圖"
-                aria-label={`查看 ${label} 的地圖`}
-            >
-                <MapIcon />
-                <span>{buttonLabel}</span>
-            </button>
+            {asPlaceLink ? (
+                <button
+                    type="button"
+                    onClick={() => setOpen(true)}
+                    style={placeLinkStyle}
+                    title="點這裡看地圖"
+                    aria-label={`在地圖上查看 ${triggerText ?? label}`}
+                >
+                    {triggerText ?? label}
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => setOpen(true)}
+                    style={buttonStyle}
+                    title="點這裡看地圖"
+                    aria-label={`查看 ${label} 的地圖`}
+                >
+                    <MapIcon />
+                    <span>{buttonLabel}</span>
+                </button>
+            )}
 
             <SelectionDialog
                 isOpen={open}
@@ -143,6 +161,19 @@ function MapIcon() {
         </svg>
     );
 }
+
+// 對齊 legacy .chgis-place-link：地名以虛線下劃連結呈現，點擊開地圖（非另置按鈕）。
+const placeLinkStyle: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    margin: 0,
+    color: APP_THEME.brandText,
+    font: 'inherit',
+    textDecoration: 'underline dashed',
+    textUnderlineOffset: 3,
+    cursor: 'pointer',
+};
 
 const buttonStyle: React.CSSProperties = {
     display: 'inline-flex',

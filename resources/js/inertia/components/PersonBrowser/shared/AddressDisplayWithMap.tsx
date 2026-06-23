@@ -29,10 +29,10 @@ export default function AddressDisplayWithMap({
         return null;
     }
 
-    return (
-        <span style={wrapStyle}>
-            <span>{label}</span>
-            {latitude !== null && longitude !== null ? (
+    // 對齊 legacy _place_link：有座標 → 地名本身為虛線下劃連結（點擊開地圖）；無座標 → 純文字。
+    if (latitude !== null && longitude !== null) {
+        return (
+            <span style={wrapStyle}>
                 <MapPreviewTrigger
                     latitude={latitude}
                     longitude={longitude}
@@ -41,8 +41,16 @@ export default function AddressDisplayWithMap({
                     adminCatLabel={adminCatLabel}
                     year={year}
                     mapId={mapId}
+                    asPlaceLink
+                    triggerText={label}
                 />
-            ) : null}
+            </span>
+        );
+    }
+
+    return (
+        <span style={wrapStyle}>
+            <span>{label}</span>
         </span>
     );
 }

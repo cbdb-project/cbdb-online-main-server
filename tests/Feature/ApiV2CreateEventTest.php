@@ -110,6 +110,7 @@ class ApiV2CreateEventTest extends TestCase {
             $table->integer('c_year')->nullable();
             $table->integer('c_month')->nullable();
             $table->integer('c_day')->nullable();
+            $table->integer('c_day_ganzhi')->nullable();
             $table->integer('c_nh_code')->nullable();
             $table->integer('c_nh_year')->nullable();
             $table->integer('c_yr_range')->nullable();
@@ -163,6 +164,36 @@ class ApiV2CreateEventTest extends TestCase {
                 'c_notes' => '新增事件',
             ],
         ], $overrides);
+    }
+
+    #[Test]
+    public function testEventCreateRejectsAddrId(): void {
+        // c_addr_id 屬 EVENTS_ADDR 副表，不得經 v2 單表寫入 EVENTS_DATA.c_addr_id；應以「不允許欄位」拒絕。
+        $user = $this->makeUser(email: 'create-event-addr-reject@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_notes' => '新增事件', 'c_addr_id' => 123],
+        ]))->assertStatus(422);
+    }
+
+    #[Test]
+    public function testDirectEventCreatePersistsDayGanzhi(): void {
+        // c_day_ganzhi 先前漏列於 create 白名單；已補回，確認新增可落庫（與 React EventEditor 農曆干支日對齊）。
+        $user = $this->makeUser(email: 'create-event-ganzhi@example.com');
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_notes' => '新增事件', 'c_day_ganzhi' => 9],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000,
+            'c_sequence' => 2,
+            'c_event_code' => 50,
+            'c_day_ganzhi' => 9,
+        ]);
     }
 
     #[Test]

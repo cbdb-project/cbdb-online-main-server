@@ -643,6 +643,76 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：事件（events）編輯器（對齊 legacy biogmains/events/_form）。
+     * 邏輯主鍵 (c_personid, c_sequence, c_event_code)；含農曆年份（干支日 c_day_ganzhi）。
+     * 地址（EVENTS_ADDR 副表）v2 尚未支援，編輯器唯讀顯示並標 TODO。獨立測試路由、flag 仍 old、不上線。
+     */
+    public function appEventEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        $hasPk = $request->filled('c_sequence') && $request->filled('c_event_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $sequence = (int) $request->input('c_sequence');
+            $eventCode = (int) $request->input('c_event_code');
+            $row = DB::table('EVENTS_DATA')->where([
+                'c_personid' => $personId,
+                'c_sequence' => $sequence,
+                'c_event_code' => $eventCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_event_code（事件搜尋）與 c_source（出處）為非同步搜尋欄位，補回顯示標籤；
+            // 地址副表補回供唯讀顯示。補水失敗不影響編輯主流程。
+            try {
+                $res = app(\App\Repositories\EventStatusRepository::class)->eventById($personId.'-'.$sequence.'-'.$eventCode);
+                if (!empty($res['event_str'])) {
+                    $initialLabels['c_event_code'] = trim($res['event_str']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+                foreach (($res['addr_str'] ?? []) as $item) {
+                    $initialAddr[] = ['id' => (string) $item[0], 'label' => (string) $item[1]];
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EventEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.events.index', ['basicinformation' => $personId], false),
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

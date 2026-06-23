@@ -112,6 +112,7 @@ class ApiV2MutateEventTest extends TestCase {
             $table->integer('c_year')->nullable();
             $table->integer('c_month')->nullable();
             $table->integer('c_day')->nullable();
+            $table->integer('c_day_ganzhi')->nullable();
             $table->integer('c_nh_code')->nullable();
             $table->integer('c_nh_year')->nullable();
             $table->integer('c_yr_range')->nullable();
@@ -227,6 +228,40 @@ class ApiV2MutateEventTest extends TestCase {
         $this->assertDatabaseHas('EVENTS_DATA', [
             'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50,
             'c_notes' => '只改備註', 'c_role' => '新角色', 'c_year' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testEventUpdateRejectsAddrId(): void {
+        // c_addr_id 屬 EVENTS_ADDR 副表，不得經 v2 單表寫入 EVENTS_DATA.c_addr_id；應以「不允許欄位」拒絕。
+        $user = $this->makeUser(email: 'event-addr-reject@example.com');
+        $this->actingAs($user);
+        $this->seedEvent();
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_addr_id' => 123],
+        ]))->assertStatus(422);
+    }
+
+    #[Test]
+    public function testDirectEventUpdatePersistsDayGanzhi(): void {
+        // React EventEditor 農曆干支日對應 c_day_ganzhi；該欄先前漏列於白名單（會被丟棄／422），
+        // 已補回。確認更新可正確落庫（無欄位遺失）。
+        $user = $this->makeUser(email: 'event-ganzhi@example.com');
+        $this->actingAs($user);
+        $this->seedEvent();
+
+        $response = $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_day_ganzhi' => 7, 'c_day' => 5],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+            'c_day_ganzhi' => 7,
+            'c_day' => 5,
         ]);
     }
 

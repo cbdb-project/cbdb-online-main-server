@@ -44,13 +44,15 @@ class EventCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_year',
             'c_month',
             'c_day',
+            'c_day_ganzhi',
             'c_nh_code',
             'c_nh_year',
             'c_yr_range',
             'c_intercalary',
             'c_role',
             'c_event',
-            'c_addr_id',
+            // c_addr_id 不列入：legacy 將事件地址寫入 EVENTS_ADDR 副表，從不寫 EVENTS_DATA.c_addr_id 純量欄。
+            // v2 為單表寫入，若允許 c_addr_id 會直接覆寫純量欄且不同步副表，與 legacy 分歧，故移除（fail closed）。
         ];
     }
 

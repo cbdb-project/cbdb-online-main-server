@@ -99,6 +99,7 @@ export default function TabPager({ currentPage, totalPages, onPageChange, showAl
 const containerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
     padding: '8px 0',
     flexWrap: 'wrap',

@@ -196,6 +196,9 @@ export default function PersonEditor() {
             title={person_label}
             breadcrumbs={[
                 { label: tPerson('person_records'), url: index_url },
+                // 末段隨當前分頁切換（人物記錄 / 著述 …），使頂部反映正在檢視的子資源，
+                // 不再固定停留在「基本資料」造成誤解。
+                { label: tPerson(`tab_${activeTab}`) },
             ]}
         >
             <PersonBanner

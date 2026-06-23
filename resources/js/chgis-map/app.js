@@ -413,7 +413,11 @@ function startMap(token, personId, currentKey, lon, lat) {
             ' <a href="https://huggingface.co/datasets/cbdb/chgis-map" target="_blank" rel="noopener noreferrer">Map data</a>',
     }).addTo(mapInstance);
 
-    const fallbackCenter = isFinite(lon) && isFinite(lat) ? [lat, lon] : [35, 110];
+    // clickedCenter：使用者點擊的 place-link 所附座標（有效時）。即使點擊點未對上任何
+    // 已抓取的 point key（例如任官地址的 office key 與 point key 不完全一致），仍以此座標
+    // 居中，取代「多點時 fitBounds 全部」造成的「點開的地址不居中」。
+    const clickedCenter = isFinite(lon) && isFinite(lat) ? [lat, lon] : null;
+    const fallbackCenter = clickedCenter || [35, 110];
     mapInstance.setView(fallbackCenter, 6, { animate: false });
 
     // modal 進場動畫結束後再重算尺寸，避免量到中間態
@@ -422,7 +426,7 @@ function startMap(token, personId, currentKey, lon, lat) {
     loadPoints(personId)
         .then((points) => {
             if (token === openToken) {
-                renderPoints(points, currentKey, fallbackCenter);
+                renderPoints(points, currentKey, fallbackCenter, clickedCenter);
             }
         })
         .catch((error) => {
@@ -505,7 +509,7 @@ function loadPoints(personId) {
         .then((data) => (data && Array.isArray(data.points) ? data.points : []));
 }
 
-function renderPoints(points, currentKey, fallbackCenter) {
+function renderPoints(points, currentKey, fallbackCenter, clickedCenter) {
     const valid = points.filter((p) => isFinite(p.lon) && isFinite(p.lat));
     if (!valid.length) {
         setStatus({ message: t('no_points'), spinner: false, retry: false });
@@ -543,6 +547,9 @@ function renderPoints(points, currentKey, fallbackCenter) {
 
     if (currentLatLng) {
         mapInstance.setView(currentLatLng, 7, { animate });
+    } else if (clickedCenter) {
+        // 點開特定 place-link：以該地址座標居中，即使其 key 未對上任何 point。
+        mapInstance.setView(clickedCenter, 7, { animate });
     } else if (markers.length === 1) {
         mapInstance.setView(markers[0].getLatLng(), 7, { animate });
     } else if (markers.length > 1) {

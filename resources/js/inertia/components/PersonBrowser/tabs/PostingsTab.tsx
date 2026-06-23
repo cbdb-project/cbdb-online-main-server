@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
+import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -80,8 +75,8 @@ export default function PostingsTab({
     onRefresh,
 }: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     const [deleteTarget, setDeleteTarget] = useState<PostingItem | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -151,57 +146,32 @@ export default function PostingsTab({
                 <LegacyCreateButton tabKey="postings" canEdit={canEdit} />
             )}
 
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => (
-                <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
-                    <MetaRow label={t('office_id')} value={item.office_id} />
-                    <MetaRow label={t('office_name')} value={formatBilingualLabel(item.office_chn, item.office)} />
-                    <MetaRow label={t('tenure')} value={item.tenure_summary} />
-                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow
-                        label={t('address_label')}
-                        value={item.addresses.length > 0 ? (
-                            <span style={addressListStyle}>
-                                {item.addresses.map((address, index) => (
-                                    <React.Fragment key={`${address.addr_id ?? 'addr'}-${index}`}>
-                                        {index > 0 ? <span>；</span> : null}
-                                        <AddressDisplayWithMap
-                                            labelChn={address.addr_chn}
-                                            labelEng={address.addr}
-                                            latitude={address.latitude}
-                                            longitude={address.longitude}
-                                            personId={personId}
-                                            mapKey={`office:${item.pk.c_office_id}:${item.pk.c_posting_id}:${address.addr_id}`}
-                                        />
-                                    </React.Fragment>
-                                ))}
-                            </span>
-                        ) : item.address_summary}
-                    />
-                    <MetaRow label={t('appt_type_label')} value={formatBilingualLabel(item.appt_chn ?? null, item.appt ?? null)} />
-                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label={t('pages_label')} value={item.pages} />
-                    <MetaRow label={t('remarks')} value={item.notes} />
-                    <CardActions>
-                        {useReactEditor ? (
-                            <>
-                                <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                                    {t('edit_btn')}
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>
-                                    {t('delete_btn')}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
-                                <LegacyDeleteButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
-                            </>
-                        )}
-                    </CardActions>
-                </TabCard>
-            ))}
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => data.items.indexOf(item) + 1 },
+                    { header: tb('sequence'), render: (item) => item.sequence ?? '—' },
+                    { header: t('posting_id'), render: (item) => item.posting_id },
+                    { header: tb('office_name_field'), width: '40%', render: (item) => formatBilingualLabel(item.office_chn, item.office) },
+                    { header: tb('place_name'), render: (item) => renderAddresses(item, personId) },
+                    { header: tb('start_year'), render: (item) => formatYear(item.first_year, postCE) },
+                    { header: tb('end_year'), render: (item) => formatYear(item.last_year, postCE) },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
+                        <LegacyEditButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="postings" pk={item.pk} canEdit={canEdit} />
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 
             {useReactEditor ? (
@@ -235,6 +205,8 @@ const createBarStyle: React.CSSProperties = {
     marginBottom: 8,
 };
 
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };
+
 const addressListStyle: React.CSSProperties = {
     display: 'inline-flex',
     flexWrap: 'wrap',
@@ -242,10 +214,36 @@ const addressListStyle: React.CSSProperties = {
     gap: 4,
 };
 
-function inferDisplayYear(firstYear: number | null, lastYear: number | null, fallbackYear: number | null): number | null {
-    if (firstYear !== null && lastYear !== null) {
-        return Math.round((firstYear + lastYear) / 2);
+function renderAddresses(item: PostingItem, personId: number | null): React.ReactNode {
+    if (item.addresses.length === 0) {
+        return item.address_summary;
     }
 
-    return firstYear ?? lastYear ?? fallbackYear;
+    return (
+        <span style={addressListStyle}>
+            {item.addresses.map((address, index) => (
+                <React.Fragment key={`${address.addr_id ?? 'addr'}-${index}`}>
+                    {index > 0 ? <span>；</span> : null}
+                    <AddressDisplayWithMap
+                        labelChn={address.addr_chn}
+                        labelEng={address.addr}
+                        latitude={address.latitude}
+                        longitude={address.longitude}
+                        personId={personId}
+                        mapKey={`office:${item.pk.c_office_id}:${item.pk.c_posting_id}:${address.addr_id}`}
+                    />
+                </React.Fragment>
+            ))}
+        </span>
+    );
+}
+
+/**
+ * 格式化單一年份（始年／終年），過濾 CBDB 哨兵值 0 與 -9999；
+ * postCE 為 true 時額外過濾負數年份。對齊 legacy index 的 c_firstyear/c_lastyear 純值欄。
+ */
+function formatYear(year: number | null, postCE: boolean = false): number | null {
+    if (year == null || year === 0 || year === -9999) return null;
+    if (postCE && year < 0) return null;
+    return year;
 }

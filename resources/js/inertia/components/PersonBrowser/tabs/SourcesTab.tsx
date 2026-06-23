@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { buildTextUrl, formatTextTitle } from '../shared/textLookup';
+import { buildTextUrl, type TextCodeRecord } from '../shared/textLookup';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { APP_THEME } from '../../../theme';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
@@ -62,6 +58,7 @@ export default function SourcesTab({
     onRefresh,
 }: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
     const { records: textRecords } = useTextCodes(data.items.map((item) => item.text_id));
 
@@ -133,75 +130,28 @@ export default function SourcesTab({
                 <LegacyCreateButton tabKey="sources" canEdit={canEdit} />
             )}
 
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => {
-                const record = textRecords[item.text_id ?? 0];
-                const title =
-                    formatTextTitle(record) ?? formatBilingualLabel(item.title_chn, item.title) ?? (item.text_id ? String(item.text_id) : null);
-                const titleUrl = record?.c_url_homepage ?? null;
-                const url = buildTextUrl(record, item.pages);
-                const tags = [
-                    item.is_main_source ? t('main_source') : null,
-                    item.is_self_bio ? t('self_bio') : null,
-                ].filter((value): value is string => Boolean(value));
-
-                return (
-                    <TabCard key={stableKey(item.pk)}>
-                        <MetaRow
-                            label={t('book_title')}
-                            value={
-                                titleUrl && title ? (
-                                    <a href={titleUrl} target="_blank" rel="noreferrer" style={linkStyle}>
-                                        {title}
-                                    </a>
-                                ) : (
-                                    title
-                                )
-                            }
-                        />
-                        <MetaRow label={t('text_id')} value={item.text_id} />
-                        <MetaRow label={t('tag_label')} value={tags.length > 0 ? (
-                            <span style={badgesStyle}>
-                                {tags.map((tag) => (
-                                    <span key={tag} style={tag === t('self_bio') ? badgeBioStyle : badgeMainStyle}>
-                                        {tag}
-                                    </span>
-                                ))}
-                            </span>
-                        ) : null}
-                        />
-                        <MetaRow label={t('pages_label')} value={item.pages} />
-                        <MetaRow
-                            label={t('link_label')}
-                            value={
-                                url ? (
-                                    <a href={url} target="_blank" rel="noreferrer" style={linkStyle}>
-                                        {url}
-                                    </a>
-                                ) : null
-                            }
-                        />
-                        <MetaRow label={t('remarks')} value={item.notes} />
-                        <CardActions>
-                            {useReactEditor ? (
-                                <>
-                                    <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                                        {t('edit_btn')}
-                                    </Button>
-                                    <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>
-                                        {t('delete_btn')}
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
-                                    <LegacyDeleteButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
-                                </>
-                            )}
-                        </CardActions>
-                    </TabCard>
-                );
-            })}
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => data.items.indexOf(item) + 1 },
+                    { header: tb('source_field'), render: (item) => renderSourceTitle(item, textRecords) },
+                    { header: tb('page_no'), render: (item) => renderPageNo(item, textRecords) },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
+                        <LegacyEditButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="sources" pk={item.pk} canEdit={canEdit} />
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 
             {useReactEditor ? (
@@ -235,31 +185,32 @@ const createBarStyle: React.CSSProperties = {
     marginBottom: 8,
 };
 
-const badgesStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    flexWrap: 'wrap',
-    gap: 4,
-    alignItems: 'center',
-};
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };
 
 const linkStyle: React.CSSProperties = {
     color: APP_THEME.brandText,
     textDecoration: 'none',
 };
 
-const badgeMainStyle: React.CSSProperties = {
-    fontSize: '0.6875rem',
-    padding: '1px 6px',
-    borderRadius: 3,
-    backgroundColor: APP_THEME.brand,
-    color: '#fff',
-};
+/** 出處欄：對齊 legacy `{{ $value->c_title_chn }}`（中文書名），缺則回退 text 記錄／英文名／text_id。 */
+function renderSourceTitle(item: SourceItem, textRecords: Record<number, TextCodeRecord>): React.ReactNode {
+    const record = textRecords[item.text_id ?? 0];
+    return record?.c_title_chn ?? item.title_chn ?? item.title ?? (item.text_id ? String(item.text_id) : null);
+}
 
-const badgeBioStyle: React.CSSProperties = {
-    fontSize: '0.6875rem',
-    padding: '1px 6px',
-    borderRadius: 3,
-    backgroundColor: '#fff',
-    color: APP_THEME.brandText,
-    border: `1px solid ${APP_THEME.brandBorder}`,
-};
+/**
+ * 頁碼欄：對齊 legacy index——當 text 有 API URL（c_url_api）時，頁碼文字本身為連結（href = c_url_api + 頁碼 + coda），
+ * 否則純文字顯示頁碼。
+ */
+function renderPageNo(item: SourceItem, textRecords: Record<number, TextCodeRecord>): React.ReactNode {
+    const record = textRecords[item.text_id ?? 0];
+    const url = record?.c_url_api ? buildTextUrl(record, item.pages) : null;
+    if (url && item.pages) {
+        return (
+            <a href={url} target="_blank" rel="noreferrer" style={linkStyle}>
+                {item.pages}
+            </a>
+        );
+    }
+    return item.pages;
+}

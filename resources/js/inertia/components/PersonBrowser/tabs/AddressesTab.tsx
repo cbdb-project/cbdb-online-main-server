@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
+import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import AddressDisplayWithMap from '../shared/AddressDisplayWithMap';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -72,6 +69,7 @@ export default function AddressesTab({
     onRefresh,
 }: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
 
     const [deleteTarget, setDeleteTarget] = useState<AddressItem | null>(null);
@@ -142,14 +140,17 @@ export default function AddressesTab({
                 <LegacyCreateButton tabKey="addresses" canEdit={canEdit} />
             )}
 
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => (
-                <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
-                    <MetaRow label={t('addr_id')} value={item.addr_id} />
-                    <MetaRow
-                        label={t('address_label')}
-                        value={(
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => item.sequence ?? (data.items.indexOf(item) + 1) },
+                    { header: tb('address_type'), render: (item) => formatBilingualLabel(item.type_label_chn, item.type_label) },
+                    {
+                        header: tb('place_name'),
+                        render: (item) => (
                             <AddressDisplayWithMap
                                 labelChn={item.addr_chn}
                                 labelEng={item.addr}
@@ -158,34 +159,23 @@ export default function AddressesTab({
                                 personId={personId ?? item.pk.c_personid}
                                 mapKey={`addr:${item.pk.c_addr_id}:${item.pk.c_addr_type}:${item.pk.c_sequence}`}
                             />
-                        )}
-                    />
-                    <MetaRow label={t('type_label')} value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow
-                        label={t('coordinates')}
-                        value={item.latitude !== null && item.longitude !== null ? `${item.longitude}, ${item.latitude}` : null}
-                    />
-                    <MetaRow label={t('remarks')} value={item.notes} />
-                    <CardActions>
-                        {useReactEditor ? (
-                            <>
-                                <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                                    {t('edit_btn')}
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>
-                                    {t('delete_btn')}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <LegacyEditButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
-                                <LegacyDeleteButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
-                            </>
-                        )}
-                    </CardActions>
-                </TabCard>
-            ))}
+                        ),
+                    },
+                    { header: tb('start_year'), render: (item) => formatYear(item.first_year, postCE) },
+                    { header: tb('end_year'), render: (item) => formatYear(item.last_year, postCE) },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
+                        <LegacyEditButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="addresses" pk={item.pk} canEdit={canEdit} />
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 
             {useReactEditor ? (
@@ -219,10 +209,14 @@ const createBarStyle: React.CSSProperties = {
     marginBottom: 8,
 };
 
-function inferDisplayYear(firstYear: number | null, lastYear: number | null, fallbackYear: number | null): number | null {
-    if (firstYear !== null && lastYear !== null) {
-        return Math.round((firstYear + lastYear) / 2);
-    }
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };
 
-    return firstYear ?? lastYear ?? fallbackYear;
+/**
+ * 格式化單一年份（始年／終年），過濾 CBDB 哨兵值 0 與 -9999；
+ * postCE 為 true 時額外過濾負數年份。對齊 legacy index 的 c_firstyear/c_lastyear 純值欄。
+ */
+function formatYear(year: number | null, postCE: boolean = false): number | null {
+    if (year == null || year === 0 || year === -9999) return null;
+    if (postCE && year < 0) return null;
+    return year;
 }

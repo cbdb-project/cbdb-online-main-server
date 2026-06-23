@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
+import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -69,8 +64,8 @@ export default function InstitutionsTab({
     onRefresh,
 }: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     const [deleteTarget, setDeleteTarget] = useState<InstitutionItem | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -141,42 +136,30 @@ export default function InstitutionsTab({
                 <LegacyCreateButton tabKey="social_institutions" canEdit={canEdit} />
             )}
 
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => (
-                <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label={t('institution_id')} value={item.inst_code} />
-                    <MetaRow label={t('institution_label')} value={formatBilingualLabel(item.inst_name_chn, item.inst_name)} />
-                    <MetaRow label={t('role_label')} value={formatBilingualLabel(item.role_chn, item.role)} />
-                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label={t('pages_label')} value={item.pages} />
-                    <MetaRow label={t('remarks')} value={item.notes} />
-                    <CardActions>
-                        {useReactEditor ? (
-                            <>
-                                <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                                    {t('edit_btn')}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => {
-                                        setDeleteError(null);
-                                        setDeleteTarget(item);
-                                    }}
-                                >
-                                    {t('delete_btn')}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <LegacyEditButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
-                                <LegacyDeleteButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
-                            </>
-                        )}
-                    </CardActions>
-                </TabCard>
-            ))}
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => data.items.indexOf(item) + 1 },
+                    { header: tb('socialinst_field'), render: (item) => formatBilingualLabel(item.inst_name_chn, item.inst_name) },
+                    { header: tb('socialinst_role'), render: (item) => formatBilingualLabel(item.role_chn, item.role) },
+                    { header: tb('start_year'), render: (item) => item.first_year },
+                    { header: tb('end_year'), render: (item) => item.last_year },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
+                        <LegacyEditButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 
             {useReactEditor ? (
@@ -211,3 +194,5 @@ const createBarStyle: React.CSSProperties = {
     justifyContent: 'flex-end',
     marginBottom: 8,
 };
+
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };

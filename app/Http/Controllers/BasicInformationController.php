@@ -207,12 +207,14 @@ class BasicInformationController extends Controller {
             abort(404);
         }
 
-        // 名稱標籤直接從 BIOG_MAIN 取，避免耦合 summary() 的完整欄位需求。
+        // 名稱標籤直接從 BIOG_MAIN 取（含朝代），避免耦合 summary() 的完整欄位需求。
         $nameRow = DB::table('BIOG_MAIN')
-            ->where('c_personid', $personId)
-            ->first(['c_name_chn', 'c_name']);
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->where('BIOG_MAIN.c_personid', $personId)
+            ->first(['BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn']);
         $nameChn = $nameRow->c_name_chn ?? '';
         $name = $nameRow->c_name ?? '';
+        $dynasty = $nameRow->c_dynasty_chn ?? '';
 
         $personLabel = (string) $personId;
         if ($nameChn || $name) {
@@ -220,6 +222,10 @@ class BasicInformationController extends Controller {
             if ($name) {
                 $personLabel .= ' (' . $name . ')';
             }
+        }
+        // 朝代併入標題（h1），避免在 PersonBanner 另起一行孤立顯示「朝代：X」。
+        if ($dynasty) {
+            $personLabel .= ' · ' . $dynasty;
         }
 
         return [

@@ -1032,6 +1032,7 @@ class PersonBrowserService {
             ->select([
                 'ASSOC_CODES.c_assoc_desc_chn',
                 'ASSOC_CODES.c_assoc_desc',
+                'ASSOC_DATA.c_sequence',
                 'ASSOC_DATA.c_assoc_code',
                 'ASSOC_DATA.c_assoc_id',
                 'ASSOC_DATA.c_kin_code',
@@ -1076,6 +1077,7 @@ class PersonBrowserService {
                     'c_text_title' => $r->c_text_title,
                     'c_assoc_first_year' => $r->c_assoc_first_year,
                 ],
+                'sequence' => $r->c_sequence,
                 'assoc_code' => $r->c_assoc_code,
                 'assoc_desc_chn' => $r->c_assoc_desc_chn,
                 'assoc_desc' => $r->c_assoc_desc,
@@ -1145,6 +1147,7 @@ class PersonBrowserService {
             ->select([
                 'POSSESSION_ACT_CODES.c_possession_act_desc_chn',
                 'POSSESSION_ACT_CODES.c_possession_act_desc',
+                'POSSESSION_DATA.c_sequence',
                 'POSSESSION_DATA.c_possession_record_id',
                 'POSSESSION_DATA.c_possession_act_code',
                 'POSSESSION_DATA.c_possession_desc_chn',
@@ -1161,6 +1164,7 @@ class PersonBrowserService {
             ])
             ->leftJoin('POSSESSION_ACT_CODES', 'POSSESSION_ACT_CODES.c_possession_act_code', '=', 'POSSESSION_DATA.c_possession_act_code')
             ->where('POSSESSION_DATA.c_personid', $personId)
+            ->orderBy('POSSESSION_DATA.c_sequence')
             ->get();
 
         return [
@@ -1169,6 +1173,7 @@ class PersonBrowserService {
                 'pk' => [
                     'c_possession_record_id' => $r->c_possession_record_id,
                 ],
+                'sequence' => $r->c_sequence,
                 'act_code' => $r->c_possession_act_code,
                 'act_chn' => $r->c_possession_act_desc_chn,
                 'act' => $r->c_possession_act_desc,

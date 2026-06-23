@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -63,8 +58,8 @@ export default function AltNamesTab({
     onRefresh,
 }: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
 
     const [deleteTarget, setDeleteTarget] = useState<AltNameItem | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -134,34 +129,29 @@ export default function AltNamesTab({
                 <LegacyCreateButton tabKey="alt_names" canEdit={canEdit} />
             )}
 
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => (
-                <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
-                    <MetaRow label={t('alt_name')} value={formatBilingualLabel(item.name_chn, item.name)} />
-                    <MetaRow label={t('type_label')} value={formatBilingualLabel(item.type_label_chn, item.type_label)} />
-                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label={t('pages_label')} value={item.pages} />
-                    <MetaRow label={t('remarks')} value={item.notes} />
-                    <CardActions>
-                        {useReactEditor ? (
-                            <>
-                                <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
-                                    {t('edit_btn')}
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>
-                                    {t('delete_btn')}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <LegacyEditButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
-                                <LegacyDeleteButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
-                            </>
-                        )}
-                    </CardActions>
-                </TabCard>
-            ))}
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => item.sequence ?? (data.items.indexOf(item) + 1) },
+                    { header: tb('altname_pinyin_label'), render: (item) => item.name },
+                    { header: tb('altname_chinese'), render: (item) => item.name_chn },
+                    { header: t('alt_name_type'), render: (item) => formatBilingualLabel(item.type_label_chn, item.type_label) },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
+                        <LegacyEditButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
+                        <LegacyDeleteButton tabKey="alt_names" pk={item.pk} canEdit={canEdit} />
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 
             {useReactEditor ? (
@@ -194,3 +184,5 @@ const createBarStyle: React.CSSProperties = {
     justifyContent: 'flex-end',
     marginBottom: 8,
 };
+
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };

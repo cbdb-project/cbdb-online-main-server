@@ -208,7 +208,10 @@ function renderKinshipPerson(item: KinshipItem, onSelectPerson?: (personId: numb
         <>
             <button
                 type="button"
-                onClick={() => onSelectPerson?.(item.kin_person_id as number)}
+                onClick={() => {
+                    const pid = item.kin_person_id as number;
+                    if (onSelectPerson) { onSelectPerson(pid); } else { router.visit(`/app/basicinformation/${pid}`); }
+                }}
                 style={linkButtonStyle}
             >
                 [{item.kin_person_id}]

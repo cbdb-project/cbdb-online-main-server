@@ -53,7 +53,6 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
 
     return (
         <div style={wrapStyle}>
-            {data.dynasty ? <div style={dynastyStyle}>{t('dynasty')}：{data.dynasty}</div> : null}
             <div style={navStyle} role="tablist">
                 {TABS.map((tab) => {
                     const active = tab.key === data.active_tab;
@@ -80,7 +79,6 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
 }
 
 const wrapStyle: React.CSSProperties = { marginBottom: 16 };
-const dynastyStyle: React.CSSProperties = { fontSize: '0.85rem', color: '#475569', marginBottom: 8 };
 const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid #dee2e6', paddingBottom: 0 };
 const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',

@@ -2784,52 +2784,6 @@ class BiogMainRepository {
         $auditLog = new AuditLogService();
 
         DB::transaction(function () use ($c_personid, $whereConditions, $row, $auditLog) {
-            // 修正：查找配對記錄時使用多層次策略
-            // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
-            // 2. 否則使用 paired c_assoc_code 來精確匹配
-            // 3. 如果沒有配對映射且非 0,0 情況，為避免誤刪不嘗試反向刪除
-            $row2 = null;
-            $reverseDeleteSkipReason = null;
-
-            // 策略 1：如果 c_kin_id = 0 且 c_assoc_kin_id = 0，直接用這些值匹配反向記錄
-            if ($row->c_kin_id == 0 && $row->c_assoc_kin_id == 0) {
-                $row2 = DB::table('ASSOC_DATA')->where([
-                    ['c_personid', $row->c_assoc_id],
-                    ['c_assoc_id', $row->c_personid],
-                    ['c_kin_id', 0],
-                    ['c_assoc_kin_id', 0],
-                    ['c_text_title', $row->c_text_title],
-                    ['c_assoc_first_year', $row->c_assoc_first_year],
-                ])->first();
-            }
-
-            // 策略 2：如果策略 1 沒找到，使用 paired c_assoc_code 匹配
-            if (!$row2) {
-                $assocCodePair = AssocCode::where('c_assoc_code', '=', $row->c_assoc_code)->first();
-                $assocPair1 = $assocCodePair?->c_assoc_pair;
-                $assocPair2 = $assocCodePair?->c_assoc_pair2;
-
-                if ($assocPair1 !== null || $assocPair2 !== null) {
-                    $row2Query = DB::table('ASSOC_DATA')->where([
-                        ['c_personid', $row->c_assoc_id],
-                        ['c_assoc_id', $row->c_personid],
-                        ['c_text_title', $row->c_text_title],
-                        ['c_assoc_first_year', $row->c_assoc_first_year],
-                    ]);
-                    $row2Query->where(function ($query) use ($assocPair1, $assocPair2) {
-                        if ($assocPair1 !== null) {
-                            $query->where('c_assoc_code', '=', $assocPair1);
-                        }
-                        if ($assocPair2 !== null) {
-                            $query->orWhere('c_assoc_code', '=', $assocPair2);
-                        }
-                    });
-                    $row2 = $row2Query->first();
-                } else {
-                    $reverseDeleteSkipReason = 'no_pair_mapping';
-                }
-            }
-
             DB::table('ASSOC_DATA')->where($whereConditions)->delete();
 
             $assocResourceId = CompositePrimaryKey::buildStoredResourceId([
@@ -2867,47 +2821,140 @@ class BiogMainRepository {
                 $operationId
             );
 
-            // 檢查$row2是否存在後再刪除反向關係
-            if ($row2 !== null) {
-                $deleteMirrorQuery = DB::table('ASSOC_DATA')->where([
-                    ['c_personid', $row2->c_personid],
-                    ['c_assoc_id', $row2->c_assoc_id],
-                    ['c_assoc_code', $row2->c_assoc_code],
-                    ['c_kin_code', $row2->c_kin_code],
-                    ['c_kin_id', $row2->c_kin_id],
-                    ['c_assoc_kin_code', $row2->c_assoc_kin_code],
-                    ['c_assoc_kin_id', $row2->c_assoc_kin_id],
-                    ['c_text_title', $row2->c_text_title],
-                    ['c_assoc_first_year', $row2->c_assoc_first_year],
-                ]);
-
-                $mirroredRows = (clone $deleteMirrorQuery)->get();
-                $deleteMirrorQuery->delete();
-
-                foreach ($mirroredRows as $mirroredRow) {
-                    $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
-                    $auditLog->write(
-                        'ASSOC_DATA',
-                        'DELETE',
-                        $auditLog->buildRowPkFromData('ASSOC_DATA', $mirroredRowData),
-                        $mirroredRowData,
-                        null,
-                        'user',
-                        (string) Auth::id(),
-                        $operationId
-                    );
-                }
-            } elseif ($reverseDeleteSkipReason !== null) {
-                Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
-                    'reason' => $reverseDeleteSkipReason,
-                    'c_personid' => $row->c_personid,
-                    'c_assoc_id' => $row->c_assoc_id,
-                    'c_assoc_code' => $row->c_assoc_code,
-                    'c_kin_id' => $row->c_kin_id,
-                    'c_assoc_kin_id' => $row->c_assoc_kin_id,
-                ]);
-            }
+            // 同步刪除反向鏡像列（共用方法；定位策略：對稱 0,0 → 舊關係碼配對碼；找不到則跳過不誤刪）。
+            $this->syncAssocMirrorOnDelete((array) $row, $operation, $auditLog);
         });
+    }
+
+    /**
+     * 定位並刪除 ASSOC_DATA 反向（互逆）鏡像列。供 legacy assocPerformDelete 與 v2 AssociationDeleteHandler 共用。
+     *
+     * 定位策略（對齊 legacy）：(1) 若 c_kin_id 與 c_assoc_kin_id 皆 0，直接以對稱 0,0 匹配反向列；
+     * (2) 否則以舊關係碼的 ASSOC_CODES.c_assoc_pair / c_assoc_pair2 匹配。找不到配對映射則跳過（避免誤刪）。
+     * 須在刪除正向列之後呼叫（反向列以 c_personid=對方、c_assoc_id=原人 定位，不受正向列刪除影響）。
+     *
+     * @param array $row 被刪除的正向列資料（c_personid / c_assoc_id / c_assoc_code / c_kin_id / c_assoc_kin_id / c_text_title / c_assoc_first_year）
+     */
+    public function syncAssocMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+        $textTitle = $row['c_text_title'] ?? '';
+        $firstYear = $row['c_assoc_first_year'] ?? '-9999';
+
+        // 反向鏡像定位：優先以舊關係碼的配對碼精確匹配反向列的 c_assoc_code（避免同對人／同書名／同年
+        // 有多筆關係時，僅憑 person/0,0/text/year 抓錯反向列而誤刪——對齊「永遠正確同步」）。
+        // 無配對映射但對稱 0,0 時，回退 legacy 的對稱匹配（罕見；此時無 code 可驗）。
+        $assocCodePair = AssocCode::where('c_assoc_code', '=', $row['c_assoc_code'])->first();
+        $assocPair1 = $assocCodePair?->c_assoc_pair;
+        $assocPair2 = $assocCodePair?->c_assoc_pair2;
+        $isSymmetric = (int) ($row['c_kin_id'] ?? 0) === 0 && (int) ($row['c_assoc_kin_id'] ?? 0) === 0;
+
+        if ($assocPair1 === null && $assocPair2 === null && !$isSymmetric) {
+            // 無關係配對映射且非對稱：無法可靠定位反向列，跳過不誤刪（對齊 legacy no_pair_mapping）。
+            Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
+                'reason' => 'no_pair_mapping',
+                'c_personid' => $row['c_personid'] ?? null,
+                'c_assoc_id' => $row['c_assoc_id'] ?? null,
+                'c_assoc_code' => $row['c_assoc_code'] ?? null,
+            ]);
+
+            return;
+        }
+
+        // 反向鏡像基底：對方擁有、指回原人、同書名/年。
+        $baseWhere = [
+            ['c_personid', $row['c_assoc_id']],
+            ['c_assoc_id', $row['c_personid']],
+            ['c_text_title', $textTitle],
+            ['c_assoc_first_year', $firstYear],
+        ];
+        $pairFilter = function ($query) use ($assocPair1, $assocPair2) {
+            if ($assocPair1 !== null) {
+                $query->where('c_assoc_code', '=', $assocPair1);
+            }
+            if ($assocPair2 !== null) {
+                $query->orWhere('c_assoc_code', '=', $assocPair2);
+            }
+        };
+
+        // 第一級：以反向鏡像的完整親屬維度精確定位（對齊 legacy create/update 鏡像的反向變換：
+        // 親屬碼取反向配對碼、kin_id/assoc_kin_id 皆為原人）。唯一識別，合法多筆（同對人/書/年/碼、
+        // 僅 kin 維度不同）也能各自命中正確反向列，不誤刪、不漏刪。
+        $row2 = null;
+        if ($assocPair1 !== null || $assocPair2 !== null) {
+            $row2 = DB::table('ASSOC_DATA')->where($baseWhere)
+                ->where('c_kin_code', $this->reverseKinPairCode($row['c_kin_code'] ?? 0))
+                ->where('c_kin_id', $row['c_personid'])
+                ->where('c_assoc_kin_code', $this->reverseKinPairCode($row['c_assoc_kin_code'] ?? 0))
+                ->where('c_assoc_kin_id', $row['c_personid'])
+                ->where($pairFilter)
+                ->first();
+        }
+
+        // 第二級回退（兼容不完全符合鏡像約定的舊資料）：僅以 person/書名/年（＋配對碼或對稱 0,0）定位，
+        // 唯一才刪；多筆無法區分則跳過（寧留待人工，也不誤刪他筆關係的反向列）。
+        if ($row2 === null) {
+            $fallback = DB::table('ASSOC_DATA')->where($baseWhere);
+            if ($assocPair1 !== null || $assocPair2 !== null) {
+                $fallback->where($pairFilter);
+            } elseif ($isSymmetric) {
+                $fallback->where('c_kin_id', 0)->where('c_assoc_kin_id', 0);
+            }
+            $candidates = $fallback->get();
+            if ($candidates->count() === 1) {
+                $row2 = $candidates->first();
+            } elseif ($candidates->count() > 1) {
+                Log::warning('[ASSOC_DATA] 反向鏡像列不唯一，跳過刪除以避免誤刪', [
+                    'c_personid' => $row['c_personid'] ?? null,
+                    'c_assoc_id' => $row['c_assoc_id'] ?? null,
+                    'c_assoc_code' => $row['c_assoc_code'] ?? null,
+                    'candidates' => $candidates->count(),
+                ]);
+
+                return;
+            } else {
+                return;
+            }
+        }
+
+        $deleteMirrorQuery = DB::table('ASSOC_DATA')->where([
+            ['c_personid', $row2->c_personid],
+            ['c_assoc_id', $row2->c_assoc_id],
+            ['c_assoc_code', $row2->c_assoc_code],
+            ['c_kin_code', $row2->c_kin_code],
+            ['c_kin_id', $row2->c_kin_id],
+            ['c_assoc_kin_code', $row2->c_assoc_kin_code],
+            ['c_assoc_kin_id', $row2->c_assoc_kin_id],
+            ['c_text_title', $row2->c_text_title],
+            ['c_assoc_first_year', $row2->c_assoc_first_year],
+        ]);
+
+        $mirroredRows = (clone $deleteMirrorQuery)->get();
+        $deleteMirrorQuery->delete();
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            $auditLog->write(
+                'ASSOC_DATA',
+                'DELETE',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $mirroredRowData),
+                $mirroredRowData,
+                null,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        }
+    }
+
+    /** 親屬碼的反向配對碼（KINSHIP_CODES.c_kin_pair1）；0／查無 → 0。供 syncAssocMirrorOnDelete 精確定位反向列。 */
+    private function reverseKinPairCode($kinCode): int {
+        if ($kinCode === null || (int) $kinCode === 0) {
+            return 0;
+        }
+        $v = DB::table('KINSHIP_CODES')->where('c_kincode', $kinCode)->value('c_kin_pair1');
+
+        return $v !== null ? (int) $v : 0;
     }
 
     public function addrStoreById(Request $request, $id) {

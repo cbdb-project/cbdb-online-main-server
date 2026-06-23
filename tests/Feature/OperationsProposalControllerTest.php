@@ -131,9 +131,45 @@ class OperationsProposalControllerTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->dateTime('c_modified_date')->nullable();
         });
+
+        Schema::dropIfExists('ASSOC_DATA');
+        Schema::create('ASSOC_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_assoc_code')->default(0);
+            $table->integer('c_assoc_id')->default(0);
+            $table->integer('c_kin_code')->default(0);
+            $table->integer('c_kin_id')->default(0);
+            $table->integer('c_assoc_kin_code')->default(0);
+            $table->integer('c_assoc_kin_id')->default(0);
+            $table->string('c_text_title', 255)->default('');
+            $table->integer('c_assoc_first_year')->default(-9999);
+            $table->integer('c_source')->default(0);
+            $table->text('c_notes')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+            $table->primary([
+                'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
+                'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
+            ]);
+        });
+
+        Schema::dropIfExists('ASSOC_CODES');
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 100, 'c_assoc_pair' => 101, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 101, 'c_assoc_pair' => 100, 'c_assoc_pair2' => null],
+        ]);
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('ASSOC_CODES');
+        Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('POSTING_DATA');
         Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
@@ -602,6 +638,53 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertNotNull($audit);
         $this->assertNotNull($audit->old_data);
         $this->assertNull($audit->new_data);
+    }
+
+    #[Test]
+    public function testApproveDeleteAssocProposalRemovesReciprocalMirror(): void {
+        // SEVERE 修復：核准社會關係刪除提案時，反向鏡像列須同步刪除（避免留下單向孤兒）。
+        $assocPk = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($assocPk, ['c_source' => 10]));
+        // 反向鏡像（對方 2000 擁有、反向碼 101、對稱 0,0 → 策略 1 可定位）。
+        DB::table('ASSOC_DATA')->insert(array_merge($assocPk, [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 10,
+        ]));
+
+        $this->actingAs($this->makeAdmin());
+
+        $resourceData = array_merge($assocPk, [
+            '__key_columns' => array_keys($assocPk),
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-2000-0-0-0-0-史記-1080',
+            'resource_data' => $resourceData,
+            'resource_original' => $assocPk,
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '同意刪除'])
+            ->assertRedirect();
+
+        // 正向已刪。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 反向鏡像同步刪除（雙向，修復前會殘留）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+
+        // 審計鏈完整：反向鏡像 DELETE audit 掛 final delete operation id（與正向一致，非 null）。
+        $finalOp = DB::table('operations')->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_DELETE)->latest('id')->first();
+        $this->assertNotNull($finalOp);
+        $mirrorAudit = DB::table('audit_log')->where('table_name', 'ASSOC_DATA')->where('operation', 'DELETE')
+            ->where('old_data', 'like', '%"c_personid":2000%')->first();
+        $this->assertNotNull($mirrorAudit);
+        $this->assertSame((string) $finalOp->id, (string) $mirrorAudit->operation_id);
     }
 
     #[Test]

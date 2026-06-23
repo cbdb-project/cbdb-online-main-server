@@ -196,6 +196,9 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
                     (string) Auth::id(),
                     $operation ? (string) $operation->id : null
                 );
+
+                // 子類在同一交易內的後續處理（例如社會關係刪除互逆鏡像列），保證原子性
+                $this->afterDirectDelete($personId, $targetPk, $originalArray, $operation);
             });
         } catch (\Illuminate\Database\QueryException $e) {
             throw $e;
@@ -264,6 +267,13 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
     }
 
     // ── 可覆寫的 helper ──────────────────────────────────────
+
+    /**
+     * direct 刪除成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
+     * 子類可覆寫以在原子交易內刪除互逆鏡像列（例如 AssociationDeleteHandler 刪 ASSOC_DATA 反向關係）。
+     */
+    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation): void {
+    }
 
     /** 查詢原始記錄 */
     protected function findOriginalRow(array $pk): ?object {

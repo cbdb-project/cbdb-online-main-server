@@ -77,8 +77,14 @@ class OperationsProposalController extends Controller {
                 );
 
                 if (!$usedDirectWorkflow) {
-                    $this->logFinalOperation($operation, $appliedRow, $original, $opType);
+                    $finalOperation = $this->logFinalOperation($operation, $appliedRow, $original, $opType);
                     $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
+
+                    // 社會關係刪除核准：在 final delete operation 建立後同步刪除反向鏡像列，
+                    // 使鏡像 audit 掛同一 operation id（與 direct delete 一致，避免單向孤兒且審計鏈完整）。
+                    if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'ASSOC_DATA') {
+                        app(\App\Repositories\BiogMainRepository::class)->syncAssocMirrorOnDelete($appliedRow, $finalOperation);
+                    }
                 }
                 $this->updateProposalStatus(
                     $operation,
@@ -654,6 +660,9 @@ class OperationsProposalController extends Controller {
 
         DB::table($table)->where($conditions)->delete();
 
+        // 注意：社會關係反向鏡像刪除移至 approve() 於 logFinalOperation 之後執行，
+        // 以便鏡像 audit 掛 final delete operation id（見 approve()）。
+
         if ($table === 'ALTNAME_DATA') {
             $this->indexAltnameAfterDelete($deletedRow);
         }
@@ -913,7 +922,7 @@ class OperationsProposalController extends Controller {
         );
     }
 
-    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {
+    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): ?Operation {
         $proposalData = json_decode($proposal->resource_data, true) ?? [];
         $keyColumns = $proposalData['__key_columns'] ?? [];
 
@@ -933,7 +942,7 @@ class OperationsProposalController extends Controller {
         $personId = $proposal->c_personid ?? 0;
 
         if ($type === Operation::TYPE_DELETE) {
-            $this->operationRepository->store(
+            return $this->operationRepository->store(
                 Auth::id(),
                 $personId,
                 Operation::TYPE_DELETE,
@@ -942,11 +951,9 @@ class OperationsProposalController extends Controller {
                 $original,
                 $original
             );
-
-            return;
         }
 
-        $this->operationRepository->store(
+        return $this->operationRepository->store(
             Auth::id(),
             $personId,
             $type,

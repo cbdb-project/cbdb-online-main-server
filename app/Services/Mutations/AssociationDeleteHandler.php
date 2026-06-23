@@ -2,6 +2,8 @@
 
 namespace App\Services\Mutations;
 
+use App\Models\Operation;
+use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 
@@ -41,5 +43,10 @@ class AssociationDeleteHandler extends AbstractPersonSubresourceDeleteHandler {
             'c_text_title',
             'c_assoc_first_year',
         ];
+    }
+
+    /** direct 刪除成功後，於同交易內同步刪除反向鏡像列（重用 BiogMainRepository::syncAssocMirrorOnDelete）。 */
+    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation): void {
+        app(BiogMainRepository::class)->syncAssocMirrorOnDelete($originalArray, $operation, $this->auditLogService);
     }
 }

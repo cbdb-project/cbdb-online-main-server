@@ -29,9 +29,13 @@ class ApiV2DeleteAssociationTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createAssocTable();
+        $this->createAssocCodesTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -120,6 +124,34 @@ class ApiV2DeleteAssociationTest extends TestCase {
         });
     }
 
+    /** 關係碼配對表：syncAssocMirrorOnDelete 策略 2 以舊關係碼查配對碼定位反向列。code 1↔2 互為配對。 */
+    protected function createAssocCodesTable(): void {
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 1, 'c_assoc_pair' => 2, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 2, 'c_assoc_pair' => 1, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 100, 'c_assoc_pair' => 101, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 101, 'c_assoc_pair' => 100, 'c_assoc_pair2' => null],
+        ]);
+    }
+
+    /** 親屬碼配對表：reverseKinPairCode 以 c_kin_pair1 查反向親屬碼。75↔76 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+        ]);
+    }
+
     protected function pk(array $overrides = []): array {
         return array_replace([
             'c_personid' => 1000,
@@ -179,6 +211,71 @@ class ApiV2DeleteAssociationTest extends TestCase {
             'c_assoc_id' => 2000,
             'c_text_title' => '史記',
         ]);
+    }
+
+    #[Test]
+    public function testDirectAssociationDeleteRemovesReciprocalMirror(): void {
+        // 後台自動雙向同步（32a-delete）：刪正向關係時，反向鏡像列同步刪除（重用 syncAssocMirrorOnDelete）。
+        $this->actingAs($this->makeUser(email: 'delete-assoc-mirror@example.com'));
+        $this->seedAssoc();
+        // 反向鏡像（對方 2000 擁有、指回 1000、反向碼 101、對稱 0,0 → 策略 1 可定位）。
+        DB::table('ASSOC_DATA')->insert(array_replace($this->pk([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+        ]), ['c_source' => 10]));
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk()->assertJson(['ok' => true]);
+
+        // 正向已刪。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 反向鏡像同步刪除（雙向）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+    }
+
+    #[Test]
+    public function testDirectAssociationDeleteRemovesMirrorViaPairCodeStrategy(): void {
+        // 策略 2：c_kin_id≠0（非對稱 0,0），以舊關係碼的配對碼（ASSOC_CODES[100].pair=101）定位反向鏡像並刪除。
+        $this->actingAs($this->makeUser(email: 'delete-assoc-strat2@example.com'));
+        $this->seedAssoc(['c_kin_id' => 5]);
+        DB::table('ASSOC_DATA')->insert(array_replace($this->pk([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_kin_id' => 5,
+        ]), ['c_source' => 10]));
+
+        $this->postJson('/api/v2/delete', $this->deletePayload([
+            'target' => ['pk' => $this->pk(['c_kin_id' => 5])],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_kin_id' => 5]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+    }
+
+    #[Test]
+    public function testDirectAssociationDeletePreciselyTargetsMirrorAmongMultipleKinDimensions(): void {
+        // codex MAJOR 修復：同對人/碼/書/年下多筆「僅 kin 維度不同」的關係，刪其一須精確命中該筆的反向鏡像，
+        // 不誤刪他筆反向、也不因歧義漏刪。第一級以反向鏡像完整親屬維度（反向親屬碼＋kin_id=原人）精確定位。
+        $this->actingAs($this->makeUser(email: 'delete-assoc-precise@example.com'));
+
+        // 兩筆正向（同 1000-100-2000-…-史記-1080，僅 c_kin_code 不同：0 與 75）。
+        $this->seedAssoc(['c_kin_code' => 0]);
+        $this->seedAssoc(['c_kin_code' => 75]);
+        // 對應反向鏡像（符合 create 鏡像約定：反向碼 101、反向親屬碼、kin_id=原人 1000）。
+        DB::table('ASSOC_DATA')->insert(array_replace($this->pk([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_kin_code' => 0, 'c_kin_id' => 1000, 'c_assoc_kin_id' => 1000,
+        ]), ['c_source' => 10]));
+        DB::table('ASSOC_DATA')->insert(array_replace($this->pk([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_kin_code' => 76, 'c_kin_id' => 1000, 'c_assoc_kin_id' => 1000,
+        ]), ['c_source' => 10]));
+
+        // 刪 c_kin_code=75 的正向 → 精確刪 c_kin_code=76 的反向，保留 c_kin_code=0 的反向。
+        $this->postJson('/api/v2/delete', $this->deletePayload([
+            'target' => ['pk' => $this->pk(['c_kin_code' => 75])],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_kin_code' => 75]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_kin_code' => 0]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_kin_code' => 76]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_kin_code' => 0]);
     }
 
     #[Test]

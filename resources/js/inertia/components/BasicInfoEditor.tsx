@@ -302,9 +302,9 @@ export default function BasicInfoEditor({
 
             {textRow('c_index_year', tr('index_year', '指數年') + ' (c_index_year)', true, tr('auto_calc_hint', '由算法自動計算'))}
             {displayRow('c_index_year_type_code', tr('index_year_method', '指數年方法') + ' (c_index_year_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
-            {displayRow('c_index_year_source_id', tr('index_year_source', '指數年來源') + ' (c_index_year_source_id)')}
-            {displayRow('c_index_addr_id', tr('index_addr', '指數地址') + ' (c_index_addr_id)')}
-            {displayRow('c_index_addr_type_code', tr('index_addr_type', '指數地址類型') + ' (c_index_addr_type_code)')}
+            {displayRow('c_index_year_source_id', tr('index_year_source', '指數年來源') + ' (c_index_year_source_id)', tr('auto_calc_hint', '由算法自動計算'))}
+            {displayRow('c_index_addr_id', tr('index_addr', '指數地址') + ' (c_index_addr_id)', tr('auto_calc_hint', '由算法自動計算'))}
+            {displayRow('c_index_addr_type_code', tr('index_addr_type', '指數地址類型') + ' (c_index_addr_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
             {textRow('c_death_age', tr('age_at_death', '享年') + ' (c_death_age)')}
             {codeRow('c_death_age_range', tr('range_label', '範圍') + ' (c_death_age_range)', 'range', 'c_range_code', ['c_range_code', 'c_approx', 'c_approx_chn'])}
 
@@ -324,12 +324,14 @@ export default function BasicInfoEditor({
                 </div>
             </div>
 
-            {canPropose && !canEdit ? (
+            {/* 修改說明：提案（提交建議）時附帶；legacy 對任何 active 使用者皆顯示，故凡可提案者（含可直接寫入者按「提交建議」）都顯示。 */}
+            {(canEdit || canPropose) ? (
                 <div style={rowStyle}>
                     <label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label>
                     <div style={fieldStyle}>
                         <textarea value={comment} rows={3} onChange={(e) => setComment(e.target.value)}
                             placeholder={tr('modification_note_placeholder', '請說明修改原因')} style={{ ...inputStyle, height: 'auto' }} />
+                        <span style={hintStyle}>{tr('modification_note_hint', '此說明將記錄於操作歷史中（提交建議時附帶）')}</span>
                     </div>
                 </div>
             ) : null}

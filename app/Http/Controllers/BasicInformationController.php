@@ -260,6 +260,8 @@ class BasicInformationController extends Controller {
             'dynasty' => $row->c_dynasty_chn ?? '',
             'active_tab' => $activeTab,
             'counts' => $this->personBrowserService->tabCounts($personId),
+            // 對齊 legacy history-button 的授權（Auth::user()->canViewAuditLogs()）。
+            'can_view_audit_logs' => Auth::check() && Auth::user()->canViewAuditLogs(),
         ];
     }
 

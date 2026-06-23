@@ -16,7 +16,17 @@ export interface PersonBannerData {
     dynasty?: string;
     active_tab: string;
     counts: Record<string, number>;
+    /** 是否可看稽核歷史（superadmin/canViewAuditLogs）；驅動「查看歷史」連結（對齊 legacy history-button）。 */
+    can_view_audit_logs?: boolean;
 }
+
+// hub 分頁 key → audit-logs 的 history_page（對齊 BasicInformationHistory 的 page 值）。
+const TAB_HISTORY_PAGE: Record<string, string> = {
+    basic_info: 'basic', addresses: 'addresses', alt_names: 'altnames', texts: 'texts',
+    postings: 'offices', entries: 'entries', events: 'events', statuses: 'statuses',
+    kinship: 'kinship', associations: 'assoc', possessions: 'possession',
+    social_institutions: 'socialinst', sources: 'sources',
+};
 
 // legacy banner 的分頁順序 / 圖示 / person.tab_* 翻譯鍵（hub tab key）。
 const TABS: Array<{ key: string; icon: string; labelKey: string }> = [
@@ -41,6 +51,7 @@ const TABS: Array<{ key: string; icon: string; labelKey: string }> = [
  */
 export default function PersonBanner({ data, onTabSelect }: { data: PersonBannerData; onTabSelect?: (key: string) => void }) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     // 不重複顯示姓名/拼音/ID（DashboardLayout 標題與麵包屑已顯示）；僅補朝代（標題未含）+ 子資源導航。
 
     const go = (key: string) => {
@@ -51,8 +62,24 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
         router.visit(`/app/basicinformation/${data.person_id}?tab=${key}`);
     };
 
+    // 「查看歷史」連結：對齊 legacy history-button（每頁一顆，連到該子資源 audit-logs，另開分頁）。
+    const historyPage = TAB_HISTORY_PAGE[data.active_tab];
+
     return (
         <div style={wrapStyle}>
+            {data.can_view_audit_logs && historyPage ? (
+                <div style={historyRowStyle}>
+                    <a
+                        href={`/admin/audit-logs?c_personid=${data.person_id}&history_page=${historyPage}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={historyLinkStyle}
+                    >
+                        <i className="fas fa-history" aria-hidden="true" style={{ marginRight: 4 }} />
+                        {tb('view_history')}
+                    </a>
+                </div>
+            ) : null}
             <div style={navStyle} role="tablist">
                 {TABS.map((tab) => {
                     const active = tab.key === data.active_tab;
@@ -79,6 +106,11 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
 }
 
 const wrapStyle: React.CSSProperties = { marginBottom: 16 };
+const historyRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'flex-end', marginBottom: 4 };
+const historyLinkStyle: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', padding: '3px 10px', fontSize: '0.78rem',
+    borderRadius: 4, border: '1px solid #c9d5e2', background: '#f8fafc', color: '#204467', textDecoration: 'none',
+};
 const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid #dee2e6', paddingBottom: 0 };
 const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',

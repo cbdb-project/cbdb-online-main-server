@@ -77,6 +77,7 @@ return [
 
     // Tab common field labels
     'seq_no'                  => 'Seq.',
+    'no_records'              => 'No records',
     'type_label'              => 'Type',
     'time_range'              => 'Period',
     'year_label'              => 'Year',

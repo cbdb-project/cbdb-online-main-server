@@ -29,8 +29,8 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
             <table style={tableStyle}>
                 <thead>
                     <tr>
-                        {columns.map((c) => (
-                            <th key={c.header} style={{ ...thStyle, ...(c.width ? { width: c.width } : {}) }}>{c.header}</th>
+                        {columns.map((c, ci) => (
+                            <th key={ci} style={{ ...thStyle, ...(c.width ? { width: c.width } : {}) }}>{c.header}</th>
                         ))}
                         {actions ? <th style={{ ...thStyle, width: 140 }}>{actionsHeader}</th> : null}
                     </tr>
@@ -42,9 +42,9 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
                         </tr>
                     ) : (
                         items.map((item, i) => (
-                            <tr key={rowKey(item, i)} style={trStyle}>
-                                {columns.map((c) => (
-                                    <td key={c.header} style={tdStyle}>{c.render(item, i)}</td>
+                            <tr key={rowKey(item, i)}>
+                                {columns.map((c, ci) => (
+                                    <td key={ci} style={tdStyle}>{c.render(item, i)}</td>
                                 ))}
                                 {actions ? <td style={tdStyle}>{actions(item)}</td> : null}
                             </tr>
@@ -63,5 +63,4 @@ const thStyle: React.CSSProperties = {
     background: '#f8f9fa', color: '#495057', fontWeight: 700, whiteSpace: 'nowrap',
 };
 const tdStyle: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid #dee2e6', color: '#212529', verticalAlign: 'top' };
-const trStyle: React.CSSProperties = {};
 const emptyTdStyle: React.CSSProperties = { padding: '16px 10px', textAlign: 'center', color: '#94a3b8', borderBottom: '1px solid #dee2e6' };

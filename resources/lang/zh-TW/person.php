@@ -77,6 +77,7 @@ return [
 
     // Tab 通用欄位標籤
     'seq_no'                  => '序號',
+    'no_records'              => '無記錄',
     'type_label'              => '類型',
     'time_range'              => '時間範圍',
     'year_label'              => '年份',

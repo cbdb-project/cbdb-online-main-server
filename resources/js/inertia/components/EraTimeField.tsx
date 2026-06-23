@@ -71,6 +71,18 @@ export default function EraTimeField({
         if (id == null) {
             const fb = await findNianhaoIdByNameFallback(era.reign_title, year);
             if (fb.found) {
+                // 對齊 legacy app.js fillEraFields：精確匹配失敗時 fallback 只是「同名年號中最近一筆」，
+                // 非已證實正確（同名跨朝代/cn-era 與 DB c_str 不一致時可能錯）。須先 confirm 再採用，
+                // 不可靜默填入，否則有錯填年號 ID 的風險。
+                const ok = window.confirm(
+                    `年號「${era.reign_title}」的資料庫記錄與 cn-era 數據存在差異。\n\n` +
+                    `cn-era：${era.reign_title} 第 ${era.year} 年（西元 ${year}）\n` +
+                    `資料庫：${fb.dbInfo}\n\n` +
+                    `是否使用資料庫中的記錄？（取消＝放棄轉換，請手動選擇）`,
+                );
+                if (!ok) {
+                    return;
+                }
                 id = fb.id;
             } else {
                 window.alert(`找到年號「${era.reign_title}」，但資料庫中無對應記錄，請手動選擇。`);
@@ -229,9 +241,9 @@ export default function EraTimeField({
                 <div style={dialogBackdrop} onClick={() => setEraOptions(null)}>
                     <div style={dialogBox} onClick={(e) => e.stopPropagation()}>
                         <div style={dialogTitle}>找到多個符合年號，請選擇：</div>
-                        {eraOptions.map((opt, i) => (
+                        {eraOptions.map((opt) => (
                             <button
-                                key={`${opt.reign_title}-${i}`}
+                                key={`${opt.dynasty ?? ''}-${opt.reign_title}-${opt.year}`}
                                 type="button"
                                 style={dialogOption}
                                 onClick={() => { setEraOptions(null); void fillFromEra(opt); }}

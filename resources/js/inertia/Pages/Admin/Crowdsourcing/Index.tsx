@@ -73,7 +73,7 @@ export default function CrowdsourcingIndex() {
     const [dataModal, setDataModal] = useState<CrowdRow | null>(null);
     const [diffModal, setDiffModal] = useState<CrowdRow | null>(null);
 
-    // 客戶端搜尋 / 排序 / 每頁筆數（對齊舊 DataTables；資料上限 100 筆，前端處理足夠）。
+    // 客戶端搜尋 / 排序 / 每頁筆數（對齊舊 DataTables）；後端 appIndex 一次取回全部、不 cap。
     const [search, setSearch] = useState('');
     const [sortKey, setSortKey] = useState<keyof CrowdRow | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');

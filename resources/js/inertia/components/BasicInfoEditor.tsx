@@ -61,7 +61,8 @@ export default function BasicInfoEditor({
     const set = (key: string, value: string) => setFields((p) => ({ ...p, [key]: value }));
     const setLabel = (key: string, value: string) => setLabels((p) => ({ ...p, [key]: value }));
 
-    // 離頁守衛：名中/拼音任一空時警告（對齊 legacy beforeunload）。
+    // 離頁守衛：有未存變更時警告（dirty guard）。TODO（基本資料收尾）：補 legacy 的
+    // 「名中/拼音任一空」專屬提示（#check_info）。
     useEffect(() => {
         const handler = (e: BeforeUnloadEvent) => {
             if (!dirty) return;

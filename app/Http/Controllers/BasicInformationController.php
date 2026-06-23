@@ -1087,6 +1087,125 @@ class BasicInformationController extends Controller {
     }
 
     /**
+     * Inertia + React 版：社會關係（assoc）編輯器（對齊 legacy assoc/_form，非 person-browser）。
+     * 9 段複合主鍵以 query 帶入編輯。pair codes 由後端自動權威補齊，編輯器不送。
+     */
+    public function appAssocEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
+        $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+
+        // 編輯模式：以 9 段複合主鍵（除 c_personid，由路由帶入）皆存在判斷。
+        $pkCols = ['c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        $hasPk = collect($pkCols)->every(fn ($c) => $request->has($c));
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $row = DB::table('ASSOC_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_assoc_code', (int) $request->input('c_assoc_code'))
+                ->where('c_assoc_id', (int) $request->input('c_assoc_id'))
+                ->where('c_kin_code', (int) $request->input('c_kin_code'))
+                ->where('c_kin_id', (int) $request->input('c_kin_id'))
+                ->where('c_assoc_kin_code', (int) $request->input('c_assoc_kin_code'))
+                ->where('c_assoc_kin_id', (int) $request->input('c_assoc_kin_id'))
+                ->where('c_text_title', (string) $request->input('c_text_title'))
+                ->where('c_assoc_first_year', (int) $request->input('c_assoc_first_year'))
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（失敗不影響編輯主流程）。person 欄查 BIOG_MAIN；代碼欄查各 codes 表。
+            $hydratePerson = function (string $col) use ($row, &$initialLabels) {
+                $pid = (int) ($row->{$col} ?? 0);
+                if ($pid) {
+                    try {
+                        $p = DB::table('BIOG_MAIN')->where('c_personid', $pid)->first();
+                        if ($p) {
+                            $initialLabels[$col] = trim($p->c_personid . ' ' . ($p->c_name_chn ?? '') . ' ' . ($p->c_name ?? ''));
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+            };
+            foreach (['c_kin_id', 'c_assoc_id', 'c_assoc_kin_id', 'c_tertiary_personid', 'c_assoc_claimer_id'] as $pc) {
+                $hydratePerson($pc);
+            }
+
+            try {
+                $ac = DB::table('ASSOC_CODES')->where('c_assoc_code', (int) $row->c_assoc_code)->first();
+                if ($ac) {
+                    $initialLabels['c_assoc_code'] = trim($ac->c_assoc_code . ' ' . ($ac->c_assoc_desc_chn ?? '') . ' ' . ($ac->c_assoc_desc ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+            foreach (['c_kin_code', 'c_assoc_kin_code'] as $kc) {
+                try {
+                    $code = (int) ($row->{$kc} ?? 0);
+                    if ($code) {
+                        $k = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+                        if ($k) {
+                            $initialLabels[$kc] = trim($k->c_kincode . ' ' . ($k->c_kinrel_chn ?? '') . ' ' . ($k->c_kinrel ?? ''));
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $addr = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_addr_id)->first();
+                if ($addr && (int) $row->c_addr_id) {
+                    $initialLabels['c_addr_id'] = trim(($addr->c_name_chn ?? '') . ' ' . ($addr->c_name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                if ((int) $row->c_inst_code) {
+                    $name = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $row->c_inst_name_code)->value('c_inst_name_hz');
+                    $initialLabels['c_inst_code'] = trim($row->c_inst_code . '-' . $row->c_inst_name_code . ' ' . ($name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AssocEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $dynastyCode,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('basicinformation.assoc.index', ['basicinformation' => $personId], false),
+            'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
+            'ai_suggest_endpoint' => Route::has('ai.code-lookup.suggest') ? route('ai.code-lookup.suggest', [], false) : '',
+        ]);
+    }
+
+    /**
      * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
      * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
      */

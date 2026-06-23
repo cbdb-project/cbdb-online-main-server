@@ -126,6 +126,11 @@ Route::get('app/basicinformation/{id}/offices/edit-v2', 'BasicInformationControl
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.offices.editv2');
+// 社會關係編輯器 V2（對齊 legacy assoc/_form，9 段 PK＋雙 era＋多人物搜尋＋AI 代碼識別；pair 後端權威補齊）。獨立測試路由，assoc flag 仍 old、不上線。
+Route::get('app/basicinformation/{id}/assoc/edit-v2', 'BasicInformationController@appAssocEditV2')
+    ->where('id', '[0-9]+')
+    ->middleware(['auth', 'inertia'])
+    ->name('app.basicinformation.assoc.editv2');
 // PersonEditor 資料端點（JSON，編輯者/訪客可用，非 superadmin-only）。額外路徑段，
 // 不會被下方 {id} 泛用路由攔截；不掛 inertia（純 JSON）。
 Route::get('app/basicinformation/{id}/summary', 'BasicInformationController@summary')

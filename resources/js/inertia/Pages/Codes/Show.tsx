@@ -235,6 +235,8 @@ export default function CodesShow() {
 
             {boolean_enabled && (
                 <>
+                    {/* 進階篩選語法說明（對齊舊頁：AND/OR/NOT 用法）。 */}
+                    <div className="mb-2 text-xs text-muted-foreground">{t('advanced_filter_hint')}</div>
                     {booleanExamples.length > 0 && (
                         <div className="mb-2 hidden text-xs text-muted-foreground md:block">
                             {t('filter_chip_label')}{' '}

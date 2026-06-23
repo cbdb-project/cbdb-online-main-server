@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { router, usePage } from '@inertiajs/react';
+import React, { useMemo, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
@@ -64,7 +64,7 @@ function formatLocal(iso: string, fallback: string): string {
 
 export default function CrowdsourcingIndex() {
     const props = usePage<CrowdsourcingPageProps>().props;
-    const { lists, pagination } = props;
+    const { lists } = props;
     const t = useTranslation('operations');
     const tc = useTranslation('codes');
     const tcom = useTranslation('common');
@@ -73,9 +73,56 @@ export default function CrowdsourcingIndex() {
     const [dataModal, setDataModal] = useState<CrowdRow | null>(null);
     const [diffModal, setDiffModal] = useState<CrowdRow | null>(null);
 
-    const onPageChange = (page: number) => {
-        router.get(window.location.pathname, { page }, { preserveScroll: true, preserveState: true });
+    // 客戶端搜尋 / 排序 / 每頁筆數（對齊舊 DataTables；資料上限 100 筆，前端處理足夠）。
+    const [search, setSearch] = useState('');
+    const [sortKey, setSortKey] = useState<keyof CrowdRow | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [pageSize, setPageSize] = useState(25);
+    const [page, setPage] = useState(1);
+
+    const toggleSort = (key: keyof CrowdRow) => {
+        if (sortKey === key) {
+            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+        setPage(1);
     };
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return lists;
+        return lists.filter((r) =>
+            [r.resource, r.resource_id, r.op_type, r.user_name, r.rate, r.created_display, r.crowdsourcing_status]
+                .map((v) => (v == null ? '' : String(v)).toLowerCase())
+                .some((s) => s.includes(q)),
+        );
+    }, [lists, search]);
+
+    const sorted = useMemo(() => {
+        if (!sortKey) return filtered;
+        const arr = [...filtered];
+        const k = sortKey;
+        arr.sort((a, b) => {
+            const av = a[k];
+            const bv = b[k];
+            const an = typeof av === 'number' ? av : Number(av);
+            const bn = typeof bv === 'number' ? bv : Number(bv);
+            const numeric = !Number.isNaN(an) && !Number.isNaN(bn)
+                && av !== null && bv !== null && av !== '' && bv !== '';
+            const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return arr;
+    }, [filtered, sortKey, sortDir]);
+
+    const total = sorted.length;
+    const lastPage = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, lastPage);
+    const pageRows = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+    const fromRow = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const toRow = Math.min(safePage * pageSize, total);
 
     return (
         <DashboardLayout
@@ -89,30 +136,63 @@ export default function CrowdsourcingIndex() {
                     {t('crowdsourcing_status_desc')}
                 </p>
 
+                {/* 客戶端搜尋 + 每頁筆數（對齊舊 DataTables）。 */}
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        placeholder={tcom('search')}
+                        className="rounded-md border border-input px-3 py-1.5 text-sm"
+                    />
+                    <select
+                        value={pageSize}
+                        onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                        className="rounded-md border border-input px-2 py-1.5 text-sm"
+                        aria-label="per-page"
+                    >
+                        {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <span className="ml-auto text-sm text-muted-foreground">{fromRow}–{toRow} / {total}</span>
+                </div>
+
                 <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50">
                             <tr>
-                                <th className="px-3 py-2 text-left font-medium">{t('modified_resource')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('modified_value')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('resource_tts')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('operation_type')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('modified_by')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('count')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('entry_time')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('status_label')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{tc('actions')}</th>
+                                {(() => {
+                                    const sortableTh = (key: keyof CrowdRow, label: string) => (
+                                        <th key={String(key)} className="px-3 py-2 text-left font-medium">
+                                            <button type="button" className="inline-flex items-center gap-1 hover:underline" onClick={() => toggleSort(key)}>
+                                                {label}{sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                                            </button>
+                                        </th>
+                                    );
+                                    return (
+                                        <>
+                                            {sortableTh('resource', t('modified_resource'))}
+                                            <th className="px-3 py-2 text-left font-medium">{t('modified_value')}</th>
+                                            {sortableTh('resource_id', t('resource_tts'))}
+                                            {sortableTh('op_type', t('operation_type'))}
+                                            {sortableTh('user_name', t('modified_by'))}
+                                            {sortableTh('rate', t('count'))}
+                                            {sortableTh('created_utc', t('entry_time'))}
+                                            {sortableTh('crowdsourcing_status', t('status_label'))}
+                                            <th className="px-3 py-2 text-left font-medium">{tc('actions')}</th>
+                                        </>
+                                    );
+                                })()}
                             </tr>
                         </thead>
                         <tbody>
-                            {lists.length === 0 && (
+                            {total === 0 && (
                                 <tr>
                                     <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
                                         —
                                     </td>
                                 </tr>
                             )}
-                            {lists.map((row) => (
+                            {pageRows.map((row) => (
                                 <tr key={row.id} className="border-t border-border align-top">
                                     <td className="px-3 py-1.5">{row.resource}</td>
                                     <td className="px-3 py-1.5">
@@ -164,8 +244,8 @@ export default function CrowdsourcingIndex() {
 
                 <Pagination
                     className="mt-4"
-                    meta={pagination}
-                    onPageChange={onPageChange}
+                    meta={{ current_page: safePage, last_page: lastPage, per_page: pageSize, total, from: fromRow || null, to: toRow || null }}
+                    onPageChange={(p) => setPage(p)}
                     labels={{ previous: tcom('previous'), next: tcom('next') }}
                 />
             </div>

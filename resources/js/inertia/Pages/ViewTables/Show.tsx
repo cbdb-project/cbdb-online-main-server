@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import DataTable from '../../components/DataTable';
@@ -44,7 +44,6 @@ export default function Show({
     description,
     columns,
     rows,
-    key,
     primary_alias,
     aliases,
     column_count,
@@ -55,6 +54,9 @@ export default function Show({
     listUrl,
     availableViews,
 }: Props) {
+    // `key` 是 React 保留 prop，會被 React 從函式組件 props 中剝除（故先前顯示 undefined）；
+    // 改從 Inertia 原始 page props 取得。
+    const { key } = usePage<Props>().props;
     const t = useTranslation('views');
     const [search, setSearch] = useState(filters.search || '');
 

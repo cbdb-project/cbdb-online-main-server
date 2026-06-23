@@ -34,8 +34,10 @@ class CrowdsourcingController extends Controller {
     /**
      * 建立眾包記錄列表（含每列 resource_diff），供 Blade index() 與 Inertia appIndex() 共用。
      */
-    protected function buildCrowdsourcingLists() {
-        $lists = Operation::where('crowdsourcing_status', '!=', 0)->orderBy('created_at', 'desc')->limit(100)->paginate(20);
+    protected function buildCrowdsourcingLists($perPage = 20) {
+        // $perPage 預設 20（舊 Blade index 不變）；React appIndex 傳 100 一次取回全部（上限 100），
+        // 由前端做搜尋/排序/每頁筆數（對齊舊 DataTables 的客戶端處理）。
+        $lists = Operation::where('crowdsourcing_status', '!=', 0)->orderBy('created_at', 'desc')->limit(100)->paginate($perPage);
         //將物件轉為陣列進行陣列比對
         $listsArr = $this->operationRepository->objectToArray($lists);
         $all = count($listsArr['data']);
@@ -115,7 +117,8 @@ class CrowdsourcingController extends Controller {
     }
 
     public function appIndex() {
-        $lists = $this->buildCrowdsourcingLists();
+        // 一次取回全部（上限 100），前端做搜尋/排序/每頁筆數。
+        $lists = $this->buildCrowdsourcingLists(100);
         $canReviewer = Auth::check() && !Auth::user()->isCrowdsourcingUser();
 
         $rows = collect($lists->items())->map(function ($item) use ($canReviewer) {

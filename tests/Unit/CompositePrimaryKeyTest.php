@@ -983,6 +983,59 @@ class CompositePrimaryKeyTest extends TestCase {
         $this->assertStringContainsString('c_posting_id=130', $url);
     }
 
+    // === buildResourceEditUrl flag-aware（子資源 flag=new → React /app edit-v2，帶完整 PK query）===
+
+    #[Test]
+    public function it_builds_app_editv2_url_when_subresource_flag_is_new(): void {
+        config()->set('migration_flags.pages.basicinformation.offices', 'new');
+        $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_OFFICE_DATA', '448-130', 12345);
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/app/basicinformation/12345/offices/edit-v2', $url);
+        $this->assertStringContainsString('c_office_id=448', $url);
+        $this->assertStringContainsString('c_posting_id=130', $url);
+        $this->assertStringNotContainsString('/offices/edit?', $url); // 非 legacy
+    }
+
+    #[Test]
+    public function it_builds_app_editv2_url_for_addr_alias_when_offices_flag_is_new(): void {
+        // POSTED_TO_ADDR_DATA 別名共用 offices editv2（PK 經 office schema 解析）。
+        config()->set('migration_flags.pages.basicinformation.offices', 'new');
+        $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_ADDR_DATA', '448-130', 12345);
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/app/basicinformation/12345/offices/edit-v2', $url);
+        $this->assertStringContainsString('c_office_id=448', $url);
+    }
+
+    #[Test]
+    public function it_builds_app_editv2_url_for_assoc_with_full_pk_when_flag_new(): void {
+        config()->set('migration_flags.pages.basicinformation.assoc', 'new');
+        $rid = CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => 1762, 'c_assoc_code' => 197, 'c_assoc_id' => 3767,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '[n/a]', 'c_assoc_first_year' => -9999,
+        ]);
+        $url = CompositePrimaryKey::buildResourceEditUrl('ASSOC_DATA', $rid, 1762);
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/app/basicinformation/1762/assoc/edit-v2', $url);
+        // 全 PK 皆作 query → edit-v2 進入 edit 模式。
+        $this->assertStringContainsString('c_assoc_code=197', $url);
+        $this->assertStringContainsString('c_assoc_id=3767', $url);
+        $this->assertStringContainsString('c_assoc_first_year=-9999', $url);
+    }
+
+    #[Test]
+    public function it_falls_back_to_legacy_edit_url_when_subresource_flag_is_old(): void {
+        config()->set('migration_flags.pages.basicinformation.offices', 'old');
+        $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_OFFICE_DATA', '448-130', 12345);
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringNotContainsString('/app/', $url);
+    }
+
     // === RESOURCE_ID_SCHEMA_ALIAS 與 getResourceIdSchemaTable 測試 ===
 
     #[Test]

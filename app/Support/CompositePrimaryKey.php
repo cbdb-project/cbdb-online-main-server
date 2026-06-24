@@ -371,6 +371,29 @@ class CompositePrimaryKey {
     ];
 
     /**
+     * 資源表 → [React edit-v2 路由名, 對應 migration flag key]。
+     * 當該子資源 flag=new 且路由存在時，buildResourceEditUrl 改導向 React /app edit-v2（帶完整 PK query，
+     * edit-v2 controller 以「全 PK 皆存在」判定 edit 模式並載入該列），否則沿用 legacy .edit.query。
+     * 修「新介面（如 /app/operations）點子資源仍開 legacy 編輯頁」。
+     */
+    public const APP_EDIT_ROUTE_MAP = [
+        'ALTNAME_DATA' => ['app.basicinformation.altnames.editv2', 'basicinformation.altname'],
+        'BIOG_ADDR_DATA' => ['app.basicinformation.addresses.editv2', 'basicinformation.addresses'],
+        'TEXT_DATA' => ['app.basicinformation.texts.editv2', 'basicinformation.texts'],
+        'BIOG_TEXT_DATA' => ['app.basicinformation.texts.editv2', 'basicinformation.texts'],
+        'BIOG_SOURCE_DATA' => ['app.basicinformation.sources.editv2', 'basicinformation.sources'],
+        'POSTED_TO_OFFICE_DATA' => ['app.basicinformation.offices.editv2', 'basicinformation.offices'],
+        'POSTED_TO_ADDR_DATA' => ['app.basicinformation.offices.editv2', 'basicinformation.offices'],
+        'ASSOC_DATA' => ['app.basicinformation.assoc.editv2', 'basicinformation.assoc'],
+        'KIN_DATA' => ['app.basicinformation.kinship.editv2', 'basicinformation.kinship'],
+        'EVENTS_DATA' => ['app.basicinformation.events.editv2', 'basicinformation.events'],
+        'STATUS_DATA' => ['app.basicinformation.statuses.editv2', 'basicinformation.statuses'],
+        'ENTRY_DATA' => ['app.basicinformation.entries.editv2', 'basicinformation.entries'],
+        'POSSESSION_DATA' => ['app.basicinformation.possession.editv2', 'basicinformation.possession'],
+        'BIOG_INST_DATA' => ['app.basicinformation.socialinst.editv2', 'basicinformation.socialinst'],
+    ];
+
+    /**
      * 將複合主鍵陣列編碼為可儲存在 resource_id 欄位的字串
      *
      * 使用 PHP 標準的 http_build_query() 產生查詢參數格式，
@@ -615,6 +638,15 @@ class CompositePrimaryKey {
         $routeName = self::EDIT_ROUTE_MAP[$upperResource] ?? null;
         if (!$routeName) {
             return null;
+        }
+
+        // flag-aware：子資源 flag=new 且 React edit-v2 路由存在時，改導向 /app edit-v2（帶完整 PK query → edit 模式）。
+        $appRoute = self::APP_EDIT_ROUTE_MAP[$upperResource] ?? null;
+        if ($appRoute !== null
+            && function_exists('migration_flag_is_new')
+            && migration_flag_is_new($appRoute[1])
+            && \Illuminate\Support\Facades\Route::has($appRoute[0])) {
+            $routeName = $appRoute[0];
         }
 
         // parseStoredResourceId() 內部已透過 getResourceIdSchemaTable() 處理別名對應

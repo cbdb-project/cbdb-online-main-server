@@ -122,6 +122,12 @@ class ApiV2MutateEventTest extends TestCase {
             $table->integer('c_addr_id')->nullable();
             $table->longText('c_event')->nullable();
             $table->string('c_role', 255)->nullable();
+            // 真實 EVENTS_DATA 含建檔/修改稽核欄；legacy eventUpdateById（提案核准路徑）會經
+            // ToolsRepository::timestamp 寫入 c_modified_*，測試表須補齊 nullable 欄否則核准會靜默回滾。
+            $table->string('c_created_by', 255)->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->dateTime('c_modified_date')->nullable();
             $table->primary(['c_personid', 'c_sequence', 'c_event_code']);
         });
     }
@@ -406,6 +412,44 @@ class ApiV2MutateEventTest extends TestCase {
 
         // 無 audit_log
         $this->assertDatabaseMissing('audit_log', ['table_name' => 'EVENTS_DATA']);
+    }
+
+    #[Test]
+    public function testApprovingEventUpdateProposalSyncsAddrSubtable(): void {
+        // 完整往返：眾包提案改地址 → __proposal_aux 帶 c_addr_id；管理員核准後 applyEventProposal
+        // 重用 eventUpdateById（is_array 守衛）同步 EVENTS_ADDR（同 tuple 刪舊重插），而非掉進泛用單表 apply 漏掉地址。
+        $proposer = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'event-prop-approve@example.com');
+        $this->actingAs($proposer);
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案改地址', 'c_addr_id' => [222, 333]],
+            'meta' => ['comment' => '提案：改地址'],
+        ]))->assertOk();
+
+        // 提案階段：原資料與副表皆未變動
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_addr_id' => 222]);
+
+        $operation = Operation::query()
+            ->where('resource', 'EVENTS_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->firstOrFail();
+        $aux = json_decode($operation->resource_data, true)['__proposal_aux'] ?? [];
+        $this->assertSame([222, 333], $aux['c_addr_id'] ?? null);
+
+        // 管理員核准 → 副表落庫
+        $admin = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'event-admin@example.com');
+        $this->actingAs($admin);
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '同意'])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_addr_id' => 111]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 333]);
+        $this->assertDatabaseHas('EVENTS_DATA', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_notes' => '提案改地址']);
     }
 
     // ── Error Cases ─────────────────────────────────────────

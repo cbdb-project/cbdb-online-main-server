@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -39,11 +40,15 @@ export default function TextEditor({
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const snapshot = useRef(JSON.stringify({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields }));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields }));
+    const msgTimer = useRef<number | null>(null);
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
+    const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
+    useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
+    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
@@ -73,7 +78,7 @@ export default function TextEditor({
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
-            const initial: Fields = JSON.parse(snapshot.current);
+            const initial: Fields = JSON.parse(savedSnapshot);
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
             // 主鍵欄位（著述／角色）可改：對齊 legacy，後端據此改鍵。PK 不可為空，故只送非空值。
@@ -89,8 +94,8 @@ export default function TextEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            snapshot.current = JSON.stringify(fields);
+            flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            setSavedSnapshot(JSON.stringify(fields));
             if (mode === 'create') { window.location.assign(indexUrl); }
             // 直接儲存若改了主鍵（著述／角色），列已改鍵；以「實際送出的 PK 變更」覆寫 originalPk，
             // 後續操作才指向新列。注意：不可用 fields 重建（清空欄位 Number('')=0 會讓 client 與 DB 失準），
@@ -117,7 +122,7 @@ export default function TextEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            snapshot.current = JSON.stringify(fields);
+            setSavedSnapshot(JSON.stringify(fields));
             window.location.assign(indexUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
@@ -178,8 +183,9 @@ export default function TextEditor({
             <div style={{ ...rowStyle, gap: 8 }}>
                 <div style={{ width: 160, flexShrink: 0 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                     {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
                 </div>

@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
@@ -73,7 +74,8 @@ export default function OfficeEditor({
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [addr, setAddr] = useState<AddrItem[]>(initialAddr);
     const [addrKey, setAddrKey] = useState(0); // 用於重置地址新增框
-    const snapshot = useRef(JSON.stringify({ f: base, a: initialAddr }));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify({ f: base, a: initialAddr }));
+    const msgTimer = useRef<number | null>(null);
     const originalPk = useRef<Record<string, number>>({
         c_office_id: Number(initialFields.c_office_id ?? 0),
         c_posting_id: Number(initialFields.c_posting_id ?? 0),
@@ -81,11 +83,13 @@ export default function OfficeEditor({
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
+    const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
+    useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
 
-    const dirty = useMemo(() => JSON.stringify({ f: fields, a: addr }) !== snapshot.current, [fields, addr]);
+    const dirty = useMemo(() => JSON.stringify({ f: fields, a: addr }) !== savedSnapshot, [fields, addr, savedSnapshot]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -212,7 +216,7 @@ export default function OfficeEditor({
             // 的 FK 安全值（不會觸發外鍵違規而擋下存檔）；legacy 僅靠 MySQL ''→0 隱性轉型，非刻意寫 0，
             // 故 v2 改以語義正確、永不擋存檔的 null（c_office_id/c_source/c_inst_code 仍用 0，因其有明確 0=未詳 列）。
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
-            const snap = JSON.parse(snapshot.current) as { f: Fields; a: AddrItem[] };
+            const snap = JSON.parse(savedSnapshot) as { f: Fields; a: AddrItem[] };
             changes = {};
             // c_office_id 可改（PK），改動才送。
             const curOffice = Number(fields.c_office_id ?? 0) || 0;
@@ -234,8 +238,8 @@ export default function OfficeEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            snapshot.current = JSON.stringify({ f: fields, a: addr });
+            flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            setSavedSnapshot(JSON.stringify({ f: fields, a: addr }));
             if (isCreate) { window.location.assign(indexUrl); } else if (sm === 'direct') {
                 // c_office_id 可改 → 重同步 originalPk（c_posting_id 不變）。
                 originalPk.current = { c_office_id: Number(fields.c_office_id ?? 0) || 0, c_posting_id: originalPk.current.c_posting_id };
@@ -257,7 +261,7 @@ export default function OfficeEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            snapshot.current = JSON.stringify({ f: fields, a: addr });
+            setSavedSnapshot(JSON.stringify({ f: fields, a: addr }));
             window.location.assign(indexUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
@@ -369,9 +373,10 @@ export default function OfficeEditor({
             <div style={{ ...rowStyle, gap: 8 }}>
                 <div style={{ width: 160, flexShrink: 0 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
                     {mode === 'edit' && canEdit ? <button type="button" style={successBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                     {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
                 </div>

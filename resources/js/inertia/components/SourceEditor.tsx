@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 
@@ -57,7 +58,8 @@ export default function SourceEditor({
     };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const snapshot = useRef(JSON.stringify(base));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
+    const msgTimer = useRef<number | null>(null);
     // 編輯目標主鍵：c_pages 為字串（哨兵 ''），c_personid / c_textid 為整數。
     const originalPk = useRef<Record<string, number | string>>({
         c_personid: Number(initialFields.c_personid ?? personId),
@@ -67,10 +69,12 @@ export default function SourceEditor({
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
+    const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
+    useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
     const [error, setError] = useState<string | null>(null);
     const [comment, setComment] = useState('');
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
+    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -105,7 +109,7 @@ export default function SourceEditor({
             if (notes !== '') changes.c_notes = notes;
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
-            const initial: Fields = JSON.parse(snapshot.current);
+            const initial: Fields = JSON.parse(savedSnapshot);
             changes = {};
             // 僅可寫非主鍵欄位（PK 在 update 不可變）。備註空字串送 null；旗標送 0/1。
             const notesCur = fields.c_notes ?? '';
@@ -126,8 +130,8 @@ export default function SourceEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            snapshot.current = JSON.stringify(fields);
+            flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            setSavedSnapshot(JSON.stringify(fields));
             if (mode === 'create') { window.location.assign(indexUrl); }
             // update 模式 PK 不可變，無需 re-sync originalPk。
         } catch (e) {
@@ -147,7 +151,7 @@ export default function SourceEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            snapshot.current = JSON.stringify(fields);
+            setSavedSnapshot(JSON.stringify(fields));
             window.location.assign(indexUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
@@ -221,8 +225,9 @@ export default function SourceEditor({
             <div style={{ ...rowStyle, gap: 8 }}>
                 <div style={{ width: 160, flexShrink: 0 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                     {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
                 </div>

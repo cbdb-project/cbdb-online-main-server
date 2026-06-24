@@ -29,9 +29,11 @@ class ApiV2MutatePossessionTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createPossessionTable();
+        $this->createPossessionAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('POSSESSION_ADDR');
         Schema::dropIfExists('POSSESSION_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -118,8 +120,27 @@ class ApiV2MutatePossessionTest extends TestCase {
             $table->integer('c_possession_nh_code')->nullable();
             $table->integer('c_possession_nh_yr')->nullable();
             $table->integer('c_possession_yr_range')->nullable();
+            // 真實 POSSESSION_DATA 含建檔/修改稽核欄；legacy possessionUpdateById（提案核准路徑）會經
+            // ToolsRepository::timestamp 寫入 c_modified_*，測試表須補齊 nullable 欄否則核准會靜默回滾。
+            $table->string('c_created_by', 255)->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->dateTime('c_modified_date')->nullable();
             $table->primary('c_possession_record_id');
         });
+    }
+
+    protected function createPossessionAddrTable(): void {
+        Schema::create('POSSESSION_ADDR', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_possession_record_id');
+            $table->integer('c_addr_id')->default(0);
+            $table->primary(['c_possession_record_id', 'c_addr_id']);
+        });
+    }
+
+    protected function seedPossessionAddr(int $addrId): void {
+        DB::table('POSSESSION_ADDR')->insert(['c_personid' => 1000, 'c_possession_record_id' => 500, 'c_addr_id' => $addrId]);
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -161,6 +182,53 @@ class ApiV2MutatePossessionTest extends TestCase {
         ];
 
         return array_replace_recursive($payload, $overrides);
+    }
+
+    // ── 地址副表（POSSESSION_ADDR）同步 ─────────────────────
+
+    #[Test]
+    public function testDirectPossessionUpdateSyncsAddrSubtable(): void {
+        // 改備註 + c_addr_id 一併送 → POSSESSION_ADDR 同步為新集合（刪舊重插）。
+        $this->actingAs($this->makeUser(email: 'poss-addr-sync@example.com'));
+        $this->seedPossession();
+        $this->seedPossessionAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->possessionPayload([
+            'changes' => ['c_notes' => '改後', 'c_addr_id' => [222, 333]],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 111]);
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 333]);
+    }
+
+    #[Test]
+    public function testDirectPossessionUpdateAddrOnlyChange(): void {
+        // 僅改地址（無財產欄）→ 走 address-only 路徑，POSSESSION_ADDR 更新成功。
+        $this->actingAs($this->makeUser(email: 'poss-addr-only@example.com'));
+        $this->seedPossession();
+        $this->seedPossessionAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->possessionPayload([
+            'changes' => ['c_addr_id' => [222]],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 222]);
+        $this->assertDatabaseMissing('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 111]);
+    }
+
+    #[Test]
+    public function testDirectPossessionUpdateNotesKeepsAddresses(): void {
+        // 未送 c_addr_id（僅改備註）→ 既有 POSSESSION_ADDR 保留（不誤刪）。
+        $this->actingAs($this->makeUser(email: 'poss-addr-keep@example.com'));
+        $this->seedPossession();
+        $this->seedPossessionAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->possessionPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 111]);
     }
 
     // ── Direct Update Tests ─────────────────────────────────
@@ -305,6 +373,44 @@ class ApiV2MutatePossessionTest extends TestCase {
 
         // 無 audit_log
         $this->assertDatabaseMissing('audit_log', ['table_name' => 'POSSESSION_DATA']);
+    }
+
+    #[Test]
+    public function testApprovingPossessionUpdateProposalSyncsAddrSubtable(): void {
+        // 完整往返：眾包提案改地址 → __proposal_aux 帶 c_addr_id；管理員核准後 applyPossessionUpdateProposal
+        // 重用 possessionUpdateById（is_array 守衛）同步 POSSESSION_ADDR（刪舊重插），而非掉進泛用單表 apply 漏掉地址。
+        $proposer = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'poss-prop-approve@example.com');
+        $this->actingAs($proposer);
+        $this->seedPossession();
+        $this->seedPossessionAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->possessionPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案改地址', 'c_addr_id' => [222, 333]],
+            'meta' => ['comment' => '提案：改地址'],
+        ]))->assertOk();
+
+        // 提案階段：原資料與副表皆未變動
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 111]);
+        $this->assertDatabaseMissing('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 222]);
+
+        $operation = Operation::query()
+            ->where('resource', 'POSSESSION_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->firstOrFail();
+        $aux = json_decode($operation->resource_data, true)['__proposal_aux'] ?? [];
+        $this->assertSame([222, 333], $aux['c_addr_id'] ?? null);
+
+        // 管理員核准 → 副表落庫
+        $admin = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'poss-admin@example.com');
+        $this->actingAs($admin);
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '同意'])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 111]);
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('POSSESSION_ADDR', ['c_possession_record_id' => 500, 'c_addr_id' => 333]);
+        $this->assertDatabaseHas('POSSESSION_DATA', ['c_possession_record_id' => 500, 'c_notes' => '提案改地址']);
     }
 
     // ── Error Cases ─────────────────────────────────────────

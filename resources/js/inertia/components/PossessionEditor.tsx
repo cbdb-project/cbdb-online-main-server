@@ -11,9 +11,9 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
  * 主鍵 c_possession_record_id 為伺服器配發 surrogate：新增 target.pk 留空，由 PossessionCreateHandler 配發；
  * 更新以 c_possession_record_id 定位。
  *
- * 地址副表（POSSESSION_ADDR）：新增時 c_addr_id 陣列由 PossessionCreateHandler 寫入副表；
- * 更新（PossessionMutationHandler 為單表 update，白名單不含 c_addr_id）目前不支援改地址副表，
- * 故編輯模式地名欄位設為唯讀並標示 TODO（對齊「child 表處理有風險寧標 TODO」原則），避免「靜默不落庫」。
+ * 地址副表（POSSESSION_ADDR）：新增與編輯皆可增刪。送 c_addr_id 陣列，由 PossessionMutationHandler
+ * 於同交易 afterDirectUpdate（及 create 的 PossessionCreateHandler）同步副表（record_id 固定、刪重插整組）；
+ * proposal 更新經 applyPossessionUpdateProposal 套用。不寫 POSSESSION_DATA 純量欄。
  */
 type Fields = Record<string, string>;
 interface AddrItem { id: string; label: string }
@@ -60,6 +60,7 @@ export default function PossessionEditor({
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [addrItems, setAddrItems] = useState<AddrItem[]>(initialAddr);
     const [addKey, setAddKey] = useState(0);
+    const initialAddrIds = useRef<string[]>(initialAddr.map((a) => String(a.id)));
     const snapshot = useRef(JSON.stringify(base));
     const originalPk = useRef<Record<string, number>>({ c_possession_record_id: Number(initialFields.c_possession_record_id ?? 0) });
     const [saving, setSaving] = useState(false);
@@ -69,7 +70,12 @@ export default function PossessionEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
+    const addrDirty = useMemo(() => {
+        const a = [...new Set(addrItems.map((x) => String(x.id)))].sort();
+        const b = [...new Set(initialAddrIds.current)].sort();
+        return JSON.stringify(a) !== JSON.stringify(b);
+    }, [addrItems]);
+    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current || addrDirty, [fields, addrDirty]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -123,7 +129,8 @@ export default function PossessionEditor({
             const initial: Fields = JSON.parse(snapshot.current);
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
-            // 編輯模式不送 c_addr_id（副表更新尚未支援，TODO）。
+            // 地址有變動才送 c_addr_id（清空則送空陣列）；後端 afterDirectUpdate 同步 POSSESSION_ADDR。
+            if (addrDirty) changes.c_addr_id = addrItems.map((it) => it.id);
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -137,6 +144,7 @@ export default function PossessionEditor({
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
             snapshot.current = JSON.stringify(fields);
+            initialAddrIds.current = addrItems.map((it) => String(it.id));
             if (mode === 'create') { window.location.assign(indexUrl); }
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
@@ -195,20 +203,16 @@ export default function PossessionEditor({
                 <EraTimeField values={buildEra(YR)} onChange={(p) => applyEra(YR, p)} dynastyCode={dynastyCode} showRange disabled={!editable} /></div></div>
 
             <div style={rowStyle}><label style={labelStyle}>{tr('place_name', '地名')} (c_addr_id)</label><div style={fieldStyle}>
-                {mode === 'create' && editable ? (
+                {editable ? (
                     <CodeAutocomplete key={addKey} mode="search" endpoint="/api/select/search/addr"
                         extraQuery={{ dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' }}
                         value="" initialLabel="" placeholder={tr('add_place', '搜尋並加入地名…')}
                         onChange={(v, l) => addAddr(v, l)} />
-                ) : (
-                    <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: 4 }}>
-                        {tr('possession_addr_edit_todo', '地址副表更新尚未支援（TODO），如需修改地名請暫用舊版編輯頁。')}
-                    </div>
-                )}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                ) : null}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: editable ? 6 : 0 }}>
                     {addrItems.map((it) => (
                         <span key={it.id} style={chipStyle}>{it.label}
-                            {mode === 'create' && editable ? (
+                            {editable ? (
                                 <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveStyle} aria-label="remove">×</button>
                             ) : null}
                         </span>

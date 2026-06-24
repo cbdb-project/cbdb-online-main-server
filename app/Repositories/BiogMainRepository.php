@@ -1577,7 +1577,9 @@ class BiogMainRepository {
 
     public function possessionUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
-        $c_addr_id = $data['c_addr_id'];
+        // 僅當 c_addr_id 為陣列才同步 POSSESSION_ADDR（legacy 表單與帶 aux 的 proposal 會送）；
+        // 未送（proposal 未帶地址 aux）時為 null → 不動既有地址，避免 TypeError 與誤刪副表。
+        $c_addr_id = $data['c_addr_id'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
@@ -1587,7 +1589,9 @@ class BiogMainRepository {
         }
 
         DB::transaction(function () use ($id, $id_, $data, $c_addr_id, $ori) {
-            $this->insertAddrPo($c_addr_id, $id_, $id);
+            if (is_array($c_addr_id)) {
+                $this->insertAddrPo($c_addr_id, $id_, $id);
+            }
             DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
             $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
             (new AuditLogService())->write(
@@ -3543,6 +3547,14 @@ class BiogMainRepository {
         }
 
         return $originalText." ".$add;
+    }
+
+    /**
+     * 公開包裝：v2 PossessionMutationHandler 於同交易內同步 POSSESSION_ADDR 副表
+     * （以 c_possession_record_id 刪除既有列後重插整組；-999→0）。create 路徑沿用 possessionStoreById。
+     */
+    public function syncPossessionAddresses(array $c_addr_id, $c_possession_record_id, $c_personid): void {
+        $this->insertAddrPo($c_addr_id, $c_possession_record_id, $c_personid);
     }
 
     protected function insertAddrPo(array $c_addr_id, $c_possession_record_id, $c_personid) {

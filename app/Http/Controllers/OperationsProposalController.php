@@ -242,6 +242,10 @@ class OperationsProposalController extends Controller {
             return [$this->applyPossessionCreateProposal($operation, $data, $auxiliaryPayload), true];
         }
 
+        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_UPDATE) {
+            return [$this->applyPossessionUpdateProposal($operation, $data, $original, $auxiliaryPayload), true];
+        }
+
         if ($table === 'EVENTS_DATA') {
             return [$this->applyEventProposal($operation, $data, $original, $auxiliaryPayload), true];
         }
@@ -422,6 +426,30 @@ class OperationsProposalController extends Controller {
         $newId = $this->biogMainRepository->possessionStoreById($request, $personId);
 
         $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $newId]);
+        if ($row === null) {
+            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
+        }
+
+        return $row;
+    }
+
+    /**
+     * 套用財產更新提案：連帶同步 POSSESSION_ADDR（修補先前 update 提案走泛型單表套用、漏掉地址副表的缺口）。
+     * aux 帶 c_addr_id（陣列）時 possessionUpdateById 同步副表；未帶則保留既有地址（is_array 守衛）。
+     */
+    protected function applyPossessionUpdateProposal(
+        Operation $operation,
+        array $data,
+        array $original,
+        array $auxiliaryPayload
+    ): array {
+        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
+        $recordId = (int) ($data['c_possession_record_id'] ?? $original['c_possession_record_id'] ?? 0);
+
+        $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
+        $this->biogMainRepository->possessionUpdateById($request, $personId, $recordId);
+
+        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $recordId]);
         if ($row === null) {
             throw new \RuntimeException('財產提案套用後讀取資料失敗。');
         }

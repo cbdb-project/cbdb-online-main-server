@@ -27,12 +27,21 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
     /**
      * 覆寫：先把互逆配對碼從 changes 抽出（非 ASSOC_DATA 欄，否則父類白名單會 422），暫存供建鏡像／存 aux，
      * 再委派父類處理主列；direct 主列寫入成功後於同交易內由 afterDirectInsert 寫互逆鏡像列（原子）。
+     *
+     * ⚠️ 鏡像關係碼修正（惡性 bug）：未送 c_assocship_pair 時**必須以代碼表權威反向碼補齊**
+     * （ASSOC_CODES.c_assoc_pair / KINSHIP_CODES.c_kin_pair1），而非以哨兵 0 補——否則建立的反向
+     * 鏡像列關係碼被洗成 0（「未详」），對方人物出現一條無意義的成對關係。create 模式 c_assoc_code 等
+     * 落在 $targetPk（PK 段），故須由 targetPk 取碼查表（對齊 AssociationMutationHandler 的 lookupAssocPair）。
      */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        $assocCode = $changes['c_assoc_code'] ?? ($targetPk['c_assoc_code'] ?? null);
+        $kinCode = $changes['c_kin_code'] ?? ($targetPk['c_kin_code'] ?? null);
+        $assocKinCode = $changes['c_assoc_kin_code'] ?? ($targetPk['c_assoc_kin_code'] ?? null);
+
         $this->pendingPairs = [
-            'assoc' => $changes['c_assocship_pair'] ?? null,
-            'kin' => $changes['c_kinship_pair'] ?? null,
-            'assocKin' => $changes['c_assoc_kinship_pair'] ?? null,
+            'assoc' => $changes['c_assocship_pair'] ?? $this->lookupAssocPair($assocCode),
+            'kin' => $changes['c_kinship_pair'] ?? $this->lookupKinPair($kinCode),
+            'assocKin' => $changes['c_assoc_kinship_pair'] ?? $this->lookupKinPair($assocKinCode),
         ];
         unset($changes['c_assocship_pair'], $changes['c_kinship_pair'], $changes['c_assoc_kinship_pair']);
 
@@ -41,6 +50,26 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
         } finally {
             $this->pendingPairs = null;
         }
+    }
+
+    /** 關係碼的權威反向碼（ASSOC_CODES.c_assoc_pair）；未送 c_assocship_pair 時用。0／空／查無 → null（→ 哨兵 0）。 */
+    private function lookupAssocPair($code): ?int {
+        if ($code === null || $code === '' || (int) $code === 0) {
+            return null;
+        }
+        $v = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->value('c_assoc_pair');
+
+        return $v !== null ? (int) $v : null;
+    }
+
+    /** 親屬碼的權威反向碼（KINSHIP_CODES.c_kin_pair1）；未送 kin/assoc_kin 配對碼時用。0／空／查無 → null（→ 哨兵 0）。 */
+    private function lookupKinPair($code): ?int {
+        if ($code === null || $code === '' || (int) $code === 0) {
+            return null;
+        }
+        $v = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->value('c_kin_pair1');
+
+        return $v !== null ? (int) $v : null;
     }
 
     /**

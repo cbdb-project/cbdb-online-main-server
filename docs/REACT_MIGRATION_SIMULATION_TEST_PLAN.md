@@ -51,6 +51,8 @@
 
 5. **「可接受 delta」要再核：後端自動推導若移除了使用者的必要選擇，不算等價**。案例：kinship/assoc 的互逆配對碼由後端依 KINSHIP_CODES.c_kin_pair1 自動同步、編輯器移除手填——但反向關係常有**歧義需人選**（父→子或女、第幾子…），legacy 容許手選。**規則**：凡標為「後端自動／accepted delta」而移除了 legacy 的使用者輸入欄，須確認該欄是否承載**使用者才能決定的語義**（性別/排行/多值歧義）；若是，則為**功能缺口**而非等價 delta，須補回可選（預設用權威值、允許覆寫）。
 
+6. **互逆關係「鏡像列資料正確性」必須在 create 與 edit 兩條路徑各自落庫驗證——不可只驗編輯器有選擇器，也不可只驗 edit 路徑**（2026-06-24 使用者於真實人物 1762 手動新增 assoc 觸發的**惡性 data-integrity bug**）。根因：assoc 反向配對碼補齊（依 ASSOC_CODES.c_assoc_pair 取權威反向碼）**只實作在 MutationHandler，CreateHandler 漏做**，且 AssocEditor 有一條**假註解**聲稱「後端已自動補齊故不送 pair」——實際 create 時鏡像列 `c_assoc_code` 被寫成哨兵 **0（未详）**，對方人物（如苏轼）平白多一條無意義成對關係。compare-pages 的純文字/欄位擷取**抓不到**這種「對方表裡多一筆錯列」。**規則**：(a) 凡有「後端雙向鏡像同步」的子資源（assoc / kinship），測試須在 **create 與 edit 兩條路徑**都斷言**對方鏡像列的關係碼 == 代碼表權威反向碼（或使用者手選值），而非 0/未详**；(b) 對「後端自動補齊」類 accepted-delta，須**逐 handler（create/mutation/proposal-approve）核對是否都實作了該補齊**，不可因一個 handler 有就假定全部有（§0.4 假設陷阱的鏡像版）；(c) 凡編輯器 docblock 聲稱「後端保證 X」，須**讀後端碼確認 X 為真**，否則即為假綠來源——本案的假註解正是讓 reviewer 略過的元兇；(d) 反向有歧義（一個正向碼在 ASSOC_CODES 有 c_assoc_pair 與 c_assoc_pair2 兩個合法反向）時，編輯器須提供手選（預設權威值、允許覆寫），且鏡像須落手選值。
+
 ## 一、方法論
 
 ### 1.1 真實互動，而非靜態快照

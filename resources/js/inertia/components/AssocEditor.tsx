@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
@@ -9,10 +9,13 @@ import AiCodeLookupPanel, { AiCandidate } from './PersonEditorShared/AiCodeLooku
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
  * 欄位最多、9 段複合主鍵的編輯器。
  *
- * === 互逆配對碼（pair codes）由後端自動補齊 ===
- * legacy 用前端 JS 查 assocpair/kinpair 填 c_assocship_pair/c_kinship_pair/c_assoc_kinship_pair（hidden）送出。
- * v2 後端 AssociationCreate/MutationHandler 已對「未送的配對碼」以代碼表權威值補齊
- * （ASSOC_CODES.c_assoc_pair / KINSHIP_CODES.c_kin_pair1），故本編輯器**不送 pair**，後端保證鏡像關係碼正確。
+ * === 互逆配對碼（c_assocship_pair）：可選/可手選反向關係碼 ===
+ * 反向社會關係常有歧義須人選（一個正向碼在 ASSOC_CODES 可能有 c_assoc_pair / c_assoc_pair2 兩個合法反向）。
+ * 本編輯器對齊 legacy + KinEditor：依正向碼查 /api/select/search/assocpair 取候選、create 預設選第一個，
+ * 使用者可手動更正後送 c_assocship_pair；後端據此寫對方鏡像列的 c_assoc_code。
+ * 後端 AssociationCreate/MutationHandler 對「未送的配對碼」以代碼表權威值補齊（ASSOC_CODES.c_assoc_pair），
+ * 故縱使編輯器未送也不會落成「未详」(0)；但反向有歧義時務必由本選擇器手選正確配對。
+ * （kin/assoc_kin 配對碼仍由後端依 KINSHIP_CODES.c_kin_pair1 補齊，非關係主軸不在此手選。）
  *
  * === 9 段複合主鍵 ===
  * c_personid, c_assoc_code, c_assoc_id, c_kin_code, c_kin_id, c_assoc_kin_code, c_assoc_kin_id,
@@ -95,11 +98,47 @@ export default function AssocEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [assocHighlight, setAssocHighlight] = useState(false);
     const [comment, setComment] = useState('');
+    // 互逆配對碼（反向社會關係碼）：候選由 /api/select/search/assocpair 依正向碼取得（對齊 legacy / KinEditor）。
+    // create 預設選第一個候選；反向有歧義（一碼可能有 c_assoc_pair / c_assoc_pair2 兩個合法反向）故容許手選。
+    type PairOpt = { code: string; label: string };
+    const [pairCandidates, setPairCandidates] = useState<PairOpt[]>([]);
+    const [reversePair, setReversePair] = useState<string>('');
+    // edit 模式僅在使用者「主動更改」反向碼時才送出覆寫（避免改備註等非關係編輯誤改鏡像反向碼）。
+    const [pairTouched, setPairTouched] = useState(false);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
+
+    // 正向關係碼變更時重抓反向配對候選，create 預設選第一個（對齊 legacy JS）；正向碼改變即重置 touched。
+    useEffect(() => {
+        const code = fields.c_assoc_code;
+        if (!code || Number(code) === 0) { setPairCandidates([]); setReversePair(''); setPairTouched(false); return; }
+        let aborted = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/select/search/assocpair?assoc_code=${encodeURIComponent(code)}&person_id=${encodeURIComponent(fields.c_assoc_id ?? '0')}`, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
+                });
+                const rows = await res.json().catch(() => []);
+                if (aborted) return;
+                const opts: PairOpt[] = Array.isArray(rows)
+                    ? rows.map((r: Record<string, unknown>) => ({
+                        code: String(r.c_assoc_code),
+                        label: `${r.c_assoc_code} ${r.c_assoc_desc_chn ?? ''} ${r.c_assoc_desc ?? ''}`.trim(),
+                    }))
+                    : [];
+                setPairCandidates(opts);
+                // create：預設選第一候選（同 legacy）；edit：預設「保持目前反向碼」（空），未觸碰即不送、後端保留原值。
+                setReversePair(mode === 'create' && opts.length ? opts[0].code : '');
+                setPairTouched(false);
+            } catch { if (!aborted) { setPairCandidates([]); setReversePair(''); } }
+        })();
+        return () => { aborted = true; };
+    // 僅依正向關係碼變動觸發（c_assoc_id 變動不需重抓配對候選）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fields.c_assoc_code]);
 
     const buildEra = (g: EraGroup): EraTimeFieldValues => ({
         year: fields[g.year] ?? '', nhCode: fields[g.nhCode] ?? '', nhCodeLabel: labels[g.nhCode] ?? '',
@@ -169,6 +208,8 @@ export default function AssocEditor({
             target = Object.fromEntries(PK.map((k) => [k, pkVal(k)]));
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+            // 反向配對碼：create 送目前選取（預設第一候選，同 legacy）；後端據此寫對方鏡像列關係碼。
+            if (reversePair) changes.c_assocship_pair = reversePair;
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
             const initial: Fields = JSON.parse(snapshot.current);
@@ -184,6 +225,9 @@ export default function AssocEditor({
                         : Number(initial[k]?.trim() ? initial[k] : '0'));
                 if (cur !== init) changes[k] = cur;
             }
+            // 反向配對碼：edit 僅在使用者主動更改時送出覆寫（避免改備註等誤改鏡像反向碼）；
+            // 可單獨送（無其他變更）→ 後端走 pair-only 鏡像修復路徑。
+            if (reversePair && pairTouched) changes.c_assocship_pair = reversePair;
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -280,6 +324,22 @@ export default function AssocEditor({
                 searchRow('c_assoc_code', `${tr('assoc_field', '社會關係')} (c_assoc_code)`, '/api/select/search/assoccode', assocHighlight),
                 searchRow('c_assoc_id', `${tr('assoc_person', '關聯人物')} (c_assoc_id)`, '/api/select/search/biog'),
             )}
+
+            {/* 互逆配對碼：依正向關係碼取候選，create 預設第一個（同 legacy）；反向有歧義（一碼可能有 c_assoc_pair/c_assoc_pair2）故可手選。 */}
+            <div style={rowStyle}><label style={labelStyle}>{tr('reverse_pair_label', '互逆配對碼')} (c_assocship_pair)</label><div style={fieldStyle}>
+                {pairCandidates.length ? (
+                    <select value={reversePair} disabled={!editable}
+                        onChange={(e) => { setReversePair(e.target.value); setPairTouched(true); }}
+                        style={{ ...inputStyle }}>
+                        {mode === 'edit' ? <option value="">{tr('keep_current_pair', '（保持目前反向碼）')}</option> : null}
+                        {pairCandidates.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                    </select>
+                ) : (
+                    <input type="text" value={tr('no_paired_assoc', '（此關係無對應反向配對碼，系統自動處理）')} readOnly disabled style={{ ...inputStyle, ...roStyle }} />
+                )}
+                <span style={fieldHintStyle}>{tr('reverse_pair_assoc_hint', '系統依關係碼自動雙向同步至對方；預設取建議的反向碼，可手動更正（一個關係可能有多個合法反向）。')}</span>
+            </div></div>
+
             {pairRow(
                 searchRow('c_assoc_kin_code', `${tr('assoc_kin_field', '關聯親屬關係')} (c_assoc_kin_code)`, '/api/select/search/kincode'),
                 searchRow('c_assoc_kin_id', `${tr('assoc_kin_person', '關聯親屬人物')} (c_assoc_kin_id)`, '/api/select/search/biog'),

@@ -29,9 +29,13 @@ class ApiV2CreateAssociationTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createAssocTable();
+        $this->createAssocCodesTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -151,6 +155,36 @@ class ApiV2CreateAssociationTest extends TestCase {
         });
     }
 
+    /**
+     * ASSOC_CODES：反向配對碼來源（c_assoc_pair 主反向 / c_assoc_pair2 次反向）。
+     * code 100 → 主反向 101、次反向 198；code 300 無反向（c_assoc_pair=null）。
+     * 用於驗證鏡像關係碼以權威值補齊（非哨兵 0「未详」），及手選覆寫。
+     */
+    protected function createAssocCodesTable(): void {
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+            $table->string('c_assoc_desc', 255)->nullable();
+            $table->string('c_assoc_desc_chn', 255)->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 100, 'c_assoc_pair' => 101, 'c_assoc_pair2' => 198, 'c_assoc_desc' => 'friend of', 'c_assoc_desc_chn' => '友人'],
+            ['c_assoc_code' => 101, 'c_assoc_pair' => 100, 'c_assoc_pair2' => null, 'c_assoc_desc' => 'befriended by', 'c_assoc_desc_chn' => '被友'],
+            ['c_assoc_code' => 198, 'c_assoc_pair' => 100, 'c_assoc_pair2' => null, 'c_assoc_desc' => 'alt reverse', 'c_assoc_desc_chn' => '替代反向'],
+            ['c_assoc_code' => 300, 'c_assoc_pair' => null, 'c_assoc_pair2' => null, 'c_assoc_desc' => 'unpaired', 'c_assoc_desc_chn' => '無配對'],
+        ]);
+    }
+
+    /** KINSHIP_CODES：lookupKinPair 來源；create 測試 c_kin_code 皆 0（短路不查），建表僅為穩健。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+    }
+
     protected function pk(array $overrides = []): array {
         return array_replace([
             'c_personid' => 1000,
@@ -248,6 +282,63 @@ class ApiV2CreateAssociationTest extends TestCase {
         $this->assertDatabaseHas('ASSOC_DATA', [
             'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
             'c_text_title' => '史記', 'c_assoc_first_year' => 1080, 'c_notes' => '甲對乙',
+        ]);
+    }
+
+    #[Test]
+    public function testCreateMirrorUsesAuthoritativePairWhenPairNotSent(): void {
+        // 惡性 bug 回歸：使用者新增社會關係但編輯器未送 c_assocship_pair 時，反向鏡像列的關係碼
+        // 必須以 ASSOC_CODES.c_assoc_pair 權威值補齊（code 100 → 101），**不可**落成哨兵 0（「未详」）。
+        // 先前 CreateHandler 未補齊（只有 MutationHandler 有），導致對方人物出現一條未详的成對關係。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror-backfill@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙（未送配對碼）'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        // 正向（主）列。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+        ]);
+        // 互逆鏡像：對方(2000)為主體、反向碼=權威 101（非 0）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+        ]);
+        // 反向碼絕不可是 0（未详）。
+        $this->assertDatabaseMissing('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 0, 'c_assoc_id' => 1000,
+        ]);
+    }
+
+    #[Test]
+    public function testCreateMirrorRespectsExplicitPairOverride(): void {
+        // 反向有歧義時使用者手選（c_assoc_pair2=198 取代預設 c_assoc_pair=101）→ 鏡像須用手選值 198。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror-override@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_assocship_pair' => 198],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 198, 'c_assoc_id' => 1000,
+        ]);
+        $this->assertDatabaseMissing('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+        ]);
+    }
+
+    #[Test]
+    public function testCreateMirrorUsesSentinelOnlyWhenCodeTrulyUnpaired(): void {
+        // code 300 無 ASSOC_CODES 反向（c_assoc_pair=null）且未送 c_assocship_pair → 鏡像碼為哨兵 0（合理，對齊 legacy）。
+        $this->actingAs($this->makeUser(email: 'assoc-mirror-unpaired@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => $this->pk(['c_assoc_code' => 300])],
+            'changes' => ['c_source' => 20],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 0, 'c_assoc_id' => 1000,
         ]);
     }
 

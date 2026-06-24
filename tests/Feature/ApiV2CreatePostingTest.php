@@ -450,4 +450,50 @@ class ApiV2CreatePostingTest extends TestCase {
 
         $this->postJson('/api/v2/create', $this->createPayload(['mode' => 'direct']))->assertStatus(403);
     }
+
+    // ── #56 M 寫入等價（legacy Blade vs v2）——主列 + 地址副表 ──────────
+
+    #[Test]
+    public function testPostingCreateWriteEquivalenceLegacyVsV2WithAddressSubtable(): void {
+        // #56（M 維度，副表）：任官同語義輸入分別經 ① legacy Blade store（OfficePostingRepository）
+        // ② v2 /api/v2/create 寫入（各自配發不同自增 c_posting_id），斷言主列 POSTED_TO_OFFICE_DATA 內容欄等價，
+        // 且**地址副表 POSTED_TO_ADDR_DATA 兩路都落庫**——直接打到測試計畫點名的「副表靜默不落庫」風險。
+        // offices 因 c_posting_id 自增、重送必產生新列（設計如此），故不在此驗「重送 409」式幂等。
+        $this->actingAs($this->makeUser(email: 'post-mwrite@example.com'));
+
+        // ① legacy：1000 任官 office 87473、地址 130。
+        $this->post('/basicinformation/1000/offices', [
+            'action' => 'save',
+            'c_office_id' => 87473, 'c_inst_code' => '0',
+            'c_source' => 20, 'c_notes' => 'M 等價', 'c_firstyear' => 1050,
+            'c_fy_intercalary' => 0, 'c_ly_intercalary' => 0,
+            'c_addr' => [130],
+        ]);
+        $legacyPid = (int) DB::table('POSTED_TO_OFFICE_DATA')->where(['c_personid' => 1000, 'c_office_id' => 87473])->value('c_posting_id');
+
+        // ② v2：同語義輸入。
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_office_id' => 87473, 'c_source' => 20, 'c_notes' => 'M 等價', 'c_firstyear' => 1050, 'c_addr' => [130]],
+        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
+        $v2Pid = (int) $res->json('result.pk.c_posting_id');
+
+        $this->assertNotSame(0, $legacyPid, 'legacy 未配發 posting id / 未寫主列');
+        $this->assertNotSame(0, $v2Pid, 'v2 未配發 posting id');
+        $this->assertNotSame($legacyPid, $v2Pid, '兩路應寫不同 posting id（各自自增）');
+
+        // 主列內容欄等價（排除差異 c_posting_id + 稽核欄）。
+        $legacyOffice = (array) DB::table('POSTED_TO_OFFICE_DATA')->where(['c_posting_id' => $legacyPid, 'c_office_id' => 87473])->first();
+        $v2Office = (array) DB::table('POSTED_TO_OFFICE_DATA')->where(['c_posting_id' => $v2Pid, 'c_office_id' => 87473])->first();
+        foreach (['c_personid', 'c_office_id', 'c_source', 'c_notes', 'c_firstyear'] as $col) {
+            $this->assertSame((string) $legacyOffice[$col], (string) $v2Office[$col], "主列欄 {$col} 新舊不等價");
+        }
+
+        // 地址副表：兩路都寫了 addr 130（核心斷言——副表不得靜默不落庫）。
+        $legacyAddr = DB::table('POSTED_TO_ADDR_DATA')->where(['c_posting_id' => $legacyPid, 'c_office_id' => 87473, 'c_addr_id' => 130])->first();
+        $v2Addr = DB::table('POSTED_TO_ADDR_DATA')->where(['c_posting_id' => $v2Pid, 'c_office_id' => 87473, 'c_addr_id' => 130])->first();
+        $this->assertNotNull($legacyAddr, 'legacy 未寫地址副表 POSTED_TO_ADDR_DATA');
+        $this->assertNotNull($v2Addr, 'v2 未寫地址副表 POSTED_TO_ADDR_DATA（副表靜默不落庫）');
+        $this->assertSame((int) $legacyAddr->c_personid, (int) $v2Addr->c_personid, '副表 c_personid 新舊不等價');
+        $this->assertSame((int) $legacyAddr->c_addr_id, (int) $v2Addr->c_addr_id, '副表 c_addr_id 新舊不等價');
+    }
 }

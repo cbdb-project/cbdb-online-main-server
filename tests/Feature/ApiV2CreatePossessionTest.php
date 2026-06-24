@@ -390,4 +390,52 @@ class ApiV2CreatePossessionTest extends TestCase {
 
         $this->postJson('/api/v2/create', $this->createPayload(['mode' => 'direct']))->assertStatus(403);
     }
+
+    // ── #56 M 寫入等價（legacy Blade vs v2）——主列 + 地址副表 POSSESSION_ADDR ──────
+
+    #[Test]
+    public function testPossessionCreateWriteEquivalenceLegacyVsV2WithAddressSubtable(): void {
+        // #56（M 維度，副表）：財產同語義輸入分別經 ① legacy Blade store（possessionStoreById）
+        // ② v2 /api/v2/create 寫入（各自配發不同自增 c_possession_record_id），斷言主列 POSSESSION_DATA 內容欄等價，
+        // 且**地址副表 POSSESSION_ADDR 兩路都落庫**（addr 130 與 200）——「副表靜默不落庫」探針。
+        // legacy 與 v2 皆以 c_addr_id=>[陣列] 送多地址。
+        $this->actingAs($this->makeUser(email: 'poss-mwrite@example.com'));
+
+        // ① legacy。
+        $this->post('/basicinformation/1000/possession', [
+            'action' => 'save',
+            'c_source' => 20, 'c_notes' => 'M 等價', 'c_possession_yr' => 1050,
+            'c_addr_id' => [130, 200],
+        ]);
+        $legacyId = (int) DB::table('POSSESSION_DATA')->where('c_personid', 1000)->value('c_possession_record_id');
+
+        // ② v2：同語義輸入。
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => 'M 等價', 'c_possession_yr' => 1050, 'c_addr_id' => [130, 200]],
+        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
+        $v2Id = (int) DB::table('POSSESSION_DATA')->where('c_personid', 1000)->where('c_possession_record_id', '!=', $legacyId)->value('c_possession_record_id');
+
+        $this->assertNotSame(0, $legacyId, 'legacy 未寫主列');
+        $this->assertNotSame(0, $v2Id, 'v2 未寫主列');
+        $this->assertNotSame($legacyId, $v2Id, '兩路應寫不同 record id（各自自增）');
+
+        // 主列內容欄等價（排除差異 c_possession_record_id + 稽核欄）。
+        $legacyMain = (array) DB::table('POSSESSION_DATA')->where('c_possession_record_id', $legacyId)->first();
+        $v2Main = (array) DB::table('POSSESSION_DATA')->where('c_possession_record_id', $v2Id)->first();
+        foreach (['c_personid', 'c_source', 'c_notes', 'c_possession_yr'] as $col) {
+            $this->assertSame((string) $legacyMain[$col], (string) $v2Main[$col], "主列欄 {$col} 新舊不等價");
+        }
+
+        // 地址副表：兩路都寫了 130 與 200（核心斷言——多地址副表不得靜默不落庫）。
+        foreach ([130, 200] as $addrId) {
+            $this->assertNotNull(
+                DB::table('POSSESSION_ADDR')->where(['c_possession_record_id' => $legacyId, 'c_addr_id' => $addrId])->first(),
+                "legacy 未寫 POSSESSION_ADDR addr {$addrId}"
+            );
+            $this->assertNotNull(
+                DB::table('POSSESSION_ADDR')->where(['c_possession_record_id' => $v2Id, 'c_addr_id' => $addrId])->first(),
+                "v2 未寫 POSSESSION_ADDR addr {$addrId}（副表靜默不落庫）"
+            );
+        }
+    }
 }

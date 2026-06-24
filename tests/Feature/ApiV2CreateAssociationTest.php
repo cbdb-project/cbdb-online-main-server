@@ -694,6 +694,9 @@ class ApiV2CreateAssociationTest extends TestCase {
 
         $this->postJson('/api/v2/create', $payload)->assertOk()->assertJson(['ok' => true]);
         $countAfterFirst = DB::table('ASSOC_DATA')->count(); // 正向 + 鏡像 = 2
+        // 幂等須涵蓋「聯動表」：重送被拒時，operations / audit_log 也不得多寫一筆（否則側效泄漏）。
+        $opsAfterFirst = DB::table('operations')->count();
+        $auditAfterFirst = DB::table('audit_log')->count();
 
         // 重送同 PK → create handler 契約為 409 conflict（鎖死，不接受其他失敗碼以免假綠）。
         $this->postJson('/api/v2/create', $payload)
@@ -701,6 +704,8 @@ class ApiV2CreateAssociationTest extends TestCase {
             ->assertJson(['ok' => false])
             ->assertJsonFragment(['target.pk' => ['conflict']]); // 鍵名含點為字面 key，非巢狀
 
-        $this->assertSame($countAfterFirst, DB::table('ASSOC_DATA')->count(), '重送不得新增重複列');
+        $this->assertSame($countAfterFirst, DB::table('ASSOC_DATA')->count(), '重送不得新增重複列（含鏡像）');
+        $this->assertSame($opsAfterFirst, DB::table('operations')->count(), '重送被拒不得新增 operations 列');
+        $this->assertSame($auditAfterFirst, DB::table('audit_log')->count(), '重送被拒不得新增 audit_log 列');
     }
 }

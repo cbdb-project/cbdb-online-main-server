@@ -10,6 +10,7 @@ return [
     'edit'              => '編輯',
     'view'              => '查看',
     'create'            => '建立',
+    'saving'            => '儲存中…',
     'update'            => '更新',
     'reset'             => '重置',
     'close'             => '關閉',

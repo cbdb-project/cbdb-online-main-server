@@ -405,5 +405,6 @@ return [
     // Create person: single Chinese full-name field (backend auto_pinyin splits surname/given, incl. compound surnames), matching legacy.
     'name_chn_label'           => 'Name (Chinese)',
     'name_autosplit_hint'      => 'Enter the full Chinese name; the system auto-splits surname/given name (incl. compound surnames) and generates pinyin — no manual splitting needed.',
+    'create_must_submit_hint'  => 'Not created yet — fill in the fields and click Create to actually save this person; closing or leaving this page will not create them.',
     'create_failed'            => 'Create failed',
 ];

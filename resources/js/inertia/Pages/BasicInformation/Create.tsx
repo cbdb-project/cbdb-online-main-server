@@ -113,8 +113,12 @@ export default function BasicInformationCreate() {
                         <p className="mt-1 text-xs text-muted-foreground">{t('name_autosplit_hint')}</p>
                     </FormField>
 
+                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {t('create_must_submit_hint')}
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
-                        <Button type="submit" disabled={submitting}>{tc('create')}</Button>
+                        <Button type="submit" disabled={submitting}>{submitting ? tc('saving') : tc('create')}</Button>
                         <a href={index_url} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
                             {tc('cancel')}
                         </a>

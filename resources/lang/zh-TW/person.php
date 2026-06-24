@@ -405,5 +405,6 @@ return [
     // 新增人物：單一中文姓名欄（後端 auto_pinyin 自動切分姓/名，含複姓），對齊 legacy。
     'name_chn_label'           => '中文姓名',
     'name_autosplit_hint'      => '輸入完整中文姓名即可；系統將自動切分姓氏與名字（含複姓）並生成拼音，無需手動分欄。',
+    'create_must_submit_hint'  => '尚未建立：填妥後請點【建立】才會真正儲存此人物；直接關閉或離開本頁不會建立。',
     'create_failed'            => '新增失敗',
 ];

@@ -10,6 +10,7 @@ return [
     'edit'              => 'Edit',
     'view'              => 'View',
     'create'            => 'Create',
+    'saving'            => 'Saving…',
     'update'            => 'Update',
     'reset'             => 'Reset',
     'close'             => 'Close',

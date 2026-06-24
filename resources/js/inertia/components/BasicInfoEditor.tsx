@@ -430,18 +430,18 @@ const cellRowStyle: React.CSSProperties = { display: 'flex', gap: 8, alignItems:
 // LABEL_W：雙欄格與單欄列共用同一 label 寬度，使所有 input 左緣對齊；
 // 取 160 與其餘 12 個編輯器一致（跨頁統一）。
 const LABEL_W = 160;
-const cellLabelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '0.875rem', color: '#374151' };
+const cellLabelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '1rem', color: '#374151' };
 // 唯讀派生 4-up grid（對齊 legacy col-xl-3）：label 置頂。
 const derivedGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 10 };
 const derivedCellStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 };
 const derivedLabelStyle: React.CSSProperties = { fontSize: '0.8rem', color: '#374151' };
 const pinyinBtnRowStyle: React.CSSProperties = { marginBottom: 10, paddingLeft: LABEL_W + 8 };
-const labelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '0.875rem', paddingTop: 8, color: '#374151' };
+const labelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '1rem', paddingTop: 8, color: '#374151' };
 const fieldStyle: React.CSSProperties = { flex: 1 };
-const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
+const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
 const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };
 const hintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
-const sectionLabel: React.CSSProperties = { fontSize: '0.875rem', fontWeight: 600, color: '#374151', margin: '8px 0 4px' };
+const sectionLabel: React.CSSProperties = { fontSize: '1rem', fontWeight: 600, color: '#374151', margin: '8px 0 4px' };
 // 動作列：主要動作（保存/提交）靠左、危險/另存（刪除/Duplicate）靠右，對齊 legacy（非全堆左）。
 const submitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
 const btnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };
@@ -449,9 +449,9 @@ const btnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 
 const actionBtnBase: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 const primaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #255f93', background: '#255f93', color: '#fff' };
 const infoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
-const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
-const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
-const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
+const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
+const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
+const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
 const auditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' };
 const dangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };
 const successLink: React.CSSProperties = { ...actionBtnBase, border: '1px solid #28a745', background: '#28a745', color: '#fff' };

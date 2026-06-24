@@ -283,7 +283,7 @@ const inputStyle: React.CSSProperties = {
     padding: '0 28px 0 10px',
     borderRadius: 6,
     border: '1px solid #cbd5e1',
-    fontSize: '0.875rem',
+    fontSize: '1rem',
     boxSizing: 'border-box',
 };
 

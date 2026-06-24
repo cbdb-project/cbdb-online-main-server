@@ -8,7 +8,9 @@ import { useTranslation } from '../../hooks/useTranslation';
  */
 export default function AiPrivacyNotice({ aiModel }: { aiModel?: string }) {
     const t = useTranslation('biogmains');
-    const [show, setShow] = useState(false);
+    // 預設展開：legacy 永遠顯示完整數據收集/第三方服務同意須知，新版若預設收合等於把同意聲明藏在點擊後，
+    // 屬 §0.2 parity 退化（且使用者多次強調此須知須可見）。故預設展開、仍可收合。
+    const [show, setShow] = useState(true);
     return (
         <div style={wrapStyle}>
             <button type="button" style={toggleStyle} onClick={() => setShow((v) => !v)} aria-expanded={show}>

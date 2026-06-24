@@ -136,7 +136,7 @@ export default function AiCodeLookupPanel({
 const cardStyle: React.CSSProperties = { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' };
 const titleStyle: React.CSSProperties = { color: '#1e3a8a', fontSize: '0.95rem' };
-const textareaStyle: React.CSSProperties = { width: '100%', minHeight: 64, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box', resize: 'vertical' };
+const textareaStyle: React.CSSProperties = { width: '100%', minHeight: 64, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
 const hintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b', marginTop: 4 };
 const runBtnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: '1px solid #1d4d77', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 const candidateBtnStyle: React.CSSProperties = { border: '1px solid #bfdbfe', background: '#fff', borderRadius: 999, padding: '4px 12px', fontSize: '0.82rem', cursor: 'pointer' };

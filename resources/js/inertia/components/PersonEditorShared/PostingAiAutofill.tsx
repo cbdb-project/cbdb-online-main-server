@@ -97,7 +97,7 @@ export default function PostingAiAutofill({ personId, extractEndpoint, aiModel, 
 const cardStyle: React.CSSProperties = { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
 const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' };
 const titleStyle: React.CSSProperties = { color: '#1e3a8a', fontSize: '0.95rem' };
-const textareaStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box', resize: 'vertical' };
+const textareaStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
 const aiBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 16px', border: '1px solid #1d4d77', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
 const clearBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' };
 const infoTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: '#0369a1' };

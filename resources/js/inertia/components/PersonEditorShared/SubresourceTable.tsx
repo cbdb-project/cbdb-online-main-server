@@ -57,7 +57,7 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
 }
 
 const wrapStyle: React.CSSProperties = { overflowX: 'auto', marginBottom: 8 };
-const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', background: '#fff' };
+const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '1rem', background: '#fff' };
 const thStyle: React.CSSProperties = {
     textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #dee2e6', borderTop: '1px solid #dee2e6',
     background: '#f8f9fa', color: '#495057', fontWeight: 700, whiteSpace: 'nowrap',

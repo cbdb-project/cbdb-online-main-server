@@ -10,7 +10,7 @@ import {
 
 /**
  * React 版「年號/時間欄位 + 西元↔年號轉換」，對齊 legacy components/inline-time-fields.blade.php
- * 與 app.js 的 era-convert 邏輯：西元年 + 轉換鈕（→年號／←西元）+ 年號 + 年號年 + (時限) +
+ * 與 app.js 的 era-convert 邏輯：西元年 + 轉換鈕（西元→年號／年號→西元，雙向）+ 年號 + 年號年 + (時限) +
  * (閏月/月/日/干支) + (備註)。受控：值由 props 傳入、變更經 onChange 回傳。
  *
  * 年號/時限/干支用 accepted CodeAutocomplete（list 模式）；轉換鈕複用移植自 app.js 的轉換邏輯，
@@ -190,8 +190,8 @@ export default function EraTimeField({
             />
             {!disabled && (
                 <div style={btnGroupStyle}>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title="轉為年號">→</button>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title="轉為西元">←</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title="由西元換算年號">西元→年號</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title="由年號換算西元">年號→西元</button>
                 </div>
             )}
             <div style={fieldGroupStyle}>
@@ -302,7 +302,7 @@ export default function EraTimeField({
 }
 
 const wrapStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, position: 'relative' };
-const inputStyle: React.CSSProperties = { height: 34, padding: '0 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
+const inputStyle: React.CSSProperties = { height: 34, padding: '0 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
 const invalidStyle: React.CSSProperties = { borderColor: '#dc3545', boxShadow: '0 0 0 1px #dc3545' };
 const btnGroupStyle: React.CSSProperties = { display: 'flex', gap: 4 };
 const convBtnStyle: React.CSSProperties = { height: 34, minWidth: 32, borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '1rem' };

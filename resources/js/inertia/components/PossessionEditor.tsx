@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 
 /**
  * 占有／財產（possession）編輯器（對齊 legacy biogmains/possession/_form.blade.php，非 person-browser）。
@@ -61,7 +62,7 @@ export default function PossessionEditor({
     const [addrItems, setAddrItems] = useState<AddrItem[]>(initialAddr);
     const [addKey, setAddKey] = useState(0);
     const initialAddrIds = useRef<string[]>(initialAddr.map((a) => String(a.id)));
-    const snapshot = useRef(JSON.stringify(base));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const originalPk = useRef<Record<string, number>>({ c_possession_record_id: Number(initialFields.c_possession_record_id ?? 0) });
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -69,13 +70,16 @@ export default function PossessionEditor({
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
+    const msgTimer = useRef<number | null>(null);
+    const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
+    useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
 
     const addrDirty = useMemo(() => {
         const a = [...new Set(addrItems.map((x) => String(x.id)))].sort();
         const b = [...new Set(initialAddrIds.current)].sort();
         return JSON.stringify(a) !== JSON.stringify(b);
     }, [addrItems]);
-    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current || addrDirty, [fields, addrDirty]);
+    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot || addrDirty, [fields, addrDirty, savedSnapshot]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -126,7 +130,7 @@ export default function PossessionEditor({
             if (addrItems.length) changes.c_addr_id = addrItems.map((it) => it.id);
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
-            const initial: Fields = JSON.parse(snapshot.current);
+            const initial: Fields = JSON.parse(savedSnapshot);
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
             // 地址有變動才送 c_addr_id（清空則送空陣列）；後端 afterDirectUpdate 同步 POSSESSION_ADDR。
@@ -142,8 +146,8 @@ export default function PossessionEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            snapshot.current = JSON.stringify(fields);
+            flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            setSavedSnapshot(JSON.stringify(fields));
             initialAddrIds.current = addrItems.map((it) => String(it.id));
             if (mode === 'create') { window.location.assign(indexUrl); }
         } catch (e) {
@@ -163,7 +167,7 @@ export default function PossessionEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            snapshot.current = JSON.stringify(fields);
+            setSavedSnapshot(JSON.stringify(fields));
             window.location.assign(indexUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
@@ -257,8 +261,9 @@ export default function PossessionEditor({
             <div style={{ ...rowStyle, gap: 8 }}>
                 <div style={{ width: 160, flexShrink: 0 }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                     {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
                 </div>

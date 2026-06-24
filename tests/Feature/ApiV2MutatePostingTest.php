@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -623,5 +624,75 @@ class ApiV2MutatePostingTest extends TestCase {
 
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'postings']);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，地址副表；#66 無關——offices 無鏡像）──────
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testPostingUpdateWriteEquivalenceLegacyVsV2WithAddressResync(): void {
+        // #56 M（update）——復原-重做實驗：同一初始狀態下 ① 旧版改一筆（notes→改後、地址 130→200）→記錄 →
+        // ② 復原初始 → ③ 新版改同一筆 → 對比主列 POSTED_TO_OFFICE_DATA 內容 + 地址副表「重同步」結果（130 移除、200 新增）等價。
+        // offices 無互逆鏡像、不經 #66 衝突閘，故此 update-M 與 #66 決策無關。
+        $this->actingAs($this->makeUser(email: 'posting-mupd@example.com'));
+
+        // legacy officeUpdateById 會更新 POSTING_DATA（人-任官連結表）稽核時間；mutate 測試 schema 未建，補上以免 legacy 500。
+        // （v2 update 不觸此表；POSTING_DATA 時間戳是否該同步另記觀察，不在本測試「主列+地址副表」對比範圍。）
+        Schema::create('POSTING_DATA', function (Blueprint $t) {
+            $t->integer('c_personid');
+            $t->integer('c_posting_id');
+            $t->string('c_modified_by', 255)->nullable();
+            $t->string('c_modified_date', 255)->nullable();
+            $t->primary(['c_personid', 'c_posting_id']);
+        });
+        DB::table('POSTING_DATA')->insert(['c_personid' => 1000, 'c_posting_id' => 400]);
+
+        $seedInitial = function (): void {
+            DB::table('POSTED_TO_OFFICE_DATA')->delete();
+            DB::table('POSTED_TO_ADDR_DATA')->delete();
+            $this->seedPosting(['c_notes' => '初始備註', 'c_source' => 10]);
+            $this->seedAddr(130);
+        };
+        $mainCols = ['c_personid', 'c_office_id', 'c_posting_id', 'c_source', 'c_notes'];
+        $pickMain = function ($row) use ($mainCols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($mainCols));
+            ksort($a);
+
+            return $a;
+        };
+        $addrIds = fn (): array => DB::table('POSTED_TO_ADDR_DATA')
+            ->where(['c_posting_id' => 400, 'c_office_id' => 300])->orderBy('c_addr_id')->pluck('c_addr_id')->map(fn ($v) => (int) $v)->all();
+
+        // ① 旧版改一筆：notes→改後、地址 130→200。
+        $seedInitial();
+        $this->put('/basicinformation/1000/offices/update?' . http_build_query(['c_office_id' => 300, 'c_posting_id' => 400]), [
+            // legacy 隱藏欄：_id=c_personid、_postingid、_officeid（officeUpdateById 直接取值、未 coalesce）。
+            '_id' => 1000, '_postingid' => 400, '_officeid' => 300,
+            'c_office_id' => 300, 'c_posting_id' => 400, 'c_inst_code' => '0',
+            'c_source' => 10, 'c_notes' => '改後', 'c_addr' => [200],
+            'c_fy_intercalary' => 0, 'c_ly_intercalary' => 0, 'action' => 'save',
+        ]);
+        $legacyMain = $pickMain(DB::table('POSTED_TO_OFFICE_DATA')->where(['c_office_id' => 300, 'c_posting_id' => 400])->first());
+        $legacyAddr = $addrIds();
+
+        // ② 復原初始 → ③ 新版改同一筆。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_notes' => '改後', 'c_addr' => [200]],
+        ]))->assertOk();
+        $v2Main = $pickMain(DB::table('POSTED_TO_OFFICE_DATA')->where(['c_office_id' => 300, 'c_posting_id' => 400])->first());
+        $v2Addr = $addrIds();
+
+        // 主列內容等價（排除稽核時間欄）。
+        $this->assertNotNull($legacyMain, 'legacy 更新後主列不存在');
+        $this->assertNotNull($v2Main, 'v2 更新後主列不存在');
+        $this->assertSame('改後', $v2Main['c_notes'], 'v2 主列 notes 應更新為改後');
+        $this->assertSame($legacyMain, $v2Main, '主列 legacy vs v2 更新結果不等價');
+        // 地址副表重同步等價（兩版皆應為 [200]：舊地址 130 移除、新地址 200 新增）。
+        $this->assertSame([200], $legacyAddr, 'legacy 地址重同步結果應為 [200]');
+        $this->assertSame($legacyAddr, $v2Addr, '地址副表重同步 legacy vs v2 不等價');
     }
 }

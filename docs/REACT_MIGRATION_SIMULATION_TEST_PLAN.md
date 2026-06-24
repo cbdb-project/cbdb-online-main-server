@@ -119,6 +119,17 @@
 > **直接存 vs 提案是兩個獨立按鈕/端點，不是角色分支**：`performStore/Update/Destroy` 只檢查 `Auth::check() && isActive()`，**任何 active 使用者點「直接儲存」(save_direct) 都直接寫目標表**；「提案」(submit_proposal) 是另一條路由（`app.codes.propose.*`），寫的是 `operations` 表**而非目標表**。本計畫 C–E 一律**點 save_direct**，**絕不可點 submit_proposal**（否則沒寫到目標表、卻污染 operations，是假測）。`can_propose`/`can_edit` 只決定按鈕是否出現，與 superadmin 身分無關。
 > manage 需 `canManageUsers()`。
 
+### M 寫入等價實作規格（2026-06-24 使用者定案）
+> 目標：以**舊版寫入行為為 ground truth**，系統性比對新版寫入是否等價＋幂等。涵蓋**每一個頁面**（13 個人物編輯器 + codes，**codes 也要用此法重測**）。
+
+1. **測試輸入來自真實寫入日誌**：從 `operations` 表 filter 出**各頁面的真實寫入紀錄**（`resource`=該表、`op_type`∈ create/update/delete），取其 `resource_data` 作為「真實使用者實際寫過的輸入樣本」。**每頁至少 10 筆且具多樣性**（不同欄位組合 / 有無副表 / 有無鏡像 / 哨兵值 / 複合主鍵邊界），覆蓋幂等所需的多樣性。
+   - **僅當某頁 `operations` 完全無資料時**，才退而以人工猜想合成若干測試輸入（並於報告標明該頁是「猜想輸入」非「真實重放」）。
+2. **等價比對**：同一筆輸入分別經 ① 舊 Blade 寫入路徑、② 新 v2 寫入路徑，落到**兩個獨立合成主鍵**，比對結果列等價——主表欄位 + 副表（EVENTS_ADDR / POSSESSION_ADDR / POSTED_TO_ADDR）+ 互逆鏡像（ASSOC/KIN 反向碼）。**比對時須排除/正規化以下差異，否則假 FAIL**：
+   - **自增 / 伺服器配發主鍵**：新建官職的 posting id、新建人物的 person id、codes 各新增的自增 PK 等——兩側必然不同，**比對時排除這些 surrogate id 欄**（以「非 id 的語義欄位 + 結構」比對）。
+   - **timestamp / audit 欄**：audit 欄（建檔者/更新者）比對 OK，但 `c_created_date`/`c_modified_date` 等**允許秒/分級誤差**（系統時間精確到秒，兩側寫入時刻本就差幾秒），故 timestamp 以「同一筆、差距 < 容差（如 ±120 秒）」視為等價，不做逐字比對。
+3. **幂等性以程式/命令驗證，不可靠目視**：對新版同一輸入**重送**，以查詢腳本/命令確認**不產生重複列、欄位不漂移**（例如 `SELECT count(*)` 與欄位 diff 由臨時程式輸出判定），人工只讀程式產出的判定結果，不靠肉眼比 UI。
+4. **安全**：全程合成資料（高位保留主鍵 + E2E 標記）、`finally` 清理（含連動 `operations` 列），**絕不碰真實 CBDB 資料**；以真實 `operations.resource_data` 為**輸入樣本**時只讀取、不修改原列。
+
 ### 目標表選定（流程 A–E）
 - 選一張**結構單純、主鍵明確、可安全插入合成列**的 codes 表（候選由實作前以 `CompositePrimaryKey::SCHEMAS` 與欄位數最少者中挑選並記錄於報告）。
 - 合成列主鍵採高位保留值（如 code 欄 `9999xxx`），名稱欄含 `E2E-TEST-<runtag>`，確保不與真實資料碰撞、清理可精準定位。

@@ -272,6 +272,12 @@ export default function BasicInfoEditor({
         </div>
     );
 
+    // 區塊分組（使用者要求：以 block 視覺分隔各區，藍系標題；不對齊 legacy，為更合適設計）。
+    // 注意：用「回傳 JSX 的函式」而非巢狀元件，避免每次 render 重新掛載 → input 失焦。
+    const block = (title: string, children: React.ReactNode) => (
+        <div style={blockStyle}><div style={blockHeaderStyle}>{title}</div>{children}</div>
+    );
+
     const birth: DateGroup = { year: 'c_birthyear', nhCode: 'c_by_nh_code', nhYear: 'c_by_nh_year', range: 'c_by_range', intercalary: 'c_by_intercalary', month: 'c_by_month', day: 'c_by_day', dayGz: 'c_by_day_gz' };
     const death: DateGroup = { year: 'c_deathyear', nhCode: 'c_dy_nh_code', nhYear: 'c_dy_nh_year', range: 'c_dy_range', intercalary: 'c_dy_intercalary', month: 'c_dy_month', day: 'c_dy_day', dayGz: 'c_dy_day_gz' };
     const flEarly: DateGroup = { year: 'c_fl_earliest_year', nhCode: 'c_fl_ey_nh_code', nhYear: 'c_fl_ey_nh_year', notes: 'c_fl_ey_notes' };
@@ -285,78 +291,91 @@ export default function BasicInfoEditor({
             {pinyinDone ? <div style={okStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
             {nameWarning ? <div style={warnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
-            {/* 姓名：中文 / 羅馬化雙欄並排（對齊 legacy col-sm-6 × col-sm-6）。 */}
-            <div style={twoColStyle}>
-                <div style={colStyle}>
-                    {cell('c_surname_chn', tr('surname_chn', '姓（中）'))}
-                    {cell('c_mingzi_chn', tr('mingzi_chn', '名（中）'))}
+            {/* 區塊一：姓名（中文/拼音/外文/羅馬字 + 生成拼音 + 4 唯讀派生全名） */}
+            {block(tr('block_names', '姓名'), <>
+                <div style={twoColStyle}>
+                    <div style={colStyle}>
+                        {cell('c_surname_chn', tr('surname_chn', '姓（中）'))}
+                        {cell('c_mingzi_chn', tr('mingzi_chn', '名（中）'))}
+                    </div>
+                    <div style={colStyle}>
+                        {cell('c_surname', 'Xing')}
+                        {cell('c_mingzi', 'Ming')}
+                    </div>
                 </div>
-                <div style={colStyle}>
-                    {cell('c_surname', 'Xing')}
-                    {cell('c_mingzi', 'Ming')}
+                {canEdit ? <div style={pinyinBtnRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button></div> : null}
+                <div style={twoColStyle}>
+                    <div style={colStyle}>{cell('c_surname_proper', tr('foreign_surname', '外文姓'))}</div>
+                    <div style={colStyle}>{cell('c_mingzi_proper', tr('foreign_mingzi', '外文名'))}</div>
                 </div>
-            </div>
-            {canEdit ? <div style={pinyinBtnRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button></div> : null}
-            {/* 外文 / 羅馬字姓名：每列兩欄並排（對齊 legacy 一行兩 pair）。 */}
-            <div style={twoColStyle}>
-                <div style={colStyle}>{cell('c_surname_proper', tr('foreign_surname', '外文姓'))}</div>
-                <div style={colStyle}>{cell('c_mingzi_proper', tr('foreign_mingzi', '外文名'))}</div>
-            </div>
-            <div style={twoColStyle}>
-                <div style={colStyle}>{cell('c_surname_rm', tr('foreign_rm_surname', '羅馬字姓'))}</div>
-                <div style={colStyle}>{cell('c_mingzi_rm', tr('foreign_rm_mingzi', '羅馬字名'))}</div>
-            </div>
-            {/* 4 唯讀自動派生：4-up grid、label 置頂（對齊 legacy col-xl-3）。 */}
-            <div style={derivedGridStyle}>
-                {derivedCell('c_name_chn', '姓名（中） (c_name_chn)', tr('name_auto_hint', '由姓和名自動合併，無需手動填寫'))}
-                {derivedCell('c_name', '拼音 (c_name)', tr('pinyin_auto_hint', '由 Xing/Ming 自動合併，無需手動填寫'))}
-                {derivedCell('c_name_proper', '外文全名 (c_name_proper)', tr('foreign_full_auto_hint', '自動合併，無需手動填寫'))}
-                {derivedCell('c_name_rm', '羅馬字全名 (c_name_rm)', tr('rm_auto_hint', '自動合併，無需手動填寫'))}
-            </div>
-
-            {/* 性別（NULL/0/1）以 select */}
-            <div style={rowStyle}>
-                <label style={labelStyle}>{tr('gender', '性別')} (c_female)</label>
-                <div style={fieldStyle}>
-                    <select value={fields.c_female ?? ''} disabled={!canEdit && !canPropose}
-                        onChange={(e) => set('c_female', e.target.value)} style={inputStyle}>
-                        <option value="">{tr('please_select', 'NULL')}</option>
-                        <option value="0">0-{tr('male', '男')}</option>
-                        <option value="1">1-{tr('female', '女')}</option>
-                    </select>
+                <div style={twoColStyle}>
+                    <div style={colStyle}>{cell('c_surname_rm', tr('foreign_rm_surname', '羅馬字姓'))}</div>
+                    <div style={colStyle}>{cell('c_mingzi_rm', tr('foreign_rm_mingzi', '羅馬字名'))}</div>
                 </div>
-            </div>
-            {codeRow('c_ethnicity_code', tr('tribe', '族群/部族') + ' (c_ethnicity_code)', 'ethnicity', 'c_ethnicity_code', ['c_ethnicity_code', 'c_name_chn', 'c_name'])}
-            {codeRow('c_dy', tr('dynasty', '朝代') + ' (c_dy)', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty'])}
-
-            <div style={sectionLabel}>{tr('birth_year', '生年')} (c_birthyear)</div>
-            <EraTimeField values={buildEra(birth)} onChange={(p) => applyEra(birth, p)} dynastyCode={dynastyCode} showRange showLunar />
-            <div style={sectionLabel}>{tr('death_year', '卒年')} (c_deathyear)</div>
-            <EraTimeField values={buildEra(death)} onChange={(p) => applyEra(death, p)} dynastyCode={dynastyCode} showRange showLunar />
-
-            {textRow('c_index_year', tr('index_year', '指數年') + ' (c_index_year)', true, tr('auto_calc_hint', '由算法自動計算'))}
-            {displayRow('c_index_year_type_code', tr('index_year_method', '指數年方法') + ' (c_index_year_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
-            {displayRow('c_index_year_source_id', tr('index_year_source', '指數年來源') + ' (c_index_year_source_id)', tr('auto_calc_hint', '由算法自動計算'))}
-            {displayRow('c_index_addr_id', tr('index_addr', '指數地址') + ' (c_index_addr_id)', tr('auto_calc_hint', '由算法自動計算'))}
-            {displayRow('c_index_addr_type_code', tr('index_addr_type', '指數地址類型') + ' (c_index_addr_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
-            {textRow('c_death_age', tr('age_at_death', '享年') + ' (c_death_age)')}
-            {codeRow('c_death_age_range', tr('range_label', '範圍') + ' (c_death_age_range)', 'range', 'c_range_code', ['c_range_code', 'c_approx', 'c_approx_chn'])}
-
-            <div style={sectionLabel}>{tr('active_from', '在世始年')} (c_fl_earliest_year)</div>
-            <EraTimeField values={buildEra(flEarly)} onChange={(p) => applyEra(flEarly, p)} dynastyCode={dynastyCode} showNotes />
-            <div style={sectionLabel}>{tr('active_until', '在世終年')} (c_fl_latest_year)</div>
-            <EraTimeField values={buildEra(flLate)} onChange={(p) => applyEra(flLate, p)} dynastyCode={dynastyCode} showNotes />
-
-            {codeRow('c_choronym_code', tr('choronym', '郡望') + ' (c_choronym_code)', 'choronym', 'c_choronym_code', ['c_choronym_code', 'c_choronym_chn', 'c_choronym'])}
-            {codeRow('c_household_status_code', tr('household_field', '戶籍') + ' (c_household_status_code)', 'household', 'c_household_status_code', ['c_household_status_code', 'c_household_status_desc_chn', 'c_household_status_desc'])}
-
-            <div style={rowStyle}>
-                <label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label>
-                <div style={fieldStyle}>
-                    <textarea value={fields.c_notes ?? ''} disabled={!canEdit && !canPropose} rows={5}
-                        onChange={(e) => set('c_notes', e.target.value)} style={{ ...inputStyle, height: 'auto' }} />
+                <div style={derivedGridStyle}>
+                    {derivedCell('c_name_chn', '姓名（中） (c_name_chn)', tr('name_auto_hint', '由姓和名自動合併，無需手動填寫'))}
+                    {derivedCell('c_name', '拼音 (c_name)', tr('pinyin_auto_hint', '由 Xing/Ming 自動合併，無需手動填寫'))}
+                    {derivedCell('c_name_proper', '外文全名 (c_name_proper)', tr('foreign_full_auto_hint', '自動合併，無需手動填寫'))}
+                    {derivedCell('c_name_rm', '羅馬字全名 (c_name_rm)', tr('rm_auto_hint', '自動合併，無需手動填寫'))}
                 </div>
-            </div>
+            </>)}
+
+            {/* 區塊二：基本屬性（性別/族群/朝代） */}
+            {block(tr('block_attributes', '基本屬性'), <>
+                <div style={rowStyle}>
+                    <label style={labelStyle}>{tr('gender', '性別')} (c_female)</label>
+                    <div style={fieldStyle}>
+                        <select value={fields.c_female ?? ''} disabled={!canEdit && !canPropose}
+                            onChange={(e) => set('c_female', e.target.value)} style={inputStyle}>
+                            <option value="">{tr('please_select', 'NULL')}</option>
+                            <option value="0">0-{tr('male', '男')}</option>
+                            <option value="1">1-{tr('female', '女')}</option>
+                        </select>
+                    </div>
+                </div>
+                {codeRow('c_ethnicity_code', tr('tribe', '族群/部族') + ' (c_ethnicity_code)', 'ethnicity', 'c_ethnicity_code', ['c_ethnicity_code', 'c_name_chn', 'c_name'])}
+                {codeRow('c_dy', tr('dynasty', '朝代') + ' (c_dy)', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty'])}
+            </>)}
+
+            {/* 區塊三：生卒年與指數年（生/卒年號轉換 + 自動計算的指數年/享年） */}
+            {block(tr('block_life_dates', '生卒年與指數年'), <>
+                <div style={sectionLabel}>{tr('birth_year', '生年')} (c_birthyear)</div>
+                <EraTimeField values={buildEra(birth)} onChange={(p) => applyEra(birth, p)} dynastyCode={dynastyCode} showRange showLunar />
+                <div style={sectionLabel}>{tr('death_year', '卒年')} (c_deathyear)</div>
+                <EraTimeField values={buildEra(death)} onChange={(p) => applyEra(death, p)} dynastyCode={dynastyCode} showRange showLunar />
+                {textRow('c_index_year', tr('index_year', '指數年') + ' (c_index_year)', true, tr('auto_calc_hint', '由算法自動計算'))}
+                {displayRow('c_index_year_type_code', tr('index_year_method', '指數年方法') + ' (c_index_year_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
+                {displayRow('c_index_year_source_id', tr('index_year_source', '指數年來源') + ' (c_index_year_source_id)', tr('auto_calc_hint', '由算法自動計算'))}
+                {displayRow('c_index_addr_id', tr('index_addr', '指數地址') + ' (c_index_addr_id)', tr('auto_calc_hint', '由算法自動計算'))}
+                {displayRow('c_index_addr_type_code', tr('index_addr_type', '指數地址類型') + ' (c_index_addr_type_code)', tr('auto_calc_hint', '由算法自動計算'))}
+                {textRow('c_death_age', tr('age_at_death', '享年') + ' (c_death_age)')}
+                {codeRow('c_death_age_range', tr('range_label', '範圍') + ' (c_death_age_range)', 'range', 'c_range_code', ['c_range_code', 'c_approx', 'c_approx_chn'])}
+            </>)}
+
+            {/* 區塊四：在世年（始/終） */}
+            {block(tr('block_floruit', '在世年（活動年）'), <>
+                <div style={sectionLabel}>{tr('active_from', '在世始年')} (c_fl_earliest_year)</div>
+                <EraTimeField values={buildEra(flEarly)} onChange={(p) => applyEra(flEarly, p)} dynastyCode={dynastyCode} showNotes />
+                <div style={sectionLabel}>{tr('active_until', '在世終年')} (c_fl_latest_year)</div>
+                <EraTimeField values={buildEra(flLate)} onChange={(p) => applyEra(flLate, p)} dynastyCode={dynastyCode} showNotes />
+            </>)}
+
+            {/* 區塊五：籍貫與戶籍（郡望/戶籍） */}
+            {block(tr('block_origin', '籍貫與戶籍'), <>
+                {codeRow('c_choronym_code', tr('choronym', '郡望') + ' (c_choronym_code)', 'choronym', 'c_choronym_code', ['c_choronym_code', 'c_choronym_chn', 'c_choronym'])}
+                {codeRow('c_household_status_code', tr('household_field', '戶籍') + ' (c_household_status_code)', 'household', 'c_household_status_code', ['c_household_status_code', 'c_household_status_desc_chn', 'c_household_status_desc'])}
+            </>)}
+
+            {/* 區塊六：備註 */}
+            {block(tr('block_notes', '備註'), (
+                <div style={rowStyle}>
+                    <label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label>
+                    <div style={fieldStyle}>
+                        <textarea value={fields.c_notes ?? ''} disabled={!canEdit && !canPropose} rows={5}
+                            onChange={(e) => set('c_notes', e.target.value)} style={{ ...inputStyle, height: 'auto' }} />
+                    </div>
+                </div>
+            ))}
 
             {/* 修改說明：提案（提交建議）時附帶；legacy 對任何 active 使用者皆顯示，故凡可提案者（含可直接寫入者按「提交建議」）都顯示。 */}
             {(canEdit || canPropose) ? (
@@ -400,6 +419,9 @@ export default function BasicInfoEditor({
 
 const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 20 };
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
+// 區塊分組：淡邊框容器 + 藍系標題列（對齊系統藍 #255f93），視覺分隔各區（使用者要求）。
+const blockStyle: React.CSSProperties = { border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', marginBottom: 16, background: '#fcfdff' };
+const blockHeaderStyle: React.CSSProperties = { fontSize: '0.9rem', fontWeight: 700, color: '#255f93', margin: '0 0 12px', paddingBottom: 8, borderBottom: '1px solid #e6eef6' };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 10 };
 // 雙欄並排（對齊 legacy col-sm-6 × col-sm-6）：窄屏自動換行。
 const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 0 };

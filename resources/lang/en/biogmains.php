@@ -54,6 +54,13 @@ return [
     // ─── Basic Information ─────────────────────────────────────────
     'basic_info_title'        => 'Basic Information',
     'basic_info_readonly'     => 'Basic Information (read-only)',
+    // Basic-info editor section block titles (block grouping).
+    'block_names'             => 'Names',
+    'block_attributes'        => 'Basic Attributes',
+    'block_life_dates'        => 'Birth / Death & Index Year',
+    'block_floruit'           => 'Floruit (Active Years)',
+    'block_origin'            => 'Ancestral Home & Household',
+    'block_notes'             => 'Notes',
     'generate_pinyin_btn'     => 'Generate Pinyin',
     'surname_chn'             => 'Surname (Chinese)',
     'mingzi_chn'              => 'Given Name (Chinese)',

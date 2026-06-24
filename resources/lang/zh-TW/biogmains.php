@@ -54,6 +54,13 @@ return [
     // ─── Basic Information ─────────────────────────────────────────
     'basic_info_title'        => '基本資料',
     'basic_info_readonly'     => '基本資料（只讀）',
+    // 基本資料編輯器區塊分組標題（block grouping）。
+    'block_names'             => '姓名',
+    'block_attributes'        => '基本屬性',
+    'block_life_dates'        => '生卒年與指數年',
+    'block_floruit'           => '在世年（活動年）',
+    'block_origin'            => '籍貫與戶籍',
+    'block_notes'             => '備註',
     'generate_pinyin_btn'     => '生成拼音',
     'surname_chn'             => '姓',
     'mingzi_chn'              => '名',

@@ -382,11 +382,17 @@ export default function BasicInfoEditor({
             ) : null}
 
             <div style={submitRow}>
+                {/* 主要動作靠左 */}
                 {canEdit ? <button type="button" disabled={saving || !dirty} style={primaryBtn} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
                 {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={infoBtn} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
-                {canEdit && deleteEndpoint ? <button type="button" disabled={deleting} style={dangerBtn} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
-                {duplicateCollateralUrl ? <a href={duplicateCollateralUrl} style={successLink}>{tr('duplicate_collateral', 'Duplicate Collateral Info')}</a> : null}
-                {saveasUrl ? <a href={saveasUrl} style={successLink}>{tr('duplicate_basic', 'Duplicate Basic Info')}</a> : null}
+                {/* 危險/另存動作靠右（對齊 legacy 的 float-right 分組） */}
+                {(canEdit && deleteEndpoint) || duplicateCollateralUrl || saveasUrl ? (
+                    <div style={btnGroupRight}>
+                        {canEdit && deleteEndpoint ? <button type="button" disabled={deleting} style={dangerBtn} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                        {duplicateCollateralUrl ? <a href={duplicateCollateralUrl} style={successLink}>{tr('duplicate_collateral', 'Duplicate Collateral Info')}</a> : null}
+                        {saveasUrl ? <a href={saveasUrl} style={successLink}>{tr('duplicate_basic', 'Duplicate Basic Info')}</a> : null}
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -399,9 +405,9 @@ const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'f
 const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 0 };
 const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
 const cellRowStyle: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 };
-// LABEL_W：雙欄格與單欄列共用同一 label 寬度，使所有 input 左緣對齊（對齊 legacy：
-// 名區 col-sm-4(於 col-sm-6 內)≈ 單欄 col-sm-2 ≈ 180px，故新舊一致）。
-const LABEL_W = 180;
+// LABEL_W：雙欄格與單欄列共用同一 label 寬度，使所有 input 左緣對齊；
+// 取 160 與其餘 12 個編輯器一致（跨頁統一）。
+const LABEL_W = 160;
 const cellLabelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '0.875rem', color: '#374151' };
 // 唯讀派生 4-up grid（對齊 legacy col-xl-3）：label 置頂。
 const derivedGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 10 };
@@ -414,12 +420,16 @@ const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0
 const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };
 const hintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
 const sectionLabel: React.CSSProperties = { fontSize: '0.875rem', fontWeight: 600, color: '#374151', margin: '8px 0 4px' };
-const submitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16 };
-const primaryBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const infoBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #17a2b8', background: '#17a2b8', color: '#fff', fontWeight: 700, cursor: 'pointer', marginBottom: 10 };
+// 動作列：主要動作（保存/提交）靠左、危險/另存（刪除/Duplicate）靠右，對齊 legacy（非全堆左）。
+const submitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
+const btnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };
+// 所有動作按鈕/連結統一尺寸（8px 14px + inline-flex 置中），避免 button 與 a 高度不一。
+const actionBtnBase: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+const primaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #255f93', background: '#255f93', color: '#fff' };
+const infoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
 const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '0.875rem' };
 const auditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' };
-const dangerBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #dc3545', background: '#dc3545', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const successLink: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #28a745', background: '#28a745', color: '#fff', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };
+const dangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };
+const successLink: React.CSSProperties = { ...actionBtnBase, border: '1px solid #28a745', background: '#28a745', color: '#fff' };

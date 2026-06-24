@@ -7,9 +7,9 @@ return [
     'save_as'                 => '另存新檔',
 
     // ─── Modification note ─────────────────────────────────────────
-    'modification_note_label'       => '修改說明 / 提案理由',
-    'modification_note_placeholder' => '請簡述本次修改的原因（直接儲存或提交提案時均會記錄此說明）',
-    'modification_note_hint'        => '此說明將記錄於操作歷史中。提交提案時必填，直接儲存時可選填。',
+    'modification_note_label'       => '修改說明 / 提案理由（可選）',
+    'modification_note_placeholder' => '選填：簡述本次修改的原因（直接儲存或提交提案時均會記錄；留空亦可送出）',
+    'modification_note_hint'        => '此說明將記錄於操作歷史中。直接儲存與提交提案皆為選填，留空亦可送出。',
 
     // ─── Record counts ─────────────────────────────────────────────
     'record_count'            => '共查詢到 :count 筆記錄',

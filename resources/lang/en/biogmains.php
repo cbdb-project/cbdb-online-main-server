@@ -7,9 +7,9 @@ return [
     'save_as'                 => 'Save As',
 
     // ─── Modification note ─────────────────────────────────────────
-    'modification_note_label'       => 'Modification Note / Proposal Reason',
-    'modification_note_placeholder' => 'Briefly describe the reason for this change (recorded for both direct saves and proposals)',
-    'modification_note_hint'        => 'This will be recorded in the operation history. Required when submitting a proposal; optional when saving directly.',
+    'modification_note_label'       => 'Modification Note / Proposal Reason (optional)',
+    'modification_note_placeholder' => 'Optional: briefly describe the reason for this change (recorded for both direct saves and proposals; may be left blank)',
+    'modification_note_hint'        => 'This will be recorded in the operation history. Optional for both direct saves and proposals; may be left blank.',
 
     // ─── Record counts ─────────────────────────────────────────────
     'record_count'            => 'Found :count records',

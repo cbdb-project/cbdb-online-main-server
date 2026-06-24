@@ -251,11 +251,13 @@ export default function EraTimeField({
                         style={{ ...inputStyle, width: '7ch', ...(monthInvalid ? invalidStyle : {}) }}
                         aria-invalid={monthInvalid} title={monthInvalid ? '請輸入 1-12 或留空' : undefined} aria-label="月" />
                     <span style={unitStyle}>月</span>
+                    <span style={{ ...rangeHintStyle, ...(monthInvalid ? invalidHintStyle : {}) }}>(1-12)</span>
                     <input type="number" min={1} max={30} value={values.day ?? ''} disabled={disabled}
                         onChange={(e) => onChange({ day: e.target.value })}
                         style={{ ...inputStyle, width: '7ch', ...(dayInvalid ? invalidStyle : {}) }}
                         aria-invalid={dayInvalid} title={dayInvalid ? '請輸入 1-30 或留空' : undefined} aria-label="日" />
                     <span style={unitStyle}>日</span>
+                    <span style={{ ...rangeHintStyle, ...(dayInvalid ? invalidHintStyle : {}) }}>(1-30)</span>
                     <label style={labelStyle}>{dayGzLabel}</label>
                     <div style={{ minWidth: '12ch', flex: '1 1 12ch' }}>
                         <CodeAutocomplete
@@ -309,6 +311,9 @@ const convBtnStyle: React.CSSProperties = { height: 34, minWidth: 32, borderRadi
 const fieldGroupStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 };
 const labelStyle: React.CSSProperties = { fontSize: '0.85rem', color: '#374151', whiteSpace: 'nowrap' };
 const unitStyle: React.CSSProperties = { fontSize: '0.85rem', color: '#374151' };
+// 農曆月/日合法範圍的常駐可見提示（對齊 legacy month_range_hint / day_range_hint，但常顯而非僅 invalid）。
+const rangeHintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#94a3b8', marginLeft: -2 };
+const invalidHintStyle: React.CSSProperties = { color: '#dc3545' };
 const checkboxLabelStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.85rem', color: '#374151' };
 const dialogBackdrop: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.3)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const dialogBox: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: 16, minWidth: 320, maxHeight: '70vh', overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.2)' };

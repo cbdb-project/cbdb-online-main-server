@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -639,6 +640,70 @@ class ApiV2MutateKinshipTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->kinshipPayload());
         $response->assertStatus(403);
+    }
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testKinUpdateWriteEquivalenceLegacyVsV2(): void {
+        // #56 M（update，鏡像）+ #66 端到端驗證（kinship，與 assoc 對稱）：同一初始 in-sync 狀態下，
+        // ① 旧版改一筆 notes→記錄結果 → ② 復原初始 → ③ 新版改同一筆（**無 force**，#66 修復後 in-sync 編輯不再誤擋）
+        // → 對比兩版落庫結果（正向 + 反向鏡像）等價。正常同步編輯下默認 v2 == 旧版，本測試即其端到端證明。
+        $this->actingAs($this->makeUser(email: 'kin-mupd@example.com'));
+
+        $pk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72];
+        $seedInitial = function (): void {
+            DB::table('KIN_DATA')->delete();
+            // 正向 (1000,2000,72) 與反向鏡像 (2000,1000,73)（72↔73 配對）；備註/出處/autogen 同值＝in-sync。
+            $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '初始備註', 'c_source' => 10, 'c_pages' => '1-5', 'c_autogen_notes' => 'auto-x']);
+            DB::table('KIN_DATA')->insert([
+                'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+                'c_source' => 10, 'c_pages' => '1-5', 'c_notes' => '初始備註', 'c_autogen_notes' => 'auto-x',
+            ]);
+        };
+        // 比對涵蓋內容欄；亦保留 c_kin_id/c_kin_code（鏡像方向寫錯主要由 fetch 的 where 抓出，此處為冗餘佐證）。排除稽核時間欄。
+        $cols = ['c_kin_code', 'c_kin_id', 'c_source', 'c_pages', 'c_notes', 'c_autogen_notes'];
+        $pick = function ($row) use ($cols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($cols));
+            ksort($a);
+
+            return $a;
+        };
+
+        // ① 旧版改一筆：notes→改後、且 c_source 10→20（同改一個偏離 seed 初值的內容欄，
+        //    使 assertSame 真正鎖「兩版對同一改動落庫一致」而非「兩版都沒動到該欄」）。PK 不變、送反向碼 73。
+        $seedInitial();
+        $this->put('/basicinformation/1000/kinship/update?' . http_build_query($pk), array_merge($pk, [
+            'c_source' => 20, 'c_notes' => '改後', 'c_kinship_pair' => 73, 'action' => 'save',
+        ]))->assertStatus(302); // legacy 成功後 redirect（非寫入成功的充分證明；真正的鎖在下方內容斷言）
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), 'legacy 更新後應仍為正向+鏡像各一（無孤兒/重複列）');
+        $legacyFwd = $pick(DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72])->first());
+        $legacyMir = $pick(DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73])->first());
+
+        // ② 復原初始 → ③ 新版改同一筆（無 force；同樣改 c_source→20）。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'kinship', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => $pk],
+            'changes' => ['c_notes' => '改後', 'c_source' => 20, 'c_kinship_pair' => 73],
+        ])->assertOk()->assertJson(['ok' => true]); // #66 修復後 in-sync 不再 409
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), 'v2 更新後應仍為正向+鏡像各一（無孤兒/重複列）');
+        $v2Fwd = $pick(DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72])->first());
+        $v2Mir = $pick(DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73])->first());
+
+        // 兩版落庫結果等價（正向 + 反向鏡像）；先確認改動真的落庫（c_notes/c_source 偏離 seed），再比兩版一致。
+        $this->assertNotNull($legacyFwd, 'legacy 更新後正向列不存在');
+        $this->assertNotNull($v2Fwd, 'v2 更新後正向列不存在');
+        $this->assertSame('改後', $v2Fwd['c_notes'], 'v2 正向 notes 應更新為改後（in-sync 不被 #66 誤擋）');
+        $this->assertSame(20, (int) $v2Fwd['c_source'], 'v2 正向 c_source 應更新為 20（partial update 確有落庫）');
+        $this->assertSame($legacyFwd, $v2Fwd, '正向列 legacy vs v2 更新結果不等價');
+        $this->assertNotNull($legacyMir, 'legacy 更新後反向鏡像不存在');
+        $this->assertNotNull($v2Mir, 'v2 更新後反向鏡像不存在');
+        $this->assertSame($legacyMir, $v2Mir, '反向鏡像 legacy vs v2 同步結果不等價');
+        $this->assertSame('改後', $v2Mir['c_notes'], '鏡像 notes 應同步為改後');
+        $this->assertSame(20, (int) $v2Mir['c_source'], '鏡像 c_source 應同步為 20');
     }
 
     #[Test]

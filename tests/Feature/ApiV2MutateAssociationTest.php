@@ -914,34 +914,39 @@ class ApiV2MutateAssociationTest extends TestCase {
             return $a;
         };
 
-        // ① 旧版改一筆：notes→改後（PK 不變、送反向碼 2）。
+        // ① 旧版改一筆：notes→改後、且 c_source 10→20（同改一個偏離 seed 初值的內容欄，
+        //    使 assertSame 真正鎖「兩版對同一改動落庫一致」而非「兩版都沒動到該欄」）。PK 不變、送反向碼 2。
         $seedInitial();
         $this->put('/basicinformation/1000/assoc/update?' . http_build_query($pk), array_merge($pk, [
-            'c_source' => 10, 'c_notes' => '改後', 'c_inst_code' => '0', 'action' => 'save',
+            'c_source' => 20, 'c_notes' => '改後', 'c_inst_code' => '0', 'action' => 'save',
             'c_assocship_pair' => 2, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
-        ]))->assertStatus(302); // legacy 成功後 redirect；直接鎖住「legacy 確實寫入成功」訊號（codex 建議）
+        ]))->assertStatus(302); // legacy 成功後 redirect（非寫入成功的充分證明；真正的鎖在下方內容斷言）
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), 'legacy 更新後應仍為正向+鏡像各一（無孤兒/重複列）');
         $legacyFwd = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000])->first());
         $legacyMir = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000])->first());
 
-        // ② 復原初始 → ③ 新版改同一筆（無 force）。
+        // ② 復原初始 → ③ 新版改同一筆（無 force；同樣改 c_source→20）。
         $seedInitial();
         $this->postJson('/api/v2/mutate', [
             'resource' => 'associations', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
             'target' => ['pk' => $pk],
-            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+            'changes' => ['c_notes' => '改後', 'c_source' => 20, 'c_assocship_pair' => 2],
         ])->assertOk()->assertJson(['ok' => true]); // #66 修復後 in-sync 不再 409，默認即過
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), 'v2 更新後應仍為正向+鏡像各一（無孤兒/重複列）');
         $v2Fwd = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000])->first());
         $v2Mir = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000])->first());
 
-        // 兩版落庫結果等價（正向 + 反向鏡像；c_notes 已改 → 隱含鎖 legacy 更新成功）。
+        // 兩版落庫結果等價（正向 + 反向鏡像）；先確認改動真的落庫（c_notes/c_source 偏離 seed），再比兩版一致。
         $this->assertNotNull($legacyFwd, 'legacy 更新後正向列不存在');
         $this->assertNotNull($v2Fwd, 'v2 更新後正向列不存在');
         $this->assertSame('改後', $v2Fwd['c_notes'], 'v2 正向 notes 應更新為改後（in-sync 不被 #66 誤擋）');
+        $this->assertSame(20, (int) $v2Fwd['c_source'], 'v2 正向 c_source 應更新為 20（partial update 確有落庫）');
         $this->assertSame($legacyFwd, $v2Fwd, '正向列 legacy vs v2 更新結果不等價');
         $this->assertNotNull($legacyMir, 'legacy 更新後反向鏡像不存在');
         $this->assertNotNull($v2Mir, 'v2 更新後反向鏡像不存在');
         $this->assertSame($legacyMir, $v2Mir, '反向鏡像 legacy vs v2 同步結果不等價');
         $this->assertSame('改後', $v2Mir['c_notes'], '鏡像 notes 應同步為改後');
+        $this->assertSame(20, (int) $v2Mir['c_source'], '鏡像 c_source 應同步為 20');
     }
 
     #[Test]

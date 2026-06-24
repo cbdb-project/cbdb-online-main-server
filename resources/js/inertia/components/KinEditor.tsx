@@ -161,7 +161,12 @@ export default function KinEditor({
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            setSavedSnapshot(JSON.stringify(fields));
+            // direct 儲存後從回傳列即時刷新唯讀稽核欄（建檔/更新），免重整；函式式合併避免 race，並併入 baseline 免誤判未存變更。
+            const auditRow = (sm === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
+            const auditPatch: Fields = {};
+            if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
+            if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
+            setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
             if (mode === 'create') { window.location.assign(indexUrl); } else if (sm === 'direct') {
                 // 改鍵後以實際送出的 PK 變更覆寫 originalPk（不可用 fields 重建，避免 Number('')=0 失準）。
                 const nextPk = { ...originalPk.current };

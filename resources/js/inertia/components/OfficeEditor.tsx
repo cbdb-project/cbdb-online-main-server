@@ -39,6 +39,7 @@ interface Props {
     deleteEndpoint?: string;
     indexUrl: string;
     aiEnabled?: boolean;
+    aiModel?: string;
     aiExtractEndpoint?: string;
     t?: (k: string) => string;
 }
@@ -57,7 +58,7 @@ const NON_PK = [
 
 export default function OfficeEditor({
     personId, personLabel, dynastyCode = null, mode, initialFields, initialLabels = {}, initialAddr = [],
-    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiExtractEndpoint, t,
+    canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiModel, aiExtractEndpoint, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 新增預設對齊 legacy：c_office_id 預設 option 0、c_source 預設 0、旗標 0；編輯由 initialFields 覆蓋。
@@ -283,7 +284,7 @@ export default function OfficeEditor({
             {error ? <div style={errStyle}>{error}</div> : null}
 
             {mode === 'create' && aiEnabled && aiExtractEndpoint && editable ? (
-                <PostingAiAutofill personId={personId} extractEndpoint={aiExtractEndpoint} disabled={!editable}
+                <PostingAiAutofill personId={personId} extractEndpoint={aiExtractEndpoint} aiModel={aiModel} disabled={!editable}
                     t={t} onApply={applyAiData} onClear={clearAi} />
             ) : null}
 

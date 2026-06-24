@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getCsrfToken } from '../PersonBrowser/shared/csrf';
+import AiPrivacyNotice from './AiPrivacyNotice';
 
 /**
  * 共享的「AI 智能識別代碼」面板（assoc / statuses 等 code-lookup 編輯器共用），
@@ -52,7 +53,6 @@ export default function AiCodeLookupPanel({
     const [candidates, setCandidates] = useState<AiCandidate[] | null>(null);
     const [notFound, setNotFound] = useState<string[]>([]);
     const [summary, setSummary] = useState('');
-    const [showNotice, setShowNotice] = useState(false);
     const aiFillLogId = useRef<number | null>(null);
 
     const run = async () => {
@@ -89,22 +89,9 @@ export default function AiCodeLookupPanel({
         <div style={cardStyle}>
             <div style={headerStyle}>
                 <strong style={titleStyle}><i className="fas fa-wand-magic-sparkles" aria-hidden="true" style={{ marginRight: 6 }} />{title}</strong>
-                <button type="button" style={noticeToggleStyle} onClick={() => setShowNotice((v) => !v)}>
-                    <i className="fas fa-circle-info" aria-hidden="true" style={{ marginRight: 4 }} />{t('ai_notice_title')}
-                </button>
             </div>
-            {showNotice ? (
-                <div style={noticeBoxStyle}>
-                    <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{t('ai_consent_intro')}</p>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <li>{t('ai_consent_record')}</li>
-                        <li>{t('ai_consent_third_party')}</li>
-                        <li>{t('ai_consent_verify')}</li>
-                    </ul>
-                    {aiModel ? <p style={{ margin: '6px 0 0' }}>{t('ai_current_model')}<code>{aiModel}</code></p> : null}
-                </div>
-            ) : null}
             <div style={{ padding: 14 }}>
+                <AiPrivacyNotice aiModel={aiModel} />
                 <textarea value={query} disabled={busy || disabled} rows={3} onChange={(e) => setQuery(e.target.value)}
                     placeholder={placeholder} style={textareaStyle} />
                 {hint ? <div style={hintStyle}>{hint}</div> : null}
@@ -149,8 +136,6 @@ export default function AiCodeLookupPanel({
 const cardStyle: React.CSSProperties = { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' };
 const titleStyle: React.CSSProperties = { color: '#1e3a8a', fontSize: '0.95rem' };
-const noticeToggleStyle: React.CSSProperties = { border: '1px solid #93c5fd', background: '#fff', color: '#1d4ed8', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' };
-const noticeBoxStyle: React.CSSProperties = { padding: '10px 14px', background: '#f8fbff', borderBottom: '1px solid #dbeafe', fontSize: '0.8rem', color: '#475569' };
 const textareaStyle: React.CSSProperties = { width: '100%', minHeight: 64, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box', resize: 'vertical' };
 const hintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b', marginTop: 4 };
 const runBtnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: '1px solid #1d4d77', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };

@@ -24,6 +24,7 @@ interface PageProps extends SharedProps {
     index_url: string;
     person_banner: PersonBannerData;
     ai_enabled: boolean;
+    ai_model: string;
     ai_extract_endpoint: string;
 }
 
@@ -59,6 +60,7 @@ export default function OfficeEditV2() {
                 deleteEndpoint={p.delete_endpoint}
                 indexUrl={p.index_url}
                 aiEnabled={p.ai_enabled}
+                aiModel={p.ai_model}
                 aiExtractEndpoint={p.ai_extract_endpoint}
                 t={t}
             />

@@ -1128,6 +1128,7 @@ class BasicInformationController extends Controller {
             'person_banner' => $this->personBannerProps($personId, 'postings'),
             // AI 任官自動填：僅在 Gemini 已設定且使用者啟用時提供（對齊 legacy offices/_form 條件，新增模式才顯示）。
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
+            'ai_model' => (string) config('services.gemini.model', ''),
             'ai_extract_endpoint' => Route::has('ai.posting.extract') ? route('ai.posting.extract', [], false) : '',
         ]);
     }

@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 
 /**
  * 基本資料編輯器（對齊 legacy /basicinformation/{id}/edit，非 person-browser）。
@@ -51,7 +52,16 @@ export default function BasicInfoEditor({
     };
     const [fields, setFields] = useState<Fields>(initialFields);
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const initialSnapshot = useRef<string>(JSON.stringify(initialFields));
+    // 已儲存基準快照：用 state（非 ref），更新後 dirty useMemo 才會重算——否則儲存後 fields 不變時 dirty 殘留 true，
+    // 重整頁面仍誤觸「Changes you made may not be saved」離頁守衛。
+    const [savedSnapshot, setSavedSnapshot] = useState<string>(JSON.stringify(initialFields));
+    const msgTimer = useRef<number | null>(null);
+    // 成功訊息 3 秒自動消失（頂部 flash 與近按鈕 ✓ 同步消失，避免分不清是這次還是上次的儲存）。
+    const flashSaved = (msg: string) => {
+        setMessage(msg);
+        if (msgTimer.current) window.clearTimeout(msgTimer.current);
+        msgTimer.current = window.setTimeout(() => setMessage(null), 3000);
+    };
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -59,7 +69,7 @@ export default function BasicInfoEditor({
     const [comment, setComment] = useState('');
     const [deleting, setDeleting] = useState(false);
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== initialSnapshot.current, [fields]);
+    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
     const dynastyCode = useMemo(() => {
         const v = parseInt(fields.c_dy ?? '', 10);
         return Number.isFinite(v) && v > 0 ? v : null;
@@ -79,6 +89,9 @@ export default function BasicInfoEditor({
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
     }, [dirty]);
+
+    // 卸載時清掉成功訊息自動消失計時器。
+    useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
 
     // indexYear 聯動：享年 = 卒-生+1；index_year = 享年>60 ? 生+60 : 卒（對齊 legacy indexYear()）。
     const recomputeIndexYear = (next: Fields): Fields => {
@@ -157,7 +170,7 @@ export default function BasicInfoEditor({
     const save = async (mode: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
         // 只送與初始不同、且非唯讀派生的欄位。
-        const initial: Fields = JSON.parse(initialSnapshot.current);
+        const initial: Fields = JSON.parse(savedSnapshot);
         const changes: Record<string, string | null> = {};
         for (const [k, v] of Object.entries(fields)) {
             if (READONLY_DERIVED.includes(k)) continue;
@@ -180,8 +193,26 @@ export default function BasicInfoEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            setMessage(mode === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            initialSnapshot.current = JSON.stringify(fields);
+            flashSaved(mode === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            // direct 儲存後，從回傳列即時刷新「更新」稽核欄（c_modified_by/date），不必重整頁面。
+            const row = (mode === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
+            const auditBy = row && row.c_modified_by != null ? String(row.c_modified_by) : null;
+            const auditDate = row && row.c_modified_date != null ? String(row.c_modified_date) : null;
+            // 函式式合併稽核欄（保留請求期間使用者新輸入，修正 race：不可用已捕捉的舊 fields 覆寫）。
+            if (auditBy !== null || auditDate !== null) {
+                setFields((prev) => ({
+                    ...prev,
+                    ...(auditBy !== null ? { c_modified_by: auditBy } : {}),
+                    ...(auditDate !== null ? { c_modified_date: auditDate } : {}),
+                }));
+            }
+            // 已儲存基準 = 本次送出欄位值（captured fields）＋ 新稽核欄；請求期間的新輸入不在基準內 → 仍正確視為 dirty。
+            const baseline: Fields = {
+                ...fields,
+                ...(auditBy !== null ? { c_modified_by: auditBy } : {}),
+                ...(auditDate !== null ? { c_modified_date: auditDate } : {}),
+            };
+            setSavedSnapshot(JSON.stringify(baseline));
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
         } finally { setSaving(false); }
@@ -207,7 +238,7 @@ export default function BasicInfoEditor({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-            initialSnapshot.current = JSON.stringify(fields); // 避免離頁守衛攔截
+            setSavedSnapshot(JSON.stringify(fields)); // 避免離頁守衛攔截
             router.visit(indexUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('delete_failed', '刪除失敗'));
@@ -276,10 +307,11 @@ export default function BasicInfoEditor({
 
             {/* 區塊一：姓名。中文+拼音一組（生成拼音僅由此區的中文名推導 Xing/Ming），其後才是外文/羅馬字（不受生成拼音影響）。 */}
             {block(tr('block_names', '姓名'), <>
+                {/* 姓（中文+拼音）成對、名（中文+拼音）成對：2 欄時每列一組、1 欄時姓組→名組相鄰。 */}
                 <div style={gGrid}>
                     {gText('c_surname_chn', tr('surname_chn', '姓（中）'), 'c_surname_chn')}
-                    {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn')}
                     {gText('c_surname', 'Xing', 'c_surname')}
+                    {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn')}
                     {gText('c_mingzi', 'Ming', 'c_mingzi')}
                 </div>
                 {canEdit ? <div style={pinyinRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button></div> : null}
@@ -393,8 +425,10 @@ export default function BasicInfoEditor({
 
             <div style={submitRow}>
                 {/* 主要動作靠左 */}
-                {canEdit ? <button type="button" disabled={saving || !dirty} style={primaryBtn} onClick={() => void save('direct')}>{tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={infoBtn} onClick={() => void save('proposal')}>{tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit ? <button type="button" disabled={saving || !dirty} style={primaryBtn} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={infoBtn} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {/* 近按鈕即時回饋（Q3）：儲存中轉圈 / ✓ 已儲存 / ✗ 失敗，緊鄰按鈕，不必抬頭看頂部 flash。 */}
+                <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 {/* 危險/另存動作靠右（對齊 legacy 的 float-right 分組） */}
                 {(canEdit && deleteEndpoint) || duplicateCollateralUrl || saveasUrl ? (
                     <div style={btnGroupRight}>

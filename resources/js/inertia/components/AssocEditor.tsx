@@ -3,6 +3,7 @@ import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import AiCodeLookupPanel, { AiCandidate } from './PersonEditorShared/AiCodeLookupPanel';
 
 /**
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
@@ -19,7 +20,6 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
  * 編輯模式 PK 段可改（改 c_assoc_code 等→後端鏡像遷移）；空值正規化哨兵；改鍵後重同步 originalPk。
  */
 type Fields = Record<string, string>;
-interface AiCandidate { code_id: number | string; desc_chn?: string; desc_en?: string; relevance?: string }
 
 interface Props {
     personId: number;
@@ -36,6 +36,7 @@ interface Props {
     indexUrl: string;
     aiEnabled?: boolean;
     aiSuggestEndpoint?: string;
+    aiModel?: string;
     routeName?: string;
     t?: (k: string) => string;
 }
@@ -66,7 +67,7 @@ const NON_PK = [
 export default function AssocEditor({
     personId, personLabel, dynastyCode = null, mode, initialFields, initialLabels = {},
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl,
-    aiEnabled = false, aiSuggestEndpoint, routeName, t,
+    aiEnabled = false, aiSuggestEndpoint, aiModel, routeName, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const base: Fields = {
@@ -94,13 +95,6 @@ export default function AssocEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [assocHighlight, setAssocHighlight] = useState(false);
     const [comment, setComment] = useState('');
-
-    // AI 代碼識別狀態。
-    const [aiQuery, setAiQuery] = useState('');
-    const [aiBusy, setAiBusy] = useState(false);
-    const [aiError, setAiError] = useState<string | null>(null);
-    const [aiCandidates, setAiCandidates] = useState<AiCandidate[] | null>(null);
-    const [aiSummary, setAiSummary] = useState('');
 
     const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
@@ -150,27 +144,6 @@ export default function AssocEditor({
         setMessage(tr('update_source_success', '已自動回填出處與頁碼'));
     };
 
-    const runAiLookup = async () => {
-        const q = aiQuery.trim();
-        if (!q) { setAiError(tr('ai_enter_description', '請輸入描述')); return; }
-        if (!aiSuggestEndpoint) return;
-        setAiBusy(true); setAiError(null); setAiCandidates(null); setAiSummary('');
-        try {
-            const res = await fetch(aiSuggestEndpoint, {
-                method: 'POST',
-                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ query: q, table: 'ASSOC_CODES', person_id: personId, route_name: routeName ?? '', route_url: typeof window !== 'undefined' ? window.location.pathname : '' }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.success) throw new Error(json?.error || tr('ai_recognition_failed', 'AI 識別失敗'));
-            const data = json.data ?? {};
-            setAiCandidates(Array.isArray(data.matched_codes) ? data.matched_codes : []);
-            setAiSummary(typeof data.summary === 'string' ? data.summary : '');
-        } catch (e) {
-            setAiError(e instanceof Error ? e.message : tr('ai_recognition_failed', 'AI 識別失敗'));
-        } finally { setAiBusy(false); }
-    };
     const applyAiCode = (c: AiCandidate) => {
         set('c_assoc_code', String(c.code_id));
         setLabel('c_assoc_code', `${c.code_id} ${c.desc_chn ?? ''} ${c.desc_en ?? ''}`.trim());
@@ -283,27 +256,16 @@ export default function AssocEditor({
             {error ? <div style={errStyle}>{error}</div> : null}
 
             {aiEnabled && aiSuggestEndpoint && editable ? (
-                <div style={aiCard}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>🔎 {tr('ai_assoc_lookup', 'AI 智能識別社會關係代碼')}</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <input type="text" value={aiQuery} disabled={aiBusy} onChange={(e) => setAiQuery(e.target.value)}
-                            placeholder={tr('ai_assoc_placeholder', '描述關係，例如「同年進士」「妻舅」')} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-                        <button type="button" style={aiBtn} disabled={aiBusy} onClick={() => void runAiLookup()}>⚡ {tr('ai_lookup_btn', '識別')}</button>
-                    </div>
-                    {aiError ? <div style={{ color: '#991b1b', fontSize: '0.82rem', marginTop: 6 }}>{aiError}</div> : null}
-                    {aiSummary ? <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: 6 }}>{aiSummary}</div> : null}
-                    {aiCandidates && aiCandidates.length > 0 ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                            {aiCandidates.map((c) => (
-                                <button type="button" key={String(c.code_id)} style={candBtn} onClick={() => applyAiCode(c)}>
-                                    {c.code_id} {c.desc_chn ?? ''} {c.desc_en ?? ''}{c.relevance ? `（${c.relevance}）` : ''}
-                                </button>
-                            ))}
-                        </div>
-                    ) : aiCandidates && aiCandidates.length === 0 ? (
-                        <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: 6 }}>{tr('ai_no_candidate', '無候選代碼，請手動選擇')}</div>
-                    ) : null}
-                </div>
+                <AiCodeLookupPanel
+                    table="ASSOC_CODES"
+                    personId={personId}
+                    aiSuggestEndpoint={aiSuggestEndpoint}
+                    aiModel={aiModel}
+                    routeName={routeName}
+                    title={tr('ai_assoc_lookup', 'AI 智能識別社會關係代碼')}
+                    placeholder={tr('ai_assoc_placeholder', '描述關係，例如「同年進士」「妻舅」')}
+                    onApply={applyAiCode}
+                />
             ) : null}
 
             {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`)}
@@ -394,9 +356,6 @@ const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: '
 const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const aiCard: React.CSSProperties = { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 12, marginBottom: 14 };
-const aiBtn: React.CSSProperties = { borderRadius: 8, padding: '7px 14px', border: '1px solid #0369a1', background: '#0ea5e9', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const candBtn: React.CSSProperties = { borderRadius: 14, padding: '4px 12px', border: '1px solid #c7d7ea', background: '#eef4fb', color: '#1f3a5f', fontSize: '0.82rem', cursor: 'pointer' };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };

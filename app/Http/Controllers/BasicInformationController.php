@@ -1249,6 +1249,7 @@ class BasicInformationController extends Controller {
             'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'associations'], false),
             'person_banner' => $this->personBannerProps($personId, 'associations'),
             'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
+            'ai_model' => (string) config('services.gemini.model', ''),
             'ai_suggest_endpoint' => Route::has('ai.code-lookup.suggest') ? route('ai.code-lookup.suggest', [], false) : '',
         ]);
     }

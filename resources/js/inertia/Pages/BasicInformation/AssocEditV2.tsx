@@ -23,6 +23,7 @@ interface PageProps extends SharedProps {
     index_url: string;
     person_banner: PersonBannerData;
     ai_enabled: boolean;
+    ai_model: string;
     ai_suggest_endpoint: string;
 }
 
@@ -57,6 +58,7 @@ export default function AssocEditV2() {
                 deleteEndpoint={p.delete_endpoint}
                 indexUrl={p.index_url}
                 aiEnabled={p.ai_enabled}
+                aiModel={p.ai_model}
                 aiSuggestEndpoint={p.ai_suggest_endpoint}
                 t={t}
             />

@@ -809,7 +809,7 @@ class OperationsController extends Controller {
                 'name' => $p['name'] ?? '',
                 'display_name' => $name !== '' ? $name : (string) ($p['id'] ?? ''),
                 'is_primary' => (bool) ($p['is_primary'] ?? false),
-                'person_edit_url' => !empty($p['id']) ? "/basicinformation/{$p['id']}/edit" : null,
+                'person_edit_url' => !empty($p['id']) ? person_page_url($p['id'], 'edit') : null,
                 'resource_id' => $p['resource_id'] ?? null,
                 'resource_link' => $p['resource_link'] ?? null,
                 'resource_description' => !empty($p['resource_id'])

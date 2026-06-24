@@ -91,7 +91,7 @@ export default function SearchResultTable({ rows, pagination, onPageChange }: Pr
                                 <td style={cellStyle}>{row.c_posting_notes ?? '—'}</td>
                                 <td style={cellStyle}>
                                     <a
-                                        href={`/basicinformation/${row.c_personid}`}
+                                        href={`/app/basicinformation/${row.c_personid}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         style={actionLinkStyle}

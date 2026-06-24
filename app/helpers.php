@@ -73,6 +73,36 @@ if (!function_exists('migration_flag_is_new')) {
     }
 }
 
+if (!function_exists('person_page_url')) {
+    /**
+     * 人物頁 flag-aware URL：對應 flag=new 時導向 React /app 版，否則 legacy（供頁內連結統一使用，
+     * 避免各處寫死 /basicinformation/{id} 造成「新介面點人物卻開舊頁」）。
+     *
+     * @param int|string $id 人物 c_personid
+     * @param string     $type 'edit'（預設）| 'show'
+     */
+    function person_page_url($id, string $type = 'edit'): string {
+        if ($type === 'show') {
+            return (migration_flag_is_new('basicinformation.show') && \Illuminate\Support\Facades\Route::has('app.basicinformation.show'))
+                ? route('app.basicinformation.show', ['id' => $id], false)
+                : '/basicinformation/' . $id;
+        }
+
+        return (migration_flag_is_new('basicinformation.editor') && \Illuminate\Support\Facades\Route::has('app.basicinformation.edit'))
+            ? route('app.basicinformation.edit', ['id' => $id], false)
+            : '/basicinformation/' . $id . '/edit';
+    }
+}
+
+if (!function_exists('person_create_url')) {
+    /** 新增人物頁 flag-aware URL：編輯器 flag=new 時導向 React 建立頁，否則 legacy。 */
+    function person_create_url(): string {
+        return (migration_flag_is_new('basicinformation.editor') && \Illuminate\Support\Facades\Route::has('app.basicinformation.create'))
+            ? route('app.basicinformation.create', [], false)
+            : route('basicinformation.create', [], false);
+    }
+}
+
 // 聯合主鍵保留字弱點防禦函式。
 // 原僅定義於 resources/views/biogmains/defense.blade.php（@include 時載入），
 // 移至此處統一自動載入，供控制器（如 OperationsController::serializeOperationRow）共用；

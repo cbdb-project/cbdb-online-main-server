@@ -247,7 +247,7 @@ export default function WikiMaintenanceIndex() {
                             {records.map((r) => (
                                 <tr key={`${r.c_personid}-${r.c_textid}-${r.c_pages}`} className="border-t border-border">
                                     <td className="px-3 py-1.5">
-                                        <a className="text-primary hover:underline" href={`/basicinformation/${r.c_personid}/sources`} target="_blank" rel="noreferrer">{r.c_personid}</a>
+                                        <a className="text-primary hover:underline" href={`/app/basicinformation/${r.c_personid}/sources/edit-v2`} target="_blank" rel="noreferrer">{r.c_personid}</a>
                                     </td>
                                     <td className="px-3 py-1.5">{r.c_name_chn ?? '-'}</td>
                                     <td className="px-3 py-1.5">{r.c_textid}</td>

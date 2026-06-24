@@ -310,7 +310,7 @@ function PersonTable({ title, person, id, genderMatch, t }: { title: string; per
                     <tr className="border-t border-border">
                         <th className="px-2 py-1 text-left">ID</th>
                         <td className="px-2 py-1">
-                            {person.exists ? <a className="text-primary hover:underline" href={`/basicinformation/${id}/edit`} target="_blank" rel="noreferrer">{id}</a> : id}
+                            {person.exists ? <a className="text-primary hover:underline" href={`/app/basicinformation/${id}/edit`} target="_blank" rel="noreferrer">{id}</a> : id}
                         </td>
                     </tr>
                     <tr className="border-t border-border">

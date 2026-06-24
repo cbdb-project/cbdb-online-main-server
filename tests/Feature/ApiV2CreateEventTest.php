@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -395,6 +396,7 @@ class ApiV2CreateEventTest extends TestCase {
     // ── #56 M 寫入等價（legacy Blade vs v2）——主列 + 地址副表 EVENTS_ADDR ──────
 
     #[Test]
+    #[Group('legacy-parity')] // 旧版下线时連同 legacy 路徑一併移除（v2 行為另有 v2-only 測試覆蓋）
     public function testEventCreateWriteEquivalenceLegacyVsV2WithAddressSubtable(): void {
         // #56（M 維度，副表）：事件同語義輸入分別經 ① legacy Blade store（EventStatusRepository::eventStoreById）
         // ② v2 /api/v2/create 寫入兩筆不同 c_sequence，斷言主列 EVENTS_DATA 內容欄等價，

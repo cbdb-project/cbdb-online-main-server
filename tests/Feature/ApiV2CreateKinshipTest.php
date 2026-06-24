@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -432,6 +433,7 @@ class ApiV2CreateKinshipTest extends TestCase {
     // ── #56 M 寫入等價（legacy Blade vs v2）+ 幂等 ──────────────────
 
     #[Test]
+    #[Group('legacy-parity')] // 旧版下线时連同 legacy 路徑一併移除（v2 行為另有 v2-only 測試覆蓋）
     public function testKinshipCreateWriteEquivalenceLegacyVsV2(): void {
         // #56（M 維度）：同一語義輸入分別經 ① legacy Blade store（BasicInformationKinshipController@store→kinshipStoreById）
         // ② v2 /api/v2/create 寫入兩個獨立合成對象，斷言正向內容欄 + 反向鏡像親屬碼落庫等價（排除差異 PK 段與稽核欄）。

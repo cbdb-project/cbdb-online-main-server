@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -635,6 +636,7 @@ class ApiV2CreateAssociationTest extends TestCase {
     // ── #56 M 寫入等價（legacy Blade vs v2）+ 幂等 ──────────────────
 
     #[Test]
+    #[Group('legacy-parity')] // 旧版下线时連同 legacy 路徑一併移除（v2 行為另有 v2-only 測試覆蓋）
     public function testAssocCreateWriteEquivalenceLegacyVsV2(): void {
         // #56（M 維度）：同一「語義/等價業務輸入」（非逐欄相同的 request payload）分別經 ① legacy Blade store ② v2 /api/v2/create 寫入兩個獨立合成對象，
         // 斷言落庫的正向列內容欄 + 反向鏡像關係碼等價（排除差異 PK 段 c_assoc_id/c_personid 與稽核欄）。

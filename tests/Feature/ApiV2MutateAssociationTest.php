@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -882,6 +883,65 @@ class ApiV2MutateAssociationTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->associationPayload());
         $response->assertStatus(403);
+    }
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testAssocUpdateWriteEquivalenceLegacyVsV2(): void {
+        // #56 M（update，鏡像）+ #66 端到端驗證：同一初始 in-sync 狀態下，① 旧版改一筆 notes→記錄結果 →
+        // ② 復原初始 → ③ 新版改同一筆（**無 force**，因 #66 修復後 in-sync 編輯不再誤擋）→ 對比兩版落庫結果（正向+反向鏡像）等價。
+        // 因 #66 已修過度觸發，正常同步編輯下默認 v2 == 旧版，無需 force——本測試正是其端到端證明。
+        $this->actingAs($this->makeUser(email: 'assoc-mupd@example.com'));
+
+        $pk = [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+        ];
+        $seedInitial = function (): void {
+            DB::table('ASSOC_DATA')->delete();
+            $this->seedAssociation(['c_notes' => '初始備註', 'c_source' => 10]);
+            $this->seedMirror(['c_notes' => '初始備註', 'c_source' => 10]); // in-sync（鏡像==正向舊值）
+        };
+        // 對比涵蓋差異 PK 段以外的內容 + 鏡像方向 ID（c_kin_id/c_assoc_kin_id 不排除，捕捉鏡像反向同步寫錯）；排除稽核時間欄。
+        $cols = ['c_assoc_code', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year', 'c_source', 'c_notes'];
+        $pick = function ($row) use ($cols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($cols));
+            ksort($a);
+
+            return $a;
+        };
+
+        // ① 旧版改一筆：notes→改後（PK 不變、送反向碼 2）。
+        $seedInitial();
+        $this->put('/basicinformation/1000/assoc/update?' . http_build_query($pk), array_merge($pk, [
+            'c_source' => 10, 'c_notes' => '改後', 'c_inst_code' => '0', 'action' => 'save',
+            'c_assocship_pair' => 2, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+        ]))->assertStatus(302); // legacy 成功後 redirect；直接鎖住「legacy 確實寫入成功」訊號（codex 建議）
+        $legacyFwd = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000])->first());
+        $legacyMir = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000])->first());
+
+        // ② 復原初始 → ③ 新版改同一筆（無 force）。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => $pk],
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+        ])->assertOk()->assertJson(['ok' => true]); // #66 修復後 in-sync 不再 409，默認即過
+        $v2Fwd = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000])->first());
+        $v2Mir = $pick(DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000])->first());
+
+        // 兩版落庫結果等價（正向 + 反向鏡像；c_notes 已改 → 隱含鎖 legacy 更新成功）。
+        $this->assertNotNull($legacyFwd, 'legacy 更新後正向列不存在');
+        $this->assertNotNull($v2Fwd, 'v2 更新後正向列不存在');
+        $this->assertSame('改後', $v2Fwd['c_notes'], 'v2 正向 notes 應更新為改後（in-sync 不被 #66 誤擋）');
+        $this->assertSame($legacyFwd, $v2Fwd, '正向列 legacy vs v2 更新結果不等價');
+        $this->assertNotNull($legacyMir, 'legacy 更新後反向鏡像不存在');
+        $this->assertNotNull($v2Mir, 'v2 更新後反向鏡像不存在');
+        $this->assertSame($legacyMir, $v2Mir, '反向鏡像 legacy vs v2 同步結果不等價');
+        $this->assertSame('改後', $v2Mir['c_notes'], '鏡像 notes 應同步為改後');
     }
 
     #[Test]

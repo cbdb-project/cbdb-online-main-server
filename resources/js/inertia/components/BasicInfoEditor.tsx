@@ -165,6 +165,7 @@ export default function BasicInfoEditor({
 
     // 生成拼音：用中文姓名查 /api/select/search/pinyin，回填拼音姓/名。
     const generatePinyin = async () => {
+        setError(null); setMessage(null); // 清掉前次錯誤/訊息，避免本次成功時頂部殘留舊 error alert。
         try {
             // 不再吞掉 HTTP 失敗：!r.ok 即拋出，落到下方 catch 顯示 generate_pinyin_failed（否則 500/422 會被誤當成功）。
             const surnameRes = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(fields.c_surname_chn ?? '')}`, {

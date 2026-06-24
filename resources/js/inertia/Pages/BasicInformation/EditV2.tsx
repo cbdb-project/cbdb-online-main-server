@@ -28,7 +28,16 @@ interface PageProps extends SharedProps {
 
 export default function EditV2() {
     const p = usePage<PageProps>().props;
-    const t = useTranslation('person');
+    // BasicInfoEditor 的標籤主要在 biogmains 命名空間（block_*/audit_*/欄位名等），輔以 person/common。
+    // 須與 TabContentLoader 內嵌版一致用 biogmains→person→common 鏈，否則獨立編輯頁（尤其 en）會落回中文 fallback。
+    const tBio = useTranslation('biogmains');
+    const tPerson = useTranslation('person');
+    const tCommon = useTranslation('common');
+    const t = (k: string): string => {
+        const v = tBio(k); if (v && v !== k) return v;
+        const v2 = tPerson(k); if (v2 && v2 !== k) return v2;
+        const v3 = tCommon(k); return v3 && v3 !== k ? v3 : k;
+    };
 
     const fields: Record<string, string> = {};
     for (const [k, v] of Object.entries(p.initial_fields || {})) {

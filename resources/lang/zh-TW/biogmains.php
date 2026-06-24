@@ -61,6 +61,15 @@ return [
     'block_floruit'           => '在世年（活動年）',
     'block_origin'            => '籍貫與戶籍',
     'block_notes'             => '備註',
+    // 建檔/更新顯示連接詞（合併「{使用者} 於 {日期}」；audit_created/audit_updated 沿用上方既有鍵，不重複定義）。
+    'audit_at'                => '於',
+    // basic_info 網格重設計：派生/指數唯讀子區塊標題與派生全名標籤。
+    'derived_auto_tag'        => '自動生成（唯讀，由上方姓名合併）',
+    'index_auto_tag'          => '指數年與指數地址（系統依算法定期自動計算，唯讀，無需手動填寫）',
+    'full_name_chn'           => '姓名（中）',
+    'pinyin_full'             => '拼音',
+    'foreign_full'            => '外文全名',
+    'rm_full'                 => '羅馬字全名',
     'generate_pinyin_btn'     => '生成拼音',
     'surname_chn'             => '姓',
     'mingzi_chn'              => '名',

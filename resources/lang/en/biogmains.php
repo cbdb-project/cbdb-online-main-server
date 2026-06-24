@@ -61,6 +61,15 @@ return [
     'block_floruit'           => 'Floruit (Active Years)',
     'block_origin'            => 'Ancestral Home & Household',
     'block_notes'             => 'Notes',
+    // Created/updated audit display connector (merged "{user} at {date}"; audit_created/audit_updated reuse the existing keys above).
+    'audit_at'                => 'at',
+    // basic_info grid redesign: derived/index read-only sub-block titles and derived full-name labels.
+    'derived_auto_tag'        => 'Auto-generated (read-only, merged from the names above)',
+    'index_auto_tag'          => 'Index year & index address (auto-computed periodically by the algorithm; read-only)',
+    'full_name_chn'           => 'Full Name (Chinese)',
+    'pinyin_full'             => 'Pinyin',
+    'foreign_full'            => 'Foreign Full Name',
+    'rm_full'                 => 'Romanized Full Name',
     'generate_pinyin_btn'     => 'Generate Pinyin',
     'surname_chn'             => 'Surname (Chinese)',
     'mingzi_chn'              => 'Given Name (Chinese)',

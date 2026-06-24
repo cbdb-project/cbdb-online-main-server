@@ -190,8 +190,8 @@ export default function EraTimeField({
             />
             {!disabled && (
                 <div style={btnGroupStyle}>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title="由西元換算年號">西元→年號</button>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title="由年號換算西元">年號→西元</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title="西元 → 年號（由西元年換算年號）" aria-label="由西元換算年號">→</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title="年號 → 西元（由年號換算西元年）" aria-label="由年號換算西元">←</button>
                 </div>
             )}
             <div style={fieldGroupStyle}>

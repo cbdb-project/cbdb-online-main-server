@@ -272,15 +272,6 @@ export default function AssocEditor({
                 value={fields[key] ?? ''} initialLabel={labels[key] ?? ''} disabled={!editable}
                 onChange={(v, l) => { set(key, v); setLabel(key, l); }} /></div></div>
     );
-    // 緊湊搜尋格（label 置頂）：供「關係碼 | 關係人」雙欄並排（對齊 legacy 一行兩欄 col-sm-6）。
-    const searchCell = (key: string, label: string, endpoint: string, highlight = false, sentinel = '0') => (
-        <div style={cellColStyle}>
-            <label style={cellLabelStyle}>{label}</label>
-            <CodeAutocomplete mode="search" endpoint={endpoint} value={fields[key] ?? sentinel} initialLabel={labels[key] ?? ''}
-                disabled={!editable} aria-invalid={highlight}
-                onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} />
-        </div>
-    );
     const pairRow = (left: React.ReactNode, right: React.ReactNode) => (
         <div style={twoColStyle}><div style={colStyle}>{left}</div><div style={colStyle}>{right}</div></div>
     );
@@ -317,18 +308,19 @@ export default function AssocEditor({
 
             {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`)}
 
-            {/* 關係碼 | 關係人 三組雙欄並排（對齊 legacy assoc/_form 一行兩欄）。 */}
+            {/* 關係碼 | 關係人 三組雙欄並排（對齊 legacy assoc/_form 一行兩欄）；
+                用 searchRow（label 靠左、與單欄列同寬）使左欄 input 左緣與下方單欄列對齊。 */}
             {pairRow(
-                searchCell('c_kin_code', `${tr('kinship_field', '親屬關係')} (c_kin_code)`, '/api/select/search/kincode'),
-                searchCell('c_kin_id', `${tr('kin_person', '親屬人物')} (c_kin_id)`, '/api/select/search/biog'),
+                searchRow('c_kin_code', `${tr('kinship_field', '親屬關係')} (c_kin_code)`, '/api/select/search/kincode'),
+                searchRow('c_kin_id', `${tr('kin_person', '親屬人物')} (c_kin_id)`, '/api/select/search/biog'),
             )}
             {pairRow(
-                searchCell('c_assoc_code', `${tr('assoc_field', '社會關係')} (c_assoc_code)`, '/api/select/search/assoccode', assocHighlight),
-                searchCell('c_assoc_id', `${tr('assoc_person', '關聯人物')} (c_assoc_id)`, '/api/select/search/biog'),
+                searchRow('c_assoc_code', `${tr('assoc_field', '社會關係')} (c_assoc_code)`, '/api/select/search/assoccode', assocHighlight),
+                searchRow('c_assoc_id', `${tr('assoc_person', '關聯人物')} (c_assoc_id)`, '/api/select/search/biog'),
             )}
             {pairRow(
-                searchCell('c_assoc_kin_code', `${tr('assoc_kin_field', '關聯親屬關係')} (c_assoc_kin_code)`, '/api/select/search/kincode'),
-                searchCell('c_assoc_kin_id', `${tr('assoc_kin_person', '關聯親屬人物')} (c_assoc_kin_id)`, '/api/select/search/biog'),
+                searchRow('c_assoc_kin_code', `${tr('assoc_kin_field', '關聯親屬關係')} (c_assoc_kin_code)`, '/api/select/search/kincode'),
+                searchRow('c_assoc_kin_id', `${tr('assoc_kin_person', '關聯親屬人物')} (c_assoc_kin_id)`, '/api/select/search/biog'),
             )}
 
             <div style={rowStyle}><label style={labelStyle}>{tr('assoc_start_year', '關係始年')} (first_year)</label><div style={fieldStyle}>
@@ -400,8 +392,6 @@ const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fo
 // 雙欄並排（對齊 legacy col-sm-6 × col-sm-6）：窄屏自動換行。
 const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap' };
 const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
-const cellColStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 0' };
-const cellLabelStyle: React.CSSProperties = { fontSize: '0.8rem', color: '#374151' };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
 const aiCard: React.CSSProperties = { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 12, marginBottom: 14 };

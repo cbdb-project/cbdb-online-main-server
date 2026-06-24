@@ -399,13 +399,16 @@ const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'f
 const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 0 };
 const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
 const cellRowStyle: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 };
-const cellLabelStyle: React.CSSProperties = { width: 96, flexShrink: 0, fontSize: '0.875rem', color: '#374151' };
+// LABEL_W：雙欄格與單欄列共用同一 label 寬度，使所有 input 左緣對齊（對齊 legacy：
+// 名區 col-sm-4(於 col-sm-6 內)≈ 單欄 col-sm-2 ≈ 180px，故新舊一致）。
+const LABEL_W = 180;
+const cellLabelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '0.875rem', color: '#374151' };
 // 唯讀派生 4-up grid（對齊 legacy col-xl-3）：label 置頂。
 const derivedGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 10 };
 const derivedCellStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 };
 const derivedLabelStyle: React.CSSProperties = { fontSize: '0.8rem', color: '#374151' };
-const pinyinBtnRowStyle: React.CSSProperties = { marginBottom: 10, paddingLeft: 96 };
-const labelStyle: React.CSSProperties = { width: 220, flexShrink: 0, fontSize: '0.875rem', paddingTop: 8, color: '#374151' };
+const pinyinBtnRowStyle: React.CSSProperties = { marginBottom: 10, paddingLeft: LABEL_W + 8 };
+const labelStyle: React.CSSProperties = { width: LABEL_W, flexShrink: 0, fontSize: '0.875rem', paddingTop: 8, color: '#374151' };
 const fieldStyle: React.CSSProperties = { flex: 1 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };

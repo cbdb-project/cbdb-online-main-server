@@ -402,5 +402,8 @@ return [
     'person_id_label'          => 'Person ID',
     'surname_chn_label'        => 'Surname (Chinese)',
     'mingzi_chn_label'         => 'Given Name (Chinese)',
+    // Create person: single Chinese full-name field (backend auto_pinyin splits surname/given, incl. compound surnames), matching legacy.
+    'name_chn_label'           => 'Name (Chinese)',
+    'name_autosplit_hint'      => 'Enter the full Chinese name; the system auto-splits surname/given name (incl. compound surnames) and generates pinyin — no manual splitting needed.',
     'create_failed'            => 'Create failed',
 ];

@@ -185,7 +185,10 @@ class BasicInformationController extends Controller {
             'edit_template' => $editIsNew
                 ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
                 : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
-            'create_url' => route('basicinformation.create', [], false),
+            // create_url flag-aware（對齊 edit_template）：編輯器已遷移時「新增」導向 React 建立頁（單一姓名欄、後端 auto_pinyin 切分），否則 legacy。
+            'create_url' => ($editIsNew && Route::has('app.basicinformation.create'))
+                ? route('app.basicinformation.create', [], false)
+                : route('basicinformation.create', [], false),
             'page_translations' => [
                 'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
                 'person' => is_array($t = trans('person')) ? $t : [],

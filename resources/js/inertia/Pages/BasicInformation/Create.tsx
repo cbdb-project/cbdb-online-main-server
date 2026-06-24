@@ -23,8 +23,9 @@ export default function BasicInformationCreate() {
     const tc = useTranslation('common');
 
     const [personId, setPersonId] = useState(String(temp_id ?? ''));
-    const [surnameChn, setSurnameChn] = useState('');
-    const [mingziChn, setMingziChn] = useState('');
+    // 對齊 legacy create.blade：只輸入單一中文姓名，姓/名於後端 store()→auto_pinyin 自動切分（含複姓）。
+    // 不再要求使用者手動切分（先前的分欄會被後端 auto_pinyin 重切而丟棄，且不符 legacy UX）。
+    const [nameChn, setNameChn] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -54,10 +55,8 @@ export default function BasicInformationCreate() {
                     operation: 'create',
                     target: { pk: { c_personid: idNum } },
                     changes: {
-                        // 中文姓名於後端由 repository store() 合成；此處提供姓/名核心欄位。
-                        c_surname_chn: surnameChn,
-                        c_mingzi_chn: mingziChn,
-                        c_name_chn: `${surnameChn}${mingziChn}`,
+                        // 只送中文全名；後端 store()→auto_pinyin 依 pinyin 表（含複姓最長前綴）自動切分姓/名並生成拼音。
+                        c_name_chn: nameChn,
                     },
                 }),
             });
@@ -109,12 +108,9 @@ export default function BasicInformationCreate() {
                         />
                     </FormField>
 
-                    <FormField label={t('surname_chn_label')} htmlFor="c_surname_chn" error={fieldErrors.c_surname_chn?.[0]}>
-                        <Input id="c_surname_chn" value={surnameChn} onChange={(e) => setSurnameChn(e.target.value)} />
-                    </FormField>
-
-                    <FormField label={t('mingzi_chn_label')} htmlFor="c_mingzi_chn" error={fieldErrors.c_mingzi_chn?.[0]}>
-                        <Input id="c_mingzi_chn" value={mingziChn} onChange={(e) => setMingziChn(e.target.value)} />
+                    <FormField label={t('name_chn_label')} htmlFor="c_name_chn" error={fieldErrors.c_name_chn?.[0] || fieldErrors.c_surname_chn?.[0] || fieldErrors.c_mingzi_chn?.[0]}>
+                        <Input id="c_name_chn" value={nameChn} onChange={(e) => setNameChn(e.target.value)} required />
+                        <p className="mt-1 text-xs text-muted-foreground">{t('name_autosplit_hint')}</p>
                     </FormField>
 
                     <div className="flex flex-wrap gap-2">

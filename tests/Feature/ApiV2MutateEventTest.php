@@ -29,9 +29,11 @@ class ApiV2MutateEventTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createEventTable();
+        $this->createEventsAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('EVENTS_ADDR');
         Schema::dropIfExists('EVENTS_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -122,6 +124,22 @@ class ApiV2MutateEventTest extends TestCase {
             $table->string('c_role', 255)->nullable();
             $table->primary(['c_personid', 'c_sequence', 'c_event_code']);
         });
+    }
+
+    protected function createEventsAddrTable(): void {
+        Schema::create('EVENTS_ADDR', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_sequence')->default(0);
+            $table->integer('c_event_code')->default(0);
+            $table->integer('c_addr_id')->default(0);
+            $table->primary(['c_personid', 'c_sequence', 'c_event_code', 'c_addr_id']);
+        });
+    }
+
+    protected function seedEventAddr(int $addrId, array $tuple = []): void {
+        DB::table('EVENTS_ADDR')->insert(array_replace([
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => $addrId,
+        ], $tuple));
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -232,15 +250,49 @@ class ApiV2MutateEventTest extends TestCase {
     }
 
     #[Test]
-    public function testEventUpdateRejectsAddrId(): void {
-        // c_addr_id 屬 EVENTS_ADDR 副表，不得經 v2 單表寫入 EVENTS_DATA.c_addr_id；應以「不允許欄位」拒絕。
-        $user = $this->makeUser(email: 'event-addr-reject@example.com');
-        $this->actingAs($user);
+    public function testEventUpdateSyncsAddrSubtable(): void {
+        // 改備註 + c_addr_id 一併送 → EVENTS_ADDR 同步為新集合（刪舊重插）。
+        $this->actingAs($this->makeUser(email: 'event-addr-sync@example.com'));
         $this->seedEvent();
+        $this->seedEventAddr(111); // 舊地址
 
         $this->postJson('/api/v2/mutate', $this->eventPayload([
-            'changes' => ['c_addr_id' => 123],
-        ]))->assertStatus(422);
+            'changes' => ['c_notes' => '改後', 'c_addr_id' => [222, 333]],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 333]);
+    }
+
+    #[Test]
+    public function testEventUpdateAddrOnlyChange(): void {
+        // 僅改地址（無其他欄）→ 走 address-only 路徑，EVENTS_ADDR 更新成功。
+        $this->actingAs($this->makeUser(email: 'event-addr-only@example.com'));
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_addr_id' => [222]],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+    }
+
+    #[Test]
+    public function testEventUpdatePkChangeMigratesAddresses(): void {
+        // 改邏輯主鍵（c_sequence 1→2）而未送地址 → 既有地址遷移到新 tuple，不留舊 tuple 孤兒。
+        $this->actingAs($this->makeUser(email: 'event-addr-migrate@example.com'));
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_sequence' => 2],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
     }
 
     #[Test]

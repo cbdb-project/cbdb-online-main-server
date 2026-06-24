@@ -29,9 +29,11 @@ class ApiV2CreateEventTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createEventsTable();
+        $this->createEventsAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('EVENTS_ADDR');
         Schema::dropIfExists('EVENTS_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -126,6 +128,16 @@ class ApiV2CreateEventTest extends TestCase {
         });
     }
 
+    protected function createEventsAddrTable(): void {
+        Schema::create('EVENTS_ADDR', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_sequence')->default(0);
+            $table->integer('c_event_code')->default(0);
+            $table->integer('c_addr_id')->default(0);
+            $table->primary(['c_personid', 'c_sequence', 'c_event_code', 'c_addr_id']);
+        });
+    }
+
     protected function seedEvent(array $overrides = []): void {
         DB::table('EVENTS_DATA')->insert(array_replace([
             'c_personid' => 1000,
@@ -167,14 +179,18 @@ class ApiV2CreateEventTest extends TestCase {
     }
 
     #[Test]
-    public function testEventCreateRejectsAddrId(): void {
-        // c_addr_id 屬 EVENTS_ADDR 副表，不得經 v2 單表寫入 EVENTS_DATA.c_addr_id；應以「不允許欄位」拒絕。
-        $user = $this->makeUser(email: 'create-event-addr-reject@example.com');
+    public function testEventCreateWritesAddrSubtable(): void {
+        // c_addr_id（多值）由 handler 抽出、afterDirectInsert 寫入 EVENTS_ADDR 副表（不寫 EVENTS_DATA 純量欄）。
+        $user = $this->makeUser(email: 'create-event-addr@example.com');
         $this->actingAs($user);
 
         $this->postJson('/api/v2/create', $this->createPayload([
-            'changes' => ['c_notes' => '新增事件', 'c_addr_id' => 123],
-        ]))->assertStatus(422);
+            'changes' => ['c_notes' => '新增事件', 'c_addr_id' => [123, 456]],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        // 主列不寫 c_addr_id 純量欄（保持 null）；地址寫入 EVENTS_ADDR。
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50, 'c_addr_id' => 123]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50, 'c_addr_id' => 456]);
     }
 
     #[Test]

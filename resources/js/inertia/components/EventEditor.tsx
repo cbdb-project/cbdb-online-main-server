@@ -10,9 +10,9 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
  * 地名(c_addr_id 多選) / 出處 / 頁碼 / 重大事件 / 備註 / textperson_pair；三態授權提交。
  * 邏輯主鍵 (c_personid, c_sequence, c_event_code)；序號／事件可改鍵，空值正規化為 '0'。
  *
- * 地址（c_addr_id）於 legacy 寫入 EVENTS_ADDR 副表（多筆）；v2 Event handler 為單表，
- * 不寫 EVENTS_ADDR，故地名於新增與編輯皆設為唯讀並標 TODO（對齊「child 表有風險寧標 TODO」），
- * 永不送出 c_addr_id，避免將陣列寫入主表 c_addr_id 欄或與 legacy 副表行為分歧。
+ * 地址（c_addr_id）寫入 EVENTS_ADDR 副表（多筆）：新增/編輯皆可增刪；送 c_addr_id 陣列，
+ * 由 v2 EventCreate/MutationHandler 於同交易內同步副表（afterDirectInsert/afterDirectUpdate，
+ * 改邏輯主鍵時遷移舊→新 tuple），不寫 EVENTS_DATA.c_addr_id 純量欄。
  */
 type Fields = Record<string, string>;
 interface AddrItem { id: string; label: string }
@@ -56,7 +56,9 @@ export default function EventEditor({
     const base: Fields = { c_personid: String(personId), c_sequence: '0', c_event_code: '0', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const [addrItems] = useState<AddrItem[]>(initialAddr);
+    const [addrItems, setAddrItems] = useState<AddrItem[]>(initialAddr);
+    const [addrKey, setAddrKey] = useState(0); // 重置地址新增框
+    const initialAddrIds = useRef<string[]>(initialAddr.map((a) => String(a.id)));
     const snapshot = useRef(JSON.stringify(base));
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
@@ -66,10 +68,22 @@ export default function EventEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
+    // 地址（EVENTS_ADDR 多筆）是否相對初始有變動（去重比對 id 集合）。
+    const addrDirty = useMemo(() => {
+        const a = [...new Set(addrItems.map((x) => String(x.id)))].sort();
+        const b = [...new Set(initialAddrIds.current)].sort();
+        return JSON.stringify(a) !== JSON.stringify(b);
+    }, [addrItems]);
+    const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current || addrDirty, [fields, addrDirty]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
+    const addAddr = (id: string, label: string) => {
+        setAddrKey((k) => k + 1); // 重置新增框
+        if (!id || id === '0') return;
+        setAddrItems((prev) => (prev.some((x) => String(x.id) === String(id)) ? prev : [...prev, { id: String(id), label }]));
+    };
+    const removeAddr = (id: string) => setAddrItems((prev) => prev.filter((x) => String(x.id) !== String(id)));
 
     const buildEra = (g: EraGroup): EraTimeFieldValues => ({
         year: fields[g.year] ?? '', nhCode: fields[g.nhCode] ?? '', nhCodeLabel: labels[g.nhCode] ?? '',
@@ -110,6 +124,8 @@ export default function EventEditor({
             target = Object.fromEntries(PK.map((k) => [k, Number(pkVal(k))]));
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+            // 事件地址（EVENTS_ADDR 多筆）：有設定才送 c_addr_id 陣列，由後端寫副表。
+            if (addrItems.length) (changes as Record<string, unknown>).c_addr_id = addrItems.map((a) => Number(a.id));
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
             const initial: Fields = JSON.parse(snapshot.current);
@@ -121,6 +137,8 @@ export default function EventEditor({
                 const init = (initial[k]?.trim() ? initial[k] : '0');
                 if (cur !== init) changes[k] = cur;
             }
+            // 地址有變動才送 c_addr_id（清空則送空陣列）；交由後端 afterDirectUpdate 同步 EVENTS_ADDR。
+            if (addrDirty) (changes as Record<string, unknown>).c_addr_id = addrItems.map((a) => Number(a.id));
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -134,6 +152,7 @@ export default function EventEditor({
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             setMessage(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
             snapshot.current = JSON.stringify(fields);
+            initialAddrIds.current = addrItems.map((a) => String(a.id));
             if (mode === 'create') { window.location.assign(indexUrl); }
             else if (sm === 'direct') {
                 const nextPk = { ...originalPk.current };
@@ -189,11 +208,18 @@ export default function EventEditor({
                 <EraTimeField values={buildEra(YR)} onChange={(p) => applyEra(YR, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
 
             <div style={rowStyle}><label style={labelStyle}>{tr('place_name', '地名')} (c_addr_id)</label><div style={fieldStyle}>
-                <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: 4 }}>
-                    {tr('events_addr_edit_todo', '地址（EVENTS_ADDR 副表）編輯尚未支援（TODO），如需修改地名請暫用舊版編輯頁。')}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {addrItems.map((it) => (<span key={it.id} style={chipStyle}>{it.label}</span>))}
+                {editable ? (
+                    <CodeAutocomplete key={addrKey} mode="search" endpoint="/api/select/search/addr" value="" initialLabel=""
+                        placeholder={tr('add_place', '搜尋並加入地名…')}
+                        onChange={(v, l) => addAddr(v, l)} />
+                ) : null}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: editable ? 6 : 0 }}>
+                    {addrItems.map((it) => (
+                        <span key={it.id} style={chipStyle}>
+                            {it.label}
+                            {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveStyle} aria-label="remove">×</button> : null}
+                        </span>
+                    ))}
                     {addrItems.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null}
                 </div></div></div>
 
@@ -253,7 +279,8 @@ const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef4fb', border: '1px solid #c7d7ea', borderRadius: 14, padding: '2px 10px', fontSize: '0.8rem', color: '#1f3a5f' };
+const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef4fb', border: '1px solid #c7d7ea', borderRadius: 14, padding: '2px 6px 2px 10px', fontSize: '0.8rem', color: '#1f3a5f' };
+const chipRemoveStyle: React.CSSProperties = { border: 'none', background: 'transparent', color: '#1f3a5f', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0 2px' };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };

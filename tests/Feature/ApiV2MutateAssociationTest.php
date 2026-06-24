@@ -408,6 +408,63 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testPairOnlyKinPairUpdateBackfillsMirror(): void {
+        // 回歸（Task 58）：只送親屬互逆配對碼 c_kinship_pair、不改任何 ASSOC_DATA 欄。
+        // pair-only bypass 過去僅認 c_assocship_pair，kin-only 會落到父類以「changes 空」被 422。
+        $this->actingAs($this->makeUser(email: 'assoc-kinpaironly@example.com'));
+        $this->seedAssociation(['c_kin_code' => 75, 'c_kin_id' => 3000]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 75, 'c_kin_id' => 3000, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_kinship_pair' => 76],
+        ])->assertOk()
+            ->assertJson(['ok' => true, 'operation' => 'update'])
+            ->assertJsonPath('result.updated_fields', ['c_kinship_pair']);
+
+        // 反向鏡像被補建，且帶入送出的親屬反向碼（c_kin_code=76）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000,
+            'c_kin_code' => 76, 'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testPairOnlyAssocKinPairUpdateBackfillsMirror(): void {
+        // 回歸（Task 58）：只送關聯親屬互逆配對碼 c_assoc_kinship_pair、不改任何 ASSOC_DATA 欄。
+        $this->actingAs($this->makeUser(email: 'assoc-assockinpaironly@example.com'));
+        $this->seedAssociation(['c_assoc_kin_code' => 75, 'c_assoc_kin_id' => 4000]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 75, 'c_assoc_kin_id' => 4000,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_assoc_kinship_pair' => 76],
+        ])->assertOk()
+            ->assertJson(['ok' => true, 'operation' => 'update'])
+            ->assertJsonPath('result.updated_fields', ['c_assoc_kinship_pair']);
+
+        // 反向鏡像被補建，且帶入送出的關聯親屬反向碼（c_assoc_kin_code=76）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000,
+            'c_assoc_kin_code' => 76, 'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+        ]);
+    }
+
+    #[Test]
     public function testDirectAssociationUpdateSucceeds(): void {
         $user = $this->makeUser(email: 'assoc-direct@example.com');
         $this->actingAs($user);

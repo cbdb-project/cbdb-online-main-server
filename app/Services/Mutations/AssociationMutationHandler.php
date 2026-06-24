@@ -49,11 +49,18 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'maintain' => $sentAssoc !== null,
         ];
 
+        // 本次明確送出的互逆配對欄（社會／親屬／關聯親屬任一），供 pair-only 判斷與回應 updated_fields。
+        $sentPairFields = array_keys(array_filter([
+            'c_assocship_pair' => $sentAssoc,
+            'c_kinship_pair' => $sentKin,
+            'c_assoc_kinship_pair' => $sentAssocKin,
+        ], static fn ($v) => $v !== null));
+
         try {
-            // pair-only direct：只送 c_assocship_pair、無任何 ASSOC_DATA 欄變更（顯式修復/補建反向鏡像）。
-            // 父類會以「changes 空」拒絕，故獨立處理（對齊 offices address-only 模式）。
-            if ($mode === 'direct' && $sentAssoc !== null && $changes === []) {
-                return $this->handlePairOnlyMirrorSync($personId, $targetPk);
+            // pair-only direct：只送互逆配對碼（c_assocship_pair / c_kinship_pair / c_assoc_kinship_pair 任一）、
+            // 無任何 ASSOC_DATA 欄變更（顯式修復/補建反向鏡像）。父類會以「changes 空」拒絕，故獨立處理（對齊 offices address-only 模式）。
+            if ($mode === 'direct' && $sentPairFields !== [] && $changes === []) {
+                return $this->handlePairOnlyMirrorSync($personId, $targetPk, $sentPairFields);
             }
 
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
@@ -133,7 +140,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
      * pair-only direct：不改正向欄位，僅依送來的配對碼修復／補建反向鏡像列（同交易 + audit）。
      * 用於「正向已存在但反向鏡像缺失」的修復場景。自帶授權與 person_id 檢查。
      */
-    private function handlePairOnlyMirrorSync(int $personId, array $targetPk): JsonResponse {
+    private function handlePairOnlyMirrorSync(int $personId, array $targetPk, array $sentPairFields = ['c_assocship_pair']): JsonResponse {
         if ($authError = $this->authorizeDirect()) {
             return $authError;
         }
@@ -187,7 +194,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'operation' => 'update',
             'result' => [
                 'pk' => array_intersect_key($targetPk, array_flip($this->keyColumns())),
-                'updated_fields' => ['c_assocship_pair'],
+                'updated_fields' => $sentPairFields,
             ],
         ]);
     }

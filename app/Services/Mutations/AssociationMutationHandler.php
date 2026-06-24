@@ -19,6 +19,46 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
      */
     private ?array $pendingPairs = null;
 
+    /** #66：本次是否強制覆寫對面鏡像（meta.force）；handle() 設定、finally 清除。預設 false＝偵測衝突。 */
+    private bool $forceMirror = false;
+
+    /** #66：納入鏡像衝突比對的「內容欄」＝備注/出處/頁/年份（關係/配對碼另依「本次是否變更」動態加入，見 mirrorConflictScope）。 */
+    private const CONTENT_CONFLICT_FIELDS = ['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'];
+
+    /** 互逆配對欄 → 對面鏡像列對應關係碼欄。 */
+    private const PAIR_TO_MIRROR_CODE = [
+        'c_assocship_pair' => 'c_assoc_code',
+        'c_kinship_pair' => 'c_kin_code',
+        'c_assoc_kinship_pair' => 'c_assoc_kin_code',
+    ];
+
+    /**
+     * #66：本次「實際變更」的鏡像衝突比對範圍（修 S1 過度觸發）。
+     * 只比對：(a) 使用者本次真的改動的內容欄（CONTENT_CONFLICT_FIELDS ∩ updateData）；
+     * (b) 本次顯式送出之互逆配對碼對應的鏡像關係碼欄；(c) 本次直接改動的正向關係碼欄（會連動改鏡像反向碼）。
+     * 不把「整條正向列所有欄」一律納入，避免「只改年份卻因對面 notes 不同而誤擋」。
+     *
+     * @param array<string,mixed> $updateData 本次寫入正向列的欄（含自動蓋的稽核欄，需排除）
+     * @param array<int,string> $sentPairFields 本次顯式送出的互逆配對欄
+     * @return array<int,string>
+     */
+    private function mirrorConflictScope(array $updateData, array $sentPairFields): array {
+        $changed = array_diff(array_keys($updateData), ['c_modified_by', 'c_modified_date']);
+        $scope = array_values(array_intersect(self::CONTENT_CONFLICT_FIELDS, $changed));
+        foreach ($sentPairFields as $pf) {
+            if (isset(self::PAIR_TO_MIRROR_CODE[$pf])) {
+                $scope[] = self::PAIR_TO_MIRROR_CODE[$pf];
+            }
+        }
+        foreach (['c_assoc_code', 'c_kin_code', 'c_assoc_kin_code'] as $codeCol) {
+            if (in_array($codeCol, $changed, true)) {
+                $scope[] = $codeCol;
+            }
+        }
+
+        return array_values(array_unique($scope));
+    }
+
     public function __construct(
         OperationRepository $operationRepository,
         AuditLogService $auditLogService
@@ -50,6 +90,8 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'assocKin' => $sentAssocKin ?? $this->lookupKinPair($assocKinCode),
             'maintain' => ($sentAssoc !== null || $sentKin !== null || $sentAssocKin !== null),
         ];
+        // #66：force 旗標——使用者在前端衝突警告中選「強制覆寫」時帶 meta.force=true，跳過鏡像衝突偵測。
+        $this->forceMirror = (bool) ($meta['force'] ?? false);
 
         // 本次明確送出的互逆配對欄（社會／親屬／關聯親屬任一），供 pair-only 判斷與回應 updated_fields。
         $sentPairFields = array_keys(array_filter([
@@ -57,6 +99,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'c_kinship_pair' => $sentKin,
             'c_assoc_kinship_pair' => $sentAssocKin,
         ], static fn ($v) => $v !== null));
+        $this->pendingPairs['sentFields'] = $sentPairFields; // #66：供 afterDirectUpdate 計算衝突比對範圍
 
         try {
             // pair-only direct：只送互逆配對碼（c_assocship_pair / c_kinship_pair / c_assoc_kinship_pair 任一）、
@@ -68,6 +111,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
         } finally {
             $this->pendingPairs = null;
+            $this->forceMirror = false;
         }
     }
 
@@ -103,7 +147,9 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             $codeRow->c_assoc_pair2 ?? null,
             $operation,
             $this->auditLogService,
-            (bool) ($pairs['maintain'] ?? false)
+            (bool) ($pairs['maintain'] ?? false),
+            !$this->forceMirror, // #66：非 force 時偵測對面衝突
+            $this->mirrorConflictScope($updateData, $pairs['sentFields'] ?? []) // #66：僅比對本次實際變更的欄（修 S1）
         );
     }
 
@@ -171,7 +217,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
         $codeRow = DB::table('ASSOC_CODES')->where('c_assoc_code', $oldCode)->first();
 
         try {
-            DB::transaction(function () use ($dataMirror, $personId, $targetPk, $codeRow) {
+            DB::transaction(function () use ($dataMirror, $personId, $targetPk, $codeRow, $sentPairFields) {
                 app(BiogMainRepository::class)->syncAssocMirrorOnUpdate(
                     $dataMirror,
                     $personId,
@@ -182,9 +228,16 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
                     $codeRow->c_assoc_pair2 ?? null,
                     null,
                     $this->auditLogService,
-                    true
+                    true,
+                    !$this->forceMirror, // #66：pair-only 修復亦為 direct 覆寫，非 force 時偵測對面衝突
+                    $this->mirrorConflictScope([], $sentPairFields) // #66：僅比對本次送出之配對碼對應的鏡像碼欄（修 S1）
                 );
             });
+        } catch (MirrorConflictException $e) {
+            // #66（修 S2）：pair-only 路徑自帶交易、不經 handleDirect，須在此自行把鏡像衝突轉 409，否則逃逸成 500。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => ['table' => $e->mirrorTable, 'pk' => $e->mirrorPk, 'fields' => $e->conflicts],
+            ]);
         } catch (\Illuminate\Database\QueryException $e) {
             return $this->errorResponse('鏡像列已存在或主鍵衝突', 409, ['mirror' => ['conflict']]);
         }

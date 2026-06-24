@@ -253,6 +253,16 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             }
 
             throw $e;
+        } catch (MirrorConflictException $e) {
+            // #66：對面鏡像列已有不同內容 → 整筆交易已回滾（含正向列），回 409 + 衝突明細 + 對面鏡像 PK，
+            // 供前端彈警告 + 可點連結跳對面 edit-v2 + 提供「強制覆寫」(meta.force) 重送。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => [
+                    'table' => $e->mirrorTable,
+                    'pk' => $e->mirrorPk,
+                    'fields' => $e->conflicts,
+                ],
+            ]);
         }
 
         return response()->json([

@@ -195,8 +195,10 @@ class ApiV2MutateKinshipTest extends TestCase {
             'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-x',
         ]);
 
+        // #66：鏡像既有 c_notes='原備註' 與本次寫入 '改後備註' 不同會觸發衝突閘；本測試專驗同步機制，故 force 略過。
         $this->postJson('/api/v2/mutate', $this->kinshipPayload([
             'changes' => ['c_notes' => '改後備註'],
+            'meta' => ['force' => true],
         ]))->assertOk();
 
         // 正向更新
@@ -223,8 +225,10 @@ class ApiV2MutateKinshipTest extends TestCase {
             'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-z',
         ]);
 
+        // #66：鏡像既有 c_notes='原備註'/c_kin_code=73 與本次寫入不同會觸發衝突閘；本測試專驗手選覆寫機制，故 force 略過。
         $this->postJson('/api/v2/mutate', $this->kinshipPayload([
             'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 74],
+            'meta' => ['force' => true],
         ]))->assertOk();
 
         // 反向鏡像由 73 改為手選的 74（以舊碼 72 的配對 {73} 定位既有列後更新）。
@@ -256,12 +260,81 @@ class ApiV2MutateKinshipTest extends TestCase {
             'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-p',
         ]);
 
+        // #66：鏡像既有 c_notes='原備註' 與本次寫入 '改後' 不同會觸發衝突閘；本測試專驗保留覆寫碼機制，故 force 略過。
         $this->postJson('/api/v2/mutate', $this->kinshipPayload([
             'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
         ]))->assertOk();
 
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
         $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+    }
+
+    // ── #66 雙向鏡像衝突偵測 ──────────────────────────────────
+
+    #[Test]
+    public function testDirectKinshipUpdateConflictBlockedAndRolledBack(): void {
+        // #66：對面鏡像列 c_notes 已有不同內容（'原備註'），direct 改正向 notes 為 '改後'（未 force）→
+        // 偵測到衝突 → 409 + mirror_conflict 明細（表/PK/欄）；整筆回滾：正向 notes 維持原值、鏡像不被覆寫。
+        $this->actingAs($this->makeUser(email: 'kin-conflict@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-c']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-c',
+        ]);
+
+        $res = $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+        ]))->assertStatus(409);
+
+        $res->assertJsonPath('errors.mirror_conflict.table', 'KIN_DATA');
+        $res->assertJsonPath('errors.mirror_conflict.pk.c_personid', 2000);
+        $res->assertJsonPath('errors.mirror_conflict.pk.c_kin_id', 1000);
+        $this->assertContains('c_notes', array_map(static fn ($c) => $c['field'], $res->json('errors.mirror_conflict.fields')));
+
+        // 整筆回滾：正向與鏡像 c_notes 皆維持 '原備註'。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '原備註']);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateForceOverwritesConflict(): void {
+        // #66：同上衝突情境，帶 meta.force=true → 跳過偵測、照常覆寫；正向與鏡像 notes 皆更新為 '改後'。
+        $this->actingAs($this->makeUser(email: 'kin-conflict-force@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-cf']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-cf',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+    }
+
+    #[Test]
+    public function testProposalKinshipUpdateNotBlockedByMirrorConflict(): void {
+        // #66：proposal 流程不偵測鏡像衝突（決策：僅 direct）。對面鏡像 notes 不同也應正常送出提案（寫 operations、不直改），不回 409。
+        $this->actingAs($this->makeUser(email: 'kin-conflict-proposal@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-cp']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-cp',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['comment' => '提案改備註'],
+        ]))->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        // proposal 不直改：正向與鏡像 c_notes 皆維持 '原備註'。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '原備註']);
     }
 
     #[Test]

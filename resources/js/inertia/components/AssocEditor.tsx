@@ -5,6 +5,7 @@ import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import AiCodeLookupPanel, { AiCandidate } from './PersonEditorShared/AiCodeLookupPanel';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 
 /**
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
@@ -99,6 +100,7 @@ export default function AssocEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [assocHighlight, setAssocHighlight] = useState(false);
     const [comment, setComment] = useState('');
+    const [conflict, setConflict] = useState<MirrorConflict | null>(null); // #66 對面鏡像衝突
     // 互逆配對碼（反向社會關係碼）：候選由 /api/select/search/assocpair 依正向碼取得（對齊 legacy / KinEditor）。
     // create 預設選第一個候選；反向有歧義（一碼可能有 c_assoc_pair / c_assoc_pair2 兩個合法反向）故容許手選。
     type PairOpt = { code: string; label: string };
@@ -256,8 +258,8 @@ export default function AssocEditor({
         window.setTimeout(() => setAssocHighlight(false), 4000);
     };
 
-    const save = async (sm: 'direct' | 'proposal') => {
-        setSaving(true); setError(null); setMessage(null);
+    const save = async (sm: 'direct' | 'proposal', force = false) => {
+        setSaving(true); setError(null); setMessage(null); setConflict(null);
         // PK 段空值正規化：c_text_title→'[n/a]'、c_assoc_first_year→'-9999'、其餘 code 段→'0'。
         const pkVal = (k: string): number | string => {
             if (k === 'c_personid') return personId;
@@ -314,14 +316,23 @@ export default function AssocEditor({
             }
         }
         try {
+            // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）。
+            const meta: Record<string, unknown> = {};
+            if (sm === 'proposal' && comment) meta.comment = comment;
+            if (force) meta.force = true;
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'associations', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
+                body: JSON.stringify({ resource: 'associations', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(Object.keys(meta).length ? { meta } : {}) }),
             });
             const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            if (!res.ok || !json?.ok) {
+                // #66：對面鏡像衝突 → 顯示警告 + 連結 + 強制覆寫，不丟一般錯誤。
+                const mc = json?.errors?.mirror_conflict;
+                if (res.status === 409 && mc) { setSaving(false); setConflict(mc as MirrorConflict); return; }
+                throw new Error(json?.message || `HTTP ${res.status}`);
+            }
             flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
             // direct 儲存後從回傳列即時刷新唯讀稽核欄（建檔/更新），免重整；函式式合併避免 race，並併入 baseline 免誤判未存變更。
             const auditRow = (sm === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
@@ -506,6 +517,17 @@ export default function AssocEditor({
                 <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
                     <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
             )}
+
+            {conflict ? (
+                <MirrorConflictNotice
+                    conflict={conflict}
+                    mirrorUrl={`/app/basicinformation/${conflict.pk.c_personid}/assoc/edit-v2?${new URLSearchParams(Object.fromEntries(Object.entries(conflict.pk).map(([k, v]) => [k, String(v)]))).toString()}`}
+                    onForce={() => void save('direct', true)}
+                    onDismiss={() => setConflict(null)}
+                    forcing={saving}
+                    tr={tr}
+                />
+            ) : null}
 
             <div style={{ ...rowStyle, gap: 8 }}>
                 <div style={{ width: 160, flexShrink: 0 }} />

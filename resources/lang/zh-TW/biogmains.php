@@ -180,6 +180,11 @@ return [
     'reverse_assoc_kin_pair_hint'  => '此為「關聯親屬關係」(c_assoc_kin_code) 的反向碼，系統依此於鏡像列雙向同步。預設取建議反向碼，可手動更正。',
     'assoc_kin_section'        => '親屬關係（選填）',
     'pair_only_proposal_hint'  => '互逆配對碼修復請使用「直接保存」；提交建議請至少修改一個關係欄位。',
+    // #66 雙向鏡像同步衝突提示。
+    'mirror_conflict_title'    => '對面記錄的對應欄位已有不同內容',
+    'mirror_conflict_desc'     => '同步到對方記錄時會覆寫以下欄位，可能洗掉對方既有資料。建議先前往對面檢查，或確認後再強制覆寫。',
+    'mirror_conflict_goto'     => '前往對面記錄檢查（另開分頁）',
+    'mirror_conflict_force'    => '強制覆寫對面',
     'kinship_create'          => '新增親屬關係',
     'kinship_edit'            => '編輯親屬關係',
     'kinship_pair_auto_hint'  => '互逆親屬關係（配對）由系統依關係碼自動雙向同步，無需手動填寫。',

@@ -2374,7 +2374,42 @@ class BiogMainRepository {
      * @param mixed      $oldPair2   舊關係碼的 ASSOC_CODES.c_assoc_pair2
      * @param mixed      $operation  本次操作的 Operation（鏡像 audit 沿用其 id）；可為 null
      */
-    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false): void {
+    /**
+     * 雙向鏡像同步衝突偵測（#66 資料安全；僅 v2 direct 路徑啟用、legacy 不傳＝不偵測）。
+     * 對每筆既有鏡像列，逐 $conflictFields 比對「既有值（非空）vs 即將寫入值」；任一不同即蒐集為衝突。
+     * 既有值為空白／哨兵（null/''/0/-1/-999/-9999）視為無內容、可安全覆寫，不算衝突（避免把「未详→真值」誤報）。
+     * 有衝突則拋 MirrorConflictException（在 handleDirect 交易內 → 整筆回滾），帶對面鏡像列 PK 與衝突明細。
+     *
+     * @param iterable<int,object> $mirroredRows 既有鏡像列
+     * @param array<string,mixed> $incoming 即將寫入鏡像列的值（update set）
+     * @param array<int,string> $conflictFields 納入比對的欄位
+     */
+    private function detectMirrorConflicts(string $table, iterable $mirroredRows, array $incoming, array $conflictFields, AuditLogService $auditLog): void {
+        $isBlank = static fn ($v): bool => $v === null || trim((string) $v) === '' || in_array(trim((string) $v), ['0', '-1', '-999', '-9999'], true);
+        foreach ($mirroredRows as $row) {
+            $existingRow = $auditLog->normalizeRow($row);
+            $conflicts = [];
+            foreach ($conflictFields as $f) {
+                if (!array_key_exists($f, $incoming)) {
+                    continue; // 本次不寫此欄 → 不可能覆寫掉對方內容
+                }
+                $existing = $existingRow[$f] ?? null;
+                $next = $incoming[$f];
+                if (!$isBlank($existing) && trim((string) $existing) !== trim((string) ($next ?? ''))) {
+                    $conflicts[] = ['field' => $f, 'existing' => $existing, 'incoming' => $next];
+                }
+            }
+            if ($conflicts !== []) {
+                throw new \App\Services\Mutations\MirrorConflictException(
+                    $table,
+                    $auditLog->buildRowPkFromData($table, $existingRow),
+                    $conflicts
+                );
+            }
+        }
+    }
+
+    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictFields = []): void {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
@@ -2426,6 +2461,12 @@ class BiogMainRepository {
 
         // 更新既有反向鏡像列；不覆蓋其建檔資訊（c_created_by/date）。
         $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+
+        // #66：覆寫前偵測衝突（僅 v2 direct 啟用）。對面對應欄已有不同內容 → 拋例外回滾整筆，回 409 警告。
+        if ($detectConflict) {
+            $this->detectMirrorConflicts('ASSOC_DATA', $mirroredRows, $updateSet, $conflictFields, $auditLog);
+        }
+
         $query->update($updateSet);
 
         foreach ($mirroredRows as $mirroredRow) {
@@ -2456,7 +2497,7 @@ class BiogMainRepository {
      * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
      * legacy 呼叫一律傳 false＝行為不變。回傳精確配對命中數（legacy 以此填 err）。
      */
-    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false): int {
+    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictFields = []): int {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
@@ -2516,6 +2557,11 @@ class BiogMainRepository {
             }
 
             return $sumCount;
+        }
+
+        // #66：覆寫前偵測衝突（僅 v2 direct 啟用）。對面對應欄已有不同內容 → 拋例外回滾整筆，回 409 警告。
+        if ($detectConflict) {
+            $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $dataMirror, $conflictFields, $auditLog);
         }
 
         $updateQuery->update($dataMirror);

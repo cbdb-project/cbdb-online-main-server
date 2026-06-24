@@ -180,6 +180,11 @@ return [
     'reverse_assoc_kin_pair_hint'  => 'The reverse of the associated kinship (c_assoc_kin_code); synced both ways on the mirror row. Defaults to the suggested reverse, editable.',
     'assoc_kin_section'        => 'Kinship relation (optional)',
     'pair_only_proposal_hint'  => 'To repair a reciprocal pairing code, use "Save Directly"; to submit a proposal, change at least one relation field.',
+    // #66 bidirectional mirror sync conflict notice.
+    'mirror_conflict_title'    => 'The corresponding fields on the other record already differ',
+    'mirror_conflict_desc'     => 'Syncing to the other person\'s record will overwrite the fields below, possibly discarding their existing data. Please check the other side first, or confirm and force-overwrite.',
+    'mirror_conflict_goto'     => 'Go check the other record (new tab)',
+    'mirror_conflict_force'    => 'Force-overwrite the other side',
     'kinship_create'          => 'Add Kinship',
     'kinship_edit'            => 'Edit Kinship',
     'kinship_pair_auto_hint'  => 'The reciprocal (paired) kinship is synced automatically by the system based on the relation code; no manual entry needed.',

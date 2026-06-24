@@ -325,6 +325,71 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectAssociationUpdateConflictBlockedAndRolledBack(): void {
+        // #66：對面鏡像列 c_notes 已有不同內容（'原鏡像備註'），direct 改正向 notes 為 '改後'（未 force）→
+        // 偵測到衝突 → 409 + mirror_conflict 明細（ASSOC_DATA/PK/欄）；整筆回滾：正向與鏡像皆不變。
+        $this->actingAs($this->makeUser(email: 'assoc-conflict@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']);
+        $this->seedMirror(['c_notes' => '原鏡像備註']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後'],
+        ]))->assertStatus(409);
+
+        $res->assertJsonPath('errors.mirror_conflict.table', 'ASSOC_DATA');
+        $res->assertJsonPath('errors.mirror_conflict.pk.c_personid', 2000);
+        $this->assertContains('c_notes', array_map(static fn ($c) => $c['field'], $res->json('errors.mirror_conflict.fields')));
+
+        // 整筆回滾：正向維持 '正向原備註'、鏡像維持 '原鏡像備註'。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '原鏡像備註']);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdateForceOverwritesConflict(): void {
+        // #66：同上衝突情境，帶 meta.force=true → 跳過偵測、照常覆寫；鏡像 notes 更新為 '改後'。
+        $this->actingAs($this->makeUser(email: 'assoc-conflict-force@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']);
+        $this->seedMirror(['c_notes' => '原鏡像備註']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+    }
+
+    #[Test]
+    public function testPairOnlyUpdateConflictReturns409NotUncaught500(): void {
+        // #66（修 S2）：pair-only 路徑自帶交易、不經 handleDirect，其拋出的 MirrorConflictException 須在該路徑自行轉 409，
+        // 否則逃逸成未捕獲 500。情境：既有鏡像反向碼為 3（pair2），pair-only 送 c_assocship_pair=2（pair1）→ 與對面不同 → 衝突。
+        $this->actingAs($this->makeUser(email: 'assoc-paironly-conflict@example.com'));
+        DB::table('ASSOC_CODES')->where('c_assoc_code', 1)->update(['c_assoc_pair2' => 3]); // code1 → {2,3} 兩合法反向
+        $this->seedAssociation();
+        $this->seedMirror(['c_assoc_code' => 3]); // 鏡像處於 pair2=3（可由 {2,3} 定位）
+
+        $res = $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_assocship_pair' => 2],
+        ])->assertStatus(409); // 關鍵：409，不是 500
+
+        $res->assertJsonPath('errors.mirror_conflict.table', 'ASSOC_DATA');
+        $this->assertContains('c_assoc_code', array_map(static fn ($c) => $c['field'], $res->json('errors.mirror_conflict.fields')));
+        // 回滾：鏡像反向碼維持 3，未被覆寫成 2。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_id' => 1000, 'c_assoc_code' => 3]);
+    }
+
+    #[Test]
     public function testDirectAssociationUpdateBackfillsMissingMirror(): void {
         // 「永遠同步」改進：反向鏡像缺失（舊資料單邊）時，更新正向會補建反向，修正 legacy 選擇性跳過。
         $this->actingAs($this->makeUser(email: 'assoc-mirror-bf@example.com'));

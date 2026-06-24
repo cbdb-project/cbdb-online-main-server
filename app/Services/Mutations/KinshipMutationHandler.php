@@ -23,6 +23,28 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
      */
     private ?array $pendingKin = null;
 
+    /** #66：本次是否強制覆寫對面鏡像（meta.force）；handle() 設定、finally 清除。預設 false＝偵測衝突。 */
+    private bool $forceMirror = false;
+
+    /** #66：納入鏡像衝突比對的「內容欄」＝備注/出處/頁（KIN_DATA 無年份欄）。反向親屬碼 c_kin_code 另依「本次是否變更/覆寫」動態加入。 */
+    private const CONTENT_CONFLICT_FIELDS = ['c_notes', 'c_source', 'c_pages'];
+
+    /**
+     * #66：本次「實際變更」的鏡像衝突比對範圍（修 S1 過度觸發）。
+     * 只比對使用者本次真的改動的內容欄；反向碼 c_kin_code 僅在本次送了覆寫或正向碼有變（codeTouched）時納入。
+     *
+     * @param array<string,mixed> $updateData 本次寫入正向列的欄（含稽核欄，需排除）
+     */
+    private function mirrorConflictScope(array $updateData, bool $codeTouched): array {
+        $changed = array_diff(array_keys($updateData), ['c_modified_by', 'c_modified_date']);
+        $scope = array_values(array_intersect(self::CONTENT_CONFLICT_FIELDS, $changed));
+        if ($codeTouched) {
+            $scope[] = 'c_kin_code';
+        }
+
+        return array_values(array_unique($scope));
+    }
+
     public function __construct(
         OperationRepository $operationRepository,
         AuditLogService $auditLogService
@@ -68,12 +90,17 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'oldKinId' => $targetPk['c_kin_id'] ?? null,
             'oldAutogen' => $oldRow->c_autogen_notes ?? null,
             'oldKinCode' => $oldKinCode,
+            // #66：本次是否觸及反向碼（送了覆寫或正向碼有變）→ 決定 c_kin_code 是否納入衝突比對範圍。
+            'codeTouched' => ($hasOverride || $codeChanged),
         ];
+        // #66：force 旗標——使用者在前端衝突警告中選「強制覆寫」時帶 meta.force=true，跳過鏡像衝突偵測。
+        $this->forceMirror = (bool) ($meta['force'] ?? false);
 
         try {
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
         } finally {
             $this->pendingKin = null;
+            $this->forceMirror = false;
         }
     }
 
@@ -106,7 +133,9 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
             $kin['oldKinCode'] ?? null,
             $operation,
             $this->auditLogService,
-            false
+            false,
+            !$this->forceMirror, // #66：非 force 時偵測對面衝突
+            $this->mirrorConflictScope($updateData, (bool) ($kin['codeTouched'] ?? false)) // #66：僅比對本次實際變更的欄（修 S1）
         );
     }
 

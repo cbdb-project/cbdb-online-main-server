@@ -36,6 +36,18 @@ const READONLY_DERIVED = ['c_name_chn', 'c_name', 'c_name_proper', 'c_name_rm'];
 // （指數年/方法/來源/地址為週期性算法另計、且其顯示值為 label 非 row 原始碼，故不在此刷新範圍。）
 const REFRESH_AFTER_SAVE = [...READONLY_DERIVED, 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'];
 
+// 姓名來源欄 → 派生全名（c_name*）的客戶端即時計算，與後端 auto_pinyin/合成及 PersonBrowser/BasicInfoView 一致：
+// 編輯中文名/拼音/外文欄或按「生成姓名拼音」後，下方「自動生成」唯讀框即時更新，使資料流（中文→拼音→派生）連貫；
+// 存檔仍以後端重算為準（存後由 REFRESH_AFTER_SAVE 從 result.row 覆寫）。
+const NAME_SRC = ['c_surname_chn', 'c_mingzi_chn', 'c_surname', 'c_mingzi', 'c_surname_proper', 'c_mingzi_proper', 'c_surname_rm', 'c_mingzi_rm'];
+const joinSp = (a?: string, b?: string): string => [a ?? '', b ?? ''].map((s) => s.trim()).filter((s) => s !== '').join(' ');
+const deriveNames = (f: Fields): Partial<Fields> => ({
+    c_name_chn: `${f.c_surname_chn ?? ''}${f.c_mingzi_chn ?? ''}`,
+    c_name: joinSp(f.c_surname, f.c_mingzi),
+    c_name_proper: joinSp(f.c_mingzi_proper, f.c_surname_proper),
+    c_name_rm: joinSp(f.c_mingzi_rm, f.c_surname_rm),
+});
+
 // 一組日期欄位（生年/卒年/活動年）↔ EraTimeField 的子欄位映射。
 interface DateGroup {
     year: string; nhCode: string; nhYear: string;
@@ -78,7 +90,11 @@ export default function BasicInfoEditor({
         return Number.isFinite(v) && v > 0 ? v : null;
     }, [fields.c_dy]);
 
-    const set = (key: string, value: string) => setFields((p) => ({ ...p, [key]: value }));
+    const set = (key: string, value: string) => setFields((p) => {
+        const next = { ...p, [key]: value };
+        // 編輯姓名來源欄時，同步重算派生全名，讓「自動生成」唯讀框即時反映（與資料流敘事一致）。
+        return NAME_SRC.includes(key) ? { ...next, ...deriveNames(next) } : next;
+    });
     const setLabel = (key: string, value: string) => setLabels((p) => ({ ...p, [key]: value }));
 
     // 離頁守衛：有未存變更時警告（dirty guard）。TODO（基本資料收尾）：補 legacy 的
@@ -150,23 +166,25 @@ export default function BasicInfoEditor({
     // 生成拼音：用中文姓名查 /api/select/search/pinyin，回填拼音姓/名。
     const generatePinyin = async () => {
         try {
+            // 不再吞掉 HTTP 失敗：!r.ok 即拋出，落到下方 catch 顯示 generate_pinyin_failed（否則 500/422 會被誤當成功）。
             const surnameRes = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(fields.c_surname_chn ?? '')}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-            }).then((r) => r.json()).catch(() => null);
+            }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
             const mingziRes = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(fields.c_mingzi_chn ?? '')}&split=0`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-            }).then((r) => r.json()).catch(() => null);
+            }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
             const pick = (res: unknown): string => {
                 const rows = Array.isArray((res as { data?: unknown[] })?.data) ? (res as { data: Array<Record<string, unknown>> }).data : [];
                 const first = rows[0];
                 return first ? String(first.text ?? first.c_name ?? first.value ?? '') : '';
             };
             const sp = pick(surnameRes); const mp = pick(mingziRes);
-            setFields((p) => ({ ...p, c_surname: sp || p.c_surname, c_mingzi: mp || p.c_mingzi }));
+            // 回填拼音姓/名後，同步重算派生「拼音全名」(c_name)，使下方自動生成框即時更新（資料流收尾）。
+            setFields((p) => { const next = { ...p, c_surname: sp || p.c_surname, c_mingzi: mp || p.c_mingzi }; return { ...next, ...deriveNames(next) }; });
             setPinyinDone(true);
             window.setTimeout(() => setPinyinDone(false), 4000);
         } catch {
-            setError(tr('save_failed', '生成拼音失敗'));
+            setError(tr('generate_pinyin_failed', '生成拼音失敗'));
         }
     };
 
@@ -309,16 +327,21 @@ export default function BasicInfoEditor({
             {pinyinDone ? <div style={okStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
             {nameWarning ? <div style={warnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
-            {/* 區塊一：姓名。中文+拼音一組（生成拼音僅由此區的中文名推導 Xing/Ming），其後才是外文/羅馬字（不受生成拼音影響）。 */}
+            {/* 區塊一：姓名（資料流分組）。自上而下一條線、按鈕作橋：中文姓名 →〔生成姓名拼音〕→ 拼音 → 外文/羅馬字 → 自動生成框。 */}
             {block(tr('block_names', '姓名'), <>
-                {/* 姓（中文+拼音）成對、名（中文+拼音）成對：2 欄時每列一組、1 欄時姓組→名組相鄰。 */}
+                {/* 中文姓名（生成姓名拼音的來源）。 */}
                 <div style={gGrid}>
                     {gText('c_surname_chn', tr('surname_chn', '姓（中）'), 'c_surname_chn')}
-                    {gText('c_surname', 'Xing', 'c_surname')}
                     {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn')}
+                </div>
+                {/* 按鈕作橋：取上方中文名、產出下方拼音；上下皆留白，使「作用範圍」一目了然。 */}
+                {canEdit ? <div style={pinyinRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成姓名拼音')}</button></div> : null}
+                {/* 拼音（可手動修正）。 */}
+                <div style={gGrid}>
+                    {gText('c_surname', 'Xing', 'c_surname')}
                     {gText('c_mingzi', 'Ming', 'c_mingzi')}
                 </div>
-                {canEdit ? <div style={pinyinRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成拼音')}</button></div> : null}
+                {/* 外文／羅馬字（獨立，不受生成姓名拼音影響）。 */}
                 <div style={gGrid}>
                     {gText('c_surname_proper', tr('foreign_surname', '外文姓'), 'c_surname_proper')}
                     {gText('c_mingzi_proper', tr('foreign_mingzi', '外文名'), 'c_mingzi_proper')}
@@ -465,7 +488,7 @@ const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not
 const derivedBoxStyle: React.CSSProperties = { background: '#fafbfd', border: '1px dashed #e5e7eb', borderRadius: 10, padding: '12px 14px', marginTop: 4 };
 const derivedTagStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#6b7280', marginBottom: 10 };
 // 生成拼音按鈕列：與上方姓名網格、下方派生區留足間距（修正先前過緊）。
-const pinyinRowStyle: React.CSSProperties = { margin: '4px 0 12px' };
+const pinyinRowStyle: React.CSSProperties = { margin: '16px 0' };
 // 動作列：主要動作（保存/提交）靠左、危險/另存（刪除/Duplicate）靠右，對齊 legacy（非全堆左）。
 const submitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
 const btnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };

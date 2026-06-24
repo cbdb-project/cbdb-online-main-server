@@ -32,6 +32,9 @@ interface Props {
 }
 
 const READONLY_DERIVED = ['c_name_chn', 'c_name', 'c_name_proper', 'c_name_rm'];
+// direct 儲存後從 json.result.row 即時刷新的唯讀/後端重算欄：派生姓名（updateById 重算）＋ 建檔/更新稽核欄。
+// （指數年/方法/來源/地址為週期性算法另計、且其顯示值為 label 非 row 原始碼，故不在此刷新範圍。）
+const REFRESH_AFTER_SAVE = [...READONLY_DERIVED, 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'];
 
 // 一組日期欄位（生年/卒年/活動年）↔ EraTimeField 的子欄位映射。
 interface DateGroup {
@@ -169,6 +172,10 @@ export default function BasicInfoEditor({
 
     const save = async (mode: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
+        // 朝代 c_dy 必填（僅此基本資料編輯頁；其他編輯器的朝代維持非必填）。空（''/'0'）即阻擋並提示。
+        if (!fields.c_dy || fields.c_dy === '0') {
+            setSaving(false); setError(tr('dynasty_required', '朝代為必填欄位，請先選擇朝代')); return;
+        }
         // 只送與初始不同、且非唯讀派生的欄位。
         const initial: Fields = JSON.parse(savedSnapshot);
         const changes: Record<string, string | null> = {};
@@ -194,24 +201,21 @@ export default function BasicInfoEditor({
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             flashSaved(mode === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
-            // direct 儲存後，從回傳列即時刷新「更新」稽核欄（c_modified_by/date），不必重整頁面。
+            // direct 儲存後，從回傳列即時刷新「唯讀/後端重算」欄位，不必重整頁面：
+            // 派生姓名（c_name*，後端 updateById 由姓/名重算）＋ 稽核欄（建檔/更新）。
+            // 以函式式合併（保留請求期間使用者新輸入，修正 race：不可用已捕捉的舊 fields 覆寫）；
+            // 並把刷新值併入 baseline，避免被誤判為「未存變更」。
             const row = (mode === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
-            const auditBy = row && row.c_modified_by != null ? String(row.c_modified_by) : null;
-            const auditDate = row && row.c_modified_date != null ? String(row.c_modified_date) : null;
-            // 函式式合併稽核欄（保留請求期間使用者新輸入，修正 race：不可用已捕捉的舊 fields 覆寫）。
-            if (auditBy !== null || auditDate !== null) {
-                setFields((prev) => ({
-                    ...prev,
-                    ...(auditBy !== null ? { c_modified_by: auditBy } : {}),
-                    ...(auditDate !== null ? { c_modified_date: auditDate } : {}),
-                }));
+            const patch: Fields = {};
+            if (row) {
+                for (const k of REFRESH_AFTER_SAVE) {
+                    if (row[k] != null) patch[k] = String(row[k]);
+                }
             }
-            // 已儲存基準 = 本次送出欄位值（captured fields）＋ 新稽核欄；請求期間的新輸入不在基準內 → 仍正確視為 dirty。
-            const baseline: Fields = {
-                ...fields,
-                ...(auditBy !== null ? { c_modified_by: auditBy } : {}),
-                ...(auditDate !== null ? { c_modified_date: auditDate } : {}),
-            };
+            if (Object.keys(patch).length > 0) {
+                setFields((prev) => ({ ...prev, ...patch }));
+            }
+            const baseline: Fields = { ...fields, ...patch };
             setSavedSnapshot(JSON.stringify(baseline));
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
@@ -250,8 +254,8 @@ export default function BasicInfoEditor({
 
     // 統一網格欄位（上標籤 + 技術碼淡化），對齊使用者認可的設計草圖。
     // 所有 g* 與 block 皆為「回傳 JSX 的函式」而非巢狀元件，避免每次 render 重新掛載 → input 失焦。
-    const fLabel = (label: string, code?: string) => (
-        <label style={gLabelStyle}>{label}{code ? <span style={gCodeStyle}>{code}</span> : null}</label>
+    const fLabel = (label: string, code?: string, required = false) => (
+        <label style={gLabelStyle}>{label}{required ? <span style={gReqStyle} title={tr('required_field', '必填')}> *</span> : null}{code ? <span style={gCodeStyle}>{code}</span> : null}</label>
     );
     // 可編輯文字欄（readonly 時灰底）。
     const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean } = {}) => (
@@ -272,9 +276,9 @@ export default function BasicInfoEditor({
         </div>
     );
     // 代碼自動完成欄。
-    const gCode = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[]) => (
+    const gCode = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[], required = false) => (
         <div>
-            {fLabel(label, code)}
+            {fLabel(label, code, required)}
             <CodeAutocomplete mode="list" model={model} idKey={idKey} labelKeys={labelKeys}
                 value={fields[key] ?? ''} initialLabel={labels[key] ?? ''}
                 onChange={(v, lbl) => { set(key, v); setLabel(key, lbl); }} disabled={!canEdit && !canPropose} />
@@ -345,7 +349,7 @@ export default function BasicInfoEditor({
                         </select>
                     </div>
                     {gCode('c_ethnicity_code', tr('tribe', '族群/部族'), 'c_ethnicity_code', 'ethnicity', 'c_ethnicity_code', ['c_ethnicity_code', 'c_name_chn', 'c_name'])}
-                    {gCode('c_dy', tr('dynasty', '朝代'), 'c_dy', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty'])}
+                    {gCode('c_dy', tr('dynasty', '朝代'), 'c_dy', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty'], true)}
                 </div>
             ))}
 
@@ -453,6 +457,7 @@ const gFull: React.CSSProperties = { gridColumn: '1 / -1' };
 // 上標籤 + 技術碼淡化（次級灰小字）。
 const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#374151', marginBottom: 5 };
 const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: '#9aa4b2', fontSize: '0.78rem', marginLeft: 6 };
+const gReqStyle: React.CSSProperties = { color: '#dc2626', fontWeight: 700 };
 const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', background: '#fff' };
 const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: '#6b7280' };
 const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };

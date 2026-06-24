@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -565,6 +566,69 @@ class ApiV2MutateEventTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->eventPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，地址副表 EVENTS_ADDR；events 無鏡像）──────
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testEventUpdateWriteEquivalenceLegacyVsV2WithAddressResync(): void {
+        // #56 M（update，副表）——復原-重做實驗：同一初始狀態下 ① 旧版改一筆（notes→改後、c_source 10→20、地址 130→200）→記錄 →
+        // ② 復原初始 → ③ 新版改同一筆 → 對比主列 EVENTS_DATA 內容 + 地址副表 EVENTS_ADDR「重同步」結果（130 移除、200 新增）等價。
+        // events 無互逆鏡像、不經 #66 衝突閘，故此 update-M 與 #66 決策無關。核心探針：副表「靜默不落庫 / 漏刪舊地址」分歧。
+        $this->actingAs($this->makeUser(email: 'event-mupd@example.com'));
+
+        $pk = ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50];
+        $seedInitial = function (): void {
+            DB::table('EVENTS_DATA')->delete();
+            DB::table('EVENTS_ADDR')->delete();
+            $this->seedEvent(['c_notes' => '初始備註', 'c_source' => 10, 'c_year' => 1060]);
+            $this->seedEventAddr(130);
+        };
+        // 主列內容欄（含 PK 段、c_year；排除稽核時間欄與純量 c_addr_id——地址在副表）。
+        $mainCols = ['c_personid', 'c_sequence', 'c_event_code', 'c_source', 'c_notes', 'c_year'];
+        $pickMain = function ($row) use ($mainCols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($mainCols));
+            ksort($a);
+
+            return $a;
+        };
+        $addrIds = fn (): array => DB::table('EVENTS_ADDR')
+            ->where($pk)->orderBy('c_addr_id')->pluck('c_addr_id')->map(fn ($v) => (int) $v)->all();
+
+        // ① 旧版改一筆：notes→改後、c_source 10→20、地址 130→200（PK 不變）。
+        // legacy eventUpdateById 直接 (int) 取 c_intercalary（未 coalesce），須送；c_addr_id 為陣列才 resync EVENTS_ADDR。
+        $seedInitial();
+        $this->put('/basicinformation/1000/events/update?' . http_build_query($pk), array_merge($pk, [
+            'c_source' => 20, 'c_notes' => '改後', 'c_intercalary' => 0, 'c_addr_id' => [200], 'action' => 'save',
+        ]))->assertStatus(302); // legacy 成功後 redirect（非寫入成功充分證明；真正的鎖在下方內容/副表斷言）
+        $this->assertSame(1, DB::table('EVENTS_DATA')->count(), 'legacy 更新後主列應仍為一筆');
+        $this->assertSame(1, DB::table('EVENTS_ADDR')->count(), 'legacy 更新後地址副表應僅剩新地址一筆（舊地址須刪、無孤兒）');
+        $legacyMain = $pickMain(DB::table('EVENTS_DATA')->where($pk)->first());
+        $legacyAddr = $addrIds();
+
+        // ② 復原初始 → ③ 新版改同一筆。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_notes' => '改後', 'c_source' => 20, 'c_addr_id' => [200]],
+        ]))->assertOk()->assertJson(['ok' => true]);
+        $this->assertSame(1, DB::table('EVENTS_DATA')->count(), 'v2 更新後主列應仍為一筆');
+        $this->assertSame(1, DB::table('EVENTS_ADDR')->count(), 'v2 更新後地址副表應僅剩新地址一筆（舊地址須刪、無孤兒）');
+        $v2Main = $pickMain(DB::table('EVENTS_DATA')->where($pk)->first());
+        $v2Addr = $addrIds();
+
+        // 主列內容等價（排除稽核時間欄）；先確認改動真的落庫，再比兩版一致。
+        $this->assertNotNull($legacyMain, 'legacy 更新後主列不存在');
+        $this->assertNotNull($v2Main, 'v2 更新後主列不存在');
+        $this->assertSame('改後', $v2Main['c_notes'], 'v2 主列 notes 應更新為改後');
+        $this->assertSame(20, (int) $v2Main['c_source'], 'v2 主列 c_source 應更新為 20（partial update 確有落庫）');
+        $this->assertSame($legacyMain, $v2Main, '主列 legacy vs v2 更新結果不等價');
+        // 地址副表重同步等價（兩版皆應為 [200]：舊地址 130 移除、新地址 200 新增）。
+        $this->assertSame([200], $legacyAddr, 'legacy 地址重同步結果應為 [200]');
+        $this->assertSame($legacyAddr, $v2Addr, '地址副表重同步 legacy vs v2 不等價');
     }
 
     #[Test]

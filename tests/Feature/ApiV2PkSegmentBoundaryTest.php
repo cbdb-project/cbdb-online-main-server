@@ -40,9 +40,15 @@ class ApiV2PkSegmentBoundaryTest extends TestCase {
         $this->createAuditLogTable();
         $this->createTextTable();
         $this->createAssocTable();
+        // AssociationCreateHandler::handle() 於委派父類前會以 c_assoc_code/c_kin_code 查代碼表補互逆碼，
+        // 故即使本測試只驗 PK 邊界，也需備齊這兩張表，否則查表拋例外（500）而非預期的 PK 驗證 422。
+        $this->createAssocCodesTable();
+        $this->createKinshipCodesTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
         Schema::dropIfExists('BIOG_TEXT_DATA');
         Schema::dropIfExists('audit_log');
@@ -140,6 +146,22 @@ class ApiV2PkSegmentBoundaryTest extends TestCase {
                 'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
                 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
             ]);
+        });
+    }
+
+    protected function createAssocCodesTable(): void {
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+    }
+
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
         });
     }
 

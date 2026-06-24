@@ -30,7 +30,9 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
      * 覆寫：先把互逆配對碼從 changes 抽出（c_assocship_pair/c_kinship_pair/c_assoc_kinship_pair，非 ASSOC_DATA 欄，
      * 否則父類白名單會 422）。**未送者一律以代碼表權威反向碼補齊**（ASSOC_CODES.c_assoc_pair /
      * KINSHIP_CODES.c_kin_pair1），而非以 0 補：否則只改備註等的更新／提案核准會把既有鏡像的關係／親屬配對碼洗成 0。
-     * 「補建缺失鏡像」(maintain) 僅在明確送了 c_assocship_pair（用戶在維護雙向關係）時才啟用，避免非關係編輯臆造鏡像。
+     * 「補建缺失鏡像」(maintain) 在明確送了任一互逆配對碼（c_assocship_pair / c_kinship_pair /
+     * c_assoc_kinship_pair）時啟用——用戶顯式編輯任一方向的反向碼即表達「維護雙向關係」意圖（含 #58 新增的
+     * 兩組親屬反向碼），與畫面「會建立鏡像關係／親屬關係」文案一致；僅改備註等非配對欄則不臆造鏡像。
      */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         $sentAssoc = $changes['c_assocship_pair'] ?? null;
@@ -46,7 +48,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'assoc' => $sentAssoc ?? $this->lookupAssocPair($assocCode),
             'kin' => $sentKin ?? $this->lookupKinPair($kinCode),
             'assocKin' => $sentAssocKin ?? $this->lookupKinPair($assocKinCode),
-            'maintain' => $sentAssoc !== null,
+            'maintain' => ($sentAssoc !== null || $sentKin !== null || $sentAssocKin !== null),
         ];
 
         // 本次明確送出的互逆配對欄（社會／親屬／關聯親屬任一），供 pair-only 判斷與回應 updated_fields。
@@ -71,7 +73,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
 
     /**
      * direct 主列更新成功後，於同交易內同步反向鏡像列（重用 BiogMainRepository::syncAssocMirrorOnUpdate）。
-     * 鏡像關係／親屬配對碼用 pendingPairs（送的或代碼表權威值，非 0）；補建僅在 maintain（送了 c_assocship_pair）時。
+     * 鏡像關係／親屬配對碼用 pendingPairs（送的或代碼表權威值，非 0）；補建僅在 maintain（顯式送了任一互逆配對碼）時。
      */
     protected function afterDirectUpdate(int $personId, array $targetPk, array $updateData, array $newArray, ?Operation $operation): void {
         $pairs = $this->pendingPairs ?? [];

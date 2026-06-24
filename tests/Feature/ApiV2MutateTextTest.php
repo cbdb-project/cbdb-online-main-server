@@ -111,6 +111,10 @@ class ApiV2MutateTextTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->text('c_supplement')->nullable();
             $table->integer('c_text_year')->nullable();
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary(['c_personid', 'c_textid', 'c_role_id']);
         });
     }

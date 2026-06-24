@@ -178,6 +178,7 @@ return [
     'reverse_assoc_kin_pair_label' => '互逆關聯親屬關係碼',
     'reverse_assoc_kin_pair_hint'  => '此為「關聯親屬關係」(c_assoc_kin_code) 的反向碼，系統依此於鏡像列雙向同步。預設取建議反向碼，可手動更正。',
     'assoc_kin_section'        => '親屬關係（選填）',
+    'pair_only_proposal_hint'  => '互逆配對碼修復請使用「直接保存」；提交建議請至少修改一個關係欄位。',
     'kinship_create'          => '新增親屬關係',
     'kinship_edit'            => '編輯親屬關係',
     'kinship_pair_auto_hint'  => '互逆親屬關係（配對）由系統依關係碼自動雙向同步，無需手動填寫。',

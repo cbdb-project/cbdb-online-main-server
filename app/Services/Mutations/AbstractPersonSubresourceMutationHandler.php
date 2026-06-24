@@ -185,6 +185,15 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
     // ── Direct Update ────────────────────────────────────────
 
     protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
+        // 對齊 legacy ToolsRepository::timestamp()（update 分支）：direct 更新一律於主列蓋更新者/
+        // 更新時間，並移除建檔欄位以免覆寫原始建檔資訊。修正 v2 子資源直改未寫 c_modified_* 的稽核/
+        // 對齊缺口（11/12 子資源原本不刷新；source 走 BiogSourceRepository 另已處理）。
+        // 須在 transaction 閉包捕獲 $updateData 前注入；有效變更判斷已在 handle() 以未注入前的 changes 完成，
+        // 故此注入不影響「無變更」攔截。
+        $updateData['c_modified_by'] = Auth::user()->name ?? '';
+        $updateData['c_modified_date'] = Carbon::now();
+        unset($updateData['c_created_by'], $updateData['c_created_date']);
+
         $operationId = (string) Str::ulid();
         /** @var Operation|null $operation */
         $operation = null;
@@ -253,7 +262,9 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             'operation' => 'update',
             'result' => [
                 'pk' => $this->buildNewPk($targetPk, $updateData),
-                'updated_fields' => array_keys($updateData),
+                // updated_fields 只反映使用者實際變更，排除自動蓋的稽核欄（c_modified_*）；
+                // 刷新後的稽核欄由 result.row 提供給前端。
+                'updated_fields' => array_values(array_diff(array_keys($updateData), ['c_modified_by', 'c_modified_date'])),
                 'operation_id' => $operation?->id,
                 'row' => $newArray,
             ],

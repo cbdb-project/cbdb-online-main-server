@@ -511,8 +511,9 @@ class OperationsIndexLinksTest extends TestCase {
         $response = $this->actingAs($user)->get('/operations');
 
         $response->assertStatus(200);
-        $response->assertSee('/basicinformation/101/kinship/edit?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
-        $response->assertSee('/basicinformation/202/kinship/edit?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
+        // flag-aware（測試環境 kinship editor flag=new）：operations 索引導向 React /app edit-v2（帶完整 PK query）。
+        $response->assertSee('/app/basicinformation/101/kinship/edit-v2?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
+        $response->assertSee('/app/basicinformation/202/kinship/edit-v2?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
         $response->assertSee('c_personid：101<br', false);
         $response->assertSee('c_personid：101');
         $response->assertSee('c_kin_code：3');
@@ -643,8 +644,9 @@ class OperationsIndexLinksTest extends TestCase {
         $response = $this->actingAs($user)->get('/operations');
 
         $response->assertStatus(200);
-        $response->assertSee('/basicinformation/101/assoc/edit?c_personid=101&amp;c_assoc_code=301&amp;c_assoc_id=202', false);
-        $response->assertSee('/basicinformation/202/assoc/edit?c_personid=202&amp;c_assoc_code=302&amp;c_assoc_id=101', false);
+        // flag-aware（測試環境 assoc editor flag=new）：operations 索引導向 React /app edit-v2（帶完整 PK query）。
+        $response->assertSee('/app/basicinformation/101/assoc/edit-v2?c_personid=101&amp;c_assoc_code=301&amp;c_assoc_id=202', false);
+        $response->assertSee('/app/basicinformation/202/assoc/edit-v2?c_personid=202&amp;c_assoc_code=302&amp;c_assoc_id=101', false);
         $response->assertSee('c_assoc_code：301');
         $response->assertSee('c_assoc_code：302');
     }
@@ -709,8 +711,9 @@ class OperationsIndexLinksTest extends TestCase {
         $response = $this->actingAs($user)->get('/operations');
 
         $response->assertStatus(200);
-        $response->assertDontSee('/basicinformation/101/kinship/edit?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
-        $response->assertDontSee('/basicinformation/202/kinship/edit?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
+        // 刪除操作不應產生任何編輯連結（含 flag-aware 的 /app edit-v2）。
+        $response->assertDontSee('/app/basicinformation/101/kinship/edit-v2?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
+        $response->assertDontSee('/app/basicinformation/202/kinship/edit-v2?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
         $response->assertSee('無資源頁面');
     }
 }

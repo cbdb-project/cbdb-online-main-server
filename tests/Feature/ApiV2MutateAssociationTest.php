@@ -465,6 +465,61 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectUpdateWithKinPairAndOtherFieldBackfillsMissingMirror(): void {
+        // 回歸（codex serious，Task 58）：非 pair-only 路徑——同時改真實欄（c_notes）與親屬互逆碼（c_kinship_pair）、
+        // 且反向鏡像缺失時，maintain 須啟用以補建鏡像。修復前 maintain 僅認 c_assocship_pair，此組合（最常見的
+        // 「順手改備註 + 修親屬 pair」）不會補建，留下單邊髒資料且與畫面「會建立鏡像」文案矛盾。
+        $this->actingAs($this->makeUser(email: 'assoc-kinpair-mixed@example.com'));
+        $this->seedAssociation(['c_kin_code' => 75, 'c_kin_id' => 3000]); // 僅正向；未 seedMirror＝反向缺失
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 75, 'c_kin_id' => 3000, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_notes' => '順手改備註', 'c_kinship_pair' => 76],
+        ])->assertOk()
+            ->assertJson(['ok' => true, 'operation' => 'update'])
+            ->assertJsonPath('result.updated_fields', ['c_notes']);
+
+        // 正向列備註已更新。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '順手改備註',
+        ]);
+        // 反向鏡像被補建，帶入送出的親屬反向碼（c_kin_code=76）。
+        $this->assertDatabaseHas('ASSOC_DATA', [
+            'c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000,
+            'c_kin_code' => 76, 'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectUpdateStampsModifiedAuditFields(): void {
+        // 回歸（Task 62）：direct 子資源更新須於主列蓋更新者/更新時間（對齊 legacy ToolsRepository::timestamp），
+        // 並於 result.row 回傳刷新後稽核欄供前端即時刷新；updated_fields 不含自動蓋的稽核欄。
+        $this->actingAs($this->makeUser(email: 'assoc-modstamp@example.com'));
+        $this->seedAssociation(['c_modified_by' => '舊使用者', 'c_modified_date' => '2000-01-01 00:00:00']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '蓋章測試'],
+        ]))->assertOk();
+
+        $res->assertJsonPath('result.row.c_modified_by', 'tester');
+        $this->assertNotContains('c_modified_by', $res->json('result.updated_fields'));
+        $this->assertNotContains('c_modified_date', $res->json('result.updated_fields'));
+
+        $row = DB::table('ASSOC_DATA')->where('c_personid', 1000)->where('c_assoc_code', 1)->first();
+        $this->assertSame('tester', $row->c_modified_by);
+        $this->assertNotSame('2000-01-01 00:00:00', (string) $row->c_modified_date);
+        $this->assertNotSame('', (string) $row->c_modified_date);
+    }
+
+    #[Test]
     public function testDirectAssociationUpdateSucceeds(): void {
         $user = $this->makeUser(email: 'assoc-direct@example.com');
         $this->actingAs($user);

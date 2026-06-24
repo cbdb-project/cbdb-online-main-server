@@ -135,6 +135,10 @@ class ApiV2MutatePostingTest extends TestCase {
             $table->integer('c_inst_code')->default(0);
             $table->integer('c_inst_name_code')->default(0);
             $table->integer('c_office_category_id')->nullable();
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary(['c_office_id', 'c_posting_id']);
         });
     }

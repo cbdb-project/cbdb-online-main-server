@@ -178,6 +178,7 @@ return [
     'reverse_assoc_kin_pair_label' => 'Reciprocal associated-kinship code',
     'reverse_assoc_kin_pair_hint'  => 'The reverse of the associated kinship (c_assoc_kin_code); synced both ways on the mirror row. Defaults to the suggested reverse, editable.',
     'assoc_kin_section'        => 'Kinship relation (optional)',
+    'pair_only_proposal_hint'  => 'To repair a reciprocal pairing code, use "Save Directly"; to submit a proposal, change at least one relation field.',
     'kinship_create'          => 'Add Kinship',
     'kinship_edit'            => 'Edit Kinship',
     'kinship_pair_auto_hint'  => 'The reciprocal (paired) kinship is synced automatically by the system based on the relation code; no manual entry needed.',

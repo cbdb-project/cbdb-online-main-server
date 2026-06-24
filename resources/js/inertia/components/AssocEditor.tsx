@@ -301,6 +301,18 @@ export default function AssocEditor({
             if (assocKinReversePair && assocKinPairTouched) changes.c_assoc_kinship_pair = assocKinReversePair;
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
+        // pair-only 修復（僅互逆配對碼變更、無任何 ASSOC_DATA 真實欄）屬「直接修復鏡像」維護動作，後端僅 direct 支援；
+        // 若以 proposal 送出會被父類「changes 不可為空」擋成 422，故前端先攔截並引導改用「直接保存」。
+        // 僅限 edit：create 走 AssociationCreateHandler，後端接受「PK + 互逆碼、無其他欄」的新建提案，不可誤擋。
+        if (mode === 'edit' && sm === 'proposal') {
+            const PAIR_KEYS = ['c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair'];
+            const realChanges = Object.keys(changes).filter((k) => !PAIR_KEYS.includes(k));
+            if (realChanges.length === 0) {
+                setSaving(false);
+                setError(tr('pair_only_proposal_hint', '互逆配對碼修復請使用「直接保存」；提交建議請至少修改一個關係欄位。'));
+                return;
+            }
+        }
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',

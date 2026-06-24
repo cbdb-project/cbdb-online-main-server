@@ -631,4 +631,76 @@ class ApiV2CreateAssociationTest extends TestCase {
 
         $this->postJson('/api/v2/create', $this->createPayload(['mode' => 'direct']))->assertStatus(403);
     }
+
+    // ── #56 M 寫入等價（legacy Blade vs v2）+ 幂等 ──────────────────
+
+    #[Test]
+    public function testAssocCreateWriteEquivalenceLegacyVsV2(): void {
+        // #56（M 維度）：同一「語義/等價業務輸入」（非逐欄相同的 request payload）分別經 ① legacy Blade store ② v2 /api/v2/create 寫入兩個獨立合成對象，
+        // 斷言落庫的正向列內容欄 + 反向鏡像關係碼等價（排除差異 PK 段 c_assoc_id/c_personid 與稽核欄）。
+        // 以舊版寫入為 ground truth。關鍵設計：legacy 依其表單送 c_assocship_pair=101，但 v2 **刻意不送**——
+        // 改驗「v2 以 ASSOC_CODES 權威值補齊後，鏡像是否與 legacy 表單送的值落庫等價（皆 101，非哨兵 0）」，
+        // 真正打到本 session 惡性 bug 的補齊分支（若 v2 backfill 壞掉寫成 0，本測試會 FAIL）。
+        $this->actingAs($this->makeUser(email: 'assoc-mwrite@example.com'));
+
+        // ① legacy：1000 → 對象 2000，code 100，顯式送反向碼 c_assocship_pair=101（對齊 legacy 表單行為）。
+        $this->post('/basicinformation/1000/assoc', [
+            'action' => 'save',
+            'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '等價測試書', 'c_assoc_first_year' => 1055,
+            'c_source' => 20, 'c_pages' => '7', 'c_notes' => 'M 等價',
+            'c_inst_code' => '0',
+            'c_assocship_pair' => 101, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+        ]);
+
+        // ② v2：1000 → 對象 3000，code 100，同內容；**刻意不送任何 pair**，逼 v2 走權威 backfill。
+        $this->postJson('/api/v2/create', [
+            'resource' => 'associations', 'person_id' => 1000, 'mode' => 'direct',
+            'target' => ['pk' => $this->pk(['c_assoc_id' => 3000, 'c_text_title' => '等價測試書', 'c_assoc_first_year' => 1055])],
+            'changes' => [
+                'c_source' => 20, 'c_pages' => '7', 'c_notes' => 'M 等價',
+            ],
+        ])->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
+
+        $legacyFwd = (array) DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->first();
+        $v2Fwd = (array) DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 3000])->first();
+        $legacyMir = DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->first();
+        $v2Mir = DB::table('ASSOC_DATA')->where(['c_personid' => 3000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->first();
+
+        // 正向內容欄等價（差異僅 c_assoc_id；稽核欄不比）。
+        foreach (['c_text_title', 'c_assoc_first_year', 'c_source', 'c_pages', 'c_notes', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id'] as $col) {
+            $this->assertSame((string) $legacyFwd[$col], (string) $v2Fwd[$col], "正向欄 {$col} 新舊不等價");
+        }
+        // 反向鏡像：兩側都寫了、且關係碼皆為權威反向 101（非 0/未详）——核心等價斷言。
+        $this->assertNotNull($legacyMir, 'legacy 未寫反向鏡像');
+        $this->assertNotNull($v2Mir, 'v2 未寫反向鏡像');
+        $this->assertSame(101, (int) $legacyMir->c_assoc_code);
+        $this->assertSame(101, (int) $v2Mir->c_assoc_code);
+        foreach (['c_text_title', 'c_assoc_first_year', 'c_source', 'c_pages', 'c_notes'] as $col) {
+            $this->assertSame((string) ((array) $legacyMir)[$col], (string) ((array) $v2Mir)[$col], "鏡像欄 {$col} 新舊不等價");
+        }
+    }
+
+    #[Test]
+    public function testAssocV2CreateIdempotentResendNoDuplicate(): void {
+        // #56（幂等）：v2 create 同輸入重送不得產生重複列——既有 PK 應被擋（非靜默再插一筆）。
+        $this->actingAs($this->makeUser(email: 'assoc-midem@example.com'));
+        $payload = [
+            'resource' => 'associations', 'person_id' => 1000, 'mode' => 'direct',
+            'target' => ['pk' => $this->pk(['c_assoc_id' => 4000])],
+            'changes' => ['c_source' => 20, 'c_notes' => '幂等', 'c_assocship_pair' => 101],
+        ];
+
+        $this->postJson('/api/v2/create', $payload)->assertOk()->assertJson(['ok' => true]);
+        $countAfterFirst = DB::table('ASSOC_DATA')->count(); // 正向 + 鏡像 = 2
+
+        // 重送同 PK → create handler 契約為 409 conflict（鎖死，不接受其他失敗碼以免假綠）。
+        $this->postJson('/api/v2/create', $payload)
+            ->assertStatus(409)
+            ->assertJson(['ok' => false])
+            ->assertJsonFragment(['target.pk' => ['conflict']]); // 鍵名含點為字面 key，非巢狀
+
+        $this->assertSame($countAfterFirst, DB::table('ASSOC_DATA')->count(), '重送不得新增重複列');
+    }
 }

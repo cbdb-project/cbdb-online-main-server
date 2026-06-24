@@ -262,6 +262,10 @@ class BasicInformationController extends Controller {
             'counts' => $this->personBrowserService->tabCounts($personId),
             // 對齊 legacy history-button 的授權（Auth::user()->canViewAuditLogs()）。
             'can_view_audit_logs' => Auth::check() && Auth::user()->canViewAuditLogs(),
+            // 稽核紀錄頁的 base URL（flag-aware）：admin.audit-logs 翻 new 後自動指向 React 版。
+            'audit_logs_base' => migration_flag_is_new('admin.audit-logs')
+                ? route('app.admin.audit-logs', [], false)
+                : route('admin.audit-logs', [], false),
         ];
     }
 

@@ -18,6 +18,8 @@ export interface PersonBannerData {
     counts: Record<string, number>;
     /** 是否可看稽核歷史（superadmin/canViewAuditLogs）；驅動「查看歷史」連結（對齊 legacy history-button）。 */
     can_view_audit_logs?: boolean;
+    /** 稽核紀錄頁 base URL（flag-aware：翻 new 後為 /app/admin/audit-logs）；後端 personBannerProps 提供。 */
+    audit_logs_base?: string;
 }
 
 // hub 分頁 key → audit-logs 的 history_page（對齊 BasicInformationHistory 的 page 值）。
@@ -70,7 +72,7 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
             {data.can_view_audit_logs && historyPage ? (
                 <div style={historyRowStyle}>
                     <a
-                        href={`/admin/audit-logs?c_personid=${data.person_id}&history_page=${historyPage}`}
+                        href={`${data.audit_logs_base ?? '/admin/audit-logs'}?c_personid=${data.person_id}&history_page=${historyPage}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={historyLinkStyle}

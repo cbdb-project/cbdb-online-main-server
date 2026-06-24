@@ -2376,27 +2376,43 @@ class BiogMainRepository {
      */
     /**
      * 雙向鏡像同步衝突偵測（#66 資料安全；僅 v2 direct 路徑啟用、legacy 不傳＝不偵測）。
-     * 對每筆既有鏡像列，逐 $conflictFields 比對「既有值（非空）vs 即將寫入值」；任一不同即蒐集為衝突。
-     * 既有值為空白／哨兵（null/''/0/-1/-999/-9999）視為無內容、可安全覆寫，不算衝突（避免把「未详→真值」誤報）。
-     * 有衝突則拋 MirrorConflictException（在 handleDirect 交易內 → 整筆回滾），帶對面鏡像列 PK 與衝突明細。
+     *
+     * 「真分歧」語義（修正過度觸發）：對每筆既有鏡像列，逐 $conflictFields 比對
+     * **鏡像當前值（非空）vs 正向「編輯前的舊值」($forwardOld)**——
+     * - 鏡像當前值 == 正向舊值 → 二者本來同步（鏡像只是跟隨正向）→ 正常編輯，**不報警**、靜默同步。
+     * - 鏡像當前值 ≠ 正向舊值 → 對面被**獨立改過**（存了正向這側不知道的內容）→ 同步會洗掉它 → **報衝突**。
+     * 注意：基準是「正向舊值」**不是「即將寫入的新值」**——否則任何把已填欄位改成新值的正常編輯都會誤報。
+     * 既有值為空白／哨兵（null/''/0/-1/-999/-9999）視為無內容、可安全覆寫，不算衝突。
+     * 有衝突則拋 MirrorConflictException（在 handleDirect 交易內 → 整筆回滾），帶對面鏡像列 PK 與衝突明細
+     *（existing=對面現值、incoming=本次將寫入值，供前端展示）。
      *
      * @param iterable<int,object> $mirroredRows 既有鏡像列
-     * @param array<string,mixed> $incoming 即將寫入鏡像列的值（update set）
-     * @param array<int,string> $conflictFields 納入比對的欄位
+     * @param array<string,mixed> $baselines 欄位 → 同步基準。每欄基準有兩型（達成「真分歧」）：
+     *   - 純量（內容欄）：正向「編輯前的舊值」；對面值 ≠ 此 → 對面被獨立改過 → 真分歧。
+     *   - 陣列（關係/配對碼）：正向舊碼的「合法反向碼集」（含 pair1/pair2）；對面碼 ∈ 此集＝仍是合法反向（同步，
+     *     pair1↔pair2 互換不誤報）、∉ 此集＝被改成無關碼 → 真分歧。
+     * @param array<string,mixed> $incoming 即將寫入鏡像列的值（僅供衝突明細展示）
      */
-    private function detectMirrorConflicts(string $table, iterable $mirroredRows, array $incoming, array $conflictFields, AuditLogService $auditLog): void {
+    private function detectMirrorConflicts(string $table, iterable $mirroredRows, array $baselines, array $incoming, AuditLogService $auditLog): void {
         $isBlank = static fn ($v): bool => $v === null || trim((string) $v) === '' || in_array(trim((string) $v), ['0', '-1', '-999', '-9999'], true);
         foreach ($mirroredRows as $row) {
             $existingRow = $auditLog->normalizeRow($row);
             $conflicts = [];
-            foreach ($conflictFields as $f) {
-                if (!array_key_exists($f, $incoming)) {
-                    continue; // 本次不寫此欄 → 不可能覆寫掉對方內容
+            foreach ($baselines as $f => $baseline) {
+                $existing = $existingRow[$f] ?? null; // 鏡像當前值
+                if ($isBlank($existing)) {
+                    continue; // 對面空白／哨兵 → 無內容、可安全覆寫
                 }
-                $existing = $existingRow[$f] ?? null;
-                $next = $incoming[$f];
-                if (!$isBlank($existing) && trim((string) $existing) !== trim((string) ($next ?? ''))) {
-                    $conflicts[] = ['field' => $f, 'existing' => $existing, 'incoming' => $next];
+                if (is_array($baseline)) {
+                    // 關係碼：對面碼仍是「正向舊碼的合法反向」(pair1/pair2) → 同步、非分歧；否則為真分歧。
+                    $valid = array_map(static fn ($v) => (string) (int) $v, $baseline);
+                    $isConflict = !in_array((string) (int) $existing, $valid, true);
+                } else {
+                    // 內容欄：對面值 ≠ 正向舊值 → 對面被獨立改過 → 真分歧。
+                    $isConflict = trim((string) $existing) !== trim((string) ($baseline ?? ''));
+                }
+                if ($isConflict) {
+                    $conflicts[] = ['field' => $f, 'existing' => $existing, 'incoming' => $incoming[$f] ?? null];
                 }
             }
             if ($conflicts !== []) {
@@ -2409,7 +2425,7 @@ class BiogMainRepository {
         }
     }
 
-    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictFields = []): void {
+    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = []): void {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
@@ -2464,7 +2480,7 @@ class BiogMainRepository {
 
         // #66：覆寫前偵測衝突（僅 v2 direct 啟用）。對面對應欄已有不同內容 → 拋例外回滾整筆，回 409 警告。
         if ($detectConflict) {
-            $this->detectMirrorConflicts('ASSOC_DATA', $mirroredRows, $updateSet, $conflictFields, $auditLog);
+            $this->detectMirrorConflicts('ASSOC_DATA', $mirroredRows, $conflictBaselines, $updateSet, $auditLog);
         }
 
         $query->update($updateSet);
@@ -2497,7 +2513,7 @@ class BiogMainRepository {
      * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
      * legacy 呼叫一律傳 false＝行為不變。回傳精確配對命中數（legacy 以此填 err）。
      */
-    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictFields = []): int {
+    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = []): int {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
@@ -2561,7 +2577,7 @@ class BiogMainRepository {
 
         // #66：覆寫前偵測衝突（僅 v2 direct 啟用）。對面對應欄已有不同內容 → 拋例外回滾整筆，回 409 警告。
         if ($detectConflict) {
-            $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $dataMirror, $conflictFields, $auditLog);
+            $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $conflictBaselines, $dataMirror, $auditLog);
         }
 
         $updateQuery->update($dataMirror);

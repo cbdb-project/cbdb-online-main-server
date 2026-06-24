@@ -362,31 +362,39 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
-    public function testPairOnlyUpdateConflictReturns409NotUncaught500(): void {
-        // #66（修 S2）：pair-only 路徑自帶交易、不經 handleDirect，其拋出的 MirrorConflictException 須在該路徑自行轉 409，
-        // 否則逃逸成未捕獲 500。情境：既有鏡像反向碼為 3（pair2），pair-only 送 c_assocship_pair=2（pair1）→ 與對面不同 → 衝突。
-        $this->actingAs($this->makeUser(email: 'assoc-paironly-conflict@example.com'));
-        DB::table('ASSOC_CODES')->where('c_assoc_code', 1)->update(['c_assoc_pair2' => 3]); // code1 → {2,3} 兩合法反向
-        $this->seedAssociation();
-        $this->seedMirror(['c_assoc_code' => 3]); // 鏡像處於 pair2=3（可由 {2,3} 定位）
+    public function testDirectAssociationUpdateMirrorKinCodeDivergenceBlocked(): void {
+        // #66（碼真分歧，B 方案）：鏡像的次要親屬碼 c_kin_code 被改成無關碼 99（∉ 正向舊碼 75 的合法反向 {76}）→ 真分歧 → 409。
+        // 注：定位器以 c_assoc_code 定位鏡像、不約束 c_kin_code，故此碼分歧可被偵測（主碼 c_assoc_code 受定位器約束、檢測為防禦性）。
+        $this->actingAs($this->makeUser(email: 'assoc-kincode-div@example.com'));
+        $this->seedAssociation(['c_kin_code' => 75, 'c_kin_id' => 3000, 'c_notes' => '同步值']);
+        $this->seedMirror(['c_kin_code' => 99, 'c_kin_id' => 1000, 'c_notes' => '同步值']); // c_kin_code=99 ∉ validReverses(75)={76}
 
-        $res = $this->postJson('/api/v2/mutate', [
-            'resource' => 'associations',
-            'person_id' => 1000,
-            'mode' => 'direct',
-            'operation' => 'update',
-            'target' => ['pk' => [
-                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
-                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
-                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
-            ]],
-            'changes' => ['c_assocship_pair' => 2],
-        ])->assertStatus(409); // 關鍵：409，不是 500
+        $res = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'target' => ['pk' => ['c_kin_code' => 75, 'c_kin_id' => 3000]],
+            'changes' => ['c_notes' => '改後'], // 內容同步（不衝突）→ 隔離出 c_kin_code 碼分歧
+        ]))->assertStatus(409);
 
         $res->assertJsonPath('errors.mirror_conflict.table', 'ASSOC_DATA');
-        $this->assertContains('c_assoc_code', array_map(static fn ($c) => $c['field'], $res->json('errors.mirror_conflict.fields')));
-        // 回滾：鏡像反向碼維持 3，未被覆寫成 2。
-        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_id' => 1000, 'c_assoc_code' => 3]);
+        $this->assertContains('c_kin_code', array_map(static fn ($c) => $c['field'], $res->json('errors.mirror_conflict.fields')));
+        // 回滾：鏡像 c_kin_code 維持 99（未被覆寫成 76）。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_kin_code' => 99]);
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdateInSyncEditNotBlocked(): void {
+        // #66（修過度觸發）：正常同步編輯——鏡像 c_notes 與正向「編輯前舊值」相同（本來同步）。
+        // 改正向 notes（未 force）→ 不應誤報衝突 → 200，鏡像靜默同步為新值。
+        $this->actingAs($this->makeUser(email: 'assoc-insync@example.com'));
+        $this->seedAssociation(['c_notes' => '同步值']);
+        $this->seedMirror(['c_notes' => '同步值']); // == 正向舊值 → 同步、非分歧
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '新值'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        // 正常同步：正向與鏡像皆更新為 '新值'（不被 #66 誤擋）。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '新值']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '新值']);
     }
 
     #[Test]

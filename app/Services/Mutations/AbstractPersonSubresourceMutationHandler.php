@@ -240,6 +240,8 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                     $operation ? (string) $operation->id : null
                 );
 
+                // #66：把「正向編輯前的舊值」暫存，供子類 afterDirectUpdate 的鏡像衝突偵測作「真分歧」基準。
+                $this->directForwardOld = $originalArray;
                 // 子類在同一交易內的後續處理（例如任官地址副表同步），保證原子性
                 $this->afterDirectUpdate($personId, $targetPk, $updateData, $newArray, $operation);
             });
@@ -395,6 +397,9 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
 
         return $newPk;
     }
+
+    /** #66：本次 direct 更新「正向編輯前的舊值」（normalizeRow 後）；handleDirect 於呼叫 afterDirectUpdate 前設定，供鏡像衝突偵測作真分歧基準。 */
+    protected array $directForwardOld = [];
 
     /**
      * direct 更新成功後、仍在同一交易內的後續處理鉤子（預設無動作）。

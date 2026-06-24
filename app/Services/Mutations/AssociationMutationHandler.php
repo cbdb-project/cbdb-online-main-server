@@ -22,41 +22,56 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
     /** #66：本次是否強制覆寫對面鏡像（meta.force）；handle() 設定、finally 清除。預設 false＝偵測衝突。 */
     private bool $forceMirror = false;
 
-    /** #66：納入鏡像衝突比對的「內容欄」＝備注/出處/頁/年份（關係/配對碼另依「本次是否變更」動態加入，見 mirrorConflictScope）。 */
+    /** #66：納入鏡像衝突比對的「內容欄」（自由文本/可手填，真實數據丟失風險）。關係/配對碼另以「合法反向集」基準比對。 */
     private const CONTENT_CONFLICT_FIELDS = ['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'];
 
-    /** 互逆配對欄 → 對面鏡像列對應關係碼欄。 */
-    private const PAIR_TO_MIRROR_CODE = [
-        'c_assocship_pair' => 'c_assoc_code',
-        'c_kinship_pair' => 'c_kin_code',
-        'c_assoc_kinship_pair' => 'c_assoc_kin_code',
-    ];
-
     /**
-     * #66：本次「實際變更」的鏡像衝突比對範圍（修 S1 過度觸發）。
-     * 只比對：(a) 使用者本次真的改動的內容欄（CONTENT_CONFLICT_FIELDS ∩ updateData）；
-     * (b) 本次顯式送出之互逆配對碼對應的鏡像關係碼欄；(c) 本次直接改動的正向關係碼欄（會連動改鏡像反向碼）。
-     * 不把「整條正向列所有欄」一律納入，避免「只改年份卻因對面 notes 不同而誤擋」。
+     * #66：建構鏡像衝突偵測的「基準」(欄位 → 基準)，達成「只在對面真分歧時警告」。
+     * - 內容欄（本次實際變更者）：基準＝正向「編輯前舊值」(純量)；對面 ≠ 此 → 被獨立改過。
+     * - 關係/配對碼（c_assoc_code/c_kin_code/c_assoc_kin_code）：基準＝正向「舊碼」的合法反向集 (pair1/pair2)；
+     *   對面碼 ∈ 集＝仍是合法反向（同步，pair1↔pair2 互換不誤報）、∉ 集＝被改成無關碼 → 真分歧。
+     *   碼總是納入（in-sync 必 ∈ 集、空/0 由 detect 跳過、無合法反向時略過該欄不檢），不需「是否送 pair」門控。
      *
-     * @param array<string,mixed> $updateData 本次寫入正向列的欄（含自動蓋的稽核欄，需排除）
-     * @param array<int,string> $sentPairFields 本次顯式送出的互逆配對欄
-     * @return array<int,string>
+     * @param array<string,mixed> $updateData 本次寫入正向列的欄（含稽核欄，需排除）
+     * @param array<string,mixed> $forwardOld 正向「編輯前」的列（純量基準與舊碼來源）
      */
-    private function mirrorConflictScope(array $updateData, array $sentPairFields): array {
+    private function conflictBaselines(array $updateData, array $forwardOld): array {
         $changed = array_diff(array_keys($updateData), ['c_modified_by', 'c_modified_date']);
-        $scope = array_values(array_intersect(self::CONTENT_CONFLICT_FIELDS, $changed));
-        foreach ($sentPairFields as $pf) {
-            if (isset(self::PAIR_TO_MIRROR_CODE[$pf])) {
-                $scope[] = self::PAIR_TO_MIRROR_CODE[$pf];
-            }
+        $baselines = [];
+        foreach (array_intersect(self::CONTENT_CONFLICT_FIELDS, $changed) as $f) {
+            $baselines[$f] = $forwardOld[$f] ?? null;
         }
-        foreach (['c_assoc_code', 'c_kin_code', 'c_assoc_kin_code'] as $codeCol) {
-            if (in_array($codeCol, $changed, true)) {
-                $scope[] = $codeCol;
-            }
+        if ($vr = $this->assocValidReverses($forwardOld['c_assoc_code'] ?? null)) {
+            $baselines['c_assoc_code'] = $vr;
+        }
+        if ($vr = $this->kinValidReverses($forwardOld['c_kin_code'] ?? null)) {
+            $baselines['c_kin_code'] = $vr;
+        }
+        if ($vr = $this->kinValidReverses($forwardOld['c_assoc_kin_code'] ?? null)) {
+            $baselines['c_assoc_kin_code'] = $vr;
         }
 
-        return array_values(array_unique($scope));
+        return $baselines;
+    }
+
+    /** ASSOC_CODES：某社會關係碼的合法反向集（c_assoc_pair / c_assoc_pair2）。空/0 或無反向 → 空陣列（該欄不納入碼分歧檢測）。 */
+    private function assocValidReverses($code): array {
+        if ($code === null || (int) $code === 0) {
+            return [];
+        }
+        $row = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->first();
+
+        return array_values(array_filter([$row->c_assoc_pair ?? null, $row->c_assoc_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+    }
+
+    /** KINSHIP_CODES：某親屬碼的合法反向集（c_kin_pair1 / c_kin_pair2）。空/0 或無反向 → 空陣列。 */
+    private function kinValidReverses($code): array {
+        if ($code === null || (int) $code === 0) {
+            return [];
+        }
+        $row = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+
+        return array_values(array_filter([$row->c_kin_pair1 ?? null, $row->c_kin_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
     }
 
     public function __construct(
@@ -99,7 +114,6 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'c_kinship_pair' => $sentKin,
             'c_assoc_kinship_pair' => $sentAssocKin,
         ], static fn ($v) => $v !== null));
-        $this->pendingPairs['sentFields'] = $sentPairFields; // #66：供 afterDirectUpdate 計算衝突比對範圍
 
         try {
             // pair-only direct：只送互逆配對碼（c_assocship_pair / c_kinship_pair / c_assoc_kinship_pair 任一）、
@@ -149,7 +163,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             $this->auditLogService,
             (bool) ($pairs['maintain'] ?? false),
             !$this->forceMirror, // #66：非 force 時偵測對面衝突
-            $this->mirrorConflictScope($updateData, $pairs['sentFields'] ?? []) // #66：僅比對本次實際變更的欄（修 S1）
+            $this->conflictBaselines($updateData, $this->directForwardOld) // #66：內容欄=正向舊值、碼=合法反向集（真分歧基準）
         );
     }
 
@@ -215,9 +229,12 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
 
         $oldCode = $targetPk['c_assoc_code'] ?? null;
         $codeRow = DB::table('ASSOC_CODES')->where('c_assoc_code', $oldCode)->first();
+        // #66：pair-only 是顯式設反向碼的修復；以正向（未變更）既有列的舊碼合法反向集為基準，
+        // 偵測對面碼是否被改成無關碼（真分歧）。無內容欄變更，故僅碼基準。
+        $baselines = $this->conflictBaselines([], (array) $original);
 
         try {
-            DB::transaction(function () use ($dataMirror, $personId, $targetPk, $codeRow, $sentPairFields) {
+            DB::transaction(function () use ($dataMirror, $personId, $targetPk, $codeRow, $baselines) {
                 app(BiogMainRepository::class)->syncAssocMirrorOnUpdate(
                     $dataMirror,
                     $personId,
@@ -229,8 +246,8 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
                     null,
                     $this->auditLogService,
                     true,
-                    !$this->forceMirror, // #66：pair-only 修復亦為 direct 覆寫，非 force 時偵測對面衝突
-                    $this->mirrorConflictScope([], $sentPairFields) // #66：僅比對本次送出之配對碼對應的鏡像碼欄（修 S1）
+                    !$this->forceMirror, // #66：非 force 時偵測對面（碼）真分歧
+                    $baselines
                 );
             });
         } catch (MirrorConflictException $e) {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
-import { Button } from '../../components/ui/Button';
+import { Button, buttonVariants } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
 import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
@@ -119,7 +119,7 @@ export default function BasicInformationCreate() {
 
                     <div className="flex flex-wrap gap-2">
                         <Button type="submit" disabled={submitting}>{submitting ? tc('saving') : tc('create')}</Button>
-                        <a href={index_url} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
+                        <a href={index_url} className={buttonVariants({ variant: 'outline' })}>
                             {tc('cancel')}
                         </a>
                     </div>

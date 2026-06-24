@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -444,6 +445,54 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，純單表；socialinst 無鏡像/副表）──────
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testSocialInstitutionUpdateWriteEquivalenceLegacyVsV2(): void {
+        // #56 M（update，純單表）——復原-重做實驗：改 c_notes。legacy updateQuery 為 inline 整包 update，且會把
+        // body 的 c_inst_code 用 explode('-') 拆成 c_inst_code/c_inst_name_code；故 body 必須送 c_inst_code='10-20'
+        // （否則 c_inst_name_code 會被清成 0、與 v2 分歧）。本測試特別斷言 legacy 改後 c_inst_name_code 仍=20（探針此坑）。
+        $this->actingAs($this->makeUser(email: 'socinst-mupd@example.com'));
+
+        $pk = ['c_personid' => 1000, 'c_inst_code' => 10, 'c_inst_name_code' => 20, 'c_bi_role_code' => 1];
+        $seedInitial = function (): void {
+            DB::table('BIOG_INST_DATA')->delete();
+            $this->seedSocialInstitution(['c_notes' => '初始備註', 'c_source' => 10]);
+        };
+        $cols = ['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code', 'c_source', 'c_notes'];
+        $pick = function ($row) use ($cols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($cols));
+            ksort($a);
+
+            return $a;
+        };
+
+        // ① 旧版 PUT（PK 走 query；body 送 c_inst_code='10-20' 還原 explode、c_bi_role_code 原值，再加要改的 c_notes）。
+        $seedInitial();
+        $this->put('/basicinformation/1000/socialinst/update?' . http_build_query($pk), [
+            'c_inst_code' => '10-20', 'c_bi_role_code' => 1, 'c_notes' => '改後備註', 'action' => 'save',
+        ])->assertStatus(302);
+        $legacy = $pick(DB::table('BIOG_INST_DATA')->where($pk)->first());
+
+        // ② 復原初始 → ③ 新版改同一筆。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload([
+            'changes' => ['c_notes' => '改後備註'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+        $v2 = $pick(DB::table('BIOG_INST_DATA')->where($pk)->first());
+
+        $this->assertNotNull($legacy, 'legacy 更新後列不存在');
+        $this->assertNotNull($v2, 'v2 更新後列不存在');
+        $this->assertSame(20, (int) $legacy['c_inst_name_code'], 'legacy 改後 c_inst_name_code 應仍=20（explode 還原正確、未被清 0）');
+        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
+        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
+        $this->assertSame($legacy, $v2, 'BIOG_INST_DATA 落庫列 legacy vs v2 不等價');
     }
 
     #[Test]

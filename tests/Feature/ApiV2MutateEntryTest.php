@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -503,6 +504,60 @@ class ApiV2MutateEntryTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->entryPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，純單表 10 段 PK；entries 無鏡像/副表）──────
+
+    #[Test]
+    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
+    public function testEntryUpdateWriteEquivalenceLegacyVsV2(): void {
+        // #56 M（update，純單表，10 段 PK）——復原-重做實驗：改 c_pages+c_notes。legacy updateQuery 為 inline 整包
+        // update，且會把 body 多個欄（含 9 段 PK/source）emptyToSentinel + c_inst_code explode 後寫回；故 body 須送
+        // 完整 10 段 PK + c_entry_addr_id/c_source 原值（避免 PK 漂移/誤寫），再加要改的兩欄。本測試斷言改後 10 段 PK 不漂移。
+        $this->actingAs($this->makeUser(email: 'entry-mupd@example.com'));
+
+        $pk = [
+            'c_personid' => 1000, 'c_entry_code' => 36, 'c_sequence' => 1, 'c_kin_code' => 0,
+            'c_assoc_code' => 0, 'c_kin_id' => 0, 'c_year' => 1057, 'c_assoc_id' => 0,
+            'c_inst_code' => 0, 'c_inst_name_code' => 0,
+        ];
+        $seedInitial = function (): void {
+            DB::table('ENTRY_DATA')->delete();
+            $this->seedEntry(['c_notes' => '初始備註', 'c_pages' => '5', 'c_source' => 10, 'c_entry_addr_id' => 100]);
+        };
+        $cols = array_merge(array_keys($pk), ['c_entry_addr_id', 'c_source', 'c_pages', 'c_notes']);
+        $pick = function ($row) use ($cols): ?array {
+            if (!$row) {
+                return null;
+            }
+            $a = array_intersect_key((array) $row, array_flip($cols));
+            ksort($a);
+
+            return $a;
+        };
+
+        // ① 旧版 PUT（PK 走 query；body 送完整 10 段 PK + c_entry_addr_id/c_source 原值 + 要改的兩欄，
+        //    使 inline 整包寫回的非改動欄與原值一致）。c_inst_code=0 → explode 出 0/0，匹配 PK。
+        $seedInitial();
+        $this->put('/basicinformation/1000/entries/update?' . http_build_query($pk), array_merge($pk, [
+            'c_entry_addr_id' => 100, 'c_source' => 10, 'c_pages' => '10-15', 'c_notes' => '改後備註', 'action' => 'save',
+        ]))->assertStatus(302);
+        $legacy = $pick(DB::table('ENTRY_DATA')->where($pk)->first());
+
+        // ② 復原初始 → ③ 新版只送改動兩欄。
+        $seedInitial();
+        $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'changes' => ['c_pages' => '10-15', 'c_notes' => '改後備註'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+        $v2 = $pick(DB::table('ENTRY_DATA')->where($pk)->first());
+
+        $this->assertNotNull($legacy, 'legacy 更新後列不存在（10 段 PK 可能漂移）');
+        $this->assertNotNull($v2, 'v2 更新後列不存在');
+        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
+        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
+        $this->assertSame('10-15', $v2['c_pages'], 'v2 c_pages 應更新');
+        $this->assertSame(36, (int) $v2['c_entry_code'], 'v2 10 段 PK 之 c_entry_code 不應漂移');
+        $this->assertSame($legacy, $v2, 'ENTRY_DATA 落庫列 legacy vs v2 不等價（含 10 段 PK 不漂移）');
     }
 
     #[Test]

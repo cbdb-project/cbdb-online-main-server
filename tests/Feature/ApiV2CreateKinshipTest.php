@@ -118,7 +118,11 @@ class ApiV2CreateKinshipTest extends TestCase {
         });
     }
 
-    /** 親屬碼配對表：未送 c_kinship_pair 時以 c_kin_pair1 查權威反向碼。75↔76、80↔81 互為配對。 */
+    /**
+     * 親屬碼配對表：未送 c_kinship_pair 時以 c_kin_pair1 查權威反向碼。75↔76、80↔81 互為配對。
+     * 另加 82（c_kin_pair1=80）模擬「80 有第二個合法反向碼」的歧義場景：searchKinPair(80)={81,82}，
+     * 故 c_kinship_pair=82 為合法覆寫、76/999 非法。
+     */
     protected function createKinshipCodesTable(): void {
         Schema::create('KINSHIP_CODES', function (Blueprint $table) {
             $table->integer('c_kincode')->primary();
@@ -130,6 +134,7 @@ class ApiV2CreateKinshipTest extends TestCase {
             ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
             ['c_kincode' => 80, 'c_kin_pair1' => 81, 'c_kin_pair2' => null],
             ['c_kincode' => 81, 'c_kin_pair1' => 80, 'c_kin_pair2' => null],
+            ['c_kincode' => 82, 'c_kin_pair1' => 80, 'c_kin_pair2' => null],
         ]);
     }
 
@@ -187,6 +192,45 @@ class ApiV2CreateKinshipTest extends TestCase {
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80, 'c_notes' => '甲之親']);
         // 互逆鏡像 (300,1000,81)：對方為主體、原人為客體、反向親屬碼 81。
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_notes' => '甲之親']);
+    }
+
+    #[Test]
+    public function testDirectKinshipCreateWithValidReversePairOverride(): void {
+        // 使用者手選合法反向碼（82∈searchKinPair(80)={81,82}）→ 鏡像用 82 而非預設 81。
+        $this->actingAs($this->makeUser(email: 'kin-pair-override@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_kinship_pair' => 82],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        // 鏡像用手選的 82，非預設 c_kin_pair1=81。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 82]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81]);
+    }
+
+    #[Test]
+    public function testDirectKinshipCreateRejectsUnknownReversePair(): void {
+        // 反向碼 999 不存在 → 422、整筆回滾（fail-closed，正向列也不寫）。
+        $this->actingAs($this->makeUser(email: 'kin-pair-unknown@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => 'x', 'c_kinship_pair' => 999],
+        ]))->assertStatus(422)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+    }
+
+    #[Test]
+    public function testDirectKinshipCreateRejectsNonPairReverseCode(): void {
+        // 76 是真實碼但非 80 的合法配對（searchKinPair(80)={81,82}）→ 422、回滾。
+        $this->actingAs($this->makeUser(email: 'kin-pair-nonpair@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => 'x', 'c_kinship_pair' => 76],
+        ]))->assertStatus(422)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
     }
 
     #[Test]

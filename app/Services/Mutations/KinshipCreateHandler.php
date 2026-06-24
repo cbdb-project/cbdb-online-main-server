@@ -5,13 +5,16 @@ namespace App\Services\Mutations;
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\Mutations\Concerns\ResolvesKinshipReversePair;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
-    /** 暫存本次互逆配對碼，一律以 KINSHIP_CODES.c_kin_pair1 權威推導（不採信前端 c_kinship_pair）。 */
+    use ResolvesKinshipReversePair;
+
+    /** 暫存本次互逆配對碼：未送覆寫＝權威 c_kin_pair1；送合法覆寫＝使用者選的反向碼（已驗證）。 */
     private $pendingKinPair = null;
 
     public function __construct(
@@ -22,15 +25,23 @@ class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
     }
 
     /**
-     * 覆寫：剝除 c_kinship_pair（非 KIN_DATA 欄，否則父類白名單 422）。
-     * 互逆配對碼一律以 KINSHIP_CODES.c_kin_pair1 權威推導，「不信任」前端送來的值——否則
-     * 呼叫端可對 (A,B,code=X) 強塞任意反向碼污染鏡像列；proposal 核准會重播同一污染路徑。
+     * 覆寫：先讀 client 可選的 c_kinship_pair（反向碼覆寫），再剝除（非 KIN_DATA 欄，否則父類白名單 422）。
+     * 反向配對碼解析（resolveReversePair）：未送覆寫→以 KINSHIP_CODES.c_kin_pair1 權威推導；送了覆寫→
+     * 須 ∈ 該正向碼的合法配對候選（對齊 searchKinPair）才接受，否則 422 回滾（fail-closed）——既恢復
+     * 使用者對歧義反向關係（父→子/女、第幾子…）的選擇權，又杜絕對鏡像列強塞任意反向碼的污染。
      * direct 主列寫入成功後於同交易內由 afterDirectInsert 寫互逆鏡像列。
      */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 先讀 client 可選的反向碼覆寫，再剝除（c_kinship_pair 非 KIN_DATA 欄）。
+        $clientReverse = $changes['c_kinship_pair'] ?? null;
         unset($changes['c_kinship_pair']);
         $kinCode = $changes['c_kin_code'] ?? ($targetPk['c_kin_code'] ?? null);
-        $this->pendingKinPair = $this->lookupKinPair($kinCode);
+        try {
+            // 未送覆寫→權威 c_kin_pair1；送覆寫→驗證為合法配對否則 422（fail-closed、回滾）。
+            $this->pendingKinPair = $this->resolveReversePair($kinCode, $clientReverse);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
 
         try {
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
@@ -66,16 +77,6 @@ class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
     /** proposal 模式把配對碼（送的或權威值）存入 __proposal_aux（核准時 applyKinshipProposal 套用）。 */
     protected function proposalAuxiliaryPayload(): array {
         return ['c_kinship_pair' => CompositePrimaryKey::emptyToSentinel($this->pendingKinPair)];
-    }
-
-    /** 親屬碼的權威反向碼（KINSHIP_CODES.c_kin_pair1）；0／查無 → null。 */
-    private function lookupKinPair($code) {
-        if ($code === null || $code === '' || (int) $code === 0) {
-            return null;
-        }
-        $v = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->value('c_kin_pair1');
-
-        return $v !== null ? (int) $v : null;
     }
 
     protected function resourceName(): string {

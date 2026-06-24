@@ -132,6 +132,8 @@ class ApiV2MutateKinshipTest extends TestCase {
             ['c_kincode' => 73, 'c_kin_pair1' => 72, 'c_kin_pair2' => null],
             ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
             ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+            // 74 為 72 的第二個合法反向碼（searchKinPair(72)={73,74}）以測手選覆寫。
+            ['c_kincode' => 74, 'c_kin_pair1' => 72, 'c_kin_pair2' => null],
         ]);
     }
 
@@ -209,6 +211,57 @@ class ApiV2MutateKinshipTest extends TestCase {
         $this->assertDatabaseMissing('KIN_DATA', [
             'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 0,
         ]);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateWithValidReversePairOverride(): void {
+        // 使用者手選合法反向碼（74∈searchKinPair(72)={73,74}）+ 改備註 → 鏡像關係碼改為 74。
+        $this->actingAs($this->makeUser(email: 'kin-upd-pair-override@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-z']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-z',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 74],
+        ]))->assertOk();
+
+        // 反向鏡像由 73 改為手選的 74（以舊碼 72 的配對 {73} 定位既有列後更新）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateRejectsInvalidReversePair(): void {
+        // 非法反向碼 999 → 422、整筆回滾（正向備註不變）。
+        $this->actingAs($this->makeUser(email: 'kin-upd-pair-bad@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 999],
+        ]))->assertStatus(422)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '原備註']);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateNotesPreservesOverriddenReversePair(): void {
+        // 既有鏡像反向碼為 74（先前手選覆寫，非預設 73）；僅改備註、未送覆寫
+        // → 鏡像 c_kin_code 應「保留 74」，不被非關係編輯洗回 c_kin_pair1=73。
+        $this->actingAs($this->makeUser(email: 'kin-upd-preserve@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-p']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-p',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
     }
 
     #[Test]

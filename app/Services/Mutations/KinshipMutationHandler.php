@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\Mutations\Concerns\ResolvesKinshipReversePair;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -13,8 +14,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
+    use ResolvesKinshipReversePair;
+
     /**
-     * 暫存本次更新的鏡像同步資料：反向親屬碼（一律權威推導）、舊定位鍵（舊對方/舊備註/舊碼配對）。
+     * 暫存本次更新的鏡像同步資料：反向親屬碼（權威預設 c_kin_pair1 或經驗證的使用者覆寫）、
+     * preserveMirrorCode（未送覆寫且正向碼未變時保留既有鏡像碼）、舊定位鍵（舊對方/舊備註/舊碼配對）。
      * handle() 計算、afterDirectUpdate()/proposalAuxiliaryPayload() 取用、finally 清除。
      */
     private ?array $pendingKin = null;
@@ -27,11 +31,15 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
     }
 
     /**
-     * 覆寫：剝除 c_kinship_pair（非 KIN_DATA 欄，否則父類白名單 422）。互逆配對碼一律以
-     * KINSHIP_CODES.c_kin_pair1 權威推導，「不信任」前端送來的值（同 create）。
+     * 覆寫：先讀 client 可選的 c_kinship_pair（反向碼覆寫），再剝除（非 KIN_DATA 欄，否則父類白名單 422）。
+     * 反向碼解析同 create：未送→權威 c_kin_pair1；送→驗證為合法配對否則 422（fail-closed）。
+     * 另：未送覆寫且正向碼未變時「保留既有鏡像 c_kin_code」（preserveMirrorCode），避免改備註等
+     * 非關係編輯把使用者先前手選的反向碼洗回 c_kin_pair1。
      * 為定位既有反向鏡像列，先讀原列取得「舊」c_kin_id / c_autogen_notes 與「舊」正向碼的配對。
      */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 先讀 client 可選的反向碼覆寫，再剝除（c_kinship_pair 非 KIN_DATA 欄）。
+        $clientReverse = $changes['c_kinship_pair'] ?? null;
         unset($changes['c_kinship_pair']);
 
         $oldKinCode = $targetPk['c_kin_code'] ?? null;
@@ -39,9 +47,23 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
         $oldRow = $this->findKinRow($targetPk);
 
+        try {
+            // 未送覆寫→權威 c_kin_pair1；送覆寫→驗證為合法配對否則 422（fail-closed）。
+            $mirrorCode = $this->resolveReversePair($newKinCode, $clientReverse);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        // 保留既有鏡像反向碼：當「未送覆寫」且「正向碼未變」時，不可把鏡像 c_kin_code 洗回 c_kin_pair1
+        // ——否則改備註等非關係編輯會抹掉使用者先前在 create 時手選的反向碼（如 pair2）。
+        $hasOverride = !($clientReverse === null || $clientReverse === '' || (int) $clientReverse === 0);
+        $codeChanged = (string) ($newKinCode ?? '') !== (string) ($oldKinCode ?? '');
+
         $this->pendingKin = [
-            // 鏡像列關係碼＝「新」正向碼的權威反向碼。
-            'mirrorCode' => $this->lookupKinPair($newKinCode),
+            // 鏡像列關係碼＝「新」正向碼的反向碼（權威預設或經驗證的使用者覆寫）。
+            'mirrorCode' => $mirrorCode,
+            // true＝本次不覆寫鏡像 c_kin_code（保留既有值）。
+            'preserveMirrorCode' => !$hasOverride && !$codeChanged,
             // 定位既有反向列用「舊」值（舊碼配對查找與缺碼 fail-closed 由 syncKinMirrorOnUpdate 處理）。
             'oldKinId' => $targetPk['c_kin_id'] ?? null,
             'oldAutogen' => $oldRow->c_autogen_notes ?? null,
@@ -67,7 +89,12 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
         unset($dataMirror['__operation_id'], $dataMirror['__note'], $dataMirror['c_created_by'], $dataMirror['c_created_date']);
         $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
         $dataMirror['c_modified_date'] = Carbon::now();
-        $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($kin['mirrorCode'] ?? null);
+        if (!empty($kin['preserveMirrorCode'])) {
+            // 未送覆寫且正向碼未變：不動鏡像 c_kin_code（保留使用者先前手選的反向碼，不洗回 c_kin_pair1）。
+            unset($dataMirror['c_kin_code']);
+        } else {
+            $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($kin['mirrorCode'] ?? null);
+        }
         $dataMirror['c_personid'] = $newArray['c_kin_id']; // 反向列主體＝（新）對方
         unset($dataMirror['c_kin_id']);                    // 反向列客體 c_kin_id 維持本人，不覆寫
 
@@ -83,19 +110,9 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
         );
     }
 
-    /** proposal 模式把反向親屬碼（權威值）存入 __proposal_aux（核准時 kinshipUpdateById 讀 c_kinship_pair）。 */
+    /** proposal 模式把反向親屬碼（權威預設或經驗證的覆寫）存入 __proposal_aux（核准時 kinshipUpdateById 讀 c_kinship_pair）。 */
     protected function proposalAuxiliaryPayload(): array {
         return ['c_kinship_pair' => CompositePrimaryKey::emptyToSentinel($this->pendingKin['mirrorCode'] ?? null)];
-    }
-
-    /** 親屬碼的權威反向碼（KINSHIP_CODES.c_kin_pair1）；0／查無 → null。 */
-    private function lookupKinPair($code): ?int {
-        if ($code === null || $code === '' || (int) $code === 0) {
-            return null;
-        }
-        $v = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->value('c_kin_pair1');
-
-        return $v !== null ? (int) $v : null;
     }
 
     private function findKinRow(array $targetPk): ?object {

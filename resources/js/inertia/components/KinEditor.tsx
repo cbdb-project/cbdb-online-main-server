@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -6,10 +6,11 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
 /**
  * 親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy biogmains/kinship/_form.blade.php，非 person-browser）。
  *
- * === 互逆配對碼（c_kinship_pair）由後端自動補齊 ===
- * legacy 用前端 JS 查 /api/select/search/kinpair 填 c_kinship_pair（hidden）送出。
- * v2 後端 KinshipCreate/MutationHandler 一律以 KINSHIP_CODES.c_kin_pair1 權威推導反向親屬碼
- * （不採信前端值），並於同交易雙向同步鏡像列，故本編輯器**不送 pair**。
+ * === 互逆配對碼（c_kinship_pair）：可選/可手選反向關係碼 ===
+ * 反向關係常有歧義須人選（父→子或女、第幾子…）。本編輯器對齊 legacy：依正向碼查
+ * /api/select/search/kinpair 取候選、預設選第一個，使用者可手動更正後送 c_kinship_pair。
+ * v2 後端（KinshipCreate/MutationHandler）：未送→權威預設 c_kin_pair1；送→驗證為合法配對
+ * 否則 422（fail-closed），再於同交易雙向同步鏡像列。
  *
  * === 3 段複合主鍵 ===
  * c_personid（路由帶入，不可改）, c_kin_id（親屬人物）, c_kin_code（親屬關係碼）。
@@ -62,11 +63,48 @@ export default function KinEditor({
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
+    // 互逆配對碼（反向關係碼）：候選由 /api/select/search/kinpair 依正向碼取得（對齊 legacy）。
+    // 預設選第一個候選（同 legacy）；反向關係常有歧義（父→子/女、第幾子…）故容許手選。
+    type PairOpt = { code: string; label: string };
+    const [pairCandidates, setPairCandidates] = useState<PairOpt[]>([]);
+    const [reversePair, setReversePair] = useState<string>('');
+    // edit 模式僅在使用者「主動更改」反向碼時才送出覆寫（避免改備註等非關係編輯誤改鏡像反向碼）。
+    const [pairTouched, setPairTouched] = useState(false);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== snapshot.current, [fields]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
+
+    // 正向碼變更時重抓反向配對候選，並預設選第一個（對齊 legacy JS）；正向碼改變即重置 touched。
+    useEffect(() => {
+        const code = fields.c_kin_code;
+        if (!code || Number(code) === 0) { setPairCandidates([]); setReversePair(''); setPairTouched(false); return; }
+        let aborted = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/select/search/kinpair?kin_code=${encodeURIComponent(code)}&person_id=${encodeURIComponent(fields.c_kin_id ?? '0')}`, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
+                });
+                const rows = await res.json().catch(() => []);
+                if (aborted) return;
+                const opts: PairOpt[] = Array.isArray(rows)
+                    ? rows.map((r: Record<string, unknown>) => ({
+                        code: String(r.c_kincode),
+                        label: `${r.c_kincode} ${r.c_kinrel_chn ?? ''} ${r.c_kinrel ?? ''}`.trim(),
+                    }))
+                    : [];
+                setPairCandidates(opts);
+                // create：預設選第一候選（同 legacy）；edit：預設「保持目前反向碼」（空），
+                // 不冒充目前值（編輯器未載入既有鏡像列的實際反向碼），未觸碰即不送、後端保留原值。
+                setReversePair(mode === 'create' && opts.length ? opts[0].code : '');
+                setPairTouched(false);
+            } catch { if (!aborted) { setPairCandidates([]); setReversePair(''); } }
+        })();
+        return () => { aborted = true; };
+    // 僅依正向碼變動觸發（c_kin_id 變動不需重抓配對候選）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fields.c_kin_code]);
 
     const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
         setFields((prev) => ({ ...prev, c_source: p.source, c_pages: p.pages }));
@@ -92,6 +130,8 @@ export default function KinEditor({
             target = Object.fromEntries(PK.map((k) => [k, pkVal(k)]));
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+            // 反向配對碼：create 送目前選取（預設第一候選，同 legacy）；後端驗證為合法配對後寫入鏡像。
+            if (reversePair) changes.c_kinship_pair = reversePair;
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
             const initial: Fields = JSON.parse(snapshot.current);
@@ -103,6 +143,8 @@ export default function KinEditor({
                 const init = String(Number(initial[k]?.trim() ? initial[k] : '0'));
                 if (cur !== init) changes[k] = cur;
             }
+            // 反向配對碼：edit 僅在使用者主動更改時送出覆寫（避免改備註等誤改鏡像反向碼）。
+            if (reversePair && pairTouched) changes.c_kinship_pair = reversePair;
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -162,6 +204,21 @@ export default function KinEditor({
             {searchRow('c_kin_code', `${tr('kinship_relation', '親屬關係')} (c_kin_code)`, '/api/select/search/kincode')}
             {searchRow('c_kin_id', `${tr('relative_name', '親屬姓名')} (c_kin_id)`, '/api/select/search/biog')}
 
+            {/* 互逆配對碼：依正向碼取候選，預設第一個（同 legacy），反向關係有歧義（父→子/女、第幾子…）故可手選。 */}
+            <div style={rowStyle}><label style={labelStyle}>{tr('reverse_pair_label', '互逆配對碼')} (c_kinship_pair)</label><div style={fieldStyle}>
+                {pairCandidates.length ? (
+                    <select value={reversePair} disabled={!editable}
+                        onChange={(e) => { setReversePair(e.target.value); setPairTouched(true); }}
+                        style={{ ...inputStyle }}>
+                        {mode === 'edit' ? <option value="">{tr('keep_current_pair', '（保持目前反向碼）')}</option> : null}
+                        {pairCandidates.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                    </select>
+                ) : (
+                    <input type="text" value={tr('no_paired_kinship', '（此關係無對應反向配對碼，系統自動處理）')} readOnly disabled style={{ ...inputStyle, ...roStyle }} />
+                )}
+                <span style={pairFieldHintStyle}>{tr('reverse_pair_hint', '系統依關係碼自動雙向同步；預設取建議的反向碼，可手動更正（例：父→子或女、第幾子）。')}</span>
+            </div></div>
+
             <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
                 <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} /></div></div>
 
@@ -176,10 +233,6 @@ export default function KinEditor({
                 <textarea value={fields.c_autogen_notes ?? ''} disabled={!editable} onChange={(e) => set('c_autogen_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
-
-            <div style={pairHintStyle}>
-                ℹ️ {tr('kinship_pair_auto_hint', '互逆親屬關係（配對）由系統依關係碼自動雙向同步，無需手動填寫。')}
-            </div>
 
             {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
                 <>
@@ -220,7 +273,7 @@ const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
 const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.875rem', boxSizing: 'border-box' };
 const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const pairHintStyle: React.CSSProperties = { background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', margin: '6px 0', fontSize: '0.82rem', color: '#334155' };
+const pairFieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
 const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
 const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };

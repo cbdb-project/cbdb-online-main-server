@@ -200,6 +200,7 @@ return [
     'opposite_edge_multiple_title' => 'The other side already has multiple corresponding relationships',
     'opposite_edge_multiple_desc' => 'The other person already has multiple corresponding reverse relationships ({n} total). Please verify the records below, and review/reconcile them on the other person\'s page.',
     'opposite_edge_code_label' => 'Code',
+    'opposite_edge_multiple_confirm' => 'The other side has multiple corresponding reverse relationships. Saving directly will sync all of them. Please confirm the records listed above are correct, then click "Save directly" again to continue.',
     'text_title_field' => 'Source Title',
     'kinship_create' => 'Add Kinship',
     'kinship_edit' => 'Edit Kinship',

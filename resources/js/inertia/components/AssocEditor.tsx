@@ -123,6 +123,8 @@ export default function AssocEditor({
     const msgTimer = useRef<number | null>(null);
     const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
+    // #80（§5-B）：對面多筆對應時，direct 存檔須二次確認（先停下提示，再次點擊才一併同步）。偵測結果變動即重置。
+    const multiAckRef = useRef(false);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
 
@@ -141,6 +143,8 @@ export default function AssocEditor({
         },
         reloadKey: savedSnapshot,
     });
+    // 偵測結果物件每次重抓即換參考（含同筆數但對面列集合改變的情形）→ 重置武裝旗標。
+    useEffect(() => { multiAckRef.current = false; }, [oppositeEdge]);
     const reverseCodeLabel = useMemo(() => pairCandidates.find((o) => o.code === reversePair)?.label, [pairCandidates, reversePair]);
 
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
@@ -281,6 +285,13 @@ export default function AssocEditor({
     };
 
     const save = async (sm: 'direct' | 'proposal', force = false) => {
+        // #80（§5-B）：direct 存檔且偵測到對面多筆對應時，第一次點擊只提示不送出（武裝確認），第二次才一併同步。
+        // force（#66/#70 衝突強制覆寫/收斂）已是使用者的明確決定，不再二次攔截。
+        if (sm === 'direct' && !force && oppositeEdge?.status === 'multiple' && !multiAckRef.current) {
+            multiAckRef.current = true;
+            setError(tr('opposite_edge_multiple_confirm', '對面有多筆對應的反向關係。直接保存會一併同步這些反向列。請先確認上方列出的記錄無誤，再次點擊「直接保存」以繼續。'));
+            return;
+        }
         setSaving(true); setError(null); setMessage(null); setConflict(null); setSuspected(null);
         // PK 段空值正規化：c_text_title→'[n/a]'、c_assoc_first_year→'-9999'、其餘 code 段→'0'。
         const pkVal = (k: string): number | string => {

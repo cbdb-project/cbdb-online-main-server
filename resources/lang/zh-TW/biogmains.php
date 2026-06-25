@@ -200,6 +200,7 @@ return [
     'opposite_edge_multiple_title' => '對面已有多筆對應關係',
     'opposite_edge_multiple_desc' => '對面人物已有多筆對應的反向關係（共 {n} 筆）。請確認下列記錄是否正確，建議前往對面人物逐一檢視整理。',
     'opposite_edge_code_label' => '碼',
+    'opposite_edge_multiple_confirm' => '對面有多筆對應的反向關係。直接保存會一併同步這些反向列。請先確認上方列出的記錄無誤，再次點擊「直接保存」以繼續。',
     'text_title_field' => '出處標題',
     'kinship_create' => '新增親屬關係',
     'kinship_edit' => '編輯親屬關係',

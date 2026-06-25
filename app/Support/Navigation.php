@@ -138,6 +138,15 @@ class Navigation {
                     self::routeUrl('app.maps.index'),
                     ['pages' => ['歷史地圖'], 'patterns' => ['app.maps.*']]
                 ),
+                // #83（§9）：單向關係修復頁降級至「暫不公開」。其缺邊補建／多條裁決已由人物編輯器行內流程取代
+                // （#79/#80/#81），路由保留供 admin 直接使用，但不在常規管理工具曝光，標註「已由行內流程取代」。
+                self::item(
+                    'unidirectional-repair',
+                    'admin.unidirectional_repair_superseded',
+                    'fas fa-exchange-alt',
+                    self::url('admin.unidirectional-relationship-repair', 'admin.unidirectional-relationship-repair', 'app.admin.unidirectional-relationship-repair'),
+                    ['pages' => ['單向關係修復'], 'patterns' => []]
+                ),
             ], null, fn () => $isSuperAdmin),
 
             // 管理工具（需 superadmin）
@@ -211,13 +220,6 @@ class Navigation {
                     'fa fa-database',
                     self::url('admin.cbdb-table-maintenance', 'admin.cbdb-table-maintenance', 'app.admin.cbdb-table-maintenance'),
                     ['pages' => ['CBDB 內部表維護'], 'patterns' => []]
-                ),
-                self::item(
-                    'unidirectional-repair',
-                    'admin.unidirectional_repair',
-                    'fas fa-exchange-alt',
-                    self::url('admin.unidirectional-relationship-repair', 'admin.unidirectional-relationship-repair', 'app.admin.unidirectional-relationship-repair'),
-                    ['pages' => ['單向關係修復'], 'patterns' => []]
                 ),
                 self::item(
                     'merge-preview',

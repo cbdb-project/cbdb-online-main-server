@@ -215,6 +215,9 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
                     'count' => $e->count(),
                 ],
             ]);
+        } catch (MirrorIntegrityException $e) {
+            // #87：fail-closed（KINSHIP_CODES 缺配對碼）→ 整筆回滾，轉結構化 422（與 update/create 一致，不漏成 500）。
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
         } catch (\Illuminate\Database\QueryException $e) {
             throw $e;
         }

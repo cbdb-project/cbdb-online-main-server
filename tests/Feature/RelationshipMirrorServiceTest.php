@@ -157,6 +157,26 @@ class RelationshipMirrorServiceTest extends TestCase {
     }
 
     #[Test]
+    public function testKinReverseLocatorCodes(): void {
+        // #87：定位碼集＝「指向 $code 的碼」∪「$code 自身 pair1/pair2」。
+        // 75：指向集{76,77} ∪ 自身{76,180} = {76,77,180}——關鍵是含 180（75.c_kin_pair2=180 但無碼回指 75）。
+        $this->assertEqualsCanonicalizing([76, 77, 180], $this->svc->kinReverseLocatorCodes(75), '聯集須含自身配對 180（非對稱）');
+        $this->assertSame([75], $this->svc->kinReverseLocatorCodes(76), '對稱配對：兩集相等');
+        $this->assertSame([201], $this->svc->kinReverseLocatorCodes(200), '無人指向 200 → 僅自身配對 [201]');
+        $this->assertSame([], $this->svc->kinReverseLocatorCodes(0));
+        $this->assertSame([], $this->svc->kinReverseLocatorCodes(null));
+    }
+
+    #[Test]
+    public function testLocateOppositeEdgesKinAsymmetricPairNotFalseMissing(): void {
+        // #87 回歸：對面以「我方自身配對碼」180 編碼（75.c_kin_pair2=180，但無碼回指 75）。
+        // 舊定位（僅指向集{76,77}）會漏命中→誤報「對面缺邊」；聯集{76,77,180}應命中→非缺邊。
+        $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'a', 'forward_code' => 75];
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 180, 'c_notes' => 'r', 'c_autogen_notes' => 'a']);
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', $locator), '180 編碼的合法反向列應被定位（不誤報缺邊）');
+    }
+
+    #[Test]
     public function testLocateOppositeEdgesKinship(): void {
         $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'a', 'forward_code' => 75];
         // 缺邊（對面 0 列 → 問題 A）。

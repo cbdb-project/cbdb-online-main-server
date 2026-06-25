@@ -111,7 +111,7 @@ class OperationsProposalController extends Controller {
             flash('審核失敗：'.$detail, 'error');
 
             return redirect()->back();
-        } catch (\App\Services\Mutations\MirrorConflictException|\App\Services\Mutations\MirrorSuspectedException|\App\Services\Mutations\MirrorIntegrityException $e) {
+        } catch (\App\Services\Mutations\MirrorConflictException|\App\Services\Mutations\MirrorSuspectedException $e) {
             // #77：核准社會關係／親屬更新提案時，偵測到對面互逆鏡像列已被獨立改動（內容分歧／關係碼漂移）或資料完整性問題。
             // 整筆交易已回滾、提案未核准——避免靜默覆寫對方資料。回友善中文提示（不外洩底層 SQL），引導審核者先至對面確認。
             Log::warning('提案核准中止：對面鏡像分歧/疑似', [
@@ -120,6 +120,17 @@ class OperationsProposalController extends Controller {
                 'exception' => get_class($e),
             ]);
             flash('審核未通過：偵測到對應的反向關係列已被獨立修改（內容或關係碼不一致）。為避免覆寫對方資料，已中止此次核准——請先至對應人物頁確認/修正反向關係後再核准。', 'error');
+
+            return redirect()->back();
+        } catch (\App\Services\Mutations\MirrorIntegrityException $e) {
+            // fail-closed：鏡像同步所需的配對碼/權威反向碼缺失，若繼續核准會造成單邊刪除或假成功。
+            Log::warning('提案核准中止：鏡像資料完整性 fail-closed', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            flash('審核未通過：對應的反向關係資料完整性異常，為避免產生單邊刪除或不一致鏡像，已中止此次核准。請先檢查關係碼與對應人物資料後再重試。', 'error');
 
             return redirect()->back();
         } catch (\Illuminate\Database\QueryException $e) {

@@ -69,7 +69,10 @@ class RelationshipMirrorService {
      * 與 ResolvesKinshipReversePair::legitReversePairCodes / syncKinMirrorOnUpdate 的 legitReverses 同義。
      *
      * ⚠ 注意：這是「指向 $oldKinCode 的碼集」（查詢方向 pair1/pair2 = $oldKinCode），與 validReverseKinSet（$oldKinCode
-     * 自身的 pair1/pair2）方向相反、語義不同。kin 鏡像定位用本法（須涵蓋排行子等多碼）；assoc 無排行，定位用 validReverseAssocSet。
+     * 自身的 pair1/pair2）方向相反、語義不同。
+     *
+     * ⚠ #87 後鏡像定位已改用 kinReverseLocatorCodes（本法 ∪ validReverseKinSet 的聯集），本法目前無生產定位呼叫端，
+     * 保留作語義對照／反向碼候選驗證（ResolvesKinshipReversePair 另有自己的 legitReversePairCodes）；勿誤當定位器使用。
      *
      * @return int[]
      */
@@ -88,10 +91,34 @@ class RelationshipMirrorService {
     }
 
     /**
+     * 親屬反向鏡像「定位碼集」＝ legitReverseKinCodes（指向 $oldKinCode 的碼）∪ validReverseKinSet（$oldKinCode 自身
+     * pair1/pair2 指向的碼）。供 locateOppositeEdges 與 syncKinMirrorOnUpdate/OnDelete 的反向列定位共用（單一真相）。
+     *
+     * 為何用聯集（#87 修正）：KINSHIP_CODES 配對可非對稱——$oldKinCode 自身可指向 X（如 75.c_kin_pair2=180），但 X 不
+     * 回指 $oldKinCode（無碼 pair=75 等於 180），且另有他碼指向 $oldKinCode（76/77 指向 75）。舊「指向集，僅空集才退回
+     * 自身」會在此情形漏掉以 X(180) 編碼的合法反向列 → 偵測誤報「對面缺邊」、sync 漏定位而 backfill 補重複。聯集同時涵蓋
+     * 「他碼指向我」與「我指向某碼」兩個方向的合法反向碼，避免漏命中。對稱配對（兩集相等）結果不變。
+     *
+     * @return int[]
+     */
+    public function kinReverseLocatorCodes($oldKinCode): array {
+        if ($oldKinCode === null || (int) $oldKinCode === 0) {
+            return [];
+        }
+        $pointingTo = DB::table('KINSHIP_CODES')
+            ->where('c_kin_pair1', $oldKinCode)->orWhere('c_kin_pair2', $oldKinCode)
+            ->pluck('c_kincode')->map(static fn ($c) => (int) $c)->all();
+
+        $merged = array_merge($pointingTo, $this->validReverseKinSet($oldKinCode));
+
+        return array_values(array_unique(array_map('intval', $merged)));
+    }
+
+    /**
      * 定位「對面互逆鏡像列」（與 syncKin/AssocMirrorOnUpdate 的嚴格定位器同套條件）。供 §4/§5 缺邊/多條偵測共用。
      *
      * - kinship  $locator：['person_id'(本人), 'opposite_id'(對方), 'autogen_notes', 'forward_code'(正向親屬碼)]
-     *   → KIN_DATA where c_kin_id=本人, c_personid=對方, c_autogen_notes=備註, c_kin_code ∈ legitReverseKinCodes(正向碼)。
+     *   → KIN_DATA where c_kin_id=本人, c_personid=對方, c_autogen_notes=備註, c_kin_code ∈ kinReverseLocatorCodes(正向碼)（#87 聯集）。
      * - association $locator：['person_id', 'opposite_id', 'text_title', 'first_year', 'forward_code']
      *   → ASSOC_DATA where c_assoc_id=本人, c_personid=對方, c_text_title=書名, c_assoc_first_year=首年, c_assoc_code ∈ validReverseAssocSet(正向碼)。
      *
@@ -107,7 +134,8 @@ class RelationshipMirrorService {
      */
     public function locateOppositeEdges(string $type, array $locator) {
         if ($type === 'kinship') {
-            $reverseCodes = $this->legitReverseKinCodes($locator['forward_code'] ?? null);
+            // #87：用聯集定位碼集（指向我 ∪ 我指向），涵蓋非對稱配對，避免漏命中合法反向列誤報缺邊。
+            $reverseCodes = $this->kinReverseLocatorCodes($locator['forward_code'] ?? null);
             $autogen = $locator['autogen_notes'] ?? null;
             $q = DB::table('KIN_DATA')
                 ->where('c_kin_id', $locator['person_id'])

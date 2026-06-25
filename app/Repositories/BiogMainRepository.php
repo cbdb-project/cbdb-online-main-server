@@ -2684,8 +2684,9 @@ class BiogMainRepository {
      * 同步親屬（KIN_DATA）反向鏡像列（update 場景）。legacy kinshipUpdateById 與 v2 KinshipMutationHandler 共用。
      *
      * 反向列定位（對齊 legacy）：對方為客體指向本人（c_kin_id=本人、c_personid=舊對方），舊備註相符，
-     * 親屬碼 ∈ 舊正向碼的權威配對（KINSHIP_CODES.c_kin_pair1/pair2）。精確命中 1 筆＝以配對定位更新；
-     * 否則退回寬鬆定位（僅 c_kin_id/c_personid/c_autogen_notes）＝完全保留 legacy 行為。
+     * 親屬碼 ∈ kinReverseLocatorCodes(舊正向碼)＝「指向該碼的碼集」∪「該碼自身 pair1/pair2」聯集（#87，與偵測
+     * locateOppositeEdges 同源，涵蓋非對稱配對）。精確命中 ≥1 筆＝以配對定位更新全部命中列；否則退回寬鬆定位
+     * （僅 c_kin_id/c_personid/c_autogen_notes）＝完全保留 legacy 行為。
      *
      * $dataMirror 須已備妥：c_kin_code=反向碼、c_personid=新對方、且「不含 c_kin_id」（反向列 c_kin_id 維持本人）。
      * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
@@ -2702,19 +2703,11 @@ class BiogMainRepository {
         if (!$kinCodePair) {
             throw new \App\Services\Mutations\MirrorIntegrityException('找不到原親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像失準已中止本次同步。');
         }
-        // 合法反向集（對齊 ResolvesKinshipReversePair::legitReversePairCodes）：KINSHIP_CODES 中 c_kin_pair1/pair2
-        // 指向 oldKinCode 者（含使用者手選的替代反向碼，如 74↔72，非僅權威 c_kin_pair1=73）；空集則退回該碼自身
-        // pair1/pair2 指向。修正原「僅用 c_kin_pair1」的過窄精確定位——否則合法替代反向碼鏡像（74）會落入下方 relaxed
-        // 被誤判為他段關係而漏同步。
-        $legitReverses = DB::table('KINSHIP_CODES')
-            ->where('c_kin_pair1', $oldKinCode)->orWhere('c_kin_pair2', $oldKinCode)
-            ->pluck('c_kincode')->map(static fn ($c) => (int) $c)->all();
-        if (empty($legitReverses)) {
-            $legitReverses = array_map('intval', array_values(array_filter(
-                [$kinCodePair->c_kin_pair1, $kinCodePair->c_kin_pair2],
-                static fn ($v) => $v !== null && (int) $v !== 0
-            )));
-        }
+        // 反向鏡像定位碼集＝聯集（#87，收斂於 RelationshipMirrorService::kinReverseLocatorCodes，單一真相）：
+        // 「指向 oldKinCode 的碼」（含使用者手選替代反向碼，如 74↔72，非僅權威 c_kin_pair1）∪「oldKinCode 自身 pair1/pair2
+        // 指向的碼」。修正原「僅指向集、空集才退回自身」在非對稱配對（如 75.c_kin_pair2=180 但無碼回指 75）漏掉以 180
+        // 編碼的合法反向列 → 落 relaxed 被誤判他段、偵測誤報缺邊、sync 漏定位補重複。偵測 locateOppositeEdges 用同一聯集。
+        $legitReverses = app(\App\Services\RelationshipMirrorService::class)->kinReverseLocatorCodes($oldKinCode);
 
         $pairWhere = function ($query) use ($cPersonid, $oldKinId, $oldAutogenNotes, $legitReverses) {
             $query->where('c_kin_id', $cPersonid)
@@ -2833,9 +2826,9 @@ class BiogMainRepository {
 
     /**
      * 同步親屬（KIN_DATA）反向鏡像列（delete 場景）。legacy kinshipDeleteById 與 v2 KinshipDeleteHandler 共用。
-     * $row 為被刪除的「正向列」（陣列）。#81 §6：以 legitReverses（指向正向碼的合法反向碼集，與 update/偵測
-     * locateOppositeEdges 同套）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、備註相符、
-     * c_kin_code ∈ legitReverseKinCodes(正向碼)），涵蓋排行子等多碼，修正舊窄定位漏刪具體排行碼反向列→孤兒。
+     * $row 為被刪除的「正向列」（陣列）。以 kinReverseLocatorCodes（指向正向碼 ∪ 正向碼自身配對的聯集，#87；與
+     * update/偵測 locateOppositeEdges 同源）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、備註相符、
+     * c_kin_code ∈ kinReverseLocatorCodes(正向碼)），涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪→孤兒。
      * 命中 0 → 不刪（合法單邊）；命中 1 → 精確刪該列；命中 >1 且未帶 $force → 拋 MirrorDeleteMultipleException
      * （整筆交易回滾，回 409 供使用者確認）；>1 且 $force → 一併精確刪除全部候選。正向列本身由呼叫端負責刪除。
      */
@@ -2843,15 +2836,15 @@ class BiogMainRepository {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
-        // 正向碼缺於 KINSHIP_CODES＝資料完整性已破壞：fail-closed 中止（拋例外回滾整筆交易，
-        // 與 legacy 解參考 null 致命錯誤同為原子失敗），避免正向已刪而反向鏡像孤兒（codex MAJOR 修正）。
+        // 正向碼缺於 KINSHIP_CODES＝資料完整性已破壞：fail-closed 中止（拋 MirrorIntegrityException 回滾整筆交易，
+        // 與 update/create 同型別→由 handleDirect/approve 轉結構化 422，而非裸 RuntimeException 漏成 500，三路一致）。
         // 注意：這與「反向列不存在」（合法的單邊資料）不同——後者下方仍正常 return 不刪。
         if (!KinshipCode::find($row['c_kin_code'] ?? null)) {
-            throw new \RuntimeException('找不到親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像孤兒已中止刪除。');
+            throw new \App\Services\Mutations\MirrorIntegrityException('找不到親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像孤兒已中止刪除。');
         }
 
-        // #81 §6：反向鏡像定位對齊 legitReverses（「指向正向碼」的合法反向碼集，與 update / 偵測 locateOppositeEdges
-        // 同套定位器），涵蓋排行子等多碼，修正舊窄定位（只認正向碼自身 c_kin_pair1/2）漏刪具體排行碼反向列→孤兒。
+        // 反向鏡像定位用 kinReverseLocatorCodes 聯集（與 update / 偵測 locateOppositeEdges 同源，#87），
+        // 涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪具體反向碼列→孤兒。
         $mirror = app(\App\Services\RelationshipMirrorService::class);
         $candidates = $mirror->locateOppositeEdges('kinship', [
             'person_id' => $row['c_personid'] ?? null,

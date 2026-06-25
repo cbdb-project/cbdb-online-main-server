@@ -251,9 +251,31 @@ class ApiV2DeleteKinshipTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectKinshipDeleteRemovesAsymmetricSelfPairReverse(): void {
+        // #87 sync 路徑回歸：對面反向列以「正向碼自身配對碼」180 編碼（75.c_kin_pair2=180，但 180 不回指 75、
+        // 且 76 指向 75）。舊窄定位（僅指向集{76}，非空故不退回自身）漏刪→孤兒；聯集 {76,180} 應命中並刪除。
+        DB::table('KINSHIP_CODES')->where('c_kincode', 75)->update(['c_kin_pair2' => 180]);
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 180, 'c_kin_pair1' => null, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-asym@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 180,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        // 非對稱自身配對碼反向列亦連帶刪除（修孤兒）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 180]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
     public function testDirectKinshipDeleteFailsClosedWhenCodeMissingFromCodeTable(): void {
         // 正向碼缺於 KINSHIP_CODES（資料完整性破壞）：刪除須 fail-closed 回滾整筆，
-        // 不可正向已刪而反向鏡像孤兒（codex MAJOR 修正）。
+        // 不可正向已刪而反向鏡像孤兒（codex MAJOR 修正）。#87：改拋 MirrorIntegrityException → 結構化 422（不漏成 500）。
         $user = $this->makeUser(email: 'delete-kin-failclosed@example.com');
         $this->actingAs($user);
         $this->seedKin(['c_kin_code' => 99, 'c_autogen_notes' => 'auto-x']); // 99 不在 KINSHIP_CODES
@@ -264,7 +286,7 @@ class ApiV2DeleteKinshipTest extends TestCase {
 
         $this->postJson('/api/v2/delete', $this->deletePayload([
             'target' => ['pk' => ['c_kin_code' => 99]],
-        ]));
+        ]))->assertStatus(422)->assertJson(['ok' => false, 'errors' => ['mirror_integrity' => ['fail_closed']]]);
 
         // 交易回滾：正向與反向皆原樣保留（無孤兒、無半刪）。
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 99]);

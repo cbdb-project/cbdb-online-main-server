@@ -1191,4 +1191,60 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertDatabaseMissing('operations', ['resource' => 'TEST_CODES', 'op_type' => Operation::TYPE_DELETE]);
         $this->assertSame(0, DB::table('audit_log')->where('operation', 'DELETE')->count());
     }
+
+    #[Test]
+    public function testApproveDeleteKinProposalFailsClosedWhenCodeMissingFromCodeTable(): void {
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 1000,
+            'c_kin_id' => 2000,
+            'c_kin_code' => 999,
+            'c_source' => 10,
+            'c_notes' => '正向待刪',
+            'c_autogen_notes' => 'auto-x',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000,
+            'c_kin_id' => 1000,
+            'c_kin_code' => 101,
+            'c_source' => 10,
+            'c_notes' => '對面鏡像',
+            'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+
+        $original = [
+            'c_personid' => 1000,
+            'c_kin_id' => 2000,
+            'c_kin_code' => 999,
+            'c_source' => 10,
+            'c_notes' => '正向待刪',
+            'c_autogen_notes' => 'auto-x',
+        ];
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-999',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, 'fail-closed 應中止核准並維持 pending');
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 999]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '回滾：正反向皆不得半刪');
+        $this->assertSame(0, DB::table('operations')->where('resource', 'KIN_DATA')->where('op_type', Operation::TYPE_DELETE)->count(), '不得寫入 final delete operation');
+    }
 }

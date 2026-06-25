@@ -456,6 +456,30 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         return $data;
     }
 
+    /**
+     * 碼/FK 欄「完全規範化」：把所有空表示（null / '' / -999）一律→'0'（等同 emptyToSentinel）。
+     *
+     * 用於「legacy 哨兵語義 0=Unknown」的非 PK 碼/FK 欄（如 c_source）：DDL 雖為 nullable，但 legacy 資料流
+     * 一律把空碼落 0（見 BasicInformationPossessionController `?? '0'`、Entry `emptyToSentinel`），故 v2 對齊＝
+     * 達成 sentinel 完全幂等：0 / null / '' / -999 落庫皆為 0、永不寫 null/''、來回重送不翻，與「表單送 0」的 legacy 一致。
+     * normalizeSentinelValues 只做 -999→0（漏 null/''），故對這類欄需改用本法（前端中介層常把空欄轉 null，送 null 是真實場景）。
+     *
+     * @param array $data 待處理資料
+     * @param array $fields 需完全規範化的碼/FK 欄名（限 legacy 哨兵 0=Unknown 語義者；真正 nullable FK（如 basic_info 空→null）勿用）
+     */
+    protected function normalizeEmptyCodeFields(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data)) {
+                $v = $data[$field];
+                if ($v === null || $v === '' || (int) $v === -999) {
+                    $data[$field] = '0';
+                }
+            }
+        }
+
+        return $data;
+    }
+
     /** 判斷是否有實際有效變更 */
     protected function hasEffectiveChanges(array $originalArray, array $updateData): bool {
         foreach ($updateData as $field => $value) {

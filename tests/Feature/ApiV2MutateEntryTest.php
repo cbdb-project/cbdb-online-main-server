@@ -561,6 +561,27 @@ class ApiV2MutateEntryTest extends TestCase {
     }
 
     #[Test]
+    public function testEntryCodeFieldsSentinelFullyIdempotent(): void {
+        // 兩個非 PK 碼欄 c_source / c_entry_addr_id（legacy 哨兵 0=Unknown）所有空表示 → 0、合法值保留、不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'entry-sentinel@example.com'));
+        $T = 'ENTRY_DATA';
+        $fields = ['c_source', 'c_entry_addr_id'];
+        foreach ($fields as $f) {
+            foreach ([null, '', -999, '0', 0] as $sent) {
+                DB::table($T)->delete();
+                $this->seedEntry([$f => 5, 'c_notes' => '初始']);
+                $this->postJson('/api/v2/mutate', $this->entryPayload(['changes' => [$f => $sent, 'c_notes' => '改'.$f.var_export($sent, true)]]))->assertOk();
+                $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+                $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+            }
+        }
+        DB::table($T)->delete();
+        $this->seedEntry(['c_source' => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->entryPayload(['changes' => ['c_source' => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value('c_source'), '合法非 0 值不得被誤清');
+    }
+
+    #[Test]
     public function testEntryUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'entry-alias@example.com');
         $this->actingAs($user);

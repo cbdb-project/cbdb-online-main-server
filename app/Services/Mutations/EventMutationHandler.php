@@ -251,6 +251,8 @@ class EventMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
     protected function preprocessUpdateData(array $data): array {
         $data = $this->normalizeSentinelValues($data, ['c_event_code', 'c_source']);
+        // sentinel 完全幂等：c_source（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
         if (array_key_exists('c_intercalary', $data)) {
             $data['c_intercalary'] = (int) ($data['c_intercalary'] ?? 0);

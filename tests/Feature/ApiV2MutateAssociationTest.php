@@ -1116,6 +1116,30 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testAssociationCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        // 不送配對碼 → maintain=false、無鏡像 backfill/疑似，純驗正向碼欄規範化。
+        $this->actingAs($this->makeUser(email: 'assoc-sentinel@example.com'));
+        $T = 'ASSOC_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedAssociation([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->associationPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedAssociation([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->associationPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->associationPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
+    }
+
+    #[Test]
     public function testAssociationUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'assoc-alias@example.com');
         $this->actingAs($user);

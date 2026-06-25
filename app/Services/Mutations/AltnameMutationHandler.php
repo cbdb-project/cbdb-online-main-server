@@ -63,6 +63,8 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
         // -999 → 0 轉換
         $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
+        // sentinel 完全幂等：c_source（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
         return $data;
     }

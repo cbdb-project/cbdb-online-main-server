@@ -359,6 +359,8 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
             'c_assoc_kin_code', 'c_assoc_kin_id', 'c_source',
         ]);
+        // sentinel 完全幂等：c_source（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999；下方 PK 欄另用 emptyToSentinel）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
         // 與 AssociationCreateHandler 及 legacy BasicInformationAssocController 對齊：
         // c_text_title / c_assoc_first_year 為 NOT NULL 複合主鍵欄位，空值須轉哨兵，

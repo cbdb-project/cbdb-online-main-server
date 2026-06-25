@@ -231,6 +231,8 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
         $data = $this->normalizeSentinelValues($data, [
             'c_source', 'c_measure_code', 'c_possession_act_code',
         ]);
+        // sentinel 完全幂等：三個碼欄（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source', 'c_measure_code', 'c_possession_act_code']);
 
         return $data;
     }

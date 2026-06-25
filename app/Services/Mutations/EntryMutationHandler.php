@@ -80,6 +80,8 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_entry_code', 'c_entry_addr_id', 'c_kin_code',
             'c_assoc_code', 'c_inst_code', 'c_source',
         ]);
+        // sentinel 完全幂等：非 PK 碼欄（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_entry_addr_id', 'c_source']);
 
         return $data;
     }

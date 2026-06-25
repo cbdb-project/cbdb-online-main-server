@@ -164,6 +164,35 @@ class ApiV2MutateTextTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    // ── Sentinel 幂等（碼/FK 欄 0/null/''/-999 規範化一致）──────────────
+
+    #[Test]
+    public function testTextCodeFieldSentinelFullyIdempotent(): void {
+        // 「完全幂等」：碼/FK 欄（c_source/c_textid，legacy 哨兵 0=Unknown（DDL 實為 nullable））的所有「空表示」
+        // ——0 / null / '' / -999——v2 一律規範化為 0，落庫穩定、來回不翻。逐一送出，斷言皆存 0（不出現 null/''）。
+        $this->actingAs($this->makeUser(email: 'text-sentinel@example.com'));
+        $pk = ['c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1];
+
+        foreach ([0, null, '', -999, '0'] as $sent) {
+            DB::table('BIOG_TEXT_DATA')->delete();
+            $this->seedText(['c_source' => 10]); // 先非 0，確保「送空 → 規範化為 0」是真寫入而非巧合
+            $this->postJson('/api/v2/mutate', $this->textPayload([
+                'changes' => ['c_source' => $sent, 'c_notes' => '改'],
+            ]))->assertOk();
+            $stored = DB::table('BIOG_TEXT_DATA')->where($pk)->value('c_source');
+            $this->assertSame(0, (int) $stored, '送出 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull($stored, 'c_source 不得為 null（NOT NULL 欄）');
+        }
+
+        // 冪等性：DB 已是 0，再送 0 / null / '' → 仍是 0，無翻動（c_notes 每輪唯一以確保有有效變更、不觸 no_effective_changes）。
+        foreach ([0, null, ''] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->textPayload([
+                'changes' => ['c_source' => $sent, 'c_notes' => '再改第'.$i.'輪'],
+            ]))->assertOk();
+            $this->assertSame(0, (int) DB::table('BIOG_TEXT_DATA')->where($pk)->value('c_source'));
+        }
+    }
+
     // ── Direct Update Tests ─────────────────────────────────
 
     #[Test]

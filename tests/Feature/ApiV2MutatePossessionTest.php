@@ -185,6 +185,49 @@ class ApiV2MutatePossessionTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    // ── Sentinel 完全幂等（碼欄 0/null/''/-999 規範化一致；§M 「每頁≥10 多樣案例」）──────
+
+    #[Test]
+    public function testPossessionCodeFieldsSentinelFullyIdempotent(): void {
+        // 三個碼欄 c_source/c_measure_code/c_possession_act_code（legacy 哨兵 0=Unknown（DDL 實為 nullable））的
+        // 所有空表示（null/''/-999/'0'/0）一律→0、永不寫 null、合法值保留、來回不翻；與「表單送 0」的 legacy 一致。
+        $this->actingAs($this->makeUser(email: 'poss-sentinel@example.com'));
+        $pk = ['c_possession_record_id' => 500];
+        $fields = ['c_source', 'c_measure_code', 'c_possession_act_code'];
+
+        // A. 各碼欄 × 各空表示 → 0（從非 0 seed 確保是真寫入而非巧合）。3×5=15 案例。
+        foreach ($fields as $field) {
+            foreach ([null, '', -999, '0', 0] as $sent) {
+                DB::table('POSSESSION_DATA')->delete();
+                $this->seedPossession([$field => 5, 'c_notes' => '初始']);
+                $this->postJson('/api/v2/mutate', $this->possessionPayload([
+                    'changes' => [$field => $sent, 'c_notes' => '改'.$field.var_export($sent, true)],
+                ]))->assertOk();
+                $stored = DB::table('POSSESSION_DATA')->where($pk)->value($field);
+                $this->assertSame(0, (int) $stored, "{$field} 送 ".var_export($sent, true)." 應規範化為 0");
+                $this->assertNotNull($stored, "{$field} 不得為 null（NOT NULL 欄）");
+            }
+        }
+
+        // B. 合法非 0 值保留（規範化不得誤清真實值）。
+        DB::table('POSSESSION_DATA')->delete();
+        $this->seedPossession(['c_source' => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->possessionPayload(['changes' => ['c_source' => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table('POSSESSION_DATA')->where($pk)->value('c_source'));
+
+        // C. 組合 + 幂等：三欄同送 null → 全 0；再送 '' → 仍全 0（不翻）。
+        DB::table('POSSESSION_DATA')->delete();
+        $this->seedPossession(['c_source' => 5, 'c_measure_code' => 5, 'c_possession_act_code' => 5, 'c_notes' => 'y']);
+        $this->postJson('/api/v2/mutate', $this->possessionPayload(['changes' => ['c_source' => null, 'c_measure_code' => null, 'c_possession_act_code' => null, 'c_notes' => '組合空1']]))->assertOk();
+        foreach ($fields as $f) {
+            $this->assertSame(0, (int) DB::table('POSSESSION_DATA')->where($pk)->value($f), "組合：{$f} 應→0");
+        }
+        $this->postJson('/api/v2/mutate', $this->possessionPayload(['changes' => ['c_source' => '', 'c_measure_code' => '', 'c_possession_act_code' => '', 'c_notes' => '組合空2']]))->assertOk();
+        foreach ($fields as $f) {
+            $this->assertSame(0, (int) DB::table('POSSESSION_DATA')->where($pk)->value($f), "幂等：{$f} 仍為 0");
+        }
+    }
+
     // ── 地址副表（POSSESSION_ADDR）同步 ─────────────────────
 
     #[Test]

@@ -613,6 +613,30 @@ class ApiV2MutatePostingTest extends TestCase {
     }
 
     #[Test]
+    public function testPostingCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        // （c_appt_code 早已是完全幂等範本；本測試補齊 c_source。）
+        $this->actingAs($this->makeUser(email: 'posting-sentinel@example.com'));
+        $T = 'POSTED_TO_OFFICE_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedPosting([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedPosting([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
+    }
+
+    #[Test]
     public function testPostingUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'posting-alias@example.com');
         $this->actingAs($user);

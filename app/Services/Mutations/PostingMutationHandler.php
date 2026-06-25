@@ -314,6 +314,8 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
     protected function preprocessUpdateData(array $data): array {
         $data = $this->normalizeSentinelValues($data, ['c_office_id', 'c_source']);
+        // sentinel 完全幂等：c_source（legacy 哨兵 0=Unknown）的 null/'' 也→0（同下方 c_appt_code 範式；normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
         if (array_key_exists('c_fy_intercalary', $data)) {
             $data['c_fy_intercalary'] = (int) ($data['c_fy_intercalary'] ?? 0);

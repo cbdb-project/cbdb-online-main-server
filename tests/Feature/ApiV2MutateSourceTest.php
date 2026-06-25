@@ -165,6 +165,39 @@ class ApiV2MutateSourceTest extends TestCase {
     }
 
     #[Test]
+    public function testSourceBooleanFlagsSentinelFullyIdempotent(): void {
+        // sources 無碼/FK 欄，可寫 c_main_source/c_self_bio 為布林旗標（(int) 規範化）：
+        // 0/'0'/null/''/false → 0；1/'1'/true → 1；來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'src-sentinel@example.com'));
+        $pk = ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '15'];
+        $seed = function (array $o = []) use ($pk): void {
+            DB::table('BIOG_SOURCE_DATA')->delete();
+            DB::table('BIOG_SOURCE_DATA')->insert(array_merge($pk, array_merge(['c_main_source' => 0, 'c_self_bio' => 0, 'c_notes' => 's'], $o)));
+        };
+        $patch = fn ($changes) => $this->postJson('/api/v2/mutate', [
+            'resource' => 'sources', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => $pk], 'changes' => $changes,
+        ]);
+        $val = fn ($f) => DB::table('BIOG_SOURCE_DATA')->where($pk)->value($f);
+
+        foreach (['c_main_source', 'c_self_bio'] as $f) {
+            // 0-ish → 0（從 seed=1 確保真寫入）。
+            foreach ([null, '', '0', 0, false] as $sent) {
+                $seed([$f => 1]);
+                $patch([$f => $sent, 'c_notes' => '改0'.$f.var_export($sent, true)])->assertOk();
+                $this->assertSame(0, (int) $val($f), $f.' 送 '.var_export($sent, true).' 應→0');
+                $this->assertNotNull($val($f), $f.' 不得寫成 null（堵 (int)null=0 假綠；codex 回饋）');
+            }
+            // 1-ish → 1（從 seed=0）。
+            foreach ([1, '1', true] as $sent) {
+                $seed([$f => 0]);
+                $patch([$f => $sent, 'c_notes' => '改1'.$f.var_export($sent, true)])->assertOk();
+                $this->assertSame(1, (int) $val($f), $f.' 送 '.var_export($sent, true).' 應→1');
+            }
+        }
+    }
+
+    #[Test]
     public function testDirectSourceCreateLandsAllFields(): void {
         $this->actingAs($this->makeUser(email: 'src-create@example.com'));
 

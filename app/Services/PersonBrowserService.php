@@ -26,7 +26,7 @@ class PersonBrowserService {
      * @return array{data: array, pagination: array}
      */
     public function search(Request $request): array {
-        $q = trim($request->input('q', ''));
+        $q = \App\Support\PinyinSearchNormalizer::umlautToV(trim($request->input('q', '')));
         $dynasty = $request->input('c_dy', '');
         $perPage = (int) $request->input('per_page', 20);
         $page = (int) $request->input('page', 1);

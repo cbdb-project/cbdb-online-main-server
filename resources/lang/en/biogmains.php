@@ -103,7 +103,7 @@ return [
     'choronym_field' => 'Choronym',
     'household_field' => 'Household Status',
     'person_name_chn_label' => 'Name (Chinese)',
-    'search_placeholder' => 'Search Person (use v for ü in pinyin)',
+    'search_placeholder' => 'Search Person (ID / Name / Pinyin)',
     'all_dynasties_opt' => 'All Dynasties',
     'basicinfo_check_alert' => 'Before leaving: please confirm that [Given Name] and [Ming] are filled in.',
     'basicinfo_pinyin_alert' => 'Pinyin generation complete.',

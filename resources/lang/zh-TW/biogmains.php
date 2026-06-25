@@ -103,7 +103,7 @@ return [
     'choronym_field' => '郡望',
     'household_field' => '戶籍',
     'person_name_chn_label' => '姓名（中）',
-    'search_placeholder' => '搜尋人物 (所有 ü 在拼音中我們都以 v 替代)',
+    'search_placeholder' => '搜尋人物（ID / 姓名 / 拼音）',
     'all_dynasties_opt' => '全部朝代',
     'basicinfo_check_alert' => '訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。',
     'basicinfo_pinyin_alert' => '訊息提示：「生成拼音」已經完成。',

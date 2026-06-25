@@ -268,7 +268,8 @@ class CbdbApiController extends Controller {
     }
 
     protected function searchPersonCandidates(string $name, int $limit = 20): array {
-        $term = trim($name);
+        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
+        $term = \App\Support\PinyinSearchNormalizer::umlautToV(trim($name));
 
         if ($term === '') {
             return [];

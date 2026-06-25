@@ -31,6 +31,8 @@ class v1 extends Model {
     }
 
     public function search(Request $request) {
+        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
+        $request->q = \App\Support\PinyinSearchNormalizer::umlautToV($request->q ?? '');
         $data = BiogMain::where('c_name_chn', 'like', $request->q)->orWhere('c_name', 'like', $request->q)->orWhere('c_personid', $request->q)->paginate(10);
         $data->appends(['q' => $request->q])->links();
 

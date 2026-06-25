@@ -379,7 +379,8 @@ class BiogMainRepository {
      */
     public static function namesByQuery(Request $request, $num = 20) {
         //20220303增加addslashes()防禦查詢參數
-        $request->q = addslashes($request->q ?? '');
+        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻，如 呂=Lv）——使用者輸入 ü 或 v 皆可命中。
+        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($request->q ?? ''));
         if ($temp = $request->num) {
             $num = addslashes($temp);
         }
@@ -583,7 +584,8 @@ class BiogMainRepository {
             return collect();
         }
 
-        $q = addslashes($q);
+        // #85：拼音 ü→v 規範化（與 namesByQuery 一致，使朝代分面與搜尋結果同口徑）。
+        $q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($q));
 
         // 純數字：單筆精確查詢，不需要 facet
         if (ctype_digit($q)) {

@@ -37,12 +37,28 @@ export default function OppositeEdgeNotice({ result, reverseCodeLabel, tr }: {
 
     if (result.status === 'multiple') {
         const n = String(result.count ?? 0);
+        const edges = result.edges ?? [];
+        const codeKey = result.resource === 'kinship' ? 'c_kin_code' : 'c_assoc_code';
+        const fmt = (e: Record<string, string | number | null>): string => {
+            const parts = [`${tr('opposite_edge_code_label', '碼')} ${e[codeKey] ?? ''}`];
+            if (e.c_text_title) parts.push(`${tr('text_title_field', '出處標題')} ${e.c_text_title}`);
+            parts.push(`${tr('source_field', '出處')} ${e.c_source ?? 0}`);
+            if (e.c_created_by) parts.push(`${tr('audit_created', '建檔')} ${e.c_created_by}`);
+            return parts.join(' · ');
+        };
         return (
             <div role="status" style={multipleBox}>
                 <strong>{tr('opposite_edge_multiple_title', '對面已有多筆對應關係')}</strong>
                 <div style={{ marginTop: 3 }}>
-                    {tr('opposite_edge_multiple_desc', '對面人物已有多筆對應的反向關係（共 {n} 筆）。儲存時不會自動覆寫，請確認是否正確。').replace('{n}', n)}
+                    {tr('opposite_edge_multiple_desc', '對面人物已有多筆對應的反向關係（共 {n} 筆）。請確認下列記錄是否正確，建議前往對面人物逐一檢視整理。').replace('{n}', n)}
                 </div>
+                {edges.length ? (
+                    <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                        {edges.map((e, i) => (
+                            <li key={`${e[codeKey] ?? ''}-${i}`} style={{ marginTop: 2 }}>{fmt(e)}</li>
+                        ))}
+                    </ul>
+                ) : null}
             </div>
         );
     }

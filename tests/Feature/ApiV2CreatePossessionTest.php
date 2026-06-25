@@ -157,6 +157,43 @@ class ApiV2CreatePossessionTest extends TestCase {
     }
 
     #[Test]
+    public function testPossessionCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create 路徑三個非 PK 碼欄（c_source / c_measure_code / c_possession_act_code）完全幂等——
+        // null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；c_source 合法非 0 保留。≥10 案例（3 欄×6 空 + 3 合法）。
+        $this->actingAs($this->makeUser(email: 'poss-create-sentinel@example.com'));
+        $T = 'POSSESSION_DATA';
+        foreach (['c_source', 'c_measure_code', 'c_possession_act_code'] as $field) {
+            foreach ([null, '', '-999', -999, '0', 0] as $sent) {
+                $resp = $this->postJson('/api/v2/create', $this->createPayload([
+                    'changes' => [$field => $sent],
+                ]))->assertOk();
+                $id = $resp->json('result.pk.c_possession_record_id');
+                $stored = DB::table($T)->where('c_possession_record_id', $id)->value($field);
+                $this->assertNotNull($stored, $field.' 送 '.var_export($sent, true).' 不得為 null');
+                $this->assertSame('0', (string) $stored, $field.' 送 '.var_export($sent, true).' 應規範化為 0');
+            }
+        }
+        foreach ([5, 7, 999] as $sent) {
+            $resp = $this->postJson('/api/v2/create', $this->createPayload([
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $id = $resp->json('result.pk.c_possession_record_id');
+            $this->assertSame($sent, (int) DB::table($T)->where('c_possession_record_id', $id)->value('c_source'), '合法非 0 值不得被誤清：'.$sent);
+        }
+        // 缺鍵（完全不送 c_source）→ 補哨兵 0（CREATE 語義：未填＝0）。亦驗證消除 legacy possessionStoreById
+        // 直接讀 $data['c_source']（無 ??）的 undefined-index / 落 null（codex SERIOUS）。手動建 payload 以略過預設 c_source。
+        $resp = $this->postJson('/api/v2/create', [
+            'resource' => 'possessions', 'person_id' => 1000, 'mode' => 'direct',
+            'target' => ['pk' => []],
+            'changes' => ['c_notes' => '無 source', 'c_possession_yr' => 1050, 'c_addr_id' => [130]],
+        ])->assertOk();
+        $id = $resp->json('result.pk.c_possession_record_id');
+        $stored = DB::table($T)->where('c_possession_record_id', $id)->value('c_source');
+        $this->assertNotNull($stored, '缺鍵 c_source 不得為 null');
+        $this->assertSame('0', (string) $stored, '缺鍵 c_source 應補哨兵 0');
+    }
+
+    #[Test]
     public function testDirectPossessionCreateSucceedsAndAllocatesId(): void {
         $user = $this->makeUser(email: 'create-poss-direct@example.com');
         $this->actingAs($user);
@@ -337,6 +374,36 @@ class ApiV2CreatePossessionTest extends TestCase {
             1,
             DB::table('audit_log')->where('table_name', 'POSSESSION_DATA')->where('operation', 'INSERT')->count()
         );
+    }
+
+    #[Test]
+    public function testProposalPossessionCreateAbsentSourceApprovesToSentinel(): void {
+        // #71（proposal 路徑，codex SERIOUS 的另一半）：缺 c_source 的提案經正規化後，c_source='0' 入 operation；
+        // 核准時 applyPossessionProposal→possessionStoreById 讀到 '0'（非缺鍵），不 undefined-index、主表落 0。
+        $author = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'create-poss-absent-author@example.com');
+        $this->actingAs($author);
+        $this->postJson('/api/v2/create', [
+            'resource' => 'possessions', 'person_id' => 1000, 'mode' => 'proposal',
+            'target' => ['pk' => []],
+            'changes' => ['c_notes' => '無 source 提案', 'c_possession_yr' => 1050, 'c_addr_id' => [130]],
+            'meta' => ['comment' => '請審'],
+        ])->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        $operation = Operation::where('resource', 'POSSESSION_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->firstOrFail();
+        // 提案 payload 已正規化：缺 c_source → '0'。
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('0', (string) ($payload['c_source'] ?? null), '提案 payload c_source 應正規化為 0');
+
+        $reviewer = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_EXPERT, 'create-poss-absent-reviewer@example.com');
+        $this->actingAs($reviewer);
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        // 核准後主表落庫 c_source=0（非 null、無 undefined-index）。
+        $row = DB::table('POSSESSION_DATA')->first();
+        $this->assertNotNull($row, '核准後應寫主表');
+        $this->assertNotNull($row->c_source, '核准後 c_source 不得為 null');
+        $this->assertSame('0', (string) $row->c_source, '核准後 c_source 應為哨兵 0');
     }
 
     #[Test]

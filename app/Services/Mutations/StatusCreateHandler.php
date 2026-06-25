@@ -54,6 +54,9 @@ class StatusCreateHandler extends AbstractPersonSubresourceCreateHandler {
     }
 
     protected function preprocessCreateData(array $data): array {
-        return $this->normalizeSentinelValues($data, ['c_status_code', 'c_source']);
+        $data = $this->normalizeSentinelValues($data, ['c_status_code', 'c_source']);
+
+        // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999→0），對齊已修的 StatusMutationHandler。
+        return $this->normalizeEmptyCodeFields($data, ['c_source']);
     }
 }

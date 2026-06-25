@@ -97,6 +97,8 @@ class EventCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
     protected function preprocessCreateData(array $data): array {
         $data = $this->normalizeSentinelValues($data, ['c_event_code', 'c_source']);
+        // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999→0），對齊已修的 EventMutationHandler。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
         if (array_key_exists('c_intercalary', $data)) {
             $data['c_intercalary'] = (int) ($data['c_intercalary'] ?? 0);

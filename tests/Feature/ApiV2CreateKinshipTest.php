@@ -472,6 +472,35 @@ class ApiV2CreateKinshipTest extends TestCase {
         }
     }
 
+    #[Test]
+    public function testKinshipCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create 路徑 c_source（legacy 哨兵 0=Unknown）完全幂等——null/''/'-999'/-999/'0'/0 落庫皆為 0、
+        // 永不寫 null/''；合法非 0 值保留。每案用不同 c_kin_id 取得獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'kin-create-sentinel@example.com'));
+        $T = 'KIN_DATA';
+        $empties = [null, '', '-999', -999, '0', 0];
+        foreach ($empties as $i => $sent) {
+            $kinId = 400 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => $kinId, 'c_kin_code' => 80]],
+                'changes' => ['c_source' => $sent, 'c_notes' => '哨兵'.var_export($sent, true)],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_kin_id' => $kinId, 'c_kin_code' => 80])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        $legals = [5, 7, 999, 42];
+        foreach ($legals as $i => $sent) {
+            $kinId = 500 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => $kinId, 'c_kin_code' => 80]],
+                'changes' => ['c_source' => $sent, 'c_notes' => '合法'.$sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_kin_id' => $kinId, 'c_kin_code' => 80])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
     // ── #70 鏡像疑似匹配（CREATE 路徑）─────────────────────────────
     // create 與 update 共用 syncKinMirrorOnUpdate 的 Option 2 安全判別：建立反向鏡像前，若對面已有「碼漂移
     // （∉ 合法 KINSHIP_CODE）」的疑似同關係列 → 非 force 時拋 409 errors.mirror_suspected（整筆回滾、正向也不建），

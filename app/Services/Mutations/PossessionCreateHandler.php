@@ -80,6 +80,18 @@ class PossessionCreateHandler extends AbstractMutationHandler {
 
         // 白名單化：只保留允許欄位 + c_addr_id（地址副表），其餘一律丟棄，避免任意欄位寫入。
         $writable = array_intersect_key($changes, array_flip(self::ALLOWED_FIELDS));
+
+        // #71：非 PK 碼欄完全幂等（null/''/-999/**缺鍵**→'0'），對齊已修的 PossessionMutationHandler。
+        // 缺鍵也補 0（CREATE 語義：未填＝哨兵 0）：legacy possessionStoreById 直接讀 $data['c_source']（無 ??），
+        // 若缺鍵會 undefined-index 並落 null/非 0；補鍵後既消除該 warning、又落 legacy 的 0 語義（codex SERIOUS）。
+        // 另 legacy 僅做 c_source -999、漏 null/'' 與 c_measure_code/c_possession_act_code，一併在此補齊。
+        foreach (['c_source', 'c_measure_code', 'c_possession_act_code'] as $f) {
+            $v = $writable[$f] ?? null;
+            if ($v === null || $v === '' || (int) $v === -999) {
+                $writable[$f] = '0';
+            }
+        }
+
         $addr = $changes['c_addr_id'] ?? [];
         if (!is_array($addr)) {
             $addr = [$addr];

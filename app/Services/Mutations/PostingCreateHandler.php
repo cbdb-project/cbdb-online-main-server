@@ -103,6 +103,13 @@ class PostingCreateHandler extends AbstractMutationHandler {
         // officeStoreById 會對這兩欄做 (int) 轉型，預設補 0 避免未定義鍵警告。
         $writable += ['c_fy_intercalary' => 0, 'c_ly_intercalary' => 0];
 
+        // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999/**缺鍵**→'0'），對齊已修的 PostingMutationHandler；
+        // 缺鍵也補 0（CREATE 語義：未填＝哨兵 0，與 legacy 表單空→0 一致）。direct 與 proposal 皆套用。
+        $cs = $writable['c_source'] ?? null;
+        if ($cs === null || $cs === '' || (int) $cs === -999) {
+            $writable['c_source'] = '0';
+        }
+
         $addr = $changes['c_addr'] ?? [];
         if (!is_array($addr)) {
             $addr = [$addr];

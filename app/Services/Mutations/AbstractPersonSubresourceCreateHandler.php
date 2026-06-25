@@ -374,6 +374,27 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     }
 
     /**
+     * 把「legacy 哨兵 0=Unknown 語義」的非 PK 碼/FK 欄在 CREATE 時規範化為 '0'：null / '' / -999 / **缺鍵** 皆落 '0'。
+     *
+     * 與 update 版（AbstractPersonSubresourceMutationHandler::normalizeEmptyCodeFields）**刻意不同**：update 的
+     * 「缺鍵＝該欄不變」故只處理已送的空值；CREATE 的「缺鍵＝使用者未填＝legacy 表單恆送 0」故缺鍵也須落 0，
+     * 否則 nullable 欄會留 null、與 legacy（表單空→0）分歧，達不到 create==legacy 完全幂等（codex #71）。
+     * 限 legacy 哨兵 0=Unknown 的碼/FK 欄（如 c_source）；真正 nullable、空應留 null 的欄勿用。
+     *
+     * @param array $fields 需完全規範化（含缺鍵補 0）的碼/FK 欄名
+     */
+    protected function normalizeEmptyCodeFields(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            $v = $data[$field] ?? null; // 缺鍵視為 null（CREATE：未填＝哨兵 0）
+            if ($v === null || $v === '' || (int) $v === -999) {
+                $data[$field] = '0';
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * 判斷 QueryException 是否為唯一性約束衝突
      */
     private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {

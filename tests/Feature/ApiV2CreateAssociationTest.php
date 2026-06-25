@@ -231,6 +231,33 @@ class ApiV2CreateAssociationTest extends TestCase {
     }
 
     #[Test]
+    public function testAssocCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71（確認 parity）：assoc create 既以 emptyToSentinel 達成 c_source 完全幂等——null/''/'-999'/-999/'0'/0
+        // 落庫皆 0、永不寫 null/''；合法非 0 保留。每案用不同 c_assoc_id 取獨立正向 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'assoc-create-sentinel@example.com'));
+        $T = 'ASSOC_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $other = 3100 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => $this->pk(['c_assoc_id' => $other])],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_assoc_id' => $other, 'c_assoc_code' => 100])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $other = 3200 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => $this->pk(['c_assoc_id' => $other])],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_assoc_id' => $other, 'c_assoc_code' => 100])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
+    #[Test]
     public function testDirectAssociationCreatePersistsEraLunarFields(): void {
         // 回歸：legacy x-inline-time-fields 送出 c_assoc_fy_*/c_assoc_ly_* era 農曆欄；v2 白名單原漏 → 靜默流失。
         $this->actingAs($this->makeUser(email: 'assoc-era@example.com'));

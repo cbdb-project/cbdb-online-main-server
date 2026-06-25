@@ -185,6 +185,29 @@ class ApiV2CreatePostingTest extends TestCase {
     }
 
     #[Test]
+    public function testPostingCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
+        // 每案配發新 c_posting_id（同 c_office_id）取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'posting-create-sentinel@example.com'));
+        $T = 'POSTED_TO_OFFICE_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $sent) {
+            $pk = $this->postJson('/api/v2/create', $this->createPayload([
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->json('result.pk');
+            $stored = DB::table($T)->where(['c_office_id' => $pk['c_office_id'], 'c_posting_id' => $pk['c_posting_id']])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $sent) {
+            $pk = $this->postJson('/api/v2/create', $this->createPayload([
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->json('result.pk');
+            $stored = DB::table($T)->where(['c_office_id' => $pk['c_office_id'], 'c_posting_id' => $pk['c_posting_id']])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
+    #[Test]
     public function testDirectPostingCreateSucceedsAndAllocatesPostingId(): void {
         $user = $this->makeUser(email: 'create-post-direct@example.com');
         $this->actingAs($user);

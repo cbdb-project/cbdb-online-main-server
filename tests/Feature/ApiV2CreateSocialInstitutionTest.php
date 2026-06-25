@@ -167,6 +167,33 @@ class ApiV2CreateSocialInstitutionTest extends TestCase {
     }
 
     #[Test]
+    public function testSocialInstitutionCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
+        // 每案用不同 c_inst_name_code 取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'inst-create-sentinel@example.com'));
+        $T = 'BIOG_INST_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $nameCode = 100 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_inst_name_code' => $nameCode]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_inst_code' => 20, 'c_inst_name_code' => $nameCode, 'c_bi_role_code' => 3])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $nameCode = 200 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_inst_name_code' => $nameCode]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_inst_code' => 20, 'c_inst_name_code' => $nameCode, 'c_bi_role_code' => 3])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
+    #[Test]
     public function testDirectSocialInstitutionCreateSucceeds(): void {
         $user = $this->makeUser(email: 'create-inst-direct@example.com');
         $this->actingAs($user);

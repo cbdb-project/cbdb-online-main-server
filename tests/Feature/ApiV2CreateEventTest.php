@@ -180,6 +180,33 @@ class ApiV2CreateEventTest extends TestCase {
     }
 
     #[Test]
+    public function testEventCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
+        // 每案用不同 c_sequence 取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'event-create-sentinel@example.com'));
+        $T = 'EVENTS_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $seq = 10 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_sequence' => $seq, 'c_event_code' => 50])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $seq = 20 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_sequence' => $seq, 'c_event_code' => 50])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
+    #[Test]
     public function testEventCreateWritesAddrSubtable(): void {
         // c_addr_id（多值）由 handler 抽出、afterDirectInsert 寫入 EVENTS_ADDR 副表（不寫 EVENTS_DATA 純量欄）。
         $user = $this->makeUser(email: 'create-event-addr@example.com');

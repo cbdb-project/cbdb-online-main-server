@@ -75,9 +75,12 @@ class EntryCreateHandler extends AbstractPersonSubresourceCreateHandler {
     }
 
     protected function preprocessCreateData(array $data): array {
-        return $this->normalizeSentinelValues($data, [
+        $data = $this->normalizeSentinelValues($data, [
             'c_entry_code', 'c_entry_addr_id', 'c_kin_code',
             'c_assoc_code', 'c_inst_code', 'c_source',
         ]);
+
+        // #71：非 PK 碼/FK 欄完全幂等（null/''/-999→0），對齊已修的 EntryMutationHandler。
+        return $this->normalizeEmptyCodeFields($data, ['c_entry_addr_id', 'c_source']);
     }
 }

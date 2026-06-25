@@ -64,6 +64,71 @@ class RelationshipMirrorService {
     }
 
     /**
+     * 「指向 $oldKinCode」的合法反向碼集：KINSHIP_CODES 中 c_kin_pair1 或 c_kin_pair2 = $oldKinCode 者
+     * （如「父(75)」展開為子/三子/季子/長女…）。空集時退回 $oldKinCode 自身 pair1/pair2 指向。
+     * 與 ResolvesKinshipReversePair::legitReversePairCodes / syncKinMirrorOnUpdate 的 legitReverses 同義。
+     *
+     * ⚠ 注意：這是「指向 $oldKinCode 的碼集」（查詢方向 pair1/pair2 = $oldKinCode），與 validReverseKinSet（$oldKinCode
+     * 自身的 pair1/pair2）方向相反、語義不同。kin 鏡像定位用本法（須涵蓋排行子等多碼）；assoc 無排行，定位用 validReverseAssocSet。
+     *
+     * @return int[]
+     */
+    public function legitReverseKinCodes($oldKinCode): array {
+        if ($oldKinCode === null || (int) $oldKinCode === 0) {
+            return [];
+        }
+        $codes = DB::table('KINSHIP_CODES')
+            ->where('c_kin_pair1', $oldKinCode)->orWhere('c_kin_pair2', $oldKinCode)
+            ->pluck('c_kincode')->map(static fn ($c) => (int) $c)->all();
+        if (!empty($codes)) {
+            return $codes;
+        }
+
+        return $this->validReverseKinSet($oldKinCode); // 退回自身配對指向
+    }
+
+    /**
+     * 定位「對面互逆鏡像列」（與 syncKin/AssocMirrorOnUpdate 的嚴格定位器同套條件）。供 §4/§5 缺邊/多條偵測共用。
+     *
+     * - kinship  $locator：['person_id'(本人), 'opposite_id'(對方), 'autogen_notes', 'forward_code'(正向親屬碼)]
+     *   → KIN_DATA where c_kin_id=本人, c_personid=對方, c_autogen_notes=備註, c_kin_code ∈ legitReverseKinCodes(正向碼)。
+     * - association $locator：['person_id', 'opposite_id', 'text_title', 'first_year', 'forward_code']
+     *   → ASSOC_DATA where c_assoc_id=本人, c_personid=對方, c_text_title=書名, c_assoc_first_year=首年, c_assoc_code ∈ validReverseAssocSet(正向碼)。
+     *
+     * 回傳命中列 Collection：count()==0 ⇒ 對面缺邊（問題 A）；count()>1 ⇒ 一對多/多對多（問題 B）。
+     *
+     * ⚠ 與 sync 嚴格定位器的兩處刻意差異（本法為「純偵測」用，較 sync 保守）：
+     * (1) assoc 正向碼**無合法配對**（pair 皆 null / 碼缺於 ASSOC_CODES）時，sync 的空 where 群組會「不加碼約束→命中全部」，
+     *     本法則 whereIn [-99999] → **命中 0**。對偵測而言正確：無定義反向碼＝無有意義的對面鏡像可言（不誤把他段關係當對面）。
+     * (2) kin 正向碼缺於 KINSHIP_CODES（髒碼）時，sync 會 fail-closed 拋 MirrorIntegrityException；本法 legitReverseKinCodes
+     *     回 [] → 命中 0（偵測不應因髒碼拋例外）。呼叫端若需 sync 的中止語義須自行處理。
+     *
+     * @return \Illuminate\Support\Collection<int,object>
+     */
+    public function locateOppositeEdges(string $type, array $locator) {
+        if ($type === 'kinship') {
+            $reverseCodes = $this->legitReverseKinCodes($locator['forward_code'] ?? null);
+
+            return DB::table('KIN_DATA')
+                ->where('c_kin_id', $locator['person_id'])
+                ->where('c_personid', $locator['opposite_id'])
+                ->where('c_autogen_notes', $locator['autogen_notes'] ?? null)
+                ->whereIn('c_kin_code', $reverseCodes ?: [-99999])
+                ->get();
+        }
+
+        $reverseCodes = $this->validReverseAssocSet($locator['forward_code'] ?? null);
+
+        return DB::table('ASSOC_DATA')
+            ->where('c_assoc_id', $locator['person_id'])
+            ->where('c_personid', $locator['opposite_id'])
+            ->where('c_text_title', $locator['text_title'] ?? '')
+            ->where('c_assoc_first_year', $locator['first_year'] ?? self::DEFAULT_ASSOC_FIRST_YEAR)
+            ->whereIn('c_assoc_code', $reverseCodes ?: [-99999])
+            ->get();
+    }
+
+    /**
      * 把「多條匹配的正向列」格式化為前端清單（人物/碼/出處/建立資訊）。供 repair 頁與行內裁決彈窗（§5.4）共用。
      *
      * @param string                     $type    kinship|association

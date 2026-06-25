@@ -32,6 +32,8 @@ class RelationshipMirrorServiceTest extends TestCase {
         DB::table('KINSHIP_CODES')->insert([
             ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => 180],
             ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+            ['c_kincode' => 77, 'c_kin_pair1' => 75, 'c_kin_pair2' => null], // 與 76 同樣「指向 75」，模擬排行多碼
+            ['c_kincode' => 200, 'c_kin_pair1' => 201, 'c_kin_pair2' => null], // 無人指向 200 → legit 退回自身配對 [201]
         ]);
 
         Schema::create('ASSOC_CODES', function (Blueprint $t) {
@@ -50,6 +52,7 @@ class RelationshipMirrorServiceTest extends TestCase {
             $t->integer('c_kin_code')->default(0);
             $t->integer('c_source')->default(0);
             $t->text('c_notes')->nullable();
+            $t->text('c_autogen_notes')->nullable();
             $t->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
         });
 
@@ -141,6 +144,55 @@ class RelationshipMirrorServiceTest extends TestCase {
         $this->assertTrue($this->svc->reverseRelationExists('kinship', (object) [], $params));
         $params['new_relation_code'] = 75;
         $this->assertFalse($this->svc->reverseRelationExists('kinship', (object) [], $params), '反向碼不同 → 不存在');
+    }
+
+    #[Test]
+    public function testLegitReverseKinCodes(): void {
+        // 「指向 $code」的碼集（pair1/pair2 = $code），與 validReverseKinSet（$code 自身配對）方向相反。
+        $this->assertEqualsCanonicalizing([76, 77], $this->svc->legitReverseKinCodes(75), '76、77 皆指向 75（排行多碼）');
+        $this->assertSame([75], $this->svc->legitReverseKinCodes(76));
+        $this->assertSame([201], $this->svc->legitReverseKinCodes(200), '無人指向 200 → 退回自身配對 [201]');
+        $this->assertSame([], $this->svc->legitReverseKinCodes(0));
+        $this->assertSame([], $this->svc->legitReverseKinCodes(null));
+    }
+
+    #[Test]
+    public function testLocateOppositeEdgesKinship(): void {
+        $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'a', 'forward_code' => 75];
+        // 缺邊（對面 0 列 → 問題 A）。
+        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', $locator));
+        // 一條對面（碼 76 ∈ legit{76,77}）。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_notes' => 'r1', 'c_autogen_notes' => 'a']);
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', $locator));
+        // 多條（再加碼 77 → 問題 B）。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 77, 'c_notes' => 'r2', 'c_autogen_notes' => 'a']);
+        $this->assertCount(2, $this->svc->locateOppositeEdges('kinship', $locator));
+        // autogen_notes 不符 → 不命中（定位器條件）。
+        $miss = array_merge($locator, ['autogen_notes' => 'other']);
+        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', $miss));
+    }
+
+    #[Test]
+    public function testLocateOppositeEdgesAssociation(): void {
+        $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'text_title' => '史記', 'first_year' => 1080, 'forward_code' => 100];
+        $this->assertCount(0, $this->svc->locateOppositeEdges('association', $locator));
+        // 對面碼 101 ∈ validReverseAssocSet(100)={101,198}。
+        DB::table('ASSOC_DATA')->insert(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_text_title' => '史記', 'c_assoc_first_year' => 1080]);
+        $this->assertCount(1, $this->svc->locateOppositeEdges('association', $locator));
+        // 對面碼 198（次反向）亦命中 → 多條。
+        DB::table('ASSOC_DATA')->insert(['c_personid' => 2000, 'c_assoc_code' => 198, 'c_assoc_id' => 1000, 'c_text_title' => '史記', 'c_assoc_first_year' => 1080]);
+        $this->assertCount(2, $this->svc->locateOppositeEdges('association', $locator));
+        // 書名不符 → 不命中。
+        $this->assertCount(0, $this->svc->locateOppositeEdges('association', array_merge($locator, ['text_title' => '漢書'])));
+    }
+
+    #[Test]
+    public function testLocateOppositeEdgesAssocPairlessCodeMatchesNone(): void {
+        // 刻意差異（codex/review MINOR）：正向碼 300 無合法配對（c_assoc_pair 皆 null）→ 即使對面同 (assoc_id/書名/首年)
+        // 有列，本「純偵測」法亦命中 0（whereIn [-99999]），不像 sync 的空 where 群組「全命中」。鎖死此偏離 sync 的刻意行為。
+        DB::table('ASSOC_DATA')->insert(['c_personid' => 2000, 'c_assoc_code' => 555, 'c_assoc_id' => 1000, 'c_text_title' => '史記', 'c_assoc_first_year' => 1080]);
+        $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'text_title' => '史記', 'first_year' => 1080, 'forward_code' => 300];
+        $this->assertCount(0, $this->svc->locateOppositeEdges('association', $locator), '無配對碼 → 命中 0（不退化為全命中）');
     }
 
     #[Test]

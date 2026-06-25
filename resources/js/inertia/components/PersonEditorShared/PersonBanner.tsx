@@ -56,12 +56,25 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
     const tb = useTranslation('biogmains');
     // 不重複顯示姓名/拼音/ID（DashboardLayout 標題與麵包屑已顯示）；僅補朝代（標題未含）+ 子資源導航。
 
+    // 分頁連結指向中樞 ?tab=<key>，使 Ctrl/⌘/Shift+點擊與中鍵可原生開新分頁（#67）。
+    const tabHref = (key: string) => `/app/basicinformation/${data.person_id}?tab=${key}`;
+
     const go = (key: string) => {
         if (onTabSelect) {
             onTabSelect(key);
             return;
         }
-        router.visit(`/app/basicinformation/${data.person_id}?tab=${key}`);
+        router.visit(tabHref(key));
+    };
+
+    const onTabClick = (event: React.MouseEvent<HTMLAnchorElement>, key: string) => {
+        // 修飾鍵 / 非左鍵（中鍵）→ 交給瀏覽器原生開新分頁；中鍵不觸發 onClick，由 <a href> 自然處理。
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+            return;
+        }
+        // 一般左鍵：攔截走 SPA（中樞內就地切分頁 / 編輯器頁 router.visit 導向中樞），不整頁重載。
+        event.preventDefault();
+        go(key);
     };
 
     // 「查看歷史」連結：對齊 legacy history-button（每頁一顆，連到該子資源 audit-logs，另開分頁）。
@@ -88,18 +101,18 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
                     // 計數僅在 >0 時顯示 badge（basic_info 無計數）；無記錄不顯示 0（使用者指定，較 legacy 精簡）。
                     const count = tab.key === 'basic_info' ? 0 : (data.counts?.[tab.key] ?? 0);
                     return (
-                        <button
+                        <a
                             key={tab.key}
-                            type="button"
+                            href={tabHref(tab.key)}
                             role="tab"
                             aria-selected={active}
-                            onClick={() => go(tab.key)}
+                            onClick={(event) => onTabClick(event, tab.key)}
                             style={{ ...tabStyle, ...(active ? tabActiveStyle : {}) }}
                         >
                             <i className={tab.icon} aria-hidden="true" style={{ marginRight: 4 }} />
                             {t(tab.labelKey)}
                             {count > 0 ? <span style={badgeStyle}>{count}</span> : null}
-                        </button>
+                        </a>
                     );
                 })}
             </div>
@@ -118,7 +131,7 @@ const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',
     border: '1px solid transparent', borderTopLeftRadius: 6, borderTopRightRadius: 6,
     background: 'none', color: '#255f93', fontSize: '0.85rem', cursor: 'pointer',
-    marginBottom: -1,
+    marginBottom: -1, textDecoration: 'none',
 };
 const tabActiveStyle: React.CSSProperties = {
     color: '#495057', background: '#fff', borderColor: '#dee2e6 #dee2e6 #fff',

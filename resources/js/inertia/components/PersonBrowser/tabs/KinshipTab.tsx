@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { router } from '@inertiajs/react';
 import TabPager from '../shared/TabPager';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -90,16 +90,8 @@ export default function KinshipTab({
         kinshipEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
-
-    const openCreate = () => {
-        const url = buildEditV2CreateUrl('kinship', personId);
-        if (url) router.visit(url);
-    };
-
-    const openEdit = (item: KinshipItem) => {
-        const url = buildEditV2EditUrl('kinship', item.pk, personId);
-        if (url) router.visit(url);
-    };
+    const createHref = buildEditV2CreateUrl('kinship', personId);
+    const editHref = (item: KinshipItem) => buildEditV2EditUrl('kinship', item.pk, personId);
 
     // force=true 為「對面多筆反向列」確認後重送（帶 meta.force，後端一併刪除全部候選）。
     // force 時用 409 快照 multiTarget（非可能已漂移的 deleteTarget）以鎖定刪除對象。
@@ -156,9 +148,9 @@ export default function KinshipTab({
         <div style={containerStyle}>
             {useReactEditor ? (
                 <div style={createBarStyle}>
-                    <Button size="sm" onClick={openCreate}>
+                    <NavButton size="sm" href={createHref}>
                         {t('add_btn')}
-                    </Button>
+                    </NavButton>
                 </div>
             ) : (
                 <LegacyCreateButton tabKey="kinship" canEdit={canEdit} />
@@ -176,7 +168,7 @@ export default function KinshipTab({
                 ]}
                 actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
                     <span style={actionCellStyle}>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" disabled={deleting || deleteFlowOpen} onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
                 ) : (

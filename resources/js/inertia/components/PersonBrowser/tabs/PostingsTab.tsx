@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { router } from '@inertiajs/react';
 import TabPager from '../shared/TabPager';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
@@ -86,16 +86,8 @@ export default function PostingsTab({
     const useReactEditor = officesEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
-
-    const openCreate = () => {
-        const url = buildEditV2CreateUrl('postings', personId);
-        if (url) router.visit(url);
-    };
-
-    const openEdit = (item: PostingItem) => {
-        const url = buildEditV2EditUrl('postings', item.pk, personId);
-        if (url) router.visit(url);
-    };
+    const createHref = buildEditV2CreateUrl('postings', personId);
+    const editHref = (item: PostingItem) => buildEditV2EditUrl('postings', item.pk, personId);
 
     const handleDelete = async () => {
         if (!deleteTarget || !personId) {
@@ -138,9 +130,9 @@ export default function PostingsTab({
         <div style={containerStyle}>
             {useReactEditor ? (
                 <div style={createBarStyle}>
-                    <Button size="sm" onClick={openCreate}>
+                    <NavButton size="sm" href={createHref}>
                         {t('add_btn')}
-                    </Button>
+                    </NavButton>
                 </div>
             ) : (
                 <LegacyCreateButton tabKey="postings" canEdit={canEdit} />
@@ -162,7 +154,7 @@ export default function PostingsTab({
                 ]}
                 actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
                     <span style={actionCellStyle}>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
                 ) : (

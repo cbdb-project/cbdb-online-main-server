@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useTranslation } from '../hooks/useTranslation';
 import type { SharedProps } from '../types/page';
 
@@ -34,12 +34,6 @@ export default function Welcome() {
         return isNumeric
             ? `${urls.basicinformation}/${encodeURIComponent(value)}`
             : `${urls.basicinformation}?q=${encodeURIComponent(value)}`;
-    };
-
-    const navigate = (value: string) => {
-        const v = value.trim();
-        if (!v) return;
-        window.location.href = buildUrl(v);
     };
 
     const onInput = (value: string) => {
@@ -106,7 +100,9 @@ export default function Welcome() {
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
-                        navigate(term);
+                        const value = term.trim();
+                        if (!value) return;
+                        router.visit(buildUrl(value));
                     }}
                 >
                     <label htmlFor="person-search" className="mb-1.5 block text-sm text-[#888]">
@@ -134,15 +130,15 @@ export default function Welcome() {
 
                 {suggestions.length > 0 && (
                     <div className="absolute left-0 right-0 top-full z-10 mt-1.5 max-h-60 overflow-y-auto rounded-md border border-[#dcdcdc] bg-white shadow-lg">
+                        {/* #67：改用真實 <a href>，使 Ctrl/⌘/Shift+點擊與中鍵可原生開新分頁；一般點擊與原 window.location 導航等價。 */}
                         {suggestions.map((item, i) => (
-                            <button
+                            <a
                                 key={item.c_personid != null ? String(item.c_personid) : `s-${i}`}
-                                type="button"
-                                onClick={() => navigate(String(item.c_personid ?? ''))}
-                                className="block w-full border-b border-[#f0f0f0] bg-white px-3 py-2.5 text-left text-sm last:border-b-0 hover:bg-[#f5f5f5] focus:bg-[#f5f5f5] focus:outline-none"
+                                href={item.c_personid != null ? buildUrl(String(item.c_personid)) : undefined}
+                                className="block w-full border-b border-[#f0f0f0] bg-white px-3 py-2.5 text-left text-sm text-inherit no-underline last:border-b-0 hover:bg-[#f5f5f5] focus:bg-[#f5f5f5] focus:outline-none"
                             >
                                 {label(item)}
-                            </button>
+                            </a>
                         ))}
                     </div>
                 )}

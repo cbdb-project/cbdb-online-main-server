@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { router } from '@inertiajs/react';
 import TabPager from '../shared/TabPager';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
+import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
@@ -71,16 +71,8 @@ export default function StatusesTab({
         statusesEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
-
-    const openCreate = () => {
-        const url = buildEditV2CreateUrl('statuses', personId);
-        if (url) router.visit(url);
-    };
-
-    const openEdit = (item: StatusItem) => {
-        const url = buildEditV2EditUrl('statuses', item.pk, personId);
-        if (url) router.visit(url);
-    };
+    const createHref = buildEditV2CreateUrl('statuses', personId);
+    const editHref = (item: StatusItem) => buildEditV2EditUrl('statuses', item.pk, personId);
 
     const handleDelete = async () => {
         if (!deleteTarget || !personId) {
@@ -123,9 +115,9 @@ export default function StatusesTab({
         <div style={containerStyle}>
             {useReactEditor ? (
                 <div style={createBarStyle}>
-                    <Button size="sm" onClick={openCreate}>
+                    <NavButton size="sm" href={createHref}>
                         {t('add_btn')}
-                    </Button>
+                    </NavButton>
                 </div>
             ) : (
                 <LegacyCreateButton tabKey="statuses" canEdit={canEdit} />
@@ -146,7 +138,7 @@ export default function StatusesTab({
                 ]}
                 actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
                     <span style={actionCellStyle}>
-                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
+                        <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
                 ) : (
